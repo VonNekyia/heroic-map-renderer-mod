@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "heroicmap",
+  "version": "${version}",
+  "name": "Heroic Map",
+  "description": "Minimap und Vollbildkarte. Die Minimap zeichnet der Mod selbst, die Vollbildkarte lädt er vom Server.",
+  "authors": [
+    "VonNekyia"
+  ],
+  "contact": {
+    "sources": "https://github.com/VonNekyia/heroic-map-renderer-mod"
+  },
+  "license": "Apache-2.0",
+  "environment": "client",
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~26.3",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}
