@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "heroicmap-tests",
+  "version": "1.0.0",
+  "name": "Heroic Map Tests",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-client-gametest": [
+      "com.nekyia.heroicmap.Bilder",
+      "com.nekyia.heroicmap.Messung"
+    ]
+  },
+  "depends": {
+    "heroicmap": "*"
+  }
+}
