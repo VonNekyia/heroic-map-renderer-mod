@@ -1,5 +1,23 @@
 {
   "key.category.heroicmap.karte": "Heroic Map",
   "key.heroicmap.zeigen": "Show or hide minimap",
-  "key.heroicmap.massstab": "Minimap scale"
+  "key.heroicmap.massstab": "Minimap scale",
+  "heroicmap.angebot.keins": "This server offers no map to download.",
+  "heroicmap.angebot.baum": "%s – %s (%s): %s",
+  "heroicmap.befehl.unbekannt": "The map %s is not offered here.",
+  "heroicmap.befehl.massstab": "No such scale; 1, 2 or 4 pixels per block.",
+  "heroicmap.befehl.voll": "A full download counts against the server's limit, 5 per week by default.",
+  "heroicmap.befehl.wechsel": "You have the map at %s px. The old set is removed once the new one at %s px is complete.",
+  "heroicmap.befehl.kein_satz": "Nothing of the map %s is on disk yet; use /heroicmap laden first.",
+  "heroicmap.download.titel": "Download the map from the server?",
+  "heroicmap.download.frage": "The game server %s offers the map from %s. It needs up to %s on disk, at %s pixels per block. The mod downloads data from this host.",
+  "heroicmap.download.beginnt": "Downloading the map, up to %s.",
+  "heroicmap.download.fertig": "Map downloaded: %s new, %s already there, %s removed, %s.",
+  "heroicmap.download.gekappt": "Map partly downloaded: %s new, %s already there, %s removed, %s. The next sync brings the rest.",
+  "heroicmap.download.fehler": "Download stopped: %s",
+  "heroicmap.download.abgelehnt": "The server declines: %s",
+  "heroicmap.download.unlesbar": "The server's release cannot be read.",
+  "heroicmap.download.schema": "The map has no http or https address; the mod downloads nothing.",
+  "heroicmap.download.heimnetz": "The map at %s is in a private network, the game server is not; the mod downloads nothing.",
+  "heroicmap.download.unbekannt": "The host %s does not exist."
 }

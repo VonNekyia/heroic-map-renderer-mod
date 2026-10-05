@@ -1,5 +1,23 @@
 {
   "key.category.heroicmap.karte": "Heroic Map",
   "key.heroicmap.zeigen": "Minimap zeigen oder verbergen",
-  "key.heroicmap.massstab": "Massstab der Minimap"
+  "key.heroicmap.massstab": "Massstab der Minimap",
+  "heroicmap.angebot.keins": "Dieser Server bietet keine Karte zum Download an.",
+  "heroicmap.angebot.baum": "%s – %s (%s): %s",
+  "heroicmap.befehl.unbekannt": "Die Karte %s wird hier nicht angeboten.",
+  "heroicmap.befehl.massstab": "Den Massstab gibt es nicht; 1, 2 oder 4 Pixel je Block.",
+  "heroicmap.befehl.voll": "Ein voller Download zählt gegen die Grenze des Servers, in der Vorgabe 5 je Woche.",
+  "heroicmap.befehl.wechsel": "Du hast die Karte mit %s px. Der alte Satz fällt weg, sobald der neue mit %s px vollständig ist.",
+  "heroicmap.befehl.kein_satz": "Von der Karte %s liegt noch nichts auf der Platte; zuerst /heroicmap laden.",
+  "heroicmap.download.titel": "Karte vom Server laden?",
+  "heroicmap.download.frage": "Der Spielserver %s bietet die Karte von %s an. Sie braucht bis zu %s auf der Platte, mit %s Pixeln je Block. Der Mod lädt Daten von diesem Host.",
+  "heroicmap.download.beginnt": "Die Karte wird geladen, bis zu %s.",
+  "heroicmap.download.fertig": "Karte geladen: %s neu, %s schon da, %s gelöscht, %s.",
+  "heroicmap.download.gekappt": "Karte zum Teil geladen: %s neu, %s schon da, %s gelöscht, %s. Den Rest bringt der nächste Abgleich.",
+  "heroicmap.download.fehler": "Download abgebrochen: %s",
+  "heroicmap.download.abgelehnt": "Der Server lehnt ab: %s",
+  "heroicmap.download.unlesbar": "Die Freigabe des Servers ist nicht lesbar.",
+  "heroicmap.download.schema": "Die Karte hat keine Adresse mit http oder https; der Mod lädt nichts.",
+  "heroicmap.download.heimnetz": "Die Karte liegt bei %s in einem privaten Netz, der Spielserver nicht; der Mod lädt nichts.",
+  "heroicmap.download.unbekannt": "Den Host %s gibt es nicht."
 }

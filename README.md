@@ -10,7 +10,7 @@ dem Plugin von [heroic-map-renderer](https://github.com/VonNekyia/heroic-map-ren
 
 ## Stand
 
-Im Aufbau: die Minimap läuft, die Vollbildkarte und der Download fehlen noch.
+Im Aufbau: Minimap und Download laufen, die Vollbildkarte fehlt noch.
 Der Plan steht in
 [heroic-map-renderer#155](https://github.com/VonNekyia/heroic-map-renderer/issues/155).
 
