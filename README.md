@@ -14,6 +14,10 @@ Im Aufbau: das Gerüst und die Projektion, noch ohne Minimap. Der Plan steht in
 Bauen und testen: [docs/entwicklung.md](docs/entwicklung.md), die ganze Doku
 in [docs/](docs/index.md).
 
+## Herausgeber und Kontakt
+
+Herausgeber und verantwortlich: VonNekyia. Kontakt: contact@mcterranova.com.
+
 ## Lizenz
 
 [Apache-2.0](LICENSE), Hinweise in [NOTICE](NOTICE).

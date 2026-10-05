@@ -22,6 +22,13 @@ Maintainer und Reviewer sind dieselben wie im Hauptrepository.
   [heroic-map-renderer#154](https://github.com/VonNekyia/heroic-map-renderer/issues/154).
   Wer daran etwas ändert, spricht es vorher mit dem Plugin-Programmierer ab.
 
+## Ausnahme von Regel 20
+
+Die Kontaktadresse steht mit dem Herausgeber in `README.md` und `NOTICE`,
+wie im Hauptrepository, siehe
+[heroic-map-renderer#158](https://github.com/VonNekyia/heroic-map-renderer/issues/158).
+Sonst nirgends.
+
 ## Doku
 
 Das Wissen über den Mod steht in `docs/` dieses Repositorys. Im
