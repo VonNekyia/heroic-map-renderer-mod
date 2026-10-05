@@ -33,6 +33,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import org.joml.Vector3fc;
 
 /**
@@ -138,21 +140,31 @@ final class ChunkMaler {
     private final BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
     private final float[] hell = new float[3];
 
+    /** Der Auftrag, an dem der Maler gerade ist; null zwischen zwei Aufträgen. */
     private Auftrag auftrag;
+    /** Die Texel des letzten Auftrags; ändern sie sich, ist neu geladen. */
+    private Map<TextureAtlasSprite, Texel> texelStand;
     private int scale;
     /** Der Abschnitt mit seinen Nachbarn, in dem der aktuelle Block liegt. */
     private RenderSectionRegion welt;
     /** Je Pixel der Spalte vormultipliziert in sRGB: r, g, b, a. */
     private float[] summe = new float[0];
 
-    /** Eine Fläche nach oben mit dem Faktor ihrer Ecken aus Licht, Schatten und Tönung. */
-    private record Flaeche(BakedQuad quad, float hoehe, float[][] ecken) {
+    /**
+     * Eine Fläche nach oben in x und z, mit UV, Sprite, Schicht und dem Faktor ihrer Ecken
+     * aus Licht, Schatten und Tönung; {@code hoehe} ordnet sie im Block.
+     */
+    private record Flaeche(float hoehe, float[] xz, float[] uv, TextureAtlasSprite sprite,
+            ChunkSectionLayer schicht, float[][] ecken) {
     }
 
     /** Zeichnet den Chunk; je Pixel ARGB, Zeile für Zeile, 16 · scale breit. */
     int[] male(Auftrag a) {
-        if (a.scale() != scale || auftrag == null || a.texel() != auftrag.texel()) {
+        if (a.scale() != scale || a.texel() != texelStand) {
+            // Neu geladen: Raster und Modelle können anders sein.
             raster.clear();
+            ohneGeometrie.clear();
+            texelStand = a.texel();
         }
         auftrag = a;
         if (scale != a.scale()) {
@@ -178,18 +190,25 @@ final class ChunkMaler {
                 if (state.isAir()) {
                     continue;
                 }
+                flaechen.clear();
+                if (state.getRenderShape() == RenderShape.MODEL) {
+                    sammleBlock(modelle.getBlockStateModelSet().get(state), state);
+                }
                 FluidState fluid = state.getFluidState();
                 if (!fluid.isEmpty() && !oberflaeche) {
                     oberflaeche = true;
-                    maleFluessigkeit(modelle.getFluidStateModelSet().get(fluid), state);
+                    sammleFluessigkeit(modelle.getFluidStateModelSet().get(fluid), state, fluid);
                 }
-                if (state.getRenderShape() == RenderShape.MODEL) {
-                    maleBlock(modelle.getBlockStateModelSet().get(state), state);
+                // Von oben nach unten; was aus dem Wasser ragt, liegt vor der Oberfläche.
+                flaechen.sort((f, g) -> Float.compare(g.hoehe(), f.hoehe()));
+                for (Flaeche f : flaechen) {
+                    schicht(f.xz(), f.uv(), f.sprite(), f.schicht(), f.ecken());
                 }
             }
             schreibe(pixel, seite, lx * scale, lz * scale);
         }
         welt = null;
+        auftrag = null;
         return pixel;
     }
 
@@ -202,38 +221,55 @@ final class ChunkMaler {
         return true;
     }
 
-    private void maleBlock(BlockStateModel model, BlockState state) {
+    private void sammleBlock(BlockStateModel model, BlockState state) {
         if (ohneGeometrie.computeIfAbsent(state, s -> ohneFlaechen(model))) {
-            // Blockentities wie Truhen: das Partikel-Sprite über den ganzen Block.
-            TextureAtlasSprite sprite = model.particleMaterial().sprite();
-            auftrag.licht().hell(LightCoordsUtil.getLightCoords(welt, pos.above()), hell);
-            float[][] ecken = {hell.clone(), hell.clone(), hell.clone(), hell.clone()};
-            schicht(VOLL, voll(sprite), sprite, ChunkSectionLayer.SOLID, ecken);
+            sammleBlockentity(model, state);
             return;
         }
-        flaechen.clear();
         tesselator.tesselateBlock((x, y, z, quad, instanz) -> {
-            if (nachOben(quad)) {
-                flaechen.add(new Flaeche(quad, hoehe(quad), ecken(instanz)));
+            if (!nachOben(quad)) {
+                return;
             }
-        }, 0, 0, 0, welt, pos, state, model, state.getSeed(pos));
-        flaechen.sort((a, b) -> Float.compare(b.hoehe(), a.hoehe()));
-        for (Flaeche f : flaechen) {
-            BakedQuad q = f.quad();
+            // x, y und z tragen den Versatz des Blocks, etwa bei Bambus.
             float[] xz = new float[8], uv = new float[8];
+            float hoehe = Float.NEGATIVE_INFINITY;
             for (int k = 0; k < 4; k++) {
-                Vector3fc p = q.position(k);
-                xz[2 * k] = p.x();
-                xz[2 * k + 1] = p.z();
-                long packed = q.packedUV(k);
+                Vector3fc p = quad.position(k);
+                xz[2 * k] = p.x() + x;
+                xz[2 * k + 1] = p.z() + z;
+                hoehe = Math.max(hoehe, p.y() + y);
+                long packed = quad.packedUV(k);
                 uv[2 * k] = UVPair.unpackU(packed);
                 uv[2 * k + 1] = UVPair.unpackV(packed);
             }
-            schicht(xz, uv, q.materialInfo().sprite(), q.materialInfo().layer(), f.ecken());
-        }
+            flaechen.add(new Flaeche(hoehe, xz, uv, quad.materialInfo().sprite(), quad.materialInfo().layer(),
+                    ecken(instanz, quad.materialInfo().lightEmission())));
+        }, 0, 0, 0, welt, pos, state, model, state.getSeed(pos));
     }
 
-    private void maleFluessigkeit(FluidModel model, BlockState state) {
+    /**
+     * Blockentities wie Truhen, Schilder und Köpfe haben im Modell keine Fläche: das
+     * Partikel-Sprite über ihre Form von oben, im Licht des Blocks darüber.
+     */
+    private void sammleBlockentity(BlockStateModel model, BlockState state) {
+        VoxelShape form = state.getShape(welt, pos);
+        if (form.isEmpty()) {
+            return;
+        }
+        AABB box = form.bounds();
+        float x0 = (float) Math.max(0, box.minX), x1 = (float) Math.min(1, box.maxX);
+        float z0 = (float) Math.max(0, box.minZ), z1 = (float) Math.min(1, box.maxZ);
+        TextureAtlasSprite s = model.particleMaterial().sprite();
+        float du = s.getU1() - s.getU0(), dv = s.getV1() - s.getV0();
+        float ua = s.getU0() + x0 * du, ub = s.getU0() + x1 * du, va = s.getV0() + z0 * dv, vb = s.getV0() + z1 * dv;
+        auftrag.licht().hell(LightCoordsUtil.getLightCoords(welt, pos.above()), hell);
+        flaechen.add(new Flaeche((float) box.maxY, new float[] {x0, z0, x0, z1, x1, z1, x1, z0},
+                new float[] {ua, va, ua, vb, ub, vb, ub, va}, s, ChunkSectionLayer.SOLID,
+                new float[][] {hell.clone(), hell.clone(), hell.clone(), hell.clone()}));
+    }
+
+    /** Die Oberfläche einer Flüssigkeit, in der Höhe, in der das Spiel sie zeichnet. */
+    private void sammleFluessigkeit(FluidModel model, BlockState state, FluidState fluid) {
         TextureAtlasSprite sprite = model.stillMaterial().sprite();
         int tint = model.tintSource() == null ? -1 : model.tintSource().colorInWorld(state, welt, pos);
         auftrag.licht().hell(LightCoordsUtil.max(LightCoordsUtil.getLightCoords(welt, pos),
@@ -243,7 +279,8 @@ final class ChunkMaler {
         for (int c = 0; c < 3; c++) {
             faktor[c] = hell[c] * schatten * ((tint >> (16 - 8 * c)) & 0xFF) / 255f;
         }
-        schicht(VOLL, voll(sprite), sprite, model.layer(), new float[][] {faktor, faktor, faktor, faktor});
+        flaechen.add(new Flaeche(fluid.getHeight(welt, pos), VOLL, voll(sprite), sprite, model.layer(),
+                new float[][] {faktor, faktor, faktor, faktor}));
     }
 
     private boolean ohneFlaechen(BlockStateModel model) {
@@ -271,19 +308,11 @@ final class ChunkMaler {
         return ny > 1e-4f * (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
     }
 
-    private static float hoehe(BakedQuad q) {
-        float max = Float.NEGATIVE_INFINITY;
-        for (int k = 0; k < 4; k++) {
-            max = Math.max(max, q.position(k).y());
-        }
-        return max;
-    }
-
-    /** Je Ecke Licht mal Farbe, die Schatten und Tönung trägt. */
-    private float[][] ecken(QuadInstance instanz) {
+    /** Je Ecke Licht, mit dem Leuchten der Fläche, mal Farbe, die Schatten und Tönung trägt. */
+    private float[][] ecken(QuadInstance instanz, int leuchten) {
         float[][] ecken = new float[4][3];
         for (int k = 0; k < 4; k++) {
-            auftrag.licht().hell(instanz.getLightCoords(k), hell);
+            auftrag.licht().hell(instanz.getLightCoordsWithEmission(k, leuchten), hell);
             int farbe = instanz.getColor(k);
             for (int c = 0; c < 3; c++) {
                 ecken[k][c] = hell[c] * ((farbe >> (16 - 8 * c)) & 0xFF) / 255f;

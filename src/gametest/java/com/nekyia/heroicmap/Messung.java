@@ -3,6 +3,8 @@ package com.nekyia.heroicmap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -15,9 +17,12 @@ import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.minecraft.client.InactivityFpsLimit;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationUiState;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.AtlasIds;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
@@ -36,6 +41,7 @@ public final class Messung implements FabricClientGameTest {
     private static final int STAND_TICKS = 100;
     private static final int FLUG_TICKS = 200;
     private static final int HOEHE = 160;
+    private static final int RUHE_TICKS = 1200;
 
     private final LongArrayList frames = new LongArrayList();
     private boolean aufnehmen;
@@ -73,36 +79,47 @@ public final class Messung implements FabricClientGameTest {
             server.runCommand("tp @a 0 " + HOEHE + " 0 -90 20");
             warteAufChunks(context);
 
+            atlas(context);
             for (int scale : new int[] {1, 2, 4}) {
                 for (int runde = 1; runde <= RUNDEN; runde++) {
                     chunks(context, scale, runde);
                 }
             }
-            context.runOnClient(mc -> {
-                while (Minimap.INSTANZ.scale() != 2) {
-                    Minimap.INSTANZ.naechsterMassstab();
-                }
-            });
-            context.waitFor(mc -> Minimap.INSTANZ.fertig(), 6000);
 
+            region(context);
+            // Gleich nach dem Laden lief ein Lauf im Takt der Ticks, ein Frame je Tick.
+            context.waitTicks(RUHE_TICKS);
+
+            // Bildrate ohne Grenze, 144 und 60, dazu die Massstäbe; 260 heisst ohne Grenze.
             int x = 0;
-            for (int runde = 1; runde <= RUNDEN; runde++) {
-                for (boolean an : new boolean[] {false, true}) {
-                    zeige(context, an);
-                    frames(context, "stand", an, runde, () -> context.waitTicks(STAND_TICKS));
+            for (int[] lauf : new int[][] {{260, 2}, {260, 4}, {144, 4}, {60, 4}}) {
+                int fps = lauf[0], scale = lauf[1];
+                context.runOnClient(mc -> {
+                    mc.options.framerateLimit().set(fps);
+                    while (Minimap.INSTANZ.scale() != scale) {
+                        Minimap.INSTANZ.naechsterMassstab();
+                    }
+                });
+                zeige(context, true);
+                String art = "fps=" + (fps == 260 ? "frei" : fps) + " scale=" + scale;
+                for (int runde = 1; runde <= RUNDEN; runde++) {
+                    for (boolean an : new boolean[] {false, true}) {
+                        zeige(context, an);
+                        frames(context, art + " stand", an, runde, () -> context.waitTicks(STAND_TICKS));
+                    }
                 }
-            }
-            for (int runde = 1; runde <= RUNDEN; runde++) {
-                for (boolean an : new boolean[] {false, true}) {
-                    zeige(context, an);
-                    int start = x;
-                    frames(context, "flug", an, runde, () -> {
-                        for (int t = 1; t <= FLUG_TICKS; t++) {
-                            server.runCommand("tp @a " + (start + t) + " " + HOEHE + " 0 -90 20");
-                            context.waitTick();
-                        }
-                    });
-                    x += FLUG_TICKS;
+                for (int runde = 1; runde <= RUNDEN; runde++) {
+                    for (boolean an : new boolean[] {false, true}) {
+                        zeige(context, an);
+                        int start = x;
+                        frames(context, art + " flug", an, runde, () -> {
+                            for (int t = 1; t <= FLUG_TICKS; t++) {
+                                server.runCommand("tp @a " + (start + t) + " " + HOEHE + " 0 -90 20");
+                                context.waitTick();
+                            }
+                        });
+                        x += FLUG_TICKS;
+                    }
                 }
             }
         }
@@ -150,6 +167,46 @@ public final class Messung implements FabricClientGameTest {
         }
     }
 
+    /** Zahl und Dauer in ms aller Garbage Collections bisher. */
+    private static long[] gc() {
+        long n = 0, ms = 0;
+        for (GarbageCollectorMXBean gc : ManagementFactory.getGarbageCollectorMXBeans()) {
+            n += Math.max(0, gc.getCollectionCount());
+            ms += Math.max(0, gc.getCollectionTime());
+        }
+        return new long[] {n, ms};
+    }
+
+    /** Was eine neue Region bei 4 px auf dem Render-Thread kostet: anlegen, leer hochladen, anmelden, freigeben. */
+    private void region(ClientGameTestContext context) {
+        long[] zeiten = context.computeOnClient(mc -> {
+            long[] z = new long[5];
+            for (int i = 0; i < z.length; i++) {
+                Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "messung/" + i);
+                long t0 = System.nanoTime();
+                DynamicTexture textur = new DynamicTexture(() -> "messung", 512, 512, true);
+                textur.upload();
+                mc.getTextureManager().register(id, textur);
+                z[i] = System.nanoTime() - t0;
+                mc.getTextureManager().release(id);
+            }
+            return z;
+        });
+        Arrays.sort(zeiten);
+        zeile("region scale=4 n=%d median=%.3f ms max=%.3f ms", zeiten.length, ms(quantil(zeiten, 0.5)), ms(zeiten[zeiten.length - 1]));
+    }
+
+    /** Wie lange die Kopie der Texel des Block-Atlas auf dem Render-Thread dauert, einmal je Neuladen. */
+    private void atlas(ClientGameTestContext context) {
+        long[] werte = context.computeOnClient(mc -> {
+            TextureAtlas atlas = mc.getAtlasManager().getAtlasOrThrow(AtlasIds.BLOCKS);
+            long t0 = System.nanoTime();
+            int n = ChunkMaler.Texel.vomAtlas(atlas).size();
+            return new long[] {System.nanoTime() - t0, n};
+        });
+        zeile("atlas sprites=%d kopie=%.3f ms", werte[1], ms(werte[0]));
+    }
+
     /**
      * Zieht jeden geladenen Chunk in Sichtweite einmal ab und zeichnet ihn; misst beides
      * getrennt, den Abzug für den Render-Thread, das Zeichnen für den Worker.
@@ -194,7 +251,9 @@ public final class Messung implements FabricClientGameTest {
             frames.clear();
             aufnehmen = true;
         });
+        long[] gcVorher = gc();
         lauf.run();
+        long[] gcNachher = gc();
         long[] zeiten = context.computeOnClient(mc -> {
             aufnehmen = false;
             return frames.toLongArray();
@@ -204,9 +263,10 @@ public final class Messung implements FabricClientGameTest {
         for (long z : zeiten) {
             summe += z;
         }
-        zeile("frames art=%s minimap=%s runde=%d n=%d mittel=%.3f ms p50=%.3f ms p95=%.3f ms",
+        zeile("frames %s minimap=%s runde=%d n=%d mittel=%.3f ms p50=%.3f ms p95=%.3f ms p99=%.3f ms max=%.3f ms gc=%d gc_ms=%d",
                 art, an ? "an" : "aus", runde, zeiten.length, ms(summe / zeiten.length),
-                ms(quantil(zeiten, 0.5)), ms(quantil(zeiten, 0.95)));
+                ms(quantil(zeiten, 0.5)), ms(quantil(zeiten, 0.95)), ms(quantil(zeiten, 0.99)),
+                ms(zeiten[zeiten.length - 1]), gcNachher[0] - gcVorher[0], gcNachher[1] - gcVorher[1]);
     }
 
     private static long quantil(long[] sortiert, double q) {

@@ -25,7 +25,7 @@ public final class Bilder implements FabricClientGameTest {
         "time set noon",
         "weather clear",
         "gamemode spectator @a",
-        // Ein Becken, nach Westen tiefer: Wasser von 1 bis 6 Blöcken über Sand.
+        // Ein Becken, nach Osten tiefer: Wasser von 1 bis 6 Blöcken über Sand.
         "fill -15 -61 -14 -2 -55 -3 stone_bricks",
         "fill -14 -60 -13 -3 -55 -4 air",
         "fill -14 -60 -13 -13 -56 -4 sand",
@@ -34,6 +34,9 @@ public final class Bilder implements FabricClientGameTest {
         "fill -8 -60 -13 -7 -59 -4 sand",
         "fill -6 -60 -13 -5 -60 -4 sand",
         "fill -14 -60 -13 -3 -55 -4 water replace air",
+        // Was aus dem Wasser ragt, liegt vor der Oberfläche: Mangrovenwurzeln und obere Stufen.
+        "fill -14 -55 -13 -13 -55 -10 mangrove_roots[waterlogged=true]",
+        "fill -14 -55 -7 -13 -55 -4 smooth_stone_slab[type=top,waterlogged=true]",
         // Ein Haus mit Dach aus Platten und Treppen.
         "fill 3 -60 -13 9 -57 -7 oak_planks hollow",
         "fill 3 -56 -13 9 -56 -7 spruce_slab",

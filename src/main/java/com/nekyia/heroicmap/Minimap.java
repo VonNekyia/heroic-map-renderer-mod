@@ -1,11 +1,13 @@
 package com.nekyia.heroicmap;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.logging.LogUtils;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Map;
@@ -32,9 +34,10 @@ import org.joml.Matrix3x2fStack;
 import org.slf4j.Logger;
 
 /**
- * Die Minimap im HUD: eckig, genordet, der Spieler in der Mitte. Chunks, die sich ändern,
- * zeichnet ein Worker nach, die nächsten zuerst; der Render-Thread zieht sie ab und
- * übernimmt die Bilder, je Frame höchstens {@link #BUDGET_NS}.
+ * Die Minimap im HUD: eckig, genordet, der Spieler in der Mitte. Gezeichnet und behalten wird
+ * der sichtbare Bereich plus {@link #VORRAT} Chunks. Chunks, die sich ändern, zeichnet ein
+ * Worker nach, die nächsten zuerst; der Render-Thread zieht sie ab und übernimmt die Bilder,
+ * je Frame höchstens {@link #BUDGET_NS}.
  * Siehe docs/minimap.md.
  */
 public final class Minimap {
@@ -50,6 +53,8 @@ public final class Minimap {
     private static final int IN_ARBEIT = 4;
     /** Seite der Minimap in Einheiten des GUI. */
     static final int GROESSE = 128;
+    /** Chunks je Richtung über den sichtbaren Bereich hinaus. */
+    static final int VORRAT = 2;
     private static final int RAND = 4;
     /** Ändert sich die Höhe des Kopfes unter einer Decke um so viele Blöcke, wird neu gezeichnet. */
     private static final int DECKE_SCHRITT = 2;
@@ -66,12 +71,18 @@ public final class Minimap {
     private boolean sichtbar = true;
     private int scale = 2;
     private final LongLinkedOpenHashSet offen = new LongLinkedOpenHashSet();
+    /** Chunks im Bereich, deren Bild in der Textur steht. */
+    private final LongOpenHashSet gezeichnet = new LongOpenHashSet();
     private final Long2ObjectMap<Region> regionen = new Long2ObjectOpenHashMap<>();
     private final ArrayDeque<CompletableFuture<Bild>> laufend = new ArrayDeque<>();
     /** Zählt jedes Leeren mit; ein Bild aus einem älteren Stand fällt weg. */
     private long stand;
+    /** Der Chunk des Spielers, um den der Bereich liegt; null, bis er wieder bekannt ist. */
+    private ChunkPos mitte;
     private Licht licht;
     private int decke = Integer.MAX_VALUE;
+    /** Der Biomübergang, mit dem gezeichnet ist; -1, solange keiner. */
+    private int mischung = -1;
     /** Die Texel des Block-Atlas und die Liste der Sprites, aus der sie stammen. */
     private Map<TextureAtlasSprite, ChunkMaler.Texel> texel;
     private List<TextureAtlasSprite> atlasStand;
@@ -87,12 +98,13 @@ public final class Minimap {
     private static final class Region {
         final Identifier id;
         final DynamicTexture textur;
-        boolean geaendert;
 
         Region(int rx, int rz, int scale) {
             int seite = CHUNKS_JE_REGION * 16 * scale;
             id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "region/" + rx + "_" + rz);
             textur = new DynamicTexture(() -> "heroicmap " + id, seite, seite, true);
+            // Einmal ganz und leer; danach nur noch die Bilder einzelner Chunks.
+            textur.upload();
             Minecraft.getInstance().getTextureManager().register(id, textur);
         }
 
@@ -101,9 +113,11 @@ public final class Minimap {
         }
     }
 
-    /** Der Chunk (x, z) ist neu zu zeichnen. */
+    /** Der Chunk (x, z) ist neu zu zeichnen, wenn er im Bereich liegt. */
     public void markiere(int x, int z) {
-        offen.add(ChunkPos.pack(x, z));
+        if (mitte == null || imBereich(x, z)) {
+            offen.add(ChunkPos.pack(x, z));
+        }
     }
 
     void umschalten() {
@@ -118,7 +132,6 @@ public final class Minimap {
     void naechsterMassstab() {
         scale = scale == 4 ? 1 : scale * 2;
         leeren();
-        markiereUmSpieler();
     }
 
     int scale() {
@@ -127,30 +140,37 @@ public final class Minimap {
 
     /** Ist nichts mehr nachzuzeichnen? */
     boolean fertig() {
-        return offen.isEmpty() && laufend.isEmpty();
+        return mitte != null && offen.isEmpty() && laufend.isEmpty();
     }
 
-    /** Vergisst alles, etwa beim Wechsel der Welt. Bilder, die noch laufen, fallen weg. */
+    /** Chunks je Richtung um den Spieler, die die Minimap zeichnet: sichtbar plus Vorrat. */
+    int reichweite() {
+        return Mth.ceil(GROESSE / 2f / (16f * scale)) + VORRAT;
+    }
+
+    private boolean imBereich(int x, int z) {
+        int r = reichweite();
+        return Math.abs(x - mitte.x()) <= r && Math.abs(z - mitte.z()) <= r;
+    }
+
+    /**
+     * Vergisst alles, etwa beim Wechsel der Welt oder beim Trennen. Bilder, die noch laufen,
+     * fallen weg; mit der nächsten Mitte wird der Bereich neu markiert.
+     */
     void leeren() {
         regionen.values().forEach(Region::schliessen);
         regionen.clear();
         offen.clear();
+        gezeichnet.clear();
+        mitte = null;
         licht = null;
         stand++;
     }
 
-    private void markiereUmSpieler() {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null) {
-            return;
-        }
-        int weite = mc.options.getEffectiveRenderDistance();
-        ChunkPos mitte = mc.player.chunkPosition();
-        for (int dz = -weite; dz <= weite; dz++) {
-            for (int dx = -weite; dx <= weite; dx++) {
-                markiere(mitte.x() + dx, mitte.z() + dz);
-            }
-        }
+    /** Zeichnet den Bereich neu, ohne die Texturen zu leeren. */
+    private void neuZeichnen() {
+        gezeichnet.clear();
+        mitte = null;
     }
 
     void zeichne(GuiGraphicsExtractor g, DeltaTracker zeit) {
@@ -171,15 +191,10 @@ public final class Minimap {
         for (int rz = Math.floorDiv(oben, seite); rz <= Math.floorDiv(oben + GROESSE - 1, seite); rz++) {
             for (int rx = Math.floorDiv(links, seite); rx <= Math.floorDiv(links + GROESSE - 1, seite); rx++) {
                 Region region = regionen.get(ChunkPos.pack(rx, rz));
-                if (region == null) {
-                    continue;
+                if (region != null) {
+                    g.blit(RenderPipelines.GUI_TEXTURED, region.id, x0 + rx * seite - links, y0 + rz * seite - oben,
+                            0, 0, seite, seite, seite, seite);
                 }
-                if (region.geaendert) {
-                    region.textur.upload();
-                    region.geaendert = false;
-                }
-                g.blit(RenderPipelines.GUI_TEXTURED, region.id, x0 + rx * seite - links, y0 + rz * seite - oben,
-                        0, 0, seite, seite, seite, seite);
             }
         }
         g.disableScissor();
@@ -192,6 +207,14 @@ public final class Minimap {
      */
     private void arbeite(Minecraft mc, ClientLevel level, LocalPlayer spieler) {
         pruefeAtlas(mc);
+        int radius = mc.options.biomeBlendRadius().get();
+        if (radius != mischung) {
+            // Ein anderer Biomübergang läuft über allChanged, nicht über setSectionDirty.
+            if (mischung != -1) {
+                neuZeichnen();
+            }
+            mischung = radius;
+        }
         if (licht == null) {
             licht = Licht.von(level.dimensionType());
         }
@@ -199,19 +222,22 @@ public final class Minimap {
             int kopf = Mth.floor(spieler.getEyeY());
             if (Math.abs(kopf - decke) >= DECKE_SCHRITT) {
                 decke = kopf;
-                markiereUmSpieler();
+                neuZeichnen();
             }
         } else {
             decke = Integer.MAX_VALUE;
         }
-        ChunkPos mitte = spieler.chunkPosition();
-        raeume(mitte, mc.options.getEffectiveRenderDistance());
+        ChunkPos jetzt = spieler.chunkPosition();
+        if (!jetzt.equals(mitte)) {
+            mitte = jetzt;
+            nachBereich();
+        }
         long ende = System.nanoTime() + BUDGET_NS;
         while (!laufend.isEmpty() && laufend.peek().isDone() && System.nanoTime() < ende) {
             uebernimm(laufend.poll());
         }
         while (laufend.size() < IN_ARBEIT && !offen.isEmpty() && System.nanoTime() < ende) {
-            long naechster = naechster(mitte);
+            long naechster = naechster();
             offen.remove(naechster);
             LevelChunk chunk = level.getChunkSource()
                     .getChunk(ChunkPos.getX(naechster), ChunkPos.getZ(naechster), ChunkStatus.FULL, false);
@@ -228,6 +254,33 @@ public final class Minimap {
         }
     }
 
+    /**
+     * Passt alles an die neue Mitte an: Was den Bereich verlassen hat, fällt weg; was neu in
+     * ihm liegt und kein Bild hat, wird markiert.
+     */
+    private void nachBereich() {
+        int r = reichweite();
+        offen.removeIf((long k) -> !imBereich(ChunkPos.getX(k), ChunkPos.getZ(k)));
+        gezeichnet.removeIf((long k) -> !imBereich(ChunkPos.getX(k), ChunkPos.getZ(k)));
+        regionen.long2ObjectEntrySet().removeIf(e -> {
+            int rx = ChunkPos.getX(e.getLongKey()), rz = ChunkPos.getZ(e.getLongKey());
+            boolean draussen = rx * CHUNKS_JE_REGION > mitte.x() + r || (rx + 1) * CHUNKS_JE_REGION - 1 < mitte.x() - r
+                    || rz * CHUNKS_JE_REGION > mitte.z() + r || (rz + 1) * CHUNKS_JE_REGION - 1 < mitte.z() - r;
+            if (draussen) {
+                e.getValue().schliessen();
+            }
+            return draussen;
+        });
+        for (int dz = -r; dz <= r; dz++) {
+            for (int dx = -r; dx <= r; dx++) {
+                long k = ChunkPos.pack(mitte.x() + dx, mitte.z() + dz);
+                if (!gezeichnet.contains(k)) {
+                    offen.add(k);
+                }
+            }
+        }
+    }
+
     /** Kopiert die Texel neu, wenn der Block-Atlas neu geladen ist, und zeichnet alles neu. */
     private void pruefeAtlas(Minecraft mc) {
         TextureAtlas atlas = mc.getAtlasManager().getAtlasOrThrow(AtlasIds.BLOCKS);
@@ -239,10 +292,10 @@ public final class Minimap {
         atlasStand = atlas.sprites;
         if (nachgeladen) {
             leeren();
-            markiereUmSpieler();
         }
     }
 
+    /** Schreibt das Bild eines Chunks in seine Region, nur diesen Ausschnitt auf die GPU. */
     private void uebernimm(CompletableFuture<Bild> fertig) {
         Bild bild;
         try {
@@ -251,23 +304,25 @@ public final class Minimap {
             LOGGER.warn("Minimap: Chunk nicht gezeichnet", e.getCause());
             return;
         }
-        if (bild.stand() != stand || bild.scale() != scale) {
+        if (bild.stand() != stand || bild.scale() != scale || mitte == null || !imBereich(bild.cx(), bild.cz())) {
             return;
         }
         Region region = regionen.computeIfAbsent(ChunkPos.pack(bild.cx() >> 3, bild.cz() >> 3),
                 k -> new Region(ChunkPos.getX(k), ChunkPos.getZ(k), scale));
-        NativeImage ziel = region.textur.getPixels();
         int seite = 16 * scale, ox = (bild.cx() & 7) * seite, oy = (bild.cz() & 7) * seite;
-        for (int y = 0; y < seite; y++) {
-            for (int x = 0; x < seite; x++) {
-                ziel.setPixel(ox + x, oy + y, bild.pixel()[y * seite + x]);
+        try (NativeImage stueck = new NativeImage(seite, seite, false)) {
+            for (int y = 0; y < seite; y++) {
+                for (int x = 0; x < seite; x++) {
+                    stueck.setPixel(x, y, bild.pixel()[y * seite + x]);
+                }
             }
+            RenderSystem.getDevice().createCommandEncoder().writeToTexture(region.textur.getTexture(), stueck, 0, 0, ox, oy);
         }
-        region.geaendert = true;
+        gezeichnet.add(ChunkPos.pack(bild.cx(), bild.cz()));
     }
 
-    // ponytail: sucht linear, bei einigen hundert offenen Chunks je Frame genug; sonst ein Heap.
-    private long naechster(ChunkPos mitte) {
+    // ponytail: sucht linear, im Bereich liegen höchstens 169 Chunks; sonst ein Heap.
+    private long naechster() {
         long bester = offen.firstLong();
         int besteWeite = Integer.MAX_VALUE;
         for (LongIterator it = offen.iterator(); it.hasNext(); ) {
@@ -280,20 +335,6 @@ public final class Minimap {
             }
         }
         return bester;
-    }
-
-    /** Gibt Regionen frei, die weit hinter der Sichtweite liegen. */
-    private void raeume(ChunkPos mitte, int weite) {
-        int grenze = weite / CHUNKS_JE_REGION + 2;
-        regionen.long2ObjectEntrySet().removeIf(e -> {
-            long k = e.getLongKey();
-            boolean weit = Math.abs(ChunkPos.getX(k) - (mitte.x() >> 3)) > grenze
-                    || Math.abs(ChunkPos.getZ(k) - (mitte.z() >> 3)) > grenze;
-            if (weit) {
-                e.getValue().schliessen();
-            }
-            return weit;
-        });
     }
 
     /** Ein Pfeil in Blickrichtung: bei Gier 0 sieht der Spieler nach Süden, auf der Karte nach unten. */

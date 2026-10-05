@@ -44,8 +44,9 @@ nicht, siehe „Neu zeichnen“ (`ChunkMaler.male`).
 - **Beginn:** der oberste Block, den die Höhenkarte `WORLD_SURFACE` nennt.
   Der Client bekommt sie mit dem Chunk vom Server, `LevelChunk.setBlockState`
   führt sie nach, belegt per javap am Client 26.3.
-- **Je Block:** zuerst eine Flüssigkeit, dann die Flächen des Modells. Von
-  Flüssigkeiten zählt nur die oberste Oberfläche der Spalte, siehe „Wasser“.
+- **Je Block:** die Flächen des Modells und die Oberfläche einer
+  Flüssigkeit, nach ihrer Höhe geordnet, siehe „Wasser“. Von Flüssigkeiten
+  zählt nur die oberste Oberfläche der Spalte.
 - **Decke:** Hat die Dimension eine Decke (`DimensionType.hasCeiling`), wie
   der Nether, beginnt die Spalte auf Höhe des Kopfes. Ist der Block dort
   voll (`isSolidRender`), bleibt die Spalte leer: eine Wand. Wandert der
@@ -68,6 +69,10 @@ Tönung (`putQuadWithTint`).
   Gras, Blumen und Getreide stehen senkrecht und fallen weg.
 - **Reihenfolge:** In einem Block zuerst die höchste Fläche, dann die Blöcke
   darunter.
+- **Versatz:** `tesselateBlock` gibt den Versatz des Blocks (`getOffset`)
+  mit, etwa bei Bambus und Blumen; der Mod schiebt die Fläche um ihn.
+- **Leuchten** einzelner Flächen (`lightEmission`) hebt ihr Licht wie im
+  Spiel (`QuadInstance.getLightCoordsWithEmission`).
 - **Weiche Beleuchtung** ist immer an, gleich was der Spieler eingestellt
   hat, wie auf der Serverkarte.
 - **Tönung** kommt über `BlockColors`, auch die anderer Mods.
@@ -124,7 +129,11 @@ der Typ keine setzt, deren Vorgabe.
 ## Wasser
 
 Eine Flüssigkeit zeichnet der Mod als eine Oberfläche
-(`ChunkMaler.maleFluessigkeit`): das ruhende Sprite aus `FluidModel`,
+(`ChunkMaler.sammleFluessigkeit`) in der Höhe, in der das Spiel sie legt:
+`FluidState.getHeight`, bei einer Quelle 8/9, so wie `FluidRenderer.tesselate`
+die Oberseite bei 0,8888889 zeichnet. Sie reiht sich unter die Flächen des
+Blocks; was höher liegt, Mangrovenwurzeln etwa oder eine obere Stufe, liegt
+davor. Sie zeigt das ruhende Sprite aus `FluidModel`,
 gemittelt, mal Tönung (`FluidModel.tintSource`), Licht und `CardinalLighting`
 nach oben, in der Schicht des Modells. Das Licht ist das hellere aus dem
 Block und dem darüber. Darunter liegt der Grund in seinem eigenen
@@ -137,28 +146,40 @@ Tiefe wie der Renderer, siehe
 
 Truhen, Schilder, Banner und Köpfe haben im Modell keine Fläche, sie
 zeichnet ein Renderer für Blockentities. Für sie legt der Mod das
-Partikel-Sprite des Modells deckend über den ganzen Block, im Licht des
-Blocks darüber. Blöcke mit `RenderShape.INVISIBLE`, etwa Barrieren, zeichnen
+Partikel-Sprite des Modells deckend über ihre Form von oben, das Rechteck
+aus `getShape(...).bounds()` in x und z, in dessen Höhe, im Licht des
+Blocks darüber (`ChunkMaler.sammleBlockentity`). Blöcke mit `RenderShape.INVISIBLE`, etwa Barrieren, zeichnen
 nichts.
 
 ## Neu zeichnen
 
-- **Wann:** Jeder Weg, auf dem der Client einen Abschnitt neu zeichnen
-  lässt, endet in `LevelExtractor.setSectionDirty(int, int, int, boolean)`,
+- **Wann:** Die Wege, auf denen der Client einen Abschnitt neu zeichnen
+  lässt, enden in `LevelExtractor.setSectionDirty(int, int, int, boolean)`,
   belegt per javap am Client 26.3: `blockChanged`, `setBlockDirty`,
   `setBlocksDirty`, `setSectionDirtyWithNeighbors` und
-  `setSectionRangeDirty`. Dort hängt der einzige Mixin des Mods
-  (`LevelExtractorMixin`) und markiert die Spalte. Dazu kommt
-  `ClientChunkEvents.CHUNK_LOAD`.
+  `setSectionRangeDirty`, auch das Licht eines neuen Chunks über
+  `enableChunkLight`. Dort hängt der einzige Mixin des Mods
+  (`LevelExtractorMixin`) und markiert die Spalte.
+- **Ausnahme:** `LevelExtractor.allChanged` legt alles neu an, ohne
+  `setSectionDirty`, etwa wenn der Biomübergang sich ändert. Der Mod
+  vergleicht deshalb je Frame `Options.biomeBlendRadius` und den Block-Atlas
+  und zeichnet bei einer Änderung neu.
+- **Bereich:** Gezeichnet und behalten wird, was die Minimap zeigt, plus
+  2 Chunks je Richtung (`Minimap.reichweite`): bei 1 px ±6 Chunks, bei
+  2 px ±4, bei 4 px ±3. Verlässt ein Chunk den Bereich, fällt sein Bild weg;
+  kommt er wieder, zeichnet der Mod ihn neu.
 - **Reihenfolge:** die offenen Chunks, die nächsten zuerst.
 - **Render-Thread:** zieht einen Chunk ab (`ChunkMaler.abziehen`): je
   Spalte die erste Höhe und je Abschnitt von dort bis zum ersten vollen
   Block eine Kopie mit den Nachbarn, über `RenderRegionCache.createRegion`
   wie das Spiel, wenn es Abschnitte baut. Er übernimmt fertige Bilder in
   die Textur. Beides je Frame höchstens 2 ms (`Minimap.BUDGET_NS`).
-- **Worker:** ein eigener Thread zeichnet den Chunk (`ChunkMaler.male`). Er
-  liest nur die Kopien (`RenderSectionRegion`), daraus auch Licht und
-  Tönung wie die Worker des Spiels. Vor ihm liegen höchstens 4 Chunks.
+- **Worker:** ein eigener Thread zeichnet den Chunk (`ChunkMaler.male`). Die
+  Blöcke liest er aus den Kopien (`RenderSectionRegion`). Licht und Tönung
+  holt die Region live aus der Welt: `getLightEngine` gibt die echte
+  `LevelLightEngine`, `getBlockTint` geht an `ClientLevel.getBlockTint`,
+  belegt per javap. Das tun die Worker des Spiels beim Bauen der Abschnitte
+  ebenso. Vor ihm liegen höchstens 4 Chunks.
 - **Texel:** Der Render-Thread kopiert die Texel aller Sprites des
   Block-Atlas, sobald der Atlas neu geladen ist, und zeichnet dann alles
   neu. Der Worker liest nie Bilder, die ein Neuladen freigeben könnte.
@@ -166,11 +187,12 @@ nichts.
   der Mod öffnet sie per Access Widener (`heroicmap.accesswidener`), weil
   er so die Pixel im Atlas liest, auch für Sprites ohne eigene PNG-Datei,
   ohne sie ein zweites Mal von der Platte zu laden.
-- **Ablage:** je 8 × 8 Chunks eine Textur (`DynamicTexture`). Sie wird erst
-  hochgeladen, wenn sie zu sehen ist. Regionen weiter als die Sichtweite
-  plus 2 Regionen gibt der Mod frei.
-- **Wechsel** der Welt leert alles; ein anderer Massstab zeichnet alles
-  neu. Bilder aus einem älteren Stand fallen weg.
+- **Ablage:** je 8 × 8 Chunks eine Textur (`DynamicTexture`), einmal leer
+  hochgeladen. Danach schreibt der Mod nur das Bild des fertigen Chunks an
+  seine Stelle (`CommandEncoder.writeToTexture` mit Versatz), bei 4 px
+  64 × 64 Pixel. Regionen ausserhalb des Bereichs gibt er frei.
+- **Wechsel** der Welt und Trennen leeren alles; ein anderer Massstab
+  zeichnet alles neu. Bilder aus einem älteren Stand fallen weg.
 
 ## Kosten
 
@@ -205,7 +227,8 @@ Minimap bei 1, 2 und 4 Pixeln je Block auf:
 
 ![Minimap bei 1 Pixel je Block](bilder/minimap-1px.png)
 
-Ein Becken mit Wasser von 1 bis 6 Blöcken Tiefe, nach Osten tiefer, ein
+Ein Becken mit Wasser von 1 bis 6 Blöcken Tiefe, nach Osten tiefer; im
+Westen ragen Mangrovenwurzeln und obere Stufen aus dem Wasser. Dazu ein
 Haus, drei Bäume, ein Weg, Glas, Eis, Schnee, Lava, eine Truhe, Teppich und
 ein Feld. Gras, Blumen und Weizen stehen senkrecht und fehlen von oben.
 

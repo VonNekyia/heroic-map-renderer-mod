@@ -2,10 +2,10 @@ package com.nekyia.heroicmap;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLevelEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.resources.Identifier;
@@ -30,9 +30,10 @@ public final class HeroicMap implements ClientModInitializer {
                 Minimap.INSTANZ.naechsterMassstab();
             }
         });
-        ClientChunkEvents.CHUNK_LOAD.register((level, chunk) ->
-                Minimap.INSTANZ.markiere(chunk.getPos().x(), chunk.getPos().z()));
+        // Fabric meldet den Wechsel der Welt nur zu einer neuen; das Trennen eigens, und das auf
+        // einem Thread von Netty, deshalb auf den Render-Thread.
         ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> Minimap.INSTANZ.leeren());
+        ClientPlayConnectionEvents.DISCONNECT.register((listener, client) -> client.execute(Minimap.INSTANZ::leeren));
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath(ID, "minimap"), Minimap.INSTANZ::zeichne);
     }
 }

@@ -21,6 +21,12 @@ class LichtTest {
     }
 
     @Test
+    void vollesBlocklichtOhneHimmelGanzHell() {
+        // Blocklicht 15 mal BlockFactor 1,4 übersteigt 1 in jedem Kanal, auch mit dem Tint.
+        assertArrayEquals(new float[] {1, 1, 1}, Licht.hell(UMGEBUNG, HIMMEL, 1, BLOCK_TINT, 0, 15), 1e-6f);
+    }
+
+    @Test
     void grundUnterWasserWieInDerTabelle() {
         // Licht des Grunds bei 1, 2, 3, 5, 10 und ab 15 Blöcken Tiefe, und wie viel von ihm
         // durch Wasser mit Alpha 180 zu sehen ist, in Prozent.
