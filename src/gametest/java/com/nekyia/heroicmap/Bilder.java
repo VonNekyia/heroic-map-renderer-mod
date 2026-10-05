@@ -61,6 +61,10 @@ public final class Bilder implements FabricClientGameTest {
         "fill -14 -61 12 -10 -61 15 farmland",
         "fill -14 -60 12 -10 -60 15 wheat[age=7]",
         "fill 3 -60 2 6 -60 2 white_carpet",
+        // Versatz und Form: Bambus, ein Kopf und ein Schild an der Wand des Hauses.
+        "fill 8 -60 2 11 -59 3 bamboo",
+        "setblock 8 -60 -1 player_head",
+        "setblock 6 -58 -6 oak_wall_sign[facing=south]",
     };
 
     @Override

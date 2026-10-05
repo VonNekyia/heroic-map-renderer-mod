@@ -87,11 +87,15 @@ public final class Messung implements FabricClientGameTest {
             }
 
             region(context);
+            // Einmal hin und zurück, ungemessen: Danach erzeugt der Server im Flug nichts mehr,
+            // und dieselbe Strecke liegt geladen da.
+            flug(context, server, true);
+            flug(context, server, false);
             // Gleich nach dem Laden lief ein Lauf im Takt der Ticks, ein Frame je Tick.
             context.waitTicks(RUHE_TICKS);
 
             // Bildrate ohne Grenze, 144 und 60, dazu die Massstäbe; 260 heisst ohne Grenze.
-            int x = 0;
+            boolean hin = true;
             for (int[] lauf : new int[][] {{260, 2}, {260, 4}, {144, 4}, {60, 4}}) {
                 int fps = lauf[0], scale = lauf[1];
                 context.runOnClient(mc -> {
@@ -111,22 +115,39 @@ public final class Messung implements FabricClientGameTest {
                 for (int runde = 1; runde <= RUNDEN; runde++) {
                     for (boolean an : new boolean[] {false, true}) {
                         zeige(context, an);
-                        int start = x;
-                        frames(context, art + " flug", an, runde, () -> {
-                            for (int t = 1; t <= FLUG_TICKS; t++) {
-                                server.runCommand("tp @a " + (start + t) + " " + HOEHE + " 0 -90 20");
-                                context.waitTick();
-                            }
-                        });
-                        x += FLUG_TICKS;
+                        boolean richtung = hin;
+                        frames(context, art + " flug", an, runde, () -> flug(context, server, richtung));
+                        hin = !hin;
                     }
                 }
             }
+
+            // Bei 60 fps mit und ohne Pause zwischen zwei Abzügen eines Chunks, im Wechsel.
+            for (int runde = 1; runde <= RUNDEN; runde++) {
+                for (long pause : new long[] {Minimap.PAUSE_NS, 0}) {
+                    context.runOnClient(mc -> Minimap.INSTANZ.pauseNs = pause);
+                    zeige(context, true);
+                    boolean richtung = hin;
+                    frames(context, "fps=60 scale=4 flug pause=" + pause / 1_000_000 + "ms", true, runde,
+                            () -> flug(context, server, richtung));
+                    hin = !hin;
+                }
+            }
+            context.runOnClient(mc -> Minimap.INSTANZ.pauseNs = Minimap.PAUSE_NS);
         }
         try {
             Files.writeString(Path.of(AUSGABE), bericht);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    /** Fliegt 20 Blöcke/s über die Strecke x = 0 bis FLUG_TICKS, hin nach Osten oder zurück. */
+    private static void flug(ClientGameTestContext context, TestServerContext server, boolean hin) {
+        for (int t = 1; t <= FLUG_TICKS; t++) {
+            int x = hin ? t : FLUG_TICKS - t;
+            server.runCommand("tp @a " + x + " " + HOEHE + " 0 " + (hin ? -90 : 90) + " 20");
+            context.waitTick();
         }
     }
 
@@ -252,8 +273,10 @@ public final class Messung implements FabricClientGameTest {
             aufnehmen = true;
         });
         long[] gcVorher = gc();
+        long chunksVorher = context.computeOnClient(mc -> Minimap.INSTANZ.uebernommen());
         lauf.run();
         long[] gcNachher = gc();
+        long chunks = context.computeOnClient(mc -> Minimap.INSTANZ.uebernommen()) - chunksVorher;
         long[] zeiten = context.computeOnClient(mc -> {
             aufnehmen = false;
             return frames.toLongArray();
@@ -263,10 +286,10 @@ public final class Messung implements FabricClientGameTest {
         for (long z : zeiten) {
             summe += z;
         }
-        zeile("frames %s minimap=%s runde=%d n=%d mittel=%.3f ms p50=%.3f ms p95=%.3f ms p99=%.3f ms max=%.3f ms gc=%d gc_ms=%d",
+        zeile("frames %s minimap=%s runde=%d n=%d mittel=%.3f ms p50=%.3f ms p95=%.3f ms p99=%.3f ms max=%.3f ms gc=%d gc_ms=%d chunks=%d",
                 art, an ? "an" : "aus", runde, zeiten.length, ms(summe / zeiten.length),
                 ms(quantil(zeiten, 0.5)), ms(quantil(zeiten, 0.95)), ms(quantil(zeiten, 0.99)),
-                ms(zeiten[zeiten.length - 1]), gcNachher[0] - gcVorher[0], gcNachher[1] - gcVorher[1]);
+                ms(zeiten[zeiten.length - 1]), gcNachher[0] - gcVorher[0], gcNachher[1] - gcVorher[1], chunks);
     }
 
     private static long quantil(long[] sortiert, double q) {

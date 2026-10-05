@@ -3,6 +3,7 @@ package com.nekyia.heroicmap;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.logging.LogUtils;
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
@@ -58,6 +59,8 @@ public final class Minimap {
     private static final int RAND = 4;
     /** Ändert sich die Höhe des Kopfes unter einer Decke um so viele Blöcke, wird neu gezeichnet. */
     private static final int DECKE_SCHRITT = 2;
+    /** So lange wartet ein Chunk nach einem Abzug, ehe er wieder abgezogen wird. */
+    static final long PAUSE_NS = 500_000_000L;
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "Heroic Map Minimap");
@@ -70,15 +73,21 @@ public final class Minimap {
 
     private boolean sichtbar = true;
     private int scale = 2;
-    private final LongLinkedOpenHashSet offen = new LongLinkedOpenHashSet();
+    final LongLinkedOpenHashSet offen = new LongLinkedOpenHashSet();
     /** Chunks im Bereich, deren Bild in der Textur steht. */
     private final LongOpenHashSet gezeichnet = new LongOpenHashSet();
+    /** Je Chunk der letzte Abzug in {@link System#nanoTime}. */
+    private final Long2LongOpenHashMap zuletzt = new Long2LongOpenHashMap();
+    /** Zahl der übernommenen Bilder, für die Messung. */
+    private long uebernommen;
+    /** Die Pause; nur die Messung stellt sie um. */
+    long pauseNs = PAUSE_NS;
     private final Long2ObjectMap<Region> regionen = new Long2ObjectOpenHashMap<>();
     private final ArrayDeque<CompletableFuture<Bild>> laufend = new ArrayDeque<>();
     /** Zählt jedes Leeren mit; ein Bild aus einem älteren Stand fällt weg. */
     private long stand;
     /** Der Chunk des Spielers, um den der Bereich liegt; null, bis er wieder bekannt ist. */
-    private ChunkPos mitte;
+    ChunkPos mitte;
     private Licht licht;
     private int decke = Integer.MAX_VALUE;
     /** Der Biomübergang, mit dem gezeichnet ist; -1, solange keiner. */
@@ -87,7 +96,7 @@ public final class Minimap {
     private Map<TextureAtlasSprite, ChunkMaler.Texel> texel;
     private List<TextureAtlasSprite> atlasStand;
 
-    private Minimap() {
+    Minimap() {
     }
 
     /** Ein fertiges Bild des Workers. */
@@ -121,10 +130,17 @@ public final class Minimap {
     }
 
     void umschalten() {
-        sichtbar = !sichtbar;
+        setzeSichtbar(!sichtbar);
     }
 
+    /**
+     * Zeigt oder verbirgt die Minimap. Verborgen läuft {@code arbeite} nicht, die Mitte veraltet;
+     * beim Zeigen ist sie deshalb unbekannt, bis der nächste Frame den Bereich anpasst.
+     */
     void setzeSichtbar(boolean sichtbar) {
+        if (sichtbar && !this.sichtbar) {
+            mitte = null;
+        }
         this.sichtbar = sichtbar;
     }
 
@@ -138,6 +154,10 @@ public final class Minimap {
         return scale;
     }
 
+    long uebernommen() {
+        return uebernommen;
+    }
+
     /** Ist nichts mehr nachzuzeichnen? */
     boolean fertig() {
         return mitte != null && offen.isEmpty() && laufend.isEmpty();
@@ -145,6 +165,10 @@ public final class Minimap {
 
     /** Chunks je Richtung um den Spieler, die die Minimap zeichnet: sichtbar plus Vorrat. */
     int reichweite() {
+        return reichweite(scale);
+    }
+
+    static int reichweite(int scale) {
         return Mth.ceil(GROESSE / 2f / (16f * scale)) + VORRAT;
     }
 
@@ -162,6 +186,7 @@ public final class Minimap {
         regionen.clear();
         offen.clear();
         gezeichnet.clear();
+        zuletzt.clear();
         mitte = null;
         licht = null;
         stand++;
@@ -237,8 +262,13 @@ public final class Minimap {
             uebernimm(laufend.poll());
         }
         while (laufend.size() < IN_ARBEIT && !offen.isEmpty() && System.nanoTime() < ende) {
-            long naechster = naechster();
+            long jetztNs = System.nanoTime();
+            long naechster = naechster(jetztNs);
+            if (naechster == KEINER) {
+                break;
+            }
             offen.remove(naechster);
+            zuletzt.put(naechster, jetztNs);
             LevelChunk chunk = level.getChunkSource()
                     .getChunk(ChunkPos.getX(naechster), ChunkPos.getZ(naechster), ChunkStatus.FULL, false);
             if (chunk == null) {
@@ -262,6 +292,7 @@ public final class Minimap {
         int r = reichweite();
         offen.removeIf((long k) -> !imBereich(ChunkPos.getX(k), ChunkPos.getZ(k)));
         gezeichnet.removeIf((long k) -> !imBereich(ChunkPos.getX(k), ChunkPos.getZ(k)));
+        zuletzt.keySet().removeIf((long k) -> !imBereich(ChunkPos.getX(k), ChunkPos.getZ(k)));
         regionen.long2ObjectEntrySet().removeIf(e -> {
             int rx = ChunkPos.getX(e.getLongKey()), rz = ChunkPos.getZ(e.getLongKey());
             boolean draussen = rx * CHUNKS_JE_REGION > mitte.x() + r || (rx + 1) * CHUNKS_JE_REGION - 1 < mitte.x() - r
@@ -319,14 +350,26 @@ public final class Minimap {
             RenderSystem.getDevice().createCommandEncoder().writeToTexture(region.textur.getTexture(), stueck, 0, 0, ox, oy);
         }
         gezeichnet.add(ChunkPos.pack(bild.cx(), bild.cz()));
+        uebernommen++;
     }
 
+    /** Kein offener Chunk, der abgezogen werden darf. */
+    private static final long KEINER = Long.MIN_VALUE;
+
+    /**
+     * Der nächste offene Chunk, dessen letzter Abzug mindestens {@link #PAUSE_NS} zurückliegt.
+     * Das Licht eines neuen Chunks markiert seine 8 Nachbarn; ohne Pause zöge der Mod sie im
+     * Flug immer wieder ab. Siehe docs/minimap.md, „Neu zeichnen“.
+     */
     // ponytail: sucht linear, im Bereich liegen höchstens 169 Chunks; sonst ein Heap.
-    private long naechster() {
-        long bester = offen.firstLong();
+    private long naechster(long jetztNs) {
+        long bester = KEINER;
         int besteWeite = Integer.MAX_VALUE;
         for (LongIterator it = offen.iterator(); it.hasNext(); ) {
             long k = it.nextLong();
+            if (zuletzt.containsKey(k) && jetztNs - zuletzt.get(k) < pauseNs) {
+                continue;
+            }
             int dx = ChunkPos.getX(k) - mitte.x(), dz = ChunkPos.getZ(k) - mitte.z();
             int w = dx * dx + dz * dz;
             if (w < besteWeite) {

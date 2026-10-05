@@ -70,7 +70,9 @@ Tönung (`putQuadWithTint`).
 - **Reihenfolge:** In einem Block zuerst die höchste Fläche, dann die Blöcke
   darunter.
 - **Versatz:** `tesselateBlock` gibt den Versatz des Blocks (`getOffset`)
-  mit, etwa bei Bambus und Blumen; der Mod schiebt die Fläche um ihn.
+  mit, etwa bei Bambus und Blumen; der Mod schiebt die Fläche um ihn. Was
+  dabei über die eigene Spalte hinausragt, fällt weg, siehe „Was anders ist
+  als top-north“.
 - **Leuchten** einzelner Flächen (`lightEmission`) hebt ihr Licht wie im
   Spiel (`QuadInstance.getLightCoordsWithEmission`).
 - **Weiche Beleuchtung** ist immer an, gleich was der Spieler eingestellt
@@ -193,6 +195,9 @@ nichts.
   64 × 64 Pixel. Regionen ausserhalb des Bereichs gibt er frei.
 - **Wechsel** der Welt und Trennen leeren alles; ein anderer Massstab
   zeichnet alles neu. Bilder aus einem älteren Stand fallen weg.
+- **Verborgen** zeichnet die Minimap nichts. Beim Zeigen gilt die Mitte als
+  unbekannt; der nächste Frame passt den Bereich an und zeichnet nach, was
+  neu in ihm liegt.
 
 ## Kosten
 
@@ -229,7 +234,7 @@ Minimap bei 1, 2 und 4 Pixeln je Block auf:
 
 Ein Becken mit Wasser von 1 bis 6 Blöcken Tiefe, nach Osten tiefer; im
 Westen ragen Mangrovenwurzeln und obere Stufen aus dem Wasser. Dazu ein
-Haus, drei Bäume, ein Weg, Glas, Eis, Schnee, Lava, eine Truhe, Teppich und
+Haus mit einem Schild an der Wand, Bambus, ein Kopf, drei Bäume, ein Weg, Glas, Eis, Schnee, Lava, eine Truhe, Teppich und
 ein Feld. Gras, Blumen und Weizen stehen senkrecht und fehlen von oben.
 
 ## Was anders ist als top-north
@@ -247,3 +252,6 @@ ein Feld. Gras, Blumen und Weizen stehen senkrecht und fehlen von oben.
 - **Biomübergang** nach der Einstellung des Spielers, Vorgabe 2 wie der
   Renderer.
 - **Nur geladene Chunks,** also nur die Sichtweite.
+- **Versatz über die Spalte hinaus:** Der Mod tastet je Spalte nur deren
+  Pixel ab. Was ein Versatz über die Spalte schiebt, etwa ein Bambusrohr am
+  Rand, fehlt.

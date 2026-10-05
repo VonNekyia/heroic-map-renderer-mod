@@ -8,9 +8,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Jeder Weg, auf dem der Client einen Abschnitt neu zeichnen lässt, endet hier: Block,
- * Bereich, Licht, Chunk. Die Minimap zeichnet die Spalte dann auch neu.
- * Siehe docs/minimap.md, „Neu zeichnen“.
+ * Die Wege, auf denen der Client einen Abschnitt neu zeichnen lässt, enden hier: Block,
+ * Bereich, Licht, Chunk; {@code allChanged} nicht. Die Minimap zeichnet die Spalte dann auch
+ * neu. Siehe docs/minimap.md, „Neu zeichnen“.
  */
 @Mixin(LevelExtractor.class)
 abstract class LevelExtractorMixin {

@@ -40,7 +40,8 @@ import org.joml.Vector3fc;
 /**
  * Zeichnet einen Chunk von oben: je Spalte die Flächen nach oben, die der Tesselator des
  * Spiels liefert, mit Tönung, weicher Beleuchtung und Licht. {@link #abziehen} läuft auf
- * dem Render-Thread, {@link #male} im Worker und liest nur, was der Abzug kopiert hat.
+ * dem Render-Thread, {@link #male} im Worker; dieser liest die Blöcke aus den Kopien des
+ * Abzugs, Licht und Tönung über die Region live aus der Welt.
  * Siehe docs/minimap.md.
  */
 final class ChunkMaler {
@@ -171,6 +172,15 @@ final class ChunkMaler {
             scale = a.scale();
             summe = new float[scale * scale * 4];
         }
+        try {
+            return zeichne(a);
+        } finally {
+            welt = null;
+            auftrag = null;
+        }
+    }
+
+    private int[] zeichne(Auftrag a) {
         int seite = 16 * scale;
         int[] pixel = new int[seite * seite];
         ModelManager modelle = minecraft.getModelManager();
@@ -207,8 +217,6 @@ final class ChunkMaler {
             }
             schreibe(pixel, seite, lx * scale, lz * scale);
         }
-        welt = null;
-        auftrag = null;
         return pixel;
     }
 
@@ -252,11 +260,17 @@ final class ChunkMaler {
      * Partikel-Sprite über ihre Form von oben, im Licht des Blocks darüber.
      */
     private void sammleBlockentity(BlockStateModel model, BlockState state) {
-        VoxelShape form = state.getShape(welt, pos);
-        if (form.isEmpty()) {
-            return;
+        AABB box;
+        try {
+            VoxelShape form = state.getShape(welt, pos);
+            if (form.isEmpty()) {
+                return;
+            }
+            box = form.bounds();
+        } catch (RuntimeException e) {
+            // Ein Block eines Mods, der im Worker mehr als eine Region erwartet: der ganze Block.
+            box = new AABB(0, 0, 0, 1, 1, 1);
         }
-        AABB box = form.bounds();
         float x0 = (float) Math.max(0, box.minX), x1 = (float) Math.min(1, box.maxX);
         float z0 = (float) Math.max(0, box.minZ), z1 = (float) Math.min(1, box.maxZ);
         TextureAtlasSprite s = model.particleMaterial().sprite();
