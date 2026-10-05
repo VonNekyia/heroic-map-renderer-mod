@@ -41,7 +41,6 @@ public final class Messung implements FabricClientGameTest {
     private static final int STAND_TICKS = 100;
     private static final int FLUG_TICKS = 200;
     private static final int HOEHE = 160;
-    private static final int RUHE_TICKS = 1200;
 
     private final LongArrayList frames = new LongArrayList();
     private boolean aufnehmen;
@@ -91,8 +90,6 @@ public final class Messung implements FabricClientGameTest {
             // und dieselbe Strecke liegt geladen da.
             flug(context, server, true);
             flug(context, server, false);
-            // Gleich nach dem Laden lief ein Lauf im Takt der Ticks, ein Frame je Tick.
-            context.waitTicks(RUHE_TICKS);
 
             // Bildrate ohne Grenze, 144 und 60, dazu die Massstäbe; 260 heisst ohne Grenze.
             boolean hin = true;
@@ -106,6 +103,7 @@ public final class Messung implements FabricClientGameTest {
                 });
                 zeige(context, true);
                 String art = "fps=" + (fps == 260 ? "frei" : fps) + " scale=" + scale;
+                warteAufFreieFrames(context, art);
                 for (int runde = 1; runde <= RUNDEN; runde++) {
                     for (boolean an : new boolean[] {false, true}) {
                         zeige(context, an);
@@ -140,6 +138,31 @@ public final class Messung implements FabricClientGameTest {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /**
+     * Wartet, bis das Spiel nicht mehr im Takt der Ticks zeichnet, einen Frame je Tick: mehr als
+     * 2 Frames je Tick über 20 Ticks. So lief der Gametest zeitweise, nach dem Laden der Welt
+     * und für einige Minuten auch später.
+     */
+    private void warteAufFreieFrames(ClientGameTestContext context, String art) {
+        for (int versuch = 0; versuch < 30; versuch++) {
+            context.runOnClient(mc -> {
+                frames.clear();
+                aufnehmen = true;
+            });
+            context.waitTicks(20);
+            int n = context.computeOnClient(mc -> {
+                aufnehmen = false;
+                return frames.size();
+            });
+            if (n > 40) {
+                zeile("frei %s versuche=%d frames_je_20_ticks=%d", art, versuch, n);
+                return;
+            }
+            context.waitTicks(200);
+        }
+        zeile("takt %s blieb bei einem Frame je Tick", art);
     }
 
     /** Fliegt 20 Blöcke/s über die Strecke x = 0 bis FLUG_TICKS, hin nach Osten oder zurück. */

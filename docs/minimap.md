@@ -170,7 +170,10 @@ nichts.
   2 Chunks je Richtung (`Minimap.reichweite`): bei 1 px ±6 Chunks, bei
   2 px ±4, bei 4 px ±3. Verlässt ein Chunk den Bereich, fällt sein Bild weg;
   kommt er wieder, zeichnet der Mod ihn neu.
-- **Reihenfolge:** die offenen Chunks, die nächsten zuerst.
+- **Reihenfolge:** die offenen Chunks, die nächsten zuerst. Ein Chunk wartet
+  nach einem Abzug 0,5 s, ehe er wieder abgezogen wird (`Minimap.PAUSE_NS`),
+  denn das Licht neuer Chunks markiert ihre Nachbarn immer wieder; was die
+  Pause bringt, steht unter „Kosten“.
 - **Render-Thread:** zieht einen Chunk ab (`ChunkMaler.abziehen`): je
   Spalte die erste Höhe und je Abschnitt von dort bis zum ersten vollen
   Block eine Kopie mit den Nachbarn, über `RenderRegionCache.createRegion`
@@ -201,15 +204,20 @@ nichts.
 
 ## Kosten
 
-Bei Sichtweite 12, gemessen am 05.10., siehe
-[Minimap, Kosten](messungen/2026-10-05-minimap-kosten.md):
+Bei Sichtweite 12 und einem Fenster von 854 × 480, gemessen am 05. und
+06.10., siehe [Minimap, Kosten](messungen/2026-10-05-minimap-kosten.md):
 
-| Was | Zeit |
-|---|---|
-| Abzug je Chunk, Render-Thread | 0,09 bis 0,10 ms im Median |
-| Zeichnen je Chunk, Worker | 2,0 ms bei 1 px, 2,1 ms bei 2 px, 2,6 ms bei 4 px |
-| Frametime im p95, im Flug | 0,03 bis 0,15 ms mehr als ohne Minimap |
-| Frametime im p95, im Stand | 0,07 bis 0,36 ms mehr als ohne Minimap |
+| Was | Bedingung | Zeit |
+|---|---|---|
+| Abzug je Chunk, Render-Thread | Median | 0,08 ms |
+| Zeichnen je Chunk, Worker | Median | 1,9 ms bei 1 px, 2,1 ms bei 2 px, 2,6 ms bei 4 px |
+| Frametime im p95, mehr als ohne Minimap | 144 und 60 fps, 4 px, Stand und Flug | höchstens 0,06 ms |
+| Frametime im p99, mehr als ohne Minimap | 144 und 60 fps, 4 px, Stand und Flug | höchstens 0,45 ms |
+| Frametime im p95, mehr als ohne Minimap | ohne Grenze, 3500 bis 5000 fps, 2 und 4 px | höchstens 0,18 ms |
+| Kopie der Texel des Atlas | einmal je Neuladen | 3,5 bis 15 ms |
+| neue Region | bei 4 px | 0,14 bis 0,17 ms |
+
+Der Flug geht dabei mit 20 Blöcken/s über geladenes Gelände.
 
 Den Gametest dazu startet:
 

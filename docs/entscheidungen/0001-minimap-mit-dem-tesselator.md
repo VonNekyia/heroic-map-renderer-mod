@@ -49,7 +49,8 @@ Freigegeben vom Reviewer am 05.10. unter diesen Bedingungen:
 - **Teurer** als A und B, je Chunk Millisekunden statt Hundertstel, siehe
   [Minimap](../minimap.md), „Kosten“.
 - **Ein Worker** zeichnet, denn auf dem Render-Thread stieg das p95 im Flug
-  um 1,9 ms; mit Worker um höchstens 0,15 ms, siehe
+  um 1,9 ms. Mit Worker steigt es bei 144 und 60 fps um höchstens 0,06 ms,
+  bei freier Bildrate um höchstens 0,18 ms, Sichtweite 12, 4 px, siehe
   [Minimap, Kosten](../messungen/2026-10-05-minimap-kosten.md).
 - **Gleiches Bild** wie der Download, bis auf die Unterschiede in
   [Minimap](../minimap.md), „Was anders ist als top-north“.
