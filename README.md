@@ -6,9 +6,12 @@ dem Plugin von [heroic-map-renderer](https://github.com/VonNekyia/heroic-map-ren
 - **Minimap:** zeichnet der Mod selbst, aus den Chunks, die der Client geladen hat.
 - **Vollbildkarte:** lädt der Mod vom Server, mit 1, 2 oder 4 Pixeln je Block.
 
+![Minimap bei 4 Pixeln je Block](docs/bilder/minimap-4px.png)
+
 ## Stand
 
-Im Aufbau: das Gerüst und die Projektion, noch ohne Minimap. Der Plan steht in
+Im Aufbau: die Minimap läuft, die Vollbildkarte und der Download fehlen noch.
+Der Plan steht in
 [heroic-map-renderer#155](https://github.com/VonNekyia/heroic-map-renderer/issues/155).
 
 Bauen und testen: [docs/entwicklung.md](docs/entwicklung.md), die ganze Doku

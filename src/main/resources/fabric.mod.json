@@ -12,6 +12,15 @@
   },
   "license": "Apache-2.0",
   "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.nekyia.heroicmap.HeroicMap"
+    ]
+  },
+  "mixins": [
+    "heroicmap.mixins.json"
+  ],
+  "accessWidener": "heroicmap.accesswidener",
   "depends": {
     "fabricloader": ">=0.19.5",
     "minecraft": "~26.3",

@@ -3,6 +3,7 @@ title: Bauen und testen
 description: Versionen, Gradle, Tests, CI und die Prüfung der Doku.
 code:
   - build.gradle.kts
+  - src/gametest/resources/fabric.mod.json
   - gradle/libs.versions.toml
   - gradle/wrapper/gradle-wrapper.properties
   - .github/workflows/ci.yml
@@ -32,6 +33,21 @@ Das baut das Jar nach `build/libs/` und lässt die Tests laufen.
 | Test | prüft |
 |---|---|
 | `ProjektionTest` | die Projektion gegen `projektion.json` des Renderers, braucht Netz, siehe [Projektion](projektion.md) |
+| `LichtTest` | die Lightmap gegen die Werte aus der Doku des Renderers, siehe [Minimap](minimap.md), „Licht“ |
+
+## Gametests
+
+Die Client-Gametests starten das Spiel mit einem Fenster und laufen nicht
+in der CI:
+
+```bash
+./gradlew runClientGameTest
+```
+
+| Gametest | tut |
+|---|---|
+| `Bilder` | baut eine Szene und nimmt die Minimap auf; mit `-Pbilder=<ordner>` landen die Ausschnitte dort, siehe [Minimap](minimap.md), „Bilder“ |
+| `Messung` | nur mit `-Pmessung=<datei>`: Zeit je Chunk und Frametime mit und ohne Minimap, siehe [Minimap](minimap.md), „Kosten“ |
 
 ## CI
 

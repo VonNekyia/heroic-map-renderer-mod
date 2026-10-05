@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "package": "com.nekyia.heroicmap.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "LevelExtractorMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
