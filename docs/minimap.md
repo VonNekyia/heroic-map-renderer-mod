@@ -170,10 +170,9 @@ nichts.
   2 Chunks je Richtung (`Minimap.reichweite`): bei 1 px ±6 Chunks, bei
   2 px ±4, bei 4 px ±3. Verlässt ein Chunk den Bereich, fällt sein Bild weg;
   kommt er wieder, zeichnet der Mod ihn neu.
-- **Reihenfolge:** die offenen Chunks, die nächsten zuerst. Ein Chunk wartet
-  nach einem Abzug 0,5 s, ehe er wieder abgezogen wird (`Minimap.PAUSE_NS`),
-  denn das Licht neuer Chunks markiert ihre Nachbarn immer wieder; was die
-  Pause bringt, steht unter „Kosten“.
+- **Reihenfolge:** die offenen Chunks, die nächsten zuerst. Eine Pause
+  zwischen zwei Abzügen eines Chunks brachte messbar nichts und verzögerte
+  jede Änderung; der Mod hat keine, siehe die Messung unter „Kosten“.
 - **Render-Thread:** zieht einen Chunk ab (`ChunkMaler.abziehen`): je
   Spalte die erste Höhe und je Abschnitt von dort bis zum ersten vollen
   Block eine Kopie mit den Nachbarn, über `RenderRegionCache.createRegion`

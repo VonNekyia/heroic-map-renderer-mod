@@ -98,8 +98,8 @@ Flug übernahm die Minimap je Lauf 76 bis 117 Chunks. Garbage Collections
 fielen mit und ohne Minimap ähnlich viele, bis auf den ersten Flug bei
 2 px in Lauf C, 13 gegen 7.
 
-Pause zwischen zwei Abzügen eines Chunks, 60 fps, 4 px, Flug, je drei Läufe
-im Wechsel:
+Pause zwischen zwei Abzügen eines Chunks, gemessen am Stand `f05408b`,
+60 fps, 4 px, Flug, je drei Läufe im Wechsel:
 
 | Lauf | Pause | Chunks je Lauf | p99 |
 |---|---|---|---|
@@ -121,6 +121,7 @@ im Wechsel:
   Lauf C nicht. In einem Lauf vom 05.10. um 21:38 mit Flug in neues Gelände,
   noch mit dem Fehler aus Punkt 15, zeichnete die Minimap ohne Pause 1004
   Chunks in 10 s, mit Pause 300 bis 400; das ist nur ein Hinweis. Der Mod
-  behält die Pause vorerst, weil das Licht neuer Chunks auf einem Server
-  ihre Nachbarn immer wieder markiert.
+  hat die Pause deshalb nicht mehr, entschieden vom Reviewer am 06.10.;
+  zeigt ein Test am Server doppeltes Markieren, kommt sie mit einer Messung
+  wieder.
 - **Der schnelle Weg** spart je Chunk rund ein Drittel.

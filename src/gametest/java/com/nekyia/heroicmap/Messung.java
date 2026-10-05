@@ -120,18 +120,6 @@ public final class Messung implements FabricClientGameTest {
                 }
             }
 
-            // Bei 60 fps mit und ohne Pause zwischen zwei Abzügen eines Chunks, im Wechsel.
-            for (int runde = 1; runde <= RUNDEN; runde++) {
-                for (long pause : new long[] {Minimap.PAUSE_NS, 0}) {
-                    context.runOnClient(mc -> Minimap.INSTANZ.pauseNs = pause);
-                    zeige(context, true);
-                    boolean richtung = hin;
-                    frames(context, "fps=60 scale=4 flug pause=" + pause / 1_000_000 + "ms", true, runde,
-                            () -> flug(context, server, richtung));
-                    hin = !hin;
-                }
-            }
-            context.runOnClient(mc -> Minimap.INSTANZ.pauseNs = Minimap.PAUSE_NS);
         }
         try {
             Files.writeString(Path.of(AUSGABE), bericht);
