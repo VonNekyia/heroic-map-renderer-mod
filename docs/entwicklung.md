@@ -41,7 +41,8 @@ Das baut das Jar nach `build/libs/` und lässt die Tests laufen.
   `gradle/actions/setup-gradle` prüft dabei auch, dass `gradle-wrapper.jar`
   ein Wrapper von Gradle ist.
 - **Doku:** `pruefe-doku.sh` vom Branch `master` des Hauptrepositorys,
-  dieselbe Prüfung wie dort.
+  dieselbe Prüfung wie dort. Der Schritt läuft mit `shell: bash`, also mit
+  `pipefail`: Scheitert der Download, wird der Job rot.
 
 ## Doku prüfen
 
