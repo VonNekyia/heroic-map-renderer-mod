@@ -8,8 +8,11 @@ dem Plugin von [heroic-map-renderer](https://github.com/VonNekyia/heroic-map-ren
 
 ## Stand
 
-Im Aufbau, noch ohne Code. Der Plan steht in
+Im Aufbau: das Gerüst und die Projektion, noch ohne Minimap. Der Plan steht in
 [heroic-map-renderer#155](https://github.com/VonNekyia/heroic-map-renderer/issues/155).
+
+Bauen und testen: [docs/entwicklung.md](docs/entwicklung.md), die ganze Doku
+in [docs/](docs/index.md).
 
 ## Lizenz
 

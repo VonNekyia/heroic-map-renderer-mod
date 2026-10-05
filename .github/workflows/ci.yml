@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gradle:
+    name: Gradle
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 25
+
+      # Prüft auch, dass gradle-wrapper.jar ein Wrapper von Gradle ist.
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Bauen und testen
+        timeout-minutes: 20
+        run: ./gradlew build
+
+  doku:
+    name: Doku
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+
+      # Die Prüfung des Hauptrepositorys, damit es sie nur einmal gibt.
+      - name: Verweise, Links und Frontmatter
+        timeout-minutes: 5
+        run: curl -fsSL https://raw.githubusercontent.com/VonNekyia/heroic-map-renderer/master/.github/pruefe-doku.sh | bash
