@@ -356,7 +356,7 @@ public final class Minimap {
     }
 
     /** Ein Pfeil in Blickrichtung: bei Gier 0 sieht der Spieler nach Süden, auf der Karte nach unten. */
-    private static void pfeil(GuiGraphicsExtractor g, int x, int y, float gier) {
+    static void pfeil(GuiGraphicsExtractor g, int x, int y, float gier) {
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.translate(x, y);

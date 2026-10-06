@@ -21,6 +21,8 @@ import net.minecraft.resources.Identifier;
 public final class HeroicMap implements ClientModInitializer {
 
     public static final String ID = "heroicmap";
+    /** Die Taste der Vollbildkarte; die Karte schliesst sich mit ihr. */
+    static KeyMapping karte;
 
     @Override
     public void onInitializeClient() {
@@ -29,12 +31,20 @@ public final class HeroicMap implements ClientModInitializer {
                 new KeyMapping("key.heroicmap.zeigen", InputConstants.KEY_M, kategorie));
         KeyMapping massstab = KeyMappingHelper.registerKeyMapping(
                 new KeyMapping("key.heroicmap.massstab", InputConstants.KEY_N, kategorie));
+        karte = KeyMappingHelper.registerKeyMapping(
+                new KeyMapping("key.heroicmap.karte", InputConstants.KEY_COMMA, kategorie));
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (zeigen.consumeClick()) {
                 Minimap.INSTANZ.umschalten();
             }
             while (massstab.consumeClick()) {
                 Minimap.INSTANZ.naechsterMassstab();
+            }
+            while (karte.consumeClick()) {
+                if (client.gui.screen() == null && client.level != null) {
+                    String dimension = client.level.dimension().identifier().toString();
+                    client.gui.setScreen(new Karte(Satz.fuer(Downloads.serverOrdner(), dimension)));
+                }
             }
         });
         // Fabric meldet den Wechsel der Welt nur zu einer neuen; das Trennen eigens, und das auf

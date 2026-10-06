@@ -34,5 +34,8 @@
   "heroicmap.download.grund.netz": "Keine, eine unvollständige oder eine falsche Antwort vom Kartenserver.",
   "heroicmap.download.grund.heimnetz": "Die Karte liegt in einem privaten Netz und nicht beim Spielserver selbst; der Mod lädt nichts.",
   "heroicmap.download.grund.unbekannt": "Den Host der Karte gibt es nicht.",
-  "heroicmap.download.grund.anderer": "Ein Fehler im Mod; Einzelheiten im Log."
+  "heroicmap.download.grund.anderer": "Ein Fehler im Mod; Einzelheiten im Log.",
+  "key.heroicmap.karte": "Vollbildkarte",
+  "heroicmap.karte.titel": "Karte",
+  "heroicmap.karte.keine": "Für diese Dimension ist keine Karte geladen; /heroicmap angebot zeigt, was der Server anbietet."
 }

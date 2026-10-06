@@ -34,5 +34,8 @@
   "heroicmap.download.grund.netz": "No, an incomplete or a wrong answer from the map server.",
   "heroicmap.download.grund.heimnetz": "The map is in a private network and not on the game server itself; the mod downloads nothing.",
   "heroicmap.download.grund.unbekannt": "The map's host does not exist.",
-  "heroicmap.download.grund.anderer": "An error in the mod; details in the log."
+  "heroicmap.download.grund.anderer": "An error in the mod; details in the log.",
+  "key.heroicmap.karte": "Full-screen map",
+  "heroicmap.karte.titel": "Map",
+  "heroicmap.karte.keine": "No map is downloaded for this dimension; /heroicmap angebot shows what the server offers."
 }
