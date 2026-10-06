@@ -58,7 +58,7 @@ final class Einstellungen extends Screen {
         addRenderableWidget(CycleButton.builder((Integer z) -> Component.translatable("heroicmap.menue.fach", z), m.zoom())
                 .withValues(1, 2, 4)
                 .create(x, y + 24, BREITE, 20, Component.translatable("heroicmap.menue.zoom"), (b, z) -> m.setzeZoom(z)));
-        addRenderableWidget(CycleButton.builder((Integer px) -> Component.translatable("heroicmap.menue.px", px), m.scale())
+        addRenderableWidget(CycleButton.builder((Integer px) -> Component.translatable("heroicmap.menue.px", px), m.aufloesung())
                 .withValues(1, 2, 4)
                 .create(x, y + 48, BREITE, 20, Component.translatable("heroicmap.menue.massstab"), (b, px) -> m.setzeScale(px)));
         addRenderableWidget(CycleButton.booleanBuilder(Component.translatable("heroicmap.menue.rund"),

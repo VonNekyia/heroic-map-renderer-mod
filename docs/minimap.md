@@ -13,6 +13,7 @@ code:
   - src/test/java/com/nekyia/heroicmap/MinimapTest.java
   - src/gametest/java/com/nekyia/heroicmap/Bilder.java
   - src/gametest/java/com/nekyia/heroicmap/Messung.java
+  - src/gametest/java/com/nekyia/heroicmap/Bedienung.java
 ---
 
 # Minimap
@@ -42,14 +43,16 @@ steht unter „Kosten“.
 
 - **Zoom und Auflösung** sind getrennt. Der Zoom legt fest, wie viel
   Gegend die Minimap zeigt: bei 128 Einheiten Seite 128 Blöcke bei 1×,
-  64 bei 2×, 32 bei 4×. Die Auflösung legt fest, wie viele Pixel ein Block
-  in den Texturen hat. Mehr Auflösung bei gleichem Zoom zeigt mehr
-  Einzelheiten, ohne Sicht zu verlieren, solange der Schirm die Pixel hat:
-  ein Block ist Zoom × GUI-Massstab Pixel des Schirms gross, bei 1× und
-  GUI-Massstab 3 also 3. Mehr Auflösung als das zeigt der Schirm nicht;
-  sie kostet dann nur Zeit je Chunk, siehe „Kosten“. Ein
-  anderer Zoom ändert nur den Bereich, eine andere Auflösung zeichnet alles
-  neu.
+  64 bei 2×, 32 bei 4×. Die Auflösung ist eine Obergrenze für die Pixel
+  je Block in den Texturen. Gezeichnet wird mit der grössten von 1, 2 und
+  4 px bis dahin, die in die Pixel eines Blocks auf dem Schirm ganz
+  aufgeht (`Minimap.effektiv`). Ein Block ist auf dem Schirm Zoom ×
+  GUI-Massstab Pixel gross: bei 1× und GUI-Massstab 2 also 2, bei
+  GUI-Massstab 3 also 3, dann zeichnet die Minimap mit 1 px, 3 Pixel je
+  Texel. So verkleinert das Spiel die Texturen nie, verkleinert wurde die
+  Minimap unscharf, und jeder Texel ist auf dem Schirm gleich gross. Mit einem anderen GUI-Massstab oder Zoom passt sich
+  die Auflösung im nächsten Frame an und zeichnet neu; ein anderer Zoom
+  ändert sonst nur den Bereich.
 - **Lage und Grösse:** Das Menü dunkelt nicht ab, die Minimap im HUD bleibt
   sichtbar und ist weiss umrandet, rund mit einem Ring. Ziehen mit links
   verschiebt sie. Der weisse Griff sitzt an der Ecke, die zur Mitte des

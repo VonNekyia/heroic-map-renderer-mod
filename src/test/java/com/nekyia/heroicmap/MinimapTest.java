@@ -110,7 +110,7 @@ class MinimapTest {
         Minimap nachher = new Minimap();
         nachher.lies(datei);
         assertFalse(nachher.sichtbar());
-        assertEquals(4, nachher.scale());
+        assertEquals(4, nachher.aufloesung());
         assertEquals(1, nachher.zoom());
         assertTrue(nachher.rund());
         assertEquals(vorher.rahmen(640, 360), nachher.rahmen(640, 360));
@@ -124,7 +124,7 @@ class MinimapTest {
         Minimap minimap = new Minimap();
         minimap.lies(datei);
         assertTrue(minimap.sichtbar());
-        assertEquals(2, minimap.scale());
+        assertEquals(2, minimap.aufloesung());
         assertFalse(minimap.rund());
         assertEquals(new Minimap.Rahmen(640 - 128 - 4, 360 - 128 - 4, 128), minimap.rahmen(640, 360));
     }
@@ -136,7 +136,7 @@ class MinimapTest {
         Files.writeString(datei, "massstab=4");
         Minimap minimap = new Minimap();
         minimap.lies(datei);
-        assertEquals(4, minimap.scale());
+        assertEquals(4, minimap.aufloesung());
         assertEquals(4, minimap.zoom());
     }
 
@@ -157,6 +157,27 @@ class MinimapTest {
         minimap.zentriere();
         assertEquals(0, minimap.versatzX());
         assertEquals(0, minimap.versatzZ());
+    }
+
+    @Test
+    void nieVerkleinertImmerGanzeTexel() {
+        // GUI-Massstab 2, Zoom 1: 2 Pixel je Block auf dem Schirm, 4 px in der Textur wären verkleinert.
+        assertEquals(2, Minimap.effektiv(4, 1, 2));
+        // GUI-Massstab 3: 3 Pixel je Block, 2 ginge nicht ganz auf.
+        assertEquals(1, Minimap.effektiv(4, 1, 3));
+        assertEquals(2, Minimap.effektiv(4, 2, 3));
+        assertEquals(4, Minimap.effektiv(4, 4, 3));
+        // Die Wahl ist die Obergrenze.
+        assertEquals(1, Minimap.effektiv(1, 4, 4));
+        assertEquals(2, Minimap.effektiv(2, 4, 4));
+        for (int a : new int[] {1, 2, 4}) {
+            for (int z : new int[] {1, 2, 4}) {
+                for (int k = 1; k <= 8; k++) {
+                    int r = Minimap.effektiv(a, z, k);
+                    assertTrue(r <= a && r <= z * k && (z * k) % r == 0, a + " " + z + " " + k);
+                }
+            }
+        }
     }
 
     @Test
