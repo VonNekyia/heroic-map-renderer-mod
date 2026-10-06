@@ -81,7 +81,10 @@ public final class Bilder implements FabricClientGameTest {
             server.runCommand("tp @a 0.5 -30 0.5 0 90");
             spiel.getConnection().waitForChunksRender();
             for (int scale : new int[] {1, 2, 4}) {
-                context.runOnClient(mc -> Minimap.INSTANZ.setzeScale(scale));
+                context.runOnClient(mc -> {
+                    Minimap.INSTANZ.setzeScale(scale);
+                    Minimap.INSTANZ.setzeZoom(scale);
+                });
                 context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
                 context.waitTicks(2);
                 Path bild = context.takeScreenshot(TestScreenshotOptions.of("minimap-" + scale + "px").disableCounterPrefix());
@@ -100,7 +103,11 @@ public final class Bilder implements FabricClientGameTest {
         context.runOnClient(mc -> Minimap.INSTANZ.setzeRund(true));
         context.waitTicks(2);
         Path rund = context.takeScreenshot(TestScreenshotOptions.of("minimap-rund").disableCounterPrefix());
-        context.runOnClient(mc -> mc.gui.setScreen(new Einstellungen()));
+        context.runOnClient(mc -> {
+            // Die Meldung zum Spielmodus läge sonst über den Knöpfen.
+            mc.gui.hud.getChat().clearMessages(false);
+            mc.gui.setScreen(new Einstellungen());
+        });
         context.waitTicks(5);
         Path menue = context.takeScreenshot(TestScreenshotOptions.of("menue").disableCounterPrefix());
         context.runOnClient(mc -> {

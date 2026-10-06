@@ -20,7 +20,8 @@ code:
 Die Minimap liegt in der Vorgabe rechts oben im HUD, 128 Einheiten des GUI
 im Quadrat, eckig und genordet, der Spieler in der Mitte; Form, Lage und
 Grösse stellt das Menü ein, siehe „Bedienung“. Sie zeichnet jeden Chunk mit
-dem Tesselator des Spiels von oben, mit 1, 2 oder 4 Pixeln je Block, und
+dem Tesselator des Spiels von oben, mit 1, 2 oder 4 Pixeln je Block in der
+Textur, und
 liegt damit nah an der Karte `top-north` des Renderers, siehe
 [0001](entscheidungen/0001-minimap-mit-dem-tesselator.md). Was sie kostet,
 steht unter „Kosten“.
@@ -34,27 +35,39 @@ steht unter „Kosten“.
 | Einstellung | Vorgabe | tut |
 |---|---|---|
 | Minimap | an | blendet die Minimap aus und ein |
-| Massstab der Minimap | 2 px je Block | 1, 2 oder 4 Pixel je Block |
+| Zoom der Minimap | 2× | 1, 2 oder 4 Einheiten des GUI je Block: wie viel Gegend die Minimap zeigt |
+| Auflösung der Minimap | 2 px je Block | 1, 2 oder 4 Pixel je Block in den Texturen: wie fein sie zeichnet |
 | Form | eckig | eckig oder rund, siehe „Form“ |
 | Knopf „Karte laden …“ | – | die Karten des Servers, wie in der [Vollbildkarte](vollbildkarte.md), „Bedienung“ |
 
+- **Zoom und Auflösung** sind getrennt. Der Zoom legt fest, wie viel
+  Gegend die Minimap zeigt: bei 128 Einheiten Seite 128 Blöcke bei 1×,
+  64 bei 2×, 32 bei 4×. Die Auflösung legt fest, wie viele Pixel ein Block
+  in den Texturen hat. Mehr Auflösung bei gleichem Zoom zeigt mehr
+  Einzelheiten, ohne Sicht zu verlieren, solange der Schirm die Pixel hat:
+  ein Block ist Zoom × GUI-Massstab Pixel des Schirms gross, bei 1× und
+  GUI-Massstab 3 also 3. Mehr Auflösung als das zeigt der Schirm nicht;
+  sie kostet dann nur Zeit je Chunk, siehe „Kosten“. Ein
+  anderer Zoom ändert nur den Bereich, eine andere Auflösung zeichnet alles
+  neu.
 - **Lage und Grösse:** Das Menü dunkelt nicht ab, die Minimap im HUD bleibt
-  sichtbar und ist weiss umrandet. Ziehen mit links verschiebt sie. Der
-  weisse Griff sitzt an der Ecke, die zur Mitte des Schirms zeigt; ihn
-  ziehen macht die Minimap grösser oder kleiner, die Ecke gegenüber bleibt
+  sichtbar und ist weiss umrandet, rund mit einem Ring. Ziehen mit links
+  verschiebt sie. Der weisse Griff sitzt an der Ecke, die zur Mitte des
+  Schirms zeigt, rund auf dem Ring in der Diagonale dorthin; ihn ziehen
+  macht die Minimap grösser oder kleiner, die Ecke gegenüber bleibt
   stehen. Die Seite liegt zwischen 64 und 256 Einheiten des GUI
   (`Minimap.KLEINSTE`, `Minimap.GROESSTE`) und höchstens so gross, wie der
-  Schirm Platz hat. Ein Pixel der Minimap bleibt eine Einheit: Grösser
-  zeigt mehr Gegend im selben Massstab und zeichnet mehr Chunks, siehe
-  „Neu zeichnen“, „Bereich“.
+  Schirm Platz hat. Grösser zeigt mehr Gegend beim selben Zoom und
+  zeichnet mehr Chunks, siehe „Neu zeichnen“, „Bereich“.
 - **Gespeichert** wird beim Schliessen des Menüs, in
   `config/heroicmap.properties`. Die Lage steht dort als Anteil des freien
   Platzes, 0 links oder oben bis 1 rechts oder unten, so bleibt die Minimap
   bei einer anderen Fenstergrösse in ihrer Ecke. Fehlt die Datei oder ist
-  ein Wert unlesbar, gilt die Vorgabe.
+  ein Wert unlesbar, gilt die Vorgabe. Eine Datei von vor dem Zoom hat nur
+  `massstab`; dann gilt er für Auflösung und Zoom, der Ausschnitt bleibt.
 - **Tasten:** Vorbelegt ist nur `.` für die
   [Vollbildkarte](vollbildkarte.md). „Minimap zeigen oder verbergen“ und
-  „Massstab der Minimap“ gibt es auch als Tasten, ohne Belegung, unter
+  „Zoom der Minimap“ gibt es auch als Tasten, ohne Belegung, unter
   Steuerung, Gruppe „Heroic Map“; was sie ändern, speichert der Mod gleich.
 - **Der Pfeil** zeigt die Blickrichtung. Bei Gier 0 blickt der Spieler nach
   Süden, auf der Karte nach unten; der Pfeil ist also um Gier + 180° gedreht.
@@ -214,9 +227,9 @@ nichts.
   vergleicht deshalb je Frame `Options.biomeBlendRadius` und den Block-Atlas
   und zeichnet bei einer Änderung neu.
 - **Bereich:** Gezeichnet und behalten wird, was die Minimap zeigt, plus
-  2 Chunks je Richtung (`Minimap.reichweite`): in der Vorgabe von 128
-  Einheiten bei 1 px ±6 Chunks, bei 2 px ±4, bei 4 px ±3; bei 256 Einheiten
-  und 1 px ±10. Rund zeichnet der Mod dasselbe Quadrat wie eckig. Verlässt ein Chunk den Bereich, fällt sein Bild weg;
+  2 Chunks je Richtung (`Minimap.reichweite`), je nach Zoom: in der
+  Vorgabe von 128 Einheiten bei 1× ±6 Chunks, bei 2× ±4, bei 4× ±3; bei
+  256 Einheiten und 1× ±10. Die Auflösung ändert den Bereich nicht. Rund zeichnet der Mod dasselbe Quadrat wie eckig. Verlässt ein Chunk den Bereich, fällt sein Bild weg;
   kommt er wieder, zeichnet der Mod ihn neu.
 - **Reihenfolge:** die offenen Chunks, die nächsten zuerst. Eine Pause
   zwischen zwei Abzügen eines Chunks brachte messbar nichts und verzögerte
@@ -243,7 +256,7 @@ nichts.
   hochgeladen. Danach schreibt der Mod nur das Bild des fertigen Chunks an
   seine Stelle (`CommandEncoder.writeToTexture` mit Versatz), bei 4 px
   64 × 64 Pixel. Regionen ausserhalb des Bereichs gibt er frei.
-- **Wechsel** der Welt und Trennen leeren alles; ein anderer Massstab
+- **Wechsel** der Welt und Trennen leeren alles; eine andere Auflösung
   zeichnet alles neu. Bilder aus einem älteren Stand fallen weg.
 - **Verborgen** zeichnet die Minimap nichts. Beim Zeigen gilt die Mitte als
   unbekannt; der nächste Frame passt den Bereich an und zeichnet nach, was
@@ -279,7 +292,8 @@ Den Gametest dazu startet:
 ## Bilder
 
 Der Gametest `Bilder` baut eine Szene in einer flachen Welt und nimmt die
-Minimap bei 1, 2 und 4 Pixeln je Block auf, dann rund bei 4 px und das
+Minimap bei 1, 2 und 4 Pixeln je Block auf, mit dem Zoom gleich der
+Auflösung, dann rund bei 4 px und das
 Menü (siehe „Bedienung“ und „Form“):
 
 ```bash

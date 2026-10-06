@@ -75,7 +75,10 @@ public final class Minimap {
     private ChunkMaler maler;
 
     private boolean sichtbar = true;
+    /** Auflösung: Pixel je Block in den Texturen, 1, 2 oder 4; wie fein die Minimap zeichnet. */
     private int scale = 2;
+    /** Zoom: Einheiten des GUI je Block, 1, 2 oder 4; wie viel Gegend die Minimap zeigt. */
+    private int zoom = 2;
     private boolean rund;
     private int groesse = GROESSE;
     /** Die Lage im freien Platz des Schirms: 0 links oder oben, 1 rechts oder unten. */
@@ -153,11 +156,24 @@ public final class Minimap {
         return sichtbar;
     }
 
-    /** 1, 2 oder 4 Pixel je Block, der Reihe nach. */
-    void naechsterMassstab() {
-        setzeScale(scale == 4 ? 1 : scale * 2);
+    /** Zoom 1, 2 oder 4 Einheiten je Block, der Reihe nach. */
+    void naechsterZoom() {
+        setzeZoom(zoom == 4 ? 1 : zoom * 2);
     }
 
+    /** Ein anderer Zoom ändert nur den Bereich; die Texturen behalten ihre Auflösung. */
+    void setzeZoom(int zoom) {
+        if (zoom != this.zoom) {
+            this.zoom = zoom;
+            mitte = null;
+        }
+    }
+
+    int zoom() {
+        return zoom;
+    }
+
+    /** Eine andere Auflösung zeichnet alles neu. */
     void setzeScale(int scale) {
         if (scale != this.scale) {
             this.scale = scale;
@@ -231,6 +247,9 @@ public final class Minimap {
         sichtbar = !"false".equals(p.getProperty("minimap"));
         int s = zahl(p.getProperty("massstab"), 2);
         scale = s == 1 || s == 4 ? s : 2;
+        // Vor dem Zoom galt der Massstab für beides; ohne zoom bleibt der Ausschnitt so.
+        int z = zahl(p.getProperty("zoom"), scale);
+        zoom = z == 1 || z == 4 ? z : 2;
         rund = "rund".equals(p.getProperty("form"));
         groesse = Mth.clamp(zahl(p.getProperty("groesse"), GROESSE), KLEINSTE, GROESSTE);
         lageX = bruch(p.getProperty("lage_x"), 1);
@@ -241,6 +260,7 @@ public final class Minimap {
         Properties p = new Properties();
         p.setProperty("minimap", Boolean.toString(sichtbar));
         p.setProperty("massstab", Integer.toString(scale));
+        p.setProperty("zoom", Integer.toString(zoom));
         p.setProperty("form", rund ? "rund" : "eckig");
         p.setProperty("groesse", Integer.toString(groesse));
         p.setProperty("lage_x", Float.toString(lageX));
@@ -297,11 +317,11 @@ public final class Minimap {
 
     /** Chunks je Richtung um den Spieler, die die Minimap zeichnet: sichtbar plus Vorrat. */
     int reichweite() {
-        return reichweite(scale, groesse);
+        return reichweite(zoom, groesse);
     }
 
-    static int reichweite(int scale, int groesse) {
-        return Mth.ceil(groesse / 2f / (16f * scale)) + VORRAT;
+    static int reichweite(int zoom, int groesse) {
+        return Mth.ceil(groesse / 2f / (16f * zoom)) + VORRAT;
     }
 
     private boolean imBereich(int x, int z) {
@@ -339,8 +359,8 @@ public final class Minimap {
         arbeite(mc, level, spieler);
 
         Rahmen r = rahmen(g.guiWidth(), g.guiHeight());
-        int links = Mth.floor(Projektion.zuPixel(spieler.getX(), scale)) - r.seite() / 2;
-        int oben = Mth.floor(Projektion.zuPixel(spieler.getZ(), scale)) - r.seite() / 2;
+        int links = Mth.floor(Projektion.zuPixel(spieler.getX(), zoom)) - r.seite() / 2;
+        int oben = Mth.floor(Projektion.zuPixel(spieler.getZ(), zoom)) - r.seite() / 2;
         male(g, r, links, oben, mc.getWindow().getGuiScale());
         pfeil(g, r.x() + r.seite() / 2, r.y() + r.seite() / 2, spieler.getYRot());
     }
@@ -350,7 +370,8 @@ public final class Minimap {
      * einziger Lauf. Siehe docs/minimap.md, „Form“.
      */
     private void male(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k) {
-        int seite = CHUNKS_JE_REGION * 16 * scale;
+        // Eine Region in Einheiten des GUI nach dem Zoom; die Textur trifft sie über die Koordinaten 0 bis 1.
+        int seite = CHUNKS_JE_REGION * 16 * zoom;
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.scale(1f / k);
@@ -391,11 +412,9 @@ public final class Minimap {
             laeufe.add(new int[] {0, n, 0, n});
             return laeufe;
         }
-        double h = n / 2.0;
         int[] lauf = null;
         for (int y = 0; y < n; y++) {
-            double dy = y + 0.5 - h;
-            int a = (int) Math.round(h - Math.sqrt(Math.max(0, h * h - dy * dy)));
+            int a = sehne(n, y);
             if (a >= n - a) {
                 lauf = null;
             } else if (lauf != null && lauf[2] == a) {
@@ -406,6 +425,12 @@ public final class Minimap {
             }
         }
         return laeufe;
+    }
+
+    /** Linker Rand der Zeile y im Kreis in ein Quadrat mit der Seite n, auf ganze Pixel; der rechte ist n minus dieser. */
+    static int sehne(int n, int y) {
+        double h = n / 2.0, dy = y + 0.5 - h;
+        return (int) Math.round(h - Math.sqrt(Math.max(0, h * h - dy * dy)));
     }
 
     /**
