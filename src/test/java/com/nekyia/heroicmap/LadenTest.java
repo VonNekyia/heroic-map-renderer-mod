@@ -385,19 +385,30 @@ class LadenTest {
         });
         // Vier Kacheln sind da, die fünfte hält der Server: Der Index nennt die vier schon jetzt,
         // nicht erst am Ende; endet das Spiel hier, lädt der nächste Versuch nur die fünfte.
+        // Gewartet wird auf die ETags, nicht nur auf die Pfade: Eine Kachel steht vor dem Schreiben ohne ETag da.
+        String[] vier = {"0/0/0", "1/0/0", "1/-1/0", "2/1/1"};
         Map<String, String> ist = Map.of();
-        for (int i = 0; i < 500 && !ist.keySet().containsAll(java.util.List.of("0/0/0", "1/0/0", "1/-1/0", "2/1/1")); i++) {
+        for (int i = 0; i < 500 && !java.util.Arrays.stream(vier).allMatch(p -> etags.get(p).equals(ist(p))); i++) {
             Thread.sleep(10);
-            ist = Laden.liesIndex(ziel);
         }
+        ist = Laden.liesIndex(ziel);
         assertFalse(Files.exists(ziel.resolve("tmp").resolve("halb.tmp")));
-        for (String pfad : new String[] {"0/0/0", "1/0/0", "1/-1/0", "2/1/1"}) {
+        for (String pfad : vier) {
             assertEquals(etags.get(pfad), ist.get(pfad), pfad);
         }
         assertFalse(ist.containsKey("2/-2/3"));
         frei.countDown();
         assertEquals(5, lauf.get(10, TimeUnit.SECONDS).geladen());
         assertEquals(etags, new TreeMap<>(Laden.liesIndex(ziel)));
+    }
+
+    /** Das ETag einer Kachel im Index, wie er jetzt auf der Platte steht, oder null. */
+    private String ist(String pfad) {
+        try {
+            return Laden.liesIndex(ziel).get(pfad);
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     @Test

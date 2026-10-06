@@ -41,5 +41,7 @@
   "heroicmap.karte.laden": "Karte laden …",
   "heroicmap.karte.abgleich": "Abgleich",
   "heroicmap.auswahl.titel": "Karten dieses Servers",
-  "heroicmap.auswahl.massstab": "%s px · %s"
+  "heroicmap.auswahl.massstab": "%s px · %s",
+  "heroicmap.karte.abgleich_ab": "Abgleich ab %s",
+  "heroicmap.download.abgleich_ab": "Der nächste Abgleich geht ab %s."
 }

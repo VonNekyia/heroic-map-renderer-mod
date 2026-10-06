@@ -41,5 +41,7 @@
   "heroicmap.karte.laden": "Download map …",
   "heroicmap.karte.abgleich": "Sync",
   "heroicmap.auswahl.titel": "Maps of this server",
-  "heroicmap.auswahl.massstab": "%s px · %s"
+  "heroicmap.auswahl.massstab": "%s px · %s",
+  "heroicmap.karte.abgleich_ab": "Sync from %s",
+  "heroicmap.download.abgleich_ab": "The next sync is possible from %s."
 }

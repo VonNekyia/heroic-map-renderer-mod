@@ -27,6 +27,9 @@ final class Karte extends Screen {
     private final Kartenblick blick;
     /** Was beim letzten Knopf schiefging, oder null. */
     private Component hinweis;
+    /** Der Knopf für den Abgleich, oder null ohne Satz; er ist aus, bis ein Abgleich wieder geht. */
+    private Button abgleich;
+    private String baum;
 
     /** {@code satz} ist null, wenn für diese Dimension nichts geladen ist. */
     Karte(Satz satz) {
@@ -48,8 +51,8 @@ final class Karte extends Screen {
                 b -> minecraft.gui.setScreen(new Auswahl(this))).bounds(x, 4, KNOPF, 20).build());
         if (satz != null) {
             // Der Baum ist der Ordner über dem Massstab.
-            String baum = satz.ordner().getParent().getFileName().toString();
-            addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.abgleich"),
+            baum = satz.ordner().getParent().getFileName().toString();
+            abgleich = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.abgleich"),
                     b -> hinweis = Downloads.INSTANZ.frageAbgleich(baum)).bounds(x, 28, KNOPF, 20).build());
         }
     }
@@ -88,6 +91,11 @@ final class Karte extends Screen {
         if (hinweis != null) {
             g.text(font, hinweis, 4, height - 24, TEXT);
         }
+        // Höchstens ein Abgleich je Tag: Nach einer Ablehnung mit wieder ist der Knopf bis dahin aus.
+        long ab = Downloads.INSTANZ.abgleichAb(baum);
+        abgleich.active = ab == 0;
+        abgleich.setMessage(ab == 0 ? Component.translatable("heroicmap.karte.abgleich")
+                : Component.translatable("heroicmap.karte.abgleich_ab", Downloads.uhr(ab)));
         super.extractRenderState(g, mausX, mausY, delta);
     }
 

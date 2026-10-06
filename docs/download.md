@@ -47,9 +47,15 @@ der Mod mit den Kacheln zeigt, steht unter [Vollbildkarte](vollbildkarte.md).
 |---|---|
 | `/heroicmap angebot` | die angebotenen Karten mit Dimension und Grösse je Massstab |
 | `/heroicmap laden <baum> <1, 2 oder 4>` | fragt erst im Dialog nach Grösse und Massstab, dann einen vollen Download an, siehe „Zustimmung und Grösse“ |
-| `/heroicmap abgleich <baum>` | fragt einen Abgleich von Hand an, im gespeicherten Massstab |
+| `/heroicmap abgleich <baum>` | fragt einen Abgleich von Hand an, im gespeicherten Massstab; nach einer Ablehnung mit `wieder` erst ab dann wieder |
 
 Dieselben Wege gehen über die Knöpfe der [Vollbildkarte](vollbildkarte.md), „Bedienung“.
+
+- **Höchstens ein Abgleich je Tag** und Spieler, automatisch oder von Hand,
+  so hat es der Maintainer entschieden; die Grenzen stehen im Protokoll des
+  Plugins. Die Ablehnung nennt den Baum nicht. Der Mod merkt sich deshalb
+  den Baum seines letzten Abgleichs von Hand und hält ihn bis `wieder`
+  zurück; beim Trennen vergisst er das.
 
 ## Zustimmung und Grösse
 
