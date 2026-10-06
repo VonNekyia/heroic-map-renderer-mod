@@ -149,6 +149,17 @@ class MinimapTest {
     }
 
     @Test
+    void umschauenBleibtInDerSichtweite() {
+        Minimap minimap = new Minimap();
+        minimap.schiebe(30, -500, 192);
+        assertEquals(30, minimap.versatzX());
+        assertEquals(-192, minimap.versatzZ());
+        minimap.zentriere();
+        assertEquals(0, minimap.versatzX());
+        assertEquals(0, minimap.versatzZ());
+    }
+
+    @Test
     void ohneDateiDieVorgabe(@TempDir Path ordner) {
         Minimap minimap = new Minimap();
         minimap.lies(ordner.resolve("fehlt.properties"));

@@ -59,6 +59,13 @@ steht unter „Kosten“.
   (`Minimap.KLEINSTE`, `Minimap.GROESSTE`) und höchstens so gross, wie der
   Schirm Platz hat. Grösser zeigt mehr Gegend beim selben Zoom und
   zeichnet mehr Chunks, siehe „Neu zeichnen“, „Bereich“.
+- **Umschauen:** Im Menü verschiebt Ziehen mit rechts die Karte in der
+  Minimap, sie folgt der Maus. Höchstens so weit, wie der Client Chunks hat,
+  die Sichtweite in Blöcken je Richtung; der Bereich, den die Minimap
+  zeichnet, folgt der neuen Mitte. Der Pfeil steht, wo der Spieler ist,
+  und verschwindet, wenn das ausserhalb der Minimap liegt. Beim Schliessen
+  des Menüs steht wieder der Spieler in der Mitte (`Minimap.zentriere`). So
+  hat es der User gewählt.
 - **Gespeichert** wird beim Schliessen des Menüs, in
   `config/heroicmap.properties`. Die Lage steht dort als Anteil des freien
   Platzes, 0 links oder oben bis 1 rechts oder unten, so bleibt die Minimap
