@@ -98,7 +98,7 @@ public final class Bilder implements FabricClientGameTest {
         }
     }
 
-    /** Die Minimap rund bei 4 px, dann das Menü über der Szene. Siehe docs/minimap.md, „Bedienung“. */
+    /** Die Minimap rund bei 4 px, dann das Menü über der Szene und das Umschauen darin. Siehe docs/minimap.md, „Bedienung“. */
     private static void menue(ClientGameTestContext context) {
         context.runOnClient(mc -> Minimap.INSTANZ.setzeRund(true));
         context.waitTicks(2);
@@ -110,6 +110,11 @@ public final class Bilder implements FabricClientGameTest {
         });
         context.waitTicks(5);
         Path menue = context.takeScreenshot(TestScreenshotOptions.of("menue").disableCounterPrefix());
+        // Umschauen wie mit rechts ziehen: 12 Blöcke nach Osten, 8 nach Süden.
+        context.runOnClient(mc -> Minimap.INSTANZ.schiebe(12, 8, 1000));
+        context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
+        context.waitTicks(2);
+        Path umschauen = context.takeScreenshot(TestScreenshotOptions.of("minimap-umschauen").disableCounterPrefix());
         context.runOnClient(mc -> {
             Minimap.INSTANZ.setzeRund(false);
             mc.gui.setScreen(null);
@@ -120,6 +125,7 @@ public final class Bilder implements FabricClientGameTest {
             if (!AUSGABE.isEmpty()) {
                 schneide(context, rund, Path.of(AUSGABE, "minimap-rund.png"));
                 Files.copy(menue, Path.of(AUSGABE, "menue.png"), StandardCopyOption.REPLACE_EXISTING);
+                schneide(context, umschauen, Path.of(AUSGABE, "minimap-umschauen.png"));
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);

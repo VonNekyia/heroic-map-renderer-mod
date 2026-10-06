@@ -15,7 +15,8 @@ import org.joml.Matrix3x2fStack;
 /**
  * Das Menü hinter {@code /hmap}: Minimap an oder aus, Zoom, Auflösung, Form, dazu die Karten des Servers.
  * Die Minimap im HUD bleibt sichtbar; Ziehen verschiebt sie, der Griff an der Ecke zur Mitte des
- * Schirms zieht sie grösser oder kleiner. Gespeichert wird beim Schliessen.
+ * Schirms zieht sie grösser oder kleiner, rechts ziehen verschiebt die Karte darin zum Umschauen.
+ * Beim Schliessen steht wieder der Spieler in der Mitte, und die Einstellungen werden gespeichert.
  * Siehe docs/minimap.md, „Bedienung“.
  */
 final class Einstellungen extends Screen {
@@ -25,7 +26,7 @@ final class Einstellungen extends Screen {
     private static final int GRIFF = 3;
     private static final int BREITE = 200;
 
-    private enum Zug { KEINER, LAGE, GROESSE }
+    private enum Zug { KEINER, LAGE, GROESSE, SCHAUEN }
 
     private Zug zug = Zug.KEINER;
     /** Beim Verschieben: wo die Maus die Minimap gegriffen hat. Beim Ziehen: die feste Ecke. */
@@ -98,10 +99,18 @@ final class Einstellungen extends Screen {
         if (super.mouseClicked(e, doppelt)) {
             return true;
         }
-        if (e.button() != 0 || !Minimap.INSTANZ.sichtbar()) {
+        if (!Minimap.INSTANZ.sichtbar()) {
             return false;
         }
         Minimap.Rahmen r = Minimap.INSTANZ.rahmen(width, height);
+        // Rechts ziehen verschiebt die Karte in der Minimap, zum Umschauen.
+        if (e.button() == 1 && r.enthaelt(e.x(), e.y())) {
+            zug = Zug.SCHAUEN;
+            return true;
+        }
+        if (e.button() != 0) {
+            return false;
+        }
         if (Math.abs(e.x() - griffX(r)) <= GRIFF + 1 && Math.abs(e.y() - griffY(r)) <= GRIFF + 1) {
             zug = Zug.GROESSE;
             griffLinks = links(r);
@@ -128,6 +137,8 @@ final class Einstellungen extends Screen {
         int mx = Mth.floor(e.x()), my = Mth.floor(e.y());
         switch (zug) {
             case LAGE -> m.verschiebe(mx - festX, my - festY, width, height);
+            // Die Karte folgt der Maus: nach rechts ziehen zeigt, was links liegt.
+            case SCHAUEN -> m.schiebe(-dx / m.zoom(), -dy / m.zoom(), minecraft.options.getEffectiveRenderDistance() * 16);
             case GROESSE -> {
                 // Relativ zum Griff: Der Griff sitzt rund nicht in der Ecke, die Seite springt so nicht.
                 int platz = Math.min(width, height) - 2 * Minimap.RAND;
@@ -200,6 +211,7 @@ final class Einstellungen extends Screen {
 
     @Override
     public void removed() {
+        Minimap.INSTANZ.zentriere();
         Minimap.INSTANZ.schreibe(HeroicMap.einstellungen());
     }
 

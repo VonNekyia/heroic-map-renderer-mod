@@ -81,6 +81,8 @@ public final class Minimap {
     private int zoom = 2;
     private boolean rund;
     private int groesse = GROESSE;
+    /** Beim Umschauen im Menü: wie weit die Mitte der Minimap vom Spieler liegt, in Blöcken. */
+    private double versatzX, versatzZ;
     /** Die Lage im freien Platz des Schirms: 0 links oder oben, 1 rechts oder unten. */
     private float lageX = 1, lageY = 0;
     final LongLinkedOpenHashSet offen = new LongLinkedOpenHashSet();
@@ -183,6 +185,29 @@ public final class Minimap {
 
     int scale() {
         return scale;
+    }
+
+    /**
+     * Verschiebt die Mitte um (dx, dz) Blöcke, höchstens {@code grenze} Blöcke vom Spieler; weiter
+     * hat der Client keine Chunks. Der Bereich folgt der Mitte.
+     */
+    void schiebe(double dx, double dz, double grenze) {
+        versatzX = Mth.clamp(versatzX + dx, -grenze, grenze);
+        versatzZ = Mth.clamp(versatzZ + dz, -grenze, grenze);
+    }
+
+    /** Wieder der Spieler in der Mitte. */
+    void zentriere() {
+        versatzX = 0;
+        versatzZ = 0;
+    }
+
+    double versatzX() {
+        return versatzX;
+    }
+
+    double versatzZ() {
+        return versatzZ;
     }
 
     boolean rund() {
@@ -359,10 +384,14 @@ public final class Minimap {
         arbeite(mc, level, spieler);
 
         Rahmen r = rahmen(g.guiWidth(), g.guiHeight());
-        int links = Mth.floor(Projektion.zuPixel(spieler.getX(), zoom)) - r.seite() / 2;
-        int oben = Mth.floor(Projektion.zuPixel(spieler.getZ(), zoom)) - r.seite() / 2;
+        int links = Mth.floor(Projektion.zuPixel(spieler.getX() + versatzX, zoom)) - r.seite() / 2;
+        int oben = Mth.floor(Projektion.zuPixel(spieler.getZ() + versatzZ, zoom)) - r.seite() / 2;
         male(g, r, links, oben, mc.getWindow().getGuiScale());
-        pfeil(g, r.x() + r.seite() / 2, r.y() + r.seite() / 2, spieler.getYRot());
+        // Beim Umschauen steht der Pfeil, wo der Spieler ist, und nur, solange das in der Minimap liegt.
+        double h = r.seite() / 2.0, px = -versatzX * zoom, pz = -versatzZ * zoom;
+        if (rund ? px * px + pz * pz <= h * h : Math.abs(px) <= h && Math.abs(pz) <= h) {
+            pfeil(g, (int) Math.round(r.x() + h + px), (int) Math.round(r.y() + h + pz), spieler.getYRot());
+        }
     }
 
     /**
@@ -460,7 +489,7 @@ public final class Minimap {
         } else {
             decke = Integer.MAX_VALUE;
         }
-        ChunkPos jetzt = spieler.chunkPosition();
+        ChunkPos jetzt = new ChunkPos(Mth.floor(spieler.getX() + versatzX) >> 4, Mth.floor(spieler.getZ() + versatzZ) >> 4);
         if (!jetzt.equals(mitte)) {
             mitte = jetzt;
             nachBereich();
