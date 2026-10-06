@@ -85,9 +85,13 @@ zwischen 0 und 7, gilt die Einstellung des Spielers.
   am Rand ändert sich mit.
 - **Je Chunk höchstens alle 5 s** (`Live.PAUSE_MS`): Wasser fliesst,
   Getreide wächst.
-- **Nur mit allen 8 Nachbarn geladen;** sonst rechneten Schatten und
-  Biomübergang am Rand mit fehlenden Blöcken. Ist der Chunk selbst nicht
-  mehr geladen, fällt er weg.
+- **Nur mit allen 8 Nachbarn geladen und mit Licht;** sonst rechneten
+  Schatten und Biomübergang am Rand mit fehlenden Blöcken. Das Licht eines
+  neuen Chunks setzt der Client erst später über eine eigene Warteschlange
+  (`setLightEnabled`, `LevelLightEngine.lightOnInColumn`); vorher wären
+  Spalten zu dunkel oder zu hell. Steht noch Lichtarbeit an
+  (`hasLightWork`), wartet die Ebene ebenso. Ist der Chunk selbst nicht mehr
+  geladen, fällt er weg.
 - **Die Minimap geht vor:** Solange sie sichtbar ist, zu zeichnen hat und
   eben gearbeitet hat, wartet die Live-Ebene. Ohne HUD, etwa mit F1,
   zeichnet die Minimap nicht; dann wartet die Ebene nicht auf sie.

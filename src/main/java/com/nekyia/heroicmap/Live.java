@@ -17,11 +17,13 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.lighting.LevelLightEngine;
 import org.slf4j.Logger;
 
 /**
@@ -182,7 +184,7 @@ public final class Live {
                 it.remove();
                 continue;
             }
-            if (jetzt - zuletzt.getOrDefault(k, Long.MIN_VALUE / 2) < PAUSE_MS || !nachbarnGeladen(level, cx, cz)) {
+            if (jetzt - zuletzt.getOrDefault(k, Long.MIN_VALUE / 2) < PAUSE_MS || !bereit(level, cx, cz)) {
                 continue;
             }
             it.remove();
@@ -192,11 +194,20 @@ public final class Live {
         }
     }
 
-    /** Schatten und Biomübergang am Rand brauchen alle 8 Nachbarn. */
-    private static boolean nachbarnGeladen(ClientLevel level, int cx, int cz) {
+    /**
+     * Schatten, Licht und Biomübergang am Rand brauchen alle 8 Nachbarn, geladen und mit Licht. Der
+     * Client setzt das Licht eines neuen Chunks erst später über eine eigene Warteschlange
+     * ({@code setLightEnabled}); vorher läse der Maler dunkle oder zu helle Spalten.
+     */
+    private static boolean bereit(ClientLevel level, int cx, int cz) {
+        LevelLightEngine licht = level.getChunkSource().getLightEngine();
+        if (licht.hasLightWork()) {
+            return false;
+        }
         for (int dz = -1; dz <= 1; dz++) {
             for (int dx = -1; dx <= 1; dx++) {
-                if (level.getChunkSource().getChunk(cx + dx, cz + dz, ChunkStatus.FULL, false) == null) {
+                if (level.getChunkSource().getChunk(cx + dx, cz + dz, ChunkStatus.FULL, false) == null
+                        || !licht.lightOnInColumn(SectionPos.getZeroNode(cx + dx, cz + dz))) {
                     return false;
                 }
             }
