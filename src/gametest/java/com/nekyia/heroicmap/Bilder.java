@@ -106,6 +106,12 @@ public final class Bilder implements FabricClientGameTest {
     private static void live(ClientGameTestContext context, TestServerContext server) {
         Path baum = FabricLoader.getInstance().getGameDir().resolve(HeroicMap.ID).resolve("test").resolve("beispiel");
         Path ebene = Ebene.ordner(baum);
+        try {
+            // Eine Ebene aus einem früheren Lauf käme sonst mit ins Bild.
+            Laden.loesche(ebene);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
         context.runOnClient(mc -> Live.INSTANZ.satzFuerTest(Satz.lies(baum)));
         server.runCommand("fill -3 -61 2 3 -61 3 gold_block");
         context.waitFor(mc -> Files.exists(ebene.resolve("0.0.png")) && Files.exists(ebene.resolve("-1.0.png")), 1200);

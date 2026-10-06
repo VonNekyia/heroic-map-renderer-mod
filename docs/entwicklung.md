@@ -40,7 +40,8 @@ Das baut das Jar nach `build/libs/` und lässt die Tests laufen.
 | `KartenblickTest` | wie die Vollbildkarte Kacheln auf den Schirm legt, Zoom über Stufen und Lupe, Schieben, siehe [Vollbildkarte](vollbildkarte.md) |
 | `KachelnTest` | WebP mit TwelveMonkeys lesen, samt Alpha, die Grösse aus dem Kopf vor dem Dekodieren, siehe [Vollbildkarte](vollbildkarte.md), „Kacheln“ |
 | `PyramideTest` | Verkleinern wie die Pyramide des Renderers, siehe [Live-Ebene](live.md), „Raster“ |
-| `EbeneTest` | die Bilder der Live-Ebene schreiben, lesen, beim Abgleich räumen, beim Wechsel des Massstabs anpassen und in die Kacheln legen, siehe [Live-Ebene](live.md) |
+| `EbeneTest` | die Bilder der Live-Ebene schreiben, lesen, beim Abgleich räumen, auch über einen Fehler hinweg, beim Wechsel des Massstabs anpassen und in die Kacheln legen, auch bei negativen Chunks, siehe [Live-Ebene](live.md) |
+| `LiveTest` | welche Änderungen die Live-Ebene zeichnet, siehe [Live-Ebene](live.md), „Wann gezeichnet wird“ |
 | `SatzTest` | den Satz zur Dimension finden, Grenzen für `map.json`, siehe [Vollbildkarte](vollbildkarte.md), „Welcher Satz“ |
 | `MinimapTest` | den Bereich der Minimap, siehe [Minimap](minimap.md), „Neu zeichnen“ |
 | `LichtTest` | die Lightmap gegen die Werte aus der Doku des Renderers, siehe [Minimap](minimap.md), „Licht“ |

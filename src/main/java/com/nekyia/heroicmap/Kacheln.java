@@ -7,10 +7,12 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.imageio.ImageReader;
@@ -57,8 +59,14 @@ final class Kacheln implements AutoCloseable {
         }
     };
     private final Set<String> laeuft = new HashSet<>();
-    /** Kacheln, die es nicht gibt oder die sich nicht lesen lassen; der Mod fragt nicht wieder. */
+    /** Kacheln, die es nicht gibt oder die sich nicht lesen lassen; der Mod fragt erst nach einer Änderung der Ebene wieder. */
     private final Set<String> leer = new HashSet<>();
+    /** Je Kachel zählt jede Änderung der Ebene; ein Ergebnis aus einer älteren Zählung ist veraltet. */
+    private final Map<String, Integer> generation = new HashMap<>();
+    /** Kacheln mit einer älteren Textur: Sie bleibt sichtbar, bis die neue da ist. */
+    private final Set<String> veraltet = new HashSet<>();
+    /** Die Bilder der Ebene je Chunk, einmal je offener Karte gelesen; der Render-Thread verwirft geänderte. */
+    private final Map<Long, int[]> bilder = new ConcurrentHashMap<>();
     private boolean geschlossen;
     private int naechste;
 
@@ -82,25 +90,30 @@ final class Kacheln implements AutoCloseable {
     }
 
     private void vergiss(int cx, int cz) {
-        chunks.add(Ebene.schluessel(cx, cz));
+        long k = Ebene.schluessel(cx, cz);
+        chunks.add(k);
+        bilder.remove(k);
         for (int z = stufe; z >= minZoom && chunk >> (stufe - z) >= 1; z--) {
             int breite = chunk >> (stufe - z);
             String pfad = z + "/" + Math.floorDiv(cx * breite, seite) + "/" + Math.floorDiv(cz * breite, seite);
-            Identifier id = texturen.remove(pfad);
-            if (id != null) {
-                Minecraft.getInstance().getTextureManager().release(id);
+            generation.merge(pfad, 1, Integer::sum);
+            if (texturen.containsKey(pfad) || laeuft.contains(pfad)) {
+                veraltet.add(pfad);
             }
             leer.remove(pfad);
         }
     }
 
-    /** Die Textur der Kachel, oder null, solange sie lädt oder es sie nicht gibt. */
+    /** Die Textur der Kachel, oder null, solange sie das erste Mal lädt oder es sie nicht gibt. */
     Identifier textur(int z, int x, int y) {
         String pfad = z + "/" + x + "/" + y;
         Identifier id = texturen.get(pfad);
-        if (id != null || leer.contains(pfad) || !laeuft.add(pfad)) {
+        if ((id != null && !veraltet.contains(pfad)) || leer.contains(pfad) || laeuft.contains(pfad)) {
             return id;
         }
+        laeuft.add(pfad);
+        veraltet.remove(pfad);
+        int gen = generation.getOrDefault(pfad, 0);
         Path datei = ordner.resolve(String.valueOf(z)).resolve(String.valueOf(x)).resolve(y + ".webp");
         dekoder.execute(() -> {
             NativeImage pixel = null;
@@ -114,7 +127,8 @@ final class Kacheln implements AutoCloseable {
                     argb = null;
                 }
                 // Darüber die Live-Ebene, auch wo der Server noch keine Kachel hat.
-                argb = Ebene.lege(argb, seite, z, x, y, stufe, chunk, chunks, ebene);
+                argb = Ebene.lege(argb, seite, z, x, y, stufe, chunk, chunks,
+                        k -> bilder.computeIfAbsent(k, c -> Ebene.lies(ebene, Ebene.cx(c), Ebene.cz(c), chunk)));
                 if (argb != null) {
                     pixel = pixel(new Bild(seite, seite, argb));
                 }
@@ -122,34 +136,44 @@ final class Kacheln implements AutoCloseable {
                 pixel = null;
             } finally {
                 // Auch nach einem Error, sonst bliebe die Kachel für immer in laeuft.
-                zurueck(pfad, pixel);
+                zurueck(pfad, gen, pixel);
             }
         });
-        return null;
+        return id;
     }
 
-    private void zurueck(String pfad, NativeImage pixel) {
-        Minecraft.getInstance().execute(() -> uebernimm(pfad, pixel));
+    private void zurueck(String pfad, int gen, NativeImage pixel) {
+        Minecraft.getInstance().execute(() -> uebernimm(pfad, gen, pixel));
     }
 
     /** Auf dem Render-Thread: nur noch hochladen, die Pixel sind schon im {@code NativeImage}. */
-    private void uebernimm(String pfad, NativeImage pixel) {
+    private void uebernimm(String pfad, int gen, NativeImage pixel) {
         laeuft.remove(pfad);
-        if (geschlossen) {
+        if (geschlossen || gen != generation.getOrDefault(pfad, 0)) {
             if (pixel != null) {
                 pixel.close();
             }
+            // Während des Dekodierens legte die Ebene ein neueres Bild ab: noch einmal.
+            if (!geschlossen) {
+                veraltet.add(pfad);
+            }
             return;
         }
+        Identifier alt;
         if (pixel == null) {
             leer.add(pfad);
-            return;
+            alt = texturen.remove(pfad);
+        } else {
+            Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "kachel/" + naechste++);
+            DynamicTexture textur = new DynamicTexture(() -> "heroicmap " + pfad, pixel);
+            textur.upload();
+            Minecraft.getInstance().getTextureManager().register(id, textur);
+            // Die alte Textur geht erst, wenn die neue da ist: Die Karte blinkt nicht.
+            alt = texturen.put(pfad, id);
         }
-        Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "kachel/" + naechste++);
-        DynamicTexture textur = new DynamicTexture(() -> "heroicmap " + pfad, pixel);
-        textur.upload();
-        Minecraft.getInstance().getTextureManager().register(id, textur);
-        texturen.put(pfad, id);
+        if (alt != null) {
+            Minecraft.getInstance().getTextureManager().release(alt);
+        }
     }
 
     /** Füllt ein {@code NativeImage} mit der Kachel, im Faden des Dekoders. */

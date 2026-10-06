@@ -2,12 +2,14 @@ package com.nekyia.heroicmap;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.LongFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -80,10 +82,14 @@ final class Ebene {
         }
     }
 
-    /** Das Bild eines Chunks, oder null, wenn keins lesbar daliegt oder es nicht {@code seite} breit ist. */
+    /**
+     * Das Bild eines Chunks, oder null, wenn keins lesbar daliegt oder es nicht {@code seite} breit
+     * ist. Liest über {@code Files.newInputStream}: Unter Windows darf die Datei dabei ersetzt
+     * oder gelöscht werden, anders als mit {@code ImageIO.read(File)}.
+     */
     static int[] lies(Path ordner, int cx, int cz, int seite) {
-        try {
-            BufferedImage bild = ImageIO.read(datei(ordner, cx, cz).toFile());
+        try (InputStream rein = Files.newInputStream(datei(ordner, cx, cz))) {
+            BufferedImage bild = ImageIO.read(rein);
             if (bild == null || bild.getWidth() != seite || bild.getHeight() != seite) {
                 return null;
             }
@@ -99,14 +105,52 @@ final class Ebene {
      */
     static int raeume(Path ordner, long bis) throws IOException {
         int weg = 0;
+        IOException fehler = null;
         for (long k : liste(ordner)) {
             Path d = datei(ordner, cx(k), cz(k));
-            if (Files.getLastModifiedTime(d).toMillis() < bis) {
-                Files.delete(d);
-                weg++;
+            try {
+                if (Files.getLastModifiedTime(d).toMillis() < bis) {
+                    Files.delete(d);
+                    weg++;
+                }
+            } catch (IOException e) {
+                // Weiter mit den anderen; am Ende zählt der erste Fehler.
+                fehler = mit(fehler, e);
             }
         }
+        if (fehler != null) {
+            throw fehler;
+        }
         return weg;
+    }
+
+    private static IOException mit(IOException erster, IOException neu) {
+        if (erster == null) {
+            return neu;
+        }
+        erster.addSuppressed(neu);
+        return erster;
+    }
+
+    /** Löscht die Zwischendateien eines abgebrochenen Schreibens; was sich nicht löschen lässt, bleibt. */
+    static void raeumeZwischen(Path ordner) {
+        if (!Files.isDirectory(ordner)) {
+            return;
+        }
+        try (Stream<Path> dateien = Files.list(ordner)) {
+            for (Path d : dateien.toList()) {
+                String name = d.getFileName().toString();
+                if (name.startsWith("chunk") && name.endsWith(".tmp")) {
+                    try {
+                        Files.deleteIfExists(d);
+                    } catch (IOException e) {
+                        // Beim nächsten Mal.
+                    }
+                }
+            }
+        } catch (IOException e) {
+            // Ohne lesbaren Ordner nichts zu räumen.
+        }
     }
 
     /**
@@ -115,16 +159,24 @@ final class Ebene {
      * mtime bleibt.
      */
     static void wechsle(Path ordner, int alt, int neu) throws IOException {
+        IOException fehler = null;
         for (long k : liste(ordner)) {
             int cx = cx(k), cz = cz(k);
             Path d = datei(ordner, cx, cz);
-            int[] bild = neu < alt ? lies(ordner, cx, cz, alt) : null;
-            if (bild == null) {
-                Files.delete(d);
-                continue;
+            try {
+                int[] bild = neu < alt ? lies(ordner, cx, cz, alt) : null;
+                if (bild == null) {
+                    Files.delete(d);
+                    continue;
+                }
+                long zeit = Files.getLastModifiedTime(d).toMillis();
+                schreibe(ordner, cx, cz, Pyramide.verkleinere(bild, alt, Integer.numberOfTrailingZeros(alt / neu)), neu, zeit);
+            } catch (IOException e) {
+                fehler = mit(fehler, e);
             }
-            long zeit = Files.getLastModifiedTime(d).toMillis();
-            schreibe(ordner, cx, cz, Pyramide.verkleinere(bild, alt, Integer.numberOfTrailingZeros(alt / neu)), neu, zeit);
+        }
+        if (fehler != null) {
+            throw fehler;
         }
     }
 
@@ -133,9 +185,11 @@ final class Ebene {
      * Ein Chunk ist auf der feinsten Stufe {@code stufe} {@code chunk} Pixel breit und auf jeder
      * gröberen halb so breit; unter 1 Pixel mischte ein Pixel fremde Chunks, dort bleibt die
      * Kachel des Servers. {@code kachel} ist null, wenn der Server keine hat; dann entsteht eine
-     * durchsichtige, falls ein Bild hineinfällt. Gibt die Kachel zurück, oder null.
+     * durchsichtige, falls ein Bild hineinfällt. {@code bilder} gibt das Bild eines Chunks in der
+     * feinsten Stufe, oder null. Gibt die Kachel zurück, oder null.
      */
-    static int[] lege(int[] kachel, int seite, int z, int x, int y, int stufe, int chunk, Set<Long> chunks, Path ordner) {
+    static int[] lege(int[] kachel, int seite, int z, int x, int y, int stufe, int chunk, Set<Long> chunks,
+            LongFunction<int[]> bilder) {
         int mal = stufe - z;
         if (mal < 0 || mal >= 31 || chunk >> mal < 1) {
             return kachel;
@@ -146,7 +200,7 @@ final class Ebene {
             if (px < 0 || py < 0 || px >= seite || py >= seite) {
                 continue;
             }
-            int[] bild = lies(ordner, cx(k), cz(k), chunk);
+            int[] bild = bilder.apply(k);
             if (bild == null) {
                 continue;
             }

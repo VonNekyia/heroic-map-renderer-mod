@@ -57,6 +57,8 @@ final class Downloads {
     private boolean neuGefragt;
     /** Uhr des Servers minus Uhr des Spielers, in ms, aus {@code jetzt} der letzten Nachricht. */
     private long versatz;
+    /** Ob dieser Server schon {@code jetzt} geschickt hat; ohne Plugin nie. */
+    private boolean uhrBekannt;
 
     private Downloads() {
     }
@@ -72,6 +74,7 @@ final class Downloads {
             }
             if (json.has("jetzt")) {
                 versatz = json.get("jetzt").getAsLong() * 1000 - System.currentTimeMillis();
+                uhrBekannt = true;
             }
         } catch (RuntimeException e) {
             LOGGER.warn("Heroic Map: Nachricht nicht lesbar");
@@ -94,10 +97,17 @@ final class Downloads {
         return System.currentTimeMillis() + versatz;
     }
 
+    /** Kennt der Mod die Uhr dieses Servers? Ohne sie legt die Live-Ebene nichts ab. */
+    boolean uhrBekannt() {
+        return uhrBekannt;
+    }
+
     /** Vergisst Angebot, Bestätigungen und Dialog und bricht die Downloads ab, etwa beim Trennen. */
     void leeren() {
         angebot = null;
         neuGefragt = false;
+        uhrBekannt = false;
+        versatz = 0;
         bestaetigt.clear();
         dialog = null;
         reihe.abbrechen();
@@ -310,6 +320,10 @@ final class Downloads {
 
     private void beende(Freigabe f, Laden.Auftrag auftrag, Laden.Ergebnis ergebnis, Exception fehler) {
         if (ergebnis != null) {
+            if (fehler != null) {
+                // Die Kacheln sind da; nur die Live-Ebene ist nicht ganz geräumt.
+                LOGGER.warn("Heroic Map: Live-Ebene nach dem Download nicht geräumt", fehler);
+            }
             neuGefragt = false;
             // Der Satz kann neu sein oder einen anderen Massstab haben.
             Live.INSTANZ.satzNeu();

@@ -6,9 +6,12 @@ code:
   - src/main/java/com/nekyia/heroicmap/Ebene.java
   - src/main/java/com/nekyia/heroicmap/Pyramide.java
   - src/main/java/com/nekyia/heroicmap/ChunkMaler.java
+  - src/main/java/com/nekyia/heroicmap/Kacheln.java
+  - src/main/java/com/nekyia/heroicmap/Downloads.java
   - src/main/java/com/nekyia/heroicmap/mixin/LevelExtractorMixin.java
   - src/test/java/com/nekyia/heroicmap/EbeneTest.java
   - src/test/java/com/nekyia/heroicmap/PyramideTest.java
+  - src/test/java/com/nekyia/heroicmap/LiveTest.java
   - src/gametest/java/com/nekyia/heroicmap/Bilder.java
 ---
 
@@ -72,6 +75,12 @@ zwischen 0 und 7, gilt die Einstellung des Spielers.
   führt `ClientLevel.setBlocksDirty` aus `Level.setBlock`: die Vorhersage
   des Spielers, die Antwort des Servers und Änderungen anderer Spieler in
   Sichtweite. Licht und das Laden von Chunks laufen dort nicht durch.
+- **Nur was man von oben sieht** (`Live.markiere`):
+  - nur, wenn das Spiel selbst neu zeichnen würde, `ModelManager.requiresRender(alt, neu)`;
+  - nicht unter dem ersten deckenden Block der Spalte (`isSolidRender`),
+    gezählt vom obersten Block nach unten (`Live.sichtbar`). Dort endet
+    auch die Spalte des Malers. Ein Tunnel, Öfen oder Redstone im Keller
+    lassen die Karte so in Ruhe.
 - **Am Rand** eines Chunks kommt auch der Nachbar dran, denn sein Schatten
   am Rand ändert sich mit.
 - **Je Chunk höchstens alle 5 s** (`Live.PAUSE_MS`): Wasser fliesst,
@@ -79,8 +88,12 @@ zwischen 0 und 7, gilt die Einstellung des Spielers.
 - **Nur mit allen 8 Nachbarn geladen;** sonst rechneten Schatten und
   Biomübergang am Rand mit fehlenden Blöcken. Ist der Chunk selbst nicht
   mehr geladen, fällt er weg.
-- **Die Minimap geht vor:** Solange sie sichtbar ist und zu zeichnen hat,
-  wartet die Live-Ebene.
+- **Die Minimap geht vor:** Solange sie sichtbar ist, zu zeichnen hat und
+  eben gearbeitet hat, wartet die Live-Ebene. Ohne HUD, etwa mit F1,
+  zeichnet die Minimap nicht; dann wartet die Ebene nicht auf sie.
+- **Ohne Uhr des Servers** wartet sie auch: Bis das Plugin `jetzt` schickt,
+  passten ihre Zeiten nicht zu `abdeckt_bis`, siehe „Ablage“.
+- **Scheitert das Ablegen,** kommt der Chunk zurück in die Reihe.
 - **Je Tick** höchstens ein Abzug auf dem Render-Thread; das Zeichnen läuft
   in einem eigenen Worker mit niedriger Priorität.
 - **Nur mit Satz:** Ohne geladenen Satz für die Dimension, in
@@ -94,11 +107,20 @@ zwischen 0 und 7, gilt die Einstellung des Spielers.
   Zwischendatei geschrieben (`Ebene`).
 - **Die Zeit der Änderung** steht als mtime, in Serverzeit: Der Mod misst
   den Versatz der Uhren an `jetzt` jeder Nachricht des Plugins
-  (`Downloads.serverzeit`).
+  (`Downloads.serverzeit`). Beim Trennen vergisst er ihn.
+- **Schrumpfen** kann der Ordner nur über `abdeckt_bis`, siehe „Abgleich“.
+  Zwischendateien eines abgebrochenen Schreibens räumt der Mod beim ersten
+  Zugriff auf den Satz.
 - **Grösse:** roh 16 KiB je Chunk bei 4 px, 4 KiB bei 2 und 1 KiB bei 1;
   als PNG weniger.
 - **Bei offener Karte** lädt nach einem neuen Bild nur die Kachel neu, die
-  den Chunk zeigt, in jeder Stufe (`Kacheln.geaendert`).
+  den Chunk zeigt, in jeder Stufe (`Kacheln.geaendert`). Die alte Textur
+  bleibt sichtbar, bis die neue da ist; ein Ergebnis, das während einer
+  neueren Änderung entstand, verwirft die Karte und dekodiert noch einmal.
+- **Gelesen** wird jedes Bild einmal je offener Karte; die gröberen Stufen
+  rechnet die Karte daraus.
+- **Unter Windows** liest der Mod über `Files.newInputStream`; so darf ein
+  Bild ersetzt oder gelöscht werden, während die Karte es liest.
 
 ## Abgleich
 
@@ -112,6 +134,8 @@ Nach jedem vollständigen Download, ob voll oder Abgleich:
 - **Anderer Massstab:** Gröber verkleinert der Mod die Bilder, feiner fallen
   sie weg, denn feinere Pixel hat er nicht.
 - **Ein gekappter Download** räumt nichts.
+- **Lässt sich ein Bild nicht löschen,** räumt der Mod die übrigen und
+  schreibt den Fehler ins Log.
 
 ## Kosten
 

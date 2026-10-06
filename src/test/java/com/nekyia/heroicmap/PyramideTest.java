@@ -44,6 +44,13 @@ class PyramideTest {
     }
 
     @Test
+    void summiertInFesterReihenfolge() {
+        // Derselbe Fall wie verkleinern_summiert_in_fester_reihenfolge des Renderers.
+        int[] bild = {0xFF765D6B, 0xFF4C160E, 0xFF6019CA, 0xFF52D5E1};
+        assertArrayEquals(new int[] {0xFF5F7BA5}, Pyramide.halbiere(bild, 2));
+    }
+
+    @Test
     void zweimalHalbiert() {
         int[] bild = new int[4 * 4];
         Arrays.fill(bild, 0xFF123456);

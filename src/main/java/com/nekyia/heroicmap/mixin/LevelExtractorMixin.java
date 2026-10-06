@@ -28,6 +28,6 @@ abstract class LevelExtractorMixin {
     @Inject(method = "setBlockDirty(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;"
             + "Lnet/minecraft/world/level/block/state/BlockState;)V", at = @At("HEAD"))
     private void heroicmap$live(BlockPos pos, BlockState alt, BlockState neu, CallbackInfo info) {
-        Live.INSTANZ.markiere(pos.getX(), pos.getZ());
+        Live.INSTANZ.markiere(pos, alt, neu);
     }
 }

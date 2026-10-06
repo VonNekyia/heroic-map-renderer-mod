@@ -7,20 +7,21 @@ import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.IntPredicate;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.data.AtlasIds;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.levelgen.Heightmap;
 import org.slf4j.Logger;
 
 /**
@@ -51,26 +52,39 @@ public final class Live {
     private final LongLinkedOpenHashSet offen = new LongLinkedOpenHashSet();
     /** Wann jeder Chunk zuletzt gezeichnet wurde, in ms. */
     private final Long2LongOpenHashMap zuletzt = new Long2LongOpenHashMap();
-    private CompletableFuture<Long> laufend;
-    /** Zählt jedes Leeren mit; ein Bild aus einem älteren Stand fällt weg. */
-    private long stand;
+    /** Der Auftrag im Worker, wahr, wenn sein Bild abgelegt ist; dazu sein Chunk. */
+    private CompletableFuture<Boolean> laufend;
+    private long laufendChunk;
     /** Der Satz für diese Welt, oder null; gesucht beim ersten Bedarf nach jedem Leeren. */
     private Satz satz;
     private boolean gesucht;
     private Licht licht;
-    /** Die Texel des Block-Atlas und die Liste der Sprites, aus der sie stammen. */
-    private Map<TextureAtlasSprite, ChunkMaler.Texel> atlas;
-    private List<TextureAtlasSprite> atlasStand;
+    /** Im Gametest stempelt die Ebene mit der Uhr des Spielers; sonst nur mit bekannter Uhr des Servers. */
+    private boolean test;
 
     private Live() {
     }
 
-    /** Ein Block an (x, z) hat sich sichtbar geändert; vom Mixin, auf dem Render-Thread. */
-    public void markiere(int x, int z) {
-        if (satz() == null) {
+    /**
+     * Ein Block hat sich geändert; vom Mixin, auf dem Render-Thread, noch vor dem Filter des
+     * Spiels. Markiert wird nur, was das Bild ändern kann, siehe docs/live.md, „Wann gezeichnet wird“.
+     */
+    public void markiere(BlockPos pos, BlockState alt, BlockState neu) {
+        Minecraft mc = Minecraft.getInstance();
+        ClientLevel level = mc.level;
+        if (level == null || satz() == null || !mc.getModelManager().requiresRender(alt, neu)) {
             return;
         }
-        int cx = x >> 4, cz = z >> 4, lx = x & 15, lz = z & 15;
+        int x = pos.getX(), z = pos.getZ(), cx = x >> 4, cz = z >> 4, lx = x & 15, lz = z & 15;
+        LevelChunk chunk = level.getChunkSource().getChunk(cx, cz, ChunkStatus.FULL, false);
+        if (chunk == null) {
+            return;
+        }
+        BlockPos.MutableBlockPos spalte = new BlockPos.MutableBlockPos(x, 0, z);
+        if (!sichtbar(pos.getY(), chunk.getHeight(Heightmap.Types.WORLD_SURFACE, lx, lz),
+                y -> chunk.getBlockState(spalte.setY(y)).isSolidRender())) {
+            return;
+        }
         // Am Rand ändert sich der Schatten des Nachbarn mit.
         for (int dz = lz == 0 ? -1 : 0; dz <= (lz == 15 ? 1 : 0); dz++) {
             for (int dx = lx == 0 ? -1 : 0; dx <= (lx == 15 ? 1 : 0); dx++) {
@@ -79,7 +93,26 @@ public final class Live {
         }
     }
 
-    /** Vergisst alles, etwa beim Wechsel der Welt, beim Trennen oder nach einem Download. */
+    /** Für den Gametest: genau diesen Chunk zeichnen, ohne Änderung. */
+    void markiereChunk(int cx, int cz) {
+        offen.add(ChunkPos.pack(cx, cz));
+    }
+
+    /**
+     * Kann eine Änderung in Höhe {@code y} von oben zu sehen sein? Nicht, wenn zwischen ihr und
+     * dem obersten Block der Spalte, {@code oben}, ein deckender liegt; dort endet auch die Spalte
+     * in {@code ChunkMaler.abziehen}.
+     */
+    static boolean sichtbar(int y, int oben, IntPredicate deckend) {
+        for (int h = oben; h > y; h--) {
+            if (deckend.test(h)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Vergisst alles, etwa beim Wechsel der Welt oder beim Trennen. */
     void leeren() {
         offen.clear();
         zuletzt.clear();
@@ -87,13 +120,14 @@ public final class Live {
         gesucht = false;
         licht = null;
         laufend = null;
-        stand++;
+        test = false;
     }
 
-    /** Für den Gametest: ein Satz ohne Server, im Einzelspieler. */
+    /** Für den Gametest: ein Satz ohne Server, im Einzelspieler, mit der Uhr des Spielers. */
     void satzFuerTest(Satz s) {
         satz = s;
         gesucht = true;
+        test = true;
     }
 
     /** Nach einem Download: Der Satz wird beim nächsten Bedarf neu gesucht; offene Änderungen bleiben. */
@@ -113,6 +147,11 @@ public final class Live {
             boolean passt = s != null && (s.scale() == 1 || s.scale() == 2 || s.scale() == 4)
                     && !level.dimensionType().hasCeiling();
             satz = passt ? s : null;
+            if (satz != null) {
+                // Zwischendateien eines abgebrochenen Spiels.
+                Path ordner = Ebene.ordner(satz.ordner().getParent());
+                worker.execute(() -> Ebene.raeumeZwischen(ordner));
+            }
         }
         return satz;
     }
@@ -127,10 +166,11 @@ public final class Live {
             if (!laufend.isDone()) {
                 return;
             }
-            uebernimm(laufend);
+            uebernimm(laufend, laufendChunk);
             laufend = null;
         }
-        if (offen.isEmpty() || Minimap.INSTANZ.beschaeftigt()) {
+        // Ohne Uhr des Servers passten die Zeiten nicht zu abdeckt_bis; die Änderungen warten.
+        if (offen.isEmpty() || Minimap.INSTANZ.beschaeftigt() || !(test || Downloads.INSTANZ.uhrBekannt())) {
             return;
         }
         long jetzt = System.currentTimeMillis();
@@ -169,14 +209,13 @@ public final class Live {
         if (licht == null) {
             licht = Licht.von(level.dimensionType());
         }
-        pruefeAtlas(mc);
-        ChunkMaler.Auftrag auftrag = ChunkMaler.abziehen(level, chunk, s.scale(), Integer.MAX_VALUE, licht, atlas, stand,
-                s.mischung());
+        ChunkMaler.Auftrag auftrag = ChunkMaler.abziehen(level, chunk, s.scale(), Integer.MAX_VALUE, licht,
+                Minimap.INSTANZ.atlasTexel(mc), 0, s.mischung());
         Path ordner = Ebene.ordner(s.ordner().getParent());
         // Gezeichnet mit scale Pixeln je Block, abgelegt in der Auflösung der feinsten Stufe des Satzes.
         int mal = s.maxZoom() - s.stufe(), seite = s.chunk();
-        long zeit = Downloads.INSTANZ.serverzeit();
-        long k = ChunkPos.pack(auftrag.cx(), auftrag.cz());
+        long zeit = test ? System.currentTimeMillis() : Downloads.INSTANZ.serverzeit();
+        laufendChunk = ChunkPos.pack(auftrag.cx(), auftrag.cz());
         laufend = CompletableFuture.supplyAsync(() -> {
             if (maler == null) {
                 maler = new ChunkMaler();
@@ -191,31 +230,25 @@ public final class Live {
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
-            return k;
+            return true;
         }, worker).exceptionally(fehler -> {
-            LOGGER.warn("Live-Ebene: Chunk nicht gezeichnet", fehler);
-            return null;
+            LOGGER.warn("Live-Ebene: Chunk nicht abgelegt", fehler);
+            return false;
         });
     }
 
-    private void uebernimm(CompletableFuture<Long> fertig) {
-        Long k;
+    /** Ein abgelegtes Bild meldet der Mod der offenen Karte; ein gescheitertes kommt wieder in die Reihe. */
+    private void uebernimm(CompletableFuture<Boolean> fertig, long k) {
+        boolean abgelegt;
         try {
-            k = fertig.join();
+            abgelegt = fertig.join();
         } catch (CompletionException e) {
-            return;
+            abgelegt = false;
         }
-        if (k != null) {
+        if (abgelegt) {
             Kacheln.geaendert(ChunkPos.getX(k), ChunkPos.getZ(k));
-        }
-    }
-
-    /** Kopiert die Texel des Block-Atlas neu, wenn er neu geladen ist. */
-    private void pruefeAtlas(Minecraft mc) {
-        TextureAtlas a = mc.getAtlasManager().getAtlasOrThrow(AtlasIds.BLOCKS);
-        if (a.sprites != atlasStand) {
-            atlas = ChunkMaler.Texel.vomAtlas(a);
-            atlasStand = a.sprites;
+        } else {
+            offen.add(k);
         }
     }
 }
