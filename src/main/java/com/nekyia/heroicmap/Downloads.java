@@ -183,7 +183,7 @@ final class Downloads {
         }
         Freigabe f;
         try {
-            f = Freigabe.lies(json);
+            f = Freigabe.lies(json, verbindung());
         } catch (RuntimeException e) {
             melde(Component.translatable("heroicmap.download.unlesbar"));
             return;

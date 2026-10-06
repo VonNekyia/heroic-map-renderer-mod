@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -29,7 +30,7 @@ class FreigabeTest {
     }
 
     private static Freigabe freigabe(String art, int massstab, long bytes) {
-        return Freigabe.lies(json("welt", art, massstab, bytes, "https://karte.example/welt"));
+        return Freigabe.lies(json("welt", art, massstab, bytes, "https://karte.example/welt"), null);
     }
 
     @Test
@@ -48,8 +49,35 @@ class FreigabeTest {
             json("welt", "voll", 4, 1, "https://k.example/x#a"),
             json("welt", "voll", 4, 1, "https://nutzer@k.example/x"),
             json("welt", "voll", 4, 1, "ftp://k.example/x")}) {
-            assertThrows(RuntimeException.class, () -> Freigabe.lies(falsch), falsch.toString());
+            assertThrows(RuntimeException.class, () -> Freigabe.lies(falsch, null), falsch.toString());
         }
+    }
+
+    /** Eine freigabe mit port statt url. */
+    private static JsonObject mitPort(String port) {
+        JsonObject json = json("welt", "voll", 4, 1, "x");
+        json.remove("url");
+        if (port != null) {
+            json.addProperty("port", Integer.parseInt(port));
+        }
+        return json;
+    }
+
+    @Test
+    void portStattUrl() throws Exception {
+        InetAddress v4 = InetAddress.getByName("203.0.113.7"), v6 = InetAddress.getByName("2001:db8::7");
+        assertEquals(URI.create("http://203.0.113.7:8090/download/welt"), Freigabe.lies(mitPort("8090"), v4).url());
+        // IPv6 in eckigen Klammern, wie Java die Adresse schreibt.
+        assertEquals(URI.create("http://[2001:db8:0:0:0:0:0:7]:8090/download/welt"), Freigabe.lies(mitPort("8090"), v6).url());
+        // Steht url da, gilt sie, auch neben port.
+        JsonObject beides = json("welt", "voll", 4, 1, "https://karte.example/welt");
+        beides.addProperty("port", 8090);
+        assertEquals(URI.create("https://karte.example/welt"), Freigabe.lies(beides, v4).url());
+        // Ohne url und port, ohne Verbindung oder mit einem Port ausserhalb: unlesbar.
+        assertThrows(RuntimeException.class, () -> Freigabe.lies(mitPort(null), v4));
+        assertThrows(RuntimeException.class, () -> Freigabe.lies(mitPort("8090"), null));
+        assertThrows(RuntimeException.class, () -> Freigabe.lies(mitPort("0"), v4));
+        assertThrows(RuntimeException.class, () -> Freigabe.lies(mitPort("65536"), v4));
     }
 
     @Test
