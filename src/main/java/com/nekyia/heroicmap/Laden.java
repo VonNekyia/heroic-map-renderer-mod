@@ -36,6 +36,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Flow;
@@ -127,7 +128,11 @@ final class Laden {
         final Grund grund;
 
         Fehler(Grund grund, String text) {
-            super(grund + ": " + text);
+            this(grund, text, null);
+        }
+
+        Fehler(Grund grund, String text, Throwable ursache) {
+            super(grund + ": " + text, ursache);
             this.grund = grund;
         }
     }
@@ -137,6 +142,8 @@ final class Laden {
             // Kein dritter Host bekommt das Token.
             .followRedirects(HttpClient.Redirect.NEVER)
             .connectTimeout(Duration.ofSeconds(10))
+            // Ein Proxy des Systems ginge an der Prüfung der Adresse vorbei.
+            .proxy(HttpClient.Builder.NO_PROXY)
             .build();
     /** So lange darf eine Anfrage dauern, Header und Körper zusammen. */
     private final Duration zeit;
@@ -151,13 +158,6 @@ final class Laden {
 
     /** Lädt den Satz nach {@code ziel}: {@code map.json}, {@code etags.txt} und {@code z/x/y.webp}. */
     Ergebnis lade(Auftrag a, Path ziel) throws Fehler, IOException, InterruptedException {
-        switch (Adresse.pruefe(a.url(), a.spielserver())) {
-            case SCHEMA -> throw new Fehler(Grund.NETZ, "Adresse");
-            case HEIMNETZ -> throw new Fehler(Grund.HEIMNETZ, a.url().getHost());
-            case UNBEKANNT -> throw new Fehler(Grund.UNBEKANNT, a.url().getHost());
-            case GUT -> {
-            }
-        }
         Path zwischen = ziel.resolve(ZWISCHEN);
         // Was ein beendetes Spiel halb geschrieben hat.
         loesche(zwischen);
@@ -218,9 +218,9 @@ final class Laden {
         OutputStream protokoll = Files.newOutputStream(ziel.resolve(INDEX), StandardOpenOption.CREATE,
                 StandardOpenOption.APPEND);
         try {
-            List<Future<?>> arbeit = new ArrayList<>();
+            ExecutorCompletionService<Void> arbeit = new ExecutorCompletionService<>(pool);
             for (int i = 0; i < VERBINDUNGEN; i++) {
-                arbeit.add(pool.submit(() -> {
+                arbeit.submit(() -> {
                     try {
                         for (Eintrag e; (e = fehlt.poll()) != null; ) {
                             // Die Summe bleibt unter der Grenze; was darüber läge, holt der nächste Abgleich.
@@ -249,15 +249,15 @@ final class Laden {
                             geladenBytes.addAndGet(bild.length);
                         }
                     } catch (Exception f) {
-                        // Die anderen hören nach ihrer laufenden Kachel auf.
                         fehlt.clear();
                         throw f;
                     }
                     return null;
-                }));
+                });
             }
-            for (Future<?> f : arbeit) {
-                warte(f);
+            // In der Reihenfolge des Fertigwerdens: Der erste Fehler bricht über shutdownNow die anderen ab.
+            for (int i = 0; i < VERBINDUNGEN; i++) {
+                warte(arbeit.take());
             }
         } finally {
             pool.shutdownNow();
@@ -329,9 +329,18 @@ final class Laden {
         return eintraege;
     }
 
-    /** Holt eine Datei unter der Adresse des Baums, höchstens {@code max} Byte, in höchstens {@link #zeit}. */
-    private HttpResponse<byte[]> hole(Auftrag a, String pfad, long max, Grund grund)
-            throws Fehler, IOException, InterruptedException {
+    /**
+     * Holt eine Datei unter der Adresse des Baums, höchstens {@code max} Byte, in höchstens
+     * {@link #zeit}. Prüft vorher die Adresse, denn jede neue Verbindung löst den Namen neu auf.
+     */
+    private HttpResponse<byte[]> hole(Auftrag a, String pfad, long max, Grund grund) throws Fehler, InterruptedException {
+        switch (Adresse.pruefe(a.url(), a.spielserver())) {
+            case SCHEMA -> throw new Fehler(Grund.NETZ, "Adresse");
+            case HEIMNETZ -> throw new Fehler(Grund.HEIMNETZ, a.url().getHost());
+            case UNBEKANNT -> throw new Fehler(Grund.UNBEKANNT, a.url().getHost());
+            case GUT -> {
+            }
+        }
         String basis = a.url().toString();
         URI uri = URI.create(basis.endsWith("/") ? basis + pfad : basis + "/" + pfad);
         HttpRequest anfrage = HttpRequest.newBuilder(uri)
@@ -353,11 +362,11 @@ final class Laden {
         } catch (TimeoutException e) {
             throw new Fehler(Grund.NETZ, pfad + ": nicht fertig in " + zeit.toSeconds() + " s");
         } catch (ExecutionException e) {
-            switch (e.getCause()) {
-                case Fehler fehler -> throw fehler;
-                case IOException io -> throw io;
-                default -> throw new IOException(e.getCause());
+            if (e.getCause() instanceof Fehler fehler) {
+                throw fehler;
             }
+            // Verbindung, Frist des HttpClient, abgerissener Körper: alles Netz; die Ursache bleibt fürs Log.
+            throw new Fehler(Grund.NETZ, pfad, e.getCause());
         } finally {
             // Bricht ab, was noch läuft: nach der Frist, oder wenn der Download endet.
             antwort.cancel(true);

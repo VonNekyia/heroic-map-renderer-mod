@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -286,6 +287,32 @@ class LadenTest {
         kacheln.put("2/1/1", "bild".getBytes(StandardCharsets.UTF_8));
         assertEquals(Laden.Grund.NETZ, assertThrows(Laden.Fehler.class, () -> new Laden().lade(auftrag(4, 1 << 30), ziel)).grund);
         assertFalse(Files.exists(datei("2/1/1")));
+    }
+
+    @Test
+    void verbindungsfehlerIstNetz() throws IOException {
+        int frei;
+        try (ServerSocket s = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            frei = s.getLocalPort();
+        }
+        // Ein Port, an dem niemand lauscht.
+        URI url = URI.create("http://127.0.0.1:" + frei + "/baum");
+        Laden.Auftrag a = new Laden.Auftrag(url, TOKEN, Laden.sha256(manifest), summe(), 4, false, 1L << 30, 5,
+                InetAddress.getLoopbackAddress());
+        Laden.Fehler f = assertThrows(Laden.Fehler.class, () -> new Laden().lade(a, ziel));
+        assertEquals(Laden.Grund.NETZ, f.grund);
+        assertTrue(f.getCause() instanceof IOException);
+    }
+
+    @Test
+    void ersterFehlerBrichtDieAnderenAb() throws IOException {
+        // Eine Kachel fehlt beim Server, eine andere hält er 30 s zurück: Der Download endet gleich, nicht mit der gehaltenen.
+        setze("2/5/5", "weg".getBytes(StandardCharsets.UTF_8), "\"weg\"");
+        manifest = baueManifest();
+        kacheln.remove("2/5/5");
+        haelt = "2/-2/3";
+        assertTimeoutPreemptively(Duration.ofSeconds(10), () -> assertEquals(Laden.Grund.NETZ,
+                assertThrows(Laden.Fehler.class, () -> new Laden().lade(auftrag(4, 1 << 30), ziel)).grund));
     }
 
     @Test

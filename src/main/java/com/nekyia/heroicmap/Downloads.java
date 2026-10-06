@@ -38,23 +38,21 @@ final class Downloads {
 
     static final Downloads INSTANZ = new Downloads();
     private static final Logger LOGGER = LogUtils.getLogger();
-    /** Hier steht der Massstab, den das Plugin für den Baum gespeichert hat. */
-    private static final String AKTIV = "massstab.txt";
+    /** Hier steht der Stand des Satzes, siehe {@link Freigabe.Stand}. */
+    private static final String STAND = "massstab.txt";
     private static final DateTimeFormatter UHR = DateTimeFormatter.ofPattern("dd.MM. HH:mm");
-
-    /** Was der Spieler vor einer {@code anfrage} mit {@code voll} bestätigt hat. */
-    private record Bestaetigt(int massstab, long bytes) {
-    }
 
     private final Reihe reihe = new Reihe();
     /** Nur im Thread der Reihe; der HttpClient entsteht mit dem ersten Download, beim Trennen wäre es zu früh. */
     private Laden laden;
     /** Das letzte Angebot des Servers, oder null. */
     private JsonObject angebot;
-    /** Je Baum, was der Spieler zuletzt bestätigt hat; die {@code freigabe} verbraucht es. */
-    private final Map<String, Bestaetigt> bestaetigt = new HashMap<>();
-    /** Der offene Dialog, oder null; es gibt höchstens einen. */
+    /** Je Baum, was der Spieler vor einer {@code anfrage} mit {@code voll} bestätigt hat; die {@code freigabe} verbraucht es. */
+    private final Map<String, Freigabe.Stand> bestaetigt = new HashMap<>();
+    /** Der geplante oder gezeigte Dialog, oder null; es gibt höchstens einen. */
     private ConfirmScreen dialog;
+    /** War der Dialog schon auf dem Schirm? Bis dahin ist er geplant und zählt als offen. */
+    private boolean dialogGezeigt;
     /** Nach einer falschen Prüfsumme fragt der Mod einmal neu an, dann nicht mehr. */
     private boolean neuGefragt;
 
@@ -83,12 +81,13 @@ final class Downloads {
         }
     }
 
-    /** Vergisst Angebot, Bestätigungen und Dialog, etwa beim Trennen. Laufende Downloads enden für sich. */
+    /** Vergisst Angebot, Bestätigungen und Dialog und bricht die Downloads ab, etwa beim Trennen. */
     void leeren() {
         angebot = null;
         neuGefragt = false;
         bestaetigt.clear();
         dialog = null;
+        reihe.abbrechen();
     }
 
     /** Steht der Baum im letzten Angebot? */
@@ -96,20 +95,21 @@ final class Downloads {
         return eintrag(baum) != null;
     }
 
-    /** Wartet oder läuft für den Baum ein Download? */
+    /** Wartet oder läuft für den Baum auf diesem Server ein Download? */
     boolean belegt(String baum) {
-        return reihe.belegt(baum);
+        return reihe.belegt(schluessel(baum));
     }
 
     /** Der Massstab, den das Plugin für den Baum gespeichert hat, so wie der Mod ihn zuletzt voll lud, oder 0. */
     int aktiv(String baum) {
+        Freigabe.Stand stand = stand(baum);
+        return stand == null ? 0 : stand.massstab();
+    }
+
+    /** Der gespeicherte Stand des Baums auf diesem Server, oder null. */
+    private static Freigabe.Stand stand(String baum) {
         Path ordner = ordner(baum);
-        try {
-            int m = ordner == null ? 0 : Integer.parseInt(Files.readString(ordner.resolve(AKTIV)).trim());
-            return m == 1 || m == 2 || m == 4 ? m : 0;
-        } catch (IOException | RuntimeException e) {
-            return 0;
-        }
+        return ordner == null ? null : Freigabe.Stand.lies(ordner.resolve(STAND));
     }
 
     /**
@@ -122,11 +122,11 @@ final class Downloads {
         if (!Kanal.offen() || eintrag == null) {
             return Component.translatable("heroicmap.befehl.unbekannt", baum);
         }
-        long bytes = feld(eintrag, massstab, "bytes");
-        if (bytes < 0) {
+        long bytes = feld(eintrag, massstab, "bytes"), kacheln = feld(eintrag, massstab, "kacheln");
+        if (bytes < 0 || kacheln < 0) {
             return Component.translatable("heroicmap.befehl.massstab_fehlt", massstab);
         }
-        if (reihe.belegt(baum)) {
+        if (belegt(baum)) {
             return Component.translatable("heroicmap.download.belegt", baum);
         }
         int alt = aktiv(baum);
@@ -135,7 +135,12 @@ final class Downloads {
                 ? Component.translatable("heroicmap.befehl.frage_wechsel", name, groesse(bytes), massstab, alt)
                 : Component.translatable("heroicmap.befehl.frage", name, groesse(bytes), massstab);
         boolean gezeigt = zeige(Component.translatable("heroicmap.befehl.titel"), frage, () -> {
-            bestaetigt.put(baum, new Bestaetigt(massstab, bytes));
+            // Während des Dialogs kann der Abgleich vom Beitritt begonnen haben; dann zählte die anfrage umsonst.
+            if (belegt(baum)) {
+                melde(Component.translatable("heroicmap.download.belegt", baum));
+                return;
+            }
+            bestaetigt.put(baum, new Freigabe.Stand(massstab, bytes, kacheln));
             Kanal.frage(baum, massstab, "voll");
         });
         return gezeigt ? null : Component.translatable("heroicmap.befehl.dialog");
@@ -153,23 +158,23 @@ final class Downloads {
             melde(Component.translatable("heroicmap.download.unlesbar"));
             return;
         }
-        JsonObject eintrag = eintrag(f.baum());
-        long satzBytes = feld(eintrag, f.massstab(), "bytes"), kacheln = feld(eintrag, f.massstab(), "kacheln");
-        if (satzBytes < 0 || kacheln < 0) {
+        long kacheln = feld(eintrag(f.baum()), f.massstab(), "kacheln");
+        if (kacheln < 0) {
             melde(Component.translatable("heroicmap.download.nicht_angeboten", f.baum()));
             return;
         }
-        if (reihe.belegt(f.baum())) {
+        if (belegt(f.baum())) {
             melde(Component.translatable("heroicmap.download.verfaellt_belegt", f.baum()));
             return;
         }
         String spielserver = ServerAddress.parseString(server.ip).getHost();
         String host = f.url().getHost();
-        Bestaetigt b = bestaetigt.remove(f.baum());
-        long ok = b != null && b.massstab() == f.massstab() ? b.bytes() : 0;
+        // Gemessen wird am gespeicherten oder bestätigten Stand, nie an Zahlen aus dem angebot allein.
+        Freigabe.Stand gespeichert = stand(f.baum()), bestaetigt = this.bestaetigt.remove(f.baum());
+        Freigabe.Stand mass = f.mass(gespeichert, bestaetigt, kacheln);
         Laden.Auftrag auftrag = new Laden.Auftrag(f.url(), f.token(), f.manifestSha256(), f.bytes(), f.massstab(),
-                f.abgleich(), satzBytes, kacheln, verbindung());
-        Component frage = switch (f.weg(aktiv(f.baum()), satzBytes, ok, zugestimmt(spielserver, host))) {
+                f.abgleich(), mass.bytes(), mass.kacheln(), verbindung());
+        Component frage = switch (f.weg(gespeichert, bestaetigt, zugestimmt(spielserver, host))) {
             case STILL -> null;
             case HOST -> Component.translatable("heroicmap.download.host", spielserver, host);
             case FRAGEN -> Component.translatable("heroicmap.download.frage", spielserver, host, groesse(f.bytes()),
@@ -201,10 +206,11 @@ final class Downloads {
         melde(Component.translatable("heroicmap.download.abgelehnt", grund));
     }
 
-    /** Zeigt einen Dialog; false, wenn schon einer offen ist. */
+    /** Zeigt einen Dialog; false, wenn schon einer geplant oder offen ist. */
     private boolean zeige(Component titel, Component text, Runnable ja) {
         Minecraft mc = Minecraft.getInstance();
-        if (dialog != null && mc.gui.screen() == dialog) {
+        // Geplant zählt als offen; gezeigt nur, solange er auf dem Schirm ist.
+        if (dialog != null && (!dialogGezeigt || mc.gui.screen() == dialog)) {
             return false;
         }
         ConfirmScreen neu = new ConfirmScreen(antwort -> {
@@ -215,10 +221,12 @@ final class Downloads {
             }
         }, titel, text);
         dialog = neu;
+        dialogGezeigt = false;
         // Nach einem Befehl schliesst der Chat noch; der Dialog kommt danach.
         mc.schedule(() -> {
             if (dialog == neu) {
                 mc.gui.setScreen(neu);
+                dialogGezeigt = true;
             }
         });
         return true;
@@ -229,7 +237,7 @@ final class Downloads {
         if (ordner == null) {
             return;
         }
-        if (!reihe.reihe(f.baum(), () -> lade(f, auftrag, ordner))) {
+        if (!reihe.reihe(ordner.toString(), () -> lade(f, auftrag, ordner))) {
             melde(Component.translatable("heroicmap.download.verfaellt_belegt", f.baum()));
             return;
         }
@@ -245,9 +253,8 @@ final class Downloads {
                 laden = new Laden();
             }
             if (!f.abgleich()) {
-                // Das Plugin speichert den Massstab, sobald es das Token ausstellt.
-                Files.createDirectories(ordner);
-                Files.writeString(ordner.resolve(AKTIV), String.valueOf(f.massstab()));
+                // Das Plugin speichert den Massstab, sobald es das Token ausstellt; der Abgleich misst an diesem Stand.
+                new Freigabe.Stand(f.massstab(), auftrag.satzBytes(), auftrag.kacheln()).schreibe(ordner.resolve(STAND));
             }
             ergebnis = laden.lade(auftrag, ordner.resolve(String.valueOf(f.massstab())));
             if (!ergebnis.gekappt()) {
@@ -256,15 +263,15 @@ final class Downloads {
         } catch (Exception e) {
             fehler = e;
         } finally {
-            zurueck(f, ergebnis, fehler);
+            zurueck(f, auftrag, ergebnis, fehler);
         }
     }
 
-    private void zurueck(Freigabe f, Laden.Ergebnis ergebnis, Exception fehler) {
-        Minecraft.getInstance().execute(() -> beende(f, ergebnis, fehler));
+    private void zurueck(Freigabe f, Laden.Auftrag auftrag, Laden.Ergebnis ergebnis, Exception fehler) {
+        Minecraft.getInstance().execute(() -> beende(f, auftrag, ergebnis, fehler));
     }
 
-    private void beende(Freigabe f, Laden.Ergebnis ergebnis, Exception fehler) {
+    private void beende(Freigabe f, Laden.Auftrag auftrag, Laden.Ergebnis ergebnis, Exception fehler) {
         if (ergebnis != null) {
             neuGefragt = false;
             melde(Component.translatable(ergebnis.gekappt() ? "heroicmap.download.gekappt" : "heroicmap.download.fertig",
@@ -275,7 +282,7 @@ final class Downloads {
             // Zwischen freigabe und Abruf endete ein Lauf; dasselbe Token kommt mit dem neuen Manifest.
             neuGefragt = true;
             if (!f.abgleich()) {
-                bestaetigt.put(f.baum(), new Bestaetigt(f.massstab(), f.bytes()));
+                bestaetigt.put(f.baum(), new Freigabe.Stand(f.massstab(), auftrag.satzBytes(), auftrag.kacheln()));
             }
             Kanal.frage(f.baum(), f.massstab(), f.art());
             return;
@@ -290,6 +297,12 @@ final class Downloads {
         ClientPacketListener verbindung = Minecraft.getInstance().getConnection();
         return verbindung != null && verbindung.getConnection().getRemoteAddress() instanceof InetSocketAddress a
                 ? a.getAddress() : null;
+    }
+
+    /** Der Schlüssel in der Reihe: der Ordner des Baums, also je Server und Baum. */
+    private static String schluessel(String baum) {
+        Path ordner = ordner(baum);
+        return ordner == null ? baum : ordner.toString();
     }
 
     /** Der Ordner eines Baums auf diesem Server, oder null im Einzelspieler. */

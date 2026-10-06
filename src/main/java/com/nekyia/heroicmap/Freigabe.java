@@ -1,7 +1,11 @@
 package com.nekyia.heroicmap;
 
 import com.google.gson.JsonObject;
+import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
@@ -53,19 +57,70 @@ record Freigabe(String baum, String art, int massstab, long bytes, URI url, Stri
     }
 
     /**
-     * Still lädt nur ein Abgleich im gespeicherten Massstab mit höchstens 11 % des Satzes, oder ein
-     * voller Download, dessen Grösse der Spieler vor der {@code anfrage} bestätigt hat, plus 10 %;
-     * beides nur mit Zustimmung zum Host. {@code aktiv} ist der gespeicherte Massstab oder 0,
-     * {@code satzBytes} die Grösse des Satzes aus dem {@code angebot}, {@code bestaetigt} die vom
-     * Spieler bestätigten Bytes für diesen Baum und Massstab oder 0.
+     * Ein Satz, wie der Spieler ihn bestätigt hat: Massstab, Grösse und Kacheln. Beim Start eines
+     * vollen Downloads liegt er in {@code <baum>/massstab.txt}; ein Abgleich misst daran, nie an
+     * Zahlen aus dem letzten {@code angebot}.
      */
-    Weg weg(int aktiv, long satzBytes, long bestaetigt, boolean zugestimmt) {
-        boolean erwartet = abgleich()
-                ? aktiv == massstab && bytes <= satzBytes / 100 * 11
-                : bestaetigt > 0 && bytes <= bestaetigt + bestaetigt / 10;
-        if (!erwartet) {
+    record Stand(int massstab, long bytes, long kacheln) {
+
+        /** Liest den Stand, oder null, wenn keiner lesbar daliegt. */
+        static Stand lies(Path datei) {
+            try {
+                String[] teile = Files.readString(datei, StandardCharsets.UTF_8).trim().split(" ");
+                Stand stand = new Stand(Integer.parseInt(teile[0]), Long.parseLong(teile[1]), Long.parseLong(teile[2]));
+                return teile.length == 3 && (stand.massstab == 1 || stand.massstab == 2 || stand.massstab == 4)
+                        && stand.bytes >= 0 && stand.kacheln >= 0 ? stand : null;
+            } catch (IOException | RuntimeException e) {
+                return null;
+            }
+        }
+
+        void schreibe(Path datei) throws IOException {
+            Files.createDirectories(datei.getParent());
+            Files.writeString(datei, massstab + " " + bytes + " " + kacheln, StandardCharsets.UTF_8);
+        }
+    }
+
+    /**
+     * Woran die {@code freigabe} gemessen wird: ein Abgleich am gespeicherten Stand, ein voller
+     * Download an dem, was der Spieler vor der {@code anfrage} bestätigt hat. Null, wenn keiner
+     * passt.
+     */
+    private Stand passend(Stand gespeichert, Stand bestaetigt) {
+        Stand stand = abgleich() ? gespeichert : bestaetigt;
+        if (stand == null || stand.massstab != massstab) {
+            return null;
+        }
+        long grenze = abgleich() ? stand.bytes / 100 * 11 : stand.bytes + stand.bytes / 10;
+        return bytes <= grenze ? stand : null;
+    }
+
+    /**
+     * Still lädt nur ein Abgleich im gespeicherten Massstab mit höchstens 11 % des Satzes, oder ein
+     * voller Download mit höchstens 10 % mehr, als der Spieler bestätigt hat; beides nur mit
+     * Zustimmung zum Host. Sonst fragt ein Dialog nach Host, Grösse und Massstab.
+     */
+    Weg weg(Stand gespeichert, Stand bestaetigt, boolean zugestimmt) {
+        if (passend(gespeichert, bestaetigt) == null) {
             return Weg.FRAGEN;
         }
         return zugestimmt ? Weg.STILL : Weg.HOST;
+    }
+
+    /**
+     * Der Stand, an dem der Download Zeilen und Grösse misst. Passt keiner, hat der Spieler im
+     * Dialog {@code bytes} gesehen: Ein voller Download misst daran, ein Abgleich am Zehnfachen,
+     * denn sein Deckel ist 10 % des Satzes. Die Kacheln aus dem {@code angebot} gelten nur
+     * zusammen mit dieser Grösse, siehe {@link Laden.Auftrag#zeilen()}.
+     */
+    Stand mass(Stand gespeichert, Stand bestaetigt, long angebotKacheln) {
+        Stand stand = passend(gespeichert, bestaetigt);
+        if (stand != null) {
+            return stand;
+        }
+        if (abgleich() && gespeichert != null && gespeichert.massstab == massstab) {
+            return gespeichert;
+        }
+        return new Stand(massstab, abgleich() ? Math.min(bytes, Long.MAX_VALUE / 10) * 10 : bytes, angebotKacheln);
     }
 }

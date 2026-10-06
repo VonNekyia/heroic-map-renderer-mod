@@ -61,15 +61,23 @@ Die Vollbildkarte bekommt dafür später Knöpfe.
   | `freigabe` | Bedingung | Weg |
   |---|---|---|
   | `voll` | der Spieler bestätigte diesen Baum und Massstab vor der `anfrage`, `bytes` höchstens 10 % über der bestätigten Grösse | still |
-  | `abgleich` | im gespeicherten Massstab, `bytes` höchstens 11 % der Grösse des Satzes aus dem `angebot` | still |
+  | `abgleich` | im gespeicherten Massstab, `bytes` höchstens 11 % der gespeicherten Grösse des Satzes | still |
   | jede andere | | Dialog mit Spielserver, Host, Grösse und Massstab |
 
   Still heisst: nur mit Zustimmung zum Host; fehlt sie, fragt ein Dialog
   nach dem Host allein.
+- **Gemessen wird nie an Zahlen aus dem `angebot` allein** (`Freigabe.mass`):
+  Ein voller Download misst an dem, was der Spieler bestätigt hat, im
+  Befehl oder im Dialog nach der `freigabe`. Beim Start legt der Mod Grösse
+  und Kacheln dieses Satzes ab, siehe „Ablage“, und ein Abgleich misst
+  daran. Fehlt der Stand, misst ein Abgleich nach dem Dialog am Zehnfachen
+  der gezeigten `bytes`, denn sein Deckel ist 10 % des Satzes.
 - **Die Zustimmung** gilt je Paar aus Spielserver und Host, gespeichert in
   `heroicmap/zustimmung.txt` im Spielordner.
-- **Höchstens ein Dialog** ist offen. Eine `freigabe`, die einen zweiten
-  bräuchte, verfällt mit einer Meldung.
+- **Höchstens ein Dialog,** geplant oder offen. Eine `freigabe`, die einen
+  zweiten bräuchte, verfällt mit einer Meldung. Sagt der Spieler Ja zu
+  `/heroicmap laden`, während inzwischen ein Download für den Baum läuft,
+  geht keine `anfrage` hinaus.
 - **Der tägliche Abgleich:** Das Plugin schickt ihn von sich aus als
   `freigabe` mit `art` `abgleich`; mit Zustimmung lädt der Mod ihn im
   Hintergrund.
@@ -80,13 +88,22 @@ Die Vollbildkarte bekommt dafür später Knöpfe.
 - **Adresse** (`Adresse.form`, beim Lesen der `freigabe`): nur `http` und
   `https` mit Host, ohne Userinfo, Query und Fragment; der Mod hängt Pfade
   an die Adresse an.
-- **Heimnetz** (`Adresse.pruefe`, im Thread der Reihe vor dem ersten
-  Abruf): Zeigt der Host auf loopback, link-local, ein privates Netz,
-  `100.64.0.0/10`, `0.0.0.0/8` oder `fc00::/7`, lädt der Mod nur, wenn die
-  echte Verbindung zum Spielserver selbst in ein solches Netz geht. Er nimmt
-  ihre Adresse, nicht die Namen des Servers; sonst könnte ein Server mit
-  einem zusätzlichen DNS-Eintrag Anfragen in das Heimnetz des Spielers
-  lenken.
+- **Heimnetz** (`Adresse.pruefe`, im Thread der Reihe vor jedem Abruf,
+  denn jede neue Verbindung löst den Namen neu auf): Nah heisst loopback,
+  link-local, ein privates Netz, `100.64.0.0/10`, `0.0.0.0/8` oder
+  `fc00::/7`; IPv4 in IPv6 (`::ffff:0:0/96`) packt der Mod dafür aus.
+  Massgeblich ist die Adresse der echten Verbindung zum Spielserver, nicht
+  seine Namen; sonst könnte ein Server mit einem zusätzlichen DNS-Eintrag
+  Anfragen in das Heimnetz des Spielers lenken.
+
+  | Spielserver | erlaubtes Ziel |
+  |---|---|
+  | fern | jede Adresse, die nicht nah ist |
+  | nah | nur der Spielserver selbst, gleiche Adresse oder beide loopback; dort läuft der Server aus heroic-map-renderer#151 |
+
+  Jede Adresse, auf die der Host zeigt, muss erlaubt sein.
+- **Kein Proxy** (`NO_PROXY`): Ein Proxy des Systems ginge an der Prüfung
+  vorbei.
 - **Keine Weiterleitungen** (`Redirect.NEVER`): So geht das Token nie an
   einen dritten Host.
 - **Das Token** ist für den Mod undurchsichtig; er schickt es nur im Header
@@ -103,7 +120,7 @@ Die Vollbildkarte bekommt dafür später Knöpfe.
 
 `Laden.lade`, im Thread der Reihe:
 
-1. **Adresse** prüfen, siehe „Sicherheit“.
+1. **Adresse** prüfen, vor jedem Abruf, siehe „Sicherheit“.
 2. **`map.json`** holen; daraus `minZoom` und `maxZoom`. Die Stufe des
    Massstabs: 4 px ist `maxZoom`, 2 px eine gröber, 1 px zwei.
 3. **Manifest** holen und SHA-256 über das gzip mit `manifest_sha256`
@@ -114,8 +131,8 @@ Die Vollbildkarte bekommt dafür später Knöpfe.
 6. **Laden,** was fehlt oder ein anderes ETag hat, über 4 Verbindungen mit
    Keep-Alive (`java.net.http.HttpClient`, HTTP/1.1). Gespeichert wird das
    ETag aus der Antwort, denn eine Kachel kann neuer sein als das Manifest.
-   Scheitert eine Kachel, hören die anderen Verbindungen nach ihrer
-   laufenden auf.
+   Scheitert eine Kachel, bricht der Mod die laufenden Abrufe der anderen
+   Verbindungen sofort ab.
 7. **Der Index** `etags.txt` ist ein Protokoll: je Kachel eine Zeile ohne
    ETag vor dem Schreiben, eine mit danach; die letzte gilt, eine ohne ETag
    heisst neu laden. Endet das Spiel mitten im Download, gilt, was schon
@@ -123,15 +140,18 @@ Die Vollbildkarte bekommt dafür später Knöpfe.
 
 **Fristen:** Eine Anfrage hat 2 min für Header und Körper zusammen; danach
 bricht der Mod sie ab (`sendAsync`, `cancel`). Der Aufbau der Verbindung hat
-10 s.
+10 s. Fehler der Verbindung und abgelaufene Fristen heissen `NETZ`.
 
 ## Reihe
 
 - **Nacheinander:** Downloads laufen in einem Thread (`Reihe`). Eine
   `freigabe` für einen anderen Baum wartet, bis der laufende fertig ist.
-- **Je Baum höchstens einer,** wartend oder laufend. Eine weitere
-  `freigabe` für denselben Baum verfällt mit einer Meldung, und
-  `/heroicmap laden` sagt vorher, dass schon einer läuft.
+- **Je Server und Baum höchstens einer,** wartend oder laufend; der
+  Schlüssel ist der Ordner des Baums. Eine weitere `freigabe` für denselben
+  Baum verfällt mit einer Meldung, und `/heroicmap laden` sagt vorher, dass
+  schon einer läuft.
+- **Beim Trennen** bricht der Mod den laufenden Download ab und verwirft,
+  was wartet. Was schon geladen ist, steht im Index.
 - **Das Ergebnis** meldet der Mod in jedem Fall, auch nach einem `Error` im
   Thread der Reihe.
 
@@ -142,7 +162,7 @@ bricht der Mod sie ab (`sendAsync`, `cancel`). Der Aufbau der Verbindung hat
 | `map.json` | 64 KiB | Abbruch |
 | Manifest, gepackt und entpackt | je 64 MiB | Abbruch |
 | Zeile des Manifests | `z/x/y` ganze Zahlen, `z` zwischen `minZoom` und `maxZoom`, Grösse bis 4 MiB, ETag ohne Leer- und Steuerzeichen | Abbruch |
-| Zeilen bis zur Stufe | keine doppelte Kachel; höchstens `kacheln` aus dem `angebot` plus 10 %, und höchstens eine je 4 KiB der Grösse des Satzes plus 10 % | Abbruch |
+| Zeilen bis zur Stufe | keine doppelte Kachel; höchstens `kacheln` plus 10 %, und höchstens eine je 4 KiB der Grösse des Satzes plus 10 %, beides aus dem Stand, an dem der Download misst | Abbruch |
 | eine Kachel | 4 MiB; mit dem ETag des Manifests genau die Grösse aus dem Manifest | Abbruch |
 | Summe des Geladenen | bei `voll` `bytes` plus 10 %, beim Abgleich `bytes`, der Deckel des Tokens | der Rest bleibt liegen, „zum Teil geladen“ |
 | Antwort | 200 | 401, 403 und 429 heissen abgelehnt, alles andere Abbruch |
@@ -162,9 +182,11 @@ Einzelheiten stehen im Log.
   lehnt der Mod als Baum ab und stellt dem Server ein `_` voran.
 - **Schreiben** über eine Zwischendatei in `tmp/`, dann verschieben; nie
   liegt eine halbe Kachel da. `tmp/` leert der Mod zu Beginn jedes Downloads.
-- **Der gespeicherte Massstab** steht in `<baum>/massstab.txt`. Der Mod
-  schreibt ihn, wenn ein voller Download beginnt, denn dann speichert ihn
-  auch das Plugin. Der Abgleich fragt in diesem Massstab an.
+- **Der Stand** steht in `<baum>/massstab.txt`: Massstab, Grösse und
+  Kacheln des Satzes, wie der Spieler ihn bestätigt hat, etwa `4 9000000000
+  450000`. Der Mod schreibt ihn, wenn ein voller Download beginnt, denn dann
+  speichert das Plugin den Massstab. Der Abgleich fragt in diesem Massstab
+  an und misst an Grösse und Kacheln.
 - **Eine Auflösung je Baum:** Ist ein Download vollständig, fallen die
   anderen Massstäbe dieses Baums weg. Bis dahin bleibt der alte Satz, damit
   der Spieler nicht ohne Karte dasteht; ein gekappter Download löscht nichts.
@@ -173,6 +195,10 @@ Einzelheiten stehen im Log.
 
 ## Was bleibt eine Näherung
 
-- **Auflösen und Laden** sind zwei Schritte: Der Host kann zwischen der
-  Prüfung der Adresse und dem Abruf auf eine andere Adresse zeigen.
+- **Auflösen und Laden** sind zwei Schritte: Prüfung und Verbindung lösen
+  den Namen getrennt auf. Beide gehen durch denselben Cache der JVM; läuft
+  er genau dazwischen ab, kann die Verbindung eine andere Adresse bekommen
+  als die geprüfte.
+- **Ein naher Spielserver** darf sich selbst als Ziel nennen, also jeden
+  Port auf seiner Adresse.
 - **Plattenplatz** prüft der Mod nicht; der Dialog nennt nur die Grösse.

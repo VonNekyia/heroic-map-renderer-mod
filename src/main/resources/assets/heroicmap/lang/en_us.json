@@ -32,7 +32,7 @@
   "heroicmap.download.grund.kachel": "A tile is too large.",
   "heroicmap.download.grund.abgelehnt": "The map server declines the token.",
   "heroicmap.download.grund.netz": "No, an incomplete or a wrong answer from the map server.",
-  "heroicmap.download.grund.heimnetz": "The map is in a private network, the game server is not; the mod downloads nothing.",
+  "heroicmap.download.grund.heimnetz": "The map is in a private network and not on the game server itself; the mod downloads nothing.",
   "heroicmap.download.grund.unbekannt": "The map's host does not exist.",
   "heroicmap.download.grund.anderer": "An error in the mod; details in the log."
 }

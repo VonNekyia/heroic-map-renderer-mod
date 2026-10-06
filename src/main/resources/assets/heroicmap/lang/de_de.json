@@ -32,7 +32,7 @@
   "heroicmap.download.grund.kachel": "Eine Kachel ist zu gross.",
   "heroicmap.download.grund.abgelehnt": "Der Kartenserver lehnt das Token ab.",
   "heroicmap.download.grund.netz": "Keine, eine unvollständige oder eine falsche Antwort vom Kartenserver.",
-  "heroicmap.download.grund.heimnetz": "Die Karte liegt in einem privaten Netz, der Spielserver nicht; der Mod lädt nichts.",
+  "heroicmap.download.grund.heimnetz": "Die Karte liegt in einem privaten Netz und nicht beim Spielserver selbst; der Mod lädt nichts.",
   "heroicmap.download.grund.unbekannt": "Den Host der Karte gibt es nicht.",
   "heroicmap.download.grund.anderer": "Ein Fehler im Mod; Einzelheiten im Log."
 }

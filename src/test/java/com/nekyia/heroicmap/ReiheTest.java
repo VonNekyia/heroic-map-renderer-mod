@@ -50,6 +50,33 @@ class ReiheTest {
         assertTrue(lief.await(5, TimeUnit.SECONDS));
     }
 
+    @Test
+    void abbrechenUnterbrichtUndVerwirft() throws Exception {
+        Reihe reihe = new Reihe();
+        CountDownLatch laeuft = new CountDownLatch(1), unterbrochen = new CountDownLatch(1), neu = new CountDownLatch(1);
+        List<String> folge = new CopyOnWriteArrayList<>();
+        assertTrue(reihe.reihe("server-a/welt", () -> {
+            laeuft.countDown();
+            try {
+                Thread.sleep(30_000);
+            } catch (InterruptedException e) {
+                unterbrochen.countDown();
+            }
+        }));
+        assertTrue(reihe.reihe("server-a/nether", () -> folge.add("alt")));
+        assertTrue(laeuft.await(5, TimeUnit.SECONDS));
+        // Beim Trennen: Was läuft, bricht ab, was wartet, verfällt; Neues läuft danach ohne Unterbrechung.
+        reihe.abbrechen();
+        assertTrue(unterbrochen.await(5, TimeUnit.SECONDS));
+        warteFrei(reihe, "server-a/nether");
+        assertTrue(reihe.reihe("server-b/welt", () -> {
+            folge.add(Thread.currentThread().isInterrupted() ? "unterbrochen" : "neu");
+            neu.countDown();
+        }));
+        assertTrue(neu.await(5, TimeUnit.SECONDS));
+        assertEquals(List.of("neu"), folge);
+    }
+
     private static void warteFrei(Reihe reihe, String baum) throws InterruptedException {
         for (int i = 0; i < 500 && reihe.belegt(baum); i++) {
             Thread.sleep(10);
