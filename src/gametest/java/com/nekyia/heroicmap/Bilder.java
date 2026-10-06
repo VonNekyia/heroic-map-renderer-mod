@@ -103,7 +103,11 @@ public final class Bilder implements FabricClientGameTest {
         context.runOnClient(mc -> Minimap.INSTANZ.setzeRund(true));
         context.waitTicks(2);
         Path rund = context.takeScreenshot(TestScreenshotOptions.of("minimap-rund").disableCounterPrefix());
-        context.runOnClient(mc -> mc.gui.setScreen(new Einstellungen()));
+        context.runOnClient(mc -> {
+            // Die Meldung zum Spielmodus läge sonst über den Knöpfen.
+            mc.gui.hud.getChat().clearMessages(false);
+            mc.gui.setScreen(new Einstellungen());
+        });
         context.waitTicks(5);
         Path menue = context.takeScreenshot(TestScreenshotOptions.of("menue").disableCounterPrefix());
         context.runOnClient(mc -> {
