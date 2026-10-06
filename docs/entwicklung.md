@@ -77,6 +77,10 @@ braucht:
 - **`server-ip=127.0.0.1`:** Ohne Anmeldung kommt jeder mit jedem Namen
   herein. Das ist für einen Testserver auf demselben Rechner richtig, aber
   nur, solange er von aussen nicht erreichbar ist.
+- **Keine Whitelist,** oder der Client darauf: `whitelist off` oder
+  `whitelist add Player0`, so heisst der Client im Gametest. Weist der
+  Server ihn ab, endet der Gametest gleich mit dem Bild `server-abgewiesen`,
+  denn der Grund steht nur auf dem Schirm.
 - **Das Plugin mit einem Baum zum Download und dem Webserver** aus
   heroic-map-renderer#151. Läuft der Webserver auf demselben Rechner wie
   der Server, passt die Prüfung der Adresse, siehe [Download](download.md),
