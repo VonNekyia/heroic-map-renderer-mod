@@ -61,8 +61,6 @@ final class Downloads {
     private long versatz;
     /** Ob dieser Server schon {@code jetzt} geschickt hat; ohne Plugin nie. */
     private boolean uhrBekannt;
-    /** Der Baum des letzten Abgleichs von Hand, auf den noch keine Antwort kam; die Ablehnung nennt ihn nicht. */
-    private String abgleichAngefragt;
     /** Je Baum auf diesem Server, ab wann ein Abgleich wieder geht, in ms Uhr des Spielers. */
     private final Map<String, Long> abgleichAb = new HashMap<>();
 
@@ -88,10 +86,7 @@ final class Downloads {
         }
         switch (json.has("typ") ? json.get("typ").getAsString() : "") {
             case "angebot" -> angebot = json;
-            case "freigabe" -> {
-                abgleichAngefragt = null;
-                freigabe(json);
-            }
+            case "freigabe" -> freigabe(json);
             case "abgelehnt" -> abgelehnt(json);
             default -> {
             }
@@ -115,7 +110,6 @@ final class Downloads {
     void leeren() {
         angebot = null;
         neuGefragt = false;
-        abgleichAngefragt = null;
         abgleichAb.clear();
         uhrBekannt = false;
         versatz = 0;
@@ -226,16 +220,15 @@ final class Downloads {
 
     private void abgelehnt(JsonObject json) {
         String grund = json.has("grund") ? json.get("grund").getAsString() : "?";
-        String baum = abgleichAngefragt;
-        abgleichAngefragt = null;
+        // Höchstens ein Abgleich je Tag: Bis wieder ist der Abgleich des genannten Baums aus.
+        Freigabe.Sperre sperre = Freigabe.sperre(json, System.currentTimeMillis());
+        if (sperre != null) {
+            abgleichAb.put(schluessel(sperre.baum()), sperre.ab());
+        }
         try {
             if (json.has("wieder") && json.has("jetzt")) {
                 // Die Uhr des Servers kann anders gehen; es zählt der Abstand.
                 long lokal = Instant.now().getEpochSecond() + json.get("wieder").getAsLong() - json.get("jetzt").getAsLong();
-                if (baum != null) {
-                    // Höchstens ein Abgleich je Tag: Bis dahin ist der Knopf aus.
-                    abgleichAb.put(schluessel(baum), lokal * 1000);
-                }
                 melde(Component.translatable("heroicmap.download.abgelehnt_wieder", grund, uhr(lokal * 1000)));
                 return;
             }
@@ -569,7 +562,6 @@ final class Downloads {
         if (ab > 0) {
             return Component.translatable("heroicmap.download.abgleich_ab", uhr(ab));
         }
-        abgleichAngefragt = baum;
         Kanal.frage(baum, massstab, "abgleich");
         return null;
     }

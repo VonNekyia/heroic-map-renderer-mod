@@ -103,6 +103,21 @@ class FreigabeTest {
     }
 
     @Test
+    void ablehnungSperrtNurDenGenanntenAbgleich() {
+        String vorlage = "{\"v\":1,\"typ\":\"abgelehnt\",\"grund\":\"x\",\"jetzt\":1000,\"wieder\":4600";
+        // Angefragt war ein Abgleich von A; die Ablehnung nennt B: gesperrt wird B, eine Stunde lang.
+        Freigabe.Sperre b = Freigabe.sperre(JsonParser.parseString(vorlage
+                + ",\"baum\":\"nether\",\"art\":\"abgleich\"}").getAsJsonObject(), 5_000_000);
+        assertEquals(new Freigabe.Sperre("nether", 5_000_000 + 3_600_000), b);
+        // Ein voller Download sperrt keinen Abgleich, ohne Baum oder Zeit nichts, ein Gerätename auch nicht.
+        assertNull(Freigabe.sperre(JsonParser.parseString(vorlage + ",\"baum\":\"welt\",\"art\":\"voll\"}").getAsJsonObject(), 0));
+        assertNull(Freigabe.sperre(JsonParser.parseString(vorlage + ",\"art\":\"abgleich\"}").getAsJsonObject(), 0));
+        assertNull(Freigabe.sperre(JsonParser.parseString(vorlage + ",\"baum\":\"con\",\"art\":\"abgleich\"}").getAsJsonObject(), 0));
+        assertNull(Freigabe.sperre(JsonParser.parseString(
+                "{\"v\":1,\"typ\":\"abgelehnt\",\"grund\":\"x\",\"baum\":\"welt\",\"art\":\"abgleich\"}").getAsJsonObject(), 0));
+    }
+
+    @Test
     void standAufDerPlatte(@TempDir Path ordner) throws IOException {
         Path datei = ordner.resolve("welt").resolve("massstab.txt");
         assertNull(Freigabe.Stand.lies(datei));

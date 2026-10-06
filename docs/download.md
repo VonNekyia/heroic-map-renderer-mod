@@ -53,9 +53,10 @@ Dieselben Wege gehen über die Knöpfe der [Vollbildkarte](vollbildkarte.md), �
 
 - **Höchstens ein Abgleich je Tag** und Spieler, automatisch oder von Hand,
   so hat es der Maintainer entschieden; die Grenzen stehen im Protokoll des
-  Plugins. Die Ablehnung nennt den Baum nicht. Der Mod merkt sich deshalb
-  den Baum seines letzten Abgleichs von Hand und hält ihn bis `wieder`
-  zurück; beim Trennen vergisst er das.
+  Plugins. Eine Ablehnung nennt `baum` und `art`. Ist `art` `abgleich`,
+  sperrt der Mod den Abgleich genau dieses Baums bis `wieder`
+  (`Freigabe.sperre`); fehlt ein Feld, sperrt er nichts und zeigt nur die
+  Meldung. Beim Trennen vergisst er die Sperren.
 
 ## Zustimmung und Grösse
 
