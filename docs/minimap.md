@@ -29,6 +29,8 @@ steht unter „Kosten“.
 
 `/hmap` öffnet das Menü (`Einstellungen`):
 
+![Das Menü über der Szene des Gametests, die Minimap rund](bilder/menue.png)
+
 | Einstellung | Vorgabe | tut |
 |---|---|---|
 | Minimap | an | blendet die Minimap aus und ein |
@@ -74,6 +76,9 @@ Der Mod zeichnet die Minimap in Pixeln des Schirms, nicht des GUI
   braucht weder Scissor noch Shader noch Stencil.
 - **Kanten:** Der Kreis ist auf ganze Pixel des Schirms gestuft, ohne
   Glättung.
+- **Kosten:** rund 0,33 ms je Frame, eckig 0,003 ms, siehe „Kosten“.
+
+![Minimap rund bei 4 Pixeln je Block](bilder/minimap-rund.png)
 
 ## Welcher Block oben liegt
 
@@ -247,7 +252,8 @@ nichts.
 ## Kosten
 
 Bei Sichtweite 12 und einem Fenster von 854 × 480, gemessen am 05. und
-06.10., siehe [Minimap, Kosten](messungen/2026-10-05-minimap-kosten.md):
+06.10., siehe [Minimap, Kosten](messungen/2026-10-05-minimap-kosten.md) und
+[Minimap, rund gegen eckig](messungen/2026-10-06-minimap-rund.md):
 
 | Was | Bedingung | Zeit |
 |---|---|---|
@@ -258,6 +264,9 @@ Bei Sichtweite 12 und einem Fenster von 854 × 480, gemessen am 05. und
 | Frametime im p95, mehr als ohne Minimap | ohne Grenze, 3500 bis 5000 fps, 2 und 4 px | höchstens 0,18 ms |
 | Kopie der Texel des Atlas | einmal je Neuladen | 3,5 bis 15 ms |
 | neue Region | bei 4 px | 0,14 bis 0,17 ms |
+| HUD-Element je Frame, eckig | 4 px, Stand, Median | 0,003 ms |
+| HUD-Element je Frame, rund | 4 px, Stand, Median, 149 Läufe | 0,33 ms |
+| Frametime im p50, rund, mehr als ohne Minimap | freie Bildrate, 4 px, Stand | 0,40 ms |
 
 Der Flug geht dabei mit 20 Blöcken/s über geladenes Gelände.
 
@@ -270,7 +279,8 @@ Den Gametest dazu startet:
 ## Bilder
 
 Der Gametest `Bilder` baut eine Szene in einer flachen Welt und nimmt die
-Minimap bei 1, 2 und 4 Pixeln je Block auf:
+Minimap bei 1, 2 und 4 Pixeln je Block auf, dann rund bei 4 px und das
+Menü (siehe „Bedienung“ und „Form“):
 
 ```bash
 ./gradlew runClientGameTest -Pbilder=docs/bilder

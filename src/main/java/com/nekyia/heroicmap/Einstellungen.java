@@ -1,5 +1,6 @@
 package com.nekyia.heroicmap;
 
+import java.util.List;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
@@ -7,6 +8,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 
 /**
@@ -20,6 +22,7 @@ final class Einstellungen extends Screen {
     private static final int TEXT = 0xFFFFFFFF;
     /** Halbe Seite des Griffs in Einheiten des GUI. */
     private static final int GRIFF = 3;
+    private static final int BREITE = 200;
 
     private enum Zug { KEINER, LAGE, GROESSE }
 
@@ -28,6 +31,8 @@ final class Einstellungen extends Screen {
     private int festX, festY;
     /** Beim Ziehen: liegt der Griff links oder oben? */
     private boolean griffLinks, griffOben;
+    /** Linker Rand und Oberkante der Knöpfe. */
+    private int spalte, oben;
 
     Einstellungen() {
         super(Component.translatable("heroicmap.menue.titel"));
@@ -36,18 +41,25 @@ final class Einstellungen extends Screen {
     @Override
     protected void init() {
         Minimap m = Minimap.INSTANZ;
-        int x = width / 2 - 100, y = height / 2 - 60;
+        // Die Knöpfe stehen mittig im grösseren freien Platz neben der Minimap, nicht auf ihr.
+        Minimap.Rahmen r = m.rahmen(width, height);
+        int links = r.x(), rechts = width - r.x() - r.seite();
+        spalte = !m.sichtbar() ? (width - BREITE) / 2
+                : links >= rechts ? (links - BREITE) / 2 : r.x() + r.seite() + (rechts - BREITE) / 2;
+        spalte = Math.max(4, Math.min(spalte, width - BREITE - 4));
+        oben = Math.max(50, height / 2 - 60);
+        int x = spalte, y = oben;
         addRenderableWidget(CycleButton.onOffBuilder(m.sichtbar())
-                .create(x, y, 200, 20, Component.translatable("heroicmap.menue.minimap"), (b, an) -> m.setzeSichtbar(an)));
+                .create(x, y, BREITE, 20, Component.translatable("heroicmap.menue.minimap"), (b, an) -> m.setzeSichtbar(an)));
         addRenderableWidget(CycleButton.builder((Integer px) -> Component.translatable("heroicmap.menue.px", px), m.scale())
                 .withValues(1, 2, 4)
-                .create(x, y + 24, 200, 20, Component.translatable("heroicmap.menue.massstab"), (b, px) -> m.setzeScale(px)));
+                .create(x, y + 24, BREITE, 20, Component.translatable("heroicmap.menue.massstab"), (b, px) -> m.setzeScale(px)));
         addRenderableWidget(CycleButton.booleanBuilder(Component.translatable("heroicmap.menue.rund"),
                         Component.translatable("heroicmap.menue.eckig"), m.rund())
-                .create(x, y + 48, 200, 20, Component.translatable("heroicmap.menue.form"), (b, rund) -> m.setzeRund(rund)));
+                .create(x, y + 48, BREITE, 20, Component.translatable("heroicmap.menue.form"), (b, rund) -> m.setzeRund(rund)));
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.laden"),
-                b -> minecraft.gui.setScreen(new Auswahl(this))).bounds(x, y + 72, 200, 20).build());
-        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x, y + 100, 200, 20).build());
+                b -> minecraft.gui.setScreen(new Auswahl(this))).bounds(x, y + 72, BREITE, 20).build());
+        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x, y + 100, BREITE, 20).build());
     }
 
     /** Ohne Unschärfe und Abdunkeln, damit die Minimap im HUD zu sehen ist. */
@@ -58,8 +70,15 @@ final class Einstellungen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mausX, int mausY, float delta) {
         super.extractRenderState(g, mausX, mausY, delta);
-        g.centeredText(font, title, width / 2, height / 2 - 80, TEXT);
-        g.centeredText(font, Component.translatable("heroicmap.menue.ziehen"), width / 2, height / 2 + 66, TEXT);
+        // Titel und Hinweis über den Knöpfen; unten läge der Chat darüber.
+        int mitte = spalte + BREITE / 2;
+        List<FormattedCharSequence> hinweis = font.split(Component.translatable("heroicmap.menue.ziehen"), BREITE);
+        int y = oben - 6 - hinweis.size() * (font.lineHeight + 1);
+        g.centeredText(font, title, mitte, y - 14, TEXT);
+        for (FormattedCharSequence zeile : hinweis) {
+            g.centeredText(font, zeile, mitte, y, TEXT);
+            y += font.lineHeight + 1;
+        }
         if (Minimap.INSTANZ.sichtbar()) {
             Minimap.Rahmen r = Minimap.INSTANZ.rahmen(width, height);
             g.outline(r.x() - 2, r.y() - 2, r.seite() + 4, r.seite() + 4, TEXT);
