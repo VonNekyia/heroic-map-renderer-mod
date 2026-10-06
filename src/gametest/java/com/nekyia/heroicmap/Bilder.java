@@ -2,9 +2,13 @@ package com.nekyia.heroicmap;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import javax.imageio.ImageIO;
+import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -89,6 +93,44 @@ public final class Bilder implements FabricClientGameTest {
                     schneide(context, bild, Path.of(AUSGABE, "minimap-" + scale + "px.png"));
                 }
             }
+            vollbildkarte(context);
+        }
+    }
+
+    /**
+     * Öffnet die Vollbildkarte mit einem kleinen Satz gemalter Testkacheln um den Ursprung,
+     * scale 4, Stufen 0 bis 2, und nimmt sie auf der feinsten Stufe auf.
+     */
+    private static void vollbildkarte(ClientGameTestContext context) {
+        Path baum = FabricLoader.getInstance().getGameDir().resolve(HeroicMap.ID).resolve("test").resolve("beispiel");
+        try {
+            for (String datei : liste()) {
+                Path ziel = baum.resolve("4").resolve(datei);
+                Files.createDirectories(ziel.getParent());
+                try (InputStream rein = Bilder.class.getResourceAsStream("/satz/4/" + datei)) {
+                    Files.copy(rein, ziel, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+            Satz.schreibe(baum, "Beispiel", "minecraft:overworld", 4);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
+        context.waitTicks(40);
+        Path bild = context.takeScreenshot(TestScreenshotOptions.of("vollbildkarte").disableCounterPrefix());
+        if (!AUSGABE.isEmpty()) {
+            try {
+                Files.copy(bild, Path.of(AUSGABE, "vollbildkarte.png"), StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        context.runOnClient(mc -> mc.gui.setScreen(null));
+    }
+
+    private static java.util.List<String> liste() throws IOException {
+        try (InputStream rein = Bilder.class.getResourceAsStream("/satz/liste.txt")) {
+            return new String(rein.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).lines().filter(z -> !z.isBlank()).toList();
         }
     }
 

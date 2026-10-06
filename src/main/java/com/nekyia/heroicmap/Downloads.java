@@ -237,7 +237,9 @@ final class Downloads {
         if (ordner == null) {
             return;
         }
-        if (!reihe.reihe(ordner.toString(), () -> lade(f, auftrag, ordner))) {
+        JsonObject eintrag = eintrag(f.baum());
+        String name = text(eintrag, "name"), dimension = text(eintrag, "dimension");
+        if (!reihe.reihe(ordner.toString(), () -> lade(f, auftrag, ordner, name, dimension))) {
             melde(Component.translatable("heroicmap.download.verfaellt_belegt", f.baum()));
             return;
         }
@@ -245,7 +247,7 @@ final class Downloads {
     }
 
     /** Im Thread der Reihe. Das Ergebnis geht in jedem Fall zurück, auch bei einem Error. */
-    private void lade(Freigabe f, Laden.Auftrag auftrag, Path ordner) {
+    private void lade(Freigabe f, Laden.Auftrag auftrag, Path ordner, String name, String dimension) {
         Laden.Ergebnis ergebnis = null;
         Exception fehler = null;
         try {
@@ -259,6 +261,10 @@ final class Downloads {
             ergebnis = laden.lade(auftrag, ordner.resolve(String.valueOf(f.massstab())));
             if (!ergebnis.gekappt()) {
                 Laden.behalteNur(ordner, f.massstab());
+                if (name != null && dimension != null) {
+                    // Erst jetzt zeigt die Vollbildkarte den Satz, siehe docs/vollbildkarte.md, „Welcher Satz“.
+                    Satz.schreibe(ordner, name, dimension, f.massstab());
+                }
             }
         } catch (Exception e) {
             fehler = e;
@@ -307,11 +313,14 @@ final class Downloads {
 
     /** Der Ordner eines Baums auf diesem Server, oder null im Einzelspieler. */
     private static Path ordner(String baum) {
+        Path server = serverOrdner();
+        return server == null || !Freigabe.baum(baum) ? null : server.resolve(baum);
+    }
+
+    /** Der Ordner dieses Servers, oder null im Einzelspieler. */
+    static Path serverOrdner() {
         ServerData server = Minecraft.getInstance().getCurrentServer();
-        if (server == null || !Freigabe.baum(baum)) {
-            return null;
-        }
-        return wurzel().resolve(name(server.ip)).resolve(baum);
+        return server == null ? null : wurzel().resolve(name(server.ip));
     }
 
     /** Der Eintrag eines Baums im letzten Angebot, oder null. */
@@ -326,6 +335,15 @@ final class Downloads {
             // Kein oder ein unlesbares Angebot.
         }
         return null;
+    }
+
+    /** Ein Text aus dem Eintrag des Angebots, oder null. */
+    private static String text(JsonObject eintrag, String feld) {
+        try {
+            return eintrag.get(feld).getAsString();
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     /** Ein Feld eines Massstabs im Eintrag des Angebots, oder -1. */

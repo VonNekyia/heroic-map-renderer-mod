@@ -5,11 +5,19 @@ fabric-loader = "0.19.5"
 fabric-api = "0.161.0+26.3"
 fabric-loom = "1.18-SNAPSHOT"
 junit = "6.1.3"
+# WebP lesen, BSD-3-Clause; der Hinweis steht in NOTICE.
+twelvemonkeys = "3.15.2"
 
 [libraries]
 minecraft = { module = "com.mojang:minecraft", version.ref = "minecraft" }
 fabric-loader = { module = "net.fabricmc:fabric-loader", version.ref = "fabric-loader" }
 fabric-api = { module = "net.fabricmc.fabric-api:fabric-api", version.ref = "fabric-api" }
+twelvemonkeys-webp = { module = "com.twelvemonkeys.imageio:imageio-webp", version.ref = "twelvemonkeys" }
+twelvemonkeys-core = { module = "com.twelvemonkeys.imageio:imageio-core", version.ref = "twelvemonkeys" }
+twelvemonkeys-metadata = { module = "com.twelvemonkeys.imageio:imageio-metadata", version.ref = "twelvemonkeys" }
+twelvemonkeys-lang = { module = "com.twelvemonkeys.common:common-lang", version.ref = "twelvemonkeys" }
+twelvemonkeys-io = { module = "com.twelvemonkeys.common:common-io", version.ref = "twelvemonkeys" }
+twelvemonkeys-image = { module = "com.twelvemonkeys.common:common-image", version.ref = "twelvemonkeys" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 junit-launcher = { module = "org.junit.platform:junit-platform-launcher" }

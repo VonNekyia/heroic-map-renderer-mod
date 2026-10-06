@@ -24,8 +24,8 @@ Plan und Entscheidungen an
 Diese Seite sagt, was der Mod davon tut. Gegen einen echten Server läuft der
 Download erst mit dem Server aus
 [heroic-map-renderer#151](https://github.com/VonNekyia/heroic-map-renderer/issues/151);
-bis dahin prüfen ihn die Tests gegen einen kleinen Server auf loopback. Die
-Vollbildkarte aus den Kacheln kommt mit dem nächsten Schritt.
+bis dahin prüfen ihn die Tests gegen einen kleinen Server auf loopback. Was
+der Mod mit den Kacheln zeigt, steht unter [Vollbildkarte](vollbildkarte.md).
 
 ## Kanal
 
@@ -182,6 +182,8 @@ Einzelheiten stehen im Log.
   lehnt der Mod als Baum ab und stellt dem Server ein `_` voran.
 - **Schreiben** über eine Zwischendatei in `tmp/`, dann verschieben; nie
   liegt eine halbe Kachel da. `tmp/` leert der Mod zu Beginn jedes Downloads.
+- **`satz.json`** je Baum gehört zur [Vollbildkarte](vollbildkarte.md),
+  „Welcher Satz“.
 - **Der Stand** steht in `<baum>/massstab.txt`: Massstab, Grösse und
   Kacheln des Satzes, wie der Spieler ihn bestätigt hat, etwa `4 9000000000
   450000`. Der Mod schreibt ihn, wenn ein voller Download beginnt, denn dann
