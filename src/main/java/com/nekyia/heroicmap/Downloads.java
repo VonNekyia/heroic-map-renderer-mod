@@ -20,6 +20,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConfirmScreen;
@@ -59,6 +61,8 @@ final class Downloads {
     private long versatz;
     /** Ob dieser Server schon {@code jetzt} geschickt hat; ohne Plugin nie. */
     private boolean uhrBekannt;
+    /** Je Baum auf diesem Server, ab wann ein Abgleich wieder geht, in ms Uhr des Spielers. */
+    private final Map<String, Long> abgleichAb = new HashMap<>();
 
     private Downloads() {
     }
@@ -106,6 +110,7 @@ final class Downloads {
     void leeren() {
         angebot = null;
         neuGefragt = false;
+        abgleichAb.clear();
         uhrBekannt = false;
         versatz = 0;
         bestaetigt.clear();
@@ -215,18 +220,33 @@ final class Downloads {
 
     private void abgelehnt(JsonObject json) {
         String grund = json.has("grund") ? json.get("grund").getAsString() : "?";
+        // Höchstens ein Abgleich je Tag: Bis wieder ist der Abgleich des genannten Baums aus.
+        Freigabe.Sperre sperre = Freigabe.sperre(json, System.currentTimeMillis());
+        if (sperre != null) {
+            abgleichAb.put(schluessel(sperre.baum()), sperre.ab());
+        }
         try {
             if (json.has("wieder") && json.has("jetzt")) {
                 // Die Uhr des Servers kann anders gehen; es zählt der Abstand.
                 long lokal = Instant.now().getEpochSecond() + json.get("wieder").getAsLong() - json.get("jetzt").getAsLong();
-                String wann = UHR.format(LocalDateTime.ofInstant(Instant.ofEpochSecond(lokal), ZoneId.systemDefault()));
-                melde(Component.translatable("heroicmap.download.abgelehnt_wieder", grund, wann));
+                melde(Component.translatable("heroicmap.download.abgelehnt_wieder", grund, uhr(lokal * 1000)));
                 return;
             }
         } catch (RuntimeException e) {
             // Ohne lesbare Zeit nur der Grund.
         }
         melde(Component.translatable("heroicmap.download.abgelehnt", grund));
+    }
+
+    /** Eine Zeit der Uhr des Spielers, in ms, als Datum und Uhrzeit. */
+    static String uhr(long ms) {
+        return UHR.format(LocalDateTime.ofInstant(Instant.ofEpochMilli(ms), ZoneId.systemDefault()));
+    }
+
+    /** Ab wann ein Abgleich des Baums wieder geht, in ms Uhr des Spielers, oder 0, wenn jetzt. */
+    long abgleichAb(String baum) {
+        Long ab = abgleichAb.get(schluessel(baum));
+        return ab == null || ab <= System.currentTimeMillis() ? 0 : ab;
     }
 
     /** Zeigt einen Dialog; false, wenn schon einer geplant oder offen ist. */
@@ -477,27 +497,72 @@ final class Downloads {
         }
     }
 
-    /** Für den Befehl: Bäume und Grössen des Angebots, je Zeile. */
-    List<Component> zeilen() {
+    /** Ein Baum des Angebots: Kennung, Name, Dimension und je Massstab die Grösse in Bytes. */
+    record Baum(String id, String name, String dimension, SortedMap<Integer, Long> bytes) {
+    }
+
+    /** Die Bäume des letzten Angebots; unlesbare fallen weg. */
+    List<Baum> baeume() {
+        List<Baum> baeume = new java.util.ArrayList<>();
         if (angebot == null || !angebot.has("baeume")) {
-            return List.of(Component.translatable("heroicmap.angebot.keins"));
+            return baeume;
         }
         try {
-            List<Component> zeilen = new java.util.ArrayList<>();
             for (JsonElement e : angebot.getAsJsonArray("baeume")) {
-                JsonObject baum = e.getAsJsonObject();
-                JsonObject massstaebe = baum.getAsJsonObject("massstaebe");
-                StringBuilder groessen = new StringBuilder();
-                for (String m : massstaebe.keySet()) {
-                    groessen.append(m).append(" px ").append(groesse(massstaebe.getAsJsonObject(m).get("bytes").getAsLong()))
-                            .append("  ");
+                try {
+                    JsonObject baum = e.getAsJsonObject();
+                    SortedMap<Integer, Long> bytes = new TreeMap<>();
+                    for (int m : new int[] {1, 2, 4}) {
+                        long b = feld(baum, m, "bytes");
+                        if (b >= 0) {
+                            bytes.put(m, b);
+                        }
+                    }
+                    baeume.add(new Baum(baum.get("id").getAsString(), baum.get("name").getAsString(),
+                            baum.get("dimension").getAsString(), bytes));
+                } catch (RuntimeException kaputt) {
+                    // Dieser Baum ist unlesbar, die anderen nicht.
                 }
-                zeilen.add(Component.translatable("heroicmap.angebot.baum", baum.get("id").getAsString(),
-                        baum.get("name").getAsString(), baum.get("dimension").getAsString(), groessen.toString().trim()));
             }
-            return zeilen;
         } catch (RuntimeException e) {
-            return List.of(Component.translatable("heroicmap.angebot.unlesbar"));
+            // Kein lesbares Angebot.
         }
+        return baeume;
+    }
+
+    /** Für den Befehl: Bäume und Grössen des Angebots, je Zeile. */
+    List<Component> zeilen() {
+        List<Baum> baeume = baeume();
+        if (baeume.isEmpty()) {
+            return List.of(Component.translatable("heroicmap.angebot.keins"));
+        }
+        List<Component> zeilen = new java.util.ArrayList<>();
+        for (Baum baum : baeume) {
+            StringBuilder groessen = new StringBuilder();
+            baum.bytes().forEach((m, b) -> groessen.append(m).append(" px ").append(groesse(b)).append("  "));
+            zeilen.add(Component.translatable("heroicmap.angebot.baum", baum.id(), baum.name(), baum.dimension(),
+                    groessen.toString().trim()));
+        }
+        return zeilen;
+    }
+
+    /** Der Befehl {@code abgleich} und der Knopf der Karte: fragt im gespeicherten Massstab an. Gibt den Fehler zurück, oder null. */
+    Component frageAbgleich(String baum) {
+        int massstab = aktiv(baum);
+        if (massstab == 0) {
+            return Component.translatable("heroicmap.befehl.kein_satz", baum);
+        }
+        if (!Kanal.offen() || !angeboten(baum)) {
+            return Component.translatable("heroicmap.befehl.unbekannt", baum);
+        }
+        if (belegt(baum)) {
+            return Component.translatable("heroicmap.download.belegt", baum);
+        }
+        long ab = abgleichAb(baum);
+        if (ab > 0) {
+            return Component.translatable("heroicmap.download.abgleich_ab", uhr(ab));
+        }
+        Kanal.frage(baum, massstab, "abgleich");
+        return null;
     }
 }

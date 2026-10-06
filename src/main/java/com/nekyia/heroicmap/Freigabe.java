@@ -44,6 +44,28 @@ record Freigabe(String baum, String art, int massstab, long bytes, URI url, Stri
         return f;
     }
 
+    /** Ein Abgleich, der bis {@code ab} gesperrt ist, in ms Uhr des Spielers. */
+    record Sperre(String baum, long ab) {
+    }
+
+    /**
+     * Was eine Ablehnung sperrt: nur einen Abgleich, nur den Baum, den sie nennt, bis {@code wieder},
+     * um den Versatz der Uhren aus {@code jetzt} verschoben. Fehlt ein Feld, sperrt sie nichts.
+     * {@code jetztMs} ist die Uhr des Spielers. Siehe docs/download.md, „Befehle“.
+     */
+    static Sperre sperre(JsonObject abgelehnt, long jetztMs) {
+        try {
+            String baum = abgelehnt.get("baum").getAsString();
+            if (!"abgleich".equals(abgelehnt.get("art").getAsString()) || !baum(baum)) {
+                return null;
+            }
+            long ab = jetztMs + (abgelehnt.get("wieder").getAsLong() - abgelehnt.get("jetzt").getAsLong()) * 1000;
+            return new Sperre(baum, ab);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     /** Taugt {@code name} als Ordner eines Baums? */
     static boolean baum(String name) {
         return BAUM.matcher(name).matches() && !reserviert(name);

@@ -69,6 +69,19 @@ final class Kartenblick {
         mz -= dy / lupe * teiler();
     }
 
+    /**
+     * Wo die Kachel (x, y) in ihrer Vorfahrin {@code k} Stufen gröber liegt: deren x und y, dann u
+     * und v in Pixeln und die Seite des Ausschnitts. Null, wenn er unter 1 Pixel fiele.
+     */
+    static int[] grob(int x, int y, int k, int kachel) {
+        int teil = kachel >> k;
+        if (teil < 1) {
+            return null;
+        }
+        int maske = (1 << k) - 1;
+        return new int[] {x >> k, y >> k, (x & maske) * teil, (y & maske) * teil, teil};
+    }
+
     /** Die sichtbaren Kacheln der aktuellen Stufe: x von, x bis, y von, y bis, jeweils eingeschlossen. */
     int[] kacheln(int breite, int hoehe) {
         double t = teiler() * kachel;

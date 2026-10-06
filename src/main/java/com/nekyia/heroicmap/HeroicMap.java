@@ -96,21 +96,11 @@ public final class HeroicMap implements ClientModInitializer {
 
     /** Fragt einen Abgleich von Hand an, im gespeicherten Massstab. */
     private static int abgleich(CommandContext<FabricClientCommandSource> c) {
-        String baum = StringArgumentType.getString(c, "baum");
-        int massstab = Downloads.INSTANZ.aktiv(baum);
-        if (massstab == 0) {
-            c.getSource().sendError(Component.translatable("heroicmap.befehl.kein_satz", baum));
+        Component fehler = Downloads.INSTANZ.frageAbgleich(StringArgumentType.getString(c, "baum"));
+        if (fehler != null) {
+            c.getSource().sendError(fehler);
             return 0;
         }
-        if (!Kanal.offen() || !Downloads.INSTANZ.angeboten(baum)) {
-            c.getSource().sendError(Component.translatable("heroicmap.befehl.unbekannt", baum));
-            return 0;
-        }
-        if (Downloads.INSTANZ.belegt(baum)) {
-            c.getSource().sendError(Component.translatable("heroicmap.download.belegt", baum));
-            return 0;
-        }
-        Kanal.frage(baum, massstab, "abgleich");
         return 1;
     }
 }
