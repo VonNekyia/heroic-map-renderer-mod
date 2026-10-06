@@ -114,8 +114,10 @@ final class Laden {
         MANIFEST,
         /** Eine Kachel ist grösser als {@link #KACHEL_MAX}. */
         KACHEL,
-        /** Der Server lehnt das Token ab, 401, 403 oder 429. */
+        /** Der Server lehnt das Token ab, 401 oder 403. */
         ABGELEHNT,
+        /** Die Bytes dieses Tokens sind aufgebraucht, 429; dasselbe Token hilft nicht mehr. */
+        BUDGET,
         /** Eine andere Antwort, eine Weiterleitung, keine Antwort in der Zeit oder ein Fehler im Netz. */
         NETZ,
         /** Das Ziel liegt im Heimnetz, der Spielserver nicht. */
@@ -355,8 +357,12 @@ final class Laden {
             HttpResponse<byte[]> fertig = antwort.get(zeit.toMillis(), TimeUnit.MILLISECONDS);
             int status = fertig.statusCode();
             if (status != 200) {
-                throw new Fehler(status == 401 || status == 403 || status == 429 ? Grund.ABGELEHNT : Grund.NETZ,
-                        pfad + ": " + status);
+                Grund warum = switch (status) {
+                    case 401, 403 -> Grund.ABGELEHNT;
+                    case 429 -> Grund.BUDGET;
+                    default -> Grund.NETZ;
+                };
+                throw new Fehler(warum, pfad + ": " + status);
             }
             return fertig;
         } catch (TimeoutException e) {
@@ -458,6 +464,11 @@ final class Laden {
         Path tmp = Files.createTempFile(zwischen, "datei", ".tmp");
         Files.write(tmp, inhalt);
         Files.move(tmp, datei, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    /** Gibt es im Ziel einen Stand zum Fortsetzen? Den gibt es, sobald eine Kachel im Index steht. */
+    static boolean hatStand(Path ziel) {
+        return Files.exists(ziel.resolve(INDEX));
     }
 
     /** Liest den Index; die letzte Zeile je Kachel gilt, eine ohne ETag heisst: neu laden. */

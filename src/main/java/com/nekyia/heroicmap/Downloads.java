@@ -169,7 +169,9 @@ final class Downloads {
                 return;
             }
             bestaetigt.put(baum, new Freigabe.Stand(massstab, bytes, kacheln));
-            Kanal.frage(baum, massstab, "voll");
+            // Ohne Stand gibt es nichts fortzusetzen; ein altes Token könnte schon verbraucht sein.
+            Path ordner = ordner(baum);
+            Kanal.frage(baum, massstab, "voll", ordner == null || !Laden.hatStand(ordner.resolve(String.valueOf(massstab))));
         });
         return gezeigt ? null : Component.translatable("heroicmap.befehl.dialog");
     }
@@ -381,7 +383,7 @@ final class Downloads {
             if (!f.abgleich()) {
                 bestaetigt.put(f.baum(), new Freigabe.Stand(f.massstab(), auftrag.satzBytes(), auftrag.kacheln()));
             }
-            Kanal.frage(f.baum(), f.massstab(), f.art());
+            Kanal.frage(f.baum(), f.massstab(), f.art(), false);
             return;
         }
         LOGGER.warn("Heroic Map: Download abgebrochen", fehler);
@@ -562,7 +564,7 @@ final class Downloads {
         if (ab > 0) {
             return Component.translatable("heroicmap.download.abgleich_ab", uhr(ab));
         }
-        Kanal.frage(baum, massstab, "abgleich");
+        Kanal.frage(baum, massstab, "abgleich", false);
         return null;
     }
 }
