@@ -66,6 +66,9 @@ steht unter „Kosten“.
   und verschwindet, wenn das ausserhalb der Minimap liegt. Beim Schliessen
   des Menüs steht wieder der Spieler in der Mitte (`Minimap.zentriere`). So
   hat es der User gewählt.
+
+  ![Umschauen: 12 Blöcke nach Osten, 8 nach Süden, der Pfeil beim Spieler](bilder/minimap-umschauen.png)
+
 - **Gespeichert** wird beim Schliessen des Menüs, in
   `config/heroicmap.properties`. Die Lage steht dort als Anteil des freien
   Platzes, 0 links oder oben bis 1 rechts oder unten, so bleibt die Minimap
@@ -300,7 +303,7 @@ Den Gametest dazu startet:
 
 Der Gametest `Bilder` baut eine Szene in einer flachen Welt und nimmt die
 Minimap bei 1, 2 und 4 Pixeln je Block auf, mit dem Zoom gleich der
-Auflösung, dann rund bei 4 px und das
+Auflösung, dann rund bei 4 px, das Umschauen und das
 Menü (siehe „Bedienung“ und „Form“):
 
 ```bash
