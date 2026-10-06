@@ -1,6 +1,5 @@
 package com.nekyia.heroicmap;
 
-import com.google.gson.JsonElement;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -64,7 +63,7 @@ public final class HeroicMap implements ClientModInitializer {
         return 1;
     }
 
-    /** Fragt einen vollen Download an; vorher sagt der Mod, dass er zählt. */
+    /** Fragt einen vollen Download an, nach einem Dialog mit Grösse und Massstab. */
     private static int laden(CommandContext<FabricClientCommandSource> c) {
         String baum = StringArgumentType.getString(c, "baum");
         int massstab = IntegerArgumentType.getInteger(c, "massstab");
@@ -72,45 +71,31 @@ public final class HeroicMap implements ClientModInitializer {
             c.getSource().sendError(Component.translatable("heroicmap.befehl.massstab"));
             return 0;
         }
-        if (!Kanal.offen() || !angeboten(baum)) {
-            c.getSource().sendError(Component.translatable("heroicmap.befehl.unbekannt", baum));
+        Component fehler = Downloads.INSTANZ.frageVoll(baum, massstab);
+        if (fehler != null) {
+            c.getSource().sendError(fehler);
             return 0;
         }
-        c.getSource().sendFeedback(Component.translatable("heroicmap.befehl.voll"));
-        int alt = Downloads.INSTANZ.massstab(baum);
-        if (alt != 0 && alt != massstab) {
-            c.getSource().sendFeedback(Component.translatable("heroicmap.befehl.wechsel", alt, massstab));
-        }
-        Kanal.frage(baum, massstab, "voll");
         return 1;
     }
 
     /** Fragt einen Abgleich von Hand an, im gespeicherten Massstab. */
     private static int abgleich(CommandContext<FabricClientCommandSource> c) {
         String baum = StringArgumentType.getString(c, "baum");
-        int massstab = Downloads.INSTANZ.massstab(baum);
+        int massstab = Downloads.INSTANZ.aktiv(baum);
         if (massstab == 0) {
             c.getSource().sendError(Component.translatable("heroicmap.befehl.kein_satz", baum));
             return 0;
         }
-        if (!Kanal.offen() || !angeboten(baum)) {
+        if (!Kanal.offen() || !Downloads.INSTANZ.angeboten(baum)) {
             c.getSource().sendError(Component.translatable("heroicmap.befehl.unbekannt", baum));
+            return 0;
+        }
+        if (Downloads.INSTANZ.belegt(baum)) {
+            c.getSource().sendError(Component.translatable("heroicmap.download.belegt", baum));
             return 0;
         }
         Kanal.frage(baum, massstab, "abgleich");
         return 1;
-    }
-
-    private static boolean angeboten(String baum) {
-        var angebot = Downloads.INSTANZ.angebot();
-        if (angebot == null || !angebot.has("baeume")) {
-            return false;
-        }
-        for (JsonElement e : angebot.getAsJsonArray("baeume")) {
-            if (baum.equals(e.getAsJsonObject().get("id").getAsString())) {
-                return true;
-            }
-        }
-        return false;
     }
 }

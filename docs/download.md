@@ -1,12 +1,16 @@
 ---
 title: Download
-description: Wie der Mod die Karte vom Plugin lädt, mit dem Kanal heroicmap:karte, den Befehlen, Zustimmung und Grösse, der Prüfung der Adresse, Manifest und Prüfsumme, den harten Grenzen, der Ablage je Server, Baum und Massstab, Fortsetzen und Abgleich, und was der Offline-Modus heisst.
+description: Wie der Mod die Karte vom Plugin lädt, mit dem Kanal heroicmap:karte, den Befehlen, Zustimmung und Grösse, der Prüfung der Adresse, Manifest und Prüfsumme, Fristen, den harten Grenzen, der Reihe der Downloads, der Ablage je Server, Baum und Massstab, Fortsetzen und Abgleich, und was der Offline-Modus heisst.
 code:
   - src/main/java/com/nekyia/heroicmap/Kanal.java
   - src/main/java/com/nekyia/heroicmap/Downloads.java
+  - src/main/java/com/nekyia/heroicmap/Freigabe.java
+  - src/main/java/com/nekyia/heroicmap/Reihe.java
   - src/main/java/com/nekyia/heroicmap/Laden.java
   - src/main/java/com/nekyia/heroicmap/Adresse.java
   - src/test/java/com/nekyia/heroicmap/LadenTest.java
+  - src/test/java/com/nekyia/heroicmap/FreigabeTest.java
+  - src/test/java/com/nekyia/heroicmap/ReiheTest.java
   - src/test/java/com/nekyia/heroicmap/AdresseTest.java
 ---
 
@@ -17,8 +21,11 @@ Kacheln auf die Platte. Das Protokoll steht an einer Stelle, in
 [`docs/download.md` des Plugins](https://github.com/VonNekyia/heroic-map-renderer-plugin/blob/main/docs/download.md),
 Plan und Entscheidungen an
 [heroic-map-renderer#154](https://github.com/VonNekyia/heroic-map-renderer/issues/154).
-Diese Seite sagt, was der Mod davon tut. Die Vollbildkarte aus den Kacheln
-kommt mit dem nächsten Schritt.
+Diese Seite sagt, was der Mod davon tut. Gegen einen echten Server läuft der
+Download erst mit dem Server aus
+[heroic-map-renderer#151](https://github.com/VonNekyia/heroic-map-renderer/issues/151);
+bis dahin prüfen ihn die Tests gegen einen kleinen Server auf loopback. Die
+Vollbildkarte aus den Kacheln kommt mit dem nächsten Schritt.
 
 ## Kanal
 
@@ -26,9 +33,10 @@ kommt mit dem nächsten Schritt.
   (`Kanal`). Der Mod meldet ihn für beide Richtungen an; Fabric sagt es dem
   Server mit `minecraft:register`, und das Plugin schickt dann sein
   `angebot`.
-- **Empfangen:** `angebot` merkt sich der Mod, `freigabe` startet einen
-  Download, `abgelehnt` zeigt er dem Spieler. Nachrichten mit einem anderen
-  `v` als 1 oder über 64 KiB verwirft er.
+- **Empfangen:** `angebot` merkt sich der Mod, `freigabe` reiht einen
+  Download ein, `abgelehnt` zeigt er dem Spieler, mit `wieder` als
+  Uhrzeit. Nachrichten mit einem anderen `v` als 1 oder über 64 KiB
+  verwirft er.
 - **Senden:** `anfrage` nur, wenn `ClientPlayNetworking.canSend` wahr ist,
   also wenn das Plugin den Kanal angemeldet hat.
 
@@ -37,77 +45,126 @@ kommt mit dem nächsten Schritt.
 | Befehl | tut |
 |---|---|
 | `/heroicmap angebot` | die angebotenen Karten mit Dimension und Grösse je Massstab |
-| `/heroicmap laden <baum> <1, 2 oder 4>` | fragt einen vollen Download an; vorher sagt der Mod, dass er gegen die Grenze des Servers zählt, und bei einem anderen Massstab, dass der alte Satz wegfällt |
+| `/heroicmap laden <baum> <1, 2 oder 4>` | fragt erst im Dialog nach Grösse und Massstab, dann einen vollen Download an, siehe „Zustimmung und Grösse“ |
 | `/heroicmap abgleich <baum>` | fragt einen Abgleich von Hand an, im gespeicherten Massstab |
 
 Die Vollbildkarte bekommt dafür später Knöpfe.
 
 ## Zustimmung und Grösse
 
-- **Vor einem vollen Download** fragt ein Dialog: Er nennt den Spielserver,
-  den Host der Karte, die Grösse aus `bytes` und den Massstab, und dass der
-  Mod Daten von diesem Host lädt.
+- **Vor der `anfrage`** eines vollen Downloads fragt ein Dialog: Name der
+  Karte, Grösse und Massstab aus dem `angebot`, und dass ein voller
+  Download gegen die Grenze des Servers zählt. Ein Nein kostet nichts, denn
+  das Plugin zählt erst, wenn es das Token ausstellt.
+- **Nach der `freigabe`** entscheidet `Freigabe.weg`:
+
+  | `freigabe` | Bedingung | Weg |
+  |---|---|---|
+  | `voll` | der Spieler bestätigte diesen Baum und Massstab vor der `anfrage`, `bytes` höchstens 10 % über der bestätigten Grösse | still |
+  | `abgleich` | im gespeicherten Massstab, `bytes` höchstens 11 % der Grösse des Satzes aus dem `angebot` | still |
+  | jede andere | | Dialog mit Spielserver, Host, Grösse und Massstab |
+
+  Still heisst: nur mit Zustimmung zum Host; fehlt sie, fragt ein Dialog
+  nach dem Host allein.
 - **Die Zustimmung** gilt je Paar aus Spielserver und Host, gespeichert in
   `heroicmap/zustimmung.txt` im Spielordner.
-- **Der tägliche Abgleich:** Schickt das Plugin von sich aus eine `freigabe`
-  mit `art` `abgleich` und die Zustimmung liegt vor, lädt der Mod im
-  Hintergrund, ohne Dialog.
+- **Höchstens ein Dialog** ist offen. Eine `freigabe`, die einen zweiten
+  bräuchte, verfällt mit einer Meldung.
+- **Der tägliche Abgleich:** Das Plugin schickt ihn von sich aus als
+  `freigabe` mit `art` `abgleich`; mit Zustimmung lädt der Mod ihn im
+  Hintergrund.
 - **Im Einzelspieler** gibt es keinen Server und keinen Download.
 
 ## Sicherheit
 
-- **Adresse** (`Adresse.pruefe`): nur `http` und `https` mit Host. Zeigt der
-  Host auf loopback, link-local, ein privates Netz oder `fc00::/7`, der
-  Spielserver aber nicht, lehnt der Mod ab; sonst könnte ein Server
-  Anfragen in das Heimnetz des Spielers lenken.
+- **Adresse** (`Adresse.form`, beim Lesen der `freigabe`): nur `http` und
+  `https` mit Host, ohne Userinfo, Query und Fragment; der Mod hängt Pfade
+  an die Adresse an.
+- **Heimnetz** (`Adresse.pruefe`, im Thread der Reihe vor dem ersten
+  Abruf): Zeigt der Host auf loopback, link-local, ein privates Netz,
+  `100.64.0.0/10`, `0.0.0.0/8` oder `fc00::/7`, lädt der Mod nur, wenn die
+  echte Verbindung zum Spielserver selbst in ein solches Netz geht. Er nimmt
+  ihre Adresse, nicht die Namen des Servers; sonst könnte ein Server mit
+  einem zusätzlichen DNS-Eintrag Anfragen in das Heimnetz des Spielers
+  lenken.
 - **Keine Weiterleitungen** (`Redirect.NEVER`): So geht das Token nie an
   einen dritten Host.
 - **Das Token** ist für den Mod undurchsichtig; er schickt es nur im Header
   `Authorization: Bearer`.
+- **Nur angebotene Bäume:** Eine `freigabe` für einen Baum oder Massstab,
+  der nicht im `angebot` steht, verwirft der Mod.
 - **Offline-Modus:** Ein Server im Offline-Modus verschlüsselt die
   Spielverbindung nicht. Dann ist auch `manifest_sha256` über den Kanal
   nicht abgesichert, und ohne HTTPS kann ein Lauscher das Token mitlesen;
   der Deckel der Bytes je Token begrenzt, was er damit lädt.
-- **Kacheln** prüft der Mod nur über ihre Grösse, nicht ihren Inhalt.
+- **Kacheln** prüft der Mod über ihre Grösse, nicht ihren Inhalt.
 
 ## Ablauf
 
-`Laden.lade`, im Hintergrund:
+`Laden.lade`, im Thread der Reihe:
 
-1. **`map.json`** holen; daraus `minZoom` und `maxZoom`. Die Stufe des
+1. **Adresse** prüfen, siehe „Sicherheit“.
+2. **`map.json`** holen; daraus `minZoom` und `maxZoom`. Die Stufe des
    Massstabs: 4 px ist `maxZoom`, 2 px eine gröber, 1 px zwei.
-2. **Manifest** holen und SHA-256 über das gzip mit `manifest_sha256`
+3. **Manifest** holen und SHA-256 über das gzip mit `manifest_sha256`
    vergleichen. Passt es nicht, endete inzwischen ein Lauf; der Mod fragt
    einmal neu an und bekommt dasselbe Token mit dem neuen Manifest.
-3. **Entpacken** und die Zeilen bis zur Stufe des Massstabs nehmen.
-4. **Löschen,** was lokal liegt und nicht mehr im Manifest steht.
-5. **Laden,** was fehlt oder ein anderes ETag hat, über 4 Verbindungen mit
+4. **Entpacken** und die Zeilen bis zur Stufe des Massstabs nehmen.
+5. **Löschen,** was lokal liegt und nicht mehr im Manifest steht.
+6. **Laden,** was fehlt oder ein anderes ETag hat, über 4 Verbindungen mit
    Keep-Alive (`java.net.http.HttpClient`, HTTP/1.1). Gespeichert wird das
    ETag aus der Antwort, denn eine Kachel kann neuer sein als das Manifest.
-6. **Der Index** `etags.txt` wird am Ende geschrieben, auch nach einem
-   Abbruch; was er nennt, lädt der nächste Versuch nicht noch einmal.
+   Scheitert eine Kachel, hören die anderen Verbindungen nach ihrer
+   laufenden auf.
+7. **Der Index** `etags.txt` ist ein Protokoll: je Kachel eine Zeile ohne
+   ETag vor dem Schreiben, eine mit danach; die letzte gilt, eine ohne ETag
+   heisst neu laden. Endet das Spiel mitten im Download, gilt, was schon
+   dasteht. Am Ende schreibt der Mod den Index neu, eine Zeile je Kachel.
+
+**Fristen:** Eine Anfrage hat 2 min für Header und Körper zusammen; danach
+bricht der Mod sie ab (`sendAsync`, `cancel`). Der Aufbau der Verbindung hat
+10 s.
+
+## Reihe
+
+- **Nacheinander:** Downloads laufen in einem Thread (`Reihe`). Eine
+  `freigabe` für einen anderen Baum wartet, bis der laufende fertig ist.
+- **Je Baum höchstens einer,** wartend oder laufend. Eine weitere
+  `freigabe` für denselben Baum verfällt mit einer Meldung, und
+  `/heroicmap laden` sagt vorher, dass schon einer läuft.
+- **Das Ergebnis** meldet der Mod in jedem Fall, auch nach einem `Error` im
+  Thread der Reihe.
 
 ## Harte Grenzen
 
 | Grenze | Wert | bei Verstoss |
 |---|---|---|
-| Manifest entpackt, `map.json` | 64 MiB | Abbruch |
+| `map.json` | 64 KiB | Abbruch |
+| Manifest, gepackt und entpackt | je 64 MiB | Abbruch |
 | Zeile des Manifests | `z/x/y` ganze Zahlen, `z` zwischen `minZoom` und `maxZoom`, Grösse bis 4 MiB, ETag ohne Leer- und Steuerzeichen | Abbruch |
-| eine Kachel | 4 MiB | Abbruch |
-| Summe des Geladenen | `bytes` aus `freigabe` plus 10 % | der Rest bleibt liegen, „zum Teil geladen“ |
+| Zeilen bis zur Stufe | keine doppelte Kachel; höchstens `kacheln` aus dem `angebot` plus 10 %, und höchstens eine je 4 KiB der Grösse des Satzes plus 10 % | Abbruch |
+| eine Kachel | 4 MiB; mit dem ETag des Manifests genau die Grösse aus dem Manifest | Abbruch |
+| Summe des Geladenen | bei `voll` `bytes` plus 10 %, beim Abgleich `bytes`, der Deckel des Tokens | der Rest bleibt liegen, „zum Teil geladen“ |
 | Antwort | 200 | 401, 403 und 429 heissen abgelehnt, alles andere Abbruch |
 
 `z/x/y` wird ein Dateipfad; deshalb nur ganze Zahlen, auch beim Lesen des
-eigenen Index. Ein Abbruch meldet dem Spieler den Grund.
+eigenen Index, und doppelt zählt nach den Zahlen, `7/0/0` wie `007/0/0`.
+Ein Abbruch meldet dem Spieler den Grund, übersetzt und ohne Pfad;
+Einzelheiten stehen im Log.
 
 ## Ablage
 
 - **Ordner:** `heroicmap/<server>/<baum>/<massstab>/` im Spielordner, darin
-  `map.json`, `etags.txt` und `z/x/y.webp`. `<server>` ist die Adresse des
-  Servers, klein, andere Zeichen als Buchstaben, Ziffern, Punkt und Strich
-  werden `_`. Ein Baum heisst nur `[a-z0-9_-]`, höchstens 64 Zeichen.
-- **Schreiben** über eine Zwischendatei, dann verschieben; nie liegt eine
-  halbe Kachel da.
+  `map.json`, `etags.txt`, `z/x/y.webp` und `tmp/`. `<server>` ist die
+  Adresse des Servers, klein, andere Zeichen als Buchstaben, Ziffern, Punkt
+  und Strich werden `_`. Ein Baum heisst nur `[a-z0-9_-]`, höchstens 64
+  Zeichen. Namen, die Windows für Geräte hält (`con`, `nul`, `com1` …),
+  lehnt der Mod als Baum ab und stellt dem Server ein `_` voran.
+- **Schreiben** über eine Zwischendatei in `tmp/`, dann verschieben; nie
+  liegt eine halbe Kachel da. `tmp/` leert der Mod zu Beginn jedes Downloads.
+- **Der gespeicherte Massstab** steht in `<baum>/massstab.txt`. Der Mod
+  schreibt ihn, wenn ein voller Download beginnt, denn dann speichert ihn
+  auch das Plugin. Der Abgleich fragt in diesem Massstab an.
 - **Eine Auflösung je Baum:** Ist ein Download vollständig, fallen die
   anderen Massstäbe dieses Baums weg. Bis dahin bleibt der alte Satz, damit
   der Spieler nicht ohne Karte dasteht; ein gekappter Download löscht nichts.
