@@ -26,11 +26,11 @@ sagt sie das und zeigt nichts.
 
 | Eingabe | tut |
 |---|---|
-| Taste `,` | öffnet die Karte, schliesst sie wieder; frei belegbar unter „Heroic Map“ |
+| Taste `.` | öffnet die Karte, schliesst sie wieder; frei belegbar unter „Heroic Map“, die einzige vorbelegte Taste des Mods |
 | Ziehen mit links | verschiebt die Karte, der Inhalt folgt der Maus |
 | Mausrad | zoomt, siehe „Stufen und Lupe“ |
-| Knopf „Karte laden …“ | zeigt die Karten des Servers, je Baum ein Knopf je Massstab mit seiner Grösse (`Auswahl`); ein Klick fragt wie `/heroicmap laden` erst im Dialog nach |
-| Knopf „Abgleich“ | fragt einen Abgleich des gezeigten Satzes an, wie `/heroicmap abgleich`; nur mit Satz. Lehnt der Server mit `wieder` ab, ist der Knopf bis dahin aus und nennt die Uhrzeit |
+| Knopf „Karte laden …“ | zeigt die Karten des Servers, je Baum ein Knopf je Massstab mit seiner Grösse (`Auswahl`); ein Klick fragt wie `/hmap laden` erst im Dialog nach |
+| Knopf „Abgleich“ | fragt einen Abgleich des gezeigten Satzes an, wie `/hmap abgleich`; nur mit Satz. Lehnt der Server mit `wieder` ab, ist der Knopf bis dahin aus und nennt die Uhrzeit |
 | `Esc` | schliesst |
 
 - **Das Spiel läuft weiter,** die Karte hält es nicht an (`isPauseScreen`).

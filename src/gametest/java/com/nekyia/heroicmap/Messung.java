@@ -13,6 +13,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.minecraft.client.InactivityFpsLimit;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationUiState;
@@ -29,7 +30,8 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 
 /**
- * Was die Minimap kostet: die Zeit je Chunk und die Frametime mit und ohne Minimap, bei
+ * Was die Minimap kostet: die Zeit je Chunk, die Frametime mit und ohne Minimap, eckig und rund,
+ * und die Zeit im HUD-Element der Minimap, bei
  * Sichtweite 12 in einer erzeugten Welt. Läuft nur mit -Pmessung=&lt;datei&gt; und schreibt
  * das Ergebnis dorthin. Siehe docs/minimap.md, „Kosten“.
  */
@@ -43,6 +45,9 @@ public final class Messung implements FabricClientGameTest {
     private static final int HOEHE = 160;
 
     private final LongArrayList frames = new LongArrayList();
+    /** Zeit je Frame im HUD-Element der Minimap. */
+    private final LongArrayList hud = new LongArrayList();
+    private long hudVor;
     private boolean aufnehmen;
     private long letzter;
     private final StringBuilder bericht = new StringBuilder();
@@ -59,6 +64,16 @@ public final class Messung implements FabricClientGameTest {
             }
             letzter = jetzt;
         });
+        // Zwei Elemente um das der Minimap stoppen, was sie im HUD kostet: arbeiten und zeichnen.
+        Identifier minimap = Identifier.fromNamespaceAndPath(HeroicMap.ID, "minimap");
+        HudElementRegistry.attachElementBefore(minimap, Identifier.fromNamespaceAndPath(HeroicMap.ID, "messung_vor"),
+                (g, t) -> hudVor = System.nanoTime());
+        HudElementRegistry.attachElementAfter(minimap, Identifier.fromNamespaceAndPath(HeroicMap.ID, "messung_nach"),
+                (g, t) -> {
+                    if (aufnehmen) {
+                        hud.add(System.nanoTime() - hudVor);
+                    }
+                });
         context.runOnClient(mc -> {
             mc.options.renderDistance().set(SICHTWEITE);
             mc.options.framerateLimit().set(260);
@@ -91,18 +106,19 @@ public final class Messung implements FabricClientGameTest {
             flug(context, server, true);
             flug(context, server, false);
 
-            // Bildrate ohne Grenze, 144 und 60, dazu die Massstäbe; 260 heisst ohne Grenze.
+            // Bildrate ohne Grenze, 144 und 60, dazu die Massstäbe und rund gleich nach eckig;
+            // 260 heisst ohne Grenze.
             boolean hin = true;
-            for (int[] lauf : new int[][] {{260, 2}, {260, 4}, {144, 4}, {60, 4}}) {
+            for (int[] lauf : new int[][] {{260, 2, 0}, {260, 4, 0}, {260, 4, 1}, {144, 4, 0}, {144, 4, 1}, {60, 4, 0}}) {
                 int fps = lauf[0], scale = lauf[1];
+                boolean rund = lauf[2] == 1;
                 context.runOnClient(mc -> {
                     mc.options.framerateLimit().set(fps);
-                    while (Minimap.INSTANZ.scale() != scale) {
-                        Minimap.INSTANZ.naechsterMassstab();
-                    }
+                    Minimap.INSTANZ.setzeScale(scale);
+                    Minimap.INSTANZ.setzeRund(rund);
                 });
                 zeige(context, true);
-                String art = "fps=" + (fps == 260 ? "frei" : fps) + " scale=" + scale;
+                String art = "fps=" + (fps == 260 ? "frei" : fps) + " scale=" + scale + " form=" + (rund ? "rund" : "eckig");
                 warteAufFreieFrames(context, art);
                 for (int runde = 1; runde <= RUNDEN; runde++) {
                     for (boolean an : new boolean[] {false, true}) {
@@ -281,6 +297,7 @@ public final class Messung implements FabricClientGameTest {
     private void frames(ClientGameTestContext context, String art, boolean an, int runde, Runnable lauf) {
         context.runOnClient(mc -> {
             frames.clear();
+            hud.clear();
             aufnehmen = true;
         });
         long[] gcVorher = gc();
@@ -288,11 +305,13 @@ public final class Messung implements FabricClientGameTest {
         lauf.run();
         long[] gcNachher = gc();
         long chunks = context.computeOnClient(mc -> Minimap.INSTANZ.uebernommen()) - chunksVorher;
-        long[] zeiten = context.computeOnClient(mc -> {
+        long[][] beide = context.computeOnClient(mc -> {
             aufnehmen = false;
-            return frames.toLongArray();
+            return new long[][] {frames.toLongArray(), hud.toLongArray()};
         });
+        long[] zeiten = beide[0], imHud = beide[1];
         Arrays.sort(zeiten);
+        Arrays.sort(imHud);
         long summe = 0;
         for (long z : zeiten) {
             summe += z;
@@ -301,6 +320,10 @@ public final class Messung implements FabricClientGameTest {
                 art, an ? "an" : "aus", runde, zeiten.length, ms(summe / zeiten.length),
                 ms(quantil(zeiten, 0.5)), ms(quantil(zeiten, 0.95)), ms(quantil(zeiten, 0.99)),
                 ms(zeiten[zeiten.length - 1]), gcNachher[0] - gcVorher[0], gcNachher[1] - gcVorher[1], chunks);
+        if (imHud.length > 0) {
+            zeile("hud %s runde=%d n=%d p50=%.3f ms p95=%.3f ms p99=%.3f ms", art, runde, imHud.length,
+                    ms(quantil(imHud, 0.5)), ms(quantil(imHud, 0.95)), ms(quantil(imHud, 0.99)));
+        }
     }
 
     private static long quantil(long[] sortiert, double q) {

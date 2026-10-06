@@ -8,9 +8,16 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
@@ -20,7 +27,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -34,7 +40,7 @@ import org.joml.Matrix3x2fStack;
 import org.slf4j.Logger;
 
 /**
- * Die Minimap im HUD: eckig, genordet, der Spieler in der Mitte. Gezeichnet und behalten wird
+ * Die Minimap im HUD: eckig oder rund, genordet, der Spieler in der Mitte. Gezeichnet und behalten wird
  * der sichtbare Bereich plus {@link #VORRAT} Chunks. Chunks, die sich ändern, zeichnet ein
  * Worker nach, die nächsten zuerst; der Render-Thread zieht sie ab und übernimmt die Bilder,
  * je Frame höchstens {@link #BUDGET_NS}.
@@ -51,11 +57,11 @@ public final class Minimap {
     static final long BUDGET_NS = 2_000_000L;
     /** So viele Chunks hat der Worker höchstens vor sich. */
     private static final int IN_ARBEIT = 4;
-    /** Seite der Minimap in Einheiten des GUI. */
-    static final int GROESSE = 128;
+    /** Seite der Minimap in Einheiten des GUI: Vorgabe, kleinste, grösste. Ein Pixel der Minimap ist eine Einheit. */
+    static final int GROESSE = 128, KLEINSTE = 64, GROESSTE = 256;
     /** Chunks je Richtung über den sichtbaren Bereich hinaus. */
     static final int VORRAT = 2;
-    private static final int RAND = 4;
+    static final int RAND = 4;
     /** Ändert sich die Höhe des Kopfes unter einer Decke um so viele Blöcke, wird neu gezeichnet. */
     private static final int DECKE_SCHRITT = 2;
 
@@ -70,6 +76,10 @@ public final class Minimap {
 
     private boolean sichtbar = true;
     private int scale = 2;
+    private boolean rund;
+    private int groesse = GROESSE;
+    /** Die Lage im freien Platz des Schirms: 0 links oder oben, 1 rechts oder unten. */
+    private float lageX = 1, lageY = 0;
     final LongLinkedOpenHashSet offen = new LongLinkedOpenHashSet();
     /** Chunks im Bereich, deren Bild in der Textur steht. */
     private final LongOpenHashSet gezeichnet = new LongOpenHashSet();
@@ -139,14 +149,127 @@ public final class Minimap {
         this.sichtbar = sichtbar;
     }
 
+    boolean sichtbar() {
+        return sichtbar;
+    }
+
     /** 1, 2 oder 4 Pixel je Block, der Reihe nach. */
     void naechsterMassstab() {
-        scale = scale == 4 ? 1 : scale * 2;
-        leeren();
+        setzeScale(scale == 4 ? 1 : scale * 2);
+    }
+
+    void setzeScale(int scale) {
+        if (scale != this.scale) {
+            this.scale = scale;
+            leeren();
+        }
     }
 
     int scale() {
         return scale;
+    }
+
+    boolean rund() {
+        return rund;
+    }
+
+    void setzeRund(boolean rund) {
+        this.rund = rund;
+    }
+
+    /** Lage und Seite auf dem Schirm, in Einheiten des GUI. */
+    record Rahmen(int x, int y, int seite) {
+
+        boolean enthaelt(double mx, double my) {
+            return mx >= x && mx < x + seite && my >= y && my < y + seite;
+        }
+    }
+
+    Rahmen rahmen(int breite, int hoehe) {
+        return rahmen(breite, hoehe, groesse, lageX, lageY);
+    }
+
+    /** Die Seite höchstens so gross, wie der Schirm erlaubt; die Lage verteilt den freien Platz. */
+    static Rahmen rahmen(int breite, int hoehe, int groesse, float lageX, float lageY) {
+        int seite = Math.max(1, Math.min(groesse, Math.min(breite, hoehe) - 2 * RAND));
+        return new Rahmen(RAND + Math.round(lageX * (breite - seite - 2 * RAND)),
+                RAND + Math.round(lageY * (hoehe - seite - 2 * RAND)), seite);
+    }
+
+    /** Gibt der Minimap die Seite und legt sie dann wie {@link #verschiebe}. */
+    void stelle(int x, int y, int seite, int breite, int hoehe) {
+        int neu = Mth.clamp(seite, KLEINSTE, GROESSTE);
+        if (neu != groesse) {
+            groesse = neu;
+            // Die Reichweite ändert sich; der nächste Frame passt den Bereich an.
+            mitte = null;
+        }
+        verschiebe(x, y, breite, hoehe);
+    }
+
+    /** Legt die Minimap mit der linken oberen Ecke auf (x, y), soweit sie auf den Schirm passt. */
+    void verschiebe(int x, int y, int breite, int hoehe) {
+        int s = rahmen(breite, hoehe).seite();
+        lageX = anteil(x - RAND, breite - s - 2 * RAND);
+        lageY = anteil(y - RAND, hoehe - s - 2 * RAND);
+    }
+
+    private static float anteil(int wert, int platz) {
+        return platz <= 0 ? 0 : Mth.clamp(wert / (float) platz, 0, 1);
+    }
+
+    /** Liest die Einstellungen beim Start; fehlt die Datei oder ein Wert, gilt die Vorgabe. */
+    void lies(Path datei) {
+        Properties p = new Properties();
+        if (Files.exists(datei)) {
+            try (Reader rein = Files.newBufferedReader(datei)) {
+                p.load(rein);
+            } catch (IOException | IllegalArgumentException e) {
+                LOGGER.warn("Heroic Map: Einstellungen {} nicht lesbar, es gilt die Vorgabe", datei, e);
+            }
+        }
+        sichtbar = !"false".equals(p.getProperty("minimap"));
+        int s = zahl(p.getProperty("massstab"), 2);
+        scale = s == 1 || s == 4 ? s : 2;
+        rund = "rund".equals(p.getProperty("form"));
+        groesse = Mth.clamp(zahl(p.getProperty("groesse"), GROESSE), KLEINSTE, GROESSTE);
+        lageX = bruch(p.getProperty("lage_x"), 1);
+        lageY = bruch(p.getProperty("lage_y"), 0);
+    }
+
+    void schreibe(Path datei) {
+        Properties p = new Properties();
+        p.setProperty("minimap", Boolean.toString(sichtbar));
+        p.setProperty("massstab", Integer.toString(scale));
+        p.setProperty("form", rund ? "rund" : "eckig");
+        p.setProperty("groesse", Integer.toString(groesse));
+        p.setProperty("lage_x", Float.toString(lageX));
+        p.setProperty("lage_y", Float.toString(lageY));
+        try {
+            Files.createDirectories(datei.getParent());
+            try (Writer raus = Files.newBufferedWriter(datei)) {
+                p.store(raus, "Heroic Map");
+            }
+        } catch (IOException e) {
+            LOGGER.warn("Heroic Map: Einstellungen {} nicht geschrieben", datei, e);
+        }
+    }
+
+    private static int zahl(String text, int vorgabe) {
+        try {
+            return text == null ? vorgabe : Integer.parseInt(text.trim());
+        } catch (NumberFormatException e) {
+            return vorgabe;
+        }
+    }
+
+    private static float bruch(String text, float vorgabe) {
+        try {
+            float f = text == null ? vorgabe : Float.parseFloat(text.trim());
+            return Float.isNaN(f) ? vorgabe : Mth.clamp(f, 0, 1);
+        } catch (NumberFormatException e) {
+            return vorgabe;
+        }
     }
 
     long uebernommen() {
@@ -174,11 +297,11 @@ public final class Minimap {
 
     /** Chunks je Richtung um den Spieler, die die Minimap zeichnet: sichtbar plus Vorrat. */
     int reichweite() {
-        return reichweite(scale);
+        return reichweite(scale, groesse);
     }
 
-    static int reichweite(int scale) {
-        return Mth.ceil(GROESSE / 2f / (16f * scale)) + VORRAT;
+    static int reichweite(int scale, int groesse) {
+        return Mth.ceil(groesse / 2f / (16f * scale)) + VORRAT;
     }
 
     private boolean imBereich(int x, int z) {
@@ -215,23 +338,74 @@ public final class Minimap {
         }
         arbeite(mc, level, spieler);
 
-        int x0 = g.guiWidth() - GROESSE - RAND, y0 = RAND;
-        g.fill(x0 - 1, y0 - 1, x0 + GROESSE + 1, y0 + GROESSE + 1, 0xFF000000);
-        int links = Mth.floor(Projektion.zuPixel(spieler.getX(), scale)) - GROESSE / 2;
-        int oben = Mth.floor(Projektion.zuPixel(spieler.getZ(), scale)) - GROESSE / 2;
+        Rahmen r = rahmen(g.guiWidth(), g.guiHeight());
+        int links = Mth.floor(Projektion.zuPixel(spieler.getX(), scale)) - r.seite() / 2;
+        int oben = Mth.floor(Projektion.zuPixel(spieler.getZ(), scale)) - r.seite() / 2;
+        male(g, r, links, oben, mc.getWindow().getGuiScale());
+        pfeil(g, r.x() + r.seite() / 2, r.y() + r.seite() / 2, spieler.getYRot());
+    }
+
+    /**
+     * Zeichnet Rand und Regionen in Pixeln des Schirms, Lauf für Lauf der Form; eckig ist das ein
+     * einziger Lauf. Siehe docs/minimap.md, „Form“.
+     */
+    private void male(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k) {
         int seite = CHUNKS_JE_REGION * 16 * scale;
-        g.enableScissor(x0, y0, x0 + GROESSE, y0 + GROESSE);
-        for (int rz = Math.floorDiv(oben, seite); rz <= Math.floorDiv(oben + GROESSE - 1, seite); rz++) {
-            for (int rx = Math.floorDiv(links, seite); rx <= Math.floorDiv(links + GROESSE - 1, seite); rx++) {
+        Matrix3x2fStack pose = g.pose();
+        pose.pushMatrix();
+        pose.scale(1f / k);
+        int x0 = r.x() * k, y0 = r.y() * k, n = r.seite() * k;
+        for (int[] l : laeufe(n + 2 * k, rund)) {
+            g.fill(x0 - k + l[2], y0 - k + l[0], x0 - k + l[3], y0 - k + l[1], 0xFF000000);
+        }
+        List<int[]> form = laeufe(n, rund);
+        int s = seite * k;
+        for (int rz = Math.floorDiv(oben, seite); rz <= Math.floorDiv(oben + r.seite() - 1, seite); rz++) {
+            for (int rx = Math.floorDiv(links, seite); rx <= Math.floorDiv(links + r.seite() - 1, seite); rx++) {
                 Region region = regionen.get(ChunkPos.pack(rx, rz));
-                if (region != null) {
-                    g.blit(RenderPipelines.GUI_TEXTURED, region.id, x0 + rx * seite - links, y0 + rz * seite - oben,
-                            0, 0, seite, seite, seite, seite);
+                if (region == null) {
+                    continue;
+                }
+                int qx = x0 + (rx * seite - links) * k, qy = y0 + (rz * seite - oben) * k;
+                // Je Region alle Läufe nacheinander, so bleibt es ein Stapel je Textur.
+                for (int[] l : form) {
+                    int ya = Math.max(y0 + l[0], qy), yb = Math.min(y0 + l[1], qy + s);
+                    int xa = Math.max(x0 + l[2], qx), xb = Math.min(x0 + l[3], qx + s);
+                    if (ya < yb && xa < xb) {
+                        g.blit(region.id, xa, ya, xb, yb, (xa - qx) / (float) s, (xb - qx) / (float) s,
+                                (ya - qy) / (float) s, (yb - qy) / (float) s);
+                    }
                 }
             }
         }
-        g.disableScissor();
-        pfeil(g, x0 + GROESSE / 2, y0 + GROESSE / 2, spieler.getYRot());
+        pose.popMatrix();
+    }
+
+    /**
+     * Die Zeilen einer Form mit der Seite n, zu Läufen gleicher Breite zusammengefasst, je Lauf
+     * {y0, y1, x0, x1}, Ende ausschliesslich. Rund ist es der Kreis in das Quadrat, sonst das Quadrat.
+     */
+    static List<int[]> laeufe(int n, boolean rund) {
+        List<int[]> laeufe = new ArrayList<>();
+        if (!rund) {
+            laeufe.add(new int[] {0, n, 0, n});
+            return laeufe;
+        }
+        double h = n / 2.0;
+        int[] lauf = null;
+        for (int y = 0; y < n; y++) {
+            double dy = y + 0.5 - h;
+            int a = (int) Math.round(h - Math.sqrt(Math.max(0, h * h - dy * dy)));
+            if (a >= n - a) {
+                lauf = null;
+            } else if (lauf != null && lauf[2] == a) {
+                lauf[1] = y + 1;
+            } else {
+                lauf = new int[] {y, y + 1, a, n - a};
+                laeufe.add(lauf);
+            }
+        }
+        return laeufe;
     }
 
     /**

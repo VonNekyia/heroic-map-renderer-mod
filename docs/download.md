@@ -45,11 +45,12 @@ der Mod mit den Kacheln zeigt, steht unter [Vollbildkarte](vollbildkarte.md).
 
 | Befehl | tut |
 |---|---|
-| `/heroicmap angebot` | die angebotenen Karten mit Dimension und Grösse je Massstab |
-| `/heroicmap laden <baum> <1, 2 oder 4>` | fragt erst im Dialog nach Grösse und Massstab, dann einen vollen Download an, siehe „Zustimmung und Grösse“ |
-| `/heroicmap abgleich <baum>` | fragt einen Abgleich von Hand an, im gespeicherten Massstab; nach einer Ablehnung mit `wieder` erst ab dann wieder |
+| `/hmap angebot` | die angebotenen Karten mit Dimension und Grösse je Massstab |
+| `/hmap laden <baum> <1, 2 oder 4>` | fragt erst im Dialog nach Grösse und Massstab, dann einen vollen Download an, siehe „Zustimmung und Grösse“ |
+| `/hmap abgleich <baum>` | fragt einen Abgleich von Hand an, im gespeicherten Massstab; nach einer Ablehnung mit `wieder` erst ab dann wieder |
 
 Dieselben Wege gehen über die Knöpfe der [Vollbildkarte](vollbildkarte.md), „Bedienung“.
+Ohne Unterbefehl öffnet `/hmap` das Menü, siehe [Minimap](minimap.md), „Bedienung“.
 
 - **Höchstens ein Abgleich je Tag** und Spieler, automatisch oder von Hand,
   so hat es der Maintainer entschieden; die Grenzen stehen im Protokoll des
@@ -84,7 +85,7 @@ Dieselben Wege gehen über die Knöpfe der [Vollbildkarte](vollbildkarte.md), �
   `heroicmap/zustimmung.txt` im Spielordner.
 - **Höchstens ein Dialog,** geplant oder offen. Eine `freigabe`, die einen
   zweiten bräuchte, verfällt mit einer Meldung. Sagt der Spieler Ja zu
-  `/heroicmap laden`, während inzwischen ein Download für den Baum läuft,
+  `/hmap laden`, während inzwischen ein Download für den Baum läuft,
   geht keine `anfrage` hinaus.
 - **Der tägliche Abgleich:** Das Plugin schickt ihn von sich aus als
   `freigabe` mit `art` `abgleich`; mit Zustimmung lädt der Mod ihn im
@@ -156,7 +157,7 @@ bricht der Mod sie ab (`sendAsync`, `cancel`). Der Aufbau der Verbindung hat
   `freigabe` für einen anderen Baum wartet, bis der laufende fertig ist.
 - **Je Server und Baum höchstens einer,** wartend oder laufend; der
   Schlüssel ist der Ordner des Baums. Eine weitere `freigabe` für denselben
-  Baum verfällt mit einer Meldung, und `/heroicmap laden` sagt vorher, dass
+  Baum verfällt mit einer Meldung, und `/hmap laden` sagt vorher, dass
   schon einer läuft.
 - **Beim Trennen** bricht der Mod den laufenden Download ab und verwirft,
   was wartet. Was schon geladen ist, steht im Index.

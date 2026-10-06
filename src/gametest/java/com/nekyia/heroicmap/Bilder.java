@@ -81,11 +81,7 @@ public final class Bilder implements FabricClientGameTest {
             server.runCommand("tp @a 0.5 -30 0.5 0 90");
             spiel.getConnection().waitForChunksRender();
             for (int scale : new int[] {1, 2, 4}) {
-                context.runOnClient(mc -> {
-                    while (Minimap.INSTANZ.scale() != scale) {
-                        Minimap.INSTANZ.naechsterMassstab();
-                    }
-                });
+                context.runOnClient(mc -> Minimap.INSTANZ.setzeScale(scale));
                 context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
                 context.waitTicks(2);
                 Path bild = context.takeScreenshot(TestScreenshotOptions.of("minimap-" + scale + "px").disableCounterPrefix());
@@ -93,8 +89,33 @@ public final class Bilder implements FabricClientGameTest {
                     schneide(context, bild, Path.of(AUSGABE, "minimap-" + scale + "px.png"));
                 }
             }
+            menue(context);
             vollbildkarte(context);
             live(context, server);
+        }
+    }
+
+    /** Die Minimap rund bei 4 px, dann das Menü über der Szene. Siehe docs/minimap.md, „Bedienung“. */
+    private static void menue(ClientGameTestContext context) {
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeRund(true));
+        context.waitTicks(2);
+        Path rund = context.takeScreenshot(TestScreenshotOptions.of("minimap-rund").disableCounterPrefix());
+        context.runOnClient(mc -> mc.gui.setScreen(new Einstellungen()));
+        context.waitTicks(5);
+        Path menue = context.takeScreenshot(TestScreenshotOptions.of("menue").disableCounterPrefix());
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeRund(false);
+            mc.gui.setScreen(null);
+        });
+        try {
+            // Das Menü speichert beim Schliessen; spätere Gametests sollen mit der Vorgabe beginnen.
+            Files.deleteIfExists(HeroicMap.einstellungen());
+            if (!AUSGABE.isEmpty()) {
+                schneide(context, rund, Path.of(AUSGABE, "minimap-rund.png"));
+                Files.copy(menue, Path.of(AUSGABE, "menue.png"), StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 

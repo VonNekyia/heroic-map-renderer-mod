@@ -1,22 +1,25 @@
 ---
 title: Minimap
-description: Wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
+description: Bedienung über das Menü hinter /hmap, Form, Lage und Grösse; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
 code:
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/ChunkMaler.java
   - src/main/java/com/nekyia/heroicmap/Licht.java
   - src/main/java/com/nekyia/heroicmap/HeroicMap.java
+  - src/main/java/com/nekyia/heroicmap/Einstellungen.java
   - src/main/java/com/nekyia/heroicmap/mixin/LevelExtractorMixin.java
   - src/main/resources/heroicmap.accesswidener
   - src/test/java/com/nekyia/heroicmap/LichtTest.java
+  - src/test/java/com/nekyia/heroicmap/MinimapTest.java
   - src/gametest/java/com/nekyia/heroicmap/Bilder.java
   - src/gametest/java/com/nekyia/heroicmap/Messung.java
 ---
 
 # Minimap
 
-Die Minimap liegt rechts oben im HUD, 128 Einheiten des GUI im Quadrat,
-eckig und genordet, der Spieler in der Mitte. Sie zeichnet jeden Chunk mit
+Die Minimap liegt in der Vorgabe rechts oben im HUD, 128 Einheiten des GUI
+im Quadrat, eckig und genordet, der Spieler in der Mitte; Form, Lage und
+Grösse stellt das Menü ein, siehe „Bedienung“. Sie zeichnet jeden Chunk mit
 dem Tesselator des Spiels von oben, mit 1, 2 oder 4 Pixeln je Block, und
 liegt damit nah an der Karte `top-north` des Renderers, siehe
 [0001](entscheidungen/0001-minimap-mit-dem-tesselator.md). Was sie kostet,
@@ -24,15 +27,53 @@ steht unter „Kosten“.
 
 ## Bedienung
 
-| Taste | Vorgabe | tut |
-|---|---|---|
-| Minimap zeigen oder verbergen | M | blendet die Minimap aus und ein |
-| Massstab der Minimap | N | 1, 2, 4 Pixel je Block, der Reihe nach; Vorgabe 2 |
+`/hmap` öffnet das Menü (`Einstellungen`):
 
-- **Die Tasten** lassen sich unter Steuerung ändern, Gruppe „Heroic Map“.
+| Einstellung | Vorgabe | tut |
+|---|---|---|
+| Minimap | an | blendet die Minimap aus und ein |
+| Massstab der Minimap | 2 px je Block | 1, 2 oder 4 Pixel je Block |
+| Form | eckig | eckig oder rund, siehe „Form“ |
+| Knopf „Karte laden …“ | – | die Karten des Servers, wie in der [Vollbildkarte](vollbildkarte.md), „Bedienung“ |
+
+- **Lage und Grösse:** Das Menü dunkelt nicht ab, die Minimap im HUD bleibt
+  sichtbar und ist weiss umrandet. Ziehen mit links verschiebt sie. Der
+  weisse Griff sitzt an der Ecke, die zur Mitte des Schirms zeigt; ihn
+  ziehen macht die Minimap grösser oder kleiner, die Ecke gegenüber bleibt
+  stehen. Die Seite liegt zwischen 64 und 256 Einheiten des GUI
+  (`Minimap.KLEINSTE`, `Minimap.GROESSTE`) und höchstens so gross, wie der
+  Schirm Platz hat. Ein Pixel der Minimap bleibt eine Einheit: Grösser
+  zeigt mehr Gegend im selben Massstab und zeichnet mehr Chunks, siehe
+  „Neu zeichnen“, „Bereich“.
+- **Gespeichert** wird beim Schliessen des Menüs, in
+  `config/heroicmap.properties`. Die Lage steht dort als Anteil des freien
+  Platzes, 0 links oder oben bis 1 rechts oder unten, so bleibt die Minimap
+  bei einer anderen Fenstergrösse in ihrer Ecke. Fehlt die Datei oder ist
+  ein Wert unlesbar, gilt die Vorgabe.
+- **Tasten:** Vorbelegt ist nur `.` für die
+  [Vollbildkarte](vollbildkarte.md). „Minimap zeigen oder verbergen“ und
+  „Massstab der Minimap“ gibt es auch als Tasten, ohne Belegung, unter
+  Steuerung, Gruppe „Heroic Map“; was sie ändern, speichert der Mod gleich.
 - **Der Pfeil** zeigt die Blickrichtung. Bei Gier 0 blickt der Spieler nach
   Süden, auf der Karte nach unten; der Pfeil ist also um Gier + 180° gedreht.
 - **Wo ein Block liegt,** sagt die [Projektion](projektion.md).
+
+## Form
+
+Der Mod zeichnet die Minimap in Pixeln des Schirms, nicht des GUI
+(`Minimap.male`), Zeile für Zeile der Form:
+
+- **Läufe:** Gleich breite Zeilen fasst `Minimap.laeufe` zu einem Lauf
+  zusammen. Eckig ist das ein einziger Lauf. Rund ist es der Kreis in das
+  Quadrat, je Zeile die Sehne auf ganze Pixel gerundet; bei 384 Pixeln
+  Seite sind das 225 Läufe, etwa 1,2 je Pixel des Radius.
+- **Zeichnen:** je Region der Minimap ein Rechteck aus ihrer Textur je
+  Lauf, das sie schneidet, mit den passenden Texturkoordinaten; dazu
+  dieselbe Form eine Einheit grösser in Schwarz als Rand. Je Region gehen
+  ihre Rechtecke nacheinander, so bleibt es ein Stapel je Textur. Der Mod
+  braucht weder Scissor noch Shader noch Stencil.
+- **Kanten:** Der Kreis ist auf ganze Pixel des Schirms gestuft, ohne
+  Glättung.
 
 ## Welcher Block oben liegt
 
@@ -168,8 +209,9 @@ nichts.
   vergleicht deshalb je Frame `Options.biomeBlendRadius` und den Block-Atlas
   und zeichnet bei einer Änderung neu.
 - **Bereich:** Gezeichnet und behalten wird, was die Minimap zeigt, plus
-  2 Chunks je Richtung (`Minimap.reichweite`): bei 1 px ±6 Chunks, bei
-  2 px ±4, bei 4 px ±3. Verlässt ein Chunk den Bereich, fällt sein Bild weg;
+  2 Chunks je Richtung (`Minimap.reichweite`): in der Vorgabe von 128
+  Einheiten bei 1 px ±6 Chunks, bei 2 px ±4, bei 4 px ±3; bei 256 Einheiten
+  und 1 px ±10. Rund zeichnet der Mod dasselbe Quadrat wie eckig. Verlässt ein Chunk den Bereich, fällt sein Bild weg;
   kommt er wieder, zeichnet der Mod ihn neu.
 - **Reihenfolge:** die offenen Chunks, die nächsten zuerst. Eine Pause
   zwischen zwei Abzügen eines Chunks brachte messbar nichts und verzögerte

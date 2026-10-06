@@ -9,7 +9,7 @@ import net.minecraft.network.chat.Component;
 
 /**
  * Die Karten, die der Server anbietet, je Baum ein Knopf je Massstab mit seiner Grösse. Ein Knopf
- * fragt wie {@code /heroicmap laden} erst im Dialog nach. Siehe docs/vollbildkarte.md, „Bedienung“.
+ * fragt wie {@code /hmap laden} erst im Dialog nach. Siehe docs/vollbildkarte.md, „Bedienung“.
  */
 final class Auswahl extends Screen {
 
