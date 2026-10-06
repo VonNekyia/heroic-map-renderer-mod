@@ -6,6 +6,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/Kartenblick.java
   - src/main/java/com/nekyia/heroicmap/Kacheln.java
   - src/main/java/com/nekyia/heroicmap/Satz.java
+  - src/main/java/com/nekyia/heroicmap/Auswahl.java
   - src/test/java/com/nekyia/heroicmap/KartenblickTest.java
   - src/test/java/com/nekyia/heroicmap/KachelnTest.java
   - src/test/java/com/nekyia/heroicmap/SatzTest.java
@@ -28,12 +29,17 @@ sagt sie das und zeigt nichts.
 | Taste `,` | öffnet die Karte, schliesst sie wieder; frei belegbar unter „Heroic Map“ |
 | Ziehen mit links | verschiebt die Karte, der Inhalt folgt der Maus |
 | Mausrad | zoomt, siehe „Stufen und Lupe“ |
+| Knopf „Karte laden …“ | zeigt die Karten des Servers, je Baum ein Knopf je Massstab mit seiner Grösse (`Auswahl`); ein Klick fragt wie `/heroicmap laden` erst im Dialog nach |
+| Knopf „Abgleich“ | fragt einen Abgleich des gezeigten Satzes an, wie `/heroicmap abgleich`; nur mit Satz |
 | `Esc` | schliesst |
 
 - **Das Spiel läuft weiter,** die Karte hält es nicht an (`isPauseScreen`).
 - **Unten links** stehen der Name des Satzes und `x`, `z` des Blocks unter
   der Maus.
 - **Beim Öffnen** liegt der Spieler in der Mitte.
+- **Geht ein Knopf nicht,** etwa weil der Server den Baum nicht anbietet oder
+  schon ein Download läuft, steht der Grund über den Koordinaten.
+- **Ohne Satz** zeigt die Karte nur den Hinweis und den Knopf zum Laden.
 
 ## Welcher Satz
 
@@ -81,7 +87,11 @@ sagt sie das und zeigt nichts.
 - **Im Hintergrund:** Ein Thread dekodiert und füllt das `NativeImage`; auf
   dem Render-Thread bleibt nur das Hochladen als `DynamicTexture`. Die
   Rückgabe an den Render-Thread steht im `finally`, auch nach einem `Error`.
-  Bis eine Kachel da ist, bleibt ihr Platz dunkel.
+- **Platzhalter:** Bis eine Kachel da ist, zeigt die Karte ihren Ausschnitt
+  aus der nächsten gröberen Stufe, die schon geladen ist, vergrössert
+  (`Karte.platzhalter`, `Kartenblick.grob`). Angefragt wird dafür nichts;
+  beim Hineinzoomen liegt die gröbere Kachel meist schon da. Sonst bleibt
+  der Platz dunkel.
 - **Kosten** ([Messung](messungen/2026-10-06-vollbildkarte-uebernahme.md)):
   Eine Kachel 256² dekodiert in rund 2,8 ms, der Thread liefert also rund
   350 je Sekunde, etwa 6 je Frame bei 60 fps. Das Hochladen kostet den
@@ -113,6 +123,5 @@ prüft, dass TwelveMonkeys im Spiel lädt und die Kacheln richtig liegen.
 
 ## Was fehlt
 
-- **Knöpfe** für Laden und Abgleich; bis dahin die Befehle unter
-  [Download](download.md), „Befehle“.
-- **Platzhalter aus einer gröberen Stufe,** solange eine Kachel lädt.
+- **Mehrere Bäume einer Dimension** zeigt die Karte nicht zur Wahl, siehe
+  „Welcher Satz“.

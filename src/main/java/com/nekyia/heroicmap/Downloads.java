@@ -20,6 +20,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConfirmScreen;
@@ -477,27 +479,68 @@ final class Downloads {
         }
     }
 
-    /** Für den Befehl: Bäume und Grössen des Angebots, je Zeile. */
-    List<Component> zeilen() {
+    /** Ein Baum des Angebots: Kennung, Name, Dimension und je Massstab die Grösse in Bytes. */
+    record Baum(String id, String name, String dimension, SortedMap<Integer, Long> bytes) {
+    }
+
+    /** Die Bäume des letzten Angebots; unlesbare fallen weg. */
+    List<Baum> baeume() {
+        List<Baum> baeume = new java.util.ArrayList<>();
         if (angebot == null || !angebot.has("baeume")) {
-            return List.of(Component.translatable("heroicmap.angebot.keins"));
+            return baeume;
         }
         try {
-            List<Component> zeilen = new java.util.ArrayList<>();
             for (JsonElement e : angebot.getAsJsonArray("baeume")) {
-                JsonObject baum = e.getAsJsonObject();
-                JsonObject massstaebe = baum.getAsJsonObject("massstaebe");
-                StringBuilder groessen = new StringBuilder();
-                for (String m : massstaebe.keySet()) {
-                    groessen.append(m).append(" px ").append(groesse(massstaebe.getAsJsonObject(m).get("bytes").getAsLong()))
-                            .append("  ");
+                try {
+                    JsonObject baum = e.getAsJsonObject();
+                    SortedMap<Integer, Long> bytes = new TreeMap<>();
+                    for (int m : new int[] {1, 2, 4}) {
+                        long b = feld(baum, m, "bytes");
+                        if (b >= 0) {
+                            bytes.put(m, b);
+                        }
+                    }
+                    baeume.add(new Baum(baum.get("id").getAsString(), baum.get("name").getAsString(),
+                            baum.get("dimension").getAsString(), bytes));
+                } catch (RuntimeException kaputt) {
+                    // Dieser Baum ist unlesbar, die anderen nicht.
                 }
-                zeilen.add(Component.translatable("heroicmap.angebot.baum", baum.get("id").getAsString(),
-                        baum.get("name").getAsString(), baum.get("dimension").getAsString(), groessen.toString().trim()));
             }
-            return zeilen;
         } catch (RuntimeException e) {
-            return List.of(Component.translatable("heroicmap.angebot.unlesbar"));
+            // Kein lesbares Angebot.
         }
+        return baeume;
+    }
+
+    /** Für den Befehl: Bäume und Grössen des Angebots, je Zeile. */
+    List<Component> zeilen() {
+        List<Baum> baeume = baeume();
+        if (baeume.isEmpty()) {
+            return List.of(Component.translatable("heroicmap.angebot.keins"));
+        }
+        List<Component> zeilen = new java.util.ArrayList<>();
+        for (Baum baum : baeume) {
+            StringBuilder groessen = new StringBuilder();
+            baum.bytes().forEach((m, b) -> groessen.append(m).append(" px ").append(groesse(b)).append("  "));
+            zeilen.add(Component.translatable("heroicmap.angebot.baum", baum.id(), baum.name(), baum.dimension(),
+                    groessen.toString().trim()));
+        }
+        return zeilen;
+    }
+
+    /** Der Befehl {@code abgleich} und der Knopf der Karte: fragt im gespeicherten Massstab an. Gibt den Fehler zurück, oder null. */
+    Component frageAbgleich(String baum) {
+        int massstab = aktiv(baum);
+        if (massstab == 0) {
+            return Component.translatable("heroicmap.befehl.kein_satz", baum);
+        }
+        if (!Kanal.offen() || !angeboten(baum)) {
+            return Component.translatable("heroicmap.befehl.unbekannt", baum);
+        }
+        if (belegt(baum)) {
+            return Component.translatable("heroicmap.download.belegt", baum);
+        }
+        Kanal.frage(baum, massstab, "abgleich");
+        return null;
     }
 }

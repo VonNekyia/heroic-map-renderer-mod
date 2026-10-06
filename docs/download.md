@@ -49,7 +49,7 @@ der Mod mit den Kacheln zeigt, steht unter [Vollbildkarte](vollbildkarte.md).
 | `/heroicmap laden <baum> <1, 2 oder 4>` | fragt erst im Dialog nach Grösse und Massstab, dann einen vollen Download an, siehe „Zustimmung und Grösse“ |
 | `/heroicmap abgleich <baum>` | fragt einen Abgleich von Hand an, im gespeicherten Massstab |
 
-Die Vollbildkarte bekommt dafür später Knöpfe.
+Dieselben Wege gehen über die Knöpfe der [Vollbildkarte](vollbildkarte.md), „Bedienung“.
 
 ## Zustimmung und Grösse
 

@@ -37,5 +37,9 @@
   "heroicmap.download.grund.anderer": "An error in the mod; details in the log.",
   "key.heroicmap.karte": "Full-screen map",
   "heroicmap.karte.titel": "Map",
-  "heroicmap.karte.keine": "No map is downloaded for this dimension; /heroicmap angebot shows what the server offers."
+  "heroicmap.karte.keine": "No map is downloaded for this dimension; /heroicmap angebot shows what the server offers.",
+  "heroicmap.karte.laden": "Download map …",
+  "heroicmap.karte.abgleich": "Sync",
+  "heroicmap.auswahl.titel": "Maps of this server",
+  "heroicmap.auswahl.massstab": "%s px · %s"
 }

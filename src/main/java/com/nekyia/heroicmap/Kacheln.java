@@ -127,6 +127,11 @@ final class Kacheln implements AutoCloseable {
         }
     }
 
+    /** Die Textur der Kachel, wenn sie schon geladen ist, ohne sie anzufragen; sonst null. */
+    Identifier vorhanden(int z, int x, int y) {
+        return texturen.get(z + "/" + x + "/" + y);
+    }
+
     /** Die Textur der Kachel, oder null, solange sie das erste Mal lädt oder es sie nicht gibt. */
     Identifier textur(int z, int x, int y) {
         String pfad = z + "/" + x + "/" + y;

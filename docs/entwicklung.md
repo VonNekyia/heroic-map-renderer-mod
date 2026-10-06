@@ -37,7 +37,7 @@ Das baut das Jar nach `build/libs/` und lässt die Tests laufen.
 | `FreigabeTest` | die `freigabe` lesen, reservierte Namen, und wann der Mod fragt, siehe [Download](download.md), „Zustimmung und Grösse“ |
 | `ReiheTest` | Downloads nacheinander, je Baum höchstens einer, auch nach einem `Error`, siehe [Download](download.md), „Reihe“ |
 | `AdresseTest` | die Prüfung der Adresse, siehe [Download](download.md), „Sicherheit“ |
-| `KartenblickTest` | wie die Vollbildkarte Kacheln auf den Schirm legt, Zoom über Stufen und Lupe, Schieben, siehe [Vollbildkarte](vollbildkarte.md) |
+| `KartenblickTest` | wie die Vollbildkarte Kacheln auf den Schirm legt, Zoom über Stufen und Lupe, Schieben, Platzhalter aus gröberen Stufen, siehe [Vollbildkarte](vollbildkarte.md) |
 | `KachelnTest` | WebP mit TwelveMonkeys lesen, samt Alpha, die Grösse aus dem Kopf vor dem Dekodieren, siehe [Vollbildkarte](vollbildkarte.md), „Kacheln“ |
 | `PyramideTest` | Verkleinern wie die Pyramide des Renderers, siehe [Live-Ebene](live.md), „Raster“ |
 | `EbeneTest` | die Bilder der Live-Ebene schreiben, lesen, beim Abgleich räumen, auch über einen Fehler hinweg, beim Wechsel des Massstabs anpassen und in die Kacheln legen, auch bei negativen Chunks, siehe [Live-Ebene](live.md) |

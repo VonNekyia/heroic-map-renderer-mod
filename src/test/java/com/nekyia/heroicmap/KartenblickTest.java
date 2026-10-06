@@ -2,6 +2,7 @@ package com.nekyia.heroicmap;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
@@ -48,6 +49,16 @@ class KartenblickTest {
         blick.zoom = 5;
         // Auf Stufe 5 deckt eine Kachel 512 Pixel der Basis: x von -212 bis 812, z von 288 bis 1248.
         assertArrayEquals(new int[] {-1, 1, 0, 2}, blick.kacheln(512, 480));
+    }
+
+    @Test
+    void platzhalterAusGroeberenStufen() {
+        // Eine Stufe gröber: Kachel (5, 3) ist das rechte untere Viertel von (2, 1).
+        assertArrayEquals(new int[] {2, 1, 128, 128, 128}, Kartenblick.grob(5, 3, 1, 256));
+        // Zwei Stufen gröber und negativ: (-1, -3) liegt in (-1, -1) bei Viertel 3 und 1 von 4.
+        assertArrayEquals(new int[] {-1, -1, 192, 64, 64}, Kartenblick.grob(-1, -3, 2, 256));
+        // Unter 1 Pixel gibt es keinen Ausschnitt.
+        assertNull(Kartenblick.grob(0, 0, 9, 256));
     }
 
     @Test
