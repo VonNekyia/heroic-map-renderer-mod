@@ -357,12 +357,12 @@ final class Laden {
             HttpResponse<byte[]> fertig = antwort.get(zeit.toMillis(), TimeUnit.MILLISECONDS);
             int status = fertig.statusCode();
             if (status != 200) {
-                Grund grund = switch (status) {
+                Grund warum = switch (status) {
                     case 401, 403 -> Grund.ABGELEHNT;
                     case 429 -> Grund.BUDGET;
                     default -> Grund.NETZ;
                 };
-                throw new Fehler(grund, pfad + ": " + status);
+                throw new Fehler(warum, pfad + ": " + status);
             }
             return fertig;
         } catch (TimeoutException e) {
