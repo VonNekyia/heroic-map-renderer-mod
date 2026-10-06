@@ -13,6 +13,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 ## Karte
 
 - [Projektion](projektion.md): wo ein Block auf Minimap und Vollbildkarte liegt, genordet von oben wie `top-north`, geprüft an `projektion.json` des Renderers.
+- [Download](download.md): wie der Mod die Karte vom Plugin lädt, Kanal, Befehle, Zustimmung und Grösse, Sicherheit, Manifest, harte Grenzen, Ablage, Fortsetzen und Abgleich.
 - [Minimap](minimap.md): Bedienung, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, Neu zeichnen im Worker, Kosten, Bilder und was anders ist als `top-north`.
 
 ## Entwicklung
