@@ -12,7 +12,13 @@ import java.util.stream.Stream;
  * Ein geladener Satz auf der Platte: sein Ordner, Name, Dimension und Massstab aus
  * {@code satz.json}, Kachelgrösse, Stufen und scale aus {@code map.json}. Siehe docs/vollbildkarte.md.
  */
-record Satz(Path ordner, String name, String dimension, int massstab, int kachel, int minZoom, int maxZoom, int scale) {
+record Satz(Path ordner, String name, String dimension, int massstab, int kachel, int minZoom, int maxZoom, int scale,
+        int mischung) {
+
+    /** Wie breit ein Chunk auf der feinsten Stufe ist, in Pixeln. */
+    int chunk() {
+        return 16 * scale >> (maxZoom - stufe());
+    }
 
     /** Die feinste Stufe des Satzes: 4 px ist {@code maxZoom}, 2 px eine gröber, 1 px zwei. */
     int stufe() {
@@ -58,7 +64,7 @@ record Satz(Path ordner, String name, String dimension, int massstab, int kachel
             JsonObject karte = json(ordner.resolve("map.json"));
             Satz s = new Satz(ordner, satz.get("name").getAsString(), satz.get("dimension").getAsString(), massstab,
                     karte.get("tileSize").getAsInt(), karte.get("minZoom").getAsInt(), karte.get("maxZoom").getAsInt(),
-                    karte.get("scale").getAsInt());
+                    karte.get("scale").getAsInt(), mischung(karte));
             boolean gut = (massstab == 1 || massstab == 2 || massstab == 4)
                     && s.kachel >= 64 && s.kachel <= 1024 && Integer.bitCount(s.kachel) == 1
                     && s.minZoom >= 0 && s.minZoom <= s.stufe() && s.maxZoom <= 30 && s.scale >= 1;
@@ -66,6 +72,12 @@ record Satz(Path ordner, String name, String dimension, int massstab, int kachel
         } catch (IOException | RuntimeException e) {
             return null;
         }
+    }
+
+    /** Der Radius des Biomübergangs aus {@code map.json}, 0 bis 7 wie im Spiel, sonst -1. */
+    private static int mischung(JsonObject karte) {
+        int r = karte.has("biomeBlend") ? karte.get("biomeBlend").getAsInt() : -1;
+        return r >= 0 && r <= 7 ? r : -1;
     }
 
     /** Schreibt {@code satz.json} eines Baums: Name, Dimension und Massstab. */

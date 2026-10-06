@@ -7,10 +7,12 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.imageio.ImageReader;
@@ -27,13 +29,22 @@ final class Kacheln implements AutoCloseable {
 
     /** So viele Texturen bleiben; bei 256² Pixeln rund 48 MiB. */
     private static final int MAX = 192;
+    /** So viele Bilder der Ebene hält die Karte höchstens. */
+    private static final int BILDER_MAX = 4096;
 
     /** Ein dekodiertes Bild, ARGB Zeile für Zeile. */
     record Bild(int breite, int hoehe, int[] argb) {
     }
 
+    /** Die offene Karte, der die Live-Ebene geänderte Chunks meldet; nur auf dem Render-Thread. */
+    private static Kacheln offen;
+
     private final Path ordner;
     private final int seite;
+    private final int minZoom, stufe, chunk;
+    private final Path ebene;
+    /** Die Chunks der Live-Ebene; der Dekoder liest, der Render-Thread ergänzt. */
+    private final Set<Long> chunks;
     private final ExecutorService dekoder = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "Heroic Map Kacheln");
         t.setDaemon(true);
@@ -50,47 +61,124 @@ final class Kacheln implements AutoCloseable {
         }
     };
     private final Set<String> laeuft = new HashSet<>();
-    /** Kacheln, die es nicht gibt oder die sich nicht lesen lassen; der Mod fragt nicht wieder. */
+    /** Kacheln, die es nicht gibt oder die sich nicht lesen lassen; der Mod fragt erst nach einer Änderung der Ebene wieder. */
     private final Set<String> leer = new HashSet<>();
+    /** Je Kachel zählt jede Änderung der Ebene; ein Ergebnis aus einer älteren Zählung ist veraltet. */
+    private final Map<String, Integer> generation = new HashMap<>();
+    /** Kacheln mit einer älteren Textur: Sie bleibt sichtbar, bis die neue da ist. */
+    private final Set<String> veraltet = new HashSet<>();
+    /** Die Bilder der Ebene je Chunk, einmal je offener Karte gelesen; der Render-Thread verwirft geänderte. */
+    private final Map<Long, int[]> bilder = new ConcurrentHashMap<>();
     private boolean geschlossen;
     private int naechste;
 
-    /** {@code seite} ist die Kachelgrösse aus {@code map.json}; jede Kachel muss genau so gross sein. */
-    Kacheln(Path ordner, int seite) {
-        this.ordner = ordner;
-        this.seite = seite;
+    /** Die Kacheln des Satzes; jede muss genau {@code tileSize} gross sein. Auf dem Render-Thread. */
+    Kacheln(Satz satz) {
+        this.ordner = satz.ordner();
+        this.seite = satz.kachel();
+        this.minZoom = satz.minZoom();
+        this.stufe = satz.stufe();
+        this.chunk = satz.chunk();
+        this.ebene = Ebene.ordner(satz.ordner().getParent());
+        this.chunks = Ebene.liste(ebene);
+        offen = this;
     }
 
-    /** Die Textur der Kachel, oder null, solange sie lädt oder es sie nicht gibt. */
+    /** Nach einem Abgleich: Die Ebene ist geräumt, alles über ihr lädt neu. Auf dem Render-Thread. */
+    static void ebeneGeraeumt() {
+        if (offen != null) {
+            offen.allesNeu();
+        }
+    }
+
+    private void allesNeu() {
+        bilder.clear();
+        chunks.clear();
+        chunks.addAll(Ebene.liste(ebene));
+        leer.clear();
+        for (String pfad : texturen.keySet()) {
+            generation.merge(pfad, 1, Integer::sum);
+            veraltet.add(pfad);
+        }
+        for (String pfad : laeuft) {
+            generation.merge(pfad, 1, Integer::sum);
+        }
+    }
+
+    /** Die Live-Ebene hat einen Chunk neu abgelegt: Die Kacheln über ihm laden neu. Auf dem Render-Thread. */
+    static void geaendert(int cx, int cz) {
+        if (offen != null) {
+            offen.vergiss(cx, cz);
+        }
+    }
+
+    private void vergiss(int cx, int cz) {
+        long k = Ebene.schluessel(cx, cz);
+        chunks.add(k);
+        bilder.remove(k);
+        for (int z = stufe; z >= minZoom && chunk >> (stufe - z) >= 1; z--) {
+            int breite = chunk >> (stufe - z);
+            String pfad = z + "/" + Math.floorDiv(cx * breite, seite) + "/" + Math.floorDiv(cz * breite, seite);
+            generation.merge(pfad, 1, Integer::sum);
+            if (texturen.containsKey(pfad) || laeuft.contains(pfad)) {
+                veraltet.add(pfad);
+            }
+            leer.remove(pfad);
+        }
+    }
+
+    /** Die Textur der Kachel, oder null, solange sie das erste Mal lädt oder es sie nicht gibt. */
     Identifier textur(int z, int x, int y) {
         String pfad = z + "/" + x + "/" + y;
         Identifier id = texturen.get(pfad);
-        if (id != null || leer.contains(pfad) || !laeuft.add(pfad)) {
+        if ((id != null && !veraltet.contains(pfad)) || leer.contains(pfad) || laeuft.contains(pfad)) {
             return id;
         }
+        laeuft.add(pfad);
+        veraltet.remove(pfad);
+        int gen = generation.getOrDefault(pfad, 0);
         Path datei = ordner.resolve(String.valueOf(z)).resolve(String.valueOf(x)).resolve(y + ".webp");
         dekoder.execute(() -> {
             NativeImage pixel = null;
             try {
-                if (Files.exists(datei)) {
-                    pixel = pixel(dekodiere(Files.readAllBytes(datei), seite));
+                int[] argb = null;
+                try {
+                    if (Files.exists(datei)) {
+                        argb = dekodiere(Files.readAllBytes(datei), seite).argb();
+                    }
+                } catch (IOException e) {
+                    argb = null;
                 }
-            } catch (IOException | RuntimeException e) {
+                // Darüber die Live-Ebene, auch wo der Server noch keine Kachel hat.
+                argb = Ebene.lege(argb, seite, z, x, y, stufe, chunk, chunks, this::bild);
+                if (argb != null) {
+                    pixel = pixel(new Bild(seite, seite, argb));
+                }
+            } catch (RuntimeException e) {
                 pixel = null;
             } finally {
                 // Auch nach einem Error, sonst bliebe die Kachel für immer in laeuft.
-                zurueck(pfad, pixel);
+                zurueck(pfad, gen, pixel);
             }
         });
-        return null;
+        return id;
     }
 
-    private void zurueck(String pfad, NativeImage pixel) {
-        Minecraft.getInstance().execute(() -> uebernimm(pfad, pixel));
+    /** Das Bild eines Chunks der Ebene, im Dekoder; je offener Karte einmal gelesen. */
+    private int[] bild(long k) {
+        // ponytail: leert ganz statt der ältesten; bei 64 × 64 Pixeln sind 4096 Bilder rund 64 MiB.
+        if (bilder.size() > BILDER_MAX) {
+            bilder.clear();
+        }
+        return bilder.computeIfAbsent(k, c -> Ebene.lies(ebene, Ebene.cx(c), Ebene.cz(c), chunk));
+    }
+
+    private void zurueck(String pfad, int gen, NativeImage pixel) {
+        Minecraft.getInstance().execute(() -> uebernimm(pfad, gen, pixel));
     }
 
     /** Auf dem Render-Thread: nur noch hochladen, die Pixel sind schon im {@code NativeImage}. */
-    private void uebernimm(String pfad, NativeImage pixel) {
+    private void uebernimm(String pfad, int gen, NativeImage pixel) {
         laeuft.remove(pfad);
         if (geschlossen) {
             if (pixel != null) {
@@ -98,15 +186,26 @@ final class Kacheln implements AutoCloseable {
             }
             return;
         }
+        if (gen != generation.getOrDefault(pfad, 0)) {
+            // Während des Dekodierens legte die Ebene ein neueres Bild ab: Das Ergebnis ist trotzdem
+            // neuer als das gezeigte, also hoch damit, und gleich noch einmal.
+            veraltet.add(pfad);
+        }
+        Identifier alt;
         if (pixel == null) {
             leer.add(pfad);
-            return;
+            alt = texturen.remove(pfad);
+        } else {
+            Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "kachel/" + naechste++);
+            DynamicTexture textur = new DynamicTexture(() -> "heroicmap " + pfad, pixel);
+            textur.upload();
+            Minecraft.getInstance().getTextureManager().register(id, textur);
+            // Die alte Textur geht erst, wenn die neue da ist: Die Karte blinkt nicht.
+            alt = texturen.put(pfad, id);
         }
-        Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "kachel/" + naechste++);
-        DynamicTexture textur = new DynamicTexture(() -> "heroicmap " + pfad, pixel);
-        textur.upload();
-        Minecraft.getInstance().getTextureManager().register(id, textur);
-        texturen.put(pfad, id);
+        if (alt != null) {
+            Minecraft.getInstance().getTextureManager().release(alt);
+        }
     }
 
     /** Füllt ein {@code NativeImage} mit der Kachel, im Faden des Dekoders. */
@@ -149,6 +248,9 @@ final class Kacheln implements AutoCloseable {
     @Override
     public void close() {
         geschlossen = true;
+        if (offen == this) {
+            offen = null;
+        }
         dekoder.shutdownNow();
         texturen.values().forEach(Minecraft.getInstance().getTextureManager()::release);
         texturen.clear();

@@ -88,6 +88,8 @@ public final class Minimap {
     /** Die Texel des Block-Atlas und die Liste der Sprites, aus der sie stammen. */
     private Map<TextureAtlasSprite, ChunkMaler.Texel> texel;
     private List<TextureAtlasSprite> atlasStand;
+    /** Wann {@code arbeite} zuletzt lief, in ns. */
+    private long gearbeitet;
 
     Minimap() {
     }
@@ -149,6 +151,20 @@ public final class Minimap {
 
     long uebernommen() {
         return uebernommen;
+    }
+
+    /**
+     * Zeigt die Minimap, hat noch zu zeichnen und hat eben gearbeitet? Dann wartet die Live-Ebene.
+     * Ohne HUD, etwa mit F1, läuft {@code arbeite} nicht; dann wartet sie nicht auf die Minimap.
+     */
+    boolean beschaeftigt() {
+        return sichtbar && !fertig() && System.nanoTime() - gearbeitet < 250_000_000L;
+    }
+
+    /** Die Texel des Block-Atlas, auf dem Render-Thread; auch die Live-Ebene zeichnet aus dieser Kopie. */
+    Map<TextureAtlasSprite, ChunkMaler.Texel> atlasTexel(Minecraft mc) {
+        pruefeAtlas(mc);
+        return texel;
     }
 
     /** Ist nichts mehr nachzuzeichnen? */
@@ -223,6 +239,7 @@ public final class Minimap {
      * Budget des Frames aufgebraucht ist.
      */
     private void arbeite(Minecraft mc, ClientLevel level, LocalPlayer spieler) {
+        gearbeitet = System.nanoTime();
         pruefeAtlas(mc);
         int radius = mc.options.biomeBlendRadius().get();
         if (radius != mischung) {

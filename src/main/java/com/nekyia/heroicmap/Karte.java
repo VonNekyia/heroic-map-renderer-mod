@@ -27,7 +27,7 @@ final class Karte extends Screen {
     Karte(Satz satz) {
         super(Component.translatable("heroicmap.karte.titel"));
         this.satz = satz;
-        this.kacheln = satz == null ? null : new Kacheln(satz.ordner(), satz.kachel());
+        this.kacheln = satz == null ? null : new Kacheln(satz);
         this.blick = satz == null ? null : new Kartenblick(satz.kachel(), satz.minZoom(), satz.maxZoom(), satz.stufe());
     }
 

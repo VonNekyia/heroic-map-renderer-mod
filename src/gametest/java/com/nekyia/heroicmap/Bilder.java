@@ -17,8 +17,8 @@ import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptio
 
 /**
  * Bilder der Minimap zum Ansehen, nicht zum Vergleichen: baut eine Szene in einer flachen
- * Welt und nimmt die Minimap bei 1, 2 und 4 Pixeln je Block auf. Mit -Pbilder=&lt;ordner&gt;
- * landet je Massstab der Ausschnitt der Minimap dort. Siehe docs/minimap.md, „Bilder“.
+ * Welt und nimmt die Minimap bei 1, 2 und 4 Pixeln je Block auf, danach Vollbildkarte und
+ * Live-Ebene. Mit -Pbilder=&lt;ordner&gt; landen die Bilder dort. Siehe docs/minimap.md, „Bilder“.
  */
 public final class Bilder implements FabricClientGameTest {
 
@@ -94,7 +94,38 @@ public final class Bilder implements FabricClientGameTest {
                 }
             }
             vollbildkarte(context);
+            live(context, server);
         }
+    }
+
+    /**
+     * Die Live-Ebene über dem Testsatz: Gold quer über die Grenze von Chunk -1 und 0, dann die
+     * Vollbildkarte. Im Einzelspieler gibt es keinen Satz vom Server, der Test setzt ihn.
+     * Siehe docs/live.md.
+     */
+    private static void live(ClientGameTestContext context, TestServerContext server) {
+        Path baum = FabricLoader.getInstance().getGameDir().resolve(HeroicMap.ID).resolve("test").resolve("beispiel");
+        Path ebene = Ebene.ordner(baum);
+        try {
+            // Eine Ebene aus einem früheren Lauf käme sonst mit ins Bild.
+            Laden.loesche(ebene);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        context.runOnClient(mc -> Live.INSTANZ.satzFuerTest(Satz.lies(baum)));
+        server.runCommand("fill -3 -61 2 3 -61 3 gold_block");
+        context.waitFor(mc -> Files.exists(ebene.resolve("0.0.png")) && Files.exists(ebene.resolve("-1.0.png")), 1200);
+        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
+        context.waitTicks(40);
+        Path bild = context.takeScreenshot(TestScreenshotOptions.of("live").disableCounterPrefix());
+        if (!AUSGABE.isEmpty()) {
+            try {
+                Files.copy(bild, Path.of(AUSGABE, "live.png"), StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        context.runOnClient(mc -> mc.gui.setScreen(null));
     }
 
     /**
