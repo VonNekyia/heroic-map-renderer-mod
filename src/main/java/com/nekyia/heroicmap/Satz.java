@@ -41,7 +41,11 @@ record Satz(Path ordner, String name, String dimension, int massstab, int kachel
         return null;
     }
 
-    /** Liest den Satz eines Baums, oder null, wenn keiner vollständig daliegt. */
+    /**
+     * Liest den Satz eines Baums, oder null, wenn keiner vollständig daliegt oder {@code map.json}
+     * vom Server eine Grenze verletzt: {@code tileSize} eine Zweierpotenz von 64 bis 1024,
+     * {@code 0 ≤ minZoom ≤ stufe ≤ maxZoom ≤ 30}, {@code scale} ab 1.
+     */
     static Satz lies(Path baum) {
         try {
             Path datei = baum.resolve("satz.json");
@@ -52,9 +56,13 @@ record Satz(Path ordner, String name, String dimension, int massstab, int kachel
             int massstab = satz.get("massstab").getAsInt();
             Path ordner = baum.resolve(String.valueOf(massstab));
             JsonObject karte = json(ordner.resolve("map.json"));
-            return new Satz(ordner, satz.get("name").getAsString(), satz.get("dimension").getAsString(), massstab,
+            Satz s = new Satz(ordner, satz.get("name").getAsString(), satz.get("dimension").getAsString(), massstab,
                     karte.get("tileSize").getAsInt(), karte.get("minZoom").getAsInt(), karte.get("maxZoom").getAsInt(),
                     karte.get("scale").getAsInt());
+            boolean gut = (massstab == 1 || massstab == 2 || massstab == 4)
+                    && s.kachel >= 64 && s.kachel <= 1024 && Integer.bitCount(s.kachel) == 1
+                    && s.minZoom >= 0 && s.minZoom <= s.stufe() && s.maxZoom <= 30 && s.scale >= 1;
+            return gut ? s : null;
         } catch (IOException | RuntimeException e) {
             return null;
         }

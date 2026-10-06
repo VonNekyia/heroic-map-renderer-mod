@@ -38,7 +38,8 @@ tasks.jar {
 }
 
 // Bilder der Minimap: ./gradlew runClientGameTest -Pbilder=docs/bilder schreibt sie dorthin.
-// Die Messung läuft nur mit -Pmessung=<datei>, siehe docs/minimap.md, „Kosten“.
+// Die Messung läuft nur mit -Pmessung=<datei>, siehe docs/minimap.md, „Kosten“; die Übernahme der
+// Kacheln der Vollbildkarte nur mit -Puebernahme=<datei>, siehe docs/vollbildkarte.md, „Kacheln“.
 fabricApi {
     configureTests {
         createSourceSet = true
@@ -50,9 +51,11 @@ fabricApi {
 
 val bilder = providers.gradleProperty("bilder").map { file(it).absolutePath }.orElse("")
 val messung = providers.gradleProperty("messung").map { file(it).absolutePath }.orElse("")
+val uebernahme = providers.gradleProperty("uebernahme").map { file(it).absolutePath }.orElse("")
 tasks.matching { it.name == "runClientGameTest" }.configureEach {
     (this as JavaExec).systemProperty("heroicmap.bilder", bilder.get())
     systemProperty("heroicmap.messung", messung.get())
+    systemProperty("heroicmap.uebernahme", uebernahme.get())
 }
 
 tasks.processResources {

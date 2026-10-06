@@ -43,8 +43,17 @@ sagt sie das und zeigt nichts.
 - **Die Karte** nimmt unter dem Ordner des Servers den Baum, dessen
   Dimension die des Spielers ist (`Satz.fuer`). Kachelgrösse, Stufen und
   `scale` liest sie aus `map.json` des Satzes.
-- **Ein Baum ohne `satz.json`, `map.json` oder mit unlesbarer Datei** zählt
-  nicht und verdeckt keinen anderen.
+- **`map.json` kommt vom Server** und hat deshalb Grenzen (`Satz.lies`):
+
+  | Feld | erlaubt |
+  |---|---|
+  | `tileSize` | Zweierpotenz von 64 bis 1024 |
+  | `minZoom`, `maxZoom` | `0 ≤ minZoom ≤ maxZoom ≤ 30`, und die Stufe des Massstabs nicht unter `minZoom` |
+  | `scale` | ab 1 |
+  | Massstab aus `satz.json` | 1, 2 oder 4 |
+
+- **Ein Baum ohne `satz.json`, `map.json` oder mit unlesbarer Datei oder
+  verletzter Grenze** zählt nicht und verdeckt keinen anderen.
 - **Bietet ein Server zwei Bäume derselben Dimension an,** nimmt die Karte
   den ersten, den das Dateisystem nennt.
 
@@ -65,9 +74,20 @@ sagt sie das und zeigt nichts.
 - **WebP lesen:** Das Spiel liest Texturen nur als PNG. Die Kacheln
   dekodiert TwelveMonkeys `imageio-webp`, im Jar des Mods mitgeliefert;
   der Hinweis seiner Lizenz steht in [`NOTICE`](../NOTICE).
-- **Im Hintergrund:** Ein Thread dekodiert; hochgeladen wird auf dem
-  Render-Thread als `DynamicTexture`. Bis eine Kachel da ist, bleibt ihr
-  Platz dunkel.
+- **Grösse vor dem Dekodieren:** Der Kopf der WebP nennt Breite und Höhe.
+  Sind sie nicht genau `tileSize`, gilt die Kachel als leer, bevor
+  TwelveMonkeys Speicher anlegt; sonst könnte eine kleine Datei mit einem
+  Kopf von 16384 × 16384 rund 1 GiB verlangen.
+- **Im Hintergrund:** Ein Thread dekodiert und füllt das `NativeImage`; auf
+  dem Render-Thread bleibt nur das Hochladen als `DynamicTexture`. Die
+  Rückgabe an den Render-Thread steht im `finally`, auch nach einem `Error`.
+  Bis eine Kachel da ist, bleibt ihr Platz dunkel.
+- **Kosten** ([Messung](messungen/2026-10-06-vollbildkarte-uebernahme.md)):
+  Eine Kachel 256² dekodiert in rund 2,8 ms, der Thread liefert also rund
+  350 je Sekunde, etwa 6 je Frame bei 60 fps. Das Hochladen kostet den
+  Render-Thread rund 0,05 ms je Kachel, also rund 0,3 ms je Frame beim
+  Öffnen. 160 Kacheln, ein Schirm in 4K bei GUI-Massstab 1, kosten ihn
+  zusammen rund 8 ms, verteilt über eine knappe halbe Sekunde.
 - **Behalten:** die 192 zuletzt gezeigten Texturen, bei 256² Pixeln rund
   48 MiB auf der Grafikkarte. Die älteste gibt der Mod frei.
 - **Fehlt eine Kachel** oder lässt sie sich nicht lesen, merkt sich die

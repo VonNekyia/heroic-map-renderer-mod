@@ -33,6 +33,7 @@ final class Kacheln implements AutoCloseable {
     }
 
     private final Path ordner;
+    private final int seite;
     private final ExecutorService dekoder = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "Heroic Map Kacheln");
         t.setDaemon(true);
@@ -54,8 +55,10 @@ final class Kacheln implements AutoCloseable {
     private boolean geschlossen;
     private int naechste;
 
-    Kacheln(Path ordner) {
+    /** {@code seite} ist die Kachelgrösse aus {@code map.json}; jede Kachel muss genau so gross sein. */
+    Kacheln(Path ordner, int seite) {
         this.ordner = ordner;
+        this.seite = seite;
     }
 
     /** Die Textur der Kachel, oder null, solange sie lädt oder es sie nicht gibt. */
@@ -67,34 +70,37 @@ final class Kacheln implements AutoCloseable {
         }
         Path datei = ordner.resolve(String.valueOf(z)).resolve(String.valueOf(x)).resolve(y + ".webp");
         dekoder.execute(() -> {
-            Bild bild = null;
+            NativeImage pixel = null;
             try {
                 if (Files.exists(datei)) {
-                    bild = dekodiere(Files.readAllBytes(datei));
+                    pixel = pixel(dekodiere(Files.readAllBytes(datei), seite));
                 }
             } catch (IOException | RuntimeException e) {
-                bild = null;
+                pixel = null;
+            } finally {
+                // Auch nach einem Error, sonst bliebe die Kachel für immer in laeuft.
+                zurueck(pfad, pixel);
             }
-            Bild fertig = bild;
-            Minecraft.getInstance().execute(() -> uebernimm(pfad, fertig));
         });
         return null;
     }
 
-    private void uebernimm(String pfad, Bild bild) {
+    private void zurueck(String pfad, NativeImage pixel) {
+        Minecraft.getInstance().execute(() -> uebernimm(pfad, pixel));
+    }
+
+    /** Auf dem Render-Thread: nur noch hochladen, die Pixel sind schon im {@code NativeImage}. */
+    private void uebernimm(String pfad, NativeImage pixel) {
         laeuft.remove(pfad);
         if (geschlossen) {
+            if (pixel != null) {
+                pixel.close();
+            }
             return;
         }
-        if (bild == null) {
+        if (pixel == null) {
             leer.add(pfad);
             return;
-        }
-        NativeImage pixel = new NativeImage(bild.breite(), bild.hoehe(), false);
-        for (int y = 0; y < bild.hoehe(); y++) {
-            for (int x = 0; x < bild.breite(); x++) {
-                pixel.setPixel(x, y, bild.argb()[y * bild.breite() + x]);
-            }
         }
         Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "kachel/" + naechste++);
         DynamicTexture textur = new DynamicTexture(() -> "heroicmap " + pfad, pixel);
@@ -103,11 +109,35 @@ final class Kacheln implements AutoCloseable {
         texturen.put(pfad, id);
     }
 
-    /** Dekodiert eine WebP-Kachel mit TwelveMonkeys; das Spiel selbst liest nur PNG. */
-    static Bild dekodiere(byte[] webp) throws IOException {
+    /** Füllt ein {@code NativeImage} mit der Kachel, im Faden des Dekoders. */
+    static NativeImage pixel(Bild bild) {
+        NativeImage pixel = new NativeImage(bild.breite(), bild.hoehe(), false);
+        try {
+            for (int y = 0; y < bild.hoehe(); y++) {
+                for (int x = 0; x < bild.breite(); x++) {
+                    pixel.setPixel(x, y, bild.argb()[y * bild.breite() + x]);
+                }
+            }
+            return pixel;
+        } catch (Throwable fehler) {
+            pixel.close();
+            throw fehler;
+        }
+    }
+
+    /**
+     * Dekodiert eine WebP-Kachel mit TwelveMonkeys; das Spiel selbst liest nur PNG. Die Grösse
+     * aus dem Kopf muss {@code seite} × {@code seite} sein, sonst wirft es, bevor es Speicher
+     * dafür anlegt.
+     */
+    static Bild dekodiere(byte[] webp, int seite) throws IOException {
         ImageReader leser = new WebPImageReaderSpi().createReaderInstance();
         try (MemoryCacheImageInputStream rein = new MemoryCacheImageInputStream(new ByteArrayInputStream(webp))) {
             leser.setInput(rein);
+            int breite = leser.getWidth(0), hoehe = leser.getHeight(0);
+            if (breite != seite || hoehe != seite) {
+                throw new IOException("Grösse " + breite + " × " + hoehe + " statt " + seite + " × " + seite);
+            }
             BufferedImage bild = leser.read(0);
             int w = bild.getWidth(), h = bild.getHeight();
             return new Bild(w, h, bild.getRGB(0, 0, w, h, null, 0, w));
