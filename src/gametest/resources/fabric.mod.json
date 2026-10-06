@@ -9,7 +9,8 @@
       "com.nekyia.heroicmap.Bilder",
       "com.nekyia.heroicmap.Messung",
       "com.nekyia.heroicmap.Uebernahme",
-      "com.nekyia.heroicmap.Abnahme"
+      "com.nekyia.heroicmap.Abnahme",
+      "com.nekyia.heroicmap.Server"
     ]
   },
   "depends": {

@@ -60,7 +60,32 @@ in der CI:
 | `Bilder` | baut eine Szene und nimmt die Minimap auf, danach die Vollbildkarte aus einem Testsatz und die Live-Ebene darüber; mit `-Pbilder=<ordner>` landen die Bilder dort, siehe [Minimap](minimap.md), „Bilder“, [Vollbildkarte](vollbildkarte.md), „Bild“, und [Live-Ebene](live.md), „Bild“ |
 | `Messung` | nur mit `-Pmessung=<datei>`: Zeit je Chunk und Frametime mit und ohne Minimap, siehe [Minimap](minimap.md), „Kosten“ |
 | `Abnahme` | nur mit `-Pabnahme=<ordner>`: die Live-Ebene gegen `top-north` scale 4 des Renderers an der Testwelt, siehe [Live-Ebene](live.md), „Abnahme“ |
+| `Server` | nur mit `-Pserver=<adresse>`: von Ende zu Ende gegen einen echten Paper-Server mit dem Plugin, Angebot, voller Download des kleinsten Massstabs des ersten Baums, jeder Dialog mit Ja, die Vollbildkarte als Bild `server-karte`; siehe unten |
 | `Uebernahme` | nur mit `-Puebernahme=<datei>`: was eine Kachel der Vollbildkarte den Render-Thread kostet, siehe [Vollbildkarte](vollbildkarte.md), „Kacheln“ |
+
+### Gegen einen echten Server
+
+Der Gametest `Server` verbindet sich wie der Testserver der Fabric API über
+`ConnectScreen.startConnecting` mit der Adresse aus `-Pserver`. Der Server
+braucht:
+
+- **Paper in der Version des Clients,** heute 26.3; ein Client spricht nur
+  das Protokoll seiner Version. Das Plugin baut gegen die API 26.2 und läuft
+  darauf.
+- **`online-mode=false`:** Der Client im Gametest hat keine Mojang-Sitzung.
+  Auch der Testserver der Fabric API stellt das so ein.
+- **`server-ip=127.0.0.1`:** Ohne Anmeldung kommt jeder mit jedem Namen
+  herein. Das ist für einen Testserver auf demselben Rechner richtig, aber
+  nur, solange er von aussen nicht erreichbar ist.
+- **Das Plugin mit einem Baum zum Download und dem Webserver** aus
+  heroic-map-renderer#151. Läuft der Webserver auf demselben Rechner wie
+  der Server, passt die Prüfung der Adresse, siehe [Download](download.md),
+  „Sicherheit“.
+
+Er löscht vorher den Ordner dieses Servers unter `heroicmap/`, lädt den
+kleinsten Massstab des ersten Baums und bestätigt jeden Dialog. Er läuft
+unter der Sperrdatei und nur, wenn kein Minecraft-Client des Users offen
+ist.
 
 ## CI
 
