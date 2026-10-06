@@ -55,6 +55,8 @@ final class Downloads {
     private boolean dialogGezeigt;
     /** Nach einer falschen Prüfsumme fragt der Mod einmal neu an, dann nicht mehr. */
     private boolean neuGefragt;
+    /** Uhr des Servers minus Uhr des Spielers, in ms, aus {@code jetzt} der letzten Nachricht. */
+    private long versatz;
 
     private Downloads() {
     }
@@ -68,6 +70,9 @@ final class Downloads {
             if (json.get("v").getAsInt() != 1) {
                 return;
             }
+            if (json.has("jetzt")) {
+                versatz = json.get("jetzt").getAsLong() * 1000 - System.currentTimeMillis();
+            }
         } catch (RuntimeException e) {
             LOGGER.warn("Heroic Map: Nachricht nicht lesbar");
             return;
@@ -79,6 +84,14 @@ final class Downloads {
             default -> {
             }
         }
+    }
+
+    /**
+     * Jetzt in Serverzeit, ms: Die Live-Ebene stempelt damit ihre Bilder, damit sie zu
+     * {@code abdeckt_bis} passen. Genau auf die Laufzeit einer Nachricht. Siehe docs/live.md, „Abgleich“.
+     */
+    long serverzeit() {
+        return System.currentTimeMillis() + versatz;
     }
 
     /** Vergisst Angebot, Bestätigungen und Dialog und bricht die Downloads ab, etwa beim Trennen. */
@@ -258,6 +271,7 @@ final class Downloads {
                 // Das Plugin speichert den Massstab, sobald es das Token ausstellt; der Abgleich misst an diesem Stand.
                 new Freigabe.Stand(f.massstab(), auftrag.satzBytes(), auftrag.kacheln()).schreibe(ordner.resolve(STAND));
             }
+            Satz vorher = Satz.lies(ordner);
             ergebnis = laden.lade(auftrag, ordner.resolve(String.valueOf(f.massstab())));
             if (!ergebnis.gekappt()) {
                 Laden.behalteNur(ordner, f.massstab());
@@ -265,11 +279,28 @@ final class Downloads {
                     // Erst jetzt zeigt die Vollbildkarte den Satz, siehe docs/vollbildkarte.md, „Welcher Satz“.
                     Satz.schreibe(ordner, name, dimension, f.massstab());
                 }
+                raeumeEbene(ordner, vorher, f.abdecktBis());
             }
         } catch (Exception e) {
             fehler = e;
         } finally {
             zurueck(f, auftrag, ergebnis, fehler);
+        }
+    }
+
+    /**
+     * Nach einem vollständigen Download: Bilder der Live-Ebene, die die Kacheln schon enthalten,
+     * fallen weg; bei einem anderen Massstab passen sich die übrigen an. Ohne {@code abdeckt_bis}
+     * bleiben alle. Siehe docs/live.md, „Abgleich“.
+     */
+    private static void raeumeEbene(Path ordner, Satz vorher, long abdecktBis) throws IOException {
+        Path ebene = Ebene.ordner(ordner);
+        Satz jetzt = Satz.lies(ordner);
+        if (vorher != null && jetzt != null && vorher.chunk() != jetzt.chunk()) {
+            Ebene.wechsle(ebene, vorher.chunk(), jetzt.chunk());
+        }
+        if (abdecktBis > 0) {
+            Ebene.raeume(ebene, abdecktBis * 1000);
         }
     }
 
@@ -280,6 +311,8 @@ final class Downloads {
     private void beende(Freigabe f, Laden.Auftrag auftrag, Laden.Ergebnis ergebnis, Exception fehler) {
         if (ergebnis != null) {
             neuGefragt = false;
+            // Der Satz kann neu sein oder einen anderen Massstab haben.
+            Live.INSTANZ.satzNeu();
             melde(Component.translatable(ergebnis.gekappt() ? "heroicmap.download.gekappt" : "heroicmap.download.fertig",
                     ergebnis.geladen(), ergebnis.gleich(), ergebnis.geloescht(), groesse(ergebnis.bytesGeladen())));
             return;

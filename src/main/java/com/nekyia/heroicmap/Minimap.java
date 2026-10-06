@@ -151,6 +151,11 @@ public final class Minimap {
         return uebernommen;
     }
 
+    /** Zeigt die Minimap und hat noch zu zeichnen? Dann wartet die Live-Ebene. */
+    boolean beschaeftigt() {
+        return sichtbar && !fertig();
+    }
+
     /** Ist nichts mehr nachzuzeichnen? */
     boolean fertig() {
         return mitte != null && offen.isEmpty() && laufend.isEmpty();

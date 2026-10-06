@@ -32,8 +32,15 @@ final class Kacheln implements AutoCloseable {
     record Bild(int breite, int hoehe, int[] argb) {
     }
 
+    /** Die offene Karte, der die Live-Ebene geänderte Chunks meldet; nur auf dem Render-Thread. */
+    private static Kacheln offen;
+
     private final Path ordner;
     private final int seite;
+    private final int minZoom, stufe, chunk;
+    private final Path ebene;
+    /** Die Chunks der Live-Ebene; der Dekoder liest, der Render-Thread ergänzt. */
+    private final Set<Long> chunks;
     private final ExecutorService dekoder = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "Heroic Map Kacheln");
         t.setDaemon(true);
@@ -55,10 +62,36 @@ final class Kacheln implements AutoCloseable {
     private boolean geschlossen;
     private int naechste;
 
-    /** {@code seite} ist die Kachelgrösse aus {@code map.json}; jede Kachel muss genau so gross sein. */
-    Kacheln(Path ordner, int seite) {
-        this.ordner = ordner;
-        this.seite = seite;
+    /** Die Kacheln des Satzes; jede muss genau {@code tileSize} gross sein. Auf dem Render-Thread. */
+    Kacheln(Satz satz) {
+        this.ordner = satz.ordner();
+        this.seite = satz.kachel();
+        this.minZoom = satz.minZoom();
+        this.stufe = satz.stufe();
+        this.chunk = satz.chunk();
+        this.ebene = Ebene.ordner(satz.ordner().getParent());
+        this.chunks = Ebene.liste(ebene);
+        offen = this;
+    }
+
+    /** Die Live-Ebene hat einen Chunk neu abgelegt: Die Kacheln über ihm laden neu. Auf dem Render-Thread. */
+    static void geaendert(int cx, int cz) {
+        if (offen != null) {
+            offen.vergiss(cx, cz);
+        }
+    }
+
+    private void vergiss(int cx, int cz) {
+        chunks.add(Ebene.schluessel(cx, cz));
+        for (int z = stufe; z >= minZoom && chunk >> (stufe - z) >= 1; z--) {
+            int breite = chunk >> (stufe - z);
+            String pfad = z + "/" + Math.floorDiv(cx * breite, seite) + "/" + Math.floorDiv(cz * breite, seite);
+            Identifier id = texturen.remove(pfad);
+            if (id != null) {
+                Minecraft.getInstance().getTextureManager().release(id);
+            }
+            leer.remove(pfad);
+        }
     }
 
     /** Die Textur der Kachel, oder null, solange sie lädt oder es sie nicht gibt. */
@@ -72,10 +105,20 @@ final class Kacheln implements AutoCloseable {
         dekoder.execute(() -> {
             NativeImage pixel = null;
             try {
-                if (Files.exists(datei)) {
-                    pixel = pixel(dekodiere(Files.readAllBytes(datei), seite));
+                int[] argb = null;
+                try {
+                    if (Files.exists(datei)) {
+                        argb = dekodiere(Files.readAllBytes(datei), seite).argb();
+                    }
+                } catch (IOException e) {
+                    argb = null;
                 }
-            } catch (IOException | RuntimeException e) {
+                // Darüber die Live-Ebene, auch wo der Server noch keine Kachel hat.
+                argb = Ebene.lege(argb, seite, z, x, y, stufe, chunk, chunks, ebene);
+                if (argb != null) {
+                    pixel = pixel(new Bild(seite, seite, argb));
+                }
+            } catch (RuntimeException e) {
                 pixel = null;
             } finally {
                 // Auch nach einem Error, sonst bliebe die Kachel für immer in laeuft.
@@ -149,6 +192,9 @@ final class Kacheln implements AutoCloseable {
     @Override
     public void close() {
         geschlossen = true;
+        if (offen == this) {
+            offen = null;
+        }
         dekoder.shutdownNow();
         texturen.values().forEach(Minecraft.getInstance().getTextureManager()::release);
         texturen.clear();

@@ -13,7 +13,8 @@ import java.util.regex.Pattern;
  * Eine {@code freigabe} des Plugins, geprüft, und ob der Mod vor dem Laden fragt. Ohne
  * Minecraft, damit es sich testen lässt. Siehe docs/download.md, „Zustimmung und Grösse“.
  */
-record Freigabe(String baum, String art, int massstab, long bytes, URI url, String token, String manifestSha256) {
+record Freigabe(String baum, String art, int massstab, long bytes, URI url, String token, String manifestSha256,
+        long abdecktBis) {
 
     /** Ein Baum wird ein Ordnername; nur so viel ist erlaubt. */
     private static final Pattern BAUM = Pattern.compile("[a-z0-9_-]{1,64}");
@@ -34,7 +35,8 @@ record Freigabe(String baum, String art, int massstab, long bytes, URI url, Stri
     static Freigabe lies(JsonObject json) {
         Freigabe f = new Freigabe(json.get("baum").getAsString(), json.get("art").getAsString(),
                 json.get("massstab").getAsInt(), json.get("bytes").getAsLong(), URI.create(json.get("url").getAsString()),
-                json.get("token").getAsString(), json.get("manifest_sha256").getAsString());
+                json.get("token").getAsString(), json.get("manifest_sha256").getAsString(),
+                json.has("abdeckt_bis") ? json.get("abdeckt_bis").getAsLong() : 0);
         if (!baum(f.baum) || !(f.art.equals("voll") || f.art.equals("abgleich"))
                 || (f.massstab != 1 && f.massstab != 2 && f.massstab != 4) || f.bytes < 0 || !Adresse.form(f.url)) {
             throw new IllegalArgumentException("freigabe");

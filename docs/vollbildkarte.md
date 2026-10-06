@@ -93,6 +93,8 @@ sagt sie das und zeigt nichts.
 - **Fehlt eine Kachel** oder lässt sie sich nicht lesen, merkt sich die
   Karte das und fragt nicht wieder, bis sie neu öffnet.
 - **Beim Schliessen** gibt die Karte alle Texturen frei.
+- **Darüber** legt der Dekoder die [Live-Ebene](live.md): was sich seit dem
+  letzten Lauf des Renderers in geladenen Chunks geändert hat.
 
 ## Spieler und Koordinaten
 
@@ -110,8 +112,6 @@ prüft, dass TwelveMonkeys im Spiel lädt und die Kacheln richtig liegen.
 
 ## Was fehlt
 
-- **Live-Ebene:** Änderungen seit dem letzten Lauf des Renderers zeichnet
-  der Mod noch nicht über die Karte.
 - **Knöpfe** für Laden und Abgleich; bis dahin die Befehle unter
   [Download](download.md), „Befehle“.
 - **Platzhalter aus einer gröberen Stufe,** solange eine Kachel lädt.
