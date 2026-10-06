@@ -2,6 +2,8 @@ package com.nekyia.heroicmap;
 
 import com.google.gson.JsonObject;
 import java.io.IOException;
+import java.net.Inet6Address;
+import java.net.InetAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -31,17 +33,43 @@ record Freigabe(String baum, String art, int massstab, long bytes, URI url, Stri
         FRAGEN
     }
 
-    /** Liest eine {@code freigabe}; wirft, wenn ein Feld fehlt oder nicht passt. */
-    static Freigabe lies(JsonObject json) {
-        Freigabe f = new Freigabe(json.get("baum").getAsString(), json.get("art").getAsString(),
-                json.get("massstab").getAsInt(), json.get("bytes").getAsLong(), URI.create(json.get("url").getAsString()),
+    /**
+     * Liest eine {@code freigabe}; wirft, wenn ein Feld fehlt oder nicht passt. {@code verbindung}
+     * ist die Adresse der echten Verbindung zum Spielserver, oder null; aus ihr wird die url, wenn
+     * die freigabe statt {@code url} nur {@code port} nennt.
+     */
+    static Freigabe lies(JsonObject json, InetAddress verbindung) {
+        String baum = json.get("baum").getAsString();
+        if (!baum(baum)) {
+            throw new IllegalArgumentException("freigabe");
+        }
+        Freigabe f = new Freigabe(baum, json.get("art").getAsString(),
+                json.get("massstab").getAsInt(), json.get("bytes").getAsLong(), url(json, baum, verbindung),
                 json.get("token").getAsString(), json.get("manifest_sha256").getAsString(),
                 json.has("abdeckt_bis") ? json.get("abdeckt_bis").getAsLong() : 0);
-        if (!baum(f.baum) || !(f.art.equals("voll") || f.art.equals("abgleich"))
+        if (!(f.art.equals("voll") || f.art.equals("abgleich"))
                 || (f.massstab != 1 && f.massstab != 2 && f.massstab != 4) || f.bytes < 0 || !Adresse.form(f.url)) {
             throw new IllegalArgumentException("freigabe");
         }
         return f;
+    }
+
+    /**
+     * Die {@code url}, oder ohne sie {@code http://<ip>:<port>/download/<baum>} mit der IP der
+     * Verbindung zum Spielserver, nicht dem Namen aus der Serverliste; so kommt kein neuer Weg über
+     * DNS dazu. Siehe docs/download.md, „Kanal“.
+     */
+    static URI url(JsonObject json, String baum, InetAddress verbindung) {
+        if (json.has("url")) {
+            return URI.create(json.get("url").getAsString());
+        }
+        int port = json.get("port").getAsInt();
+        if (verbindung == null || port < 1 || port > 65535) {
+            throw new IllegalArgumentException("port");
+        }
+        String ip = verbindung.getHostAddress();
+        String host = verbindung instanceof Inet6Address ? "[" + ip + "]" : ip;
+        return URI.create("http://" + host + ":" + port + "/download/" + baum);
     }
 
     /** Ein Abgleich, der bis {@code ab} gesperrt ist, in ms Uhr des Spielers. */

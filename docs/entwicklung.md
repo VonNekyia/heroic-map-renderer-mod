@@ -34,7 +34,7 @@ Das baut das Jar nach `build/libs/` und lässt die Tests laufen.
 |---|---|
 | `ProjektionTest` | die Projektion gegen `projektion.json` des Renderers, braucht Netz, siehe [Projektion](projektion.md) |
 | `LadenTest` | den Download gegen einen kleinen Server auf loopback: Fortsetzen, geänderte und gelöschte Kacheln, Stufen, Prüfsumme, Token, Budget, Stand zum Fortsetzen, Heimnetz, alle harten Grenzen, Fristen, keine Weiterleitung, den Index während des Downloads, siehe [Download](download.md) |
-| `FreigabeTest` | die `freigabe` lesen, reservierte Namen, und wann der Mod fragt, siehe [Download](download.md), „Zustimmung und Grösse“ |
+| `FreigabeTest` | die `freigabe` lesen, auch mit `port` statt `url`, reservierte Namen, und wann der Mod fragt, siehe [Download](download.md), „Zustimmung und Grösse“ |
 | `ReiheTest` | Downloads nacheinander, je Baum höchstens einer, auch nach einem `Error`, siehe [Download](download.md), „Reihe“ |
 | `KanalTest` | die `anfrage`, `neu` nur, wenn wahr, siehe [Download](download.md), „Kanal“ |
 | `AdresseTest` | die Prüfung der Adresse, siehe [Download](download.md), „Sicherheit“ |

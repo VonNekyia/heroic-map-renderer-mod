@@ -49,6 +49,17 @@ der Mod mit den Kacheln zeigt, steht unter [Vollbildkarte](vollbildkarte.md).
   gibt zum Fortsetzen dasselbe Token, solange es noch gilt. So hat es der
   Reviewer entschieden: Ein altes Token kann seinen Deckel schon verbraucht
   haben.
+- **`url` oder `port`** in der `freigabe`: Die `url` ist im Plugin
+  optional. Fehlt sie, nennt die `freigabe` `port`, und der Mod baut die
+  Adresse selbst: `http://<ip>:<port>/download/<baum>` (`Freigabe.url`).
+  `<ip>` ist die entfernte Adresse der bestehenden Verbindung zum
+  Spielserver, nicht der Name aus der Serverliste; so gehen auch
+  SRV-Einträge, und es kommt kein neuer Weg über DNS dazu. IPv6 steht in
+  eckigen Klammern. Steht `url` da, gilt sie. Fehlen beide, fehlt die
+  Verbindung oder liegt `port` nicht zwischen 1 und 65535, ist die
+  `freigabe` unlesbar. Die Prüfung unter „Sicherheit“ gilt unverändert; mit
+  der IP der Verbindung ist das Ziel der Spielserver selbst. So hat es der
+  Reviewer auf Wunsch des Users entschieden.
 
 ## Befehle
 
