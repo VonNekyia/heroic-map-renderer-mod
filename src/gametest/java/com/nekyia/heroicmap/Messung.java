@@ -115,6 +115,7 @@ public final class Messung implements FabricClientGameTest {
                 context.runOnClient(mc -> {
                     mc.options.framerateLimit().set(fps);
                     Minimap.INSTANZ.setzeScale(scale);
+                    Minimap.INSTANZ.setzeZoom(scale);
                     Minimap.INSTANZ.setzeRund(rund);
                 });
                 zeige(context, true);

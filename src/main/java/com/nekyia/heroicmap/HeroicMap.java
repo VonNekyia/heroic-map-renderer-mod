@@ -33,8 +33,8 @@ public final class HeroicMap implements ClientModInitializer {
         // Vorbelegt ist nur die Vollbildkarte; die Minimap stellt das Menü hinter /hmap ein.
         KeyMapping zeigen = KeyMappingHelper.registerKeyMapping(
                 new KeyMapping("key.heroicmap.zeigen", InputConstants.UNKNOWN.getValue(), kategorie));
-        KeyMapping massstab = KeyMappingHelper.registerKeyMapping(
-                new KeyMapping("key.heroicmap.massstab", InputConstants.UNKNOWN.getValue(), kategorie));
+        KeyMapping zoom = KeyMappingHelper.registerKeyMapping(
+                new KeyMapping("key.heroicmap.zoom", InputConstants.UNKNOWN.getValue(), kategorie));
         karte = KeyMappingHelper.registerKeyMapping(
                 new KeyMapping("key.heroicmap.karte", InputConstants.KEY_PERIOD, kategorie));
         Minimap.INSTANZ.lies(einstellungen());
@@ -44,8 +44,8 @@ public final class HeroicMap implements ClientModInitializer {
                 Minimap.INSTANZ.umschalten();
                 geaendert = true;
             }
-            while (massstab.consumeClick()) {
-                Minimap.INSTANZ.naechsterMassstab();
+            while (zoom.consumeClick()) {
+                Minimap.INSTANZ.naechsterZoom();
                 geaendert = true;
             }
             if (geaendert) {

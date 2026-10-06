@@ -81,7 +81,10 @@ public final class Bilder implements FabricClientGameTest {
             server.runCommand("tp @a 0.5 -30 0.5 0 90");
             spiel.getConnection().waitForChunksRender();
             for (int scale : new int[] {1, 2, 4}) {
-                context.runOnClient(mc -> Minimap.INSTANZ.setzeScale(scale));
+                context.runOnClient(mc -> {
+                    Minimap.INSTANZ.setzeScale(scale);
+                    Minimap.INSTANZ.setzeZoom(scale);
+                });
                 context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
                 context.waitTicks(2);
                 Path bild = context.takeScreenshot(TestScreenshotOptions.of("minimap-" + scale + "px").disableCounterPrefix());

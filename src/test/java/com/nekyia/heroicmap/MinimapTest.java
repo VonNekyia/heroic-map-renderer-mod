@@ -102,6 +102,7 @@ class MinimapTest {
         Minimap vorher = new Minimap();
         vorher.setzeSichtbar(false);
         vorher.setzeScale(4);
+        vorher.setzeZoom(1);
         vorher.setzeRund(true);
         vorher.stelle(20, 30, 200, 640, 360);
         vorher.schreibe(datei);
@@ -110,6 +111,7 @@ class MinimapTest {
         nachher.lies(datei);
         assertFalse(nachher.sichtbar());
         assertEquals(4, nachher.scale());
+        assertEquals(1, nachher.zoom());
         assertTrue(nachher.rund());
         assertEquals(vorher.rahmen(640, 360), nachher.rahmen(640, 360));
     }
@@ -125,6 +127,25 @@ class MinimapTest {
         assertEquals(2, minimap.scale());
         assertFalse(minimap.rund());
         assertEquals(new Minimap.Rahmen(640 - 128 - 4, 360 - 128 - 4, 128), minimap.rahmen(640, 360));
+    }
+
+    @Test
+    void ohneZoomGiltDerMassstab(@TempDir Path ordner) throws Exception {
+        // Eine Datei von vor dem Zoom: Der Ausschnitt bleibt, wie er war.
+        Path datei = ordner.resolve("heroicmap.properties");
+        Files.writeString(datei, "massstab=4");
+        Minimap minimap = new Minimap();
+        minimap.lies(datei);
+        assertEquals(4, minimap.scale());
+        assertEquals(4, minimap.zoom());
+    }
+
+    @Test
+    void zoomBestimmtDieReichweite() {
+        Minimap minimap = new Minimap();
+        minimap.setzeScale(4);
+        minimap.setzeZoom(1);
+        assertEquals(Minimap.reichweite(1, Minimap.GROESSE), minimap.reichweite());
     }
 
     @Test
