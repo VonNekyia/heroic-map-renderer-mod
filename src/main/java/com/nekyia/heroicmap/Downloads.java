@@ -289,7 +289,12 @@ final class Downloads {
                     // Erst jetzt zeigt die Vollbildkarte den Satz, siehe docs/vollbildkarte.md, „Welcher Satz“.
                     Satz.schreibe(ordner, name, dimension, f.massstab());
                 }
-                raeumeEbene(ordner, vorher, f.abdecktBis());
+                try {
+                    raeumeEbene(ordner, vorher, f.abdecktBis());
+                } catch (IOException e) {
+                    // Die Kacheln sind da; nur die Live-Ebene ist nicht ganz geräumt.
+                    LOGGER.warn("Heroic Map: Live-Ebene nach dem Download nicht geräumt", e);
+                }
             }
         } catch (Exception e) {
             fehler = e;
@@ -306,11 +311,28 @@ final class Downloads {
     private static void raeumeEbene(Path ordner, Satz vorher, long abdecktBis) throws IOException {
         Path ebene = Ebene.ordner(ordner);
         Satz jetzt = Satz.lies(ordner);
-        if (vorher != null && jetzt != null && vorher.chunk() != jetzt.chunk()) {
-            Ebene.wechsle(ebene, vorher.chunk(), jetzt.chunk());
+        IOException fehler = null;
+        try {
+            if (vorher != null && jetzt != null && vorher.chunk() != jetzt.chunk()) {
+                Ebene.wechsle(ebene, vorher.chunk(), jetzt.chunk());
+            }
+        } catch (IOException e) {
+            fehler = e;
         }
-        if (abdecktBis > 0) {
-            Ebene.raeume(ebene, abdecktBis * 1000);
+        // Auch wenn der Wechsel scheiterte: Alte Bilder deckten sonst neuere Kacheln zu.
+        try {
+            if (abdecktBis > 0) {
+                Ebene.raeume(ebene, abdecktBis * 1000);
+            }
+        } catch (IOException e) {
+            if (fehler == null) {
+                fehler = e;
+            } else {
+                fehler.addSuppressed(e);
+            }
+        }
+        if (fehler != null) {
+            throw fehler;
         }
     }
 
@@ -321,8 +343,10 @@ final class Downloads {
     private void beende(Freigabe f, Laden.Auftrag auftrag, Laden.Ergebnis ergebnis, Exception fehler) {
         if (ergebnis != null) {
             if (fehler != null) {
-                // Die Kacheln sind da; nur die Live-Ebene ist nicht ganz geräumt.
-                LOGGER.warn("Heroic Map: Live-Ebene nach dem Download nicht geräumt", fehler);
+                LOGGER.warn("Heroic Map: Kacheln geladen, Satz nicht fertig angelegt", fehler);
+            }
+            if (!ergebnis.gekappt()) {
+                Kacheln.ebeneGeraeumt();
             }
             neuGefragt = false;
             // Der Satz kann neu sein oder einen anderen Massstab haben.

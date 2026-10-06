@@ -76,7 +76,9 @@ zwischen 0 und 7, gilt die Einstellung des Spielers.
   des Spielers, die Antwort des Servers und Änderungen anderer Spieler in
   Sichtweite. Licht und das Laden von Chunks laufen dort nicht durch.
 - **Nur was man von oben sieht** (`Live.markiere`):
-  - nur, wenn das Spiel selbst neu zeichnen würde, `ModelManager.requiresRender(alt, neu)`;
+  - nur, wenn sich das Aussehen des Blocks ändern kann,
+    `ModelManager.requiresRender(alt, neu)`; dieselbe Prüfung macht
+    `setBlockDirty` danach selbst;
   - nicht unter dem ersten deckenden Block der Spalte (`isSolidRender`),
     gezählt vom obersten Block nach unten (`Live.sichtbar`). Dort endet
     auch die Spalte des Malers. Ein Tunnel, Öfen oder Redstone im Keller
@@ -89,15 +91,17 @@ zwischen 0 und 7, gilt die Einstellung des Spielers.
   Schatten und Biomübergang am Rand mit fehlenden Blöcken. Das Licht eines
   neuen Chunks setzt der Client erst später über eine eigene Warteschlange
   (`setLightEnabled`, `LevelLightEngine.lightOnInColumn`); vorher wären
-  Spalten zu dunkel oder zu hell. Steht noch Lichtarbeit an
-  (`hasLightWork`), wartet die Ebene ebenso. Ist der Chunk selbst nicht mehr
-  geladen, fällt er weg.
+  Spalten zu dunkel oder zu hell. Laufende Lichtarbeit anderswo hält sie
+  nicht auf; der Maler liest das Licht aus der Engine. Ist der Chunk selbst
+  nicht mehr geladen, fällt er weg.
 - **Die Minimap geht vor:** Solange sie sichtbar ist, zu zeichnen hat und
   eben gearbeitet hat, wartet die Live-Ebene. Ohne HUD, etwa mit F1,
   zeichnet die Minimap nicht; dann wartet die Ebene nicht auf sie.
 - **Ohne Uhr des Servers** wartet sie auch: Bis das Plugin `jetzt` schickt,
   passten ihre Zeiten nicht zu `abdeckt_bis`, siehe „Ablage“.
-- **Scheitert das Ablegen,** kommt der Chunk zurück in die Reihe.
+- **Scheitert das Ablegen,** kommt der Chunk zurück in die Reihe, mit
+  doppelter Pause je Fehlschlag, höchstens fünfmal in Folge
+  (`Live.VERSUCHE`). Jede Ursache steht einmal im Log.
 - **Je Tick** höchstens ein Abzug auf dem Render-Thread; das Zeichnen läuft
   in einem eigenen Worker mit niedriger Priorität.
 - **Nur mit Satz:** Ohne geladenen Satz für die Dimension, in
@@ -122,9 +126,13 @@ zwischen 0 und 7, gilt die Einstellung des Spielers.
   bleibt sichtbar, bis die neue da ist; ein Ergebnis, das während einer
   neueren Änderung entstand, verwirft die Karte und dekodiert noch einmal.
 - **Gelesen** wird jedes Bild einmal je offener Karte; die gröberen Stufen
-  rechnet die Karte daraus.
-- **Unter Windows** liest der Mod über `Files.newInputStream`; so darf ein
-  Bild ersetzt oder gelöscht werden, während die Karte es liest.
+  rechnet die Karte daraus. Sie hält höchstens 4096 Bilder, bei 64 × 64
+  Pixeln rund 64 MiB, darüber beginnt sie von vorn. Nach einem Abgleich
+  liest sie die Ebene neu.
+- **Gelesen auf einmal** (`readAllBytes`): Unter Windows scheitert das
+  Ersetzen einer Datei, die jemand offen hält. So hält die Karte ein Bild
+  nur kurz offen; trifft es doch, legt die Ebene es später wieder ab, siehe
+  „Wann gezeichnet wird“.
 
 ## Abgleich
 
@@ -139,7 +147,8 @@ Nach jedem vollständigen Download, ob voll oder Abgleich:
   sie weg, denn feinere Pixel hat er nicht.
 - **Ein gekappter Download** räumt nichts.
 - **Lässt sich ein Bild nicht löschen,** räumt der Mod die übrigen und
-  schreibt den Fehler ins Log.
+  schreibt den Fehler ins Log. Scheitert der Wechsel des Massstabs, räumt er
+  trotzdem nach `abdeckt_bis`.
 
 ## Kosten
 
@@ -166,6 +175,10 @@ setzt ihn (`Live.satzFuerTest`).
 - **Ganze Chunks,** die der Server neu schickt, laufen nicht über
   `setBlock`, etwa nach grossen Bearbeitungen; sie kommen mit dem
   nächsten Abgleich.
+- **Am Fuss einer Klippe** grenzt ein Block unter einem deckenden Block
+  seiner Spalte an eine tiefere Nachbarspalte. Ändert er sich, ändern sich
+  Schatten und Licht des Nachbarn; die Ebene zeichnet das nicht nach, bis
+  sich dort etwas Sichtbares ändert oder der Abgleich kommt.
 - **Hängt der Autosave des Servers** länger als die Reserve des Plugins,
   fällt beim Abgleich eine Änderung weg, die die Kacheln noch nicht haben.
   Sie fehlt bis zum nächsten Abgleich oder bis der Chunk sich wieder

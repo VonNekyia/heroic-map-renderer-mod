@@ -2,7 +2,7 @@ package com.nekyia.heroicmap;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.ByteArrayInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -14,6 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import javax.imageio.ImageIO;
+import javax.imageio.stream.MemoryCacheImageInputStream;
 
 /**
  * Die Live-Ebene auf der Platte: je Chunk ein PNG in der Auflösung der feinsten Stufe des
@@ -84,12 +85,14 @@ final class Ebene {
 
     /**
      * Das Bild eines Chunks, oder null, wenn keins lesbar daliegt oder es nicht {@code seite} breit
-     * ist. Liest über {@code Files.newInputStream}: Unter Windows darf die Datei dabei ersetzt
-     * oder gelöscht werden, anders als mit {@code ImageIO.read(File)}.
+     * ist. Liest die Datei auf einmal: Unter Windows scheitert das Ersetzen einer Datei, die
+     * jemand offen hält, also so kurz wie möglich; ohne Zwischendatei im Temp.
      */
     static int[] lies(Path ordner, int cx, int cz, int seite) {
-        try (InputStream rein = Files.newInputStream(datei(ordner, cx, cz))) {
-            BufferedImage bild = ImageIO.read(rein);
+        try {
+            // ImageIO schliesst den Stream selbst; ein zweites close würfe.
+            BufferedImage bild = ImageIO.read(new MemoryCacheImageInputStream(
+                    new ByteArrayInputStream(Files.readAllBytes(datei(ordner, cx, cz)))));
             if (bild == null || bild.getWidth() != seite || bild.getHeight() != seite) {
                 return null;
             }

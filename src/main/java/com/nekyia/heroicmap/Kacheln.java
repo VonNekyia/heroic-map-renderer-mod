@@ -29,6 +29,8 @@ final class Kacheln implements AutoCloseable {
 
     /** So viele Texturen bleiben; bei 256² Pixeln rund 48 MiB. */
     private static final int MAX = 192;
+    /** So viele Bilder der Ebene hält die Karte höchstens. */
+    private static final int BILDER_MAX = 4096;
 
     /** Ein dekodiertes Bild, ARGB Zeile für Zeile. */
     record Bild(int breite, int hoehe, int[] argb) {
@@ -82,6 +84,27 @@ final class Kacheln implements AutoCloseable {
         offen = this;
     }
 
+    /** Nach einem Abgleich: Die Ebene ist geräumt, alles über ihr lädt neu. Auf dem Render-Thread. */
+    static void ebeneGeraeumt() {
+        if (offen != null) {
+            offen.allesNeu();
+        }
+    }
+
+    private void allesNeu() {
+        bilder.clear();
+        chunks.clear();
+        chunks.addAll(Ebene.liste(ebene));
+        leer.clear();
+        for (String pfad : texturen.keySet()) {
+            generation.merge(pfad, 1, Integer::sum);
+            veraltet.add(pfad);
+        }
+        for (String pfad : laeuft) {
+            generation.merge(pfad, 1, Integer::sum);
+        }
+    }
+
     /** Die Live-Ebene hat einen Chunk neu abgelegt: Die Kacheln über ihm laden neu. Auf dem Render-Thread. */
     static void geaendert(int cx, int cz) {
         if (offen != null) {
@@ -127,8 +150,7 @@ final class Kacheln implements AutoCloseable {
                     argb = null;
                 }
                 // Darüber die Live-Ebene, auch wo der Server noch keine Kachel hat.
-                argb = Ebene.lege(argb, seite, z, x, y, stufe, chunk, chunks,
-                        k -> bilder.computeIfAbsent(k, c -> Ebene.lies(ebene, Ebene.cx(c), Ebene.cz(c), chunk)));
+                argb = Ebene.lege(argb, seite, z, x, y, stufe, chunk, chunks, this::bild);
                 if (argb != null) {
                     pixel = pixel(new Bild(seite, seite, argb));
                 }
@@ -142,6 +164,15 @@ final class Kacheln implements AutoCloseable {
         return id;
     }
 
+    /** Das Bild eines Chunks der Ebene, im Dekoder; je offener Karte einmal gelesen. */
+    private int[] bild(long k) {
+        // ponytail: leert ganz statt der ältesten; bei 64 × 64 Pixeln sind 4096 Bilder rund 64 MiB.
+        if (bilder.size() > BILDER_MAX) {
+            bilder.clear();
+        }
+        return bilder.computeIfAbsent(k, c -> Ebene.lies(ebene, Ebene.cx(c), Ebene.cz(c), chunk));
+    }
+
     private void zurueck(String pfad, int gen, NativeImage pixel) {
         Minecraft.getInstance().execute(() -> uebernimm(pfad, gen, pixel));
     }
@@ -149,15 +180,16 @@ final class Kacheln implements AutoCloseable {
     /** Auf dem Render-Thread: nur noch hochladen, die Pixel sind schon im {@code NativeImage}. */
     private void uebernimm(String pfad, int gen, NativeImage pixel) {
         laeuft.remove(pfad);
-        if (geschlossen || gen != generation.getOrDefault(pfad, 0)) {
+        if (geschlossen) {
             if (pixel != null) {
                 pixel.close();
             }
-            // Während des Dekodierens legte die Ebene ein neueres Bild ab: noch einmal.
-            if (!geschlossen) {
-                veraltet.add(pfad);
-            }
             return;
+        }
+        if (gen != generation.getOrDefault(pfad, 0)) {
+            // Während des Dekodierens legte die Ebene ein neueres Bild ab: Das Ergebnis ist trotzdem
+            // neuer als das gezeigte, also hoch damit, und gleich noch einmal.
+            veraltet.add(pfad);
         }
         Identifier alt;
         if (pixel == null) {

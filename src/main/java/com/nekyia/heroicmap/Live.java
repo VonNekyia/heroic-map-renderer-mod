@@ -1,13 +1,16 @@
 package com.nekyia.heroicmap;
 
 import com.mojang.logging.LogUtils;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
@@ -38,6 +41,8 @@ public final class Live {
     private static final Logger LOGGER = LogUtils.getLogger();
     /** Je Chunk höchstens so oft: Wasser fliesst, Getreide wächst. */
     static final long PAUSE_MS = 5000;
+    /** So oft in Folge darf das Ablegen eines Chunks scheitern; die Pause verdoppelt sich je Mal. */
+    static final int VERSUCHE = 5;
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "Heroic Map Live");
@@ -52,8 +57,12 @@ public final class Live {
 
     /** Chunks mit Änderungen, die noch zu zeichnen sind. */
     private final LongLinkedOpenHashSet offen = new LongLinkedOpenHashSet();
-    /** Wann jeder Chunk zuletzt gezeichnet wurde, in ms. */
+    /** Wann jeder Chunk zuletzt gezeichnet wurde, in ms; nach einem Fehlschlag in der Zukunft. */
     private final Long2LongOpenHashMap zuletzt = new Long2LongOpenHashMap();
+    /** Fehlschläge je Chunk in Folge; nach {@link #VERSUCHE} gibt die Ebene ihn auf. */
+    private final Long2IntOpenHashMap fehlschlaege = new Long2IntOpenHashMap();
+    /** Ursachen, die schon im Log stehen; jede einmal. */
+    private final Set<String> geloggt = new HashSet<>();
     /** Der Auftrag im Worker, wahr, wenn sein Bild abgelegt ist; dazu sein Chunk. */
     private CompletableFuture<Boolean> laufend;
     private long laufendChunk;
@@ -118,6 +127,7 @@ public final class Live {
     void leeren() {
         offen.clear();
         zuletzt.clear();
+        fehlschlaege.clear();
         satz = null;
         gesucht = false;
         licht = null;
@@ -197,13 +207,11 @@ public final class Live {
     /**
      * Schatten, Licht und Biomübergang am Rand brauchen alle 8 Nachbarn, geladen und mit Licht. Der
      * Client setzt das Licht eines neuen Chunks erst später über eine eigene Warteschlange
-     * ({@code setLightEnabled}); vorher läse der Maler dunkle oder zu helle Spalten.
+     * ({@code setLightEnabled}); vorher läse der Maler dunkle oder zu helle Spalten. Laufende
+     * Lichtarbeit sonstwo hält die Ebene nicht auf; der Maler liest das Licht aus der Engine.
      */
     private static boolean bereit(ClientLevel level, int cx, int cz) {
         LevelLightEngine licht = level.getChunkSource().getLightEngine();
-        if (licht.hasLightWork()) {
-            return false;
-        }
         for (int dz = -1; dz <= 1; dz++) {
             for (int dx = -1; dx <= 1; dx++) {
                 if (level.getChunkSource().getChunk(cx + dx, cz + dz, ChunkStatus.FULL, false) == null
@@ -243,12 +251,16 @@ public final class Live {
             }
             return true;
         }, worker).exceptionally(fehler -> {
-            LOGGER.warn("Live-Ebene: Chunk nicht abgelegt", fehler);
+            Throwable ursache = fehler.getCause() != null ? fehler.getCause() : fehler;
+            melde(ursache);
             return false;
         });
     }
 
-    /** Ein abgelegtes Bild meldet der Mod der offenen Karte; ein gescheitertes kommt wieder in die Reihe. */
+    /**
+     * Ein abgelegtes Bild meldet der Mod der offenen Karte. Ein gescheitertes kommt wieder in die
+     * Reihe, mit doppelter Pause je Fehlschlag, nach {@link #VERSUCHE} nicht mehr.
+     */
     private void uebernimm(CompletableFuture<Boolean> fertig, long k) {
         boolean abgelegt;
         try {
@@ -257,9 +269,28 @@ public final class Live {
             abgelegt = false;
         }
         if (abgelegt) {
+            fehlschlaege.remove(k);
             Kacheln.geaendert(ChunkPos.getX(k), ChunkPos.getZ(k));
-        } else {
+            return;
+        }
+        int n = fehlschlaege.addTo(k, 1) + 1;
+        if (n < VERSUCHE) {
+            zuletzt.put(k, System.currentTimeMillis() + PAUSE_MS * ((1L << n) - 1));
             offen.add(k);
+        } else {
+            fehlschlaege.remove(k);
+        }
+    }
+
+    /** Schreibt eine Ursache einmal ins Log, mit Stacktrace; jede weitere gleiche nicht. Im Worker. */
+    private void melde(Throwable ursache) {
+        String art = ursache.getClass().getName() + ": " + ursache.getMessage();
+        boolean neu;
+        synchronized (geloggt) {
+            neu = geloggt.add(art);
+        }
+        if (neu) {
+            LOGGER.warn("Live-Ebene: Chunk nicht abgelegt", ursache);
         }
     }
 }
