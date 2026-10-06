@@ -45,7 +45,7 @@ final class Ebene {
         return (int) schluessel;
     }
 
-    private static Path datei(Path ordner, int cx, int cz) {
+    static Path datei(Path ordner, int cx, int cz) {
         return ordner.resolve(cx + "." + cz + ".png");
     }
 

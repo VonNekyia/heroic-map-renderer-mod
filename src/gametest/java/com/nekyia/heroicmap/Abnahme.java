@@ -59,6 +59,8 @@ public final class Abnahme implements FabricClientGameTest {
             TestServerContext server = spiel.getServer();
             server.runCommand("time set noon");
             server.runCommand("weather clear");
+            // Ohne Zufallsticks ändert sich vor dem Zeichnen nichts, im Ausschnitt nicht und daneben nicht.
+            server.runCommand("gamerule random_tick_speed 0");
             server.runCommand("gamemode spectator @a");
             server.runCommand("tp @a -96 200 352 0 90");
             // Die Chunks aus 26.2 zieht der Server beim Laden hoch; fertig gezeichnet sein muss nichts,
@@ -72,9 +74,21 @@ public final class Abnahme implements FabricClientGameTest {
                     }
                 }
             });
-            context.waitFor(mc -> Ebene.liste(ebene).size() >= CHUNKS * CHUNKS, 6000);
+            context.waitFor(mc -> alleDa(ebene), 6000);
         }
         vergleiche(ordner, ebene);
+    }
+
+    /** Liegt das Bild jedes Chunks im Ausschnitt da? Bilder ausserhalb zählen nicht. */
+    private static boolean alleDa(Path ebene) {
+        for (int cz = CZ0; cz < CZ0 + CHUNKS; cz++) {
+            for (int cx = CX0; cx < CX0 + CHUNKS; cx++) {
+                if (!Files.exists(Ebene.datei(ebene, cx, cz))) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /** Sind der Ausschnitt und ein Chunk Rand ringsum geladen? */
@@ -171,14 +185,14 @@ public final class Abnahme implements FabricClientGameTest {
      * das der Renderer mit der dunklen Farbe seiner Löcher mittelt, der Mod nicht.
      */
     private static void pruefe(int[] verteilung, long alle) {
-        int[][] schwellen = {{1, 80}, {16, 99}, {32, 998}};
+        // Abweichung je Kanal höchstens, nötiger Anteil in Promille.
+        int[][] schwellen = {{1, 800}, {16, 990}, {32, 998}};
         for (int[] s : schwellen) {
             long bis = 0;
             for (int k = 0; k <= s[0]; k++) {
                 bis += verteilung[k];
             }
-            // Die dritte Schwelle in Promille, die anderen in Prozent.
-            long noetig = s[1] >= 100 ? alle * s[1] / 1000 : alle * s[1] / 100;
+            long noetig = alle * s[1] / 1000;
             if (bis < noetig) {
                 throw new AssertionError("Abnahme: nur " + bis + " von " + alle + " Pixeln weichen um höchstens " + s[0]
                         + " ab, nötig " + noetig);

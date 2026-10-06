@@ -102,7 +102,8 @@ zwischen 0 und 7, gilt die Einstellung des Spielers.
   passten ihre Zeiten nicht zu `abdeckt_bis`, siehe „Ablage“.
 - **Scheitert das Ablegen,** kommt der Chunk zurück in die Reihe, mit
   doppelter Pause je Fehlschlag, höchstens fünfmal in Folge
-  (`Live.VERSUCHE`). Jede Ursache steht einmal im Log.
+  (`Live.VERSUCHE`). Jede Ursache steht einmal im Log; bei Dateien zählt
+  der Grund ohne den Pfad.
 - **Je Tick** höchstens ein Abzug auf dem Render-Thread; das Zeichnen läuft
   in einem eigenen Worker mit niedriger Priorität.
 - **Nur mit Satz:** Ohne geladenen Satz für die Dimension, in
@@ -172,10 +173,13 @@ Der Gametest `Abnahme` vergleicht die Live-Ebene Pixel für Pixel mit
 - **Renderer:** `--render` mit `--camera top-north --scale 4
   --biome-blend 2 --center -96 352 --size 768`, Assets und Daten aus dem
   Client-Jar 26.3, wie der Mod sie hat.
-- **Mod:** Der Gametest legt die zwei Regionsdateien der Testwelt um den
-  Ausschnitt in eine neue Welt und öffnet sie wieder; die Chunks aus 26.2
-  zieht der Server beim Laden hoch. Dann markiert er jeden Chunk und wartet
-  auf die Bilder.
+- **Mod:** Der Gametest legt `r.-1.0.mca` und `r.0.0.mca` aus
+  `dimensions/minecraft/overworld/region` der Testwelt in eine neue Welt und
+  öffnet sie wieder; die Chunks aus 26.2 zieht der Server beim Laden hoch.
+  Zufallsticks sind aus (`random_tick_speed` 0). Dann markiert er jeden
+  Chunk und wartet, bis jedes der 144 Bilder des Ausschnitts daliegt.
+- **Die Testwelt** liegt nicht im Repo, siehe
+  [`eingabedaten.md` des Renderers](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entwicklung/eingabedaten.md).
 - **Befehl:** `./gradlew runClientGameTest -Pabnahme=<ordner>`; im Ordner
   liegen `regionen/` und `top-north.png`, dorthin schreibt er
   `bericht.txt` und `mod.png`.
@@ -197,7 +201,7 @@ Der Gametest `Abnahme` vergleicht die Live-Ebene Pixel für Pixel mit
 - **Darüber** liegen 0,1 % der Pixel, einzeln an Ufern und Kanten.
 - **Nähte** an den Chunkgrenzen gibt es keine.
 - **Die Schwellen** liegen knapp unter dem Gemessenen. Der Ausschnitt ist
-  fest, vier Läufe gaben denselben Bericht. Fällt eine Schwelle, hat sich
+  fest, fünf Läufe gaben denselben Bericht. Fällt eine Schwelle, hat sich
   das Bild geändert, im Mod oder im Renderer.
 - **Einmal fiel sie:** Ein schnellerer Lauf zeichnete die Chunks am
   nördlichen Rand, bevor der Client ihr Licht gesetzt hatte; sie wurden zu
