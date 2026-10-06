@@ -7,6 +7,7 @@ import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Map;
@@ -282,9 +283,14 @@ public final class Live {
         }
     }
 
-    /** Schreibt eine Ursache einmal ins Log, mit Stacktrace; jede weitere gleiche nicht. Im Worker. */
+    /**
+     * Schreibt eine Ursache einmal ins Log, mit Stacktrace; jede weitere gleiche nicht. Gleich heisst
+     * dieselbe Klasse und derselbe Grund; bei Dateien ohne den Pfad, sonst stünde jede Datei einzeln
+     * da. Im Worker.
+     */
     private void melde(Throwable ursache) {
-        String art = ursache.getClass().getName() + ": " + ursache.getMessage();
+        String art = ursache.getClass().getName() + ": "
+                + (ursache instanceof FileSystemException datei ? datei.getReason() : ursache.getMessage());
         boolean neu;
         synchronized (geloggt) {
             neu = geloggt.add(art);

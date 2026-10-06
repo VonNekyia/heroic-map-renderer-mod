@@ -1,6 +1,6 @@
 ---
 title: Live-Ebene
-description: Wie der Mod Änderungen seit dem letzten Lauf des Renderers über die Vollbildkarte legt, mit Raster, Texturen, Biomübergang, wann gezeichnet wird, Ablage je Chunk, Abgleich, Kosten, Grenzen und was anders ist als top-north.
+description: Wie der Mod Änderungen seit dem letzten Lauf des Renderers über die Vollbildkarte legt, mit Raster, Texturen, Biomübergang, wann gezeichnet wird, Ablage je Chunk, Abgleich, Kosten, der Abnahme gegen top-north und was bleibt.
 code:
   - src/main/java/com/nekyia/heroicmap/Live.java
   - src/main/java/com/nekyia/heroicmap/Ebene.java
@@ -13,6 +13,7 @@ code:
   - src/test/java/com/nekyia/heroicmap/PyramideTest.java
   - src/test/java/com/nekyia/heroicmap/LiveTest.java
   - src/gametest/java/com/nekyia/heroicmap/Bilder.java
+  - src/gametest/java/com/nekyia/heroicmap/Abnahme.java
 ---
 
 # Live-Ebene
@@ -101,7 +102,8 @@ zwischen 0 und 7, gilt die Einstellung des Spielers.
   passten ihre Zeiten nicht zu `abdeckt_bis`, siehe „Ablage“.
 - **Scheitert das Ablegen,** kommt der Chunk zurück in die Reihe, mit
   doppelter Pause je Fehlschlag, höchstens fünfmal in Folge
-  (`Live.VERSUCHE`). Jede Ursache steht einmal im Log.
+  (`Live.VERSUCHE`). Jede Ursache steht einmal im Log; bei Dateien zählt
+  der Grund ohne den Pfad.
 - **Je Tick** höchstens ein Abzug auf dem Render-Thread; das Zeichnen läuft
   in einem eigenen Worker mit niedriger Priorität.
 - **Nur mit Satz:** Ohne geladenen Satz für die Dimension, in
@@ -159,6 +161,52 @@ Nach jedem vollständigen Download, ob voll oder Abgleich:
 - **Je Frame** nichts; die Karte legt die Bilder beim Laden einer Kachel im
   Dekoder hinein.
 - **Einmal je Atlas** liest der Worker die Vanilla-Texturen.
+
+## Abnahme
+
+Der Gametest `Abnahme` vergleicht die Live-Ebene Pixel für Pixel mit
+`top-north` scale 4 des Renderers an der Testwelt. Stand 06.10., Renderer
+`654dc08`, Mod `e0659b9`:
+
+- **Ausschnitt:** Blöcke x −192 bis −1, z 256 bis 447, also 12 × 12
+  Chunks mit Wald, Strand und Meer.
+- **Renderer:** `--render` mit `--camera top-north --scale 4
+  --biome-blend 2 --center -96 352 --size 768`, Assets und Daten aus dem
+  Client-Jar 26.3, wie der Mod sie hat.
+- **Mod:** Der Gametest legt `r.-1.0.mca` und `r.0.0.mca` aus
+  `dimensions/minecraft/overworld/region` der Testwelt in eine neue Welt und
+  öffnet sie wieder; die Chunks aus 26.2 zieht der Server beim Laden hoch.
+  Zufallsticks sind aus (`random_tick_speed` 0). Dann markiert er jeden
+  Chunk und wartet, bis jedes der 144 Bilder des Ausschnitts daliegt.
+- **Die Testwelt** liegt nicht im Repo, siehe
+  [`eingabedaten.md` des Renderers](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entwicklung/eingabedaten.md).
+- **Befehl:** `./gradlew runClientGameTest -Pabnahme=<ordner>`; im Ordner
+  liegen `regionen/` und `top-north.png`, dorthin schreibt er
+  `bericht.txt` und `mod.png`.
+
+| Abweichung je Kanal höchstens | Anteil der Pixel | Schwelle |
+|---|---|---|
+| 0 | 50,3 % | |
+| 1 | 84,5 % | 80 % |
+| 8 | 91,1 % | |
+| 16 | 99,2 % | 99 % |
+| 32 | 99,9 % | 99,8 % |
+
+![Mod, Renderer und Abweichung mal 8, ein Ausschnitt von 6 × 6 Chunks](bilder/live-abnahme.png)
+
+- **Bis 1** weicht ab, was gerundet ist, siehe „Raster“.
+- **Bis 16** weicht fast nur Laub ab: Der Renderer mittelt bei
+  `dark_cutout` die dunkle Farbe der Löcher mit, der Mod nicht. Dort ist der
+  Mod im Mittel um 7 heller.
+- **Darüber** liegen 0,1 % der Pixel, einzeln an Ufern und Kanten.
+- **Nähte** an den Chunkgrenzen gibt es keine.
+- **Die Schwellen** liegen knapp unter dem Gemessenen. Der Ausschnitt ist
+  fest, fünf Läufe gaben denselben Bericht. Fällt eine Schwelle, hat sich
+  das Bild geändert, im Mod oder im Renderer.
+- **Einmal fiel sie:** Ein schnellerer Lauf zeichnete die Chunks am
+  nördlichen Rand, bevor der Client ihr Licht gesetzt hatte; sie wurden zu
+  dunkel oder zu hell. Seitdem wartet die Ebene auf das Licht, siehe „Wann
+  gezeichnet wird“.
 
 ## Bild
 

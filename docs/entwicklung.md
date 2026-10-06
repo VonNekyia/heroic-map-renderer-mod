@@ -59,6 +59,7 @@ in der CI:
 |---|---|
 | `Bilder` | baut eine Szene und nimmt die Minimap auf, danach die Vollbildkarte aus einem Testsatz und die Live-Ebene darüber; mit `-Pbilder=<ordner>` landen die Bilder dort, siehe [Minimap](minimap.md), „Bilder“, [Vollbildkarte](vollbildkarte.md), „Bild“, und [Live-Ebene](live.md), „Bild“ |
 | `Messung` | nur mit `-Pmessung=<datei>`: Zeit je Chunk und Frametime mit und ohne Minimap, siehe [Minimap](minimap.md), „Kosten“ |
+| `Abnahme` | nur mit `-Pabnahme=<ordner>`: die Live-Ebene gegen `top-north` scale 4 des Renderers an der Testwelt, siehe [Live-Ebene](live.md), „Abnahme“ |
 | `Uebernahme` | nur mit `-Puebernahme=<datei>`: was eine Kachel der Vollbildkarte den Render-Thread kostet, siehe [Vollbildkarte](vollbildkarte.md), „Kacheln“ |
 
 ## CI
