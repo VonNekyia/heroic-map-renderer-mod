@@ -54,11 +54,13 @@ val bilder = providers.gradleProperty("bilder").map { file(it).absolutePath }.or
 val messung = providers.gradleProperty("messung").map { file(it).absolutePath }.orElse("")
 val uebernahme = providers.gradleProperty("uebernahme").map { file(it).absolutePath }.orElse("")
 val abnahme = providers.gradleProperty("abnahme").map { file(it).absolutePath }.orElse("")
+val server = providers.gradleProperty("server").orElse("")
 tasks.matching { it.name == "runClientGameTest" }.configureEach {
     (this as JavaExec).systemProperty("heroicmap.bilder", bilder.get())
     systemProperty("heroicmap.messung", messung.get())
     systemProperty("heroicmap.uebernahme", uebernahme.get())
     systemProperty("heroicmap.abnahme", abnahme.get())
+    systemProperty("heroicmap.server", server.get())
 }
 
 tasks.processResources {
