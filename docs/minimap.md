@@ -49,10 +49,10 @@ steht unter „Kosten“.
   aufgeht (`Minimap.effektiv`). Ein Block ist auf dem Schirm Zoom ×
   GUI-Massstab Pixel gross: bei 1× und GUI-Massstab 2 also 2, bei
   GUI-Massstab 3 also 3, dann zeichnet die Minimap mit 1 px, 3 Pixel je
-  Texel. So verkleinert das Spiel die Texturen nie, verkleinert wurde die
-  Minimap unscharf, und jeder Texel ist auf dem Schirm gleich gross. Mit einem anderen GUI-Massstab oder Zoom passt sich
-  die Auflösung im nächsten Frame an und zeichnet neu; ein anderer Zoom
-  ändert sonst nur den Bereich.
+  Texel. Das Spiel verkleinert die Texturen so nie; verkleinert war die
+  Minimap unscharf. Jeder Texel ist auf dem Schirm gleich gross. Mit einem
+  anderen GUI-Massstab oder Zoom passt sich die Auflösung im nächsten Frame
+  an und zeichnet neu; ein anderer Zoom ändert sonst nur den Bereich.
 - **Lage und Grösse:** Das Menü dunkelt nicht ab, die Minimap im HUD bleibt
   sichtbar und ist weiss umrandet, rund mit einem Ring. Ziehen mit links
   verschiebt sie. Der weisse Griff sitzt an der Ecke, die zur Mitte des

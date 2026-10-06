@@ -177,9 +177,15 @@ public final class Minimap {
         return zoom;
     }
 
-    /** Die Obergrenze der Auflösung; der nächste Frame zeichnet neu, wenn sich die wirkliche ändert. */
+    /**
+     * Die Obergrenze der Auflösung. Eine andere Wahl leert gleich, damit {@link #fertig} bis zum
+     * nächsten Frame nicht wahr bleibt; passt danach die wirkliche nicht, leert {@code arbeite} noch einmal.
+     */
     void setzeScale(int aufloesung) {
-        this.aufloesung = aufloesung;
+        if (aufloesung != this.aufloesung) {
+            this.aufloesung = aufloesung;
+            leeren();
+        }
     }
 
     int aufloesung() {
