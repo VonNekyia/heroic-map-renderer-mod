@@ -87,14 +87,14 @@ braucht:
   „Sicherheit“.
 
 Er löscht vorher den Ordner dieses Servers unter `heroicmap/`, lädt den
-kleinsten Massstab des ersten Baums und bestätigt jeden Dialog.
+kleinsten Massstab des ersten Baums und bestätigt jeden Dialog. Er läuft
+unter der Sperrdatei und nur, wenn kein Minecraft-Client des Users offen
+ist.
 
 Lauf am 06.10. gegen Paper 26.3-157 mit dem Plugin, ein Baum `top-north-s`
 aus der Testwelt: 46 Kacheln, 2,2 MB, Code 0. Das Bild `server-karte`:
 
-![Vollbildkarte nach dem Download vom Paper-Server](bilder/server-karte.png) Er läuft
-unter der Sperrdatei und nur, wenn kein Minecraft-Client des Users offen
-ist.
+![Vollbildkarte nach dem Download vom Paper-Server](bilder/server-karte.png)
 
 ## CI
 
