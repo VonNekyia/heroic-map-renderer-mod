@@ -12,7 +12,10 @@ import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Der Bereich, den die Minimap zeichnet, ihre Form, Lage und Einstellungen. Siehe docs/minimap.md, „Neu zeichnen“ und „Bedienung“. */
+/**
+ * Der Bereich, den die Minimap zeichnet. Siehe docs/minimap.md, „Neu zeichnen“.
+ * Form, Lage und Einstellungen: siehe docs/minimap.md, „Bedienung“.
+ */
 class MinimapTest {
 
     @Test
