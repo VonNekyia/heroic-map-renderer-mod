@@ -75,7 +75,9 @@ public final class Minimap {
     private ChunkMaler maler;
 
     private boolean sichtbar = true;
-    /** Auflösung: Pixel je Block in den Texturen, 1, 2 oder 4; wie fein die Minimap zeichnet. */
+    /** Auflösung, die der Spieler gewählt hat: höchstens so viele Pixel je Block, 1, 2 oder 4. */
+    private int aufloesung = 2;
+    /** Pixel je Block in den Texturen, wie gezeichnet: siehe {@link #effektiv}. */
     private int scale = 2;
     /** Zoom: Einheiten des GUI je Block, 1, 2 oder 4; wie viel Gegend die Minimap zeigt. */
     private int zoom = 2;
@@ -175,16 +177,39 @@ public final class Minimap {
         return zoom;
     }
 
-    /** Eine andere Auflösung zeichnet alles neu. */
-    void setzeScale(int scale) {
-        if (scale != this.scale) {
-            this.scale = scale;
+    /**
+     * Die Obergrenze der Auflösung. Eine andere Wahl leert gleich, damit {@link #fertig} bis zum
+     * nächsten Frame nicht wahr bleibt; passt danach die wirkliche nicht, leert {@code arbeite} noch einmal.
+     */
+    void setzeScale(int aufloesung) {
+        if (aufloesung != this.aufloesung) {
+            this.aufloesung = aufloesung;
             leeren();
         }
     }
 
+    int aufloesung() {
+        return aufloesung;
+    }
+
     int scale() {
         return scale;
+    }
+
+    /**
+     * Die Auflösung, mit der gezeichnet wird: die grösste von 1, 2 und 4 Pixeln je Block bis zur
+     * gewählten, die in die Pixel eines Blocks auf dem Schirm, Zoom mal GUI-Massstab, ganz aufgeht.
+     * So wird nie verkleinert, also nie unscharf, und jeder Texel ist gleich gross.
+     * Siehe docs/minimap.md, „Bedienung“.
+     */
+    static int effektiv(int aufloesung, int zoom, int guiMassstab) {
+        int schirm = zoom * guiMassstab;
+        for (int r = aufloesung; r > 1; r /= 2) {
+            if (schirm % r == 0) {
+                return r;
+            }
+        }
+        return 1;
     }
 
     /**
@@ -271,9 +296,9 @@ public final class Minimap {
         }
         sichtbar = !"false".equals(p.getProperty("minimap"));
         int s = zahl(p.getProperty("massstab"), 2);
-        scale = s == 1 || s == 4 ? s : 2;
+        aufloesung = s == 1 || s == 4 ? s : 2;
         // Vor dem Zoom galt der Massstab für beides; ohne zoom bleibt der Ausschnitt so.
-        int z = zahl(p.getProperty("zoom"), scale);
+        int z = zahl(p.getProperty("zoom"), aufloesung);
         zoom = z == 1 || z == 4 ? z : 2;
         rund = "rund".equals(p.getProperty("form"));
         groesse = Mth.clamp(zahl(p.getProperty("groesse"), GROESSE), KLEINSTE, GROESSTE);
@@ -284,7 +309,7 @@ public final class Minimap {
     void schreibe(Path datei) {
         Properties p = new Properties();
         p.setProperty("minimap", Boolean.toString(sichtbar));
-        p.setProperty("massstab", Integer.toString(scale));
+        p.setProperty("massstab", Integer.toString(aufloesung));
         p.setProperty("zoom", Integer.toString(zoom));
         p.setProperty("form", rund ? "rund" : "eckig");
         p.setProperty("groesse", Integer.toString(groesse));
@@ -469,6 +494,11 @@ public final class Minimap {
     private void arbeite(Minecraft mc, ClientLevel level, LocalPlayer spieler) {
         gearbeitet = System.nanoTime();
         pruefeAtlas(mc);
+        int soll = effektiv(aufloesung, zoom, mc.getWindow().getGuiScale());
+        if (soll != scale) {
+            scale = soll;
+            leeren();
+        }
         int radius = mc.options.biomeBlendRadius().get();
         if (radius != mischung) {
             // Ein anderer Biomübergang läuft über allChanged, nicht über setSectionDirty.
