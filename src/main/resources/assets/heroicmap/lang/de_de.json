@@ -31,6 +31,7 @@
   "heroicmap.download.grund.manifest": "Manifest oder map.json verletzen eine Grenze.",
   "heroicmap.download.grund.kachel": "Eine Kachel ist zu gross.",
   "heroicmap.download.grund.abgelehnt": "Der Kartenserver lehnt das Token ab.",
+  "heroicmap.download.grund.budget": "Das Budget dieses Downloads ist erschöpft; der Rest kommt mit dem nächsten Abgleich.",
   "heroicmap.download.grund.netz": "Keine, eine unvollständige oder eine falsche Antwort vom Kartenserver.",
   "heroicmap.download.grund.heimnetz": "Die Karte liegt in einem privaten Netz und nicht beim Spielserver selbst; der Mod lädt nichts.",
   "heroicmap.download.grund.unbekannt": "Den Host der Karte gibt es nicht.",

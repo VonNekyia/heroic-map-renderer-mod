@@ -52,14 +52,25 @@ record Kanal(String json) implements CustomPacketPayload {
         return ClientPlayNetworking.canSend(TYPE);
     }
 
-    /** Fragt einen Satz an: {@code art} ist voll oder abgleich. */
-    static void frage(String baum, int massstab, String art) {
+    /**
+     * Fragt einen Satz an: {@code art} ist voll oder abgleich. {@code neu} heisst ein voller
+     * Download ohne Stand zum Fortsetzen; dann gibt das Plugin ein neues Token aus.
+     */
+    static void frage(String baum, int massstab, String art, boolean neu) {
+        ClientPlayNetworking.send(new Kanal(anfrage(baum, massstab, art, neu)));
+    }
+
+    /** Die {@code anfrage}; {@code neu} steht nur darin, wenn es wahr ist. */
+    static String anfrage(String baum, int massstab, String art, boolean neu) {
         JsonObject json = new JsonObject();
         json.addProperty("v", 1);
         json.addProperty("typ", "anfrage");
         json.addProperty("baum", baum);
         json.addProperty("massstab", massstab);
         json.addProperty("art", art);
-        ClientPlayNetworking.send(new Kanal(json.toString()));
+        if (neu) {
+            json.addProperty("neu", true);
+        }
+        return json.toString();
     }
 }

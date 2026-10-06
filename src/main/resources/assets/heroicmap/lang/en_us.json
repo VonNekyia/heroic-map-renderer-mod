@@ -31,6 +31,7 @@
   "heroicmap.download.grund.manifest": "Manifest or map.json break a limit.",
   "heroicmap.download.grund.kachel": "A tile is too large.",
   "heroicmap.download.grund.abgelehnt": "The map server declines the token.",
+  "heroicmap.download.grund.budget": "This download's budget is used up; the rest comes with the next sync.",
   "heroicmap.download.grund.netz": "No, an incomplete or a wrong answer from the map server.",
   "heroicmap.download.grund.heimnetz": "The map is in a private network and not on the game server itself; the mod downloads nothing.",
   "heroicmap.download.grund.unbekannt": "The map's host does not exist.",

@@ -9,6 +9,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/Laden.java
   - src/main/java/com/nekyia/heroicmap/Adresse.java
   - src/test/java/com/nekyia/heroicmap/LadenTest.java
+  - src/test/java/com/nekyia/heroicmap/KanalTest.java
   - src/test/java/com/nekyia/heroicmap/FreigabeTest.java
   - src/test/java/com/nekyia/heroicmap/ReiheTest.java
   - src/test/java/com/nekyia/heroicmap/AdresseTest.java
@@ -40,6 +41,14 @@ der Mod mit den Kacheln zeigt, steht unter [Vollbildkarte](vollbildkarte.md).
   verwirft er.
 - **Senden:** `anfrage` nur, wenn `ClientPlayNetworking.canSend` wahr ist,
   also wenn das Plugin den Kanal angemeldet hat.
+- **`neu: true`** steht in der `anfrage` eines vollen Downloads, wenn es
+  für den Massstab keinen Stand zum Fortsetzen gibt, also kein `etags.txt`
+  im Ordner des Massstabs (`Laden.hatStand`), etwa nachdem die Karte
+  gelöscht ist. Dann gibt das Plugin ein neues Token aus, das gegen die
+  vollen Downloads je Woche zählt. Sonst fehlt das Feld, und das Plugin
+  gibt zum Fortsetzen dasselbe Token, solange es noch gilt. So hat es der
+  Reviewer entschieden: Ein altes Token kann seinen Deckel schon verbraucht
+  haben.
 
 ## Befehle
 
@@ -173,7 +182,7 @@ bricht der Mod sie ab (`sendAsync`, `cancel`). Der Aufbau der Verbindung hat
 | Zeilen bis zur Stufe | keine doppelte Kachel; höchstens `kacheln` plus 10 %, und höchstens eine je 4 KiB der Grösse des Satzes plus 10 %, beides aus dem Stand, an dem der Download misst | Abbruch |
 | eine Kachel | 4 MiB; mit dem ETag des Manifests genau die Grösse aus dem Manifest | Abbruch |
 | Summe des Geladenen | bei `voll` `bytes` plus 10 %, beim Abgleich `bytes`, der Deckel des Tokens | der Rest bleibt liegen, „zum Teil geladen“ |
-| Antwort | 200 | 401, 403 und 429 heissen abgelehnt, alles andere Abbruch |
+| Antwort | 200 | 401 und 403 heissen abgelehnt, 429 Budget erschöpft, alles andere Abbruch |
 
 `z/x/y` wird ein Dateipfad; deshalb nur ganze Zahlen, auch beim Lesen des
 eigenen Index, und doppelt zählt nach den Zahlen, `7/0/0` wie `007/0/0`.

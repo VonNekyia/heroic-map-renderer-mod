@@ -33,9 +33,10 @@ Das baut das Jar nach `build/libs/` und lässt die Tests laufen.
 | Test | prüft |
 |---|---|
 | `ProjektionTest` | die Projektion gegen `projektion.json` des Renderers, braucht Netz, siehe [Projektion](projektion.md) |
-| `LadenTest` | den Download gegen einen kleinen Server auf loopback: Fortsetzen, geänderte und gelöschte Kacheln, Stufen, Prüfsumme, Token, Heimnetz, alle harten Grenzen, Fristen, keine Weiterleitung, den Index während des Downloads, siehe [Download](download.md) |
+| `LadenTest` | den Download gegen einen kleinen Server auf loopback: Fortsetzen, geänderte und gelöschte Kacheln, Stufen, Prüfsumme, Token, Budget, Stand zum Fortsetzen, Heimnetz, alle harten Grenzen, Fristen, keine Weiterleitung, den Index während des Downloads, siehe [Download](download.md) |
 | `FreigabeTest` | die `freigabe` lesen, reservierte Namen, und wann der Mod fragt, siehe [Download](download.md), „Zustimmung und Grösse“ |
 | `ReiheTest` | Downloads nacheinander, je Baum höchstens einer, auch nach einem `Error`, siehe [Download](download.md), „Reihe“ |
+| `KanalTest` | die `anfrage`, `neu` nur, wenn wahr, siehe [Download](download.md), „Kanal“ |
 | `AdresseTest` | die Prüfung der Adresse, siehe [Download](download.md), „Sicherheit“ |
 | `KartenblickTest` | wie die Vollbildkarte Kacheln auf den Schirm legt, Zoom über Stufen und Lupe, Schieben, Platzhalter aus gröberen Stufen, siehe [Vollbildkarte](vollbildkarte.md) |
 | `KachelnTest` | WebP mit TwelveMonkeys lesen, samt Alpha, die Grösse aus dem Kopf vor dem Dekodieren, siehe [Vollbildkarte](vollbildkarte.md), „Kacheln“ |

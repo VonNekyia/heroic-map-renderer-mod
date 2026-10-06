@@ -54,6 +54,8 @@ class LadenTest {
     private String karte = "{\"tileSize\":256,\"scale\":4,\"minZoom\":0,\"maxZoom\":2}";
     /** Diese Kachel hält der Server zurück, bis {@link #frei}. */
     private String haelt;
+    /** Antwortet der Server auf Kacheln mit 429, wie über dem Deckel des Tokens? */
+    private volatile boolean erschoepft;
     private final AtomicInteger abrufe = new AtomicInteger();
     private final AtomicInteger fremd = new AtomicInteger();
 
@@ -114,7 +116,9 @@ class LadenTest {
                 if (zxy.equals(haelt)) {
                     warte();
                 }
-                if (kacheln.containsKey(zxy)) {
+                if (erschoepft) {
+                    sende(t, 429, new byte[0], null);
+                } else if (kacheln.containsKey(zxy)) {
                     abrufe.incrementAndGet();
                     sende(t, 200, kacheln.get(zxy), etags.get(zxy));
                 } else {
@@ -220,6 +224,19 @@ class LadenTest {
         Laden.Auftrag falsch = new Laden.Auftrag(url, "nein", Laden.sha256(manifest), summe(), 4, false, 1L << 30, 5,
                 InetAddress.getLoopbackAddress());
         assertEquals(Laden.Grund.ABGELEHNT, assertThrows(Laden.Fehler.class, () -> new Laden().lade(falsch, ziel)).grund);
+    }
+
+    @Test
+    void budgetErschoepft() {
+        erschoepft = true;
+        assertEquals(Laden.Grund.BUDGET, assertThrows(Laden.Fehler.class, () -> new Laden().lade(auftrag(4, summe()), ziel)).grund);
+    }
+
+    @Test
+    void standGibtEsAbDemErstenDownload() throws Exception {
+        assertFalse(Laden.hatStand(ziel));
+        new Laden().lade(auftrag(4, summe()), ziel);
+        assertTrue(Laden.hatStand(ziel));
     }
 
     @Test
