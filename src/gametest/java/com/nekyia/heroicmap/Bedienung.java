@@ -94,6 +94,24 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("Links klicken öffnete das Teleport-Menü");
         }
 
+        // Rechts ziehen verschiebt ebenso und öffnet kein Menü.
+        double[] vorRechts = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blickMitte());
+        maus.holdMouse(RECHTS);
+        context.waitTick();
+        for (int i = 0; i < 10; i++) {
+            maus.moveCursor(-5 * k, -3 * k);
+            context.waitTick();
+        }
+        maus.releaseMouse(RECHTS);
+        context.waitTicks(2);
+        double[] nachRechts = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blickMitte());
+        if (!(nachRechts[0] > vorRechts[0] && nachRechts[1] > vorRechts[1])) {
+            throw new AssertionError("Karte rechts ziehen: Mitte " + vorRechts[0] + "," + vorRechts[1] + " → " + nachRechts[0] + "," + nachRechts[1]);
+        }
+        if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).ziel()) != null) {
+            throw new AssertionError("Rechts ziehen öffnete das Teleport-Menü");
+        }
+
         maus.pressMouse(RECHTS);
         context.waitTicks(2);
         int[] ziel = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).ziel());

@@ -33,6 +33,10 @@ final class Karte extends Screen {
     /** Das Menü zum Teleportieren nach Rechtsklick: der Block, oder null, und wo das Menü steht. */
     private int[] ziel;
     private int menueX, menueY;
+    /** Wo die rechte Taste gedrückt wurde, oder NaN; das Menü öffnet erst beim Loslassen ohne Ziehen. */
+    private double rechtsX = Double.NaN, rechtsY = Double.NaN;
+    /** So weit darf die Maus zwischen Drücken und Loslassen wandern, damit es ein Klick bleibt, in Einheiten. */
+    private static final double KLICK = 3;
 
     /** {@code satz} ist null, wenn für diese Dimension nichts geladen ist. */
     Karte(Satz satz) {
@@ -161,7 +165,24 @@ final class Karte extends Screen {
         if (super.mouseClicked(e, doppelt)) {
             return true;
         }
-        if (e.button() == 1 && blick != null && minecraft.level != null && minecraft.getConnection() != null
+        if (e.button() == 1) {
+            rechtsX = e.x();
+            rechtsY = e.y();
+        }
+        return false;
+    }
+
+    /**
+     * Das Menü öffnet beim Loslassen der rechten Taste, wenn die Maus seit dem Drücken kaum wanderte;
+     * sonst war es Ziehen. So stört es nicht, mit welcher Taste jemand zieht.
+     */
+    @Override
+    public boolean mouseReleased(MouseButtonEvent e) {
+        boolean klick = e.button() == 1 && !Double.isNaN(rechtsX)
+                && Math.abs(e.x() - rechtsX) <= KLICK && Math.abs(e.y() - rechtsY) <= KLICK;
+        rechtsX = Double.NaN;
+        rechtsY = Double.NaN;
+        if (klick && blick != null && minecraft.level != null && minecraft.getConnection() != null
                 && !minecraft.level.dimensionType().hasCeiling() && Teleport.erlaubt(minecraft.getConnection().getCommands())) {
             ziel = block(e.x(), e.y());
             // Das Menü bleibt ganz auf dem Schirm, auch bei grossem GUI-Massstab.
@@ -169,7 +190,7 @@ final class Karte extends Screen {
             menueY = Math.max(0, Math.min(Mth.floor(e.y()), height - 14));
             return true;
         }
-        return false;
+        return super.mouseReleased(e);
     }
 
     /**
@@ -193,7 +214,8 @@ final class Karte extends Screen {
 
     @Override
     public boolean mouseDragged(MouseButtonEvent ereignis, double dx, double dy) {
-        if (blick != null && ereignis.button() == 0) {
+        // Mit der linken wie der rechten Taste; ist die Maus am Treiber getauscht, zieht man so trotzdem.
+        if (blick != null && (ereignis.button() == 0 || ereignis.button() == 1)) {
             blick.schiebe(dx, dy);
             return true;
         }
