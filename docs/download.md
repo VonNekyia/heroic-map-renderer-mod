@@ -36,7 +36,8 @@ der Mod mit den Kacheln zeigt, steht unter [Vollbildkarte](vollbildkarte.md).
   `angebot`.
 - **Empfangen:** `angebot` merkt sich der Mod, `freigabe` reiht einen
   Download ein, `abgelehnt` zeigt er dem Spieler, mit `wieder` als
-  Uhrzeit. An `jetzt` jeder Nachricht misst er den Versatz der Uhren für die
+  Uhrzeit. `spieler` nennt die Mitspieler, siehe
+  [Minimap](minimap.md), „Mitspieler“. An `jetzt` jeder Nachricht misst er den Versatz der Uhren für die
   [Live-Ebene](live.md). Nachrichten mit einem anderen `v` als 1 oder über 64 KiB
   verwirft er.
 - **Senden:** `anfrage` nur, wenn `ClientPlayNetworking.canSend` wahr ist,

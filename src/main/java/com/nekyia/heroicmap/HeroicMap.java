@@ -69,6 +69,7 @@ public final class HeroicMap implements ClientModInitializer {
             Minimap.INSTANZ.leeren();
             Live.INSTANZ.leeren();
             Downloads.INSTANZ.leeren();
+            Mitspieler.INSTANZ.leeren();
         }));
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath(ID, "minimap"), Minimap.INSTANZ::zeichne);
         Kanal.anmelden();

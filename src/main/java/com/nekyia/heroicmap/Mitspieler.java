@@ -1,0 +1,96 @@
+package com.nekyia.heroicmap;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.regex.Pattern;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.PlayerFaceExtractor;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.world.entity.player.Player;
+
+/**
+ * Die anderen Spieler, die der Server zeigen lässt: wer den Spieler in Simple Voice Chat hört.
+ * Der Server entscheidet; der Mod zeigt nur, was in der letzten Nachricht {@code spieler} stand.
+ * Siehe docs/minimap.md, „Mitspieler“.
+ */
+final class Mitspieler {
+
+    static final Mitspieler INSTANZ = new Mitspieler();
+    /** So lange gilt eine Liste ohne neue Nachricht, in ms. */
+    static final long FRIST = 5000;
+    /** Mehr Einträge liest der Mod nicht. */
+    static final int HOECHSTENS = 256;
+    /** Wie das Spiel Namen von Spielern zulässt: druckbares ASCII ohne Leerzeichen, bis 16 Zeichen. */
+    private static final Pattern NAME = Pattern.compile("[!-~]{1,16}");
+
+    /** Ein Spieler: wo er steht und wohin er blickt, die Gier in Grad wie {@code getYRot}. */
+    record Eintrag(UUID uuid, String name, String dimension, double x, double z, float gier) {
+    }
+
+    private volatile List<Eintrag> liste = List.of();
+    private volatile long empfangen;
+
+    void empfange(JsonObject json, long jetztMs) {
+        liste = lies(json);
+        empfangen = jetztMs;
+    }
+
+    /** Liest die Liste; ein unlesbarer Eintrag fällt weg, nicht die ganze Nachricht. */
+    static List<Eintrag> lies(JsonObject json) {
+        List<Eintrag> neu = new ArrayList<>();
+        JsonArray spieler = json.has("spieler") && json.get("spieler").isJsonArray()
+                ? json.getAsJsonArray("spieler") : new JsonArray();
+        for (JsonElement element : spieler) {
+            if (neu.size() >= HOECHSTENS) {
+                break;
+            }
+            try {
+                JsonObject o = element.getAsJsonObject();
+                String name = o.get("name").getAsString();
+                double x = o.get("x").getAsDouble(), z = o.get("z").getAsDouble();
+                if (!NAME.matcher(name).matches() || !Double.isFinite(x) || !Double.isFinite(z)) {
+                    continue;
+                }
+                neu.add(new Eintrag(UUID.fromString(o.get("uuid").getAsString()), name,
+                        o.get("dimension").getAsString(), x, z, o.has("gier") ? o.get("gier").getAsFloat() : 0));
+            } catch (RuntimeException kaputt) {
+                // Nur dieser Eintrag fällt weg.
+            }
+        }
+        return List.copyOf(neu);
+    }
+
+    /** Die Liste, solange sie gilt; nach {@link #FRIST} ohne Nachricht leer. */
+    List<Eintrag> aktuell(long jetztMs) {
+        return jetztMs - empfangen > FRIST ? List.of() : liste;
+    }
+
+    void leeren() {
+        liste = List.of();
+        empfangen = 0;
+    }
+
+    /** x, z und Gier: hat der Client den Spieler als Entity, dessen Lage, die ist flüssiger; sonst die des Servers. */
+    static double[] lage(Minecraft mc, Eintrag e) {
+        Player p = mc.level == null ? null : mc.level.getPlayerByUUID(e.uuid());
+        return p != null ? new double[] {p.getX(), p.getZ(), p.getYRot()} : new double[] {e.x(), e.z(), e.gier()};
+    }
+
+    /** Der Kopf aus dem Skin, {@code groesse} Einheiten gross, die Mitte bei (x, y); ohne Skin ein weisser Punkt. */
+    static void kopf(GuiGraphicsExtractor g, Minecraft mc, Eintrag e, int x, int y, int groesse) {
+        ClientPacketListener verbindung = mc.getConnection();
+        PlayerInfo info = verbindung == null ? null : verbindung.getPlayerInfo(e.uuid());
+        g.fill(x - groesse / 2 - 1, y - groesse / 2 - 1, x + groesse / 2 + 1, y + groesse / 2 + 1, 0xFF000000);
+        if (info != null) {
+            PlayerFaceExtractor.extractRenderState(g, info.getSkin(), x - groesse / 2, y - groesse / 2, groesse);
+        } else {
+            g.fill(x - groesse / 2, y - groesse / 2, x + groesse / 2, y + groesse / 2, 0xFFFFFFFF);
+        }
+    }
+}

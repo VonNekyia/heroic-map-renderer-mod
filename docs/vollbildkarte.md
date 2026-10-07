@@ -111,7 +111,8 @@ sagt sie das und zeigt nichts.
 
 Pfeil und Koordinaten rechnen mit derselben Projektion wie der Renderer und
 mit `scale` aus `map.json`, siehe [Projektion](projektion.md). Der Pfeil ist
-derselbe wie auf der Minimap.
+derselbe wie auf der Minimap. Mitspieler stehen als Kopf mit Namen darüber,
+siehe [Minimap](minimap.md), „Mitspieler“.
 
 ## Bild
 

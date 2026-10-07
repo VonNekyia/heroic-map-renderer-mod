@@ -1,12 +1,14 @@
 ---
 title: Minimap
-description: Bedienung über das Menü hinter /hmap, Form, Lage und Grösse; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
+description: Bedienung über das Menü hinter /hmap, Form, Lage und Grösse, Mitspieler; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
 code:
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/ChunkMaler.java
   - src/main/java/com/nekyia/heroicmap/Licht.java
   - src/main/java/com/nekyia/heroicmap/HeroicMap.java
   - src/main/java/com/nekyia/heroicmap/Einstellungen.java
+  - src/main/java/com/nekyia/heroicmap/Mitspieler.java
+  - src/test/java/com/nekyia/heroicmap/MitspielerTest.java
   - src/main/java/com/nekyia/heroicmap/mixin/LevelExtractorMixin.java
   - src/main/resources/heroicmap.accesswidener
   - src/test/java/com/nekyia/heroicmap/LichtTest.java
@@ -85,6 +87,38 @@ steht unter „Kosten“.
 - **Der Pfeil** zeigt die Blickrichtung. Bei Gier 0 blickt der Spieler nach
   Süden, auf der Karte nach unten; der Pfeil ist also um Gier + 180° gedreht.
 - **Wo ein Block liegt,** sagt die [Projektion](projektion.md).
+
+## Mitspieler
+
+Andere Spieler zeigt der Mod nur, wenn der Server sie nennt. Wen er nennt,
+entscheidet allein das Plugin: mit `autogroup: simplevoicechat` in seiner
+`config.yml` die Spieler, die einen in Simple Voice Chat hören, also nah
+genug oder in derselben Sprachgruppe; mit `disabled`, der Vorgabe, oder
+ohne Simple Voice Chat niemanden. Eigene Gruppen gibt es nicht; so hat es
+der User gewählt.
+
+- **Nachricht:** `spieler` über den Kanal, etwa einmal je Sekunde:
+
+  ```json
+  {"v":1,"typ":"spieler","jetzt":1696600000,"spieler":[
+    {"uuid":"…","name":"Sam","dimension":"minecraft:overworld","x":12.5,"z":-40.2,"gier":90.0}]}
+  ```
+
+  Endet die Sicht, kommt einmal eine leere Liste.
+- **Lesen** (`Mitspieler.lies`): höchstens 256 Einträge. Ein Eintrag ohne
+  gültige UUID, mit einem Namen ausser druckbarem ASCII ohne Leerzeichen
+  bis 16 Zeichen, wie das Spiel Namen zulässt, oder mit `x`, `z` nicht
+  endlich fällt weg, die übrigen bleiben.
+- **Verfallen:** Kommt 5 s keine Nachricht (`Mitspieler.FRIST`), ist die
+  Liste leer; ebenso beim Verlassen des Servers. Die Positionen liegen nur
+  im Speicher, nie auf der Platte.
+- **Lage:** Hat der Client einen genannten Spieler als Entity mit derselben
+  UUID, nimmt der Mod dessen Position, die ist flüssiger; sonst die des
+  Servers.
+- **Zeichnen:** der Kopf aus dem Skin (`PlayerFaceExtractor`), 8 Einheiten
+  des GUI mit schwarzem Rand, nur in der Dimension des Spielers und
+  innerhalb der Form; ohne Skin ein weisses Quadrat. Auf der
+  [Vollbildkarte](vollbildkarte.md) steht der Name darüber.
 
 ## Form
 
