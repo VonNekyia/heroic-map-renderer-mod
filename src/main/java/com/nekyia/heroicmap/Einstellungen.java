@@ -55,7 +55,7 @@ final class Einstellungen extends Screen {
         spalte = !m.sichtbar() ? (width - breite) / 2
                 : links >= rechts ? (links - breite) / 2 : r.x() + r.seite() + (rechts - breite) / 2;
         spalte = Math.max(4, Math.min(spalte, width - breite - 4));
-        oben = Math.max(50, height / 2 - 72);
+        oben = Math.max(50, height / 2 - 84);
         int x = spalte, y = oben;
         addRenderableWidget(CycleButton.onOffBuilder(m.sichtbar())
                 .create(x, y, breite, 20, Component.translatable("heroicmap.menue.minimap"), (b, an) -> m.setzeSichtbar(an)));
@@ -68,9 +68,15 @@ final class Einstellungen extends Screen {
         addRenderableWidget(CycleButton.booleanBuilder(Component.translatable("heroicmap.menue.rund"),
                         Component.translatable("heroicmap.menue.eckig"), m.rund())
                 .create(x, y + 72, breite, 20, Component.translatable("heroicmap.menue.form"), (b, rund) -> m.setzeRund(rund)));
+        addRenderableWidget(CycleButton.booleanBuilder(Component.translatable("heroicmap.menue.show.simplevoicechat"),
+                        Component.translatable("heroicmap.menue.show.hidden"), m.show())
+                .create(x, y + 96, breite, 20, Component.translatable("heroicmap.menue.show"), (b, an) -> {
+                    m.setzeShow(an);
+                    Kanal.sendeShow();
+                }));
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.laden"),
-                b -> minecraft.gui.setScreen(new Auswahl(this))).bounds(x, y + 96, breite, 20).build());
-        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x, y + 124, breite, 20).build());
+                b -> minecraft.gui.setScreen(new Auswahl(this))).bounds(x, y + 120, breite, 20).build());
+        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x, y + 148, breite, 20).build());
     }
 
     /** Ohne Unschärfe und Abdunkeln, damit die Minimap im HUD zu sehen ist. */
@@ -89,6 +95,13 @@ final class Einstellungen extends Screen {
         for (FormattedCharSequence zeile : hinweis) {
             g.centeredText(font, zeile, mitte, y, TEXT);
             y += font.lineHeight + 1;
+        }
+        // Lehnt der Server show ab, steht der Grund unter den Knöpfen.
+        String verweigert = Mitspieler.INSTANZ.verweigert();
+        if (verweigert != null) {
+            for (FormattedCharSequence zeile : font.split(Component.translatable("heroicmap.menue.show.grund." + verweigert), breite)) {
+                g.centeredText(font, zeile, mitte, oben + 172, TEXT);
+            }
         }
         if (Minimap.INSTANZ.sichtbar()) {
             Minimap.Rahmen r = Minimap.INSTANZ.rahmen(width, height);

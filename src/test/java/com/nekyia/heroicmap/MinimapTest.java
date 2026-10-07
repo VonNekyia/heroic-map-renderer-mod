@@ -105,6 +105,7 @@ class MinimapTest {
         vorher.setzeScale(4);
         vorher.setzeZoom(1);
         vorher.setzeRund(true);
+        vorher.setzeShow(false);
         vorher.stelle(20, 30, 200, 640, 360);
         vorher.schreibe(datei);
 
@@ -114,6 +115,7 @@ class MinimapTest {
         assertEquals(4, nachher.aufloesung());
         assertEquals(1, nachher.zoom());
         assertTrue(nachher.rund());
+        assertFalse(nachher.show());
         assertEquals(vorher.rahmen(640, 360), nachher.rahmen(640, 360));
     }
 
@@ -178,6 +180,8 @@ class MinimapTest {
         Minimap minimap = new Minimap();
         minimap.lies(ordner.resolve("fehlt.properties"));
         assertTrue(minimap.sichtbar());
+        // show: Vorgabe simplevoicechat, die Wahl des Maintainers.
+        assertTrue(minimap.show());
         assertEquals(new Minimap.Rahmen(640 - 128 - 4, 4, 128), minimap.rahmen(640, 360));
     }
 }

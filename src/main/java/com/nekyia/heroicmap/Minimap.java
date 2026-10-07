@@ -86,6 +86,8 @@ public final class Minimap {
     /** Zoom: Einheiten des GUI je Block, 1, 2, 4 oder 8; wie viel Gegend die Minimap zeigt. */
     private int zoom = 2;
     private boolean rund;
+    /** Die Wahl {@code show}: Mitspieler über Simple Voice Chat zeigen und gezeigt werden, oder versteckt. */
+    private boolean show = true;
     private int groesse = GROESSE;
     /** Die Lage im freien Platz des Schirms: 0 links oder oben, 1 rechts oder unten. */
     private float lageX = 1, lageY = 0;
@@ -214,6 +216,14 @@ public final class Minimap {
         return 1;
     }
 
+    boolean show() {
+        return show;
+    }
+
+    void setzeShow(boolean show) {
+        this.show = show;
+    }
+
     boolean rund() {
         return rund;
     }
@@ -280,6 +290,7 @@ public final class Minimap {
         int z = zahl(p.getProperty("zoom"), aufloesung);
         zoom = z == 1 || z == 4 || z == 8 ? z : 2;
         rund = "rund".equals(p.getProperty("form"));
+        show = !"hidden".equals(p.getProperty("show"));
         groesse = Mth.clamp(zahl(p.getProperty("groesse"), GROESSE), KLEINSTE, GROESSTE);
         lageX = bruch(p.getProperty("lage_x"), 1);
         lageY = bruch(p.getProperty("lage_y"), 0);
@@ -291,6 +302,7 @@ public final class Minimap {
         p.setProperty("massstab", Integer.toString(aufloesung));
         p.setProperty("zoom", Integer.toString(zoom));
         p.setProperty("form", rund ? "rund" : "eckig");
+        p.setProperty("show", show ? "simplevoicechat" : "hidden");
         p.setProperty("groesse", Integer.toString(groesse));
         p.setProperty("lage_x", Float.toString(lageX));
         p.setProperty("lage_y", Float.toString(lageY));
@@ -399,7 +411,7 @@ public final class Minimap {
     private void mitspieler(GuiGraphicsExtractor g, Minecraft mc, Rahmen r, LocalPlayer spieler, ClientLevel level) {
         String dimension = level.dimension().identifier().toString();
         double h = r.seite() / 2.0, mx = spieler.getX(), mz = spieler.getZ();
-        for (Mitspieler.Eintrag e : Mitspieler.INSTANZ.aktuell(System.currentTimeMillis())) {
+        for (Mitspieler.Eintrag e : show ? Mitspieler.INSTANZ.aktuell(System.currentTimeMillis()) : List.<Mitspieler.Eintrag>of()) {
             if (!e.dimension().equals(dimension) || e.uuid().equals(spieler.getUUID())) {
                 continue;
             }

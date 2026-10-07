@@ -3,6 +3,7 @@ package com.nekyia.heroicmap;
 import com.google.gson.JsonObject;
 import java.nio.charset.StandardCharsets;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.client.networking.v1.ServerboundPlayChannelEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -45,6 +46,28 @@ record Kanal(String json) implements CustomPacketPayload {
         PayloadTypeRegistry.clientboundPlay().register(TYPE, CODEC);
         PayloadTypeRegistry.serverboundPlay().register(TYPE, CODEC);
         ClientPlayNetworking.registerGlobalReceiver(TYPE, (nachricht, kontext) -> Downloads.INSTANZ.empfange(nachricht.json()));
+        // Sobald der Server den Kanal anmeldet, erfährt er die Wahl show.
+        ServerboundPlayChannelEvents.REGISTER.register((verbindung, sender, mc, kanaele) -> {
+            if (kanaele.contains(TYPE.id())) {
+                mc.execute(Kanal::sendeShow);
+            }
+        });
+    }
+
+    /** Schickt die Wahl {@code show}, wenn der Server den Kanal hört; beim Start und nach jeder Änderung. */
+    static void sendeShow() {
+        if (offen()) {
+            ClientPlayNetworking.send(new Kanal(show(Minimap.INSTANZ.show())));
+        }
+    }
+
+    /** Die Nachricht {@code show}: simplevoicechat oder hidden. Siehe docs/minimap.md, „Mitspieler“. */
+    static String show(boolean an) {
+        JsonObject json = new JsonObject();
+        json.addProperty("v", 1);
+        json.addProperty("typ", "show");
+        json.addProperty("show", an ? "simplevoicechat" : "hidden");
+        return json.toString();
     }
 
     /** Hört der Server auf dem Kanal? Das meldet Paper, wenn das Plugin ihn angemeldet hat. */
