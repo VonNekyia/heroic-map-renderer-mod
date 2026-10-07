@@ -41,6 +41,7 @@
   "heroicmap.karte.keine": "No map is downloaded for this dimension; /hmap angebot shows what the server offers.",
   "heroicmap.karte.laden": "Download map …",
   "heroicmap.karte.abgleich": "Sync",
+  "heroicmap.karte.teleport": "Teleport here (%s, %s)",
   "heroicmap.auswahl.titel": "Maps of this server",
   "heroicmap.auswahl.massstab": "%s px · %s",
   "heroicmap.karte.abgleich_ab": "Sync from %s",
@@ -54,5 +55,6 @@
   "heroicmap.menue.form": "Shape",
   "heroicmap.menue.eckig": "Square",
   "heroicmap.menue.rund": "Round",
-  "heroicmap.menue.ziehen": "Drag left to move the minimap, drag right to look around in it; the handle resizes it."
+  "heroicmap.menue.ziehen": "Drag left to move the minimap, drag right to look around in it; the handle resizes it.",
+  "heroicmap.koordinaten": "x %s   z %s"
 }

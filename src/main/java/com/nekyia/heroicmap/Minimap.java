@@ -26,6 +26,8 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.gui.components.PlayerFaceExtractor;
+import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
@@ -418,7 +420,7 @@ public final class Minimap {
         // Beim Umschauen steht der Pfeil, wo der Spieler ist, und nur, solange das in der Minimap liegt.
         double h = r.seite() / 2.0, px = -versatzX * zoom, pz = -versatzZ * zoom;
         if (rund ? px * px + pz * pz <= h * h : Math.abs(px) <= h && Math.abs(pz) <= h) {
-            pfeil(g, (int) Math.round(r.x() + h + px), (int) Math.round(r.y() + h + pz), spieler.getYRot());
+            avatar(g, spieler, (int) Math.round(r.x() + h + px), (int) Math.round(r.y() + h + pz));
         }
     }
 
@@ -649,17 +651,22 @@ public final class Minimap {
         return bester;
     }
 
-    /** Ein Pfeil in Blickrichtung: bei Gier 0 sieht der Spieler nach Süden, auf der Karte nach unten. */
-    static void pfeil(GuiGraphicsExtractor g, int x, int y, float gier) {
+    /** Der eigene Spieler: sein Kopf aus dem Skin, daneben ein kleiner Pfeil in Blickrichtung. Siehe docs/minimap.md, „Bedienung“. */
+    static void avatar(GuiGraphicsExtractor g, AbstractClientPlayer spieler, int x, int y) {
+        int h = KOPF / 2;
+        g.fill(x - h - 1, y - h - 1, x + h + 1, y + h + 1, 0xFF000000);
+        PlayerFaceExtractor.extractRenderState(g, spieler.getSkin(), x - h, y - h, KOPF);
+        // Der Pfeil kreist um den Kopf; bei Gier 0 blickt der Spieler nach Süden, auf der Karte nach unten.
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.translate(x, y);
-        pose.rotate((float) Math.toRadians(gier + 180));
-        for (int i = 0; i < 4; i++) {
-            g.fill(-i - 1, -4 + i, i + 2, -2 + i, 0xFF000000);
+        pose.rotate((float) Math.toRadians(spieler.getYRot() + 180));
+        pose.translate(0, -(h + 1));
+        for (int i = 0; i < 3; i++) {
+            g.fill(-i - 1, -3 + i, i + 2, -1 + i, 0xFF000000);
         }
-        for (int i = 0; i < 4; i++) {
-            g.fill(-i, -3 + i, i + 1, -2 + i, 0xFFFFFFFF);
+        for (int i = 0; i < 3; i++) {
+            g.fill(-i, -2 + i, i + 1, -1 + i, 0xFFFFFFFF);
         }
         pose.popMatrix();
     }

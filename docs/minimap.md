@@ -64,15 +64,18 @@ steht unter „Kosten“.
   (`Minimap.KLEINSTE`, `Minimap.GROESSTE`) und höchstens so gross, wie der
   Schirm Platz hat. Grösser zeigt mehr Gegend beim selben Zoom und
   zeichnet mehr Chunks, siehe „Neu zeichnen“, „Bereich“.
+- **Koordinaten:** Im Menü stehen über der Minimap `x` und `z` des Blocks
+  unter der Maus an der Maus, genau wie gezeichnet, auch beim Umschauen;
+  nicht beim Ziehen.
 - **Umschauen:** Im Menü verschiebt Ziehen mit rechts die Karte in der
   Minimap, sie folgt der Maus. Höchstens so weit, wie der Client Chunks hat,
   die Sichtweite in Blöcken je Richtung; der Bereich, den die Minimap
-  zeichnet, folgt der neuen Mitte. Der Pfeil steht, wo der Spieler ist,
+  zeichnet, folgt der neuen Mitte. Der eigene Kopf steht, wo der Spieler ist,
   und verschwindet, wenn das ausserhalb der Minimap liegt. Beim Schliessen
   des Menüs steht wieder der Spieler in der Mitte (`Minimap.zentriere`). So
   hat es der User gewählt.
 
-  ![Umschauen: 12 Blöcke nach Osten, 8 nach Süden, der Pfeil beim Spieler](bilder/minimap-umschauen.png)
+  ![Umschauen: 12 Blöcke nach Osten, 8 nach Süden, der Kopf beim Spieler](bilder/minimap-umschauen.png)
 
 - **Gespeichert** wird beim Schliessen des Menüs, in
   `config/heroicmap.properties`. Die Lage steht dort als Anteil des freien
@@ -84,8 +87,11 @@ steht unter „Kosten“.
   [Vollbildkarte](vollbildkarte.md). „Minimap zeigen oder verbergen“ und
   „Zoom der Minimap“ gibt es auch als Tasten, ohne Belegung, unter
   Steuerung, Gruppe „Heroic Map“; was sie ändern, speichert der Mod gleich.
-- **Der Pfeil** zeigt die Blickrichtung. Bei Gier 0 blickt der Spieler nach
-  Süden, auf der Karte nach unten; der Pfeil ist also um Gier + 180° gedreht.
+- **Der eigene Spieler** ist sein Kopf aus dem Skin, 8 Einheiten mit
+  schwarzem Rand, daneben ein kleiner Pfeil in Blickrichtung
+  (`Minimap.avatar`). Bei Gier 0 blickt der Spieler nach Süden, auf der
+  Karte nach unten; der Pfeil kreist deshalb um Gier + 180° gedreht um den
+  Kopf. So hat es der User gewünscht.
 - **Wo ein Block liegt,** sagt die [Projektion](projektion.md).
 
 ## Mitspieler

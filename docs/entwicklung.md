@@ -39,6 +39,7 @@ Das baut das Jar nach `build/libs/` und lässt die Tests laufen.
 | `KanalTest` | die `anfrage`, `neu` nur, wenn wahr, siehe [Download](download.md), „Kanal“ |
 | `AdresseTest` | die Prüfung der Adresse, siehe [Download](download.md), „Sicherheit“ |
 | `KartenblickTest` | wie die Vollbildkarte Kacheln auf den Schirm legt, Zoom über Stufen und Lupe, Schieben, Platzhalter aus gröberen Stufen, siehe [Vollbildkarte](vollbildkarte.md) |
+| `TeleportTest` | der Befehl zum Teleportieren und dass es ihn nur mit `execute` und `tp` im Befehlsbaum gibt, siehe [Vollbildkarte](vollbildkarte.md), „Teleportieren“ |
 | `KachelnTest` | WebP mit TwelveMonkeys lesen, samt Alpha, die Grösse aus dem Kopf vor dem Dekodieren, siehe [Vollbildkarte](vollbildkarte.md), „Kacheln“ |
 | `PyramideTest` | Verkleinern wie die Pyramide des Renderers, siehe [Live-Ebene](live.md), „Raster“ |
 | `EbeneTest` | die Bilder der Live-Ebene schreiben, lesen, beim Abgleich räumen, auch über einen Fehler hinweg, beim Wechsel des Massstabs anpassen und in die Kacheln legen, auch bei negativen Chunks, siehe [Live-Ebene](live.md) |
