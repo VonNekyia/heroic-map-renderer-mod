@@ -411,7 +411,7 @@ public final class Minimap {
     private void mitspieler(GuiGraphicsExtractor g, Minecraft mc, Rahmen r, LocalPlayer spieler, ClientLevel level) {
         String dimension = level.dimension().identifier().toString();
         double h = r.seite() / 2.0, mx = spieler.getX(), mz = spieler.getZ();
-        for (Mitspieler.Eintrag e : show ? Mitspieler.INSTANZ.aktuell(System.currentTimeMillis()) : List.<Mitspieler.Eintrag>of()) {
+        for (Mitspieler.Eintrag e : Mitspieler.INSTANZ.sichtbar(System.currentTimeMillis())) {
             if (!e.dimension().equals(dimension) || e.uuid().equals(spieler.getUUID())) {
                 continue;
             }

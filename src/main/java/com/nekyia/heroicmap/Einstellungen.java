@@ -99,8 +99,10 @@ final class Einstellungen extends Screen {
         // Lehnt der Server show ab, steht der Grund unter den Knöpfen.
         String verweigert = Mitspieler.INSTANZ.verweigert();
         if (verweigert != null) {
+            int zeileY = oben + 172;
             for (FormattedCharSequence zeile : font.split(Component.translatable("heroicmap.menue.show.grund." + verweigert), breite)) {
-                g.centeredText(font, zeile, mitte, oben + 172, TEXT);
+                g.centeredText(font, zeile, mitte, zeileY, TEXT);
+                zeileY += font.lineHeight + 1;
             }
         }
         if (Minimap.INSTANZ.sichtbar()) {

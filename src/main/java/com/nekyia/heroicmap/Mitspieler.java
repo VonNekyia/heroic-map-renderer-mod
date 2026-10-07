@@ -73,6 +73,11 @@ final class Mitspieler {
         return jetztMs - empfangen > FRIST ? List.of() : liste;
     }
 
+    /** Was Minimap und Vollbildkarte zeichnen: die gültige Liste, bei show hidden nichts. */
+    List<Eintrag> sichtbar(long jetztMs) {
+        return Minimap.INSTANZ.show() ? aktuell(jetztMs) : List.of();
+    }
+
     void leeren() {
         liste = List.of();
         empfangen = 0;
