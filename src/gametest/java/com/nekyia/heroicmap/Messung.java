@@ -94,13 +94,14 @@ public final class Messung implements FabricClientGameTest {
             warteAufChunks(context);
 
             atlas(context);
-            for (int scale : new int[] {1, 2, 4}) {
+            for (int scale : new int[] {1, 2, 4, 8, 16}) {
                 for (int runde = 1; runde <= RUNDEN; runde++) {
                     chunks(context, scale, runde);
                 }
             }
 
-            region(context);
+            region(context, 512);
+            region(context, 2048);
             // Einmal hin und zurück, ungemessen: Danach erzeugt der Server im Flug nichts mehr,
             // und dieselbe Strecke liegt geladen da.
             flug(context, server, true);
@@ -109,17 +110,19 @@ public final class Messung implements FabricClientGameTest {
             // Bildrate ohne Grenze, 144 und 60, dazu die Massstäbe und rund gleich nach eckig;
             // 260 heisst ohne Grenze.
             boolean hin = true;
-            for (int[] lauf : new int[][] {{260, 2, 0}, {260, 4, 0}, {260, 4, 1}, {144, 4, 0}, {144, 4, 1}, {60, 4, 0}}) {
-                int fps = lauf[0], scale = lauf[1];
+            // Bildrate, Auflösung, rund, Zoom; 16 px nur mit Zoom 8, sonst hat der Schirm die Pixel nicht.
+            for (int[] lauf : new int[][] {{260, 2, 0, 2}, {260, 4, 0, 4}, {260, 4, 1, 4}, {260, 16, 0, 8},
+                    {144, 4, 0, 4}, {144, 4, 1, 4}, {144, 16, 0, 8}, {60, 4, 0, 4}}) {
+                int fps = lauf[0], scale = lauf[1], zoom = lauf[3];
                 boolean rund = lauf[2] == 1;
                 context.runOnClient(mc -> {
                     mc.options.framerateLimit().set(fps);
                     Minimap.INSTANZ.setzeScale(scale);
-                    Minimap.INSTANZ.setzeZoom(scale);
+                    Minimap.INSTANZ.setzeZoom(zoom);
                     Minimap.INSTANZ.setzeRund(rund);
                 });
                 zeige(context, true);
-                String art = "fps=" + (fps == 260 ? "frei" : fps) + " scale=" + scale + " form=" + (rund ? "rund" : "eckig");
+                String art = "fps=" + (fps == 260 ? "frei" : fps) + " scale=" + scale + " zoom=" + zoom + " form=" + (rund ? "rund" : "eckig");
                 warteAufFreieFrames(context, art);
                 for (int runde = 1; runde <= RUNDEN; runde++) {
                     for (boolean an : new boolean[] {false, true}) {
@@ -226,14 +229,14 @@ public final class Messung implements FabricClientGameTest {
         return new long[] {n, ms};
     }
 
-    /** Was eine neue Region bei 4 px auf dem Render-Thread kostet: anlegen, leer hochladen, anmelden, freigeben. */
-    private void region(ClientGameTestContext context) {
+    /** Was eine neue Region auf dem Render-Thread kostet: anlegen, leer hochladen, anmelden, freigeben; 512 ist 4 px, 2048 ist 16 px. */
+    private void region(ClientGameTestContext context, int seite) {
         long[] zeiten = context.computeOnClient(mc -> {
             long[] z = new long[5];
             for (int i = 0; i < z.length; i++) {
                 Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "messung/" + i);
                 long t0 = System.nanoTime();
-                DynamicTexture textur = new DynamicTexture(() -> "messung", 512, 512, true);
+                DynamicTexture textur = new DynamicTexture(() -> "messung", seite, seite, true);
                 textur.upload();
                 mc.getTextureManager().register(id, textur);
                 z[i] = System.nanoTime() - t0;
@@ -242,7 +245,7 @@ public final class Messung implements FabricClientGameTest {
             return z;
         });
         Arrays.sort(zeiten);
-        zeile("region scale=4 n=%d median=%.3f ms max=%.3f ms", zeiten.length, ms(quantil(zeiten, 0.5)), ms(zeiten[zeiten.length - 1]));
+        zeile("region seite=%d n=%d median=%.3f ms max=%.3f ms", seite, zeiten.length, ms(quantil(zeiten, 0.5)), ms(zeiten[zeiten.length - 1]));
     }
 
     /** Wie lange die Kopie der Texel des Block-Atlas auf dem Render-Thread dauert, einmal je Neuladen. */

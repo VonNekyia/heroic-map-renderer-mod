@@ -92,9 +92,9 @@ steht unter „Kosten“.
 ## Mitspieler
 
 Andere Spieler zeigt der Mod nur, wenn der Server sie nennt. Wen er nennt,
-entscheidet allein das Plugin: mit `autogroup: simplevoicechat` in seiner
+entscheidet allein das Plugin: mit `show: simplevoicechat` in seiner
 `config.yml` die Spieler, die einen in Simple Voice Chat hören, also nah
-genug oder in derselben Sprachgruppe; mit `disabled`, der Vorgabe, oder
+genug oder in derselben Sprachgruppe; mit `hidden`, der Vorgabe, oder
 ohne Simple Voice Chat niemanden. Eigene Gruppen gibt es nicht; so hat es
 der User gewählt.
 
@@ -325,12 +325,23 @@ Bei Sichtweite 12 und einem Fenster von 854 × 480, gemessen am 05. und
 | Frametime im p95, mehr als ohne Minimap | ohne Grenze, 3500 bis 5000 fps, 2 und 4 px | höchstens 0,18 ms |
 | Kopie der Texel des Atlas | einmal je Neuladen | 3,5 bis 15 ms |
 | neue Region | bei 4 px | 0,14 bis 0,17 ms |
-| Zeichnen je Chunk, Worker, bei 8 und 16 px | nicht gemessen; eine Region hat bei 16 px 2048 × 2048 Pixel | – |
 | HUD-Element je Frame, eckig | 4 px, Stand, Median | 0,003 ms |
 | HUD-Element je Frame, rund | 4 px, Stand, Median, 149 Läufe | 0,33 ms |
 | Frametime im p50, rund, mehr als ohne Minimap | freie Bildrate, 4 px, Stand | 0,40 ms |
 
 Der Flug geht dabei mit 20 Blöcken/s über geladenes Gelände.
+
+Bei 8 und 16 px, gerechnet, die Messung steht aus:
+
+- **Speicher:** Eine Region hat 8 × 16 × Auflösung Pixel Seite, bei 16 px
+  2048 × 2048, also 16 MiB in RGBA, bei 8 px 4 MiB. 16 px nimmt die Minimap
+  nur, wenn Zoom × GUI-Massstab mindestens 16 ist, etwa Zoom 8× bei
+  GUI-Massstab 2; dann zeigt sie bei 128 Einheiten 16 Blöcke, und es liegen
+  höchstens etwa 4 Regionen im Bereich, rund 64 MiB.
+- **Zeichnen je Chunk:** Der Maler füllt (16 × Auflösung)² Pixel, bei 16 px
+  also 16-mal so viele wie bei 4 px; die Zeit fällt im Worker an, nicht auf
+  dem Render-Thread. Das Bild eines Chunks ist bei 16 px 256 × 256 Pixel,
+  1 MiB zum Hochladen.
 
 Den Gametest dazu startet:
 
