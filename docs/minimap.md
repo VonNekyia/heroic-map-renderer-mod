@@ -331,17 +331,19 @@ Bei Sichtweite 12 und einem Fenster von 854 × 480, gemessen am 05. und
 
 Der Flug geht dabei mit 20 Blöcken/s über geladenes Gelände.
 
-Bei 8 und 16 px, gerechnet, die Messung steht aus:
+Bei 8 und 16 px, gemessen am 07.10., siehe
+[Minimap, 8 und 16 px](messungen/2026-10-07-minimap-8-16px.md):
 
-- **Speicher:** Eine Region hat 8 × 16 × Auflösung Pixel Seite, bei 16 px
-  2048 × 2048, also 16 MiB in RGBA, bei 8 px 4 MiB. 16 px nimmt die Minimap
-  nur, wenn Zoom × GUI-Massstab mindestens 16 ist, etwa Zoom 8× bei
-  GUI-Massstab 2; dann zeigt sie bei 128 Einheiten 16 Blöcke, und es liegen
-  höchstens etwa 4 Regionen im Bereich, rund 64 MiB.
-- **Zeichnen je Chunk:** Der Maler füllt (16 × Auflösung)² Pixel, bei 16 px
-  also 16-mal so viele wie bei 4 px; die Zeit fällt im Worker an, nicht auf
-  dem Render-Thread. Das Bild eines Chunks ist bei 16 px 256 × 256 Pixel,
-  1 MiB zum Hochladen.
+- **Zeichnen je Chunk** im Worker, Median: 5,1 ms bei 8 px, 14,4 ms bei
+  16 px, gegen 2,7 ms bei 4 px im selben Lauf. Der Abzug auf dem
+  Render-Thread bleibt bei 0,1 ms.
+- **Neue Region:** 5,8 ms auf dem Render-Thread bei 16 px, 0,17 ms bei
+  4 px; einmal je Region. Eine Region hat 8 × 16 × Auflösung Pixel Seite,
+  bei 16 px 2048 × 2048, 16 MiB in RGBA. 16 px nimmt die Minimap nur, wenn
+  Zoom × GUI-Massstab mindestens 16 ist, dann liegen höchstens etwa 4
+  Regionen im Bereich, rund 64 MiB.
+- **Frametime:** bei 16 px und Zoom 8× gegen 4 px nicht messbar anders; das
+  HUD-Element im Flug im p95 0,25 ms statt 0,11 ms.
 
 Den Gametest dazu startet:
 
