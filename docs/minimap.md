@@ -64,6 +64,9 @@ steht unter „Kosten“.
   (`Minimap.KLEINSTE`, `Minimap.GROESSTE`) und höchstens so gross, wie der
   Schirm Platz hat. Grösser zeigt mehr Gegend beim selben Zoom und
   zeichnet mehr Chunks, siehe „Neu zeichnen“, „Bereich“.
+- **Koordinaten:** Im Menü stehen über der Minimap `x` und `z` des Blocks
+  unter der Maus an der Maus, genau wie gezeichnet, auch beim Umschauen;
+  nicht beim Ziehen.
 - **Umschauen:** Im Menü verschiebt Ziehen mit rechts die Karte in der
   Minimap, sie folgt der Maus. Höchstens so weit, wie der Client Chunks hat,
   die Sichtweite in Blöcken je Richtung; der Bereich, den die Minimap

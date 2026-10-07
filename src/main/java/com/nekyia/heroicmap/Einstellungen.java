@@ -91,7 +91,21 @@ final class Einstellungen extends Screen {
             umriss(g, r);
             int gx = griffX(r), gy = griffY(r);
             g.fill(gx - GRIFF, gy - GRIFF, gx + GRIFF, gy + GRIFF, TEXT);
+            koordinaten(g, r, mausX, mausY);
         }
+    }
+
+    /** Über der Minimap die Koordinaten des Blocks unter der Maus, genau wie gezeichnet. */
+    private void koordinaten(GuiGraphicsExtractor g, Minimap.Rahmen r, int mausX, int mausY) {
+        Minimap m = Minimap.INSTANZ;
+        double h = r.seite() / 2.0, dx = mausX - (r.x() + h), dz = mausY - (r.y() + h);
+        if (zug != Zug.KEINER || minecraft.player == null || (m.rund() ? dx * dx + dz * dz > h * h : !r.enthaelt(mausX, mausY))) {
+            return;
+        }
+        int links = Mth.floor((minecraft.player.getX() + m.versatzX()) * m.zoom()) - r.seite() / 2;
+        int oben = Mth.floor((minecraft.player.getZ() + m.versatzZ()) * m.zoom()) - r.seite() / 2;
+        int bx = Math.floorDiv(links + mausX - r.x(), m.zoom()), bz = Math.floorDiv(oben + mausY - r.y(), m.zoom());
+        g.setTooltipForNextFrame(font, Component.translatable("heroicmap.koordinaten", bx, bz), mausX, mausY);
     }
 
     @Override

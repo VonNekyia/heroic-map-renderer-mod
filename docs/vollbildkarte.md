@@ -7,6 +7,8 @@ code:
   - src/main/java/com/nekyia/heroicmap/Kacheln.java
   - src/main/java/com/nekyia/heroicmap/Satz.java
   - src/main/java/com/nekyia/heroicmap/Auswahl.java
+  - src/main/java/com/nekyia/heroicmap/Teleport.java
+  - src/test/java/com/nekyia/heroicmap/TeleportTest.java
   - src/test/java/com/nekyia/heroicmap/KartenblickTest.java
   - src/test/java/com/nekyia/heroicmap/KachelnTest.java
   - src/test/java/com/nekyia/heroicmap/SatzTest.java
@@ -29,17 +31,36 @@ sagt sie das und zeigt nichts.
 | Taste `.` | öffnet die Karte, schliesst sie wieder; frei belegbar unter „Heroic Map“, die einzige vorbelegte Taste des Mods |
 | Ziehen mit links | verschiebt die Karte, der Inhalt folgt der Maus |
 | Mausrad | zoomt, siehe „Stufen und Lupe“ |
+| Rechtsklick | öffnet ein kleines Menü „Hierher teleportieren (x, z)“ für den Block unter der Maus, wie die Anzeige an der Maus; erst ein Klick darauf teleportiert, jeder andere Klick schliesst es; siehe unten |
 | Knopf „Karte laden …“ | zeigt die Karten des Servers, je Baum ein Knopf je Massstab mit seiner Grösse (`Auswahl`); ein Klick fragt wie `/hmap laden` erst im Dialog nach |
 | Knopf „Abgleich“ | fragt einen Abgleich des gezeigten Satzes an, wie `/hmap abgleich`; nur mit Satz. Lehnt der Server mit `wieder` ab, ist der Knopf bis dahin aus und nennt die Uhrzeit |
 | `Esc` | schliesst |
 
 - **Das Spiel läuft weiter,** die Karte hält es nicht an (`isPauseScreen`).
-- **Unten links** stehen der Name des Satzes und `x`, `z` des Blocks unter
-  der Maus.
+- **An der Maus** stehen `x` und `z` des Blocks darunter, als Tooltip,
+  ausser über den Knöpfen und solange das Menü zum Teleportieren offen ist.
+  Unten links steht der Name des Satzes.
 - **Beim Öffnen** liegt der Spieler in der Mitte.
 - **Geht ein Knopf nicht,** etwa weil der Server den Baum nicht anbietet oder
-  schon ein Download läuft, steht der Grund über den Koordinaten.
+  schon ein Download läuft, steht der Grund über dem Namen des Satzes.
 - **Ohne Satz** zeigt die Karte nur den Hinweis und den Knopf zum Laden.
+
+### Teleportieren
+
+- **Befehl** (`Teleport.befehl`): `execute in <dimension> positioned <x+0,5>
+  0 <z+0,5> positioned over motion_blocking_no_leaves run tp @s ~ ~ ~`. Der
+  Server liest die Höhe selbst und setzt den Spieler auf den obersten
+  Block, der Bewegung aufhält, ohne Laub, auch in Chunks, die der Client
+  nicht hat. Der Mod schickt ihn mit `sendCommand`; darin stehen nur die
+  Dimension des Spielers und die beiden Zahlen, kein Text vom Server.
+- **Nur mit Recht:** Den Eintrag gibt es nur, wenn der Befehlsbaum des
+  Servers `execute` und `tp` enthält (`Teleport.erlaubt`); der Server
+  schickt nur Befehle, die der Spieler nutzen darf. Die Rechte prüft er
+  beim Ausführen noch einmal, der Mod umgeht nichts.
+- **Nicht unter einer Decke:** In Dimensionen mit Decke
+  (`dimensionType().hasCeiling()`), etwa dem Nether, fehlt der Eintrag. Der
+  oberste Block wäre dort das Dach aus Grundgestein.
+- Nach dem Klick schliesst sich die Karte.
 
 ## Welcher Satz
 

@@ -41,6 +41,7 @@
   "heroicmap.karte.keine": "Für diese Dimension ist keine Karte geladen; /hmap angebot zeigt, was der Server anbietet.",
   "heroicmap.karte.laden": "Karte laden …",
   "heroicmap.karte.abgleich": "Abgleich",
+  "heroicmap.karte.teleport": "Hierher teleportieren (%s, %s)",
   "heroicmap.auswahl.titel": "Karten dieses Servers",
   "heroicmap.auswahl.massstab": "%s px · %s",
   "heroicmap.karte.abgleich_ab": "Abgleich ab %s",
@@ -54,5 +55,6 @@
   "heroicmap.menue.form": "Form",
   "heroicmap.menue.eckig": "Eckig",
   "heroicmap.menue.rund": "Rund",
-  "heroicmap.menue.ziehen": "Links ziehen verschiebt die Minimap, rechts ziehen die Karte darin; der Griff ändert die Grösse."
+  "heroicmap.menue.ziehen": "Links ziehen verschiebt die Minimap, rechts ziehen die Karte darin; der Griff ändert die Grösse.",
+  "heroicmap.koordinaten": "x %s   z %s"
 }
