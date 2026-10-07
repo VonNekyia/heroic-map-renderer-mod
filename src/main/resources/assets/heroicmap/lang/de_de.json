@@ -55,6 +55,6 @@
   "heroicmap.menue.form": "Form",
   "heroicmap.menue.eckig": "Eckig",
   "heroicmap.menue.rund": "Rund",
-  "heroicmap.menue.ziehen": "Links ziehen verschiebt die Minimap, rechts ziehen die Karte darin; der Griff ändert die Grösse.",
+  "heroicmap.menue.ziehen": "Ziehen verschiebt die Minimap, am Griff wird sie grösser oder kleiner.",
   "heroicmap.koordinaten": "x %s   z %s"
 }

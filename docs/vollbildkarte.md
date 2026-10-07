@@ -31,18 +31,17 @@ sagt sie das und zeigt nichts.
 | Taste `.` | öffnet die Karte, schliesst sie wieder; frei belegbar unter „Heroic Map“, die einzige vorbelegte Taste des Mods |
 | Ziehen mit links | verschiebt die Karte, der Inhalt folgt der Maus |
 | Mausrad | zoomt, siehe „Stufen und Lupe“ |
-| Rechtsklick | öffnet ein kleines Menü „Hierher teleportieren (x, z)“ für den Block unter der Maus, wie die Anzeige an der Maus; erst ein Klick darauf teleportiert, jeder andere Klick schliesst es; siehe unten |
-| Knopf „Karte laden …“ | zeigt die Karten des Servers, je Baum ein Knopf je Massstab mit seiner Grösse (`Auswahl`); ein Klick fragt wie `/hmap laden` erst im Dialog nach |
+| Rechtsklick | öffnet ein kleines Menü „Hierher teleportieren (x, z)“ für den Block unter der Maus, wie die Anzeige unten links; erst ein Klick darauf teleportiert, mit der linken oder rechten Taste, jeder Klick daneben schliesst es, ein Rechtsklick öffnet es dort neu; siehe unten |
+| Knopf „Karte laden …“ | zeigt die Karten des Servers, je Baum der Name und darunter ein Knopf je Massstab mit seiner Grösse (`Auswahl`); die Knöpfe teilen sich die Breite des Schirms, höchstens 90 Einheiten je Knopf, so passen sie auch bei grossem GUI-Massstab; ein Klick fragt wie `/hmap laden` erst im Dialog nach |
 | Knopf „Abgleich“ | fragt einen Abgleich des gezeigten Satzes an, wie `/hmap abgleich`; nur mit Satz. Lehnt der Server mit `wieder` ab, ist der Knopf bis dahin aus und nennt die Uhrzeit |
 | `Esc` | schliesst |
 
 - **Das Spiel läuft weiter,** die Karte hält es nicht an (`isPauseScreen`).
-- **An der Maus** stehen `x` und `z` des Blocks darunter, als Tooltip,
-  ausser über den Knöpfen und solange das Menü zum Teleportieren offen ist.
-  Unten links steht der Name des Satzes.
+- **Unten links** stehen der Name des Satzes und `x`, `z` des Blocks unter
+  der Maus, fest wie auf der Karte im Browser; so will es der User.
 - **Beim Öffnen** liegt der Spieler in der Mitte.
 - **Geht ein Knopf nicht,** etwa weil der Server den Baum nicht anbietet oder
-  schon ein Download läuft, steht der Grund über dem Namen des Satzes.
+  schon ein Download läuft, steht der Grund über den Koordinaten.
 - **Ohne Satz** zeigt die Karte nur den Hinweis und den Knopf zum Laden.
 
 ### Teleportieren
@@ -60,6 +59,7 @@ sagt sie das und zeigt nichts.
 - **Nicht unter einer Decke:** In Dimensionen mit Decke
   (`dimensionType().hasCeiling()`), etwa dem Nether, fehlt der Eintrag. Der
   oberste Block wäre dort das Dach aus Grundgestein.
+- **Das Menü** bleibt ganz auf dem Schirm, auch bei grossem GUI-Massstab.
 - Nach dem Klick schliesst sich die Karte.
 
 ## Welcher Satz

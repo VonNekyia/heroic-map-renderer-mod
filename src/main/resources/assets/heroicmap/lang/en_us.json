@@ -55,6 +55,6 @@
   "heroicmap.menue.form": "Shape",
   "heroicmap.menue.eckig": "Square",
   "heroicmap.menue.rund": "Round",
-  "heroicmap.menue.ziehen": "Drag left to move the minimap, drag right to look around in it; the handle resizes it.",
+  "heroicmap.menue.ziehen": "Drag to move the minimap, drag the handle to resize it.",
   "heroicmap.koordinaten": "x %s   z %s"
 }

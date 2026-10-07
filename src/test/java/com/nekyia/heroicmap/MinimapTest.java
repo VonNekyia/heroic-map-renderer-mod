@@ -25,6 +25,7 @@ class MinimapTest {
         assertEquals(4, Minimap.reichweite(2, 128));
         assertEquals(3, Minimap.reichweite(4, 128));
         assertEquals(10, Minimap.reichweite(1, 256));
+        assertEquals(3, Minimap.reichweite(8, 128));
     }
 
     @Test
@@ -149,17 +150,6 @@ class MinimapTest {
     }
 
     @Test
-    void umschauenBleibtInDerSichtweite() {
-        Minimap minimap = new Minimap();
-        minimap.schiebe(30, -500, 192);
-        assertEquals(30, minimap.versatzX());
-        assertEquals(-192, minimap.versatzZ());
-        minimap.zentriere();
-        assertEquals(0, minimap.versatzX());
-        assertEquals(0, minimap.versatzZ());
-    }
-
-    @Test
     void nieVerkleinertImmerGanzeTexel() {
         // GUI-Massstab 2, Zoom 1: 2 Pixel je Block auf dem Schirm, 4 px in der Textur wären verkleinert.
         assertEquals(2, Minimap.effektiv(4, 1, 2));
@@ -170,8 +160,11 @@ class MinimapTest {
         // Die Wahl ist die Obergrenze.
         assertEquals(1, Minimap.effektiv(1, 4, 4));
         assertEquals(2, Minimap.effektiv(2, 4, 4));
-        for (int a : new int[] {1, 2, 4}) {
-            for (int z : new int[] {1, 2, 4}) {
+        // Zoom 8 bei GUI-Massstab 2: 16 Pixel je Block, 16 px gehen ganz auf.
+        assertEquals(16, Minimap.effektiv(16, 8, 2));
+        assertEquals(8, Minimap.effektiv(16, 4, 2));
+        for (int a : new int[] {1, 2, 4, 8, 16}) {
+            for (int z : new int[] {1, 2, 4, 8}) {
                 for (int k = 1; k <= 8; k++) {
                     int r = Minimap.effektiv(a, z, k);
                     assertTrue(r <= a && r <= z * k && (z * k) % r == 0, a + " " + z + " " + k);

@@ -15,8 +15,8 @@ import org.joml.Matrix3x2fStack;
 /**
  * Das Menü hinter {@code /hmap}: Minimap an oder aus, Zoom, Auflösung, Form, dazu die Karten des Servers.
  * Die Minimap im HUD bleibt sichtbar; Ziehen verschiebt sie, der Griff an der Ecke zur Mitte des
- * Schirms zieht sie grösser oder kleiner, rechts ziehen verschiebt die Karte darin zum Umschauen.
- * Beim Schliessen steht wieder der Spieler in der Mitte, und die Einstellungen werden gespeichert.
+ * Schirms zieht sie grösser oder kleiner, mit der linken wie der rechten Taste. Die Knöpfe passen
+ * sich dem Platz an. Gespeichert wird beim Schliessen.
  * Siehe docs/minimap.md, „Bedienung“.
  */
 final class Einstellungen extends Screen {
@@ -24,9 +24,10 @@ final class Einstellungen extends Screen {
     private static final int TEXT = 0xFFFFFFFF;
     /** Halbe Seite des Griffs in Einheiten des GUI. */
     private static final int GRIFF = 3;
+    /** Breite der Knöpfe, höchstens; schmaler, wenn neben der Minimap weniger Platz ist. */
     private static final int BREITE = 200;
 
-    private enum Zug { KEINER, LAGE, GROESSE, SCHAUEN }
+    private enum Zug { KEINER, LAGE, GROESSE }
 
     private Zug zug = Zug.KEINER;
     /** Beim Verschieben: wo die Maus die Minimap gegriffen hat. Beim Ziehen: die feste Ecke. */
@@ -35,8 +36,8 @@ final class Einstellungen extends Screen {
     private boolean griffLinks, griffOben;
     /** Beim Ziehen: Seite und Maus beim Greifen. */
     private int startSeite, startX, startY;
-    /** Linker Rand und Oberkante der Knöpfe. */
-    private int spalte, oben;
+    /** Linker Rand, Oberkante und Breite der Knöpfe. */
+    private int spalte, oben, breite;
 
     Einstellungen() {
         super(Component.translatable("heroicmap.menue.titel"));
@@ -47,26 +48,29 @@ final class Einstellungen extends Screen {
         Minimap m = Minimap.INSTANZ;
         // Die Knöpfe stehen mittig im grösseren freien Platz neben der Minimap, nicht auf ihr.
         Minimap.Rahmen r = m.rahmen(width, height);
+        // Bei grossem GUI-Massstab ist der Schirm schmal; dann werden die Knöpfe schmaler.
         int links = r.x(), rechts = width - r.x() - r.seite();
-        spalte = !m.sichtbar() ? (width - BREITE) / 2
-                : links >= rechts ? (links - BREITE) / 2 : r.x() + r.seite() + (rechts - BREITE) / 2;
-        spalte = Math.max(4, Math.min(spalte, width - BREITE - 4));
+        int platz = !m.sichtbar() ? width : Math.max(links, rechts);
+        breite = Math.max(120, Math.min(BREITE, platz - 8));
+        spalte = !m.sichtbar() ? (width - breite) / 2
+                : links >= rechts ? (links - breite) / 2 : r.x() + r.seite() + (rechts - breite) / 2;
+        spalte = Math.max(4, Math.min(spalte, width - breite - 4));
         oben = Math.max(50, height / 2 - 72);
         int x = spalte, y = oben;
         addRenderableWidget(CycleButton.onOffBuilder(m.sichtbar())
-                .create(x, y, BREITE, 20, Component.translatable("heroicmap.menue.minimap"), (b, an) -> m.setzeSichtbar(an)));
+                .create(x, y, breite, 20, Component.translatable("heroicmap.menue.minimap"), (b, an) -> m.setzeSichtbar(an)));
         addRenderableWidget(CycleButton.builder((Integer z) -> Component.translatable("heroicmap.menue.fach", z), m.zoom())
-                .withValues(1, 2, 4)
-                .create(x, y + 24, BREITE, 20, Component.translatable("heroicmap.menue.zoom"), (b, z) -> m.setzeZoom(z)));
+                .withValues(1, 2, 4, 8)
+                .create(x, y + 24, breite, 20, Component.translatable("heroicmap.menue.zoom"), (b, z) -> m.setzeZoom(z)));
         addRenderableWidget(CycleButton.builder((Integer px) -> Component.translatable("heroicmap.menue.px", px), m.aufloesung())
-                .withValues(1, 2, 4)
-                .create(x, y + 48, BREITE, 20, Component.translatable("heroicmap.menue.massstab"), (b, px) -> m.setzeScale(px)));
+                .withValues(1, 2, 4, 8, 16)
+                .create(x, y + 48, breite, 20, Component.translatable("heroicmap.menue.massstab"), (b, px) -> m.setzeScale(px)));
         addRenderableWidget(CycleButton.booleanBuilder(Component.translatable("heroicmap.menue.rund"),
                         Component.translatable("heroicmap.menue.eckig"), m.rund())
-                .create(x, y + 72, BREITE, 20, Component.translatable("heroicmap.menue.form"), (b, rund) -> m.setzeRund(rund)));
+                .create(x, y + 72, breite, 20, Component.translatable("heroicmap.menue.form"), (b, rund) -> m.setzeRund(rund)));
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.laden"),
-                b -> minecraft.gui.setScreen(new Auswahl(this))).bounds(x, y + 96, BREITE, 20).build());
-        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x, y + 124, BREITE, 20).build());
+                b -> minecraft.gui.setScreen(new Auswahl(this))).bounds(x, y + 96, breite, 20).build());
+        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x, y + 124, breite, 20).build());
     }
 
     /** Ohne Unschärfe und Abdunkeln, damit die Minimap im HUD zu sehen ist. */
@@ -78,8 +82,8 @@ final class Einstellungen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor g, int mausX, int mausY, float delta) {
         super.extractRenderState(g, mausX, mausY, delta);
         // Titel und Hinweis über den Knöpfen; unten läge der Chat darüber.
-        int mitte = spalte + BREITE / 2;
-        List<FormattedCharSequence> hinweis = font.split(Component.translatable("heroicmap.menue.ziehen"), BREITE);
+        int mitte = spalte + breite / 2;
+        List<FormattedCharSequence> hinweis = font.split(Component.translatable("heroicmap.menue.ziehen"), breite);
         int y = oben - 6 - hinweis.size() * (font.lineHeight + 1);
         g.centeredText(font, title, mitte, y - 14, TEXT);
         for (FormattedCharSequence zeile : hinweis) {
@@ -95,17 +99,17 @@ final class Einstellungen extends Screen {
         }
     }
 
-    /** Über der Minimap die Koordinaten des Blocks unter der Maus, genau wie gezeichnet. */
+    /** Über der Minimap die Koordinaten des Blocks unter der Maus, fest unten links, genau wie gezeichnet. */
     private void koordinaten(GuiGraphicsExtractor g, Minimap.Rahmen r, int mausX, int mausY) {
         Minimap m = Minimap.INSTANZ;
         double h = r.seite() / 2.0, dx = mausX - (r.x() + h), dz = mausY - (r.y() + h);
         if (zug != Zug.KEINER || minecraft.player == null || (m.rund() ? dx * dx + dz * dz > h * h : !r.enthaelt(mausX, mausY))) {
             return;
         }
-        int links = Mth.floor((minecraft.player.getX() + m.versatzX()) * m.zoom()) - r.seite() / 2;
-        int oben = Mth.floor((minecraft.player.getZ() + m.versatzZ()) * m.zoom()) - r.seite() / 2;
+        int links = Mth.floor(minecraft.player.getX() * m.zoom()) - r.seite() / 2;
+        int oben = Mth.floor(minecraft.player.getZ() * m.zoom()) - r.seite() / 2;
         int bx = Math.floorDiv(links + mausX - r.x(), m.zoom()), bz = Math.floorDiv(oben + mausY - r.y(), m.zoom());
-        g.setTooltipForNextFrame(font, Component.translatable("heroicmap.koordinaten", bx, bz), mausX, mausY);
+        g.text(font, Component.translatable("heroicmap.koordinaten", bx, bz), 4, height - 12, TEXT);
     }
 
     @Override
@@ -117,12 +121,8 @@ final class Einstellungen extends Screen {
             return false;
         }
         Minimap.Rahmen r = Minimap.INSTANZ.rahmen(width, height);
-        // Rechts ziehen verschiebt die Karte in der Minimap, zum Umschauen.
-        if (e.button() == 1 && r.enthaelt(e.x(), e.y())) {
-            zug = Zug.SCHAUEN;
-            return true;
-        }
-        if (e.button() != 0) {
+        // Links wie rechts: Ziehen greift die ganze Minimap, am Griff ihre Grösse.
+        if (e.button() != 0 && e.button() != 1) {
             return false;
         }
         if (Math.abs(e.x() - griffX(r)) <= GRIFF + 1 && Math.abs(e.y() - griffY(r)) <= GRIFF + 1) {
@@ -151,8 +151,6 @@ final class Einstellungen extends Screen {
         int mx = Mth.floor(e.x()), my = Mth.floor(e.y());
         switch (zug) {
             case LAGE -> m.verschiebe(mx - festX, my - festY, width, height);
-            // Die Karte folgt der Maus: nach rechts ziehen zeigt, was links liegt.
-            case SCHAUEN -> m.schiebe(-dx / m.zoom(), -dy / m.zoom(), minecraft.options.getEffectiveRenderDistance() * 16);
             case GROESSE -> {
                 // Relativ zum Griff: Der Griff sitzt rund nicht in der Ecke, die Seite springt so nicht.
                 int platz = Math.min(width, height) - 2 * Minimap.RAND;
@@ -225,7 +223,6 @@ final class Einstellungen extends Screen {
 
     @Override
     public void removed() {
-        Minimap.INSTANZ.zentriere();
         Minimap.INSTANZ.schreibe(HeroicMap.einstellungen());
     }
 
