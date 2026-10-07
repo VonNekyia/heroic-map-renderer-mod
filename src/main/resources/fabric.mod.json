@@ -11,6 +11,7 @@
     "sources": "https://github.com/VonNekyia/heroic-map-renderer-mod"
   },
   "license": "Apache-2.0",
+  "icon": "assets/heroicmap/icon.png",
   "environment": "client",
   "entrypoints": {
     "client": [
