@@ -160,7 +160,8 @@ public final class Bilder implements FabricClientGameTest {
      * Öffnet die Vollbildkarte mit einem kleinen Satz gemalter Testkacheln um den Ursprung,
      * scale 4, Stufen 0 bis 2, und nimmt sie auf der feinsten Stufe auf.
      */
-    private static void vollbildkarte(ClientGameTestContext context) {
+    /** Legt den Testsatz aus den Ressourcen unter heroicmap/test/beispiel an und gibt den Baum zurück. */
+    static Path testsatz() {
         Path baum = FabricLoader.getInstance().getGameDir().resolve(HeroicMap.ID).resolve("test").resolve("beispiel");
         try {
             for (String datei : liste()) {
@@ -174,6 +175,11 @@ public final class Bilder implements FabricClientGameTest {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+        return baum;
+    }
+
+    private static void vollbildkarte(ClientGameTestContext context) {
+        Path baum = testsatz();
         context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
         context.waitTicks(40);
         Path bild = context.takeScreenshot(TestScreenshotOptions.of("vollbildkarte").disableCounterPrefix());
