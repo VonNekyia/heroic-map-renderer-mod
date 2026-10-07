@@ -40,8 +40,9 @@ der Mod mit den Kacheln zeigt, steht unter [Vollbildkarte](vollbildkarte.md).
   „Mitspieler“. An `jetzt` jeder Nachricht misst er den Versatz der Uhren
   für die [Live-Ebene](live.md). Nachrichten mit einem anderen `v` als 1
   oder über 64 KiB verwirft er.
-- **Senden:** `anfrage` nur, wenn `ClientPlayNetworking.canSend` wahr ist,
-  also wenn das Plugin den Kanal angemeldet hat.
+- **Senden:** `anfrage` und `show` nur, wenn `ClientPlayNetworking.canSend`
+  wahr ist, also wenn das Plugin den Kanal angemeldet hat. Zu `show` siehe
+  [Minimap](minimap.md), „Mitspieler“.
 - **`neu: true`** steht in der `anfrage` eines vollen Downloads, wenn es
   für den Massstab keinen Stand zum Fortsetzen gibt, also kein `etags.txt`
   im Ordner des Massstabs (`Laden.hatStand`), etwa nachdem die Karte

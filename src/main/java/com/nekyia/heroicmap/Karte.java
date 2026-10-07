@@ -90,7 +90,7 @@ final class Karte extends Screen {
             Minimap.avatar(g, spieler, px, pz);
             // Die Mitspieler mit Namen, in der Dimension des Spielers. Siehe docs/minimap.md, „Mitspieler“.
             String dimension = spieler.level().dimension().identifier().toString();
-            for (Mitspieler.Eintrag e : Mitspieler.INSTANZ.aktuell(System.currentTimeMillis())) {
+            for (Mitspieler.Eintrag e : Mitspieler.INSTANZ.sichtbar(System.currentTimeMillis())) {
                 if (!e.dimension().equals(dimension) || e.uuid().equals(spieler.getUUID())) {
                     continue;
                 }

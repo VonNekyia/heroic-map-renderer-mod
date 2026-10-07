@@ -8,7 +8,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 
-/** Die anfrage an das Plugin. Siehe docs/download.md, „Kanal“. */
+/** Die anfrage und show an das Plugin. Siehe docs/download.md, „Kanal“. */
 class KanalTest {
 
     @Test
@@ -21,6 +21,15 @@ class KanalTest {
         assertEquals("voll", json.get("art").getAsString());
         // Ohne Feld gilt das Fortsetzen; ein neu=false schickt der Mod nie.
         assertFalse(json.has("neu"));
+    }
+
+    @Test
+    void show() {
+        JsonObject an = JsonParser.parseString(Kanal.show(true)).getAsJsonObject();
+        assertEquals(1, an.get("v").getAsInt());
+        assertEquals("show", an.get("typ").getAsString());
+        assertEquals("simplevoicechat", an.get("show").getAsString());
+        assertEquals("hidden", JsonParser.parseString(Kanal.show(false)).getAsJsonObject().get("show").getAsString());
     }
 
     @Test

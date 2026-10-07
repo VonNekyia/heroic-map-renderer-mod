@@ -56,6 +56,23 @@ class MitspielerTest {
     }
 
     @Test
+    void antwortAufShow() {
+        Mitspieler m = new Mitspieler();
+        m.antwort(JsonParser.parseString("{\"v\":1,\"typ\":\"show\",\"erlaubt\":false,\"grund\":\"permission\"}").getAsJsonObject());
+        assertEquals("permission", m.verweigert());
+        m.antwort(JsonParser.parseString("{\"v\":1,\"typ\":\"show\",\"erlaubt\":false,\"grund\":\"simplevoicechat\"}").getAsJsonObject());
+        assertEquals("simplevoicechat", m.verweigert());
+        // Ein unbekannter Grund wird kein Schlüssel für einen Text.
+        m.antwort(JsonParser.parseString("{\"v\":1,\"typ\":\"show\",\"erlaubt\":false,\"grund\":\"<b>\"}").getAsJsonObject());
+        assertEquals("sonst", m.verweigert());
+        m.antwort(JsonParser.parseString("{\"v\":1,\"typ\":\"show\",\"erlaubt\":true}").getAsJsonObject());
+        assertEquals(null, m.verweigert());
+        m.antwort(JsonParser.parseString("{\"v\":1,\"typ\":\"show\",\"erlaubt\":false}").getAsJsonObject());
+        m.leeren();
+        assertEquals(null, m.verweigert());
+    }
+
+    @Test
     void verfaelltNachDerFristUndBeimVerlassen() {
         Mitspieler m = new Mitspieler();
         m.empfange(json(eintrag(SAM, "Sam", "1")), 10_000);

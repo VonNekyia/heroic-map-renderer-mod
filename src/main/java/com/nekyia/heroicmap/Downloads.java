@@ -89,6 +89,7 @@ final class Downloads {
             case "freigabe" -> freigabe(json);
             case "abgelehnt" -> abgelehnt(json);
             case "spieler" -> Mitspieler.INSTANZ.empfange(json, System.currentTimeMillis());
+            case "show" -> Mitspieler.INSTANZ.antwort(json);
             default -> {
             }
         }

@@ -38,7 +38,7 @@ Das baut das Jar nach `build/libs/` und lässt die Tests laufen.
 | `LadenTest` | den Download gegen einen kleinen Server auf loopback: Fortsetzen, geänderte und gelöschte Kacheln, Stufen, Prüfsumme, Token, Budget, Stand zum Fortsetzen, Heimnetz, alle harten Grenzen, Fristen, keine Weiterleitung, den Index während des Downloads, siehe [Download](download.md) |
 | `FreigabeTest` | die `freigabe` lesen, auch mit `port` statt `url`, reservierte Namen, und wann der Mod fragt, siehe [Download](download.md), „Zustimmung und Grösse“ |
 | `ReiheTest` | Downloads nacheinander, je Baum höchstens einer, auch nach einem `Error`, siehe [Download](download.md), „Reihe“ |
-| `KanalTest` | die `anfrage`, `neu` nur, wenn wahr, siehe [Download](download.md), „Kanal“ |
+| `KanalTest` | die `anfrage`, `neu` nur, wenn wahr, und `show`, siehe [Download](download.md), „Kanal“ |
 | `AdresseTest` | die Prüfung der Adresse, siehe [Download](download.md), „Sicherheit“ |
 | `KartenblickTest` | wie die Vollbildkarte Kacheln auf den Schirm legt, Zoom über Stufen und Lupe, Schieben, Platzhalter aus gröberen Stufen, siehe [Vollbildkarte](vollbildkarte.md) |
 | `TeleportTest` | der Befehl zum Teleportieren und dass es ihn nur mit `execute` und `tp` im Befehlsbaum gibt, siehe [Vollbildkarte](vollbildkarte.md), „Teleportieren“ |
@@ -47,7 +47,7 @@ Das baut das Jar nach `build/libs/` und lässt die Tests laufen.
 | `EbeneTest` | die Bilder der Live-Ebene schreiben, lesen, beim Abgleich räumen, auch über einen Fehler hinweg, beim Wechsel des Massstabs anpassen und in die Kacheln legen, auch bei negativen Chunks, siehe [Live-Ebene](live.md) |
 | `LiveTest` | welche Änderungen die Live-Ebene zeichnet, siehe [Live-Ebene](live.md), „Wann gezeichnet wird“ |
 | `SatzTest` | den Satz zur Dimension finden, Grenzen für `map.json`, siehe [Vollbildkarte](vollbildkarte.md), „Welcher Satz“ |
-| `MitspielerTest` | die Nachricht `spieler` lesen, kaputte Einträge, Obergrenze, verfallen nach 5 s und beim Verlassen, siehe [Minimap](minimap.md), „Mitspieler“ |
+| `MitspielerTest` | die Nachricht `spieler` lesen, kaputte Einträge, Obergrenze, verfallen nach 5 s und beim Verlassen, die Antwort auf `show`, siehe [Minimap](minimap.md), „Mitspieler“ |
 | `MinimapTest` | den Bereich der Minimap, siehe [Minimap](minimap.md), „Neu zeichnen“ |
 | `LichtTest` | die Lightmap gegen die Werte aus der Doku des Renderers, siehe [Minimap](minimap.md), „Licht“ |
 

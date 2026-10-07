@@ -58,5 +58,11 @@
   "heroicmap.menue.eckig": "Eckig",
   "heroicmap.menue.rund": "Rund",
   "heroicmap.menue.ziehen": "Ziehen verschiebt die Minimap, am Griff wird sie grösser oder kleiner.",
-  "heroicmap.koordinaten": "x %s   z %s"
+  "heroicmap.koordinaten": "x %s   z %s",
+  "heroicmap.menue.show": "Mitspieler",
+  "heroicmap.menue.show.simplevoicechat": "Simple Voice Chat",
+  "heroicmap.menue.show.hidden": "Versteckt",
+  "heroicmap.menue.show.grund.permission": "Der Server erlaubt dir keine Mitspieler auf der Karte.",
+  "heroicmap.menue.show.grund.simplevoicechat": "Auf dem Server fehlt Simple Voice Chat.",
+  "heroicmap.menue.show.grund.sonst": "Der Server lehnt Mitspieler auf der Karte ab."
 }

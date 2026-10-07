@@ -35,6 +35,8 @@ final class Mitspieler {
 
     private volatile List<Eintrag> liste = List.of();
     private volatile long empfangen;
+    /** Warum der Server die Wahl show ablehnt, oder null; das Menü zeigt es. */
+    private volatile String verweigert;
 
     void empfange(JsonObject json, long jetztMs) {
         liste = lies(json);
@@ -71,9 +73,30 @@ final class Mitspieler {
         return jetztMs - empfangen > FRIST ? List.of() : liste;
     }
 
+    /** Was Minimap und Vollbildkarte zeichnen: die gültige Liste, bei show hidden nichts. */
+    List<Eintrag> sichtbar(long jetztMs) {
+        return Minimap.INSTANZ.show() ? aktuell(jetztMs) : List.of();
+    }
+
     void leeren() {
         liste = List.of();
         empfangen = 0;
+        verweigert = null;
+    }
+
+    /** Die Antwort auf show: erlaubt, oder ein Grund wie permission oder simplevoicechat. */
+    void antwort(JsonObject json) {
+        boolean erlaubt = json.has("erlaubt") && json.get("erlaubt").isJsonPrimitive() && json.get("erlaubt").getAsBoolean();
+        if (erlaubt) {
+            verweigert = null;
+        } else {
+            String grund = json.has("grund") && json.get("grund").isJsonPrimitive() ? json.get("grund").getAsString() : "";
+            verweigert = grund.equals("permission") || grund.equals("simplevoicechat") ? grund : "sonst";
+        }
+    }
+
+    String verweigert() {
+        return verweigert;
     }
 
     /** x und z: hat der Client den Spieler als Entity mit dieser UUID, dessen Lage, die ist flüssiger; sonst die des Servers. */

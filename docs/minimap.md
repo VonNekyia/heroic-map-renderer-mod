@@ -91,12 +91,25 @@ steht unter „Kosten“.
 
 ## Mitspieler
 
-Andere Spieler zeigt der Mod nur, wenn der Server sie nennt. Wen er nennt,
-entscheidet allein das Plugin: mit `show: simplevoicechat` in seiner
-`config.yml` die Spieler, die einen in Simple Voice Chat hören, also nah
-genug oder in derselben Sprachgruppe; mit `hidden`, der Vorgabe, oder
-ohne Simple Voice Chat niemanden. Eigene Gruppen gibt es nicht; so hat es
-der User gewählt.
+Andere Spieler zeigt der Mod nur, wenn der Server sie nennt. Eigene Gruppen
+gibt es nicht; so hat es der User gewählt.
+
+- **Wahl `show`** im Menü, Knopf „Mitspieler“, gespeichert in
+  `heroicmap.properties`: `simplevoicechat`, die Vorgabe, so hat es der
+  Maintainer entschieden: Wer mich in Simple Voice Chat hört, also nah genug
+  oder in derselben Sprachgruppe, sieht mich, und ich sehe ihn. `hidden`:
+  Niemand sieht mich, und ich sehe niemanden; der Mod zeichnet dann auch
+  nichts, was noch kommt.
+- **Senden:** `{"v":1,"typ":"show","show":"simplevoicechat"}` (`Kanal.show`),
+  sobald der Server den Kanal anmeldet (`ServerboundPlayChannelEvents`), und
+  nach jeder Änderung im Menü.
+- **Der Server** entscheidet, wen er nennt: nur mit der Permission
+  `heroicmap.show` auf beiden Seiten, Vorgabe alle, mit Simple Voice Chat
+  auf dem Server und wenn beide `simplevoicechat` gewählt haben. Er antwortet
+  `{"typ":"show","erlaubt":true}`, oder mit `"erlaubt":false` und `grund`
+  `permission` oder `simplevoicechat`; das Menü nennt den Grund unter den
+  Knöpfen (`Mitspieler.antwort`), ein anderer Grund wird ein allgemeiner
+  Text. Beim Verlassen des Servers fällt die Antwort weg.
 
 - **Nachricht:** `spieler` über den Kanal, etwa einmal je Sekunde:
 
