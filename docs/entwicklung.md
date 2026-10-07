@@ -7,6 +7,8 @@ code:
   - gradle/libs.versions.toml
   - gradle/wrapper/gradle-wrapper.properties
   - .github/workflows/ci.yml
+  - src/main/resources/fabric.mod.json
+  - src/main/resources/assets/heroicmap/icon.png
 ---
 
 # Bauen und testen
@@ -99,6 +101,15 @@ Lauf am 06.10. gegen Paper 26.3-157 mit dem Plugin, ein Baum `top-north-s`
 aus der Testwelt: 46 Kacheln, 2,2 MB, Code 0. Das Bild `server-karte`:
 
 ![Vollbildkarte nach dem Download vom Paper-Server](bilder/server-karte.png)
+
+## Icon
+
+`src/main/resources/assets/heroicmap/icon.png`, 300 × 300 Pixel mit
+durchsichtigem Hintergrund, steht in `fabric.mod.json` unter `icon`;
+Launcher wie Prism und Mod-Listen zeigen es. Es ist die Insel aus dem Banner
+des Hauptrepositorys, die Ebene „Insel“ in `docs/bilder/quellen/banner.aseprite`
+von heroic-map-renderer, also eine Szene aus den Tests, ohne Verlauf und
+Schrift, mittig auf ein Quadrat gesetzt.
 
 ## CI
 
