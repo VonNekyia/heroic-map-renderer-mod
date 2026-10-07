@@ -44,6 +44,8 @@
   "heroicmap.karte.teleport": "Teleport here (%s, %s)",
   "heroicmap.auswahl.titel": "Maps of this server",
   "heroicmap.auswahl.massstab": "%s px · %s",
+  "heroicmap.auswahl.abgleich": "%s px · Sync",
+  "heroicmap.auswahl.abgleich_ab": "%s px · from %s",
   "heroicmap.karte.abgleich_ab": "Sync from %s",
   "heroicmap.download.abgleich_ab": "The next sync is possible from %s.",
   "heroicmap.menue.titel": "Heroic Map",
