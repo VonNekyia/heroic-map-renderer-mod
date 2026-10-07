@@ -135,6 +135,16 @@ final class Downloads {
         return stand == null ? 0 : stand.massstab();
     }
 
+    /**
+     * Der Massstab, den der Spieler vom Baum ganz auf der Platte hat und für den ein Abgleich geht,
+     * oder 0: ein vollständiger Satz, und das Plugin misst den Abgleich an demselben Massstab.
+     */
+    int vollstaendig(String baum) {
+        Path ordner = ordner(baum);
+        Satz satz = ordner == null ? null : Satz.lies(ordner);
+        return satz != null && satz.massstab() == aktiv(baum) ? satz.massstab() : 0;
+    }
+
     /** Der gespeicherte Stand des Baums auf diesem Server, oder null. */
     private static Freigabe.Stand stand(String baum) {
         Path ordner = ordner(baum);

@@ -9,8 +9,8 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContex
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 
 /**
- * Das Menü mit echten Eingaben der Maus: links ziehen verschiebt die Minimap, rechts ziehen
- * schaut sich in ihr um, beim Schliessen steht wieder der Spieler in der Mitte.
+ * Das Menü mit echten Eingaben der Maus: Ziehen mit der linken wie der rechten Taste verschiebt
+ * die ganze Minimap.
  * Siehe docs/minimap.md, „Bedienung“.
  */
 public final class Bedienung implements FabricClientGameTest {
@@ -33,17 +33,13 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Links ziehen: " + vorher + " → " + nachher);
             }
 
+            // Rechts ziehen verschiebt ebenso die ganze Minimap.
             ziehe(context, maus, RECHTS, nachher, 8 * k, 0);
-            double erwartet = -80.0 / context.computeOnClient(mc -> Minimap.INSTANZ.zoom());
-            double versatz = context.computeOnClient(mc -> Minimap.INSTANZ.versatzX());
-            if (Math.abs(versatz - erwartet) > 1) {
-                throw new AssertionError("Rechts ziehen: Versatz " + versatz + " statt " + erwartet);
+            Minimap.Rahmen rechts = rahmen(context);
+            if (Math.abs(rechts.x() - (nachher.x() + 80)) > 1 || rechts.y() != nachher.y()) {
+                throw new AssertionError("Rechts ziehen: " + nachher + " → " + rechts);
             }
-
             context.runOnClient(mc -> mc.gui.setScreen(null));
-            if (context.computeOnClient(mc -> Minimap.INSTANZ.versatzX()) != 0) {
-                throw new AssertionError("Nach dem Schliessen nicht zentriert");
-            }
         } finally {
             // Das Menü speichert beim Schliessen; danach wieder die Vorgabe.
             try {

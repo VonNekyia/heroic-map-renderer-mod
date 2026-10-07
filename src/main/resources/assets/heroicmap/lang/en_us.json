@@ -44,6 +44,8 @@
   "heroicmap.karte.teleport": "Teleport here (%s, %s)",
   "heroicmap.auswahl.titel": "Maps of this server",
   "heroicmap.auswahl.massstab": "%s px · %s",
+  "heroicmap.auswahl.abgleich": "%s px · Sync",
+  "heroicmap.auswahl.abgleich_ab": "%s px · from %s",
   "heroicmap.karte.abgleich_ab": "Sync from %s",
   "heroicmap.download.abgleich_ab": "The next sync is possible from %s.",
   "heroicmap.menue.titel": "Heroic Map",
@@ -55,6 +57,6 @@
   "heroicmap.menue.form": "Shape",
   "heroicmap.menue.eckig": "Square",
   "heroicmap.menue.rund": "Round",
-  "heroicmap.menue.ziehen": "Drag left to move the minimap, drag right to look around in it; the handle resizes it.",
+  "heroicmap.menue.ziehen": "Drag to move the minimap, drag the handle to resize it.",
   "heroicmap.koordinaten": "x %s   z %s"
 }

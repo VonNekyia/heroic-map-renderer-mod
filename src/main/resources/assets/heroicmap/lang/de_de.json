@@ -44,6 +44,8 @@
   "heroicmap.karte.teleport": "Hierher teleportieren (%s, %s)",
   "heroicmap.auswahl.titel": "Karten dieses Servers",
   "heroicmap.auswahl.massstab": "%s px · %s",
+  "heroicmap.auswahl.abgleich": "%s px · Abgleich",
+  "heroicmap.auswahl.abgleich_ab": "%s px · ab %s",
   "heroicmap.karte.abgleich_ab": "Abgleich ab %s",
   "heroicmap.download.abgleich_ab": "Der nächste Abgleich geht ab %s.",
   "heroicmap.menue.titel": "Heroic Map",
@@ -55,6 +57,6 @@
   "heroicmap.menue.form": "Form",
   "heroicmap.menue.eckig": "Eckig",
   "heroicmap.menue.rund": "Rund",
-  "heroicmap.menue.ziehen": "Links ziehen verschiebt die Minimap, rechts ziehen die Karte darin; der Griff ändert die Grösse.",
+  "heroicmap.menue.ziehen": "Ziehen verschiebt die Minimap, am Griff wird sie grösser oder kleiner.",
   "heroicmap.koordinaten": "x %s   z %s"
 }

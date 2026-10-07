@@ -38,16 +38,16 @@ steht unter „Kosten“.
 | Einstellung | Vorgabe | tut |
 |---|---|---|
 | Minimap | an | blendet die Minimap aus und ein |
-| Zoom der Minimap | 2× | 1, 2 oder 4 Einheiten des GUI je Block: wie viel Gegend die Minimap zeigt |
-| Auflösung der Minimap | 2 px je Block | 1, 2 oder 4 Pixel je Block in den Texturen: wie fein sie zeichnet |
+| Zoom der Minimap | 2× | 1, 2, 4 oder 8 Einheiten des GUI je Block: wie viel Gegend die Minimap zeigt |
+| Auflösung der Minimap | 2 px je Block | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet |
 | Form | eckig | eckig oder rund, siehe „Form“ |
 | Knopf „Karte laden …“ | – | die Karten des Servers, wie in der [Vollbildkarte](vollbildkarte.md), „Bedienung“ |
 
 - **Zoom und Auflösung** sind getrennt. Der Zoom legt fest, wie viel
   Gegend die Minimap zeigt: bei 128 Einheiten Seite 128 Blöcke bei 1×,
-  64 bei 2×, 32 bei 4×. Die Auflösung ist eine Obergrenze für die Pixel
-  je Block in den Texturen. Gezeichnet wird mit der grössten von 1, 2 und
-  4 px bis dahin, die in die Pixel eines Blocks auf dem Schirm ganz
+  64 bei 2×, 32 bei 4×, 16 bei 8×. Die Auflösung ist eine Obergrenze für
+  die Pixel je Block in den Texturen. Gezeichnet wird mit der grössten von
+  1, 2, 4, 8 und 16 px bis dahin, die in die Pixel eines Blocks auf dem Schirm ganz
   aufgeht (`Minimap.effektiv`). Ein Block ist auf dem Schirm Zoom ×
   GUI-Massstab Pixel gross: bei 1× und GUI-Massstab 2 also 2, bei
   GUI-Massstab 3 also 3, dann zeichnet die Minimap mit 1 px, 3 Pixel je
@@ -56,27 +56,22 @@ steht unter „Kosten“.
   anderen GUI-Massstab oder Zoom passt sich die Auflösung im nächsten Frame
   an und zeichnet neu; ein anderer Zoom ändert sonst nur den Bereich.
 - **Lage und Grösse:** Das Menü dunkelt nicht ab, die Minimap im HUD bleibt
-  sichtbar und ist weiss umrandet, rund mit einem Ring. Ziehen mit links
-  verschiebt sie. Der weisse Griff sitzt an der Ecke, die zur Mitte des
+  sichtbar und ist weiss umrandet, rund mit einem Ring. Ziehen mit der
+  linken oder rechten Taste verschiebt die ganze Minimap, etwa von rechts
+  oben nach links oben. Der weisse Griff sitzt an der Ecke, die zur Mitte des
   Schirms zeigt, rund auf dem Ring in der Diagonale dorthin; ihn ziehen
   macht die Minimap grösser oder kleiner, die Ecke gegenüber bleibt
   stehen. Die Seite liegt zwischen 64 und 256 Einheiten des GUI
   (`Minimap.KLEINSTE`, `Minimap.GROESSTE`) und höchstens so gross, wie der
   Schirm Platz hat. Grösser zeigt mehr Gegend beim selben Zoom und
   zeichnet mehr Chunks, siehe „Neu zeichnen“, „Bereich“.
+- **Knöpfe** stehen im grösseren freien Platz neben der Minimap, 200
+  Einheiten breit oder schmaler, bis 120, wenn dort weniger Platz ist. So
+  passen sie auch bei grossem GUI-Massstab auf den Schirm.
 - **Koordinaten:** Im Menü stehen über der Minimap `x` und `z` des Blocks
-  unter der Maus an der Maus, genau wie gezeichnet, auch beim Umschauen;
-  nicht beim Ziehen.
-- **Umschauen:** Im Menü verschiebt Ziehen mit rechts die Karte in der
-  Minimap, sie folgt der Maus. Höchstens so weit, wie der Client Chunks hat,
-  die Sichtweite in Blöcken je Richtung; der Bereich, den die Minimap
-  zeichnet, folgt der neuen Mitte. Der eigene Kopf steht, wo der Spieler ist,
-  und verschwindet, wenn das ausserhalb der Minimap liegt. Beim Schliessen
-  des Menüs steht wieder der Spieler in der Mitte (`Minimap.zentriere`). So
-  hat es der User gewählt.
-
-  ![Umschauen: 12 Blöcke nach Osten, 8 nach Süden, der Kopf beim Spieler](bilder/minimap-umschauen.png)
-
+  unter der Maus fest unten links, wie auf der Karte im Browser, genau wie
+  gezeichnet; nicht beim Ziehen. Zum Umschauen dient die
+  [Vollbildkarte](vollbildkarte.md), so will es der User.
 - **Gespeichert** wird beim Schliessen des Menüs, in
   `config/heroicmap.properties`. Die Lage steht dort als Anteil des freien
   Platzes, 0 links oder oben bis 1 rechts oder unten, so bleibt die Minimap
@@ -97,9 +92,9 @@ steht unter „Kosten“.
 ## Mitspieler
 
 Andere Spieler zeigt der Mod nur, wenn der Server sie nennt. Wen er nennt,
-entscheidet allein das Plugin: mit `autogroup: simplevoicechat` in seiner
+entscheidet allein das Plugin: mit `show: simplevoicechat` in seiner
 `config.yml` die Spieler, die einen in Simple Voice Chat hören, also nah
-genug oder in derselben Sprachgruppe; mit `disabled`, der Vorgabe, oder
+genug oder in derselben Sprachgruppe; mit `hidden`, der Vorgabe, oder
 ohne Simple Voice Chat niemanden. Eigene Gruppen gibt es nicht; so hat es
 der User gewählt.
 
@@ -282,7 +277,7 @@ nichts.
 - **Bereich:** Gezeichnet und behalten wird, was die Minimap zeigt, plus
   2 Chunks je Richtung (`Minimap.reichweite`), je nach Zoom: in der
   Vorgabe von 128 Einheiten bei 1× ±6 Chunks, bei 2× ±4, bei 4× ±3; bei
-  256 Einheiten und 1× ±10. Die Auflösung ändert den Bereich nicht. Rund zeichnet der Mod dasselbe Quadrat wie eckig. Verlässt ein Chunk den Bereich, fällt sein Bild weg;
+  256 Einheiten und 1× ±10; bei 8× ±3. Die Auflösung ändert den Bereich nicht. Rund zeichnet der Mod dasselbe Quadrat wie eckig. Verlässt ein Chunk den Bereich, fällt sein Bild weg;
   kommt er wieder, zeichnet der Mod ihn neu.
 - **Reihenfolge:** die offenen Chunks, die nächsten zuerst. Eine Pause
   zwischen zwei Abzügen eines Chunks brachte messbar nichts und verzögerte
@@ -336,6 +331,20 @@ Bei Sichtweite 12 und einem Fenster von 854 × 480, gemessen am 05. und
 
 Der Flug geht dabei mit 20 Blöcken/s über geladenes Gelände.
 
+Bei 8 und 16 px, gemessen am 07.10., siehe
+[Minimap, 8 und 16 px](messungen/2026-10-07-minimap-8-16px.md):
+
+- **Zeichnen je Chunk** im Worker, Median: 5,1 ms bei 8 px, 14,4 ms bei
+  16 px, gegen 2,7 ms bei 4 px im selben Lauf. Der Abzug auf dem
+  Render-Thread bleibt bei 0,1 ms.
+- **Neue Region:** 5,8 ms auf dem Render-Thread bei 16 px, 0,17 ms bei
+  4 px; einmal je Region. Eine Region hat 8 × 16 × Auflösung Pixel Seite,
+  bei 16 px 2048 × 2048, 16 MiB in RGBA. 16 px nimmt die Minimap nur, wenn
+  Zoom × GUI-Massstab mindestens 16 ist, dann liegen höchstens etwa 4
+  Regionen im Bereich, rund 64 MiB.
+- **Frametime:** bei 16 px und Zoom 8× gegen 4 px nicht messbar anders; das
+  HUD-Element im Flug im p95 0,25 ms statt 0,11 ms.
+
 Den Gametest dazu startet:
 
 ```bash
@@ -346,7 +355,7 @@ Den Gametest dazu startet:
 
 Der Gametest `Bilder` baut eine Szene in einer flachen Welt und nimmt die
 Minimap bei 1, 2 und 4 Pixeln je Block auf, mit dem Zoom gleich der
-Auflösung, dann rund bei 4 px, das Umschauen und das
+Auflösung, dann rund bei 4 px und das
 Menü (siehe „Bedienung“ und „Form“):
 
 ```bash

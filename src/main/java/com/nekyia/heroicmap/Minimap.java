@@ -79,16 +79,14 @@ public final class Minimap {
     private ChunkMaler maler;
 
     private boolean sichtbar = true;
-    /** Auflösung, die der Spieler gewählt hat: höchstens so viele Pixel je Block, 1, 2 oder 4. */
+    /** Auflösung, die der Spieler gewählt hat: höchstens so viele Pixel je Block, 1, 2, 4, 8 oder 16. */
     private int aufloesung = 2;
     /** Pixel je Block in den Texturen, wie gezeichnet: siehe {@link #effektiv}. */
     private int scale = 2;
-    /** Zoom: Einheiten des GUI je Block, 1, 2 oder 4; wie viel Gegend die Minimap zeigt. */
+    /** Zoom: Einheiten des GUI je Block, 1, 2, 4 oder 8; wie viel Gegend die Minimap zeigt. */
     private int zoom = 2;
     private boolean rund;
     private int groesse = GROESSE;
-    /** Beim Umschauen im Menü: wie weit die Mitte der Minimap vom Spieler liegt, in Blöcken. */
-    private double versatzX, versatzZ;
     /** Die Lage im freien Platz des Schirms: 0 links oder oben, 1 rechts oder unten. */
     private float lageX = 1, lageY = 0;
     final LongLinkedOpenHashSet offen = new LongLinkedOpenHashSet();
@@ -164,9 +162,9 @@ public final class Minimap {
         return sichtbar;
     }
 
-    /** Zoom 1, 2 oder 4 Einheiten je Block, der Reihe nach. */
+    /** Zoom 1, 2, 4 oder 8 Einheiten je Block, der Reihe nach. */
     void naechsterZoom() {
-        setzeZoom(zoom == 4 ? 1 : zoom * 2);
+        setzeZoom(zoom == 8 ? 1 : zoom * 2);
     }
 
     /** Ein anderer Zoom ändert nur den Bereich; die Texturen behalten ihre Auflösung. */
@@ -201,7 +199,7 @@ public final class Minimap {
     }
 
     /**
-     * Die Auflösung, mit der gezeichnet wird: die grösste von 1, 2 und 4 Pixeln je Block bis zur
+     * Die Auflösung, mit der gezeichnet wird: die grösste Zweierpotenz von Pixeln je Block bis zur
      * gewählten, die in die Pixel eines Blocks auf dem Schirm, Zoom mal GUI-Massstab, ganz aufgeht.
      * So wird nie verkleinert, also nie unscharf, und jeder Texel ist gleich gross.
      * Siehe docs/minimap.md, „Bedienung“.
@@ -214,29 +212,6 @@ public final class Minimap {
             }
         }
         return 1;
-    }
-
-    /**
-     * Verschiebt die Mitte um (dx, dz) Blöcke, höchstens {@code grenze} Blöcke vom Spieler; weiter
-     * hat der Client keine Chunks. Der Bereich folgt der Mitte.
-     */
-    void schiebe(double dx, double dz, double grenze) {
-        versatzX = Mth.clamp(versatzX + dx, -grenze, grenze);
-        versatzZ = Mth.clamp(versatzZ + dz, -grenze, grenze);
-    }
-
-    /** Wieder der Spieler in der Mitte. */
-    void zentriere() {
-        versatzX = 0;
-        versatzZ = 0;
-    }
-
-    double versatzX() {
-        return versatzX;
-    }
-
-    double versatzZ() {
-        return versatzZ;
     }
 
     boolean rund() {
@@ -300,10 +275,10 @@ public final class Minimap {
         }
         sichtbar = !"false".equals(p.getProperty("minimap"));
         int s = zahl(p.getProperty("massstab"), 2);
-        aufloesung = s == 1 || s == 4 ? s : 2;
+        aufloesung = s == 1 || s == 4 || s == 8 || s == 16 ? s : 2;
         // Vor dem Zoom galt der Massstab für beides; ohne zoom bleibt der Ausschnitt so.
         int z = zahl(p.getProperty("zoom"), aufloesung);
-        zoom = z == 1 || z == 4 ? z : 2;
+        zoom = z == 1 || z == 4 || z == 8 ? z : 2;
         rund = "rund".equals(p.getProperty("form"));
         groesse = Mth.clamp(zahl(p.getProperty("groesse"), GROESSE), KLEINSTE, GROESSTE);
         lageX = bruch(p.getProperty("lage_x"), 1);
@@ -413,21 +388,17 @@ public final class Minimap {
         arbeite(mc, level, spieler);
 
         Rahmen r = rahmen(g.guiWidth(), g.guiHeight());
-        int links = Mth.floor(Projektion.zuPixel(spieler.getX() + versatzX, zoom)) - r.seite() / 2;
-        int oben = Mth.floor(Projektion.zuPixel(spieler.getZ() + versatzZ, zoom)) - r.seite() / 2;
+        int links = Mth.floor(Projektion.zuPixel(spieler.getX(), zoom)) - r.seite() / 2;
+        int oben = Mth.floor(Projektion.zuPixel(spieler.getZ(), zoom)) - r.seite() / 2;
         male(g, r, links, oben, mc.getWindow().getGuiScale());
         mitspieler(g, mc, r, spieler, level);
-        // Beim Umschauen steht der Pfeil, wo der Spieler ist, und nur, solange das in der Minimap liegt.
-        double h = r.seite() / 2.0, px = -versatzX * zoom, pz = -versatzZ * zoom;
-        if (rund ? px * px + pz * pz <= h * h : Math.abs(px) <= h && Math.abs(pz) <= h) {
-            avatar(g, spieler, (int) Math.round(r.x() + h + px), (int) Math.round(r.y() + h + pz));
-        }
+        avatar(g, spieler, r.x() + r.seite() / 2, r.y() + r.seite() / 2);
     }
 
     /** Die Mitspieler als Köpfe, in derselben Dimension und innerhalb der Form. Siehe docs/minimap.md, „Mitspieler“. */
     private void mitspieler(GuiGraphicsExtractor g, Minecraft mc, Rahmen r, LocalPlayer spieler, ClientLevel level) {
         String dimension = level.dimension().identifier().toString();
-        double h = r.seite() / 2.0, mx = spieler.getX() + versatzX, mz = spieler.getZ() + versatzZ;
+        double h = r.seite() / 2.0, mx = spieler.getX(), mz = spieler.getZ();
         for (Mitspieler.Eintrag e : Mitspieler.INSTANZ.aktuell(System.currentTimeMillis())) {
             if (!e.dimension().equals(dimension) || e.uuid().equals(spieler.getUUID())) {
                 continue;
@@ -540,7 +511,7 @@ public final class Minimap {
         } else {
             decke = Integer.MAX_VALUE;
         }
-        ChunkPos jetzt = new ChunkPos(Mth.floor(spieler.getX() + versatzX) >> 4, Mth.floor(spieler.getZ() + versatzZ) >> 4);
+        ChunkPos jetzt = spieler.chunkPosition();
         if (!jetzt.equals(mitte)) {
             mitte = jetzt;
             nachBereich();
