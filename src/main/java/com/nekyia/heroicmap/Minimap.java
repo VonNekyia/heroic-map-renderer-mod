@@ -62,6 +62,8 @@ public final class Minimap {
     /** Chunks je Richtung über den sichtbaren Bereich hinaus. */
     static final int VORRAT = 2;
     static final int RAND = 4;
+    /** Seite eines Kopfes der Mitspieler in Einheiten des GUI. */
+    static final int KOPF = 8;
     /** Ändert sich die Höhe des Kopfes unter einer Decke um so viele Blöcke, wird neu gezeichnet. */
     private static final int DECKE_SCHRITT = 2;
 
@@ -412,10 +414,27 @@ public final class Minimap {
         int links = Mth.floor(Projektion.zuPixel(spieler.getX() + versatzX, zoom)) - r.seite() / 2;
         int oben = Mth.floor(Projektion.zuPixel(spieler.getZ() + versatzZ, zoom)) - r.seite() / 2;
         male(g, r, links, oben, mc.getWindow().getGuiScale());
+        mitspieler(g, mc, r, spieler, level);
         // Beim Umschauen steht der Pfeil, wo der Spieler ist, und nur, solange das in der Minimap liegt.
         double h = r.seite() / 2.0, px = -versatzX * zoom, pz = -versatzZ * zoom;
         if (rund ? px * px + pz * pz <= h * h : Math.abs(px) <= h && Math.abs(pz) <= h) {
             pfeil(g, (int) Math.round(r.x() + h + px), (int) Math.round(r.y() + h + pz), spieler.getYRot());
+        }
+    }
+
+    /** Die Mitspieler als Köpfe, in derselben Dimension und innerhalb der Form. Siehe docs/minimap.md, „Mitspieler“. */
+    private void mitspieler(GuiGraphicsExtractor g, Minecraft mc, Rahmen r, LocalPlayer spieler, ClientLevel level) {
+        String dimension = level.dimension().identifier().toString();
+        double h = r.seite() / 2.0, mx = spieler.getX() + versatzX, mz = spieler.getZ() + versatzZ;
+        for (Mitspieler.Eintrag e : Mitspieler.INSTANZ.aktuell(System.currentTimeMillis())) {
+            if (!e.dimension().equals(dimension) || e.uuid().equals(spieler.getUUID())) {
+                continue;
+            }
+            double[] lage = Mitspieler.lage(mc, e);
+            double px = (lage[0] - mx) * zoom, pz = (lage[1] - mz) * zoom;
+            if (rund ? px * px + pz * pz <= h * h : Math.abs(px) <= h && Math.abs(pz) <= h) {
+                Mitspieler.kopf(g, mc, e, (int) Math.round(r.x() + h + px), (int) Math.round(r.y() + h + pz), KOPF);
+            }
         }
     }
 
