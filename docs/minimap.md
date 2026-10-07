@@ -101,7 +101,7 @@ der User gewählt.
 
   ```json
   {"v":1,"typ":"spieler","jetzt":1696600000,"spieler":[
-    {"uuid":"…","name":"Sam","dimension":"minecraft:overworld","x":12.5,"z":-40.2,"gier":90.0}]}
+    {"uuid":"…","name":"Sam","dimension":"minecraft:overworld","x":12.5,"z":-40.2}]}
   ```
 
   Endet die Sicht, kommt einmal eine leere Liste.

@@ -29,8 +29,8 @@ final class Mitspieler {
     /** Wie das Spiel Namen von Spielern zulässt: druckbares ASCII ohne Leerzeichen, bis 16 Zeichen. */
     private static final Pattern NAME = Pattern.compile("[!-~]{1,16}");
 
-    /** Ein Spieler: wo er steht und wohin er blickt, die Gier in Grad wie {@code getYRot}. */
-    record Eintrag(UUID uuid, String name, String dimension, double x, double z, float gier) {
+    /** Ein Spieler und wo er steht. */
+    record Eintrag(UUID uuid, String name, String dimension, double x, double z) {
     }
 
     private volatile List<Eintrag> liste = List.of();
@@ -58,7 +58,7 @@ final class Mitspieler {
                     continue;
                 }
                 neu.add(new Eintrag(UUID.fromString(o.get("uuid").getAsString()), name,
-                        o.get("dimension").getAsString(), x, z, o.has("gier") ? o.get("gier").getAsFloat() : 0));
+                        o.get("dimension").getAsString(), x, z));
             } catch (RuntimeException kaputt) {
                 // Nur dieser Eintrag fällt weg.
             }
@@ -76,13 +76,13 @@ final class Mitspieler {
         empfangen = 0;
     }
 
-    /** x, z und Gier: hat der Client den Spieler als Entity, dessen Lage, die ist flüssiger; sonst die des Servers. */
+    /** x und z: hat der Client den Spieler als Entity mit dieser UUID, dessen Lage, die ist flüssiger; sonst die des Servers. */
     static double[] lage(Minecraft mc, Eintrag e) {
         Player p = mc.level == null ? null : mc.level.getPlayerByUUID(e.uuid());
-        return p != null ? new double[] {p.getX(), p.getZ(), p.getYRot()} : new double[] {e.x(), e.z(), e.gier()};
+        return p != null ? new double[] {p.getX(), p.getZ()} : new double[] {e.x(), e.z()};
     }
 
-    /** Der Kopf aus dem Skin, {@code groesse} Einheiten gross, die Mitte bei (x, y); ohne Skin ein weisser Punkt. */
+    /** Der Kopf aus dem Skin, {@code groesse} Einheiten gross, die Mitte bei (x, y); ohne Skin ein weisses Quadrat. */
     static void kopf(GuiGraphicsExtractor g, Minecraft mc, Eintrag e, int x, int y, int groesse) {
         ClientPacketListener verbindung = mc.getConnection();
         PlayerInfo info = verbindung == null ? null : verbindung.getPlayerInfo(e.uuid());

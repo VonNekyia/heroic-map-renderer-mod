@@ -20,13 +20,13 @@ class MitspielerTest {
 
     private static String eintrag(String uuid, String name, String x) {
         return "{\"uuid\":\"" + uuid + "\",\"name\":\"" + name + "\",\"dimension\":\"minecraft:overworld\",\"x\":" + x
-                + ",\"z\":-40.25,\"gier\":90}";
+                + ",\"z\":-40.25}";
     }
 
     @Test
     void lesen() {
         List<Mitspieler.Eintrag> liste = Mitspieler.lies(json(eintrag(SAM, "Sam", "12.5")));
-        assertEquals(List.of(new Mitspieler.Eintrag(UUID.fromString(SAM), "Sam", "minecraft:overworld", 12.5, -40.25, 90)), liste);
+        assertEquals(List.of(new Mitspieler.Eintrag(UUID.fromString(SAM), "Sam", "minecraft:overworld", 12.5, -40.25)), liste);
     }
 
     @Test
