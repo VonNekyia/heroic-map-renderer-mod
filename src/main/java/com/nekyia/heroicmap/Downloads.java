@@ -99,6 +99,32 @@ final class Downloads {
         }
     }
 
+    /**
+     * Ein neuer Login, auch der Wechsel des Backends hinter einem Proxy, bei dem kein
+     * {@code DISCONNECT} kommt: Angebot, Bestätigungen und wartende freigaben gehören zum alten
+     * Backend und gelten nicht mehr; welche Hashes gelten, sagt das nächste Level. Ein laufender
+     * Download lädt weiter in seinen Ordner. Siehe docs/download.md, „Ablage“.
+     */
+    void neueSitzung() {
+        angebot = null;
+        neuGefragt = false;
+        bestaetigt.clear();
+        wartend.clear();
+        if (welten != null) {
+            welten.neueSitzung();
+        }
+    }
+
+    /** Hält eine freigabe, bis der Hash ihrer Dimension bekannt ist. */
+    void warte(String baum, JsonObject json) {
+        wartend.put(baum, json);
+    }
+
+    /** Für den Test: wie viele freigaben warten. */
+    int wartende() {
+        return wartend.size();
+    }
+
     /** Vergisst Angebot, Bestätigungen und Dialog und bricht die Downloads ab, etwa beim Trennen. */
     void leeren() {
         angebot = null;
@@ -216,7 +242,7 @@ final class Downloads {
         }
         if (ordner(f.baum()) == null) {
             // Den Hash der Dimension kennt der Mod erst, wenn der Spieler sie betritt. Siehe docs/download.md, „Ablage“.
-            wartend.put(f.baum(), json);
+            warte(f.baum(), json);
             return;
         }
         if (belegt(f.baum())) {
@@ -406,11 +432,18 @@ final class Downloads {
         return hash == null || !Freigabe.baum(baum) ? null : wurzel.resolve(weltOrdner(ablage, adresse, hash)).resolve(baum);
     }
 
-    /** Der Fehler, wenn der Spieler die Dimension des Baums noch nicht betreten hat, sonst null. */
+    /** Der Fehler, wenn der Spieler die Dimension des Baums auf diesem Backend noch nicht betreten hat, sonst null. */
     private Component weltUnbekannt(String baum) {
+        ServerData server = Minecraft.getInstance().getCurrentServer();
         String dimension = text(eintrag(baum), "dimension");
-        return dimension != null && ordner(baum) == null && Minecraft.getInstance().getCurrentServer() != null
+        Long hash = server == null || dimension == null ? null : welten().hash(Welten.server(server.ip), dimension);
+        return server != null && weltUnbekannt(baum, dimension, hash)
                 ? Component.translatable("heroicmap.befehl.welt_unbekannt", dimension) : null;
+    }
+
+    /** Fehlt nur der Hash? Ein Baum ohne Dimension oder mit einem Namen, den der Mod ablehnt, ist ein anderer Fehler. */
+    static boolean weltUnbekannt(String baum, String dimension, Long hash) {
+        return dimension != null && Freigabe.baum(baum) && hash == null;
     }
 
     private Welten welten() {

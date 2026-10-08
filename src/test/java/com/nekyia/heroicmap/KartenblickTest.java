@@ -37,6 +37,37 @@ class KartenblickTest {
     }
 
     @Test
+    void klickTrifftDenGezeichnetenBlock() {
+        // scale 4, Lupe 1: Die Kachel liegt um den Rest 0,25 links ihrer exakten Lage. Ein Klick 0,1 rechts der
+        // Kante von Block 250 trifft Block 250, nicht 249.
+        Kartenblick blick = new Kartenblick(256, 0, 6, 6);
+        blick.mx = 1000.75;
+        double x = blick.rasterX(1000, 854) + 0.1;
+        assertEquals(250, (int) Math.floor(blick.basisRasterX(x, 854) / 4));
+        // Hin und zurück, auch auf einer groben Stufe mit Lupe.
+        blick.zoom = 3;
+        blick.lupe = 1;
+        blick.mz = -77.3;
+        for (double b : new double[] {-5000.5, 0, 1234.25}) {
+            assertEquals(b, blick.basisRasterX(blick.rasterX(b, 854), 854), 1e-6);
+            assertEquals(b, blick.basisRasterZ(blick.rasterY(b, 480), 480), 1e-6);
+        }
+    }
+
+    @Test
+    void nameBleibtAufDemSchirmUndNebenDenKnoepfen() {
+        // Schirm 400 breit, Knöpfe ab x 306 bis y 48, Name 60 breit.
+        assertArrayEquals(new int[] {170, 30}, Kartenblick.name(200, 30, 400, 60, 306, 48));
+        // Am linken und rechten Rand ganz auf dem Schirm.
+        assertArrayEquals(new int[] {2, 100}, Kartenblick.name(5, 100, 400, 60, 306, 48));
+        assertArrayEquals(new int[] {338, 100}, Kartenblick.name(395, 100, 400, 60, 306, 48));
+        // Oben rechts nicht unter den Knöpfen, sondern links daneben.
+        assertArrayEquals(new int[] {244, 10}, Kartenblick.name(395, 10, 400, 60, 306, 48));
+        // Ganz oben nicht über den Rand.
+        assertEquals(2, Kartenblick.name(100, -6, 400, 60, 306, 48)[1]);
+    }
+
+    @Test
     void markeWeichtDenKnoepfenAus() {
         // Schirm 400 × 200, Rand 14, Knöpfe ab x 306 bis y 48, halbe Marke 4.
         double[] oben = Kartenblick.marke(1700, -900, 400, 200, 14, 4, 306, 48);

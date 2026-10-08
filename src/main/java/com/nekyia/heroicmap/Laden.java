@@ -551,18 +551,20 @@ final class Laden {
         if (!Files.isDirectory(wurzel)) {
             return new Bestand(List.of(), 0);
         }
+        // Ist heroicmap/ selbst eine Verbindung, etwa auf ein anderes Laufwerk, läuft der Durchlauf über ihr Ziel;
+        // die Pfade rechnet er auf die Wurzel zurück, wie Downloads sie kennt.
         Path echt = wurzel.toRealPath();
         // Bytes je Ordner der ersten drei Ebenen; ein Baum liegt höchstens dort.
         Map<Path, long[]> jeOrdner = new HashMap<>();
         Set<Path> baeume = new HashSet<>();
         long[] summe = {0};
-        Files.walkFileTree(wurzel, new SimpleFileVisitor<>() {
+        Files.walkFileTree(echt, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult preVisitDirectory(Path ordner, BasicFileAttributes a) throws IOException {
                 if (abbruch.getAsBoolean()) {
                     return FileVisitResult.TERMINATE;
                 }
-                return verbindung(wurzel, echt, ordner, a) ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
+                return verbindung(echt, echt, ordner, a) ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
             }
 
             @Override
@@ -571,14 +573,14 @@ final class Laden {
                     // Ein Link zählt nicht, auch nicht, worauf er zeigt.
                     return FileVisitResult.CONTINUE;
                 }
-                Path relativ = wurzel.relativize(datei);
+                Path relativ = echt.relativize(datei);
                 String name = datei.getFileName().toString();
-                if (relativ.getNameCount() <= 4 && (name.equals("massstab.txt") || name.equals("satz.json"))) {
-                    baeume.add(datei.getParent());
+                if (relativ.getNameCount() >= 2 && relativ.getNameCount() <= 4 && (name.equals("massstab.txt") || name.equals("satz.json"))) {
+                    baeume.add(wurzel.resolve(relativ.getParent().toString()));
                 }
                 summe[0] += a.size();
                 for (int i = 1; i < relativ.getNameCount() && i <= 3; i++) {
-                    jeOrdner.computeIfAbsent(wurzel.resolve(relativ.subpath(0, i)), k -> new long[1])[0] += a.size();
+                    jeOrdner.computeIfAbsent(wurzel.resolve(relativ.subpath(0, i).toString()), k -> new long[1])[0] += a.size();
                 }
                 return FileVisitResult.CONTINUE;
             }
@@ -606,10 +608,10 @@ final class Laden {
      * Pfad nicht dort liegt, wo der Durchlauf ist. {@code echt} ist der echte Pfad der Wurzel.
      */
     static boolean verbindung(Path wurzel, Path echt, Path ordner, BasicFileAttributes a) throws IOException {
-        if (a.isSymbolicLink() || a.isOther()) {
-            return true;
+        if (ordner.equals(wurzel)) {
+            return false;
         }
-        return !ordner.equals(wurzel) && !ordner.toRealPath().equals(echt.resolve(wurzel.relativize(ordner)));
+        return a.isSymbolicLink() || a.isOther() || !ordner.toRealPath().equals(echt.resolve(wurzel.relativize(ordner)));
     }
 
     /** Verschiebt {@code alt} nach {@code neu}, wenn es {@code alt} gibt und {@code neu} noch nicht. Siehe docs/download.md, „Ablage“. */
