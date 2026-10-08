@@ -437,7 +437,7 @@ public final class Minimap {
         double innen = r.seite() / 2.0 - kopf / 2 - 1;
         for (Wegpunkte.Punkt p : Wegpunkte.INSTANZ.punkte()) {
             if (p.angeheftet() && p.dimension().equals(dimension)) {
-                float[] m = marke(r, p.x() + 0.5, p.z() + 0.5, links, oben, k, innen, true);
+                float[] m = marke(r, p.x() + 0.5, p.z() + 0.5, links, oben, k, zoom, rund, innen, true);
                 wegpunkt(g, m[0], m[1], kopf, Wegpunkte.FARBEN[p.farbe()], 0);
             }
         }
@@ -448,7 +448,7 @@ public final class Minimap {
      * die Karte den Ort zeichnet. Liegt er weiter als {@code innen} von der Mitte, mit
      * {@code klemmen} am Rand der Form in seiner Richtung, sonst null. Siehe docs/wegpunkte.md, „Am Rand“.
      */
-    private float[] marke(Rahmen r, double x, double z, int links, int oben, int k, double innen, boolean klemmen) {
+    static float[] marke(Rahmen r, double x, double z, int links, int oben, int k, int zoom, boolean rund, double innen, boolean klemmen) {
         double h = r.seite() / 2.0;
         double mx = (r.x() * k + pixel(x, zoom, k, links)) / (double) k, my = (r.y() * k + pixel(z, zoom, k, oben)) / (double) k;
         double dx = mx - (r.x() + h), dz = my - (r.y() + h);
@@ -500,7 +500,7 @@ public final class Minimap {
             }
             double[] lage = Mitspieler.lage(mc, e, a);
             boolean angeheftet = Wegpunkte.INSTANZ.angeheftet(e.uuid());
-            float[] m = marke(r, lage[0], lage[1], links, oben, k, angeheftet ? h - kopf / 2 - 1 : h, angeheftet);
+            float[] m = marke(r, lage[0], lage[1], links, oben, k, zoom, rund, angeheftet ? h - kopf / 2 - 1 : h, angeheftet);
             if (m != null) {
                 Mitspieler.kopf(g, mc, e.uuid(), m[0], m[1], kopf, 0);
             }

@@ -41,7 +41,8 @@ sagt sie das und zeigt nichts.
 
 - **Das Spiel läuft weiter,** die Karte hält es nicht an (`isPauseScreen`).
 - **Unten links** stehen der Name des Satzes und `x`, `z` des Blocks unter
-  der Maus, fest wie auf der Karte im Browser; so will es der User.
+  der Maus, so wie die Kacheln ihn zeichnen (`Kartenblick.basisRasterX`),
+  fest wie auf der Karte im Browser; so will es der User.
 - **Beim Öffnen** liegt der Spieler in der Mitte.
 - **Geht ein Knopf nicht,** etwa weil der Server den Baum nicht anbietet oder
   schon ein Download läuft, steht der Grund über den Koordinaten.

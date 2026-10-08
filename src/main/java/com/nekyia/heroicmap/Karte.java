@@ -41,6 +41,8 @@ final class Karte extends Screen {
     private final Kartenblick blick;
     /** Was beim letzten Knopf schiefging, oder null. */
     private Component hinweis;
+    /** Wo die Knöpfe rechts oben beginnen und enden; Marken und Namen weichen ihnen aus. */
+    private int knopfX, knopfUnten;
     /** Der Knopf für den Abgleich, oder null ohne Satz; er ist aus, bis ein Abgleich wieder geht. */
     private Button abgleich;
     private String baum;
@@ -87,14 +89,17 @@ final class Karte extends Screen {
             blick.mz = Projektion.zuPixel(spieler.getZ(), satz.scale());
         }
         int x = width - KNOPF - 4;
-        addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.laden"),
+        Button unterster = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.laden"),
                 b -> minecraft.gui.setScreen(new Auswahl(this))).bounds(x, 4, KNOPF, 20).build());
         if (satz != null) {
             // Der Baum ist der Ordner über dem Massstab.
             baum = satz.ordner().getParent().getFileName().toString();
             abgleich = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.abgleich"),
                     b -> hinweis = Downloads.INSTANZ.frageAbgleich(baum)).bounds(x, 28, KNOPF, 20).build());
+            unterster = abgleich;
         }
+        knopfX = x;
+        knopfUnten = unterster.getY() + unterster.getHeight();
     }
 
     @Override
@@ -170,7 +175,8 @@ final class Karte extends Screen {
             double[] lage = Mitspieler.lage(minecraft, e, 1f);
             Marke m = marke(lage[0], lage[1], e.uuid(), null);
             Mitspieler.kopf(g, minecraft, e.uuid(), m.x(), m.y(), Minimap.KOPF, Wegpunkte.INSTANZ.angeheftet(e.uuid()) ? bunt : 0);
-            g.centeredText(font, e.name(), Mth.floor(m.x()), Mth.floor(m.y() - m.halb()) - 10, TEXT);
+            int[] name = Kartenblick.name(m.x(), m.y() - m.halb() - 10, width, font.width(e.name()), knopfX, knopfUnten);
+            g.text(font, e.name(), name[0], name[1], TEXT);
         }
         Marke ich = marke(spieler.getX(), spieler.getZ(), null, null);
         Minimap.avatar(g, spieler, ich.x(), ich.y(), 1f, Minimap.KOPF);
@@ -184,7 +190,7 @@ final class Karte extends Screen {
         float halb = Minimap.KOPF / 2f + 1;
         double[] p = Kartenblick.marke(blick.rasterX(Projektion.zuPixel(x, satz.scale()), width),
                 blick.rasterY(Projektion.zuPixel(z, satz.scale()), height), width, height, RAND, halb,
-                width - KNOPF - 4, abgleich != null ? 48 : 24);
+                knopfX, knopfUnten);
         // Auf ganze Pixel wie die Kacheln, deren Kanten auf ganzen Einheiten liegen.
         int k = minecraft.getWindow().getGuiScale();
         Marke m = new Marke(Math.round(p[0] * k) / (float) k, Math.round(p[1] * k) / (float) k, halb, x, z, uuid, punkt);
@@ -241,9 +247,9 @@ final class Karte extends Screen {
         return eintraege.stream().map(Eintrag::text).toList();
     }
 
-    /** Der Block unter (x, y) des Schirms. */
+    /** Der Block unter (x, y) des Schirms, so wie die Kacheln ihn zeichnen. */
     private int[] block(double x, double y) {
-        return new int[] {Mth.floor(blick.basisX(x, width) / satz.scale()), Mth.floor(blick.basisZ(y, height) / satz.scale())};
+        return new int[] {Mth.floor(blick.basisRasterX(x, width) / satz.scale()), Mth.floor(blick.basisRasterZ(y, height) / satz.scale())};
     }
 
     /**
