@@ -25,6 +25,8 @@ final class Auswahl extends Screen {
     private List<Downloads.Baum> baeume = List.of();
     /** Geht „Selbst“, und ist es an? Dazu die Dimension des Spielers. */
     private boolean selbst, selbstAn;
+    /** Wurde hier „Selbst“ gewählt? Dann zeigt die Karte beim Zurückgehen die eigene. */
+    private boolean gewaehlt;
     private String dimension;
     /** Was beim letzten Knopf schiefging, oder null. */
     private Component hinweis;
@@ -107,6 +109,7 @@ final class Auswahl extends Screen {
             if (ja) {
                 hinweis = Selbst.INSTANZ.waehle(minecraft);
                 if (hinweis == null) {
+                    gewaehlt = true;
                     hinweis = Component.translatable("heroicmap.selbst.gewaehlt");
                 }
             }
@@ -114,8 +117,14 @@ final class Auswahl extends Screen {
         }, Component.translatable("heroicmap.selbst.titel"), Component.translatable("heroicmap.selbst.frage")));
     }
 
+    /** Zurück; kam die Liste von der Karte und wurde „Selbst“ gewählt, öffnet die Karte neu mit der eigenen. */
     @Override
     public void onClose() {
+        if (gewaehlt && zurueck instanceof Karte karte && minecraft.level != null) {
+            karte.onClose();
+            minecraft.gui.setScreen(new Karte(Satz.fuer(Selbst.INSTANZ.weltOrdner(), dimension)));
+            return;
+        }
         minecraft.gui.setScreen(zurueck);
     }
 

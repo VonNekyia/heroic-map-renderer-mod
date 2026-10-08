@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
@@ -16,6 +17,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
+import java.util.zip.CRC32;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.SectionPos;
@@ -41,8 +44,10 @@ public final class Selbst {
     static final String PRAEFIX = "selbst-";
     /** Je Chunk höchstens so oft: Wasser fliesst, Getreide wächst. */
     static final long PAUSE_MS = 5000;
-    /** So oft schreibt der Worker geänderte Kacheln. */
-    static final long SCHREIBEN_MS = 5000;
+    /** So oft schreibt der Worker geänderte Kacheln der zwei feinsten Stufen, und so oft die gröberen. */
+    static final long SCHREIBEN_MS = 5000, GROB_MS = 60_000;
+    /** Die Datei, die einen Baum als selbst gezeichnet ausweist. */
+    static final String MARKE = "selbst.txt";
     /** So viele Chunks hat der Worker höchstens vor sich. */
     private static final int IN_ARBEIT = 4;
     /** Zeit je Tick auf dem Render-Thread für Abzüge. */
@@ -58,6 +63,8 @@ public final class Selbst {
     private ChunkMaler maler;
     private Kachelwerk werk;
     private boolean gemeldet;
+    /** Wann die gröberen Stufen zuletzt geschrieben wurden, in ms. */
+    private long grobGeschrieben;
 
     /** Chunks, die zu zeichnen sind. */
     private final LongLinkedOpenHashSet offen = new LongLinkedOpenHashSet();
@@ -72,18 +79,34 @@ public final class Selbst {
     private Path testWelt;
 
     private Selbst() {
-        worker.scheduleWithFixedDelay(this::schreibe, SCHREIBEN_MS, SCHREIBEN_MS, TimeUnit.MILLISECONDS);
+        worker.scheduleWithFixedDelay(() -> schreibe(false), SCHREIBEN_MS, SCHREIBEN_MS, TimeUnit.MILLISECONDS);
     }
 
-    /** Der Name des Baums einer Dimension: {@link #PRAEFIX} und die Kennung, andere Zeichen als a–z, 0–9, _ und - werden _. */
+    /**
+     * Der Name des Baums einer Dimension: {@link #PRAEFIX}, die Kennung, andere Zeichen als a–z,
+     * 0–9, _ und - als _, gekürzt, dazu 8 Stellen hex aus CRC32 der Kennung. So ergeben
+     * {@code mod:a/b} und {@code mod:a_b} zwei Bäume.
+     */
     static String baum(String dimension) {
-        String name = PRAEFIX + dimension.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]", "_");
-        return name.length() > 64 ? name.substring(0, 64) : name;
+        String lesbar = dimension.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]", "_");
+        CRC32 crc = new CRC32();
+        crc.update(dimension.getBytes(StandardCharsets.UTF_8));
+        return PRAEFIX + lesbar.substring(0, Math.min(lesbar.length(), 47)) + "-" + String.format(Locale.ROOT, "%08x", crc.getValue());
     }
 
-    /** Ist der Baum selbst gezeichnet? */
+    /**
+     * Ist der Baum selbst gezeichnet? Am Präfix und an {@link #MARKE}; einen Baum mit dem Präfix
+     * lädt der Mod nie vom Server ({@code Freigabe.baum}).
+     */
     static boolean selbst(Path baum) {
-        return baum.getFileName().toString().startsWith(PRAEFIX);
+        return baum.getFileName().toString().startsWith(PRAEFIX) && Files.exists(baum.resolve(MARKE));
+    }
+
+    /** Wird die Dimension in der Welt {@code welt} selbst gezeichnet? Die Dimension aus {@code satz.json} muss passen. */
+    static boolean an(Path welt, String dimension) {
+        Path baum = welt.resolve(baum(dimension));
+        Satz satz = Satz.lies(baum);
+        return satz != null && dimension.equals(satz.dimension()) && selbst(baum);
     }
 
     /** Legt den Baum der Dimension in der Welt an, {@code satz.json} und {@code map.json}, und gibt ihn zurück. */
@@ -96,23 +119,24 @@ public final class Selbst {
         karte.addProperty("maxZoom", MAX_ZOOM);
         karte.addProperty("scale", SCALE);
         Files.writeString(ordner.resolve("map.json"), karte.toString(), StandardCharsets.UTF_8);
+        Files.writeString(baum.resolve(MARKE), "Heroic Map: selbst gezeichnet, " + dimension + "\n", StandardCharsets.UTF_8);
         Satz.schreibe(baum, "Selbst", dimension, SCALE);
         return baum;
     }
 
-    /** Der Ordner der Welt, in dem der Mod zeichnen kann, oder null, etwa im Einzelspieler. */
-    private Path welt() {
+    /** Der Ordner der Welt, in dem der Mod zeichnen kann, oder null, etwa im Einzelspieler; im Gametest der Testordner. */
+    Path weltOrdner() {
         return testWelt != null ? testWelt : Downloads.weltOrdner();
     }
 
     /** Geht „Selbst“ hier? Nicht ohne Ordner der Welt, etwa im Einzelspieler, und nicht unter einer Decke. */
     boolean moeglich(Minecraft mc) {
-        return welt() != null && mc.level != null && !mc.level.dimensionType().hasCeiling();
+        return weltOrdner() != null && mc.level != null && !mc.level.dimensionType().hasCeiling();
     }
 
     /** Wird die Dimension des Spielers schon selbst gezeichnet? */
     boolean an(Minecraft mc) {
-        return moeglich(mc) && Files.exists(welt().resolve(baum(dimension(mc.level))).resolve("satz.json"));
+        return moeglich(mc) && an(weltOrdner(), dimension(mc.level));
     }
 
     /** Die Wahl „Selbst“: legt den Baum an und zeichnet die geladenen Chunks. Gibt den Fehler zurück, oder null. */
@@ -121,7 +145,7 @@ public final class Selbst {
             return Component.translatable("heroicmap.selbst.geht_nicht");
         }
         try {
-            anlegen(welt(), dimension(mc.level));
+            anlegen(weltOrdner(), dimension(mc.level));
         } catch (IOException e) {
             LOGGER.warn("Heroic Map: Karte zum selbst Zeichnen nicht angelegt", e);
             return Component.translatable("heroicmap.selbst.fehler");
@@ -160,31 +184,35 @@ public final class Selbst {
         gesucht = false;
         licht = null;
         worker.execute(() -> {
-            schreibe();
+            schreibe(true);
             werk = null;
         });
     }
 
     /**
      * Löscht einen selbst gezeichneten Baum im Worker, nach allem, was dort noch wartet, und ruft
-     * dann {@code danach} auf dem Render-Thread. Wird gerade in ihn gezeichnet, endet das bis zum nächsten Wechsel der Welt.
+     * dann {@code danach} auf dem Render-Thread, mit wahr, wenn alles weg ist. Wird gerade in ihn
+     * gezeichnet, endet das bis zum nächsten Wechsel der Welt.
      */
-    void loesche(Path baum, Runnable danach) {
+    void loesche(Path baum, Consumer<Boolean> danach) {
         if (satz != null && satz.ordner().getParent().equals(baum)) {
             satz = null;
             gesucht = true;
             offen.clear();
         }
         worker.execute(() -> {
+            boolean ganz = false;
             try {
                 if (werk != null && werk.ordner().getParent().equals(baum)) {
                     werk = null;
                 }
                 Laden.loesche(baum);
+                ganz = true;
             } catch (IOException | RuntimeException e) {
                 LOGGER.warn("Heroic Map: {} nicht ganz gelöscht", baum, e);
             } finally {
-                Minecraft.getInstance().execute(danach);
+                boolean ok = ganz;
+                Minecraft.getInstance().execute(() -> danach.accept(ok));
             }
         });
     }
@@ -192,7 +220,7 @@ public final class Selbst {
     private Satz satz(ClientLevel level) {
         if (!gesucht) {
             gesucht = true;
-            Satz s = level.dimensionType().hasCeiling() ? null : Satz.fuer(welt(), dimension(level));
+            Satz s = level.dimensionType().hasCeiling() ? null : Satz.fuer(weltOrdner(), dimension(level));
             satz = s != null && selbst(s.ordner().getParent()) ? s : null;
             if (satz == null) {
                 offen.clear();
@@ -201,14 +229,19 @@ public final class Selbst {
         return satz;
     }
 
-    /** Je Tick: Chunks, die bereit sind, abziehen und dem Worker geben, solange die Minimap nichts zu tun hat. */
+    /**
+     * Je Tick: Chunks, die bereit sind, abziehen und dem Worker geben. Die Minimap geht vor: Hat sie
+     * zu tun, höchstens einer je Tick, so wartet die eigene Karte nie ganz.
+     */
     void arbeite(Minecraft mc) {
         ClientLevel level = mc.level;
-        if (level == null || satz(level) == null || offen.isEmpty() || Minimap.INSTANZ.beschaeftigt()) {
+        if (level == null || satz(level) == null || offen.isEmpty()) {
             return;
         }
+        int hoechstens = Minimap.INSTANZ.beschaeftigt() ? 1 : IN_ARBEIT, gestartet = 0;
         long jetzt = System.currentTimeMillis(), ende = System.nanoTime() + BUDGET_NS;
-        for (LongIterator it = offen.iterator(); it.hasNext() && inArbeit.get() < IN_ARBEIT && System.nanoTime() < ende; ) {
+        for (LongIterator it = offen.iterator(); it.hasNext() && gestartet < hoechstens && inArbeit.get() < IN_ARBEIT
+                && System.nanoTime() < ende; ) {
             long k = it.nextLong();
             int cx = ChunkPos.getX(k), cz = ChunkPos.getZ(k);
             LevelChunk chunk = level.getChunkSource().getChunk(cx, cz, ChunkStatus.FULL, false);
@@ -222,6 +255,7 @@ public final class Selbst {
             it.remove();
             zuletzt.put(k, jetzt);
             starte(mc, level, chunk);
+            gestartet++;
         }
     }
 
@@ -267,25 +301,36 @@ public final class Selbst {
     /** Im Worker: das Werk für den Satz; ein anderes schreibt vorher, was es noch hat. */
     private Kachelwerk werk(Satz s) {
         if (werk == null || !werk.ordner().equals(s.ordner())) {
-            schreibe();
+            schreibe(true);
             werk = new Kachelwerk(s.ordner(), s.kachel(), 16 * SCALE, s.minZoom(), s.maxZoom());
         }
         return werk;
     }
 
-    /** Im Worker: geänderte Kacheln schreiben und der offenen Karte melden. Wirft nie, sonst endete die Wiederholung. */
-    private void schreibe() {
+    /**
+     * Im Worker: geänderte Kacheln schreiben, die gröberen Stufen höchstens alle {@link #GROB_MS}
+     * oder mit {@code alles}, und der offenen Karte melden, was geschrieben ist, auch nach einem
+     * Fehler. Wirft nie, sonst endete die Wiederholung.
+     */
+    private void schreibe(boolean alles) {
         if (werk == null) {
             return;
         }
+        Path ordner = werk.ordner();
+        List<Kachelwerk.Kachel> fertig = new ArrayList<>();
+        long jetzt = System.currentTimeMillis();
+        boolean grob = alles || jetzt - grobGeschrieben >= GROB_MS;
         try {
-            Path ordner = werk.ordner();
-            List<Kachelwerk.Kachel> fertig = werk.schreibe();
-            if (!fertig.isEmpty()) {
-                Minecraft.getInstance().execute(() -> fertig.forEach(k -> Kacheln.geaendert(ordner, k.z(), k.x(), k.y())));
+            werk.schreibe(grob, fertig);
+            if (grob) {
+                grobGeschrieben = jetzt;
             }
         } catch (IOException | RuntimeException e) {
             melde(e);
+        } finally {
+            if (!fertig.isEmpty()) {
+                Minecraft.getInstance().execute(() -> fertig.forEach(k -> Kacheln.geaendert(ordner, k.z(), k.x(), k.y())));
+            }
         }
     }
 
@@ -317,6 +362,6 @@ public final class Selbst {
 
     /** Für den Gametest: schreibt jetzt, was geändert ist. */
     CompletableFuture<Void> schreibeJetzt() {
-        return CompletableFuture.runAsync(this::schreibe, worker);
+        return CompletableFuture.runAsync(() -> schreibe(true), worker);
     }
 }

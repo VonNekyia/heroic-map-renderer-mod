@@ -51,10 +51,15 @@ class PyramideTest {
     }
 
     @Test
-    void zweimalHalbiert() {
-        int[] bild = new int[4 * 4];
-        Arrays.fill(bild, 0xFF123456);
-        assertArrayEquals(new int[] {0xFF123456}, Pyramide.verkleinere(bild, 4, 2));
-        assertEquals(bild, Pyramide.verkleinere(bild, 4, 0));
+    void jedesViertelAusSeinenPixeln() {
+        // 4 × 4 aus vier einfarbigen Blöcken 2 × 2: Jeder Pixel des Ergebnisses hat die Farbe seines Blocks.
+        // Ein falscher Index, etwa y · seite statt 2 · y · seite, mischte Blöcke.
+        int a = 0xFF102030, b = 0xFF405060, c = 0xFF708090, d = 0xFFA0B0C0;
+        int[] bild = {
+            a, a, b, b,
+            a, a, b, b,
+            c, c, d, d,
+            c, c, d, d};
+        assertArrayEquals(new int[] {a, b, c, d}, Pyramide.halbiere(bild, 4));
     }
 }

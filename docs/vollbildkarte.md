@@ -36,7 +36,7 @@ sagt sie das und zeigt nichts.
 | Rechtsklick | öffnet ein kleines Menü für den Block unter der Maus, wie die Anzeige unten links: „Hierher teleportieren (x, z)“, siehe unten, darunter „Wegpunkt setzen“, auf einem Wegpunkt „Wegpunkt löschen“, siehe [Wegpunkte](wegpunkte.md); erst ein Klick auf einen Eintrag tut etwas, mit der linken oder rechten Taste, jeder Klick daneben schliesst es, ein Rechtsklick öffnet es dort neu |
 | Klick, Doppelklick auf eine Marke | legt beim Loslassen einen Wegpunkt, Mitspieler oder den eigenen Spieler in die Mitte; ein Doppelklick heftet einen Wegpunkt oder Mitspieler an die Minimap; wer auf einer Marke zieht, zieht nur die Karte; siehe [Wegpunkte](wegpunkte.md) |
 | Knopf „Karte laden …“ | zeigt die Karten des Servers, je Baum der Name und darunter ein Knopf je Massstab mit seiner Grösse (`Auswahl`), darüber die Wahl „Selbst“, siehe [Selbst gezeichnete Karte](selbst.md); die Knöpfe teilen sich die Breite des Schirms, höchstens 90 Einheiten je Knopf, so passen sie auch bei grossem GUI-Massstab; den Massstab, den der Spieler schon ganz hat (`Downloads.vollstaendig`: ein vollständiger Satz, und das Plugin misst den Abgleich an demselben Massstab), zeigt der Knopf als „Abgleich“ und gleicht ab wie der Knopf „Abgleich“, nach einer Ablehnung mit `wieder` bis dahin aus; ein Klick fragt wie `/hmap laden` erst im Dialog nach |
-| Knopf „Abgleich“ | fragt einen Abgleich des gezeigten Satzes an, wie `/hmap abgleich`; nur mit Satz. Lehnt der Server mit `wieder` ab, ist der Knopf bis dahin aus und nennt die Uhrzeit |
+| Knopf „Abgleich“ | fragt einen Abgleich des gezeigten Satzes an, wie `/hmap abgleich`; nur mit einem Satz vom Server, nicht auf der selbst gezeichneten Karte. Lehnt der Server mit `wieder` ab, ist der Knopf bis dahin aus und nennt die Uhrzeit |
 | `Esc` | schliesst |
 
 - **Das Spiel läuft weiter,** die Karte hält es nicht an (`isPauseScreen`).
@@ -139,8 +139,10 @@ sagt sie das und zeigt nichts.
   gleich noch einmal.
 - **Beim Schliessen** gibt die Karte alle Texturen frei.
 - **Nur Kacheln vom Server:** Was sich seit dem letzten Lauf des Renderers
-  ändert, bringt der Abgleich; selbst zeichnet der Mod nur die Minimap,
-  siehe [0002](entscheidungen/0002-vollbildkarte-nur-vom-server.md).
+  ändert, bringt der Abgleich; über die Kacheln des Servers zeichnet der
+  Mod nichts, siehe [0002](entscheidungen/0002-vollbildkarte-nur-vom-server.md).
+  Eine eigene Karte statt der des Servers gibt es mit der Wahl „Selbst“,
+  siehe [Selbst gezeichnete Karte](selbst.md).
 
 ### Farbindex hinter der Palette
 

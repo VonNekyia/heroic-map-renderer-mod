@@ -14,7 +14,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.gui.screens.ConfirmScreen;
 
 /**
  * Bilder der Minimap zum Ansehen, nicht zum Vergleichen: baut eine Szene in einer flachen
@@ -95,7 +95,7 @@ public final class Bilder implements FabricClientGameTest {
             }
             menue(context);
             vollbildkarte(context);
-            selbst(context);
+            selbst(context, server);
         }
     }
 
@@ -174,10 +174,12 @@ public final class Bilder implements FabricClientGameTest {
     }
 
     /**
-     * Die selbst gezeichnete Karte der Szene: „Selbst“ wählen, warten, bis um den Spieler alles
-     * gezeichnet ist, schreiben und auf der feinsten Stufe aufnehmen. Siehe docs/selbst.md, „Bild“.
+     * Die selbst gezeichnete Karte der Szene, gewählt wie ein Spieler: Karte ohne Satz, „Karte
+     * laden …“, „Selbst“, Ja, Zurück; die Karte zeigt dann die eigene. Während die Minimap jeden
+     * Tick zu tun hat, wird um den Spieler trotzdem alles gezeichnet; dann schreiben und auf der
+     * feinsten Stufe aufnehmen. Siehe docs/selbst.md, „Bild“.
      */
-    private static void selbst(ClientGameTestContext context) {
+    private static void selbst(ClientGameTestContext context, TestServerContext server) {
         Path welt = FabricLoader.getInstance().getGameDir().resolve(HeroicMap.ID).resolve("test").resolve("selbst");
         try {
             Laden.loesche(welt);
@@ -186,15 +188,36 @@ public final class Bilder implements FabricClientGameTest {
         }
         context.runOnClient(mc -> {
             Selbst.INSTANZ.fuerTest(welt);
-            Component fehler = Selbst.INSTANZ.waehle(mc);
-            if (fehler != null) {
-                throw new AssertionError("Selbst: " + fehler.getString());
-            }
+            Karte ohne = new Karte(null);
+            mc.gui.setScreen(ohne);
+            mc.gui.setScreen(new Auswahl(ohne));
         });
-        context.waitFor(mc -> Selbst.INSTANZ.fertig(mc.player.chunkPosition(), 2), 1200);
+        context.waitTicks(2);
+        context.clickScreenButton("heroicmap.selbst.knopf");
+        context.waitFor(mc -> mc.gui.screen() instanceof ConfirmScreen, 100);
+        context.clickScreenButton("gui.yes");
+        context.waitTicks(2);
+        context.clickScreenButton("gui.back");
+        context.waitTicks(2);
+        String baum = context.computeOnClient(mc -> mc.gui.screen() instanceof Karte k && k.satz() != null
+                ? k.satz().ordner().getParent().getFileName().toString() : null);
+        if (baum == null || !baum.startsWith(Selbst.PRAEFIX)) {
+            throw new AssertionError("Nach „Selbst“ zeigt die Karte " + baum);
+        }
+        context.runOnClient(mc -> mc.gui.screen().onClose());
+
+        // Ein Block im Bereich der Minimap, ausserhalb des geprüften Radius, wechselt jeden Tick.
+        boolean fertig = false;
+        for (int i = 0; i < 1200 && !fertig; i++) {
+            server.runCommand("setblock 50 -60 0 " + (i % 2 == 0 ? "stone" : "air"));
+            context.waitTick();
+            fertig = context.computeOnClient(mc -> Selbst.INSTANZ.fertig(mc.player.chunkPosition(), 2));
+        }
+        if (!fertig) {
+            throw new AssertionError("Die eigene Karte wurde neben der beschäftigten Minimap nicht fertig");
+        }
         context.computeOnClient(mc -> Selbst.INSTANZ.schreibeJetzt()).join();
-        Path baum = welt.resolve(Selbst.baum("minecraft:overworld"));
-        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
+        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(welt, "minecraft:overworld"))));
         context.waitTicks(40);
         Path bild = context.takeScreenshot(TestScreenshotOptions.of("selbst").disableCounterPrefix());
         try {
@@ -205,7 +228,7 @@ public final class Bilder implements FabricClientGameTest {
             throw new UncheckedIOException(e);
         }
         context.runOnClient(mc -> {
-            mc.gui.setScreen(null);
+            mc.gui.screen().onClose();
             Selbst.INSTANZ.fuerTest(null);
             Selbst.INSTANZ.leeren();
         });

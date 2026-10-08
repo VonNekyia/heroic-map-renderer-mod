@@ -37,15 +37,6 @@ final class Pyramide {
         return aus;
     }
 
-    /** Halbiert {@code mal} Mal: {@code seite} durch 2^mal. */
-    static int[] verkleinere(int[] argb, int seite, int mal) {
-        for (int i = 0; i < mal; i++) {
-            argb = halbiere(argb, seite);
-            seite /= 2;
-        }
-        return argb;
-    }
-
     private static int kanal(float linear) {
         return Math.clamp(Math.round(ChunkMaler.srgb(linear) * 255), 0, 255);
     }

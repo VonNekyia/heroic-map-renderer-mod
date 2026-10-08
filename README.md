@@ -4,7 +4,8 @@ Ein Fabric-Mod für Minecraft mit Minimap und Vollbildkarte, für Server mit
 dem Plugin von [heroic-map-renderer](https://github.com/VonNekyia/heroic-map-renderer).
 
 - **Minimap:** zeichnet der Mod selbst, aus den Chunks, die der Client geladen hat.
-- **Vollbildkarte:** lädt der Mod vom Server, mit 1, 2 oder 4 Pixeln je Block.
+- **Vollbildkarte:** lädt der Mod vom Server, mit 1, 2 oder 4 Pixeln je Block,
+  oder zeichnet sie mit der Wahl „Selbst“ aus den Chunks, die der Spieler lädt.
 
 ![Minimap bei 4 Pixeln je Block](docs/bilder/minimap-4px.png)
 

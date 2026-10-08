@@ -236,6 +236,10 @@ final class Karte extends Screen {
         return ziel;
     }
 
+    Satz satz() {
+        return satz;
+    }
+
     List<Marke> marken() {
         return List.copyOf(marken);
     }

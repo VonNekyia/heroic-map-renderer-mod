@@ -108,7 +108,8 @@ final class Kartenliste extends Screen {
                 loesche(e);
             }
         }, Component.translatable("heroicmap.liste.frage_titel"),
-                Component.translatable("heroicmap.liste.frage", e.pfad(), Downloads.groesse(e.bytes()))));
+                Component.translatable(Selbst.selbst(e.ordner()) ? "heroicmap.liste.frage_selbst" : "heroicmap.liste.frage",
+                        e.pfad(), Downloads.groesse(e.bytes()))));
     }
 
     /** Löscht den Baum, den {@link Downloads#halte} hält, und gibt ihn danach frei. */
@@ -119,7 +120,7 @@ final class Kartenliste extends Screen {
         rebuildWidgets();
         if (Selbst.selbst(e.ordner())) {
             // Im Worker der eigenen Karte, nach allem, was er noch in sie schreibt.
-            Selbst.INSTANZ.loesche(e.ordner(), this::zaehle);
+            Selbst.INSTANZ.loesche(e.ordner(), ok -> geloescht(e, ok));
             return;
         }
         Thread.ofPlatform().daemon().name("Heroic Map Löschen").start(() -> {
@@ -129,19 +130,23 @@ final class Kartenliste extends Screen {
             } catch (IOException | RuntimeException fehler) {
                 LOGGER.warn("Heroic Map: {} nicht ganz gelöscht", e.ordner(), fehler);
                 ganz = false;
-            } finally {
-                Downloads.INSTANZ.gibFrei(e.ordner());
             }
             boolean ok = ganz;
-            Minecraft.getInstance().execute(() -> {
-                if (!ok) {
-                    hinweis = Component.translatable("heroicmap.liste.fehler");
-                }
-                if (minecraft.gui.screen() == this) {
-                    zaehle();
-                }
-            });
+            Minecraft.getInstance().execute(() -> geloescht(e, ok));
         });
+    }
+
+    /** Auf dem Render-Thread nach dem Löschen: den Schlüssel freigeben, einen Fehler nennen, neu zählen. */
+    private void geloescht(Laden.AufPlatte e, boolean ok) {
+        Downloads.INSTANZ.gibFrei(e.ordner());
+        if (!ok) {
+            hinweis = Component.translatable("heroicmap.liste.fehler");
+        }
+        if (minecraft.gui.screen() == this) {
+            zaehle();
+        } else {
+            zaehlt = null;
+        }
     }
 
     @Override

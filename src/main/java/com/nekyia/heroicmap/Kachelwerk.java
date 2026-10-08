@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,9 +14,9 @@ import javax.imageio.ImageIO;
 
 /**
  * Die Kacheln der selbst gezeichneten Karte auf der Platte: nimmt die Bilder einzelner Chunks in
- * die Kacheln der feinsten Stufe, schreibt geänderte Kacheln als PNG und rechnet die gröberen
- * Stufen darüber neu, je 2 × 2 Kacheln wie die Pyramide des Renderers. Ohne Minecraft; gehört
- * einem Thread. Siehe docs/selbst.md, „Kacheln“.
+ * die Kacheln der feinsten Stufe und schreibt geänderte Kacheln als PNG. Jede geschriebene Kachel
+ * verkleinert es in ihr Viertel des Vorfahren, wie die Pyramide des Renderers. Ohne Minecraft;
+ * gehört einem Thread. Siehe docs/selbst.md, „Kacheln“.
  */
 final class Kachelwerk {
 
@@ -38,7 +37,7 @@ final class Kachelwerk {
 
     private final Path ordner;
     private final int seite, chunk, minZoom, maxZoom;
-    /** Geänderte Kacheln der feinsten Stufe, noch nicht geschrieben. */
+    /** Geänderte Kacheln aller Stufen, noch nicht geschrieben; ihr Inhalt liegt im Speicher. */
     private final Set<Kachel> geaendert = new HashSet<>();
     private final Map<Kachel, int[]> speicher = new LinkedHashMap<>(16, 0.75f, true) {
         @Override
@@ -76,42 +75,35 @@ final class Kachelwerk {
     }
 
     /**
-     * Schreibt die geänderten Kacheln und rechnet ihre Vorfahren bis {@code minZoom} neu. Gibt
-     * jede geschriebene Kachel zurück. Scheitert das Schreiben, bleibt, was nicht geschrieben ist,
-     * geändert.
+     * Schreibt geänderte Kacheln, die feinste Stufe zuerst; ohne {@code grob} nur die zwei
+     * feinsten Stufen, die gröberen warten. Jede geschriebene Kachel kommt nach {@code fertig},
+     * auch wenn danach eine scheitert; was nicht geschrieben ist, bleibt geändert.
      */
-    List<Kachel> schreibe() throws IOException {
-        List<Kachel> fertig = new ArrayList<>();
-        Set<Kachel> stufe = new HashSet<>();
-        for (Kachel k : List.copyOf(geaendert)) {
-            speichere(k, speicher.get(k));
-            geaendert.remove(k);
-            stufe.add(k);
-            fertig.add(k);
-        }
-        for (int z = maxZoom - 1; z >= minZoom && !stufe.isEmpty(); z--) {
-            Set<Kachel> eltern = new HashSet<>();
-            for (Kachel k : stufe) {
-                eltern.add(k.eltern());
-            }
-            for (Kachel e : eltern) {
-                int[] argb = new int[seite * seite];
-                int halb = seite / 2;
-                for (int i = 0; i < 4; i++) {
-                    int[] kind = lies(new Kachel(z + 1, 2 * e.x() + (i & 1), 2 * e.y() + (i >> 1)));
-                    int[] klein = Pyramide.halbiere(kind, seite);
-                    int ox = (i & 1) * halb, oy = (i >> 1) * halb;
-                    for (int y = 0; y < halb; y++) {
-                        System.arraycopy(klein, y * halb, argb, (oy + y) * seite + ox, halb);
-                    }
+    void schreibe(boolean grob, List<Kachel> fertig) throws IOException {
+        for (int z = maxZoom; z >= minZoom && (grob || z >= maxZoom - 1); z--) {
+            int stufe = z;
+            for (Kachel k : geaendert.stream().filter(k -> k.z() == stufe).toList()) {
+                int[] argb = speicher.get(k);
+                speichere(k, argb);
+                geaendert.remove(k);
+                fertig.add(k);
+                if (z > minZoom) {
+                    viertel(k, argb);
                 }
-                speicher.put(e, argb);
-                speichere(e, argb);
-                fertig.add(e);
             }
-            stufe = eltern;
         }
-        return fertig;
+    }
+
+    /** Verkleinert die Kachel in ihr Viertel des Vorfahren; der ist damit geändert. Die anderen drei Viertel bleiben. */
+    private void viertel(Kachel k, int[] argb) throws IOException {
+        Kachel e = k.eltern();
+        int[] ziel = lies(e);
+        int[] klein = Pyramide.halbiere(argb, seite);
+        int halb = seite / 2, ox = (k.x() & 1) * halb, oy = (k.y() & 1) * halb;
+        for (int y = 0; y < halb; y++) {
+            System.arraycopy(klein, y * halb, ziel, (oy + y) * seite + ox, halb);
+        }
+        geaendert.add(e);
     }
 
     /** Die Kachel aus dem Speicher, sonst von der Platte; fehlt sie oder ist sie unlesbar, durchsichtig. */
@@ -131,15 +123,19 @@ final class Kachelwerk {
         return argb;
     }
 
-    /** Als PNG über eine Zwischendatei; nie liegt eine halbe Kachel da. */
+    /** Als PNG über eine Zwischendatei; nie liegt eine halbe Kachel da, und eine gescheiterte Zwischendatei geht wieder. */
     private void speichere(Kachel k, int[] argb) throws IOException {
         Path datei = k.datei(ordner), tmp = datei.resolveSibling(k.y() + ".png.tmp");
         Files.createDirectories(datei.getParent());
         BufferedImage bild = new BufferedImage(seite, seite, BufferedImage.TYPE_INT_ARGB);
         bild.setRGB(0, 0, seite, seite, argb, 0, seite);
-        if (!ImageIO.write(bild, "png", tmp.toFile())) {
-            throw new IOException("Kein Schreiber für PNG");
+        try {
+            if (!ImageIO.write(bild, "png", tmp.toFile())) {
+                throw new IOException("Kein Schreiber für PNG");
+            }
+            Files.move(tmp, datei, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } finally {
+            Files.deleteIfExists(tmp);
         }
-        Files.move(tmp, datei, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     }
 }
