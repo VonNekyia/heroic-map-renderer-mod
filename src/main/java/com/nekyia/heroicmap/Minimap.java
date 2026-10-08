@@ -103,6 +103,8 @@ public final class Minimap {
     private final LongOpenHashSet gezeichnet = new LongOpenHashSet();
     /** Zahl der übernommenen Bilder, für die Messung. */
     private long uebernommen;
+    /** Wann {@code arbeite} zuletzt lief, in ns; ohne HUD läuft es nicht. */
+    private long gearbeitet;
     private final Long2ObjectMap<Region> regionen = new Long2ObjectOpenHashMap<>();
     private final ArrayDeque<CompletableFuture<Bild>> laufend = new ArrayDeque<>();
     /** Zählt jedes Leeren mit; ein Bild aus einem älteren Stand fällt weg. */
@@ -361,6 +363,20 @@ public final class Minimap {
         return mitte != null && offen.isEmpty() && laufend.isEmpty();
     }
 
+    /**
+     * Hat die Minimap zu tun? Dann wartet die selbst gezeichnete Karte. Ohne HUD, etwa mit F1,
+     * zeichnet die Minimap nicht; nach einer Sekunde ohne Arbeit wartet niemand mehr auf sie.
+     */
+    boolean beschaeftigt() {
+        return sichtbar && !fertig() && System.nanoTime() - gearbeitet < 1_000_000_000L;
+    }
+
+    /** Die Texel des Block-Atlas, nach einem Neuladen neu kopiert; auf dem Render-Thread. */
+    Map<TextureAtlasSprite, ChunkMaler.Texel> texel(Minecraft mc) {
+        pruefeAtlas(mc);
+        return texel;
+    }
+
     /** Chunks je Richtung um den Spieler, die die Minimap zeichnet: sichtbar plus Vorrat. */
     int reichweite() {
         return reichweite(zoom, groesse);
@@ -560,6 +576,7 @@ public final class Minimap {
      * Budget des Frames aufgebraucht ist.
      */
     private void arbeite(Minecraft mc, ClientLevel level, LocalPlayer spieler) {
+        gearbeitet = System.nanoTime();
         pruefeAtlas(mc);
         int soll = effektiv(aufloesung, zoom, mc.getWindow().getGuiScale());
         if (soll != scale) {

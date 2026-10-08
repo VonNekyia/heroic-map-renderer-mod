@@ -91,6 +91,11 @@ final class Kartenliste extends Screen {
     private void loesche(Laden.AufPlatte e) {
         bestand = null;
         rebuildWidgets();
+        if (Selbst.selbst(e.ordner())) {
+            // Im Worker der eigenen Karte, nach allem, was er noch in sie schreibt.
+            Selbst.INSTANZ.loesche(e.ordner(), this::zaehle);
+            return;
+        }
         Thread.ofPlatform().daemon().name("Heroic Map Löschen").start(() -> {
             try {
                 Laden.loesche(e.ordner());

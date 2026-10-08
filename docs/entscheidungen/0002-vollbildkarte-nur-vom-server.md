@@ -1,7 +1,7 @@
 ---
 title: "0002: Die Vollbildkarte nur vom Server"
 description: Warum die Vollbildkarte nur Kacheln vom Server zeigt und der Mod die Live-Ebene darüber nicht mehr zeichnet.
-status: gilt
+status: teilweise abgelöst durch 0004
 date: 2026-10-08
 issues: [25]
 code:
@@ -24,7 +24,10 @@ hielt die Karte deshalb für kaputt.
 ## Entscheidung
 
 Die Vollbildkarte zeigt nur Kacheln aus dem Satz vom Server. Selbst
-gezeichnet wird nur die [Minimap](../minimap.md). Neue Änderungen bringt
+gezeichnet wird nur die [Minimap](../minimap.md). Seit
+[0004](0004-karte-selbst-zeichnen.md) gibt es daneben die Wahl „Selbst“,
+eine eigene Karte, die die des Servers ersetzt; über deren Kacheln legt der
+Mod weiter nichts. Neue Änderungen bringt
 der Abgleich, bis zu 10-mal am Tag. Entschieden vom Maintainer am 08.10.
 
 - Weg sind `Live`, `Ebene`, `Pyramide`, der Mixin an `setBlockDirty`, die

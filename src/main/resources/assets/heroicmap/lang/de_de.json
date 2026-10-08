@@ -81,5 +81,13 @@
   "heroicmap.liste.frage_titel": "Karte löschen?",
   "heroicmap.liste.frage": "%s mit %s geht von der Platte. Wieder da ist die Karte nur mit einem neuen Download.",
   "heroicmap.liste.belegt": "In diese Karte läuft gerade ein Download.",
-  "heroicmap.liste.fehler": "Die Karte ist nicht ganz gelöscht; Einzelheiten im Log."
+  "heroicmap.liste.fehler": "Die Karte ist nicht ganz gelöscht; Einzelheiten im Log.",
+  "heroicmap.selbst.zeile": "Selbst zeichnen: %s",
+  "heroicmap.selbst.knopf": "Selbst",
+  "heroicmap.selbst.an": "Selbst · an",
+  "heroicmap.selbst.titel": "Karte selbst zeichnen?",
+  "heroicmap.selbst.frage": "Ab jetzt zeichnet der Mod jeden Chunk, den du in dieser Dimension lädst, mit 4 Pixeln je Block in eine eigene Karte dieser Welt. Die Vollbildkarte zeigt dann nur sie, nicht die Karte des Servers. Beenden: in der Kartenliste löschen.",
+  "heroicmap.selbst.gewaehlt": "Der Mod zeichnet die Karte jetzt selbst.",
+  "heroicmap.selbst.geht_nicht": "Selbst zeichnen geht nur auf einem Server und nicht unter einer Decke.",
+  "heroicmap.selbst.fehler": "Die Karte zum selbst Zeichnen liess sich nicht anlegen; Einzelheiten im Log."
 }

@@ -14,11 +14,12 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
+import net.minecraft.network.chat.Component;
 
 /**
  * Bilder der Minimap zum Ansehen, nicht zum Vergleichen: baut eine Szene in einer flachen
  * Welt und nimmt die Minimap bei 1, 2 und 4 Pixeln je Block auf, danach das Menü und die
- * Vollbildkarte mit zwei Wegpunkten. Mit -Pbilder=&lt;ordner&gt; landen die Bilder dort. Siehe docs/minimap.md, „Bilder“.
+ * Vollbildkarte mit zwei Wegpunkten, zuletzt die selbst gezeichnete Karte der Szene. Mit -Pbilder=&lt;ordner&gt; landen die Bilder dort. Siehe docs/minimap.md, „Bilder“.
  */
 public final class Bilder implements FabricClientGameTest {
 
@@ -94,6 +95,7 @@ public final class Bilder implements FabricClientGameTest {
             }
             menue(context);
             vollbildkarte(context);
+            selbst(context);
         }
     }
 
@@ -168,6 +170,44 @@ public final class Bilder implements FabricClientGameTest {
         context.runOnClient(mc -> {
             mc.gui.setScreen(null);
             Wegpunkte.INSTANZ.leeren();
+        });
+    }
+
+    /**
+     * Die selbst gezeichnete Karte der Szene: „Selbst“ wählen, warten, bis um den Spieler alles
+     * gezeichnet ist, schreiben und auf der feinsten Stufe aufnehmen. Siehe docs/selbst.md, „Bild“.
+     */
+    private static void selbst(ClientGameTestContext context) {
+        Path welt = FabricLoader.getInstance().getGameDir().resolve(HeroicMap.ID).resolve("test").resolve("selbst");
+        try {
+            Laden.loesche(welt);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        context.runOnClient(mc -> {
+            Selbst.INSTANZ.fuerTest(welt);
+            Component fehler = Selbst.INSTANZ.waehle(mc);
+            if (fehler != null) {
+                throw new AssertionError("Selbst: " + fehler.getString());
+            }
+        });
+        context.waitFor(mc -> Selbst.INSTANZ.fertig(mc.player.chunkPosition(), 2), 1200);
+        context.computeOnClient(mc -> Selbst.INSTANZ.schreibeJetzt()).join();
+        Path baum = welt.resolve(Selbst.baum("minecraft:overworld"));
+        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
+        context.waitTicks(40);
+        Path bild = context.takeScreenshot(TestScreenshotOptions.of("selbst").disableCounterPrefix());
+        try {
+            if (!AUSGABE.isEmpty()) {
+                Files.copy(bild, Path.of(AUSGABE, "selbst.png"), StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        context.runOnClient(mc -> {
+            mc.gui.setScreen(null);
+            Selbst.INSTANZ.fuerTest(null);
+            Selbst.INSTANZ.leeren();
         });
     }
 

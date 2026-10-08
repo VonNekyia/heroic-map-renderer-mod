@@ -63,6 +63,7 @@ public final class HeroicMap implements ClientModInitializer {
             if (geaendert) {
                 Minimap.INSTANZ.schreibe(einstellungen());
             }
+            Selbst.INSTANZ.arbeite(client);
             while (karte.consumeClick()) {
                 if (client.gui.screen() == null && client.level != null) {
                     String dimension = client.level.dimension().identifier().toString();
@@ -74,6 +75,7 @@ public final class HeroicMap implements ClientModInitializer {
         // einem Thread von Netty, deshalb auf den Render-Thread.
         ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> {
             Minimap.INSTANZ.leeren();
+            Selbst.INSTANZ.leeren();
             // Die Wegpunkte gehören zur Welt; ein Wechsel über einen Proxy bringt eine andere. Siehe docs/wegpunkte.md, „Ablage“.
             Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner(), Downloads.alterOrdner());
         });
@@ -82,6 +84,7 @@ public final class HeroicMap implements ClientModInitializer {
             Downloads.INSTANZ.leeren();
             Mitspieler.INSTANZ.leeren();
             Wegpunkte.INSTANZ.leeren();
+            Selbst.INSTANZ.leeren();
         }));
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath(ID, "minimap"), Minimap.INSTANZ::zeichne);
         Kanal.anmelden();

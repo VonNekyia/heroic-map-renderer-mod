@@ -23,22 +23,29 @@ record Satz(Path ordner, String name, String dimension, int massstab, int kachel
         };
     }
 
-    /** Der Satz für {@code dimension} unter dem Ordner eines Servers, oder null. */
-    static Satz fuer(Path server, String dimension) {
-        if (server == null || !Files.isDirectory(server)) {
+    /**
+     * Der Satz für {@code dimension} unter dem Ordner einer Welt, oder null. Ein selbst
+     * gezeichneter geht vor, siehe docs/selbst.md, „Wahl“.
+     */
+    static Satz fuer(Path welt, String dimension) {
+        if (welt == null || !Files.isDirectory(welt)) {
             return null;
         }
-        try (Stream<Path> baeume = Files.list(server)) {
+        Satz erster = null;
+        try (Stream<Path> baeume = Files.list(welt)) {
             for (Path baum : baeume.toList()) {
                 Satz satz = lies(baum);
                 if (satz != null && dimension.equals(satz.dimension())) {
-                    return satz;
+                    if (Selbst.selbst(baum)) {
+                        return satz;
+                    }
+                    erster = erster == null ? satz : erster;
                 }
             }
         } catch (IOException e) {
             return null;
         }
-        return null;
+        return erster;
     }
 
     /**

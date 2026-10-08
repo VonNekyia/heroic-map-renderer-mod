@@ -309,7 +309,8 @@ nichts.
   `setBlocksDirty`, `setSectionDirtyWithNeighbors` und
   `setSectionRangeDirty`, auch das Licht eines neuen Chunks über
   `enableChunkLight`. Dort hängt der Mixin des Mods
-  (`LevelExtractorMixin`) und markiert die Spalte.
+  (`LevelExtractorMixin`) und markiert die Spalte, für die Minimap und die
+  [selbst gezeichnete Karte](selbst.md).
 - **Ausnahme:** `LevelExtractor.allChanged` legt alles neu an, ohne
   `setSectionDirty`, etwa wenn der Biomübergang sich ändert. Der Mod
   vergleicht deshalb je Frame `Options.biomeBlendRadius` und den Block-Atlas

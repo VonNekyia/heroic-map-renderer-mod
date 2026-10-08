@@ -276,6 +276,8 @@ Platte (`Kartenliste`), auch die anderer Server und Welten:
 - **Löschen** fragt erst im Dialog nach und löscht den Ordner des Baums
   samt Inhalt in einem eigenen Thread (`Laden.loesche`), danach zählt die
   Liste neu. Läuft gerade ein Download in den Baum, löscht der Knopf nicht.
+  Eine selbst gezeichnete Karte löscht der Worker, der in sie zeichnet,
+  siehe [Selbst gezeichnete Karte](selbst.md), „Wahl“.
 - **Mausrad** blättert, wenn nicht alle Karten auf den Schirm passen.
 
 ## Was bleibt eine Näherung
