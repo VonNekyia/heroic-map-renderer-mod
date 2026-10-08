@@ -60,22 +60,20 @@ class WegpunkteTest {
     }
 
     @Test
-    void wechselLiestNurEinenAnderenOrdner(@TempDir Path wurzel) throws Exception {
-        // Eine Datei aus der Ablage vor dem Hash zieht beim ersten Wechsel mit.
-        Path alt = wurzel.resolve("mc.example.com"), welt = alt.resolve("welt-01");
-        Files.createDirectories(alt);
-        Files.writeString(alt.resolve("wegpunkte.json"),
-                "{\"wegpunkte\":[{\"dimension\":\"minecraft:overworld\",\"x\":3,\"z\":4,\"farbe\":0,\"minimap\":false}]}");
+    void wechselLiestNurEinenAnderenOrdner(@TempDir Path wurzel) {
         Wegpunkte w = new Wegpunkte();
-        w.wechsel(welt, alt);
+        w.wechsel(wurzel.resolve("welt-01"));
+        w.setze(WELT, 1, 1);
+        // Derselbe Ordner: nichts wird neu gelesen; ein anderer: dessen Wegpunkte.
+        w.wechsel(wurzel.resolve("welt-01"));
         assertEquals(1, w.punkte().size());
-        assertFalse(Files.exists(alt.resolve("wegpunkte.json")));
-        assertTrue(Files.exists(welt.resolve("wegpunkte.json")));
+        w.wechsel(wurzel.resolve("welt-02"));
+        assertTrue(w.punkte().isEmpty());
         // Im Einzelspieler bleibt beim Wechsel der Dimension, was nur im Speicher liegt.
         w.leeren();
-        w.wechsel(null, null);
+        w.wechsel(null);
         w.setze(WELT, 1, 1);
-        w.wechsel(null, null);
+        w.wechsel(null);
         assertEquals(1, w.punkte().size());
     }
 

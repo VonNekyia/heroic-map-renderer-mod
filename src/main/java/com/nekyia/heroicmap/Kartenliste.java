@@ -3,6 +3,7 @@ package com.nekyia.heroicmap;
 import com.mojang.logging.LogUtils;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
@@ -26,33 +27,49 @@ final class Kartenliste extends Screen {
     private final Screen zurueck;
     /** Null, solange gezählt wird. */
     private Laden.Bestand bestand;
+    /** Bricht das laufende Zählen ab, oder null, wenn keins läuft. */
+    private AtomicBoolean zaehlt;
     private int erste;
     private Component hinweis;
 
     Kartenliste(Screen zurueck) {
         super(Component.translatable("heroicmap.liste.titel"));
         this.zurueck = zurueck;
-        zaehle();
     }
 
-    /** Zählt in einem eigenen Thread und baut die Liste dann neu. */
+    /** Zählt in einem eigenen Thread und baut die Liste dann neu; schliesst die Liste vorher, endet es. */
     private void zaehle() {
         bestand = null;
+        AtomicBoolean abbruch = new AtomicBoolean();
+        zaehlt = abbruch;
         Thread.ofPlatform().daemon().name("Heroic Map Kartenliste").start(() -> {
             Laden.Bestand b;
             try {
-                b = Laden.bestand(Downloads.wurzel());
+                b = Laden.bestand(Downloads.wurzel(), abbruch::get);
             } catch (IOException | RuntimeException e) {
                 LOGGER.warn("Heroic Map: Karten auf der Platte nicht gezählt", e);
                 b = new Laden.Bestand(List.of(), 0);
             }
             Laden.Bestand fertig = b;
             Minecraft.getInstance().execute(() -> {
+                if (zaehlt != abbruch || fertig == null) {
+                    return;
+                }
+                zaehlt = null;
                 bestand = fertig;
                 erste = Math.min(erste, Math.max(0, fertig.karten().size() - 1));
                 rebuildWidgets();
             });
         });
+    }
+
+    /** Auch beim Dialog zum Löschen: Das Zählen endet und beginnt beim Zurückkommen neu, falls nötig. */
+    @Override
+    public void removed() {
+        if (zaehlt != null) {
+            zaehlt.set(true);
+            zaehlt = null;
+        }
     }
 
     /** So viele Zeilen passen zwischen Kopf und den Knopf unten. */
@@ -62,6 +79,9 @@ final class Kartenliste extends Screen {
 
     @Override
     protected void init() {
+        if (bestand == null && zaehlt == null) {
+            zaehle();
+        }
         if (bestand != null) {
             for (int i = erste; i < Math.min(bestand.karten().size(), erste + zeilen()); i++) {
                 Laden.AufPlatte e = bestand.karten().get(i);
@@ -81,24 +101,41 @@ final class Kartenliste extends Screen {
         }
         minecraft.gui.setScreen(new ConfirmScreen(ja -> {
             minecraft.gui.setScreen(this);
-            if (ja) {
+            // Während der Rückfrage kann eine freigabe einen Download in den Baum begonnen haben.
+            if (ja && !Downloads.INSTANZ.halte(e.ordner())) {
+                hinweis = Component.translatable("heroicmap.liste.belegt");
+            } else if (ja) {
                 loesche(e);
             }
         }, Component.translatable("heroicmap.liste.frage_titel"),
                 Component.translatable("heroicmap.liste.frage", e.pfad(), Downloads.groesse(e.bytes()))));
     }
 
+    /** Löscht den Baum, den {@link Downloads#halte} hält, und gibt ihn danach frei. */
     private void loesche(Laden.AufPlatte e) {
         bestand = null;
+        // Gezählt wird erst nach dem Löschen.
+        zaehlt = new AtomicBoolean();
         rebuildWidgets();
         Thread.ofPlatform().daemon().name("Heroic Map Löschen").start(() -> {
+            boolean ganz = true;
             try {
                 Laden.loesche(e.ordner());
             } catch (IOException | RuntimeException fehler) {
                 LOGGER.warn("Heroic Map: {} nicht ganz gelöscht", e.ordner(), fehler);
-                Minecraft.getInstance().execute(() -> hinweis = Component.translatable("heroicmap.liste.fehler"));
+                ganz = false;
+            } finally {
+                Downloads.INSTANZ.gibFrei(e.ordner());
             }
-            zaehle();
+            boolean ok = ganz;
+            Minecraft.getInstance().execute(() -> {
+                if (!ok) {
+                    hinweis = Component.translatable("heroicmap.liste.fehler");
+                }
+                if (minecraft.gui.screen() == this) {
+                    zaehle();
+                }
+            });
         });
     }
 

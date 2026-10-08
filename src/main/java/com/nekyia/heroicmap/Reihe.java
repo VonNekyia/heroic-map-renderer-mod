@@ -51,6 +51,16 @@ final class Reihe {
         return true;
     }
 
+    /** Hält den Schlüssel ohne Download, etwa solange ein Baum gelöscht wird; false, wenn er belegt ist. */
+    boolean halte(String schluessel) {
+        return belegt.add(schluessel);
+    }
+
+    /** Gibt einen mit {@link #halte} gehaltenen Schlüssel frei. */
+    void gibFrei(String schluessel) {
+        belegt.remove(schluessel);
+    }
+
     /** Wartet oder läuft für den Schlüssel gerade ein Download? */
     boolean belegt(String schluessel) {
         return belegt.contains(schluessel);

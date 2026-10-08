@@ -81,5 +81,6 @@
   "heroicmap.liste.frage_titel": "Karte löschen?",
   "heroicmap.liste.frage": "%s mit %s geht von der Platte. Wieder da ist die Karte nur mit einem neuen Download.",
   "heroicmap.liste.belegt": "In diese Karte läuft gerade ein Download.",
-  "heroicmap.liste.fehler": "Die Karte ist nicht ganz gelöscht; Einzelheiten im Log."
+  "heroicmap.liste.fehler": "Die Karte ist nicht ganz gelöscht; Einzelheiten im Log.",
+  "heroicmap.befehl.welt_unbekannt": "Betritt zuerst %s; erst dann weiss der Mod, zu welcher Welt die Karte gehört."
 }

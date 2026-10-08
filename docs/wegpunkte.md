@@ -100,9 +100,6 @@ gewünscht.
   Proxy bringt so die Wegpunkte der neuen Welt. Im Einzelspieler gibt es
   keinen Ordner; dort liegen sie nur im Speicher und bleiben beim Wechsel
   der Dimension.
-- **Umzug:** Eine `wegpunkte.json` aus der Ablage vor dem Hash,
-  `heroicmap/<adresse>/`, zieht in die erste Welt, die der Spieler auf
-  diesem Server betritt, wenn es dort noch keine gibt.
 - **Format:**
 
   ```json
@@ -134,6 +131,8 @@ gewünscht.
   ein schneller Klick nach „Wegpunkt setzen“ heftet nichts an; ein
   Doppelklick heftet an; am eigenen Standort holt ein Klick den Spieler
   zurück, und ein Rechtsklick bietet „Wegpunkt löschen“.
+- `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
+  [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und
   einem am Rand, siehe [Vollbildkarte](vollbildkarte.md), „Bild“.
 

@@ -16,6 +16,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/Kartenliste.java
   - src/test/java/com/nekyia/heroicmap/AblageTest.java
   - src/main/resources/heroicmap.accesswidener
+  - src/main/java/com/nekyia/heroicmap/Welten.java
 ---
 
 # Download
@@ -179,8 +180,10 @@ bricht der Mod sie ab (`sendAsync`, `cancel`). Der Aufbau der Verbindung hat
 
 - **Nacheinander:** Downloads laufen in einem Thread (`Reihe`). Eine
   `freigabe` für einen anderen Baum wartet, bis der laufende fertig ist.
-- **Je Server und Baum höchstens einer,** wartend oder laufend; der
-  Schlüssel ist der Ordner des Baums. Eine weitere `freigabe` für denselben
+- **Je Ordner eines Baums höchstens einer,** wartend oder laufend; der
+  Schlüssel ist der Ordner des Baums, also je Welt und Baum. Solange die
+  Kartenliste einen Baum löscht, hält sie denselben Schlüssel
+  (`Reihe.halte`). Eine weitere `freigabe` für denselben
   Baum verfällt mit einer Meldung, und `/hmap laden` sagt vorher, dass
   schon einer läuft.
 - **Beim Trennen** bricht der Mod den laufenden Download ab und verwirft,
@@ -220,30 +223,48 @@ Einzelheiten stehen im Log.
 
   `<hash>` ist der Hash des Seeds, den der Server dem Client mit jeder Welt
   schickt (`BiomeManager.biomeZoomSeed`, per Access Widener), 16 Stellen
-  hex. Den Seed selbst und den Namen der Welt kennt der Client nicht. Der
-  Hash ist je Seed eindeutig und in allen Dimensionen einer Welt gleich.
+  hex. Den Seed selbst und den Namen der Welt kennt der Client nicht.
   Ohne Port gilt 25565. Die Vorgabe IP + Hash hat der User gewählt: Ein
   Netz hinter einem Proxy hat für alle Server dieselbe Adresse; eine Welt,
   etwa ein Mining-Realm, behält ihre Karte, und eine neue Welt überschreibt
-  sie nicht. Eine andere Wahl gilt ab dem Schliessen des Menüs und zieht
-  nichts um; die Karten unter der alten Wahl stehen weiter in der
+  sie nicht. Eine andere Wahl gilt sofort für Downloads und die
+  Vollbildkarte, für die Wegpunkte beim Schliessen des Menüs; sie zieht
+  nichts um, die Karten unter der alten Wahl stehen weiter in der
   Kartenliste. `<host>` ist klein, andere Zeichen als Buchstaben, Ziffern, Punkt
   und Strich werden `_`. Ein Baum heisst nur `[a-z0-9_-]`, höchstens 64
   Zeichen. Namen, die Windows für Geräte hält (`con`, `nul`, `com1` …),
   lehnt der Mod als Baum ab und stellt dem Server ein `_` voran.
+- **Hash je Dimension:** Paper hat einen Seed je Welt, belegt per javap an
+  Paper 26.3 (`ServerLevel.getSeed` aus den `worldGenSettings` der Welt).
+  Ein Baum liegt deshalb unter dem Hash seiner Dimension aus dem
+  `angebot`, nicht unter dem der Welt, in der der Spieler gerade steht.
+  Den Hash einer Dimension sieht der Client erst, wenn der Spieler sie
+  betritt (`ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE`); der Mod merkt
+  ihn je Server mit Port und Dimension in `heroicmap/welten.properties`
+  (`Welten`, `Downloads.weltBetreten`). Solange er unbekannt ist:
+  - `/hmap laden` und der Abgleich sagen „Betritt zuerst `<dimension>`“
+    und fragen nichts an;
+  - eine `freigabe`, etwa der Abgleich beim Beitritt, wartet und läuft,
+    sobald der Spieler die Dimension betritt; beim Trennen fällt sie weg.
+- **Gleiche Hashes:** Bei der Wahl Hash teilen sich zwei Server mit
+  demselben Seed einen Ordner, ebenso Server, die statt des Hashes einen
+  festen Wert wie 0 schicken. Der Download des einen löscht dann, was nicht
+  in seinem Manifest steht, also die Kacheln des anderen. Würfelt ein
+  Server den Wert bei jedem Beitritt, entsteht jedes Mal ein neuer Ordner.
+  Beides zeigt die Kartenliste; dort lässt sich aufräumen.
 - **Schreiben** über eine Zwischendatei in `tmp/`, dann verschieben; nie
   liegt eine halbe Kachel da. `tmp/` leert der Mod zu Beginn jedes Downloads.
 - **`satz.json`** je Baum gehört zur [Vollbildkarte](vollbildkarte.md),
   „Welcher Satz“.
 - **Umzug aus der alten Ablage:** Vor dem Hash lag ein Baum unter
   `heroicmap/<adresse>/<baum>/`, `<adresse>` die Adresse aus der
-  Serverliste. Nennt ein `angebot` oder eine `freigabe` den Baum, zieht der
-  Mod ihn in den Ordner der Welt, die ihn anbietet, wenn es ihn dort noch
-  nicht gibt (`Downloads.zieheUm`, `Laden.zieheUm`). So kennt der Mod seine
-  Welt. Ein Baum, den kein Server mehr anbietet, bleibt, wo er ist, und
-  steht in der Kartenliste. `wegpunkte.json` zieht in die erste Welt, die
-  der Spieler auf dem Server betritt, siehe [Wegpunkte](wegpunkte.md),
-  „Ablage“.
+  Serverliste. Nennt ein `angebot` oder eine `freigabe` den Baum und ist
+  der Hash seiner Dimension bekannt, zieht der Mod ihn dorthin, wenn es ihn
+  dort noch nicht gibt (`Downloads.zieheUm`, `Laden.zieheBaumUm`); sonst
+  beim Betreten der Dimension. Ein übriger Ordner `overlay/` zieht nicht
+  mit, er geht vorher. Ein Baum, den kein Server mehr anbietet, bleibt, wo
+  er ist: Die Vollbildkarte findet ihn nicht mehr, die Kartenliste zeigt
+  ihn zum Löschen.
 - **`overlay/`** je Baum hielt die frühere Live-Ebene. Der Mod löscht den
   Ordner beim Start in jedem Baum (`Laden.loescheOverlays`), in einem
   eigenen Thread; was sich nicht löschen lässt, geht beim nächsten Start.
@@ -271,11 +292,22 @@ Platte (`Kartenliste`), auch die anderer Server und Welten:
 - **Ein Baum** ist ein Ordner mit `massstab.txt` oder `satz.json`, bis zu
   drei Ebenen unter `heroicmap/`, in jeder Ablage oben und in der alten
   (`Laden.bestand`).
-- **Zählen** läuft in einem eigenen Thread; bis es fertig ist, steht dort
-  „Zähle …“. Ein Satz mit 450 000 Kacheln sind ebenso viele Dateien.
-- **Löschen** fragt erst im Dialog nach und löscht den Ordner des Baums
-  samt Inhalt in einem eigenen Thread (`Laden.loesche`), danach zählt die
-  Liste neu. Läuft gerade ein Download in den Baum, löscht der Knopf nicht.
+- **Zählen** ist ein Durchlauf über `heroicmap/` in einem eigenen Thread;
+  bis er fertig ist, steht dort „Zähle …“. Ein Satz mit 450 000 Kacheln
+  sind ebenso viele Dateien. Was sich nicht lesen lässt, fällt weg, die
+  übrigen Bäume bleiben. Schliesst die Liste, auch für den Dialog, endet
+  der Durchlauf; zurück in der Liste beginnt er neu, solange nichts
+  gezählt ist.
+- **Verbindungen:** Einem Symlink oder einer Junction folgen Zählen und
+  Löschen nicht; Löschen entfernt nur die Verbindung, nie, worauf sie
+  zeigt. Eine Junction ist für das JDK unter Windows ein Ordner und kein
+  Link; der Mod erkennt sie daran, dass ihr echter Pfad nicht unter
+  `heroicmap/` liegt (`Laden.verbindung`).
+- **Löschen** fragt erst im Dialog nach. Nach dem Ja hält die Liste den
+  Schlüssel des Baums in der Reihe, siehe „Reihe“; wartet oder läuft dort
+  schon ein Download, löscht sie nichts. Gelöscht wird der Ordner des Baums
+  samt Inhalt in einem eigenen Thread (`Laden.loesche`), danach gibt sie
+  den Schlüssel frei und zählt neu.
 - **Mausrad** blättert, wenn nicht alle Karten auf den Schirm passen.
 
 ## Was bleibt eine Näherung

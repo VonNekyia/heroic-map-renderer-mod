@@ -43,20 +43,12 @@ final class Wegpunkte {
     /** Ist gelesen, seit dem letzten Leeren? */
     private boolean geladen;
 
-    /**
-     * Beim Wechsel der Welt: liest die Wegpunkte aus {@code ordner}, wenn es ein anderer ist als
-     * bisher. Eine Datei aus dem Ordner {@code alt} der Ablage vor dem Hash des Seeds zieht
-     * dabei einmal mit. Siehe docs/wegpunkte.md, „Ablage“.
-     */
-    void wechsel(Path ordner, Path alt) {
+    /** Beim Wechsel der Welt: liest die Wegpunkte aus {@code ordner}, wenn es ein anderer ist als bisher. Siehe docs/wegpunkte.md, „Ablage“. */
+    void wechsel(Path ordner) {
         Path neu = ordner == null ? null : ordner.resolve("wegpunkte.json");
-        if (geladen && Objects.equals(neu, datei)) {
-            return;
+        if (!geladen || !Objects.equals(neu, datei)) {
+            lies(ordner);
         }
-        if (neu != null && alt != null) {
-            Downloads.zieheUm(alt.resolve("wegpunkte.json"), neu);
-        }
-        lies(ordner);
     }
 
     /** Liest die Wegpunkte des Servers in {@code ordner}; null heisst nur im Speicher. Ein unlesbarer Eintrag fällt weg. */

@@ -59,36 +59,35 @@ final class Einstellungen extends Screen {
         spalte = !m.sichtbar() ? (width - breite) / 2
                 : links >= rechts ? (links - breite) / 2 : r.x() + r.seite() + (rechts - breite) / 2;
         spalte = Math.max(4, Math.min(spalte, width - breite - 4));
-        oben = Math.max(50, height / 2 - 94);
-        int x = spalte, y = oben;
+        oben = Math.max(50, height / 2 - 84);
+        int x = spalte, y = oben, halb = (breite - 4) / 2;
+        // Je zwei Knöpfe in einer Zeile, so passt das Menü auch auf 240 Einheiten Höhe, etwa 1280 × 720 bei GUI-Massstab 3.
         addRenderableWidget(CycleButton.onOffBuilder(m.sichtbar())
-                .create(x, y, breite, 20, Component.translatable("heroicmap.menue.minimap"), (b, an) -> m.setzeSichtbar(an)));
+                .create(x, y, halb, 20, Component.translatable("heroicmap.menue.minimap"), (b, an) -> m.setzeSichtbar(an)));
+        addRenderableWidget(CycleButton.booleanBuilder(Component.translatable("heroicmap.menue.rund"),
+                        Component.translatable("heroicmap.menue.eckig"), m.rund())
+                .create(x + breite - halb, y, halb, 20, Component.translatable("heroicmap.menue.form"), (b, rund) -> m.setzeRund(rund)));
         addRenderableWidget(CycleButton.builder((Integer z) -> Component.translatable("heroicmap.menue.fach", z), m.zoom())
                 .withValues(1, 2, 4, 8)
                 .create(x, y + 24, breite, 20, Component.translatable("heroicmap.menue.zoom"), (b, z) -> m.setzeZoom(z)));
         addRenderableWidget(CycleButton.builder((Integer px) -> Component.translatable("heroicmap.menue.px", px), m.aufloesung())
                 .withValues(1, 2, 4, 8, 16)
                 .create(x, y + 48, breite, 20, Component.translatable("heroicmap.menue.massstab"), (b, px) -> m.setzeScale(px)));
-        addRenderableWidget(CycleButton.booleanBuilder(Component.translatable("heroicmap.menue.rund"),
-                        Component.translatable("heroicmap.menue.eckig"), m.rund())
-                .create(x, y + 72, breite, 20, Component.translatable("heroicmap.menue.form"), (b, rund) -> m.setzeRund(rund)));
         addRenderableWidget(CycleButton.booleanBuilder(Component.translatable("heroicmap.menue.show.simplevoicechat"),
                         Component.translatable("heroicmap.menue.show.hidden"), m.show())
-                .create(x, y + 96, breite, 20, Component.translatable("heroicmap.menue.show"), (b, an) -> {
+                .create(x, y + 72, breite, 20, Component.translatable("heroicmap.menue.show"), (b, an) -> {
                     m.setzeShow(an);
                     Kanal.sendeShow();
                 }));
         addRenderableWidget(CycleButton.builder((Downloads.Ablage a) -> Component.translatable(
                         "heroicmap.menue.ablage." + a.name().toLowerCase(Locale.ROOT)), m.ablage())
                 .withValues(Downloads.Ablage.values())
-                .create(x, y + 120, breite, 20, Component.translatable("heroicmap.menue.ablage"), (b, a) -> m.setzeAblage(a)));
-        // Zwei Knöpfe in einer Zeile, so passt das Menü auch auf einen niedrigen Schirm.
-        int halb = (breite - 4) / 2;
+                .create(x, y + 96, breite, 20, Component.translatable("heroicmap.menue.ablage"), (b, a) -> m.setzeAblage(a)));
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.laden"),
-                b -> minecraft.gui.setScreen(new Auswahl(this))).bounds(x, y + 144, halb, 20).build());
+                b -> minecraft.gui.setScreen(new Auswahl(this))).bounds(x, y + 120, halb, 20).build());
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.menue.liste"),
-                b -> minecraft.gui.setScreen(new Kartenliste(this))).bounds(x + breite - halb, y + 144, halb, 20).build());
-        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x, y + 172, breite, 20).build());
+                b -> minecraft.gui.setScreen(new Kartenliste(this))).bounds(x + breite - halb, y + 120, halb, 20).build());
+        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x, y + 148, breite, 20).build());
     }
 
     /** Ohne Unschärfe und Abdunkeln, damit die Minimap im HUD zu sehen ist. */
@@ -111,7 +110,7 @@ final class Einstellungen extends Screen {
         // Lehnt der Server show ab, steht der Grund unter den Knöpfen.
         String verweigert = Mitspieler.INSTANZ.verweigert();
         if (verweigert != null) {
-            int zeileY = oben + 196;
+            int zeileY = oben + 172;
             for (FormattedCharSequence zeile : font.split(Component.translatable("heroicmap.menue.show.grund." + verweigert), breite)) {
                 g.centeredText(font, zeile, mitte, zeileY, TEXT);
                 zeileY += font.lineHeight + 1;
@@ -255,7 +254,7 @@ final class Einstellungen extends Screen {
     public void removed() {
         Minimap.INSTANZ.schreibe(HeroicMap.einstellungen());
         // Eine andere Ablage heisst ein anderer Ordner der Welt, auch für die Wegpunkte.
-        Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner(), Downloads.alterOrdner());
+        Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());
     }
 
     @Override

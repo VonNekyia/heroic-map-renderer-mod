@@ -16,6 +16,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
@@ -25,7 +26,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
@@ -50,6 +50,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
@@ -540,44 +541,75 @@ final class Laden {
     }
 
     /**
-     * Zählt den Bestand unter {@code wurzel}. Ein Baum ist ein Ordner mit {@code massstab.txt} oder
-     * {@code satz.json}, bis zu drei Ebenen tief: {@code <welt>/<baum>}, {@code <server>/<welt>/<baum>}
-     * und {@code <server>/<baum>} aus der Ablage vor dem Hash des Seeds.
+     * Zählt den Bestand unter {@code wurzel} in einem Durchlauf. Ein Baum ist ein Ordner mit
+     * {@code massstab.txt} oder {@code satz.json}, bis zu drei Ebenen tief: {@code <welt>/<baum>},
+     * {@code <server>/<welt>/<baum>} und {@code <server>/<baum>} aus der Ablage vor dem Hash des
+     * Seeds. Was sich nicht lesen lässt, fällt weg; einer Verbindung folgt er nicht. Gibt
+     * {@code abbruch} wahr, endet er und gibt null.
      */
-    static Bestand bestand(Path wurzel) throws IOException {
+    static Bestand bestand(Path wurzel, BooleanSupplier abbruch) throws IOException {
         if (!Files.isDirectory(wurzel)) {
             return new Bestand(List.of(), 0);
         }
-        Map<Path, long[]> baeume = new TreeMap<>();
-        try (Stream<Path> funde = Files.find(wurzel, 4, (p, a) -> a.isRegularFile()
-                && (p.getFileName().toString().equals("massstab.txt") || p.getFileName().toString().equals("satz.json")))) {
-            funde.forEach(p -> baeume.putIfAbsent(p.getParent(), new long[1]));
-        }
+        Path echt = wurzel.toRealPath();
+        // Bytes je Ordner der ersten drei Ebenen; ein Baum liegt höchstens dort.
+        Map<Path, long[]> jeOrdner = new HashMap<>();
+        Set<Path> baeume = new HashSet<>();
         long[] summe = {0};
         Files.walkFileTree(wurzel, new SimpleFileVisitor<>() {
             @Override
+            public FileVisitResult preVisitDirectory(Path ordner, BasicFileAttributes a) throws IOException {
+                if (abbruch.getAsBoolean()) {
+                    return FileVisitResult.TERMINATE;
+                }
+                return verbindung(wurzel, echt, ordner, a) ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
+            }
+
+            @Override
             public FileVisitResult visitFile(Path datei, BasicFileAttributes a) {
+                if (a.isSymbolicLink() || a.isOther()) {
+                    // Ein Link zählt nicht, auch nicht, worauf er zeigt.
+                    return FileVisitResult.CONTINUE;
+                }
+                Path relativ = wurzel.relativize(datei);
+                String name = datei.getFileName().toString();
+                if (relativ.getNameCount() <= 4 && (name.equals("massstab.txt") || name.equals("satz.json"))) {
+                    baeume.add(datei.getParent());
+                }
                 summe[0] += a.size();
-                for (Path p = datei.getParent(); p != null && !p.equals(wurzel); p = p.getParent()) {
-                    long[] baum = baeume.get(p);
-                    if (baum != null) {
-                        baum[0] += a.size();
-                        break;
-                    }
+                for (int i = 1; i < relativ.getNameCount() && i <= 3; i++) {
+                    jeOrdner.computeIfAbsent(wurzel.resolve(relativ.subpath(0, i)), k -> new long[1])[0] += a.size();
                 }
                 return FileVisitResult.CONTINUE;
             }
 
             @Override
             public FileVisitResult visitFileFailed(Path datei, IOException e) {
-                // Eine Datei, die gerade verschwindet, etwa in tmp/, zählt nicht.
+                // Unlesbar, oder verschwindet gerade, etwa in tmp/: zählt nicht.
                 return FileVisitResult.CONTINUE;
             }
         });
+        if (abbruch.getAsBoolean()) {
+            return null;
+        }
         List<AufPlatte> karten = new ArrayList<>();
-        baeume.forEach((ordner, bytes) -> karten.add(new AufPlatte(ordner,
-                wurzel.relativize(ordner).toString().replace('\\', '/'), Satz.lies(ordner), bytes[0])));
+        for (Path ordner : new TreeSet<>(baeume)) {
+            long[] bytes = jeOrdner.getOrDefault(ordner, new long[1]);
+            karten.add(new AufPlatte(ordner, wurzel.relativize(ordner).toString().replace('\\', '/'), Satz.lies(ordner), bytes[0]));
+        }
         return new Bestand(List.copyOf(karten), summe[0]);
+    }
+
+    /**
+     * Ist der Ordner unter {@code wurzel} eine Verbindung, ein Symlink oder eine Junction? Eine
+     * Junction ist für das JDK unter Windows ein Ordner, kein Link; erkennbar daran, dass ihr echter
+     * Pfad nicht dort liegt, wo der Durchlauf ist. {@code echt} ist der echte Pfad der Wurzel.
+     */
+    static boolean verbindung(Path wurzel, Path echt, Path ordner, BasicFileAttributes a) throws IOException {
+        if (a.isSymbolicLink() || a.isOther()) {
+            return true;
+        }
+        return !ordner.equals(wurzel) && !ordner.toRealPath().equals(echt.resolve(wurzel.relativize(ordner)));
     }
 
     /** Verschiebt {@code alt} nach {@code neu}, wenn es {@code alt} gibt und {@code neu} noch nicht. Siehe docs/download.md, „Ablage“. */
@@ -590,15 +622,53 @@ final class Laden {
         return true;
     }
 
-    /** Löscht einen Ordner samt Inhalt; Symlinks folgt es nicht. */
+    /** Wie {@link #zieheUm}, für einen Baum: Ein übriger Ordner {@code overlay/} der früheren Live-Ebene zieht nicht mit. */
+    static boolean zieheBaumUm(Path alt, Path neu) throws IOException {
+        if (alt.equals(neu) || !Files.exists(alt) || Files.exists(neu)) {
+            return false;
+        }
+        loesche(alt.resolve("overlay"));
+        return zieheUm(alt, neu);
+    }
+
+    /**
+     * Löscht einen Ordner samt Inhalt. Einer Verbindung, Symlink oder Junction, folgt es nicht; es
+     * entfernt nur sie, nie, worauf sie zeigt.
+     */
     static void loesche(Path ordner) throws IOException {
-        if (!Files.exists(ordner)) {
+        if (!Files.exists(ordner, LinkOption.NOFOLLOW_LINKS)) {
             return;
         }
-        try (Stream<Path> alle = Files.walk(ordner)) {
-            for (Path p : alle.sorted(Comparator.reverseOrder()).toList()) {
-                Files.delete(p);
-            }
+        Path eltern = ordner.toAbsolutePath().getParent(), echt = ordner.toRealPath();
+        if (eltern != null && !echt.equals(eltern.toRealPath().resolve(ordner.getFileName()))) {
+            // Der Ordner selbst ist eine Verbindung: nur sie geht.
+            Files.delete(ordner);
+            return;
         }
+        Files.walkFileTree(ordner, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes a) throws IOException {
+                if (verbindung(ordner, echt, dir, a)) {
+                    Files.delete(dir);
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path datei, BasicFileAttributes a) throws IOException {
+                Files.delete(datei);
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
+                if (e != null) {
+                    throw e;
+                }
+                Files.delete(dir);
+                return FileVisitResult.CONTINUE;
+            }
+        });
     }
 }

@@ -81,5 +81,6 @@
   "heroicmap.liste.frage_titel": "Delete map?",
   "heroicmap.liste.frage": "%s with %s will be removed from disk. You only get it back with a new download.",
   "heroicmap.liste.belegt": "A download into this map is running.",
-  "heroicmap.liste.fehler": "The map was not fully deleted; see the log for details."
+  "heroicmap.liste.fehler": "The map was not fully deleted; see the log for details.",
+  "heroicmap.befehl.welt_unbekannt": "Enter %s first; only then does the mod know which world the map belongs to."
 }
