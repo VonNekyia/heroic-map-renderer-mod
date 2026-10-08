@@ -80,6 +80,7 @@ class SelbstTest {
         assertTrue(Selbst.baum("x:" + "a".repeat(100)).length() <= 64);
         // Der angelegte Baum ist ein gültiger Satz, und er geht dem Satz des Servers vor.
         Satz.schreibe(welt.resolve("survival"), "Survival", "minecraft:overworld", 4);
+        Files.createDirectories(welt.resolve("survival/4"));
         Files.writeString(welt.resolve("survival/4/map.json"), "{\"tileSize\":256,\"minZoom\":0,\"maxZoom\":5,\"scale\":4}");
         assertEquals("Survival", Satz.fuer(welt, "minecraft:overworld").name());
         Path baum = Selbst.anlegen(welt, "minecraft:overworld");
