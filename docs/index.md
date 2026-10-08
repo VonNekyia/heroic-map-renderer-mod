@@ -16,7 +16,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [Download](download.md): wie der Mod die Karte vom Plugin lädt, Kanal, Befehle, Zustimmung und Grösse, Sicherheit, Manifest, harte Grenzen, Ablage, Fortsetzen und Abgleich.
 - [Live-Ebene](live.md): was sich seit dem letzten Lauf des Renderers ändert, über der Vollbildkarte; Raster, Texturen, Biomübergang, wann gezeichnet wird, Ablage, Abgleich, Kosten, Abnahme gegen top-north.
 - [Vollbildkarte](vollbildkarte.md): Bedienung, welcher Satz, Stufen und Lupe, Kacheln lesen und behalten, Spieler und Koordinaten, das Bild aus dem Gametest und was fehlt.
-- [Minimap](minimap.md): Bedienung, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, Neu zeichnen im Worker, Kosten, Bilder und was anders ist als `top-north`.
+- [Minimap](minimap.md): Bedienung, Bewegung zwischen zwei Ticks, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, Neu zeichnen im Worker, Kosten, Bilder und was anders ist als `top-north`.
 
 ## Entwicklung
 

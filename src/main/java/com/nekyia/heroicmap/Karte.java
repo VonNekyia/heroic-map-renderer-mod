@@ -87,14 +87,14 @@ final class Karte extends Screen {
         if (spieler != null) {
             int px = Mth.floor(blick.schirmX(Projektion.zuPixel(spieler.getX(), satz.scale()), width));
             int pz = Mth.floor(blick.schirmY(Projektion.zuPixel(spieler.getZ(), satz.scale()), height));
-            Minimap.avatar(g, spieler, px, pz);
+            Minimap.avatar(g, spieler, px, pz, 1f);
             // Die Mitspieler mit Namen, in der Dimension des Spielers. Siehe docs/minimap.md, „Mitspieler“.
             String dimension = spieler.level().dimension().identifier().toString();
             for (Mitspieler.Eintrag e : Mitspieler.INSTANZ.sichtbar(System.currentTimeMillis())) {
                 if (!e.dimension().equals(dimension) || e.uuid().equals(spieler.getUUID())) {
                     continue;
                 }
-                double[] lage = Mitspieler.lage(minecraft, e);
+                double[] lage = Mitspieler.lage(minecraft, e, 1f);
                 int ex = Mth.floor(blick.schirmX(Projektion.zuPixel(lage[0], satz.scale()), width));
                 int ez = Mth.floor(blick.schirmY(Projektion.zuPixel(lage[1], satz.scale()), height));
                 Mitspieler.kopf(g, minecraft, e, ex, ez, Minimap.KOPF);

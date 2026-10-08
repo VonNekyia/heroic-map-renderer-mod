@@ -13,6 +13,7 @@ import net.minecraft.client.gui.components.PlayerFaceExtractor;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Die anderen Spieler, die der Server zeigen lässt: wer den Spieler in Simple Voice Chat hört.
@@ -99,10 +100,14 @@ final class Mitspieler {
         return verweigert;
     }
 
-    /** x und z: hat der Client den Spieler als Entity mit dieser UUID, dessen Lage, die ist flüssiger; sonst die des Servers. */
-    static double[] lage(Minecraft mc, Eintrag e) {
+    /**
+     * x und z: hat der Client den Spieler als Entity mit dieser UUID, dessen Lage beim Anteil
+     * {@code a} zwischen zwei Ticks, die ist flüssiger; sonst die des Servers.
+     */
+    static double[] lage(Minecraft mc, Eintrag e, float a) {
         Player p = mc.level == null ? null : mc.level.getPlayerByUUID(e.uuid());
-        return p != null ? new double[] {p.getX(), p.getZ()} : new double[] {e.x(), e.z()};
+        Vec3 v = p == null ? null : p.getPosition(a);
+        return v != null ? new double[] {v.x, v.z} : new double[] {e.x(), e.z()};
     }
 
     /** Der Kopf aus dem Skin, {@code groesse} Einheiten gross, die Mitte bei (x, y); ohne Skin ein weisses Quadrat. */
