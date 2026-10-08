@@ -47,17 +47,43 @@ final class Kartenblick {
 
     /**
      * Wie {@link #schirmX}, aber auf dem Raster der gezeichneten Kacheln: Deren linke Kante liegt
-     * auf ganzen Einheiten ({@code Mth.floor} in {@code Karte}), so steht eine Marke immer auf
+     * auf ganzen Einheiten ({@code Mth.floor} in {@code Karte}). Jede Kachel ist ganze Einheiten
+     * breit, also rücken alle um denselben Rest nach links; so steht eine Marke immer auf
      * demselben Fleck der Karte.
      */
     double rasterX(double basisX, int breite) {
-        double t = kachel * teiler(), start = Math.floor(basisX / t) * t;
-        return Math.floor(schirmX(start, breite)) + (basisX - start) / teiler() * lupe;
+        return schirmX(basisX, breite) - rest(schirmX(0, breite));
     }
 
     double rasterY(double basisZ, int hoehe) {
-        double t = kachel * teiler(), start = Math.floor(basisZ / t) * t;
-        return Math.floor(schirmY(start, hoehe)) + (basisZ - start) / teiler() * lupe;
+        return schirmY(basisZ, hoehe) - rest(schirmY(0, hoehe));
+    }
+
+    /** Die Umkehrung von {@link #rasterX}: der Pixel der Basis, den die Karte unter dem Schirm-x zeichnet. */
+    double basisRasterX(double schirmX, int breite) {
+        return basisX(schirmX + rest(schirmX(0, breite)), breite);
+    }
+
+    double basisRasterZ(double schirmY, int hoehe) {
+        return basisZ(schirmY + rest(schirmY(0, hoehe)), hoehe);
+    }
+
+    private static double rest(double schirm) {
+        return schirm - Math.floor(schirm);
+    }
+
+    /**
+     * Wo der Name über einer Marke beginnt, links und oben: mittig über ihr, aber ganz auf dem
+     * Schirm; reicht er unter die Knöpfe rechts oben, ab x {@code knopfX} bis y {@code knopfUnten},
+     * steht er links daneben. Siehe docs/wegpunkte.md, „Am Rand“.
+     */
+    static int[] name(double x, double oben, int breite, int textBreite, int knopfX, int knopfUnten) {
+        int nx = Math.max(2, Math.min((int) Math.round(x - textBreite / 2.0), breite - textBreite - 2));
+        int ny = Math.max(2, (int) Math.floor(oben));
+        if (nx + textBreite > knopfX && ny < knopfUnten) {
+            nx = Math.max(2, knopfX - textBreite - 2);
+        }
+        return new int[] {nx, ny};
     }
 
     /**

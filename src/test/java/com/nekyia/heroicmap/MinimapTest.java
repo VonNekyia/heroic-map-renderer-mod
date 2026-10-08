@@ -212,12 +212,16 @@ class MinimapTest {
     @Test
     void markeAufDemPixelDerKarte() {
         // Zoom 1, GUI-Massstab 3: 3 Pixel je Block. Der Spieler steht bei x = 12 + frac; die Kante des Bildes rückt
-        // mit ihm, die Marke der Mitte von Block 10 bleibt auf demselben Pixel des Blocks.
+        // mit ihm in ganzen Pixeln. Die Marke der Mitte von Block 10 bleibt auf demselben Pixel des gezeichneten
+        // Blocks, gleich welches frac; mit der Lage relativ zum ungerundeten Spieler wäre sie um einen Pixel gewandert.
         int zoom = 1, k = 3, n = 128 * k;
-        for (double frac : new double[] {0, 0.25, 0.5, 0.75, 0.99}) {
-            int links = Minimap.ecke(12 + frac, 12 + frac, 1f, zoom, k, n);
-            int block = 10 * zoom * k - links;
-            assertEquals(block + 2, Minimap.pixel(10.5, zoom, k, links), "frac " + frac);
+        Minimap.Rahmen r = new Minimap.Rahmen(20, 30, 128);
+        for (double frac : new double[] {0, 0.1, 0.25, 0.5, 0.75, 0.99}) {
+            int links = Minimap.ecke(12 + frac, 12 + frac, 1f, zoom, k, n), oben = Minimap.ecke(-3, -3, 1f, zoom, k, n);
+            float[] m = Minimap.marke(r, 10.5, -2.5, links, oben, k, zoom, false, 64, false);
+            // Links beginnt Block 10 bei Pixel r.x·k + 10·3 − links; die Marke liegt 2 Pixel weiter.
+            assertEquals(r.x() * k + 10 * zoom * k - links + 2, m[0] * k, 1e-4, "frac " + frac);
+            assertEquals(r.y() * k + (-3) * zoom * k - oben + 2, m[1] * k, 1e-4, "frac " + frac);
         }
     }
 
