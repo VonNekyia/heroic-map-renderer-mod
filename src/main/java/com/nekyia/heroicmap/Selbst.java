@@ -105,18 +105,19 @@ public final class Selbst {
         return testWelt != null ? testWelt : Downloads.weltOrdner();
     }
 
-    /** Geht „Selbst“ hier, und wird schon gezeichnet? Null, wenn es nicht geht: ohne Ordner der Welt oder unter einer Decke. */
-    Boolean an(Minecraft mc) {
-        Path welt = welt();
-        if (welt == null || mc.level == null || mc.level.dimensionType().hasCeiling()) {
-            return null;
-        }
-        return Files.exists(welt.resolve(baum(dimension(mc.level))).resolve("satz.json"));
+    /** Geht „Selbst“ hier? Nicht ohne Ordner der Welt, etwa im Einzelspieler, und nicht unter einer Decke. */
+    boolean moeglich(Minecraft mc) {
+        return welt() != null && mc.level != null && !mc.level.dimensionType().hasCeiling();
+    }
+
+    /** Wird die Dimension des Spielers schon selbst gezeichnet? */
+    boolean an(Minecraft mc) {
+        return moeglich(mc) && Files.exists(welt().resolve(baum(dimension(mc.level))).resolve("satz.json"));
     }
 
     /** Die Wahl „Selbst“: legt den Baum an und zeichnet die geladenen Chunks. Gibt den Fehler zurück, oder null. */
     Component waehle(Minecraft mc) {
-        if (an(mc) == null || mc.player == null) {
+        if (!moeglich(mc) || mc.player == null) {
             return Component.translatable("heroicmap.selbst.geht_nicht");
         }
         try {

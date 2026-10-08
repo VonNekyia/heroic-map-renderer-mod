@@ -30,7 +30,7 @@ mit der des Servers. Warum: [0004](entscheidungen/0004-karte-selbst-zeichnen.md)
   Danach heisst der Knopf „Selbst · an“ und ist aus.
 - **Wann:** nur mit einem Ordner der Welt, also auf einem Server, auch ohne
   Plugin, und nicht unter einer Decke (`DimensionType.hasCeiling`), sonst
-  fehlt die Zeile (`Selbst.an`).
+  fehlt die Zeile (`Selbst.moeglich`).
 - **Was:** Die Wahl legt `heroicmap/<welt>/selbst-<dimension>/` an, siehe
   [Download](download.md), „Ablage“, mit `satz.json` (Name „Selbst“,
   Massstab 4) und `4/map.json` (`tileSize` 256, `minZoom` 0, `maxZoom` 8,
@@ -38,8 +38,8 @@ mit der des Servers. Warum: [0004](entscheidungen/0004-karte-selbst-zeichnen.md)
   als `a`–`z`, `0`–`9`, `_` und `-` zu `_`, höchstens 64 Zeichen
   (`Selbst.baum`). Danach zeichnet der Mod gleich alle geladenen Chunks.
 - **Vorrang:** Die Vollbildkarte nimmt einen selbst gezeichneten Baum vor
-  jedem anderen derselben Dimension (`Satz.fuer`). Downloads vom Server
-  gehen weiter in ihre eigenen Bäume.
+  jedem anderen derselben Dimension (`Satz.fuer`), ohne den Knopf
+  „Abgleich“. Downloads vom Server gehen weiter in ihre eigenen Bäume.
 - **Beenden:** die Karte in der Kartenliste löschen, siehe
   [Download](download.md), „Kartenliste“. Das Löschen läuft im Worker der
   eigenen Karte, nach allem, was er noch schreibt (`Selbst.loesche`);

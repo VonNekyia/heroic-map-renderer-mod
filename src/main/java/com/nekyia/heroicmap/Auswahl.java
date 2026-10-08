@@ -23,8 +23,8 @@ final class Auswahl extends Screen {
 
     private final Screen zurueck;
     private List<Downloads.Baum> baeume = List.of();
-    /** Geht „Selbst“, und ist es an? Null, wenn es nicht geht. Dazu die Dimension des Spielers. */
-    private Boolean selbst;
+    /** Geht „Selbst“, und ist es an? Dazu die Dimension des Spielers. */
+    private boolean selbst, selbstAn;
     private String dimension;
     /** Was beim letzten Knopf schiefging, oder null. */
     private Component hinweis;
@@ -37,13 +37,14 @@ final class Auswahl extends Screen {
     @Override
     protected void init() {
         baeume = Downloads.INSTANZ.baeume();
-        selbst = Selbst.INSTANZ.an(minecraft);
+        selbst = Selbst.INSTANZ.moeglich(minecraft);
+        selbstAn = Selbst.INSTANZ.an(minecraft);
         dimension = minecraft.level == null ? "" : minecraft.level.dimension().identifier().toString();
         int y = 34;
-        if (selbst != null) {
-            Button knopf = Button.builder(Component.translatable(selbst ? "heroicmap.selbst.an" : "heroicmap.selbst.knopf"),
+        if (selbst) {
+            Button knopf = Button.builder(Component.translatable(selbstAn ? "heroicmap.selbst.an" : "heroicmap.selbst.knopf"),
                     b -> frageSelbst()).bounds(width / 2 - 45, y + 12, 90, 20).build();
-            knopf.active = !selbst;
+            knopf.active = !selbstAn;
             addRenderableWidget(knopf);
             y += ZEILE;
         }
@@ -85,7 +86,7 @@ final class Auswahl extends Screen {
             g.centeredText(font, Component.translatable("heroicmap.angebot.keins"), width / 2, height / 2, TEXT);
         }
         int y = 34;
-        if (selbst != null) {
+        if (selbst) {
             g.centeredText(font, Component.translatable("heroicmap.selbst.zeile", dimension),
                     width / 2, y, TEXT);
             y += ZEILE;
