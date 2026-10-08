@@ -77,6 +77,45 @@ class AblageTest {
     }
 
     @Test
+    void nurDieLetztenGruppenBleiben(@TempDir Path wurzel) {
+        // Ein Server, der bei jedem Login einen neuen Hash schickt: 1000 Gruppen, behalten werden die letzten 16.
+        Welten welten = new Welten(wurzel.resolve("welten.properties"));
+        String server = Welten.server("wuerfel.example");
+        for (int i = 0; i < 1000; i++) {
+            welten.neueSitzung();
+            welten.merke(server, "minecraft:overworld", i);
+        }
+        assertEquals(Welten.GRUPPEN, welten.gruppen(server));
+        // Die zuletzt benutzte bleibt, auch nach einem Neustart.
+        Welten nachher = new Welten(wurzel.resolve("welten.properties"));
+        nachher.merke(server, "minecraft:overworld", 999);
+        assertEquals(Welten.GRUPPEN, nachher.gruppen(server));
+        nachher.neueSitzung();
+        nachher.merke(server, "minecraft:overworld", 0);
+        assertEquals(Welten.GRUPPEN, nachher.gruppen(server));
+    }
+
+    @Test
+    void ungueltigerNameFragtNichts() {
+        // Vor jeder anderen Prüfung, auch vor dem Kanal: Es geht keine anfrage hinaus.
+        assertEquals("heroicmap.befehl.name", schluessel(Downloads.INSTANZ.frageVoll("con", 4)));
+        assertEquals("heroicmap.befehl.name", schluessel(Downloads.INSTANZ.frageAbgleich("con")));
+    }
+
+    @Test
+    void nachNeuemLoginKeinNeuesFragen() {
+        // Ein Download von A scheitert an der Prüfsumme, nachdem der Spieler auf B gewechselt ist: keine anfrage an B.
+        assertTrue(Downloads.neuFragen(Laden.Grund.PRUEFSUMME, false, 3, 3));
+        assertFalse(Downloads.neuFragen(Laden.Grund.PRUEFSUMME, false, 3, 4));
+        assertFalse(Downloads.neuFragen(Laden.Grund.PRUEFSUMME, true, 3, 3));
+        assertFalse(Downloads.neuFragen(Laden.Grund.NETZ, false, 3, 3));
+    }
+
+    private static String schluessel(net.minecraft.network.chat.Component text) {
+        return ((net.minecraft.network.chat.contents.TranslatableContents) text.getContents()).getKey();
+    }
+
+    @Test
     void neuerLoginVergisstWartendeFreigaben() {
         // Eine freigabe von Backend A, die auf ihre Dimension wartet, läuft nach einem neuen Login nicht.
         Downloads.INSTANZ.warte("nether", new com.google.gson.JsonObject());

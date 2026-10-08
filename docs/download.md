@@ -75,6 +75,9 @@ der Mod mit den Kacheln zeigt, steht unter [Vollbildkarte](vollbildkarte.md).
 | `/hmap abgleich <baum>` | fragt einen Abgleich von Hand an, im gespeicherten Massstab; nach einer Ablehnung mit `wieder` erst ab dann wieder |
 
 Dieselben Wege gehen über die Knöpfe der [Vollbildkarte](vollbildkarte.md), „Bedienung“.
+Einen Namen, den der Mod nicht als Baum nimmt (`Freigabe.baum`), weisen
+`laden` und `abgleich` vor jeder anderen Prüfung ab; es geht keine
+`anfrage` hinaus, die das Plugin zählte.
 Ohne Unterbefehl öffnet `/hmap` das Menü, siehe [Minimap](minimap.md), „Bedienung“.
 
 - **Höchstens ein Abgleich je Tag** und Spieler, automatisch oder von Hand,
@@ -247,12 +250,20 @@ Einzelheiten stehen im Log.
   erste Level nach einem Login wählt die gespeicherte Gruppe, die genau
   dieses Paar aus Dimension und Hash kennt, sonst entsteht eine neue. Eine
   Dimension, die der Spieler auf diesem Backend nie betrat, ist unbekannt,
-  auch wenn ein anderes Backend sie kennt. Den Wechsel des Backends meldet
+  auch wenn ein anderes Backend sie kennt. Zwei Backends mit demselben
+  Paar beim Login, also derselben Welt am Ort des Logins, teilen eine
+  Gruppe; eine weitere Welt mit gleichem Schlüssel und anderem Seed behält
+  dann den Hash des zuletzt besuchten Backends. Nether und End der
+  Hauptwelt betrifft das nicht. Am Login sind solche Backends nicht zu
+  unterscheiden. Je Server behält der Mod die 16 zuletzt benutzten
+  Gruppen (`Welten.GRUPPEN`); sonst häuften Weltresets und Server, die den
+  Hash würfeln, immer mehr an. Den Wechsel des Backends meldet
   Fabric nicht als `DISCONNECT`, sondern als neuen Login
   (`ClientPlayConnectionEvents.INIT`); dann vergisst der Mod Angebot,
   Bestätigungen und wartende `freigabe`n des alten Backends
   (`Downloads.neueSitzung`). Ein laufender Download lädt weiter in seinen
-  Ordner. So hat es der User entschieden: nur im Mod, ohne Änderung am
+  Ordner; scheitert er an der Prüfsumme, fragt der Mod nur neu an, wenn er
+  aus derselben Sitzung stammt (`Downloads.neuFragen`). So hat es der User entschieden: nur im Mod, ohne Änderung am
   Plugin.
 - **Solange der Hash unbekannt ist:**
   - `/hmap laden` und der Abgleich sagen „Betritt zuerst `<dimension>`“
@@ -267,7 +278,8 @@ Einzelheiten stehen im Log.
     Kartenserver das Token ab, und der Mod meldet „abgelehnt“.
 - **Gleiche Hashes:** Bei der Wahl Hash teilen sich zwei Server mit
   demselben Seed einen Ordner, ebenso Server, die statt des Hashes einen
-  festen Wert wie 0 schicken. Der Download des einen löscht dann, was nicht
+  festen Wert wie 0 schicken; bei IP + Hash ebenso zwei Backends hinter
+  derselben Adresse mit demselben Seed. Der Download des einen löscht dann, was nicht
   in seinem Manifest steht, also die Kacheln des anderen. Würfelt ein
   Server den Wert bei jedem Beitritt, entsteht jedes Mal ein neuer Ordner.
   Beides zeigt die Kartenliste; dort lässt sich aufräumen.

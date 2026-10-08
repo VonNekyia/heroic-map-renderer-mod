@@ -106,6 +106,7 @@ final class Downloads {
      * Download lädt weiter in seinen Ordner. Siehe docs/download.md, „Ablage“.
      */
     void neueSitzung() {
+        sitzung++;
         angebot = null;
         neuGefragt = false;
         bestaetigt.clear();
@@ -114,6 +115,9 @@ final class Downloads {
             welten.neueSitzung();
         }
     }
+
+    /** Zählt jeden Login mit; ein Download merkt sich die Sitzung, aus der er stammt. */
+    private int sitzung;
 
     /** Hält eine freigabe, bis der Hash ihrer Dimension bekannt ist. */
     void warte(String baum, JsonObject json) {
@@ -188,6 +192,9 @@ final class Downloads {
      * Fehler zurück, oder null.
      */
     Component frageVoll(String baum, int massstab) {
+        if (!Freigabe.baum(baum)) {
+            return Component.translatable("heroicmap.befehl.name", baum);
+        }
         JsonObject eintrag = eintrag(baum);
         if (!Kanal.offen() || eintrag == null) {
             return Component.translatable("heroicmap.befehl.unbekannt", baum);
@@ -336,7 +343,8 @@ final class Downloads {
         }
         JsonObject eintrag = eintrag(f.baum());
         String name = text(eintrag, "name"), dimension = text(eintrag, "dimension");
-        if (!reihe.reihe(ordner.toString(), () -> lade(f, auftrag, ordner, name, dimension))) {
+        int meine = sitzung;
+        if (!reihe.reihe(ordner.toString(), () -> lade(f, auftrag, ordner, name, dimension, meine))) {
             melde(Component.translatable("heroicmap.download.verfaellt_belegt", f.baum()));
             return;
         }
@@ -344,7 +352,7 @@ final class Downloads {
     }
 
     /** Im Thread der Reihe. Das Ergebnis geht in jedem Fall zurück, auch bei einem Error. */
-    private void lade(Freigabe f, Laden.Auftrag auftrag, Path ordner, String name, String dimension) {
+    private void lade(Freigabe f, Laden.Auftrag auftrag, Path ordner, String name, String dimension, int meine) {
         Laden.Ergebnis ergebnis = null;
         Exception fehler = null;
         try {
@@ -366,15 +374,15 @@ final class Downloads {
         } catch (Exception e) {
             fehler = e;
         } finally {
-            zurueck(f, auftrag, ergebnis, fehler);
+            zurueck(f, auftrag, ergebnis, fehler, meine);
         }
     }
 
-    private void zurueck(Freigabe f, Laden.Auftrag auftrag, Laden.Ergebnis ergebnis, Exception fehler) {
-        Minecraft.getInstance().execute(() -> beende(f, auftrag, ergebnis, fehler));
+    private void zurueck(Freigabe f, Laden.Auftrag auftrag, Laden.Ergebnis ergebnis, Exception fehler, int meine) {
+        Minecraft.getInstance().execute(() -> beende(f, auftrag, ergebnis, fehler, meine));
     }
 
-    private void beende(Freigabe f, Laden.Auftrag auftrag, Laden.Ergebnis ergebnis, Exception fehler) {
+    private void beende(Freigabe f, Laden.Auftrag auftrag, Laden.Ergebnis ergebnis, Exception fehler, int meine) {
         if (ergebnis != null) {
             if (fehler != null) {
                 LOGGER.warn("Heroic Map: Kacheln geladen, Satz nicht fertig angelegt", fehler);
@@ -387,7 +395,7 @@ final class Downloads {
                     ergebnis.geladen(), ergebnis.gleich(), ergebnis.geloescht(), groesse(ergebnis.bytesGeladen())));
             return;
         }
-        if (fehler instanceof Laden.Fehler lf && lf.grund == Laden.Grund.PRUEFSUMME && !neuGefragt && Kanal.offen()) {
+        if (fehler instanceof Laden.Fehler lf && neuFragen(lf.grund, neuGefragt, meine, sitzung) && Kanal.offen()) {
             // Zwischen freigabe und Abruf endete ein Lauf; dasselbe Token kommt mit dem neuen Manifest.
             neuGefragt = true;
             if (!f.abgleich()) {
@@ -439,6 +447,14 @@ final class Downloads {
         Long hash = server == null || dimension == null ? null : welten().hash(Welten.server(server.ip), dimension);
         return server != null && weltUnbekannt(baum, dimension, hash)
                 ? Component.translatable("heroicmap.befehl.welt_unbekannt", dimension) : null;
+    }
+
+    /**
+     * Nach einer falschen Prüfsumme fragt der Mod einmal neu an, aber nur beim Backend, von dem der
+     * Download stammt: Nach einem neuen Login gehört die Antwort einem anderen.
+     */
+    static boolean neuFragen(Laden.Grund grund, boolean schonGefragt, int sitzungDesDownloads, int sitzungJetzt) {
+        return grund == Laden.Grund.PRUEFSUMME && !schonGefragt && sitzungDesDownloads == sitzungJetzt;
     }
 
     /** Fehlt nur der Hash? Ein Baum ohne Dimension oder mit einem Namen, den der Mod ablehnt, ist ein anderer Fehler. */
@@ -665,6 +681,9 @@ final class Downloads {
 
     /** Der Befehl {@code abgleich} und der Knopf der Karte: fragt im gespeicherten Massstab an. Gibt den Fehler zurück, oder null. */
     Component frageAbgleich(String baum) {
+        if (!Freigabe.baum(baum)) {
+            return Component.translatable("heroicmap.befehl.name", baum);
+        }
         Component unbekannt = weltUnbekannt(baum);
         if (unbekannt != null) {
             return unbekannt;
