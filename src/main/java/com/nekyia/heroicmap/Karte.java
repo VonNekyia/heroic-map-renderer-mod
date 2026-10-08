@@ -121,6 +121,15 @@ final class Karte extends Screen {
         }
     }
 
+    /** Für den Gametest Bedienung: die Mitte des Blicks in Pixeln der Basis und das offene Menü, oder null. */
+    double[] blickMitte() {
+        return blick == null ? null : new double[] {blick.mx, blick.mz};
+    }
+
+    int[] ziel() {
+        return ziel;
+    }
+
     /** Der Block unter (x, y) des Schirms. */
     private int[] block(double x, double y) {
         return new int[] {Mth.floor(blick.basisX(x, width) / satz.scale()), Mth.floor(blick.basisZ(y, height) / satz.scale())};

@@ -61,6 +61,7 @@ tasks.matching { it.name == "runClientGameTest" }.configureEach {
     systemProperty("heroicmap.uebernahme", uebernahme.get())
     systemProperty("heroicmap.abnahme", abnahme.get())
     systemProperty("heroicmap.server", server.get())
+    providers.gradleProperty("zusatzmods").orNull?.let { systemProperty("fabric.addMods", file(it).absolutePath) }
 }
 
 tasks.processResources {

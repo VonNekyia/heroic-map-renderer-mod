@@ -60,10 +60,16 @@ in der CI:
 ./gradlew runClientGameTest
 ```
 
+Mit `-Pzusatzmods=<ordner>` lädt das Spiel im Gametest zusätzlich die
+Mods aus diesem Ordner (`fabric.addMods`), etwa die eines Modpacks ohne
+Fabric API und ohne diesen Mod. So lässt sich prüfen, ob eine andere Mod
+stört; seit 26.x sind die Namen im Spiel nicht mehr verschleiert, fertige
+Mods laufen deshalb auch hier.
+
 | Gametest | tut |
 |---|---|
 | `Bilder` | baut eine Szene und nimmt die Minimap auf, danach die Vollbildkarte aus einem Testsatz und die Live-Ebene darüber; mit `-Pbilder=<ordner>` landen die Bilder dort, siehe [Minimap](minimap.md), „Bilder“, [Vollbildkarte](vollbildkarte.md), „Bild“, und [Live-Ebene](live.md), „Bild“ |
-| `Bedienung` | das Menü mit echten Eingaben der Maus: Ziehen mit der linken wie der rechten Taste verschiebt die ganze Minimap, siehe [Minimap](minimap.md), „Bedienung“ |
+| `Bedienung` | das Menü und die Vollbildkarte mit echten Eingaben der Maus (`TestInput`): im Menü verschiebt Ziehen mit der linken wie der rechten Taste die ganze Minimap; auf der Karte verschiebt links ziehen den Inhalt, ein Linksklick öffnet kein Menü, ein Rechtsklick öffnet „Hierher teleportieren“, ein Klick darauf teleportiert; siehe [Minimap](minimap.md), „Bedienung“, und [Vollbildkarte](vollbildkarte.md), „Bedienung“ |
 | `Messung` | nur mit `-Pmessung=<datei>`: Zeit je Chunk und Frametime mit und ohne Minimap, siehe [Minimap](minimap.md), „Kosten“ |
 | `Abnahme` | nur mit `-Pabnahme=<ordner>`: die Live-Ebene gegen `top-north` scale 4 des Renderers an der Testwelt, siehe [Live-Ebene](live.md), „Abnahme“ |
 | `Server` | nur mit `-Pserver=<adresse>`: von Ende zu Ende gegen einen echten Paper-Server mit dem Plugin, Angebot, voller Download des kleinsten Massstabs des ersten Baums, jeder Dialog mit Ja, die Vollbildkarte als Bild `server-karte`; siehe unten |
