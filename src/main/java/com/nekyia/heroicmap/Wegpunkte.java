@@ -70,7 +70,15 @@ final class Wegpunkte {
         try {
             lies(JsonParser.parseString(Files.readString(datei, StandardCharsets.UTF_8)).getAsJsonObject());
         } catch (IOException | RuntimeException e) {
-            LOGGER.warn("Heroic Map: Wegpunkte {} nicht lesbar", datei, e);
+            // Sonst überschriebe die nächste Änderung die Datei; so bleibt ihr Inhalt.
+            Path kaputt = datei.resolveSibling("wegpunkte.json.kaputt");
+            LOGGER.warn("Heroic Map: Wegpunkte {} nicht lesbar, gesichert als {}", datei, kaputt, e);
+            try {
+                Files.move(datei, kaputt, StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException f) {
+                LOGGER.warn("Heroic Map: {} nicht gesichert; die Wegpunkte bleiben nur im Speicher", datei, f);
+                datei = null;
+            }
         }
     }
 
@@ -130,12 +138,30 @@ final class Wegpunkte {
         return Collections.unmodifiableList(punkte);
     }
 
-    /** Setzt einen Wegpunkt auf den Block, in der nächsten Farbe; steht dort schon einer, bleibt er. */
+    /** Setzt einen Wegpunkt auf den Block; steht dort schon einer, bleibt er. */
     void setze(String dimension, int x, int z) {
         if (finde(dimension, x, z) < 0) {
-            punkte.add(new Punkt(dimension, x, z, punkte.size() % FARBEN.length, false));
+            punkte.add(new Punkt(dimension, x, z, farbe(dimension), false));
             schreibe();
         }
+    }
+
+    /** Die erste Farbe, die in der Dimension noch frei ist; sind alle vergeben, reihum. */
+    private int farbe(String dimension) {
+        boolean[] belegt = new boolean[FARBEN.length];
+        int anzahl = 0;
+        for (Punkt p : punkte) {
+            if (p.dimension().equals(dimension)) {
+                belegt[p.farbe()] = true;
+                anzahl++;
+            }
+        }
+        for (int f = 0; f < FARBEN.length; f++) {
+            if (!belegt[f]) {
+                return f;
+            }
+        }
+        return anzahl % FARBEN.length;
     }
 
     void loesche(Punkt p) {

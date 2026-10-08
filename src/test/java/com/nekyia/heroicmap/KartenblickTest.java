@@ -3,6 +3,7 @@ package com.nekyia.heroicmap;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -21,6 +22,33 @@ class KartenblickTest {
         }
         // Stufe 5 unter maxZoom 6: ein Pixel der Stufe sind zwei der Basis, die Lupe halbiert.
         assertEquals(1000 + 10, blick.basisX(427 + 10, 854), 1e-9);
+    }
+
+    @Test
+    void markenAufDemRasterDerKacheln() {
+        // Die Kacheln liegen mit Mth.floor auf ganzen Einheiten; eine Marke rückt mit ihnen, nicht mit der Mitte.
+        Kartenblick blick = new Kartenblick(256, 0, 6, 6);
+        for (double frac : new double[] {0, 0.25, 0.75}) {
+            blick.mx = 1000 + frac;
+            double kante = Math.floor(blick.schirmX(3 * 256, 854));
+            assertEquals(kante + 10.5, blick.rasterX(3 * 256 + 10.5, 854), 1e-9, "frac " + frac);
+            assertEquals(Math.floor(blick.schirmY(0, 480)) + 7, blick.rasterY(7, 480), 1e-9);
+        }
+    }
+
+    @Test
+    void markeWeichtDenKnoepfenAus() {
+        // Schirm 400 × 200, Rand 14, Knöpfe ab x 306 bis y 48, halbe Marke 4.
+        double[] oben = Kartenblick.marke(1700, -900, 400, 200, 14, 4, 306, 48);
+        assertEquals(14, oben[1], 1e-9);
+        assertTrue(oben[0] + 4 <= 306, "oben links neben die Knöpfe: " + oben[0]);
+        double[] rechts = Kartenblick.marke(5000, -1200, 400, 200, 14, 4, 306, 48);
+        assertEquals(400 - 14, rechts[0], 1e-9);
+        assertTrue(rechts[1] - 4 >= 48, "rechts unter die Knöpfe: " + rechts[1]);
+        // Drinnen bleibt eine Marke, wo sie ist, auch unter den Knöpfen.
+        assertArrayEquals(new double[] {350, 30}, Kartenblick.marke(350, 30, 400, 200, 14, 4, 306, 48), 1e-9);
+        // Fern der Knöpfe gilt nur der Rand.
+        assertArrayEquals(new double[] {14, 100}, Kartenblick.marke(-5000, 100, 400, 200, 14, 4, 306, 48), 1e-9);
     }
 
     @Test

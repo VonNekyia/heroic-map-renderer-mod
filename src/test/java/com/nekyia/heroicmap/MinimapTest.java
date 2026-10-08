@@ -212,6 +212,18 @@ class MinimapTest {
     }
 
     @Test
+    void markeAufDemPixelDerKarte() {
+        // Zoom 1, GUI-Massstab 3: 3 Pixel je Block. Der Spieler steht bei x = 12 + frac; die Kante des Bildes rückt
+        // mit ihm, die Marke der Mitte von Block 10 bleibt auf demselben Pixel des Blocks.
+        int zoom = 1, k = 3, n = 128 * k;
+        for (double frac : new double[] {0, 0.25, 0.5, 0.75, 0.99}) {
+            int links = Minimap.ecke(12 + frac, 12 + frac, 1f, zoom, k, n);
+            int block = 10 * zoom * k - links;
+            assertEquals(block + 2, Minimap.pixel(10.5, zoom, k, links), "frac " + frac);
+        }
+    }
+
+    @Test
     void ohneDateiDieVorgabe(@TempDir Path ordner) {
         Minimap minimap = new Minimap();
         minimap.lies(ordner.resolve("fehlt.properties"));

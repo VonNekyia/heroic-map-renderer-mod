@@ -29,7 +29,7 @@ class WegpunkteTest {
 
         Wegpunkte nachher = new Wegpunkte();
         nachher.lies(ordner);
-        assertEquals(List.of(new Wegpunkte.Punkt(WELT, 12, -40, 0, true), new Wegpunkte.Punkt("minecraft:the_nether", 1, 2, 1, false)),
+        assertEquals(List.of(new Wegpunkte.Punkt(WELT, 12, -40, 0, true), new Wegpunkte.Punkt("minecraft:the_nether", 1, 2, 0, false)),
                 nachher.punkte());
         assertTrue(nachher.angeheftet(SAM));
     }
@@ -96,10 +96,32 @@ class WegpunkteTest {
     }
 
     @Test
-    void unlesbareDateiGibtNichts(@TempDir Path ordner) throws Exception {
+    void unlesbareDateiBleibtGesichert(@TempDir Path ordner) throws Exception {
         Files.writeString(ordner.resolve("wegpunkte.json"), "{kaputt");
         Wegpunkte w = new Wegpunkte();
         w.lies(ordner);
         assertTrue(w.punkte().isEmpty());
+        // Die nächste Änderung schreibt eine neue Datei; die alte liegt daneben.
+        w.setze(WELT, 1, 1);
+        assertEquals("{kaputt", Files.readString(ordner.resolve("wegpunkte.json.kaputt")));
+        Wegpunkte neu = new Wegpunkte();
+        neu.lies(ordner);
+        assertEquals(1, neu.punkte().size());
+    }
+
+    @Test
+    void farbenBleibenVerschieden() {
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        w.setze(WELT, 1, 1);
+        w.setze(WELT, 2, 2);
+        w.setze(WELT, 3, 3);
+        w.loesche(w.punkte().getFirst());
+        w.setze(WELT, 4, 4);
+        // Ein Wegpunkt einer anderen Dimension nimmt keiner Farbe den Platz.
+        w.setze("minecraft:the_nether", 5, 5);
+        assertEquals(java.util.Set.of(0, 1, 2), w.punkte().stream().filter(p -> p.dimension().equals(WELT))
+                .map(Wegpunkte.Punkt::farbe).collect(java.util.stream.Collectors.toSet()));
+        assertEquals(0, w.punkte().getLast().farbe());
     }
 }
