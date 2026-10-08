@@ -29,7 +29,7 @@ class WegpunkteTest {
 
         Wegpunkte nachher = new Wegpunkte();
         nachher.lies(ordner);
-        assertEquals(List.of(new Wegpunkte.Punkt(WELT, 12, -40, 0, true), new Wegpunkte.Punkt("minecraft:the_nether", 1, 2, 1, false)),
+        assertEquals(List.of(new Wegpunkte.Punkt(WELT, 12, -40, 0, true), new Wegpunkte.Punkt("minecraft:the_nether", 1, 2, 0, false)),
                 nachher.punkte());
         assertTrue(nachher.angeheftet(SAM));
     }
