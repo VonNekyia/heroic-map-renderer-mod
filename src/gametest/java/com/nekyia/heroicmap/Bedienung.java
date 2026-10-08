@@ -286,9 +286,12 @@ public final class Bedienung implements FabricClientGameTest {
     private static void kleinerSchirm(ClientGameTestContext context) {
         int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(),
                 mc.options.guiScale().get()});
-        // Erst die Wahl, dann die Grösse: Beim Ändern der Grösse rechnet das Spiel den Massstab neu.
-        context.runOnClient(mc -> mc.options.guiScale().set(3));
+        // Die Wahl allein rechnet den Massstab nicht neu; das tut erst resizeGui, wie das Menü der Optionen.
         context.getInput().resizeWindow(1280, 720);
+        context.runOnClient(mc -> {
+            mc.options.guiScale().set(3);
+            mc.resizeGui();
+        });
         context.waitTicks(2);
         context.runOnClient(mc -> mc.gui.setScreen(new Einstellungen()));
         context.waitTicks(2);
@@ -304,11 +307,12 @@ public final class Bedienung implements FabricClientGameTest {
             }
             return null;
         });
+        context.getInput().resizeWindow(vorher[0], vorher[1]);
         context.runOnClient(mc -> {
             mc.gui.setScreen(null);
             mc.options.guiScale().set(vorher[2]);
+            mc.resizeGui();
         });
-        context.getInput().resizeWindow(vorher[0], vorher[1]);
         context.waitTicks(2);
         if (fehler != null) {
             throw new AssertionError("Menü bei 1280 × 720, GUI-Massstab 3: " + fehler);
