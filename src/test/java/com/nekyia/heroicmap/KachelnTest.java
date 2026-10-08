@@ -2,22 +2,59 @@ package com.nekyia.heroicmap;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.twelvemonkeys.imageio.plugins.webp.WebPImageReaderSpi;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Stream;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.MemoryCacheImageInputStream;
 import org.junit.jupiter.api.Test;
 
 /** WebP mit TwelveMonkeys lesen. Siehe docs/vollbildkarte.md, „Kacheln“. */
 class KachelnTest {
 
     private static byte[] kachel() throws IOException {
-        try (InputStream rein = KachelnTest.class.getResourceAsStream("/kachel.webp")) {
+        return datei("/kachel.webp");
+    }
+
+    private static byte[] datei(String name) throws IOException {
+        try (InputStream rein = KachelnTest.class.getResourceAsStream(name)) {
             return rein.readAllBytes();
         }
+    }
+
+    /** Wie TwelveMonkeys selbst liest, ohne die Kopie in {@code webp/}. */
+    private static int[] twelveMonkeys(byte[] webp) throws IOException {
+        ImageReader leser = new WebPImageReaderSpi().createReaderInstance();
+        try (MemoryCacheImageInputStream rein = new MemoryCacheImageInputStream(new ByteArrayInputStream(webp))) {
+            leser.setInput(rein);
+            BufferedImage bild = leser.read(0);
+            return bild.getRGB(0, 0, bild.getWidth(), bild.getHeight(), null, 0, bild.getWidth());
+        } finally {
+            leser.dispose();
+        }
+    }
+
+    /** Die Pixel von {@code farbindex.webp}, wie farbindex.py sie malt: Schachbrett aus Schwarz, Alpha 0, und Grau. */
+    private static int[] farbindex() {
+        int[] argb = new int[8 * 8];
+        for (int i = 0; i < argb.length; i++) {
+            int v = 8 * (1 + i / 2 % 31);
+            argb[i] = (i % 8 + i / 8) % 2 == 0 ? 0 : 0xFF000000 | v * 0x010101;
+        }
+        return argb;
     }
 
     @Test
@@ -40,5 +77,40 @@ class KachelnTest {
         puffer.putInt(21, (puffer.getInt(21) & 0xF000_0000) | (0x3FFF << 14) | 0x3FFF);
         IOException fehler = assertThrows(IOException.class, () -> Kacheln.dekodiere(webp, 256));
         assertTrue(fehler.getMessage().startsWith("Grösse 16384 × 16384"), fehler.getMessage());
+    }
+
+    @Test
+    void indexHinterDerPaletteIstDurchsichtig() throws Exception {
+        // libwebp lässt das durchsichtige Schwarz als letzten Eintrag der Palette weg; die Pixel zeigen dahinter.
+        byte[] webp = datei("/farbindex.webp");
+        assertArrayEquals(farbindex(), Kacheln.dekodiere(webp, 8).argb());
+        assertFalse(Arrays.equals(farbindex(), twelveMonkeys(webp)),
+                "TwelveMonkeys liest farbindex.webp richtig: Die Kopie in webp/ kann weg, siehe docs/vollbildkarte.md");
+    }
+
+    @Test
+    void sonstWieTwelveMonkeys() throws Exception {
+        // Die Kopie liest jedes Pixel wie TwelveMonkeys, ausser denen mit einem Index hinter der Palette.
+        assertArrayEquals(twelveMonkeys(kachel()), Kacheln.dekodiere(kachel(), 2).argb());
+        List<Path> satz;
+        try (Stream<Path> dateien = Files.walk(Path.of("src/gametest/resources/satz"))) {
+            satz = dateien.filter(p -> p.toString().endsWith(".webp")).toList();
+        }
+        assertEquals(24, satz.size());
+        Path stufe0 = Path.of("src/gametest/resources/satz/4/0");
+        for (Path p : satz) {
+            byte[] webp = Files.readAllBytes(p);
+            int[] alt = twelveMonkeys(webp), neu = Kacheln.dekodiere(webp, 256).argb();
+            int anders = 0;
+            for (int i = 0; i < neu.length; i++) {
+                if (neu[i] != alt[i]) {
+                    assertEquals(0, neu[i], p + ", Pixel " + i);
+                    anders++;
+                }
+            }
+            // In Stufe 0 liegen selbst Indizes hinter der Palette: libwebp liest in jeder dieser Kacheln
+            // 49152 Pixel durchsichtig, TwelveMonkeys keins. Die übrigen 20 Kacheln haben keine.
+            assertEquals(p.startsWith(stufe0) ? 49152 : 0, anders, p.toString());
+        }
     }
 }

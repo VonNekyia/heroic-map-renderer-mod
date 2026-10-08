@@ -1,10 +1,14 @@
 package com.nekyia.heroicmap;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import com.nekyia.heroicmap.webp.VP8LDecoder;
 import com.twelvemonkeys.imageio.plugins.webp.WebPImageReaderSpi;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -180,23 +184,58 @@ final class Kacheln implements AutoCloseable {
     }
 
     /**
-     * Dekodiert eine WebP-Kachel mit TwelveMonkeys; das Spiel selbst liest nur PNG. Die Grösse
-     * aus dem Kopf muss {@code seite} × {@code seite} sein, sonst wirft es, bevor es Speicher
-     * dafür anlegt.
+     * Dekodiert eine WebP-Kachel; das Spiel selbst liest nur PNG. Einfache verlustfreie WebP liest
+     * die Kopie des Dekoders in {@code webp/}, alle anderen TwelveMonkeys. Die Grösse aus dem Kopf
+     * muss {@code seite} × {@code seite} sein, sonst wirft es, bevor es Speicher dafür anlegt.
+     * Siehe docs/vollbildkarte.md, „Farbindex hinter der Palette“.
      */
     static Bild dekodiere(byte[] webp, int seite) throws IOException {
-        ImageReader leser = new WebPImageReaderSpi().createReaderInstance();
-        try (MemoryCacheImageInputStream rein = new MemoryCacheImageInputStream(new ByteArrayInputStream(webp))) {
-            leser.setInput(rein);
-            int breite = leser.getWidth(0), hoehe = leser.getHeight(0);
-            if (breite != seite || hoehe != seite) {
-                throw new IOException("Grösse " + breite + " × " + hoehe + " statt " + seite + " × " + seite);
+        BufferedImage bild = verlustfrei(webp, seite);
+        if (bild == null) {
+            ImageReader leser = new WebPImageReaderSpi().createReaderInstance();
+            try (MemoryCacheImageInputStream rein = new MemoryCacheImageInputStream(new ByteArrayInputStream(webp))) {
+                leser.setInput(rein);
+                pruefe(leser.getWidth(0), leser.getHeight(0), seite);
+                bild = leser.read(0);
+            } finally {
+                leser.dispose();
             }
-            BufferedImage bild = leser.read(0);
-            int w = bild.getWidth(), h = bild.getHeight();
-            return new Bild(w, h, bild.getRGB(0, 0, w, h, null, 0, w));
-        } finally {
-            leser.dispose();
+        }
+        int w = bild.getWidth(), h = bild.getHeight();
+        return new Bild(w, h, bild.getRGB(0, 0, w, h, null, 0, w));
+    }
+
+    /**
+     * Eine einfache verlustfreie WebP, {@code RIFF} mit nur dem Chunk {@code VP8L}, mit der Kopie
+     * des Dekoders, ins selbe Bildformat wie TwelveMonkeys; jede andere WebP gibt null.
+     */
+    private static BufferedImage verlustfrei(byte[] webp, int seite) throws IOException {
+        // RIFF, Länge, WEBPVP8L, Länge, Signatur 0x2F, dann LSB zuerst 14 + 14 Bit Grösse − 1,
+        // 1 Bit Alpha, 3 Bit Version.
+        if (webp.length < 25 || webp[20] != 0x2F) {
+            return null;
+        }
+        String kennung = new String(webp, 0, 16, StandardCharsets.ISO_8859_1);
+        int kopf = ByteBuffer.wrap(webp, 21, 4).order(ByteOrder.LITTLE_ENDIAN).getInt();
+        if (!kennung.startsWith("RIFF") || !kennung.startsWith("WEBPVP8L", 8) || kopf >>> 29 != 0) {
+            return null;
+        }
+        int breite = (kopf & 0x3FFF) + 1, hoehe = (kopf >>> 14 & 0x3FFF) + 1;
+        pruefe(breite, hoehe, seite);
+        BufferedImage bild = new BufferedImage(breite, hoehe,
+                (kopf >>> 28 & 1) == 1 ? BufferedImage.TYPE_4BYTE_ABGR : BufferedImage.TYPE_3BYTE_BGR);
+        try (MemoryCacheImageInputStream rein = new MemoryCacheImageInputStream(
+                new ByteArrayInputStream(webp, 20, webp.length - 20))) {
+            // Wie WebPImageReader: Der Bitleser liest ganze long aus dem Strom.
+            rein.setByteOrder(ByteOrder.LITTLE_ENDIAN);
+            new VP8LDecoder(rein, false).readVP8Lossless(bild.getRaster(), true, null, breite, hoehe);
+        }
+        return bild;
+    }
+
+    private static void pruefe(int breite, int hoehe, int seite) throws IOException {
+        if (breite != seite || hoehe != seite) {
+            throw new IOException("Grösse " + breite + " × " + hoehe + " statt " + seite + " × " + seite);
         }
     }
 

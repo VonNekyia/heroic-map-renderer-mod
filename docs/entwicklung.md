@@ -22,6 +22,9 @@ Java 25; Gradle holt es über die Toolchain in `build.gradle.kts`.
 - **Minecraft, Fabric Loader, Fabric API, Loom und JUnit** stehen in
   `gradle/libs.versions.toml`. Minecraft folgt dem Server.
 - **Gradle** steht in `gradle/wrapper/gradle-wrapper.properties`.
+- **TwelveMonkeys** steht auch in `gradle/libs.versions.toml`. Wer es hebt,
+  prüft die Kopie seines Dekoders, siehe
+  [Vollbildkarte](vollbildkarte.md), „Farbindex hinter der Palette“.
 
 ## Bauen
 
@@ -43,7 +46,7 @@ Das baut das Jar nach `build/libs/` und lässt die Tests laufen.
 | `AdresseTest` | die Prüfung der Adresse, siehe [Download](download.md), „Sicherheit“ |
 | `KartenblickTest` | wie die Vollbildkarte Kacheln auf den Schirm legt, Zoom über Stufen und Lupe, Schieben, Platzhalter aus gröberen Stufen, siehe [Vollbildkarte](vollbildkarte.md) |
 | `TeleportTest` | der Befehl zum Teleportieren und dass es ihn nur mit `execute` und `tp` im Befehlsbaum gibt, siehe [Vollbildkarte](vollbildkarte.md), „Teleportieren“ |
-| `KachelnTest` | WebP mit TwelveMonkeys lesen, samt Alpha, die Grösse aus dem Kopf vor dem Dekodieren, siehe [Vollbildkarte](vollbildkarte.md), „Kacheln“ |
+| `KachelnTest` | WebP lesen, samt Alpha, die Grösse aus dem Kopf vor dem Dekodieren, siehe [Vollbildkarte](vollbildkarte.md), „Kacheln“; Pixel mit einem Index hinter der Palette durchsichtig, alle anderen wie TwelveMonkeys, siehe [Vollbildkarte](vollbildkarte.md), „Farbindex hinter der Palette“ |
 | `SatzTest` | den Satz zur Dimension finden, Grenzen für `map.json`, siehe [Vollbildkarte](vollbildkarte.md), „Welcher Satz“ |
 | `MitspielerTest` | die Nachricht `spieler` lesen, kaputte Einträge, Obergrenze, verfallen nach 5 s und beim Verlassen, die Antwort auf `show`, siehe [Minimap](minimap.md), „Mitspieler“ |
 | `MinimapTest` | den Bereich der Minimap, siehe [Minimap](minimap.md), „Neu zeichnen“ |

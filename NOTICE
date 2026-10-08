@@ -11,7 +11,13 @@ NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR 
 ----
 
 Das Jar enthält TwelveMonkeys ImageIO 3.15.2 (imageio-webp, imageio-core,
-imageio-metadata, common-lang, common-io, common-image), unter dieser Lizenz:
+imageio-metadata, common-lang, common-io, common-image), unter dieser Lizenz.
+
+Dazu enthalten Quellen und Jar im Paket com.nekyia.heroicmap.webp eine
+geänderte Kopie des Pakets com.twelvemonkeys.imageio.plugins.webp.lossless
+aus TwelveMonkeys ImageIO 3.15.2, Copyright (c) 2017, 2022, Harald Kuhr,
+ebenfalls unter dieser Lizenz. Geändert sind das Paket und in VP8LDecoder
+die Schleife, die die Farbtabelle auflöst (haraldk/TwelveMonkeys#1361).
 
 BSD 3-Clause License
 
