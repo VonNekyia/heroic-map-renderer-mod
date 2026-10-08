@@ -112,11 +112,11 @@ final class Karte extends Screen {
         }
         int[] k = blick.kacheln(width, height);
         int seite = satz.kachel() * blick.lupe;
-        double basis = satz.kachel() * blick.teiler();
         for (int ty = k[2]; ty <= k[3]; ty++) {
             for (int tx = k[0]; tx <= k[1]; tx++) {
                 Identifier id = kacheln.textur(blick.zoom, tx, ty);
-                int sx = Mth.floor(blick.schirmX(tx * basis, width)), sy = Mth.floor(blick.schirmY(ty * basis, height));
+                // Von einer ganzzahligen Kante aus, wie Marken und Klicks. Siehe docs/wegpunkte.md, „Am Rand“.
+                int sx = blick.kachelX(tx, width), sy = blick.kachelY(ty, height);
                 if (id != null) {
                     g.blit(RenderPipelines.GUI_TEXTURED, id, sx, sy, 0, 0, seite, seite, satz.kachel(), satz.kachel(),
                             satz.kachel(), satz.kachel());
@@ -175,7 +175,7 @@ final class Karte extends Screen {
             double[] lage = Mitspieler.lage(minecraft, e, 1f);
             Marke m = marke(lage[0], lage[1], e.uuid(), null);
             Mitspieler.kopf(g, minecraft, e.uuid(), m.x(), m.y(), Minimap.KOPF, Wegpunkte.INSTANZ.angeheftet(e.uuid()) ? bunt : 0);
-            int[] name = Kartenblick.name(m.x(), m.y() - m.halb() - 10, width, font.width(e.name()), knopfX, knopfUnten);
+            int[] name = Kartenblick.name(m.x(), m.y(), m.halb(), width, font.width(e.name()), knopfX, knopfUnten);
             g.text(font, e.name(), name[0], name[1], TEXT);
         }
         Marke ich = marke(spieler.getX(), spieler.getZ(), null, null);
