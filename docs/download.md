@@ -37,9 +37,8 @@ der Mod mit den Kacheln zeigt, steht unter [Vollbildkarte](vollbildkarte.md).
 - **Empfangen:** `angebot` merkt sich der Mod, `freigabe` reiht einen
   Download ein, `abgelehnt` zeigt er dem Spieler, mit `wieder` als
   Uhrzeit. `spieler` nennt die Mitspieler, siehe [Minimap](minimap.md),
-  „Mitspieler“. An `jetzt` jeder Nachricht misst er den Versatz der Uhren
-  für die [Live-Ebene](live.md). Nachrichten mit einem anderen `v` als 1
-  oder über 64 KiB verwirft er.
+  „Mitspieler“. Nachrichten mit einem anderen `v` als 1 oder über 64 KiB
+  verwirft er.
 - **Senden:** `anfrage` und `show` nur, wenn `ClientPlayNetworking.canSend`
   wahr ist, also wenn das Plugin den Kanal angemeldet hat. Zu `show` siehe
   [Minimap](minimap.md), „Mitspieler“.
@@ -215,9 +214,10 @@ Einzelheiten stehen im Log.
   liegt eine halbe Kachel da. `tmp/` leert der Mod zu Beginn jedes Downloads.
 - **`satz.json`** je Baum gehört zur [Vollbildkarte](vollbildkarte.md),
   „Welcher Satz“.
-- **`overlay/`** je Baum hält die [Live-Ebene](live.md). Nach einem
-  vollständigen Download räumt der Mod dort, was älter ist als
-  `abdeckt_bis` aus der `freigabe`, siehe dort, „Abgleich“.
+- **`overlay/`** je Baum hielt die frühere Live-Ebene. Der Mod löscht den
+  Ordner beim Start in jedem Baum (`Laden.loescheOverlays`), in einem
+  eigenen Thread; was sich nicht löschen lässt, geht beim nächsten Start.
+  Siehe [0002](entscheidungen/0002-vollbildkarte-nur-vom-server.md).
 - **Der Stand** steht in `<baum>/massstab.txt`: Massstab, Grösse und
   Kacheln des Satzes, wie der Spieler ihn bestätigt hat, etwa `4 9000000000
   450000`. Der Mod schreibt ihn, wenn ein voller Download beginnt, denn dann

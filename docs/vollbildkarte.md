@@ -122,11 +122,16 @@ sagt sie das und zeigt nichts.
 - **Behalten:** die 192 zuletzt gezeigten Texturen, bei 256² Pixeln rund
   48 MiB auf der Grafikkarte. Die älteste gibt der Mod frei.
 - **Fehlt eine Kachel** oder lässt sie sich nicht lesen, merkt sich die
-  Karte das und fragt nicht wieder, bis sie neu öffnet oder die Live-Ebene
-  dort ein Bild ablegt.
+  Karte das und fragt nicht wieder, bis sie neu öffnet oder ein Download
+  fertig ist.
+- **Nach einem vollständigen Download** lädt die offene Karte jede Kachel
+  neu (`Kacheln.satzGeladen`). Die alte Textur bleibt sichtbar, bis die
+  neue da ist; ein Ergebnis, das während des Downloads entstand, lädt sie
+  gleich noch einmal.
 - **Beim Schliessen** gibt die Karte alle Texturen frei.
-- **Darüber** legt der Dekoder die [Live-Ebene](live.md): was sich seit dem
-  letzten Lauf des Renderers in geladenen Chunks geändert hat.
+- **Nur Kacheln vom Server:** Was sich seit dem letzten Lauf des Renderers
+  ändert, bringt der Abgleich; selbst zeichnet der Mod nur die Minimap,
+  siehe [0002](entscheidungen/0002-vollbildkarte-nur-vom-server.md).
 
 ## Spieler und Koordinaten
 

@@ -508,6 +508,25 @@ final class Laden {
         }
     }
 
+    /**
+     * Löscht {@code <wurzel>/<server>/<baum>/overlay}, den Ordner der früheren Live-Ebene, in jedem
+     * Baum. Was bleibt, geht beim nächsten Start. Siehe docs/download.md, „Ablage“.
+     */
+    static void loescheOverlays(Path wurzel) throws IOException {
+        if (!Files.isDirectory(wurzel)) {
+            return;
+        }
+        try (Stream<Path> server = Files.list(wurzel)) {
+            for (Path s : server.filter(Files::isDirectory).toList()) {
+                try (Stream<Path> baeume = Files.list(s)) {
+                    for (Path baum : baeume.toList()) {
+                        loesche(baum.resolve("overlay"));
+                    }
+                }
+            }
+        }
+    }
+
     /** Löscht einen Ordner samt Inhalt; Symlinks folgt es nicht. */
     static void loesche(Path ordner) throws IOException {
         if (!Files.exists(ordner)) {

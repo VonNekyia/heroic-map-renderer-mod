@@ -453,4 +453,19 @@ class LadenTest {
         assertFalse(Files.exists(ziel.resolve("4")));
         assertTrue(Files.exists(ziel.resolve("2").resolve("0").resolve("0").resolve("0.webp")));
     }
+
+    @Test
+    void loeschtAlteOverlays() throws IOException {
+        Path baum = ziel.resolve("server").resolve("baum");
+        Files.createDirectories(baum.resolve("overlay"));
+        Files.writeString(baum.resolve("overlay").resolve("1.-2.png"), "alt");
+        Files.createDirectories(baum.resolve("4"));
+        Files.writeString(baum.resolve("4").resolve("map.json"), "{}");
+        Files.writeString(ziel.resolve("zustimmung.txt"), "");
+        Laden.loescheOverlays(ziel);
+        assertFalse(Files.exists(baum.resolve("overlay")));
+        assertTrue(Files.exists(baum.resolve("4").resolve("map.json")));
+        // Ein zweiter Start findet nichts mehr und scheitert nicht.
+        Laden.loescheOverlays(ziel);
+    }
 }
