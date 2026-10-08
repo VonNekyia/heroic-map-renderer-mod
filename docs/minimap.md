@@ -113,8 +113,9 @@ gibt es nicht; so hat es der User gewählt.
   `heroicmap.show` auf beiden Seiten, Vorgabe alle, mit Simple Voice Chat
   auf dem Server und wenn beide `simplevoicechat` gewählt haben. Er antwortet
   `{"typ":"show","erlaubt":true}`, oder mit `"erlaubt":false` und `grund`
-  `permission` oder `simplevoicechat`; das Menü nennt den Grund unter den
-  Knöpfen (`Mitspieler.antwort`), ein anderer Grund wird ein allgemeiner
+  `permission` oder `simplevoicechat`; das Menü nennt den Grund als
+  Tooltip am Knopf „Mitspieler“ und unter den Knöpfen, soweit der Schirm
+  reicht (`Mitspieler.antwort`), ein anderer Grund wird ein allgemeiner
   Text. Beim Verlassen des Servers fällt die Antwort weg.
 
 - **Nachricht:** `spieler` über den Kanal, etwa einmal je Sekunde:

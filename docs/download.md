@@ -240,12 +240,31 @@ Einzelheiten stehen im Log.
   `angebot`, nicht unter dem der Welt, in der der Spieler gerade steht.
   Den Hash einer Dimension sieht der Client erst, wenn der Spieler sie
   betritt (`ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE`); der Mod merkt
-  ihn je Server mit Port und Dimension in `heroicmap/welten.properties`
-  (`Welten`, `Downloads.weltBetreten`). Solange er unbekannt ist:
+  ihn in `heroicmap/welten.properties` (`Welten`, `Downloads.weltBetreten`).
+- **Backends hinter einem Proxy** haben dieselbe Adresse. Der Mod merkt
+  die Hashes deshalb je Server mit Port und je Sitzung: Was der Spieler
+  zwischen zwei Logins betritt, gehört zu einem Backend, eine Gruppe. Das
+  erste Level nach einem Login wählt die gespeicherte Gruppe, die genau
+  dieses Paar aus Dimension und Hash kennt, sonst entsteht eine neue. Eine
+  Dimension, die der Spieler auf diesem Backend nie betrat, ist unbekannt,
+  auch wenn ein anderes Backend sie kennt. Den Wechsel des Backends meldet
+  Fabric nicht als `DISCONNECT`, sondern als neuen Login
+  (`ClientPlayConnectionEvents.INIT`); dann vergisst der Mod Angebot,
+  Bestätigungen und wartende `freigabe`n des alten Backends
+  (`Downloads.neueSitzung`). Ein laufender Download lädt weiter in seinen
+  Ordner. So hat es der User entschieden: nur im Mod, ohne Änderung am
+  Plugin.
+- **Solange der Hash unbekannt ist:**
   - `/hmap laden` und der Abgleich sagen „Betritt zuerst `<dimension>`“
     und fragen nichts an;
   - eine `freigabe`, etwa der Abgleich beim Beitritt, wartet und läuft,
-    sobald der Spieler die Dimension betritt; beim Trennen fällt sie weg.
+    sobald der Spieler die Dimension auf diesem Backend betritt; ein neuer
+    Login oder das Trennen verwirft sie. Das Plugin zählt den Abgleich des
+    Tages schon beim Ausstellen; eine `freigabe` für eine Dimension, die
+    der Spieler an dem Tag nicht mehr betritt, verbraucht ihn ohne Wirkung.
+  - Ein Token hat eine Frist, `ablauf`, 24 h beim Plugin; der Mod prüft sie
+    nicht. Läuft eine wartende `freigabe` erst danach, lehnt der
+    Kartenserver das Token ab, und der Mod meldet „abgelehnt“.
 - **Gleiche Hashes:** Bei der Wahl Hash teilen sich zwei Server mit
   demselben Seed einen Ordner, ebenso Server, die statt des Hashes einen
   festen Wert wie 0 schicken. Der Download des einen löscht dann, was nicht
@@ -298,9 +317,11 @@ Platte (`Kartenliste`), auch die anderer Server und Welten:
   übrigen Bäume bleiben. Schliesst die Liste, auch für den Dialog, endet
   der Durchlauf; zurück in der Liste beginnt er neu, solange nichts
   gezählt ist.
-- **Verbindungen:** Einem Symlink oder einer Junction folgen Zählen und
-  Löschen nicht; Löschen entfernt nur die Verbindung, nie, worauf sie
-  zeigt. Eine Junction ist für das JDK unter Windows ein Ordner und kein
+- **Verbindungen:** Einem Symlink oder einer Junction unter `heroicmap/`
+  folgen Zählen und Löschen nicht; Löschen entfernt nur die Verbindung,
+  nie, worauf sie zeigt. Ist `heroicmap/` selbst eine, etwa auf ein anderes
+  Laufwerk verlegt, zählt die Liste über ihr Ziel und nennt die Pfade
+  unter `heroicmap/`. Eine Junction ist für das JDK unter Windows ein Ordner und kein
   Link; der Mod erkennt sie daran, dass ihr echter Pfad nicht unter
   `heroicmap/` liegt (`Laden.verbindung`).
 - **Löschen** fragt erst im Dialog nach. Nach dem Ja hält die Liste den

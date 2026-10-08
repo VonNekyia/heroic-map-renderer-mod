@@ -78,6 +78,8 @@ public final class HeroicMap implements ClientModInitializer {
             Downloads.INSTANZ.weltBetreten();
             Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());
         });
+        // Auch ein Wechsel des Backends hinter einem Proxy ist ein neuer Login, ohne DISCONNECT.
+        ClientPlayConnectionEvents.INIT.register((listener, client) -> client.execute(Downloads.INSTANZ::neueSitzung));
         ClientPlayConnectionEvents.DISCONNECT.register((listener, client) -> client.execute(() -> {
             Minimap.INSTANZ.leeren();
             Downloads.INSTANZ.leeren();

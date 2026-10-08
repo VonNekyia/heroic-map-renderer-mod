@@ -46,10 +46,75 @@ class AblageTest {
                 Downloads.ordner(wurzel, Downloads.Ablage.IP, "mc.example.com", welten, "minecraft:overworld", "survival"));
         // Eine Dimension, die der Spieler nie betreten hat: kein Ordner, der Download wartet.
         assertNull(Downloads.ordner(wurzel, Downloads.Ablage.IP, "mc.example.com", welten, "minecraft:the_end", "ende"));
-        // Gespeichert, und je Server mit Port getrennt.
+        // Gespeichert: Nach einem Neustart wählt das erste Level die Gruppe, dann ist die Farmwelt wieder bekannt.
         Welten nachher = new Welten(wurzel.resolve("welten.properties"));
+        assertNull(nachher.hash(server, "plugin:farmwelt"));
+        nachher.merke(server, "minecraft:overworld", 1);
         assertEquals(2L, nachher.hash(server, "plugin:farmwelt"));
+        // Je Server mit Port getrennt.
         assertNull(nachher.hash(Welten.server("mc.example.com:25566"), "plugin:farmwelt"));
+    }
+
+    @Test
+    void backendsHinterEinemProxyGetrennt(@TempDir Path wurzel) {
+        // Zwei Backends hinter derselben Adresse: A mit Overworld 1 und Nether 2, B mit Overworld 3.
+        Welten welten = new Welten(wurzel.resolve("welten.properties"));
+        String proxy = Welten.server("proxy.example");
+        welten.neueSitzung();
+        welten.merke(proxy, "minecraft:overworld", 1);
+        welten.merke(proxy, "minecraft:the_nether", 2);
+        assertEquals(2L, welten.hash(proxy, "minecraft:the_nether"));
+        // Neuer Login auf B: Der Nether von A ist dort unbekannt, ein Baum des Nethers wartet.
+        welten.neueSitzung();
+        assertNull(welten.hash(proxy, "minecraft:overworld"), "vor dem ersten Level gilt nichts");
+        welten.merke(proxy, "minecraft:overworld", 3);
+        assertNull(welten.hash(proxy, "minecraft:the_nether"));
+        assertEquals(3L, welten.hash(proxy, "minecraft:overworld"));
+        // Zurück auf A: dessen Paare gelten wieder.
+        welten.neueSitzung();
+        welten.merke(proxy, "minecraft:overworld", 1);
+        assertEquals(2L, welten.hash(proxy, "minecraft:the_nether"));
+    }
+
+    @Test
+    void neuerLoginVergisstWartendeFreigaben() {
+        // Eine freigabe von Backend A, die auf ihre Dimension wartet, läuft nach einem neuen Login nicht.
+        Downloads.INSTANZ.warte("nether", new com.google.gson.JsonObject());
+        Downloads.INSTANZ.neueSitzung();
+        assertEquals(0, Downloads.INSTANZ.wartende());
+    }
+
+    @Test
+    void nurDerFehlendeHashHeisstUnbekannt() {
+        assertTrue(Downloads.weltUnbekannt("survival", "minecraft:overworld", null));
+        // Bekannt, ohne Dimension im Angebot, oder ein Name, den der Mod ablehnt: ein anderer Fehler.
+        assertFalse(Downloads.weltUnbekannt("survival", "minecraft:overworld", 7L));
+        assertFalse(Downloads.weltUnbekannt("survival", null, null));
+        assertFalse(Downloads.weltUnbekannt("con", "minecraft:overworld", null));
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX)
+    void wurzelAlsSymlink(@TempDir Path ordner) throws Exception {
+        // heroicmap/ auf ein anderes Laufwerk verlegt: Die Liste zeigt die Bäume, mit Pfaden unter der Wurzel.
+        Path echt = ordner.resolve("anderswo"), wurzel = ordner.resolve("heroicmap");
+        schreibe(echt.resolve("host/welt-01/baum/massstab.txt"), 3);
+        Files.createSymbolicLink(wurzel, echt);
+        Laden.Bestand b = Laden.bestand(wurzel, () -> false);
+        assertEquals(List.of(wurzel.resolve("host/welt-01/baum")), b.karten().stream().map(Laden.AufPlatte::ordner).toList());
+        assertEquals(3, b.bytes());
+    }
+
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void wurzelAlsJunction(@TempDir Path ordner) throws Exception {
+        Path echt = ordner.resolve("anderswo"), wurzel = ordner.resolve("heroicmap");
+        schreibe(echt.resolve("host/welt-01/baum/massstab.txt"), 3);
+        Process p = new ProcessBuilder("cmd", "/c", "mklink", "/J", wurzel.toString(), echt.toString())
+                .redirectErrorStream(true).start();
+        assertEquals(0, p.waitFor());
+        Laden.Bestand b = Laden.bestand(wurzel, () -> false);
+        assertEquals(List.of(wurzel.resolve("host/welt-01/baum")), b.karten().stream().map(Laden.AufPlatte::ordner).toList());
     }
 
     @Test

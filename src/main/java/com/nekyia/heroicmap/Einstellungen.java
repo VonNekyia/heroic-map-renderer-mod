@@ -6,6 +6,7 @@ import java.util.Locale;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.player.LocalPlayer;
@@ -40,6 +41,8 @@ final class Einstellungen extends Screen {
     private boolean griffLinks, griffOben;
     /** Beim Ziehen: Seite und Maus beim Greifen. */
     private int startSeite, startX, startY;
+    /** Der Knopf „Mitspieler“; lehnt der Server ab, trägt er den Grund als Tooltip. */
+    private CycleButton<Boolean> showKnopf;
     /** Linker Rand, Oberkante und Breite der Knöpfe. */
     private int spalte, oben, breite;
 
@@ -73,7 +76,7 @@ final class Einstellungen extends Screen {
         addRenderableWidget(CycleButton.builder((Integer px) -> Component.translatable("heroicmap.menue.px", px), m.aufloesung())
                 .withValues(1, 2, 4, 8, 16)
                 .create(x, y + 48, breite, 20, Component.translatable("heroicmap.menue.massstab"), (b, px) -> m.setzeScale(px)));
-        addRenderableWidget(CycleButton.booleanBuilder(Component.translatable("heroicmap.menue.show.simplevoicechat"),
+        showKnopf = addRenderableWidget(CycleButton.booleanBuilder(Component.translatable("heroicmap.menue.show.simplevoicechat"),
                         Component.translatable("heroicmap.menue.show.hidden"), m.show())
                 .create(x, y + 72, breite, 20, Component.translatable("heroicmap.menue.show"), (b, an) -> {
                     m.setzeShow(an);
@@ -107,11 +110,16 @@ final class Einstellungen extends Screen {
             g.centeredText(font, zeile, mitte, y, TEXT);
             y += font.lineHeight + 1;
         }
-        // Lehnt der Server show ab, steht der Grund unter den Knöpfen.
+        // Lehnt der Server show ab, steht der Grund am Knopf „Mitspieler“ und unter den Knöpfen, soweit der Schirm reicht.
         String verweigert = Mitspieler.INSTANZ.verweigert();
-        if (verweigert != null) {
+        Component grund = verweigert == null ? null : Component.translatable("heroicmap.menue.show.grund." + verweigert);
+        showKnopf.setTooltip(grund == null ? null : Tooltip.create(grund));
+        if (grund != null) {
             int zeileY = oben + 172;
-            for (FormattedCharSequence zeile : font.split(Component.translatable("heroicmap.menue.show.grund." + verweigert), breite)) {
+            for (FormattedCharSequence zeile : font.split(grund, breite)) {
+                if (zeileY + font.lineHeight > height) {
+                    break;
+                }
                 g.centeredText(font, zeile, mitte, zeileY, TEXT);
                 zeileY += font.lineHeight + 1;
             }
