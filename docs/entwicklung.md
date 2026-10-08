@@ -21,6 +21,9 @@ Java 25; Gradle holt es über die Toolchain in `build.gradle.kts`.
 - **Minecraft, Fabric Loader, Fabric API, Loom und JUnit** stehen in
   `gradle/libs.versions.toml`. Minecraft folgt dem Server.
 - **Gradle** steht in `gradle/wrapper/gradle-wrapper.properties`.
+- **TwelveMonkeys** steht auch in `gradle/libs.versions.toml`. Wer es hebt,
+  prüft die Kopie seines Dekoders, siehe
+  [Vollbildkarte](vollbildkarte.md), „Farbindex hinter der Palette“.
 
 ## Bauen
 
@@ -42,7 +45,7 @@ Das baut das Jar nach `build/libs/` und lässt die Tests laufen.
 | `AdresseTest` | die Prüfung der Adresse, siehe [Download](download.md), „Sicherheit“ |
 | `KartenblickTest` | wie die Vollbildkarte Kacheln auf den Schirm legt, Zoom über Stufen und Lupe, Schieben, Platzhalter aus gröberen Stufen, siehe [Vollbildkarte](vollbildkarte.md) |
 | `TeleportTest` | der Befehl zum Teleportieren und dass es ihn nur mit `execute` und `tp` im Befehlsbaum gibt, siehe [Vollbildkarte](vollbildkarte.md), „Teleportieren“ |
-| `KachelnTest` | WebP mit TwelveMonkeys lesen, samt Alpha, die Grösse aus dem Kopf vor dem Dekodieren, siehe [Vollbildkarte](vollbildkarte.md), „Kacheln“ |
+| `KachelnTest` | WebP lesen, samt Alpha, die Grösse aus dem Kopf vor dem Dekodieren, siehe [Vollbildkarte](vollbildkarte.md), „Kacheln“; Pixel mit einem Index hinter der Palette durchsichtig, alle anderen wie TwelveMonkeys, siehe [Vollbildkarte](vollbildkarte.md), „Farbindex hinter der Palette“ |
 | `PyramideTest` | Verkleinern wie die Pyramide des Renderers, siehe [Live-Ebene](live.md), „Raster“ |
 | `EbeneTest` | die Bilder der Live-Ebene schreiben, lesen, beim Abgleich räumen, auch über einen Fehler hinweg, beim Wechsel des Massstabs anpassen und in die Kacheln legen, auch bei negativen Chunks, siehe [Live-Ebene](live.md) |
 | `LiveTest` | welche Änderungen die Live-Ebene zeichnet, siehe [Live-Ebene](live.md), „Wann gezeichnet wird“ |

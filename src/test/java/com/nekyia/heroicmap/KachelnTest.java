@@ -90,16 +90,27 @@ class KachelnTest {
 
     @Test
     void sonstWieTwelveMonkeys() throws Exception {
-        // Ohne Index hinter der Palette liest die Kopie jede Kachel genau wie TwelveMonkeys.
+        // Die Kopie liest jedes Pixel wie TwelveMonkeys, ausser denen mit einem Index hinter der Palette.
         assertArrayEquals(twelveMonkeys(kachel()), Kacheln.dekodiere(kachel(), 2).argb());
         List<Path> satz;
         try (Stream<Path> dateien = Files.walk(Path.of("src/gametest/resources/satz"))) {
             satz = dateien.filter(p -> p.toString().endsWith(".webp")).toList();
         }
         assertEquals(24, satz.size());
+        Path stufe0 = Path.of("src/gametest/resources/satz/4/0");
         for (Path p : satz) {
             byte[] webp = Files.readAllBytes(p);
-            assertArrayEquals(twelveMonkeys(webp), Kacheln.dekodiere(webp, 256).argb(), p.toString());
+            int[] alt = twelveMonkeys(webp), neu = Kacheln.dekodiere(webp, 256).argb();
+            int anders = 0;
+            for (int i = 0; i < neu.length; i++) {
+                if (neu[i] != alt[i]) {
+                    assertEquals(0, neu[i], p + ", Pixel " + i);
+                    anders++;
+                }
+            }
+            // In Stufe 0 liegen selbst Indizes hinter der Palette: libwebp liest in jeder dieser Kacheln
+            // 49152 Pixel durchsichtig, TwelveMonkeys keins. Die übrigen 20 Kacheln haben keine.
+            assertEquals(p.startsWith(stufe0) ? 49152 : 0, anders, p.toString());
         }
     }
 }
