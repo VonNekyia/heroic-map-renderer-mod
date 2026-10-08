@@ -132,9 +132,9 @@ gibt es nicht; so hat es der User gewählt.
   Ticks wie den eigenen Spieler, siehe „Bewegung“; sonst die des Servers.
 - **Zeichnen:** der Kopf aus dem Skin (`PlayerFaceExtractor`) mit schwarzem
   Rand, so gross wie der eigene, nur in der Dimension des Spielers und
-  innerhalb der Form; ohne Skin ein weisses Quadrat. Angeheftete Mitspieler
-  stehen ausserhalb der Form an ihrem Rand, siehe [Wegpunkte](wegpunkte.md),
-  „Am Rand“. Auf der [Vollbildkarte](vollbildkarte.md) steht der Name
+  innerhalb der Form; ohne Skin ein weisses Quadrat. Angeheftete Mitspieler,
+  die ausserhalb der Form liegen, stehen an ihrem Rand, nach innen
+  geklemmt, siehe [Wegpunkte](wegpunkte.md), „Am Rand“. Auf der [Vollbildkarte](vollbildkarte.md) steht der Name
   darüber.
 
 ## Form
