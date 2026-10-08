@@ -66,16 +66,17 @@ public final class HeroicMap implements ClientModInitializer {
             while (karte.consumeClick()) {
                 if (client.gui.screen() == null && client.level != null) {
                     String dimension = client.level.dimension().identifier().toString();
-                    client.gui.setScreen(new Karte(Satz.fuer(Downloads.serverOrdner(), dimension)));
+                    client.gui.setScreen(new Karte(Satz.fuer(Downloads.weltOrdner(), dimension)));
                 }
             }
         });
         // Fabric meldet den Wechsel der Welt nur zu einer neuen; das Trennen eigens, und das auf
         // einem Thread von Netty, deshalb auf den Render-Thread.
-        ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> Minimap.INSTANZ.leeren());
-        // Die Wegpunkte gehören zum Server; im Einzelspieler nur im Speicher. Siehe docs/wegpunkte.md.
-        ClientPlayConnectionEvents.JOIN.register((listener, sender, client) -> client.execute(
-                () -> Wegpunkte.INSTANZ.lies(Downloads.serverOrdner())));
+        ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> {
+            Minimap.INSTANZ.leeren();
+            // Die Wegpunkte gehören zur Welt; ein Wechsel über einen Proxy bringt eine andere. Siehe docs/wegpunkte.md, „Ablage“.
+            Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner(), Downloads.alterOrdner());
+        });
         ClientPlayConnectionEvents.DISCONNECT.register((listener, client) -> client.execute(() -> {
             Minimap.INSTANZ.leeren();
             Downloads.INSTANZ.leeren();

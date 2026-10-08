@@ -1,6 +1,6 @@
 ---
 title: Wegpunkte
-description: Wegpunkte auf der Vollbildkarte setzen und löschen, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, Grösse der Köpfe, Ablage in wegpunkte.json und was fehlt.
+description: Wegpunkte auf der Vollbildkarte setzen und löschen, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Wegpunkte.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
@@ -74,11 +74,17 @@ gewünscht.
 
 ## Ablage
 
-- **Je Server** in `wegpunkte.json` im Ordner des Servers,
-  `heroicmap/<server>/`, siehe [Download](download.md), „Ablage“. Gelesen
-  beim Betreten des Servers (`ClientPlayConnectionEvents.JOIN`), vergessen
-  beim Trennen. Im Einzelspieler gibt es keinen Ordner des Servers; dort
-  liegen sie nur im Speicher.
+- **Je Welt** in `wegpunkte.json` im Ordner der Welt, `heroicmap/<welt>/`,
+  siehe [Download](download.md), „Ablage“. Gelesen beim Wechsel der Welt
+  (`ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE`, `Wegpunkte.wechsel`),
+  wenn der Ordner ein anderer ist, und nach dem Schliessen des Menüs, falls
+  die Ablage eine andere ist; vergessen beim Trennen. Ein Wechsel über einen
+  Proxy bringt so die Wegpunkte der neuen Welt. Im Einzelspieler gibt es
+  keinen Ordner; dort liegen sie nur im Speicher und bleiben beim Wechsel
+  der Dimension.
+- **Umzug:** Eine `wegpunkte.json` aus der Ablage vor dem Hash,
+  `heroicmap/<adresse>/`, zieht in die erste Welt, die der Spieler auf
+  diesem Server betritt, wenn es dort noch keine gibt.
 - **Format:**
 
   ```json
@@ -110,4 +116,3 @@ gewünscht.
 
 - **Namen, Farbe wählen, verschieben:** Ein Wegpunkt hat nur Block und
   Farbe; ändern heisst löschen und neu setzen.
-- **Je Welt:** Wegpunkte gelten je Server, nicht je Welt des Servers.

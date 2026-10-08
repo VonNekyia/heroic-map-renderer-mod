@@ -118,6 +118,7 @@ class MinimapTest {
         vorher.setzeZoom(1);
         vorher.setzeRund(true);
         vorher.setzeShow(false);
+        vorher.setzeAblage(Downloads.Ablage.HASH);
         vorher.stelle(20, 30, 200, 640, 360);
         vorher.schreibe(datei);
 
@@ -128,6 +129,7 @@ class MinimapTest {
         assertEquals(1, nachher.zoom());
         assertTrue(nachher.rund());
         assertFalse(nachher.show());
+        assertEquals(Downloads.Ablage.HASH, nachher.ablage());
         assertEquals(vorher.rahmen(640, 360), nachher.rahmen(640, 360));
     }
 
@@ -216,6 +218,8 @@ class MinimapTest {
         assertTrue(minimap.sichtbar());
         // show: Vorgabe simplevoicechat, die Wahl des Maintainers.
         assertTrue(minimap.show());
+        // Ablage: Vorgabe IP und Hash, die Wahl des Users.
+        assertEquals(Downloads.Ablage.IP, minimap.ablage());
         assertEquals(new Minimap.Rahmen(640 - 128 - 4, 4, 128), minimap.rahmen(640, 360));
     }
 }

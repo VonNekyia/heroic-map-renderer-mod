@@ -1,3 +1,4 @@
 accessWidener v2 official
 accessible field net/minecraft/client/renderer/texture/SpriteContents originalImage Lcom/mojang/blaze3d/platform/NativeImage;
 accessible field net/minecraft/client/renderer/texture/TextureAtlas sprites Ljava/util/List;
+accessible field net/minecraft/world/level/biome/BiomeManager biomeZoomSeed J

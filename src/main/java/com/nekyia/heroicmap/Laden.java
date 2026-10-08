@@ -14,10 +14,13 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
@@ -31,6 +34,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
@@ -525,6 +529,65 @@ final class Laden {
                 }
             }
         }
+    }
+
+    /** Ein Baum auf der Platte: sein Ordner, der Pfad unter {@code heroicmap/}, der Satz oder null, solange er unvollständig ist, und seine Bytes. */
+    record AufPlatte(Path ordner, String pfad, Satz satz, long bytes) {
+    }
+
+    /** Die Bäume und die Bytes aller Dateien unter {@code heroicmap/}. Siehe docs/download.md, „Kartenliste“. */
+    record Bestand(List<AufPlatte> karten, long bytes) {
+    }
+
+    /**
+     * Zählt den Bestand unter {@code wurzel}. Ein Baum ist ein Ordner mit {@code massstab.txt} oder
+     * {@code satz.json}, bis zu drei Ebenen tief: {@code <welt>/<baum>}, {@code <server>/<welt>/<baum>}
+     * und {@code <server>/<baum>} aus der Ablage vor dem Hash des Seeds.
+     */
+    static Bestand bestand(Path wurzel) throws IOException {
+        if (!Files.isDirectory(wurzel)) {
+            return new Bestand(List.of(), 0);
+        }
+        Map<Path, long[]> baeume = new TreeMap<>();
+        try (Stream<Path> funde = Files.find(wurzel, 4, (p, a) -> a.isRegularFile()
+                && (p.getFileName().toString().equals("massstab.txt") || p.getFileName().toString().equals("satz.json")))) {
+            funde.forEach(p -> baeume.putIfAbsent(p.getParent(), new long[1]));
+        }
+        long[] summe = {0};
+        Files.walkFileTree(wurzel, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult visitFile(Path datei, BasicFileAttributes a) {
+                summe[0] += a.size();
+                for (Path p = datei.getParent(); p != null && !p.equals(wurzel); p = p.getParent()) {
+                    long[] baum = baeume.get(p);
+                    if (baum != null) {
+                        baum[0] += a.size();
+                        break;
+                    }
+                }
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFileFailed(Path datei, IOException e) {
+                // Eine Datei, die gerade verschwindet, etwa in tmp/, zählt nicht.
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        List<AufPlatte> karten = new ArrayList<>();
+        baeume.forEach((ordner, bytes) -> karten.add(new AufPlatte(ordner,
+                wurzel.relativize(ordner).toString().replace('\\', '/'), Satz.lies(ordner), bytes[0])));
+        return new Bestand(List.copyOf(karten), summe[0]);
+    }
+
+    /** Verschiebt {@code alt} nach {@code neu}, wenn es {@code alt} gibt und {@code neu} noch nicht. Siehe docs/download.md, „Ablage“. */
+    static boolean zieheUm(Path alt, Path neu) throws IOException {
+        if (alt.equals(neu) || !Files.exists(alt) || Files.exists(neu)) {
+            return false;
+        }
+        Files.createDirectories(neu.getParent());
+        Files.move(alt, neu);
+        return true;
     }
 
     /** Löscht einen Ordner samt Inhalt; Symlinks folgt es nicht. */

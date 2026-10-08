@@ -66,5 +66,20 @@
   "heroicmap.menue.show.hidden": "Hidden",
   "heroicmap.menue.show.grund.permission": "The server does not allow you other players on the map.",
   "heroicmap.menue.show.grund.simplevoicechat": "Simple Voice Chat is missing on the server.",
-  "heroicmap.menue.show.grund.sonst": "The server declines other players on the map."
+  "heroicmap.menue.show.grund.sonst": "The server declines other players on the map.",
+  "heroicmap.menue.ablage": "Map storage",
+  "heroicmap.menue.ablage.hash": "Hash",
+  "heroicmap.menue.ablage.ip": "IP + hash",
+  "heroicmap.menue.ablage.ip_port": "IP:port + hash",
+  "heroicmap.menue.liste": "Map list …",
+  "heroicmap.liste.titel": "Maps on disk",
+  "heroicmap.liste.zaehle": "Counting …",
+  "heroicmap.liste.summe": "Total %s, %s maps",
+  "heroicmap.liste.keine": "No maps on disk.",
+  "heroicmap.liste.unvollstaendig": "incomplete",
+  "heroicmap.liste.loeschen": "Delete",
+  "heroicmap.liste.frage_titel": "Delete map?",
+  "heroicmap.liste.frage": "%s with %s will be removed from disk. You only get it back with a new download.",
+  "heroicmap.liste.belegt": "A download into this map is running.",
+  "heroicmap.liste.fehler": "The map was not fully deleted; see the log for details."
 }

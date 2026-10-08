@@ -2,6 +2,7 @@ package com.nekyia.heroicmap;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import java.util.List;
+import java.util.Locale;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
@@ -15,7 +16,8 @@ import net.minecraft.util.Mth;
 import org.joml.Matrix3x2fStack;
 
 /**
- * Das Menü hinter {@code /hmap}: Minimap an oder aus, Zoom, Auflösung, Form, dazu die Karten des Servers.
+ * Das Menü hinter {@code /hmap}: Minimap an oder aus, Zoom, Auflösung, Form, Mitspieler, Ablage der
+ * Karten, dazu die Karten des Servers und die auf der Platte.
  * Die Minimap im HUD bleibt sichtbar; Ziehen verschiebt sie, der Griff an der Ecke zur Mitte des
  * Schirms zieht sie grösser oder kleiner, mit der linken wie der rechten Taste. Die Knöpfe passen
  * sich dem Platz an. Gespeichert wird beim Schliessen.
@@ -57,7 +59,7 @@ final class Einstellungen extends Screen {
         spalte = !m.sichtbar() ? (width - breite) / 2
                 : links >= rechts ? (links - breite) / 2 : r.x() + r.seite() + (rechts - breite) / 2;
         spalte = Math.max(4, Math.min(spalte, width - breite - 4));
-        oben = Math.max(50, height / 2 - 84);
+        oben = Math.max(50, height / 2 - 94);
         int x = spalte, y = oben;
         addRenderableWidget(CycleButton.onOffBuilder(m.sichtbar())
                 .create(x, y, breite, 20, Component.translatable("heroicmap.menue.minimap"), (b, an) -> m.setzeSichtbar(an)));
@@ -76,9 +78,17 @@ final class Einstellungen extends Screen {
                     m.setzeShow(an);
                     Kanal.sendeShow();
                 }));
+        addRenderableWidget(CycleButton.builder((Downloads.Ablage a) -> Component.translatable(
+                        "heroicmap.menue.ablage." + a.name().toLowerCase(Locale.ROOT)), m.ablage())
+                .withValues(Downloads.Ablage.values())
+                .create(x, y + 120, breite, 20, Component.translatable("heroicmap.menue.ablage"), (b, a) -> m.setzeAblage(a)));
+        // Zwei Knöpfe in einer Zeile, so passt das Menü auch auf einen niedrigen Schirm.
+        int halb = (breite - 4) / 2;
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.laden"),
-                b -> minecraft.gui.setScreen(new Auswahl(this))).bounds(x, y + 120, breite, 20).build());
-        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x, y + 148, breite, 20).build());
+                b -> minecraft.gui.setScreen(new Auswahl(this))).bounds(x, y + 144, halb, 20).build());
+        addRenderableWidget(Button.builder(Component.translatable("heroicmap.menue.liste"),
+                b -> minecraft.gui.setScreen(new Kartenliste(this))).bounds(x + breite - halb, y + 144, halb, 20).build());
+        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x, y + 172, breite, 20).build());
     }
 
     /** Ohne Unschärfe und Abdunkeln, damit die Minimap im HUD zu sehen ist. */
@@ -101,7 +111,7 @@ final class Einstellungen extends Screen {
         // Lehnt der Server show ab, steht der Grund unter den Knöpfen.
         String verweigert = Mitspieler.INSTANZ.verweigert();
         if (verweigert != null) {
-            int zeileY = oben + 172;
+            int zeileY = oben + 196;
             for (FormattedCharSequence zeile : font.split(Component.translatable("heroicmap.menue.show.grund." + verweigert), breite)) {
                 g.centeredText(font, zeile, mitte, zeileY, TEXT);
                 zeileY += font.lineHeight + 1;
@@ -244,6 +254,8 @@ final class Einstellungen extends Screen {
     @Override
     public void removed() {
         Minimap.INSTANZ.schreibe(HeroicMap.einstellungen());
+        // Eine andere Ablage heisst ein anderer Ordner der Welt, auch für die Wegpunkte.
+        Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner(), Downloads.alterOrdner());
     }
 
     @Override

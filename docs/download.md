@@ -1,6 +1,6 @@
 ---
 title: Download
-description: Wie der Mod die Karte vom Plugin lädt, mit dem Kanal heroicmap:karte, den Befehlen, Zustimmung und Grösse, der Prüfung der Adresse, Manifest und Prüfsumme, Fristen, den harten Grenzen, der Reihe der Downloads, der Ablage je Server, Baum und Massstab, Fortsetzen und Abgleich, und was der Offline-Modus heisst.
+description: Wie der Mod die Karte vom Plugin lädt, mit dem Kanal heroicmap:karte, den Befehlen, Zustimmung und Grösse, der Prüfung der Adresse, Manifest und Prüfsumme, Fristen, den harten Grenzen, der Reihe der Downloads, der Ablage je Welt nach dem Hash des Seeds, Baum und Massstab, der Kartenliste mit Löschen, Fortsetzen und Abgleich, und was der Offline-Modus heisst.
 code:
   - src/main/java/com/nekyia/heroicmap/Kanal.java
   - src/main/java/com/nekyia/heroicmap/Downloads.java
@@ -13,6 +13,9 @@ code:
   - src/test/java/com/nekyia/heroicmap/FreigabeTest.java
   - src/test/java/com/nekyia/heroicmap/ReiheTest.java
   - src/test/java/com/nekyia/heroicmap/AdresseTest.java
+  - src/main/java/com/nekyia/heroicmap/Kartenliste.java
+  - src/test/java/com/nekyia/heroicmap/AblageTest.java
+  - src/main/resources/heroicmap.accesswidener
 ---
 
 # Download
@@ -204,9 +207,27 @@ Einzelheiten stehen im Log.
 
 ## Ablage
 
-- **Ordner:** `heroicmap/<server>/<baum>/<massstab>/` im Spielordner, darin
-  `map.json`, `etags.txt`, `z/x/y.webp` und `tmp/`. `<server>` ist die
-  Adresse des Servers, klein, andere Zeichen als Buchstaben, Ziffern, Punkt
+- **Ordner:** `heroicmap/<welt>/<baum>/<massstab>/` im Spielordner, darin
+  `map.json`, `etags.txt`, `z/x/y.webp` und `tmp/`. `<welt>` richtet sich
+  nach der Wahl „Ablage der Karten“ im Menü (`Downloads.weltOrdner`),
+  gespeichert als `ablage` in `heroicmap.properties`:
+
+  | Wahl | `ablage` | `<welt>` |
+  |---|---|---|
+  | Hash | `hash` | `welt-<hash>` |
+  | IP + Hash, die Vorgabe | `ip` | `<host>/welt-<hash>` |
+  | IP:Port + Hash | `ip_port` | `<host>_<port>/welt-<hash>` |
+
+  `<hash>` ist der Hash des Seeds, den der Server dem Client mit jeder Welt
+  schickt (`BiomeManager.biomeZoomSeed`, per Access Widener), 16 Stellen
+  hex. Den Seed selbst und den Namen der Welt kennt der Client nicht. Der
+  Hash ist je Seed eindeutig und in allen Dimensionen einer Welt gleich.
+  Ohne Port gilt 25565. Die Vorgabe IP + Hash hat der User gewählt: Ein
+  Netz hinter einem Proxy hat für alle Server dieselbe Adresse; eine Welt,
+  etwa ein Mining-Realm, behält ihre Karte, und eine neue Welt überschreibt
+  sie nicht. Eine andere Wahl gilt ab dem Schliessen des Menüs und zieht
+  nichts um; die Karten unter der alten Wahl stehen weiter in der
+  Kartenliste. `<host>` ist klein, andere Zeichen als Buchstaben, Ziffern, Punkt
   und Strich werden `_`. Ein Baum heisst nur `[a-z0-9_-]`, höchstens 64
   Zeichen. Namen, die Windows für Geräte hält (`con`, `nul`, `com1` …),
   lehnt der Mod als Baum ab und stellt dem Server ein `_` voran.
@@ -214,6 +235,15 @@ Einzelheiten stehen im Log.
   liegt eine halbe Kachel da. `tmp/` leert der Mod zu Beginn jedes Downloads.
 - **`satz.json`** je Baum gehört zur [Vollbildkarte](vollbildkarte.md),
   „Welcher Satz“.
+- **Umzug aus der alten Ablage:** Vor dem Hash lag ein Baum unter
+  `heroicmap/<adresse>/<baum>/`, `<adresse>` die Adresse aus der
+  Serverliste. Nennt ein `angebot` oder eine `freigabe` den Baum, zieht der
+  Mod ihn in den Ordner der Welt, die ihn anbietet, wenn es ihn dort noch
+  nicht gibt (`Downloads.zieheUm`, `Laden.zieheUm`). So kennt der Mod seine
+  Welt. Ein Baum, den kein Server mehr anbietet, bleibt, wo er ist, und
+  steht in der Kartenliste. `wegpunkte.json` zieht in die erste Welt, die
+  der Spieler auf dem Server betritt, siehe [Wegpunkte](wegpunkte.md),
+  „Ablage“.
 - **`overlay/`** je Baum hielt die frühere Live-Ebene. Der Mod löscht den
   Ordner beim Start in jedem Baum (`Laden.loescheOverlays`), in einem
   eigenen Thread; was sich nicht löschen lässt, geht beim nächsten Start.
@@ -228,6 +258,25 @@ Einzelheiten stehen im Log.
   der Spieler nicht ohne Karte dasteht; ein gekappter Download löscht nichts.
 - **Fortsetzen:** Was mit gleichem ETag schon da ist, lädt der Mod nicht.
   Ein Abgleich ist derselbe Weg mit weniger Kacheln.
+
+## Kartenliste
+
+Der Knopf „Kartenliste …“ im Menü hinter `/hmap` zeigt alle Karten auf der
+Platte (`Kartenliste`), auch die anderer Server und Welten:
+
+- **Je Baum** der Pfad unter `heroicmap/`, darunter Name, Dimension und
+  Massstab aus `satz.json`, oder „unvollständig“, und die Grösse.
+- **Oben** die Summe aller Dateien unter `heroicmap/`, immer in GB, so will
+  es der User, und die Zahl der Karten.
+- **Ein Baum** ist ein Ordner mit `massstab.txt` oder `satz.json`, bis zu
+  drei Ebenen unter `heroicmap/`, in jeder Ablage oben und in der alten
+  (`Laden.bestand`).
+- **Zählen** läuft in einem eigenen Thread; bis es fertig ist, steht dort
+  „Zähle …“. Ein Satz mit 450 000 Kacheln sind ebenso viele Dateien.
+- **Löschen** fragt erst im Dialog nach und löscht den Ordner des Baums
+  samt Inhalt in einem eigenen Thread (`Laden.loesche`), danach zählt die
+  Liste neu. Läuft gerade ein Download in den Baum, löscht der Knopf nicht.
+- **Mausrad** blättert, wenn nicht alle Karten auf den Schirm passen.
 
 ## Was bleibt eine Näherung
 

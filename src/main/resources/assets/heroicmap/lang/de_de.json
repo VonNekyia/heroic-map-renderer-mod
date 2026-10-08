@@ -66,5 +66,20 @@
   "heroicmap.menue.show.hidden": "Versteckt",
   "heroicmap.menue.show.grund.permission": "Der Server erlaubt dir keine Mitspieler auf der Karte.",
   "heroicmap.menue.show.grund.simplevoicechat": "Auf dem Server fehlt Simple Voice Chat.",
-  "heroicmap.menue.show.grund.sonst": "Der Server lehnt Mitspieler auf der Karte ab."
+  "heroicmap.menue.show.grund.sonst": "Der Server lehnt Mitspieler auf der Karte ab.",
+  "heroicmap.menue.ablage": "Ablage der Karten",
+  "heroicmap.menue.ablage.hash": "Hash",
+  "heroicmap.menue.ablage.ip": "IP + Hash",
+  "heroicmap.menue.ablage.ip_port": "IP:Port + Hash",
+  "heroicmap.menue.liste": "Kartenliste …",
+  "heroicmap.liste.titel": "Karten auf der Platte",
+  "heroicmap.liste.zaehle": "Zähle …",
+  "heroicmap.liste.summe": "Zusammen %s, %s Karten",
+  "heroicmap.liste.keine": "Keine Karten auf der Platte.",
+  "heroicmap.liste.unvollstaendig": "unvollständig",
+  "heroicmap.liste.loeschen": "Löschen",
+  "heroicmap.liste.frage_titel": "Karte löschen?",
+  "heroicmap.liste.frage": "%s mit %s geht von der Platte. Wieder da ist die Karte nur mit einem neuen Download.",
+  "heroicmap.liste.belegt": "In diese Karte läuft gerade ein Download.",
+  "heroicmap.liste.fehler": "Die Karte ist nicht ganz gelöscht; Einzelheiten im Log."
 }

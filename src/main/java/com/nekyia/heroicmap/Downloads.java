@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -25,6 +26,7 @@ import java.util.TreeMap;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConfirmScreen;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
@@ -63,6 +65,9 @@ final class Downloads {
     private Downloads() {
     }
 
+    /** Wie der Ordner einer Welt heisst: nur nach dem Hash des Seeds, mit dem Host oder mit Host und Port davor. */
+    enum Ablage { HASH, IP, IP_PORT }
+
     /** Eine Nachricht vom Plugin; der Kanal ruft das auf dem Render-Thread. */
     void empfange(String text) {
         JsonObject json;
@@ -77,7 +82,10 @@ final class Downloads {
             return;
         }
         switch (json.has("typ") ? json.get("typ").getAsString() : "") {
-            case "angebot" -> angebot = json;
+            case "angebot" -> {
+                angebot = json;
+                baeume().forEach(b -> zieheUm(b.id()));
+            }
             case "freigabe" -> freigabe(json);
             case "abgelehnt" -> abgelehnt(json);
             case "spieler" -> Mitspieler.INSTANZ.empfange(json, System.currentTimeMillis());
@@ -105,6 +113,11 @@ final class Downloads {
     /** Wartet oder läuft für den Baum auf diesem Server ein Download? */
     boolean belegt(String baum) {
         return reihe.belegt(schluessel(baum));
+    }
+
+    /** Wartet oder läuft ein Download in den Ordner eines Baums, gleich auf welchem Server? */
+    boolean belegt(Path ordner) {
+        return reihe.belegt(ordner.toString());
     }
 
     /** Der Massstab, den das Plugin für den Baum gespeichert hat, so wie der Mod ihn zuletzt voll lud, oder 0. */
@@ -177,6 +190,7 @@ final class Downloads {
             melde(Component.translatable("heroicmap.download.unlesbar"));
             return;
         }
+        zieheUm(f.baum());
         long kacheln = feld(eintrag(f.baum()), f.massstab(), "kacheln");
         if (kacheln < 0) {
             melde(Component.translatable("heroicmap.download.nicht_angeboten", f.baum()));
@@ -351,16 +365,68 @@ final class Downloads {
         return ordner == null ? baum : ordner.toString();
     }
 
-    /** Der Ordner eines Baums auf diesem Server, oder null im Einzelspieler. */
+    /** Der Ordner eines Baums in dieser Welt, oder null im Einzelspieler. */
     private static Path ordner(String baum) {
-        Path server = serverOrdner();
-        return server == null || !Freigabe.baum(baum) ? null : server.resolve(baum);
+        Path welt = weltOrdner();
+        return welt == null || !Freigabe.baum(baum) ? null : welt.resolve(baum);
     }
 
-    /** Der Ordner dieses Servers, oder null im Einzelspieler. */
-    static Path serverOrdner() {
+    /**
+     * Der Ordner dieser Welt auf diesem Server nach der Wahl Ablage, oder null im Einzelspieler.
+     * Siehe docs/download.md, „Ablage“.
+     */
+    static Path weltOrdner() {
+        Minecraft mc = Minecraft.getInstance();
+        ServerData server = mc.getCurrentServer();
+        ClientLevel level = mc.level;
+        return server == null || level == null ? null
+                : wurzel().resolve(weltOrdner(Minimap.INSTANZ.ablage(), server.ip, level.getBiomeManager().biomeZoomSeed));
+    }
+
+    /**
+     * Der Pfad einer Welt unter {@code heroicmap/}: {@code welt-<hash>}, davor der Host oder Host
+     * und Port. {@code seed} ist der Hash des Seeds, den der Server dem Client schickt.
+     */
+    static String weltOrdner(Ablage ablage, String adresse, long seed) {
+        String welt = "welt-" + HexFormat.of().toHexDigits(seed);
+        ServerAddress a = ServerAddress.parseString(adresse);
+        return switch (ablage) {
+            case HASH -> welt;
+            case IP -> name(a.getHost()) + "/" + welt;
+            case IP_PORT -> name(a.getHost() + "_" + a.getPort()) + "/" + welt;
+        };
+    }
+
+    /** Der Ordner dieses Servers in der Ablage vor dem Hash des Seeds, oder null im Einzelspieler. */
+    static Path alterOrdner() {
         ServerData server = Minecraft.getInstance().getCurrentServer();
         return server == null ? null : wurzel().resolve(name(server.ip));
+    }
+
+    /**
+     * Ein Baum aus der Ablage vor dem Hash des Seeds zieht in den Ordner der Welt, die ihn
+     * anbietet, einmal; so kennt der Mod seine Welt. Siehe docs/download.md, „Ablage“.
+     */
+    private static void zieheUm(String baum) {
+        Path alt = alterOrdner(), neu = ordner(baum);
+        if (alt == null || neu == null || !Freigabe.baum(baum)) {
+            return;
+        }
+        Path vorher = alt.resolve(baum);
+        if (Files.exists(vorher.resolve(STAND)) || Files.exists(vorher.resolve("satz.json"))) {
+            zieheUm(vorher, neu);
+        }
+    }
+
+    /** Zieht {@code alt} nach {@code neu} um, wie {@link Laden#zieheUm}; ein Fehler steht nur im Log. */
+    static void zieheUm(Path alt, Path neu) {
+        try {
+            if (Laden.zieheUm(alt, neu)) {
+                LOGGER.info("Heroic Map: {} nach {} umgezogen", alt, neu);
+            }
+        } catch (IOException e) {
+            LOGGER.warn("Heroic Map: {} nicht nach {} umgezogen", alt, neu, e);
+        }
     }
 
     /** Der Eintrag eines Baums im letzten Angebot, oder null. */
@@ -437,6 +503,11 @@ final class Downloads {
             return String.format(Locale.ROOT, "%.1f GB", bytes / 1e9);
         }
         return String.format(Locale.ROOT, "%.1f MB", bytes / 1e6);
+    }
+
+    /** Die Summe der Kartenliste immer in GB, wie der User es will. */
+    static String gb(long bytes) {
+        return String.format(Locale.ROOT, "%.2f GB", bytes / 1e9);
     }
 
     private static void melde(Component text) {
