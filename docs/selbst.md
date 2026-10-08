@@ -12,6 +12,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/mixin/LevelExtractorMixin.java
   - src/test/java/com/nekyia/heroicmap/SelbstTest.java
   - src/test/java/com/nekyia/heroicmap/PyramideTest.java
+  - src/test/java/com/nekyia/heroicmap/KachelwerkMessung.java
   - src/gametest/java/com/nekyia/heroicmap/Bilder.java
 ---
 
@@ -134,21 +135,29 @@ mit der des Servers. Warum: [0004](entscheidungen/0004-karte-selbst-zeichnen.md)
 - **Zeichnen:** je Chunk so viel wie bei der Minimap mit 4 px, siehe
   [Minimap](minimap.md), „Kosten“: im Median rund 2,6 ms im Worker und
   0,08 ms für den Abzug auf dem Render-Thread.
-- **Dateien:** Ändert sich ein Chunk dauernd, etwa an einer Farm, schreibt
-  der Mod alle 5 s 2 Kacheln, Stufe 8 und 7, und alle 60 s die 7 gröberen,
-  zusammen 1 860 je Stunde; jede Stufe je Änderung alle 5 s wären 6 480.
-  Gerechnet aus den Zeiten oben, nicht gemessen.
-- **Schreiben:** ms je Durchlauf sind noch nicht gemessen; die Messung
-  läuft mit den Gametests und steht dann hier.
+- **Schreiben** im Worker, gemessen am 09.10., siehe
+  [Selbst gezeichnete Karte, Schreiben der Kacheln](messungen/2026-10-09-selbst-schreiben.md):
+
+  | Fall | feine Stufen alle 5 s, Median | alle Stufen alle 60 s, Median | PNG je Stunde |
+  |---|---|---|---|
+  | Farm, ein Chunk ändert sich dauernd | 8,2 ms | 36 ms | 1 860 |
+  | Flug mit 20 Blöcken/s, Sichtweite 12 | 105 ms | 324 ms | 16 306 |
+
+  Bei der Farm schriebe jede Stufe je Änderung alle 5 s 6 480 PNG je
+  Stunde. Die Messung läuft ohne Minecraft mit
+  `./gradlew test --tests '*KachelwerkMessung*' -Pkachelwerk=<datei>`.
 
 ## Bild
+
+![Die selbst gezeichnete Karte der Szene aus dem Gametest](bilder/selbst.png)
 
 Der Gametest `Bilder` wählt in der Szene „Selbst“ wie ein Spieler: Karte
 ohne Satz, „Karte laden …“, „Selbst“, Ja, Zurück; die Karte zeigt dann die
 eigene. Danach wechselt im Bereich der Minimap jeden Tick ein Block,
 ausserhalb des geprüften Umkreises; um den Spieler wird trotzdem alles
 gezeichnet. Dann schreibt er und nimmt die Vollbildkarte auf der feinsten
-Stufe auf, siehe [Minimap](minimap.md), „Bilder“.
+Stufe auf, siehe [Minimap](minimap.md), „Bilder“. Der graue Punkt rechts
+ist der Block, den der Test jeden Tick wechselt.
 
 ## Was fehlt
 
