@@ -38,6 +38,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix3x2fStack;
 import org.slf4j.Logger;
 
@@ -109,8 +110,6 @@ public final class Minimap {
     /** Die Texel des Block-Atlas und die Liste der Sprites, aus der sie stammen. */
     private Map<TextureAtlasSprite, ChunkMaler.Texel> texel;
     private List<TextureAtlasSprite> atlasStand;
-    /** Wann {@code arbeite} zuletzt lief, in ns. */
-    private long gearbeitet;
 
     Minimap() {
     }
@@ -337,20 +336,6 @@ public final class Minimap {
         return uebernommen;
     }
 
-    /**
-     * Zeigt die Minimap, hat noch zu zeichnen und hat eben gearbeitet? Dann wartet die Live-Ebene.
-     * Ohne HUD, etwa mit F1, läuft {@code arbeite} nicht; dann wartet sie nicht auf die Minimap.
-     */
-    boolean beschaeftigt() {
-        return sichtbar && !fertig() && System.nanoTime() - gearbeitet < 250_000_000L;
-    }
-
-    /** Die Texel des Block-Atlas, auf dem Render-Thread; auch die Live-Ebene zeichnet aus dieser Kopie. */
-    Map<TextureAtlasSprite, ChunkMaler.Texel> atlasTexel(Minecraft mc) {
-        pruefeAtlas(mc);
-        return texel;
-    }
-
     /** Ist nichts mehr nachzuzeichnen? */
     boolean fertig() {
         return mitte != null && offen.isEmpty() && laufend.isEmpty();
@@ -400,25 +385,47 @@ public final class Minimap {
         arbeite(mc, level, spieler);
 
         Rahmen r = rahmen(g.guiWidth(), g.guiHeight());
-        int links = Mth.floor(Projektion.zuPixel(spieler.getX(), zoom)) - r.seite() / 2;
-        int oben = Mth.floor(Projektion.zuPixel(spieler.getZ(), zoom)) - r.seite() / 2;
-        male(g, r, links, oben, mc.getWindow().getGuiScale());
-        mitspieler(g, mc, r, spieler, level);
-        avatar(g, spieler, r.x() + r.seite() / 2, r.y() + r.seite() / 2);
+        float a = anteil(level, spieler, zeit);
+        int k = mc.getWindow().getGuiScale(), n = r.seite() * k;
+        int links = ecke(spieler.xo, spieler.getX(), a, zoom, k, n);
+        int oben = ecke(spieler.zo, spieler.getZ(), a, zoom, k, n);
+        male(g, r, links, oben, k);
+        mitspieler(g, mc, r, spieler, level, a, k);
+        avatar(g, spieler, r.x() + r.seite() / 2, r.y() + r.seite() / 2, a);
+    }
+
+    /** Wo zwischen zwei Ticks die Minimap den Spieler zeichnet: wie die Kamera. Siehe docs/minimap.md, „Bewegung“. */
+    static float anteil(ClientLevel level, LocalPlayer spieler, DeltaTracker zeit) {
+        return level.tickRateManager().isEntityFrozen(spieler) ? 1f : zeit.getGameTimeDeltaPartialTick(true);
+    }
+
+    /**
+     * Links oder oben im Bild der Minimap, in Pixeln des Schirms: die Lage zwischen {@code alt} und
+     * {@code neu} beim Anteil {@code a} eines Ticks, auf ganze Pixel. {@code k} ist der GUI-Massstab,
+     * {@code n} die Seite in Pixeln.
+     */
+    static int ecke(double alt, double neu, float a, int zoom, int k, int n) {
+        return Mth.floor(Projektion.zuPixel(Mth.lerp(a, alt, neu), zoom) * k) - n / 2;
     }
 
     /** Die Mitspieler als Köpfe, in derselben Dimension und innerhalb der Form. Siehe docs/minimap.md, „Mitspieler“. */
-    private void mitspieler(GuiGraphicsExtractor g, Minecraft mc, Rahmen r, LocalPlayer spieler, ClientLevel level) {
+    private void mitspieler(GuiGraphicsExtractor g, Minecraft mc, Rahmen r, LocalPlayer spieler, ClientLevel level, float a, int k) {
         String dimension = level.dimension().identifier().toString();
-        double h = r.seite() / 2.0, mx = spieler.getX(), mz = spieler.getZ();
+        double h = r.seite() / 2.0;
+        Vec3 mitte = spieler.getPosition(a);
         for (Mitspieler.Eintrag e : Mitspieler.INSTANZ.sichtbar(System.currentTimeMillis())) {
             if (!e.dimension().equals(dimension) || e.uuid().equals(spieler.getUUID())) {
                 continue;
             }
-            double[] lage = Mitspieler.lage(mc, e);
-            double px = (lage[0] - mx) * zoom, pz = (lage[1] - mz) * zoom;
+            double[] lage = Mitspieler.lage(mc, e, a);
+            double px = (lage[0] - mitte.x) * zoom, pz = (lage[1] - mitte.z) * zoom;
             if (rund ? px * px + pz * pz <= h * h : Math.abs(px) <= h && Math.abs(pz) <= h) {
-                Mitspieler.kopf(g, mc, e, (int) Math.round(r.x() + h + px), (int) Math.round(r.y() + h + pz), KOPF);
+                // Auf ganze Pixel wie die Karte darunter, nicht auf ganze Einheiten des GUI.
+                Matrix3x2fStack pose = g.pose();
+                pose.pushMatrix();
+                pose.translate(Math.round((r.x() + h + px) * k) / (float) k, Math.round((r.y() + h + pz) * k) / (float) k);
+                Mitspieler.kopf(g, mc, e, 0, 0, KOPF);
+                pose.popMatrix();
             }
         }
     }
@@ -428,8 +435,8 @@ public final class Minimap {
      * einziger Lauf. Siehe docs/minimap.md, „Form“.
      */
     private void male(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k) {
-        // Eine Region in Einheiten des GUI nach dem Zoom; die Textur trifft sie über die Koordinaten 0 bis 1.
-        int seite = CHUNKS_JE_REGION * 16 * zoom;
+        // Eine Region in Pixeln des Schirms nach dem Zoom; die Textur trifft sie über die Koordinaten 0 bis 1.
+        int s = CHUNKS_JE_REGION * 16 * zoom * k;
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.scale(1f / k);
@@ -438,14 +445,13 @@ public final class Minimap {
             g.fill(x0 - k + l[2], y0 - k + l[0], x0 - k + l[3], y0 - k + l[1], 0xFF000000);
         }
         List<int[]> form = laeufe(n, rund);
-        int s = seite * k;
-        for (int rz = Math.floorDiv(oben, seite); rz <= Math.floorDiv(oben + r.seite() - 1, seite); rz++) {
-            for (int rx = Math.floorDiv(links, seite); rx <= Math.floorDiv(links + r.seite() - 1, seite); rx++) {
+        for (int rz = Math.floorDiv(oben, s); rz <= Math.floorDiv(oben + n - 1, s); rz++) {
+            for (int rx = Math.floorDiv(links, s); rx <= Math.floorDiv(links + n - 1, s); rx++) {
                 Region region = regionen.get(ChunkPos.pack(rx, rz));
                 if (region == null) {
                     continue;
                 }
-                int qx = x0 + (rx * seite - links) * k, qy = y0 + (rz * seite - oben) * k;
+                int qx = x0 + rx * s - links, qy = y0 + rz * s - oben;
                 // Je Region alle Läufe nacheinander, so bleibt es ein Stapel je Textur.
                 for (int[] l : form) {
                     int ya = Math.max(y0 + l[0], qy), yb = Math.min(y0 + l[1], qy + s);
@@ -496,7 +502,6 @@ public final class Minimap {
      * Budget des Frames aufgebraucht ist.
      */
     private void arbeite(Minecraft mc, ClientLevel level, LocalPlayer spieler) {
-        gearbeitet = System.nanoTime();
         pruefeAtlas(mc);
         int soll = effektiv(aufloesung, zoom, mc.getWindow().getGuiScale());
         if (soll != scale) {
@@ -635,7 +640,7 @@ public final class Minimap {
     }
 
     /** Der eigene Spieler: sein Kopf aus dem Skin, daneben ein kleiner Pfeil in Blickrichtung. Siehe docs/minimap.md, „Bedienung“. */
-    static void avatar(GuiGraphicsExtractor g, AbstractClientPlayer spieler, int x, int y) {
+    static void avatar(GuiGraphicsExtractor g, AbstractClientPlayer spieler, int x, int y, float a) {
         int h = KOPF / 2;
         g.fill(x - h - 1, y - h - 1, x + h + 1, y + h + 1, 0xFF000000);
         PlayerFaceExtractor.extractRenderState(g, spieler.getSkin(), x - h, y - h, KOPF);
@@ -643,7 +648,7 @@ public final class Minimap {
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.translate(x, y);
-        pose.rotate((float) Math.toRadians(spieler.getYRot() + 180));
+        pose.rotate((float) Math.toRadians(spieler.getViewYRot(a) + 180));
         pose.translate(0, -(h + 1));
         for (int i = 0; i < 3; i++) {
             g.fill(-i - 1, -3 + i, i + 2, -1 + i, 0xFF000000);

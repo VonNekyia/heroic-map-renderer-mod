@@ -1,5 +1,6 @@
 package com.nekyia.heroicmap;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -17,7 +18,8 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
  */
 public final class Bedienung implements FabricClientGameTest {
 
-    private static final int LINKS = 0, RECHTS = 1;
+    /** Die Tasten, wie das Spiel sie zählt; TestInput reicht die Zahl unverändert durch. Siehe docs/entwicklung.md, „Maustasten“. */
+    private static final int LINKS = InputConstants.MOUSE_BUTTON_LEFT, RECHTS = InputConstants.MOUSE_BUTTON_RIGHT;
 
     @Override
     public void runTest(ClientGameTestContext context) {

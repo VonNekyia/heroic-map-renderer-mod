@@ -1,5 +1,5 @@
 ---
-title: "0002: Eine geänderte Kopie des VP8L-Dekoders von TwelveMonkeys"
+title: "0003: Eine geänderte Kopie des VP8L-Dekoders von TwelveMonkeys"
 description: Warum der Mod einfache verlustfreie Kacheln mit einer geänderten Kopie des VP8L-Dekoders von TwelveMonkeys liest, bis TwelveMonkeys den Fehler beim Farbindex hinter der Palette behebt.
 status: gilt
 date: 2026-10-08
@@ -9,7 +9,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/Kacheln.java
 ---
 
-# 0002: Eine geänderte Kopie des VP8L-Dekoders von TwelveMonkeys
+# 0003: Eine geänderte Kopie des VP8L-Dekoders von TwelveMonkeys
 
 ## Anlass
 

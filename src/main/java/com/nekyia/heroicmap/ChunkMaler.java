@@ -3,8 +3,6 @@ package com.nekyia.heroicmap;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.vertex.QuadInstance;
 import it.unimi.dsi.fastutil.objects.Reference2BooleanOpenHashMap;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
@@ -13,7 +11,6 @@ import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.builders.UVPair;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.client.renderer.block.FluidModel;
 import net.minecraft.client.renderer.block.ModelBlockRenderer;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
@@ -29,21 +26,13 @@ import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
-import net.minecraft.resources.Identifier;
-import net.minecraft.server.packs.PackResources;
-import net.minecraft.server.packs.PackType;
-import net.minecraft.server.packs.resources.IoSupplier;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.CardinalLighting;
-import net.minecraft.world.level.ColorResolver;
 import net.minecraft.world.level.block.RenderShape;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -63,7 +52,7 @@ final class ChunkMaler {
     /** Spalte ohne Inhalt, etwa eine Wand unter einer Decke. */
     private static final int LEER = Integer.MIN_VALUE;
     /** sRGB-Wert nach linearem Licht. */
-    static final float[] LINEAR = new float[256];
+    private static final float[] LINEAR = new float[256];
 
     static {
         for (int i = 0; i < 256; i++) {
@@ -100,51 +89,14 @@ final class ChunkMaler {
             }
             return texel;
         }
-
-        /**
-         * Die Texel aus den Vanilla-Assets, wie der Server sie zeichnet; ein Sprite ohne Datei dort,
-         * etwa aus einem Mod, behält seine Texel aus dem Atlas. Liest PNG, also nicht auf dem
-         * Render-Thread. Siehe docs/live.md, „Texturen“.
-         */
-        static Map<TextureAtlasSprite, Texel> vanilla(Map<TextureAtlasSprite, Texel> atlas, PackResources vanilla) {
-            Map<TextureAtlasSprite, Texel> texel = new IdentityHashMap<>(atlas);
-            for (TextureAtlasSprite sprite : atlas.keySet()) {
-                Identifier name = sprite.contents().name();
-                IoSupplier<InputStream> datei = vanilla.getResource(PackType.CLIENT_RESOURCES,
-                        name.withPath(p -> "textures/" + p + ".png"));
-                if (datei == null) {
-                    continue;
-                }
-                try (InputStream rein = datei.get(); NativeImage bild = NativeImage.read(rein)) {
-                    // Das erste Bild einer Animation: oben, so hoch wie breit.
-                    int breite = bild.getWidth(), hoehe = Math.min(bild.getHeight(), breite);
-                    int[] argb = new int[breite * hoehe];
-                    for (int y = 0; y < hoehe; y++) {
-                        for (int x = 0; x < breite; x++) {
-                            argb[y * breite + x] = bild.getPixel(x, y);
-                        }
-                    }
-                    texel.put(sprite, new Texel(argb, breite, hoehe));
-                } catch (IOException | RuntimeException e) {
-                    // Unlesbar: die Texel aus dem Atlas.
-                }
-            }
-            return texel;
-        }
     }
 
     /**
      * Was der Worker für einen Chunk braucht: je Spalte die erste Höhe, die Abschnitte von
      * {@code minSektion} an als Kopien und die Texel aller Sprites des Block-Atlas.
-     * {@code mischung} ist der Radius des Biomübergangs, oder -1 für die Einstellung des Spielers.
      */
     record Auftrag(int cx, int cz, int scale, Licht licht, Map<TextureAtlasSprite, Texel> texel,
-            int[] start, int minSektion, RenderSectionRegion[] abschnitte, long stand, ClientLevel level, int mischung) {
-
-        /** Derselbe Auftrag mit anderen Texeln, etwa denen der Vanilla-Assets. */
-        Auftrag mitTexel(Map<TextureAtlasSprite, Texel> andere) {
-            return new Auftrag(cx, cz, scale, licht, andere, start, minSektion, abschnitte, stand, level, mischung);
-        }
+            int[] start, int minSektion, RenderSectionRegion[] abschnitte, long stand) {
     }
 
     /**
@@ -153,11 +105,6 @@ final class ChunkMaler {
      */
     static Auftrag abziehen(ClientLevel level, LevelChunk chunk, int scale, int decke, Licht licht,
             Map<TextureAtlasSprite, Texel> texel, long stand) {
-        return abziehen(level, chunk, scale, decke, licht, texel, stand, -1);
-    }
-
-    static Auftrag abziehen(ClientLevel level, LevelChunk chunk, int scale, int decke, Licht licht,
-            Map<TextureAtlasSprite, Texel> texel, long stand, int mischung) {
         int cx = chunk.getPos().x(), cz = chunk.getPos().z();
         int bx = chunk.getPos().getMinBlockX(), bz = chunk.getPos().getMinBlockZ();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
@@ -178,7 +125,7 @@ final class ChunkMaler {
             unten = Math.min(unten, y);
         }
         if (oben == Integer.MIN_VALUE) {
-            return new Auftrag(cx, cz, scale, licht, texel, start, 0, new RenderSectionRegion[0], stand, level, mischung);
+            return new Auftrag(cx, cz, scale, licht, texel, start, 0, new RenderSectionRegion[0], stand);
         }
         int minSektion = SectionPos.blockToSectionCoord(unten), maxSektion = SectionPos.blockToSectionCoord(oben);
         RenderRegionCache kopien = new RenderRegionCache();
@@ -186,7 +133,7 @@ final class ChunkMaler {
         for (int sy = minSektion; sy <= maxSektion; sy++) {
             abschnitte[sy - minSektion] = kopien.createRegion(level, SectionPos.asLong(cx, sy, cz));
         }
-        return new Auftrag(cx, cz, scale, licht, texel, start, minSektion, abschnitte, stand, level, mischung);
+        return new Auftrag(cx, cz, scale, licht, texel, start, minSektion, abschnitte, stand);
     }
 
     private final Minecraft minecraft = Minecraft.getInstance();
@@ -203,8 +150,6 @@ final class ChunkMaler {
     private int scale;
     /** Der Abschnitt mit seinen Nachbarn, in dem der aktuelle Block liegt. */
     private RenderSectionRegion welt;
-    /** Wo Tesselator und Flüssigkeit die Tönung lesen: {@link #welt}, oder mit eigenem Biomübergang. */
-    private BlockAndTintGetter toenung;
     /** Je Pixel der Spalte vormultipliziert in sRGB: r, g, b, a. */
     private float[] summe = new float[0];
 
@@ -233,7 +178,6 @@ final class ChunkMaler {
             return zeichne(a);
         } finally {
             welt = null;
-            toenung = null;
             auftrag = null;
         }
     }
@@ -254,7 +198,6 @@ final class ChunkMaler {
                 }
                 if (welt != a.abschnitte()[abschnitt]) {
                     welt = a.abschnitte()[abschnitt];
-                    toenung = a.mischung() < 0 ? welt : new Mischung(welt, a.level(), a.mischung());
                 }
                 pos.set(bx + lx, y, bz + lz);
                 BlockState state = welt.getBlockState(pos);
@@ -313,7 +256,7 @@ final class ChunkMaler {
             }
             flaechen.add(new Flaeche(hoehe, xz, uv, quad.materialInfo().sprite(), quad.materialInfo().layer(),
                     ecken(instanz, quad.materialInfo().lightEmission())));
-        }, 0, 0, 0, toenung, pos, state, model, state.getSeed(pos));
+        }, 0, 0, 0, welt, pos, state, model, state.getSeed(pos));
     }
 
     /**
@@ -346,7 +289,7 @@ final class ChunkMaler {
     /** Die Oberfläche einer Flüssigkeit, in der Höhe, in der das Spiel sie zeichnet. */
     private void sammleFluessigkeit(FluidModel model, BlockState state, FluidState fluid) {
         TextureAtlasSprite sprite = model.stillMaterial().sprite();
-        int tint = model.tintSource() == null ? -1 : model.tintSource().colorInWorld(state, toenung, pos);
+        int tint = model.tintSource() == null ? -1 : model.tintSource().colorInWorld(state, welt, pos);
         auftrag.licht().hell(LightCoordsUtil.max(LightCoordsUtil.getLightCoords(welt, pos),
                 LightCoordsUtil.getLightCoords(welt, pos.above())), hell);
         float schatten = welt.cardinalLighting().up();
@@ -611,69 +554,7 @@ final class ChunkMaler {
         return null;
     }
 
-    /**
-     * Die Region mit einem festen Radius des Biomübergangs, gemischt wie
-     * {@code ClientLevel.calculateBlockTint}: das Mittel über (2r + 1)² Biome auf gleicher Höhe.
-     * Siehe docs/live.md, „Biomübergang“.
-     */
-    private record Mischung(RenderSectionRegion region, ClientLevel level, int radius) implements BlockAndTintGetter {
-
-        @Override
-        public int getBlockTint(BlockPos p, ColorResolver farbe) {
-            if (radius == 0) {
-                return farbe.getColor(level.getBiome(p).value(), p.getX(), p.getZ());
-            }
-            int n = (2 * radius + 1) * (2 * radius + 1), r = 0, g = 0, b = 0;
-            BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
-            for (int z = p.getZ() - radius; z <= p.getZ() + radius; z++) {
-                for (int x = p.getX() - radius; x <= p.getX() + radius; x++) {
-                    m.set(x, p.getY(), z);
-                    int c = farbe.getColor(level.getBiome(m).value(), x, z);
-                    r += ARGB.red(c);
-                    g += ARGB.green(c);
-                    b += ARGB.blue(c);
-                }
-            }
-            return ARGB.color(r / n, g / n, b / n);
-        }
-
-        @Override
-        public CardinalLighting cardinalLighting() {
-            return region.cardinalLighting();
-        }
-
-        @Override
-        public LevelLightEngine getLightEngine() {
-            return region.getLightEngine();
-        }
-
-        @Override
-        public BlockEntity getBlockEntity(BlockPos p) {
-            return region.getBlockEntity(p);
-        }
-
-        @Override
-        public BlockState getBlockState(BlockPos p) {
-            return region.getBlockState(p);
-        }
-
-        @Override
-        public FluidState getFluidState(BlockPos p) {
-            return region.getFluidState(p);
-        }
-
-        @Override
-        public int getHeight() {
-            return region.getHeight();
-        }
-
-        @Override
-        public int getMinY() {
-            return region.getMinY();
-        }
-    }
-
-    static float srgb(float linear) {
+    private static float srgb(float linear) {
         return linear <= 0.0031308f ? linear * 12.92f : (float) (1.055 * Math.pow(linear, 1 / 2.4) - 0.055);
     }
 

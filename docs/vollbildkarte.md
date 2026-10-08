@@ -126,11 +126,16 @@ sagt sie das und zeigt nichts.
 - **Behalten:** die 192 zuletzt gezeigten Texturen, bei 256² Pixeln rund
   48 MiB auf der Grafikkarte. Die älteste gibt der Mod frei.
 - **Fehlt eine Kachel** oder lässt sie sich nicht lesen, merkt sich die
-  Karte das und fragt nicht wieder, bis sie neu öffnet oder die Live-Ebene
-  dort ein Bild ablegt.
+  Karte das und fragt nicht wieder, bis sie neu öffnet oder ein Download
+  fertig ist.
+- **Nach einem vollständigen Download** lädt die offene Karte jede Kachel
+  neu (`Kacheln.satzGeladen`). Die alte Textur bleibt sichtbar, bis die
+  neue da ist; ein Ergebnis, das während des Downloads entstand, lädt sie
+  gleich noch einmal.
 - **Beim Schliessen** gibt die Karte alle Texturen frei.
-- **Darüber** legt der Dekoder die [Live-Ebene](live.md): was sich seit dem
-  letzten Lauf des Renderers in geladenen Chunks geändert hat.
+- **Nur Kacheln vom Server:** Was sich seit dem letzten Lauf des Renderers
+  ändert, bringt der Abgleich; selbst zeichnet der Mod nur die Minimap,
+  siehe [0002](entscheidungen/0002-vollbildkarte-nur-vom-server.md).
 
 ### Farbindex hinter der Palette
 
@@ -141,7 +146,7 @@ und lässt durchsichtiges Schwarz als letzten Eintrag weg. TwelveMonkeys
 3.15.2 und 3.15.3 lesen solche Pixel als die letzte Farbe der Palette,
 deckend; gemeldet als
 [haraldk/TwelveMonkeys#1361](https://github.com/haraldk/TwelveMonkeys/issues/1361).
-Warum eine Kopie: [0002](entscheidungen/0002-kopie-des-vp8l-dekoders.md).
+Warum eine Kopie: [0003](entscheidungen/0003-kopie-des-vp8l-dekoders.md).
 
 - **Die Kopie:** Das Paket `com.nekyia.heroicmap.webp` ist das Paket
   `com.twelvemonkeys.imageio.plugins.webp.lossless` aus TwelveMonkeys
