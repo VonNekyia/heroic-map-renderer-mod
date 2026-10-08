@@ -84,7 +84,9 @@ class WegpunkteTest {
         // Die nächste Änderung schreibt eine neue Datei; die alte liegt daneben.
         w.setze(WELT, 1, 1);
         assertEquals("{kaputt", Files.readString(ordner.resolve("wegpunkte.json.kaputt")));
-        assertEquals(1, new Wegpunkte() {{ lies(ordner); }}.punkte().size());
+        Wegpunkte neu = new Wegpunkte();
+        neu.lies(ordner);
+        assertEquals(1, neu.punkte().size());
     }
 
     @Test
