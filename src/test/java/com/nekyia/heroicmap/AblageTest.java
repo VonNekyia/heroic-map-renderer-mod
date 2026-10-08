@@ -91,6 +91,7 @@ class AblageTest {
         assertFalse(Downloads.weltUnbekannt("survival", "minecraft:overworld", 7L));
         assertFalse(Downloads.weltUnbekannt("survival", null, null));
         assertFalse(Downloads.weltUnbekannt("con", "minecraft:overworld", null));
+        assertFalse(Downloads.weltUnbekannt("selbst-x", "minecraft:overworld", null));
     }
 
     @Test

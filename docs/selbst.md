@@ -103,8 +103,10 @@ mit der des Servers. Warum: [0004](entscheidungen/0004-karte-selbst-zeichnen.md)
   der Vollbildkarte trotzdem. Was beim Beenden des Spiels noch nicht
   geschrieben ist, fehlt; der Chunk kommt wieder, sobald der Spieler ihn
   lädt.
-- **Im Speicher** bleiben 64 Kacheln, geänderte immer, bis sie geschrieben
-  sind.
+- **Im Speicher** bleiben höchstens 64 ungeänderte Kacheln, rund 16 MiB;
+  geänderte liegen getrennt davon, bis sie geschrieben sind, grobe also bis
+  60 s. Eine unlesbare Kachel auf der Platte, auch eine kaputte PNG, gilt
+  als fehlend und entsteht aus dem neu, was jetzt kommt.
 - **Die offene Vollbildkarte** lädt jede geschriebene Kachel neu
   (`Kacheln.geaendert`); die alte bleibt sichtbar, bis die neue da ist.
 

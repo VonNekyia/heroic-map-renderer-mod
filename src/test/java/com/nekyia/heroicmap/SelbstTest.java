@@ -69,7 +69,10 @@ class SelbstTest {
         fuelle(erstes, 0, 0, ROT);
         fuelle(erstes, 1, 1, BLAU);
         schreibe(erstes, true);
-        // Ein neues Werk ohne Speicher: Das Viertel von (0, 0) kommt von der Platte und bleibt.
+        // Das Kind (0, 0) ändert sich auf der Platte, ohne dass sein Vorfahr es erfährt.
+        Files.write(ordner.resolve("8/0/0.png"), pngVoll(GELB));
+        // Ein neues Werk ändert nur (1, 1): Das Viertel von (0, 0) kommt aus dem Vorfahren und bleibt Rot.
+        // Rechnete es den Vorfahren aus allen Kindern neu, wäre es Gelb.
         Kachelwerk zweites = new Kachelwerk(ordner, 256, 64, 7, 8);
         zweites.lege(4, 4, voll(64, GRUEN));
         assertEquals(List.of(new Kachelwerk.Kachel(8, 1, 1), new Kachelwerk.Kachel(7, 0, 0)), schreibe(zweites, true));
@@ -77,6 +80,29 @@ class SelbstTest {
         assertEquals(ROT, grob[5 * 256 + 5]);
         assertEquals(GRUEN, grob[(128 + 5) * 256 + 128 + 5]);
         assertEquals(BLAU, grob[(255) * 256 + 255]);
+    }
+
+    @Test
+    void speicherBleibtBei64(@TempDir Path ordner) throws Exception {
+        // Eine grobe Kachel bleibt bis zum nächsten groben Schreiben geändert; der Speicher wächst trotzdem nicht.
+        Kachelwerk werk = new Kachelwerk(ordner, 256, 64, 6, 8);
+        werk.lege(0, 0, voll(64, ROT));
+        schreibe(werk, false);
+        for (int i = 1; i <= 200; i++) {
+            werk.lege(i * 4, 0, voll(64, BLAU));
+            schreibe(werk, false);
+            assertTrue(werk.imSpeicher() <= 64, "Kachel " + i + ": " + werk.imSpeicher());
+        }
+    }
+
+    @Test
+    void kaputteKachelWieFehlend(@TempDir Path ordner) throws Exception {
+        Files.createDirectories(ordner.resolve("7/0"));
+        Files.writeString(ordner.resolve("7/0/0.png"), "keine PNG");
+        Kachelwerk werk = new Kachelwerk(ordner, 256, 64, 7, 8);
+        werk.lege(0, 0, voll(64, ROT));
+        schreibe(werk, true);
+        assertEquals(ROT, lies(ordner.resolve("7/0/0.png"))[5 * 256 + 5]);
     }
 
     @Test
@@ -129,7 +155,7 @@ class SelbstTest {
         // Gleich gelesen, verschieden gemeint: zwei Bäume.
         assertNotEquals(Selbst.baum("mod:a/b"), Selbst.baum("mod:a_b"));
         assertTrue(Selbst.baum("x:" + "a".repeat(100)).length() <= 64);
-        // Ein Baum vom Server, alphabetisch vor dem eigenen: Der eigene geht trotzdem vor.
+        // Ein Baum vom Server, nach dem Namen vor dem eigenen (Satz.fuer sortiert): Der eigene geht trotzdem vor.
         satzVomServer(welt.resolve("a-server"), "minecraft:overworld");
         assertEquals("Survival", Satz.fuer(welt, "minecraft:overworld").name());
         Path baum = Selbst.anlegen(welt, "minecraft:overworld");
@@ -195,6 +221,14 @@ class SelbstTest {
         Set<Integer> stufen = new HashSet<>();
         kacheln.forEach(k -> stufen.add(k.z()));
         return stufen;
+    }
+
+    private static byte[] pngVoll(int argb) throws IOException {
+        BufferedImage bild = new BufferedImage(256, 256, BufferedImage.TYPE_INT_ARGB);
+        bild.setRGB(0, 0, 256, 256, voll(256, argb), 0, 256);
+        java.io.ByteArrayOutputStream raus = new java.io.ByteArrayOutputStream();
+        ImageIO.write(bild, "png", raus);
+        return raus.toByteArray();
     }
 
     private static int[] voll(int seite, int argb) {

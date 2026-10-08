@@ -290,7 +290,7 @@ public final class Selbst {
                     maler = new ChunkMaler();
                 }
                 werk(s).lege(auftrag.cx(), auftrag.cz(), maler.male(auftrag));
-            } catch (IOException | RuntimeException e) {
+            } catch (RuntimeException e) {
                 melde(e);
             } finally {
                 inArbeit.decrementAndGet();

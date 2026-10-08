@@ -363,8 +363,9 @@ public final class Minimap {
     }
 
     /**
-     * Hat die Minimap zu tun? Dann wartet die selbst gezeichnete Karte. Ohne HUD, etwa mit F1,
-     * zeichnet die Minimap nicht; nach einer Sekunde ohne Arbeit wartet niemand mehr auf sie.
+     * Hat die Minimap zu tun? Dann gibt die selbst gezeichnete Karte höchstens einen Chunk je Tick
+     * an ihren Worker. Ohne HUD, etwa mit F1, zeichnet die Minimap nicht; nach einer Sekunde ohne
+     * Arbeit gilt sie nicht mehr als beschäftigt.
      */
     boolean beschaeftigt() {
         return sichtbar && !fertig() && System.nanoTime() - gearbeitet < 1_000_000_000L;

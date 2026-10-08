@@ -32,8 +32,9 @@ record Satz(Path ordner, String name, String dimension, int massstab, int kachel
             return null;
         }
         Satz erster = null;
+        // Nach dem Namen, nicht in der Folge des Dateisystems: So ist das Ergebnis überall gleich.
         try (Stream<Path> baeume = Files.list(welt)) {
-            for (Path baum : baeume.toList()) {
+            for (Path baum : baeume.sorted().toList()) {
                 Satz satz = lies(baum);
                 if (satz != null && dimension.equals(satz.dimension())) {
                     if (Selbst.selbst(baum)) {
