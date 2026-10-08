@@ -7,6 +7,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
@@ -122,9 +123,12 @@ final class Einstellungen extends Screen {
         if (zug != Zug.KEINER || minecraft.player == null || (m.rund() ? dx * dx + dz * dz > h * h : !r.enthaelt(mausX, mausY))) {
             return;
         }
-        int links = Mth.floor(minecraft.player.getX() * m.zoom()) - r.seite() / 2;
-        int oben = Mth.floor(minecraft.player.getZ() * m.zoom()) - r.seite() / 2;
-        int bx = Math.floorDiv(links + mausX - r.x(), m.zoom()), bz = Math.floorDiv(oben + mausY - r.y(), m.zoom());
+        // In Pixeln des Schirms wie Minimap.zeichne.
+        LocalPlayer p = minecraft.player;
+        float a = Minimap.anteil(minecraft.level, p, minecraft.getDeltaTracker());
+        int k = minecraft.getWindow().getGuiScale(), n = r.seite() * k, block = m.zoom() * k;
+        int links = Minimap.ecke(p.xo, p.getX(), a, m.zoom(), k, n), oben = Minimap.ecke(p.zo, p.getZ(), a, m.zoom(), k, n);
+        int bx = Math.floorDiv(links + (mausX - r.x()) * k, block), bz = Math.floorDiv(oben + (mausY - r.y()) * k, block);
         g.text(font, Component.translatable("heroicmap.koordinaten", bx, bz), 4, height - 12, TEXT);
     }
 

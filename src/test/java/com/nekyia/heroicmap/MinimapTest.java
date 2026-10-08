@@ -29,6 +29,18 @@ class MinimapTest {
     }
 
     @Test
+    void eckeZwischenZweiTicks() {
+        // Ein Tick von x = 10 nach 11, Zoom 2, GUI-Massstab 2: 4 Pixel je Block, Seite 256 Pixel.
+        assertEquals(40 - 128, Minimap.ecke(10, 11, 0f, 2, 2, 256));
+        assertEquals(42 - 128, Minimap.ecke(10, 11, 0.5f, 2, 2, 256));
+        assertEquals(44 - 128, Minimap.ecke(10, 11, 1f, 2, 2, 256));
+        // Ein Pixel, weniger als eine Einheit des GUI.
+        assertEquals(41 - 128, Minimap.ecke(10, 11, 0.25f, 2, 2, 256));
+        // Abgerundet, auch links vom Ursprung.
+        assertEquals(-42 - 128, Minimap.ecke(-10, -11, 0.3f, 2, 2, 256));
+    }
+
+    @Test
     void markiereNurImBereich() {
         Minimap minimap = new Minimap();
         minimap.mitte = new ChunkPos(10, -20);

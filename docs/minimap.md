@@ -1,6 +1,6 @@
 ---
 title: Minimap
-description: Bedienung über das Menü hinter /hmap, Form, Lage und Grösse, Mitspieler; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
+description: Bedienung über das Menü hinter /hmap, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
 code:
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/ChunkMaler.java
@@ -127,8 +127,8 @@ gibt es nicht; so hat es der User gewählt.
   Liste leer; ebenso beim Verlassen des Servers. Die Positionen liegen nur
   im Speicher, nie auf der Platte.
 - **Lage:** Hat der Client einen genannten Spieler als Entity mit derselben
-  UUID, nimmt der Mod dessen Position, die ist flüssiger; sonst die des
-  Servers.
+  UUID, nimmt der Mod dessen Position, die ist flüssiger, zwischen zwei
+  Ticks wie den eigenen Spieler, siehe „Bewegung“; sonst die des Servers.
 - **Zeichnen:** der Kopf aus dem Skin (`PlayerFaceExtractor`), 8 Einheiten
   des GUI mit schwarzem Rand, nur in der Dimension des Spielers und
   innerhalb der Form; ohne Skin ein weisses Quadrat. Auf der
@@ -153,6 +153,28 @@ Der Mod zeichnet die Minimap in Pixeln des Schirms, nicht des GUI
 - **Kosten:** rund 0,33 ms je Frame, eckig 0,003 ms, siehe „Kosten“.
 
 ![Minimap rund bei 4 Pixeln je Block](bilder/minimap-rund.png)
+
+## Bewegung
+
+Die Minimap folgt dem Spieler in jedem Frame, nicht nur je Tick
+(`Minimap.zeichne`, `Minimap.ecke`):
+
+- **Zwischen zwei Ticks:** Die Mitte ist die Lage des Spielers zwischen
+  `xo`, `zo` und `getX()`, `getZ()` beim Anteil des Ticks, wie bei der
+  Kamera: `DeltaTracker.getGameTimeDeltaPartialTick(true)`, bei einem
+  eingefrorenen Spieler 1 (`Minimap.anteil`). Belegt per javap am
+  Client 26.3: `Camera` rechnet so, mit `Mth.lerp` von `xo` nach `getX()`.
+  Mit der Lage des letzten Ticks rückte die Minimap nur 20-mal je Sekunde
+  und ruckelte bei 60 fps und mehr.
+- **Auf ganze Pixel des Schirms,** nicht auf ganze Einheiten des GUI. Ein
+  Texel ist auf dem Schirm eine ganze Zahl von Pixeln, siehe „Bedienung“;
+  verschoben wird nur, wo die Textur liegt, so bleibt sie scharf. Bei
+  GUI-Massstab 3 rückt die Minimap so in Dritteln einer Einheit.
+- **Der Pfeil** am Kopf dreht mit `getViewYRot(a)`, wie die Kamera.
+- **Mitspieler** als Entity stehen beim selben Anteil
+  (`Entity.getPosition`), ihre Köpfe auf ganzen Pixeln wie die Karte.
+- **Die Koordinaten im Menü** rechnen genauso (`Einstellungen.koordinaten`).
+- **Die Vollbildkarte** nimmt weiter die Lage des letzten Ticks.
 
 ## Welcher Block oben liegt
 
