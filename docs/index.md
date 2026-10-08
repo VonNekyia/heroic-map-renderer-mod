@@ -20,7 +20,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 
 ## Entwicklung
 
-- [Bauen und testen](entwicklung.md): Versionen, Gradle, Tests, Gametests, CI und die Prüfung der Doku.
+- [Bauen und testen](entwicklung.md): Versionen, Gradle, Tests, Gametests, Maustasten, CI und die Prüfung der Doku.
 
 ## Entscheidungen
 

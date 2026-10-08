@@ -1,5 +1,6 @@
 package com.nekyia.heroicmap;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
@@ -161,7 +162,7 @@ final class Karte extends Screen {
         if (super.mouseClicked(e, doppelt)) {
             return true;
         }
-        if (e.button() == 1 && blick != null && minecraft.level != null && minecraft.getConnection() != null
+        if (e.button() == InputConstants.MOUSE_BUTTON_RIGHT && blick != null && minecraft.level != null && minecraft.getConnection() != null
                 && !minecraft.level.dimensionType().hasCeiling() && Teleport.erlaubt(minecraft.getConnection().getCommands())) {
             ziel = block(e.x(), e.y());
             // Das Menü bleibt ganz auf dem Schirm, auch bei grossem GUI-Massstab.
@@ -193,7 +194,8 @@ final class Karte extends Screen {
 
     @Override
     public boolean mouseDragged(MouseButtonEvent ereignis, double dx, double dy) {
-        if (blick != null && ereignis.button() == 0) {
+        // Die Tasten zählen wie in SDL, links ist 1. Siehe docs/entwicklung.md, „Maustasten“.
+        if (blick != null && ereignis.button() == InputConstants.MOUSE_BUTTON_LEFT) {
             blick.schiebe(dx, dy);
             return true;
         }
