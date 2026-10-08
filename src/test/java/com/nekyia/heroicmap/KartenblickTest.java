@@ -38,33 +38,53 @@ class KartenblickTest {
 
     @Test
     void klickTrifftDenGezeichnetenBlock() {
-        // scale 4, Lupe 1: Die Kachel liegt um den Rest 0,25 links ihrer exakten Lage. Ein Klick 0,1 rechts der
-        // Kante von Block 250 trifft Block 250, nicht 249.
+        // scale 4, Lupe 1: Ein Klick 0,1 rechts der gezeichneten Kante von Block 250 trifft Block 250, nicht 249.
         Kartenblick blick = new Kartenblick(256, 0, 6, 6);
         blick.mx = 1000.75;
-        double x = blick.rasterX(1000, 854) + 0.1;
-        assertEquals(250, (int) Math.floor(blick.basisRasterX(x, 854) / 4));
-        // Hin und zurück, auch auf einer groben Stufe mit Lupe.
-        blick.zoom = 3;
-        blick.lupe = 1;
-        blick.mz = -77.3;
-        for (double b : new double[] {-5000.5, 0, 1234.25}) {
-            assertEquals(b, blick.basisRasterX(blick.rasterX(b, 854), 854), 1e-6);
-            assertEquals(b, blick.basisRasterZ(blick.rasterY(b, 480), 480), 1e-6);
+        assertEquals(250, (int) Math.floor(blick.basisRasterX(blick.rasterX(1000, 854) + 0.1, 854) / 4));
+        // Für Lupe 1, 2 und 4, auf der feinsten und einer groben Stufe, rechts und links des Ursprungs:
+        // ein Klick genau auf die Kante von Block X und knapp davor.
+        for (int stufe : new int[] {6, 3}) {
+            for (int lupe : new int[] {1, 2, 4}) {
+                blick.zoom = stufe;
+                blick.lupe = stufe == 6 ? lupe : 1;
+                blick.mx = 1000.75;
+                blick.mz = -77.3;
+                for (int x : new int[] {250, 3, 0, -1, -129}) {
+                    double kante = blick.rasterX(4.0 * x, 854);
+                    assertEquals(x, (int) Math.floor(blick.basisRasterX(kante, 854) / 4), "Kante, Stufe " + stufe + ", Lupe " + lupe + ", x " + x);
+                    assertEquals(x - 1, (int) Math.floor(blick.basisRasterX(kante - 1e-6, 854) / 4), "davor, x " + x);
+                    double kanteZ = blick.rasterY(4.0 * x, 480);
+                    assertEquals(x, (int) Math.floor(blick.basisRasterZ(kanteZ, 480) / 4), "z " + x);
+                }
+            }
         }
     }
 
     @Test
+    void kachelnRasterUndKlickAufEinerKante() {
+        // Nahe dem Ursprung nach einem Zug: Die Mitte ist 3e-14. Kachel -2 liegt, wo das Raster ihren Pixel -512 sieht.
+        Kartenblick blick = new Kartenblick(256, 0, 6, 6);
+        blick.mx = 3e-14;
+        assertEquals(Math.floor(blick.schirmX(-512, 854)), blick.rasterX(-512, 854), 1e-9);
+        assertEquals(blick.kachelX(-2, 854), blick.rasterX(-512, 854), 1e-9);
+        assertEquals(-128, (int) Math.floor(blick.basisRasterX(blick.rasterX(-512, 854), 854) / 4));
+    }
+
+    @Test
     void nameBleibtAufDemSchirmUndNebenDenKnoepfen() {
-        // Schirm 400 breit, Knöpfe ab x 306 bis y 48, Name 60 breit.
-        assertArrayEquals(new int[] {170, 30}, Kartenblick.name(200, 30, 400, 60, 306, 48));
+        // Schirm 400 breit, Knöpfe ab x 306 bis y 48, Name 60 breit, halbe Marke 4: über dem Kopf 14 höher.
+        assertArrayEquals(new int[] {170, 30}, Kartenblick.name(200, 44, 4, 400, 60, 306, 48));
         // Am linken und rechten Rand ganz auf dem Schirm.
-        assertArrayEquals(new int[] {2, 100}, Kartenblick.name(5, 100, 400, 60, 306, 48));
-        assertArrayEquals(new int[] {338, 100}, Kartenblick.name(395, 100, 400, 60, 306, 48));
-        // Oben rechts nicht unter den Knöpfen, sondern links daneben.
-        assertArrayEquals(new int[] {244, 10}, Kartenblick.name(395, 10, 400, 60, 306, 48));
+        assertArrayEquals(new int[] {2, 100}, Kartenblick.name(5, 114, 4, 400, 60, 306, 48));
+        assertArrayEquals(new int[] {338, 100}, Kartenblick.name(395, 114, 4, 400, 60, 306, 48));
+        // Ein Kopf am rechten Rand unter den Knöpfen, bei y 53: Über ihm träfe der Name die Knöpfe, also steht er
+        // unter ihm, nicht 80 Einheiten weiter links.
+        assertArrayEquals(new int[] {338, 59}, Kartenblick.name(386, 53, 4, 400, 60, 306, 48));
+        // Träfe auch der Platz unter dem Kopf die Knöpfe, steht er links neben ihnen.
+        assertArrayEquals(new int[] {244, 2}, Kartenblick.name(395, 14, 4, 400, 60, 306, 48));
         // Ganz oben nicht über den Rand.
-        assertEquals(2, Kartenblick.name(100, -6, 400, 60, 306, 48)[1]);
+        assertEquals(2, Kartenblick.name(100, 8, 4, 400, 60, 306, 48)[1]);
     }
 
     @Test
