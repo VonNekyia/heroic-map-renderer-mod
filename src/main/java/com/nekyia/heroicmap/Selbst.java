@@ -63,6 +63,8 @@ public final class Selbst {
     private ChunkMaler maler;
     private Kachelwerk werk;
     private boolean gemeldet;
+    /** Hat das Werk aufgegeben, etwa bei voller Platte? Dann zeichnet der Worker bis zum nächsten Wechsel der Welt nicht. */
+    private boolean aufgegeben;
     /** Wann die gröberen Stufen zuletzt geschrieben wurden, in ms. */
     private long grobGeschrieben;
 
@@ -186,6 +188,7 @@ public final class Selbst {
         worker.execute(() -> {
             schreibe(true);
             werk = null;
+            aufgegeben = false;
         });
     }
 
@@ -286,6 +289,9 @@ public final class Selbst {
         inArbeit.incrementAndGet();
         worker.execute(() -> {
             try {
+                if (aufgegeben) {
+                    return;
+                }
                 if (maler == null) {
                     maler = new ChunkMaler();
                 }
@@ -327,11 +333,32 @@ public final class Selbst {
             }
         } catch (IOException | RuntimeException e) {
             melde(e);
+            if (werk.aufgegeben()) {
+                gibAuf();
+            }
         } finally {
             if (!fertig.isEmpty()) {
                 Minecraft.getInstance().execute(() -> fertig.forEach(k -> Kacheln.geaendert(ordner, k.z(), k.x(), k.y())));
             }
         }
+    }
+
+    /**
+     * Im Worker, wenn das Werk aufgegeben hat: nicht mehr zeichnen und es dem Spieler sagen. Bis zum
+     * nächsten Wechsel der Welt bleibt es so. Siehe docs/selbst.md, „Kacheln“.
+     */
+    private void gibAuf() {
+        aufgegeben = true;
+        werk = null;
+        Minecraft mc = Minecraft.getInstance();
+        mc.execute(() -> {
+            satz = null;
+            gesucht = true;
+            offen.clear();
+            if (mc.player != null) {
+                mc.player.sendSystemMessage(Component.translatable("heroicmap.selbst.schreibfehler"));
+            }
+        });
     }
 
     /** Der erste Fehler steht mit Stacktrace im Log, jeder weitere nicht; im Worker. */

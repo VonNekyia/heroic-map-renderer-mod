@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.stream.Stream;
 
 /**
@@ -32,9 +33,10 @@ record Satz(Path ordner, String name, String dimension, int massstab, int kachel
             return null;
         }
         Satz erster = null;
-        // Nach dem Namen, nicht in der Folge des Dateisystems: So ist das Ergebnis überall gleich.
+        // Nach dem Namen als Zeichenkette, nicht in der Folge des Dateisystems und nicht nach Path.compareTo,
+        // das unter Windows Gross und Klein gleich nimmt: So ist das Ergebnis überall gleich.
         try (Stream<Path> baeume = Files.list(welt)) {
-            for (Path baum : baeume.sorted().toList()) {
+            for (Path baum : baeume.sorted(Comparator.comparing((Path p) -> p.getFileName().toString())).toList()) {
                 Satz satz = lies(baum);
                 if (satz != null && dimension.equals(satz.dimension())) {
                     if (Selbst.selbst(baum)) {

@@ -99,7 +99,11 @@ mit der des Servers. Warum: [0004](entscheidungen/0004-karte-selbst-zeichnen.md)
   und beim Trennen; über `<y>.png.tmp`, nie liegt eine halbe Kachel da,
   und eine gescheiterte Zwischendatei geht wieder weg. Scheitert das
   Schreiben, bleibt jede Kachel, die noch nicht geschrieben ist, geändert
-  und kommt beim nächsten Mal; was schon geschrieben ist, meldet der Mod
+  und kommt beim nächsten Mal. Scheitert es 3-mal in Folge
+  (`Kachelwerk.VERSUCHE`), etwa bei voller Platte, gibt der Mod auf: Er
+  vergisst, was ungeschrieben ist, zeichnet bis zum nächsten Wechsel der
+  Welt nicht weiter und sagt es dem Spieler im Chat; sonst wüchse der
+  Speicher mit jeder neuen Kachel. Was schon geschrieben ist, meldet der Mod
   der Vollbildkarte trotzdem. Was beim Beenden des Spiels noch nicht
   geschrieben ist, fehlt; der Chunk kommt wieder, sobald der Spieler ihn
   lädt.

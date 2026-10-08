@@ -11,6 +11,17 @@ import org.junit.jupiter.api.io.TempDir;
 /** Den Satz auf der Platte finden. Siehe docs/vollbildkarte.md, „Welcher Satz“. */
 class SatzTest {
 
+    @Test
+    void zweiBaeumeDerselbenDimensionNachDemNamen(@TempDir Path welt) throws Exception {
+        // Nach Zeichen, nicht nach Path.compareTo: Unter Windows stünde _ dort hinter den Buchstaben.
+        for (String baum : new String[] {"weltneu", "welt_alt"}) {
+            Satz.schreibe(welt.resolve(baum), baum, "minecraft:overworld", 4);
+            Files.createDirectories(welt.resolve(baum).resolve("4"));
+            Files.writeString(welt.resolve(baum).resolve("4/map.json"), "{\"tileSize\":256,\"minZoom\":0,\"maxZoom\":5,\"scale\":4}");
+        }
+        assertEquals("welt_alt", Satz.fuer(welt, "minecraft:overworld").name());
+    }
+
     @TempDir
     Path server;
 

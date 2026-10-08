@@ -33,11 +33,15 @@ final class Kachelwerk {
 
     /** So viele ungeänderte Kacheln bleiben im Speicher; bei 256² Pixeln je 256 KiB, zusammen 16 MiB. */
     private static final int BEHALTEN = 64;
+    /** Nach so vielen gescheiterten Durchläufen in Folge gibt das Werk auf, etwa bei voller Platte. */
+    static final int VERSUCHE = 3;
 
     private final Path ordner;
     private final int seite, chunk, minZoom, maxZoom;
     /** Geänderte Kacheln aller Stufen mit ihren Pixeln, noch nicht geschrieben. */
     private final Map<Kachel, int[]> geaendert = new HashMap<>();
+    /** Gescheiterte Durchläufe in Folge. */
+    private int fehlschlaege;
     /** Ungeänderte Kacheln, zuletzt gelesen oder geschrieben; höchstens {@link #BEHALTEN}. */
     private final Map<Kachel, int[]> speicher = new LinkedHashMap<>(16, 0.75f, true) {
         @Override
@@ -64,6 +68,9 @@ final class Kachelwerk {
 
     /** Legt das Bild des Chunks (cx, cz), {@code chunk}² Pixel ARGB, in seine Kachel; es ersetzt, was dort war. */
     void lege(int cx, int cz, int[] pixel) {
+        if (aufgegeben()) {
+            return;
+        }
         int n = seite / chunk;
         Kachel k = new Kachel(maxZoom, Math.floorDiv(cx, n), Math.floorDiv(cz, n));
         int[] argb = aendere(k);
@@ -79,6 +86,35 @@ final class Kachelwerk {
      * auch wenn danach eine scheitert; was nicht geschrieben ist, bleibt geändert.
      */
     void schreibe(boolean grob, List<Kachel> fertig) throws IOException {
+        if (aufgegeben()) {
+            return;
+        }
+        try {
+            schreibeStufen(grob, fertig);
+            fehlschlaege = 0;
+        } catch (IOException e) {
+            // Sonst wüchse der Speicher mit jeder neuen Kachel, bis zum OutOfMemoryError.
+            if (++fehlschlaege >= VERSUCHE) {
+                geaendert.clear();
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * Hat das Werk nach {@link #VERSUCHE} gescheiterten Durchläufen in Folge aufgegeben? Dann nimmt
+     * es keine Chunks mehr und hat vergessen, was ungeschrieben war.
+     */
+    boolean aufgegeben() {
+        return fehlschlaege >= VERSUCHE;
+    }
+
+    /** Für den Test: wie viele Kacheln geändert und ungeschrieben sind. */
+    int geaenderte() {
+        return geaendert.size();
+    }
+
+    private void schreibeStufen(boolean grob, List<Kachel> fertig) throws IOException {
         for (int z = maxZoom; z >= minZoom && (grob || z >= maxZoom - 1); z--) {
             int stufe = z;
             for (Kachel k : geaendert.keySet().stream().filter(k -> k.z() == stufe).toList()) {

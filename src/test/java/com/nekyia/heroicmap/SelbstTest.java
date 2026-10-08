@@ -97,8 +97,9 @@ class SelbstTest {
 
     @Test
     void kaputteKachelWieFehlend(@TempDir Path ordner) throws Exception {
+        // Eine PNG mit Signatur und abgeschnittenem Rest: Der Reader erkennt sie und wirft, statt null zu geben.
         Files.createDirectories(ordner.resolve("7/0"));
-        Files.writeString(ordner.resolve("7/0/0.png"), "keine PNG");
+        Files.write(ordner.resolve("7/0/0.png"), Arrays.copyOf(pngVoll(ROT), 60));
         Kachelwerk werk = new Kachelwerk(ordner, 256, 64, 7, 8);
         werk.lege(0, 0, voll(64, ROT));
         schreibe(werk, true);
@@ -113,6 +114,26 @@ class SelbstTest {
         assertFalse(Files.exists(ordner.resolve("6/0/0.png")));
         assertEquals(Set.of(6, 5), stufen(schreibe(werk, true)));
         assertTrue(Files.exists(ordner.resolve("5/0/0.png")));
+    }
+
+    @Test
+    void dauerhafterSchreibfehlerBegrenztDenSpeicher(@TempDir Path ordner) throws Exception {
+        // Wo der Ordner des Massstabs hingehört, liegt eine Datei: Jedes Schreiben scheitert.
+        Path massstab = ordner.resolve("4");
+        Files.writeString(massstab, "im Weg");
+        Kachelwerk werk = new Kachelwerk(massstab, 256, 64, 0, 8);
+        int gescheitert = 0;
+        for (int i = 0; i < 1000; i++) {
+            werk.lege(i * 4, 0, voll(64, ROT));
+            try {
+                werk.schreibe(true, new ArrayList<>());
+            } catch (IOException erwartet) {
+                gescheitert++;
+            }
+        }
+        assertTrue(werk.aufgegeben());
+        assertEquals(Kachelwerk.VERSUCHE, gescheitert, "danach nimmt es nichts mehr an");
+        assertEquals(0, werk.geaenderte());
     }
 
     @Test

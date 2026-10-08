@@ -207,15 +207,18 @@ public final class Bilder implements FabricClientGameTest {
         context.runOnClient(mc -> mc.gui.screen().onClose());
 
         // Ein Block im Bereich der Minimap, ausserhalb des geprüften Radius, wechselt jeden Tick.
-        boolean fertig = false, beschaeftigt = false;
+        boolean fertig = false;
+        int ruhig = 0, ticks = 0;
         for (int i = 0; i < 1200 && !fertig; i++) {
             server.runCommand("setblock 50 -60 0 " + (i % 2 == 0 ? "stone" : "air"));
             context.waitTick();
-            beschaeftigt |= context.computeOnClient(mc -> Minimap.INSTANZ.beschaeftigt());
+            ticks++;
+            ruhig += context.computeOnClient(mc -> Minimap.INSTANZ.beschaeftigt()) ? 0 : 1;
             fertig = context.computeOnClient(mc -> Selbst.INSTANZ.fertig(mc.player.chunkPosition(), 2));
         }
-        if (!beschaeftigt) {
-            throw new AssertionError("Die Minimap war nie beschäftigt; der Test prüft so den Vorrang nicht");
+        // Nur wenn die Minimap jeden Tick zu tun hatte, prüft der Test den Vorrang.
+        if (ruhig > 0) {
+            throw new AssertionError("Die Minimap war in " + ruhig + " von " + ticks + " Ticks nicht beschäftigt");
         }
         if (!fertig) {
             throw new AssertionError("Die eigene Karte wurde neben der beschäftigten Minimap nicht fertig");

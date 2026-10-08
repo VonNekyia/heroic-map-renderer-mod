@@ -92,6 +92,6 @@
   "heroicmap.selbst.fehler": "Die Karte zum selbst Zeichnen liess sich nicht anlegen; Einzelheiten im Log.",
   "heroicmap.befehl.welt_unbekannt": "Betritt zuerst %s; erst dann weiss der Mod, zu welcher Welt die Karte gehört.",
   "heroicmap.liste.frage_selbst": "%s mit %s geht von der Platte. Die eigene Karte beginnt von vorn, sobald du wieder „Selbst“ wählst.",
-  "heroicmap.befehl.welt_unbekannt": "Betritt zuerst %s; erst dann weiss der Mod, zu welcher Welt die Karte gehört.",
-  "heroicmap.befehl.name": "Den Namen %s nimmt der Mod nicht als Karte; er fragt nichts an."
+  "heroicmap.befehl.name": "Den Namen %s nimmt der Mod nicht als Karte; er fragt nichts an.",
+  "heroicmap.selbst.schreibfehler": "Die eigene Karte lässt sich nicht schreiben, etwa weil die Platte voll ist; sie zeichnet bis zum nächsten Wechsel der Welt nicht weiter. Einzelheiten im Log."
 }

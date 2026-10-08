@@ -92,6 +92,6 @@
   "heroicmap.selbst.fehler": "The map to draw yourself could not be created; see the log for details.",
   "heroicmap.befehl.welt_unbekannt": "Enter %s first; only then does the mod know which world the map belongs to.",
   "heroicmap.liste.frage_selbst": "%s with %s will be removed from disk. Your own map starts over once you choose “Myself” again.",
-  "heroicmap.befehl.welt_unbekannt": "Enter %s first; only then does the mod know which world the map belongs to.",
-  "heroicmap.befehl.name": "The mod does not accept %s as a map name; it asks for nothing."
+  "heroicmap.befehl.name": "The mod does not accept %s as a map name; it asks for nothing.",
+  "heroicmap.selbst.schreibfehler": "Your own map cannot be written, for example because the disk is full; it stops drawing until you change worlds. See the log for details."
 }

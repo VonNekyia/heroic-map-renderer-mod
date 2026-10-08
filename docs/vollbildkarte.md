@@ -90,7 +90,7 @@ sagt sie das und zeigt nichts.
 - **Ein Baum ohne `satz.json`, `map.json` oder mit unlesbarer Datei oder
   verletzter Grenze** zählt nicht und verdeckt keinen anderen.
 - **Bietet ein Server zwei Bäume derselben Dimension an,** nimmt die Karte
-  den ersten nach dem Namen.
+  den ersten nach dem Namen, Zeichen für Zeichen (`welt_alt` vor `weltneu`).
 
 ## Stufen und Lupe
 
