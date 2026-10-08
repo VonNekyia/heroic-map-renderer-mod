@@ -91,5 +91,7 @@
   "heroicmap.selbst.geht_nicht": "Selbst zeichnen geht nur auf einem Server und nicht unter einer Decke.",
   "heroicmap.selbst.fehler": "Die Karte zum selbst Zeichnen liess sich nicht anlegen; Einzelheiten im Log.",
   "heroicmap.befehl.welt_unbekannt": "Betritt zuerst %s; erst dann weiss der Mod, zu welcher Welt die Karte gehört.",
-  "heroicmap.liste.frage_selbst": "%s mit %s geht von der Platte. Die eigene Karte beginnt von vorn, sobald du wieder „Selbst“ wählst."
+  "heroicmap.liste.frage_selbst": "%s mit %s geht von der Platte. Die eigene Karte beginnt von vorn, sobald du wieder „Selbst“ wählst.",
+  "heroicmap.befehl.welt_unbekannt": "Betritt zuerst %s; erst dann weiss der Mod, zu welcher Welt die Karte gehört.",
+  "heroicmap.befehl.name": "Den Namen %s nimmt der Mod nicht als Karte; er fragt nichts an."
 }

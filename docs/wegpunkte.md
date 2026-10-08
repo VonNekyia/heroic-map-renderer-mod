@@ -59,15 +59,18 @@ gewünscht.
   am Rand aus, oben nach links, rechts nach unten.
 - **Auf der Karte:** Eine Marke steht auf dem Pixel, auf dem die Karte
   ihren Ort zeichnet, und wackelt beim Ziehen und Laufen nicht gegen sie.
-  Auf der Vollbildkarte liegen alle Kacheln auf ganzen Einheiten, also um
-  denselben Rest links ihrer exakten Lage; die Marke rückt um denselben
-  Rest (`Kartenblick.rasterX`). Umgekehrt nehmen „Wegpunkt setzen“,
-  „Hierher teleportieren“ und die Koordinaten unten links den Block, den
-  die Karte unter der Maus zeichnet (`Kartenblick.basisRasterX`). Auf der
+  Auf der Vollbildkarte rechnen Kacheln, Marken und Klicks von derselben
+  ganzzahligen Kante aus, der Kante des Pixels 0 der Basis
+  (`Kartenblick.kanteX`): Kachel `tx` liegt bei `kante + tx · kachel ·
+  lupe`, eine Marke bei `kante + B / teiler · lupe` (`Kartenblick.rasterX`).
+  Umgekehrt nehmen „Wegpunkt setzen“, „Hierher teleportieren“ und die
+  Koordinaten unten links den Block, den die Karte unter der Maus zeichnet
+  (`Kartenblick.basisRasterX`). So stimmen sie auch in Doubles überein. Auf der
   Minimap rechnet die Marke von der Kante des Bildes aus `Minimap.ecke`
   (`Minimap.pixel`, `Minimap.marke`).
-- **Namen** über Köpfen stehen ganz auf dem Schirm; reichten sie unter die
-  Knöpfe rechts oben, stehen sie links daneben (`Kartenblick.name`). Die
+- **Namen** über Köpfen stehen ganz auf dem Schirm. Träfe der Name über
+  dem Kopf die Knöpfe rechts oben, steht er unter dem Kopf; erst wenn auch
+  das sie träfe, links neben ihnen (`Kartenblick.name`). Die
   Knöpfe misst die Karte an ihren eigenen Grenzen.
 - **Minimap:** Angeheftete Wegpunkte und Mitspieler, die ausserhalb der
   Form liegen, stehen an ihrem Rand in ihrer Richtung, rund am Kreis, eckig
@@ -131,8 +134,10 @@ gewünscht.
 - `MinimapTest`: `kopfWaechstMitDerSeite`, `amRandInSeinerRichtung` und
   `markeAufDemPixelDerKarte`.
 - `KartenblickTest`: `markenAufDemRasterDerKacheln`,
-  `klickTrifftDenGezeichnetenBlock`, `nameBleibtAufDemSchirmUndNebenDenKnoepfen`
-  und `markeWeichtDenKnoepfenAus`.
+  `klickTrifftDenGezeichnetenBlock` (Lupe 1, 2, 4, grobe Stufe, links des
+  Ursprungs, genau auf der Kante), `kachelnRasterUndKlickAufEinerKante`,
+  `nameBleibtAufDemSchirmUndNebenDenKnoepfen` und
+  `markeWeichtDenKnoepfenAus`.
 - Gametest `Bedienung` mit echten Eingaben: Rechtsklick und „Wegpunkt
   setzen“; die Karte ziehen, bis der Wegpunkt am rechten Rand steht; auf
   der Marke ziehen zieht nur die Karte; ein Klick legt sie in die Mitte;
