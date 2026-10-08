@@ -63,10 +63,12 @@ class KartenblickTest {
 
     @Test
     void kachelnRasterUndKlickAufEinerKante() {
-        // Nahe dem Ursprung nach einem Zug: Die Mitte ist 3e-14. Kachel -2 liegt, wo das Raster ihren Pixel -512 sieht.
+        // Nahe dem Ursprung nach einem Zug: Die Mitte ist 3e-14. In Doubles rundet schirmX(-512) auf genau -85,
+        // schirmX(0) aber auf knapp unter 427; je Kachel gefloort lag Kachel -2 deshalb bei -85, das Raster bei -86.
+        // Von einer Kante aus liegen Kachel, Raster und Klick alle bei -86, wie es auch genau gerechnet wäre.
         Kartenblick blick = new Kartenblick(256, 0, 6, 6);
         blick.mx = 3e-14;
-        assertEquals(Math.floor(blick.schirmX(-512, 854)), blick.rasterX(-512, 854), 1e-9);
+        assertEquals(-86, blick.kachelX(-2, 854));
         assertEquals(blick.kachelX(-2, 854), blick.rasterX(-512, 854), 1e-9);
         assertEquals(-128, (int) Math.floor(blick.basisRasterX(blick.rasterX(-512, 854), 854) / 4));
     }
