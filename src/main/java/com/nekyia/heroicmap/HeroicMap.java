@@ -76,8 +76,9 @@ public final class HeroicMap implements ClientModInitializer {
         ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> {
             Minimap.INSTANZ.leeren();
             Selbst.INSTANZ.leeren();
-            // Die Wegpunkte gehören zur Welt; ein Wechsel über einen Proxy bringt eine andere. Siehe docs/wegpunkte.md, „Ablage“.
-            Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner(), Downloads.alterOrdner());
+            // Erst den Hash der Welt merken; Wegpunkte und Bäume liegen unter ihm. Siehe docs/download.md, „Ablage“.
+            Downloads.INSTANZ.weltBetreten();
+            Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());
         });
         ClientPlayConnectionEvents.DISCONNECT.register((listener, client) -> client.execute(() -> {
             Minimap.INSTANZ.leeren();

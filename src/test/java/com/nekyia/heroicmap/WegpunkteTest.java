@@ -29,7 +29,7 @@ class WegpunkteTest {
 
         Wegpunkte nachher = new Wegpunkte();
         nachher.lies(ordner);
-        assertEquals(List.of(new Wegpunkte.Punkt(WELT, 12, -40, 0, true), new Wegpunkte.Punkt("minecraft:the_nether", 1, 2, 1, false)),
+        assertEquals(List.of(new Wegpunkte.Punkt(WELT, 12, -40, 0, true), new Wegpunkte.Punkt("minecraft:the_nether", 1, 2, 0, false)),
                 nachher.punkte());
         assertTrue(nachher.angeheftet(SAM));
     }
@@ -60,22 +60,20 @@ class WegpunkteTest {
     }
 
     @Test
-    void wechselLiestNurEinenAnderenOrdner(@TempDir Path wurzel) throws Exception {
-        // Eine Datei aus der Ablage vor dem Hash zieht beim ersten Wechsel mit.
-        Path alt = wurzel.resolve("mc.example.com"), welt = alt.resolve("welt-01");
-        Files.createDirectories(alt);
-        Files.writeString(alt.resolve("wegpunkte.json"),
-                "{\"wegpunkte\":[{\"dimension\":\"minecraft:overworld\",\"x\":3,\"z\":4,\"farbe\":0,\"minimap\":false}]}");
+    void wechselLiestNurEinenAnderenOrdner(@TempDir Path wurzel) {
         Wegpunkte w = new Wegpunkte();
-        w.wechsel(welt, alt);
+        w.wechsel(wurzel.resolve("welt-01"));
+        w.setze(WELT, 1, 1);
+        // Derselbe Ordner: nichts wird neu gelesen; ein anderer: dessen Wegpunkte.
+        w.wechsel(wurzel.resolve("welt-01"));
         assertEquals(1, w.punkte().size());
-        assertFalse(Files.exists(alt.resolve("wegpunkte.json")));
-        assertTrue(Files.exists(welt.resolve("wegpunkte.json")));
+        w.wechsel(wurzel.resolve("welt-02"));
+        assertTrue(w.punkte().isEmpty());
         // Im Einzelspieler bleibt beim Wechsel der Dimension, was nur im Speicher liegt.
         w.leeren();
-        w.wechsel(null, null);
+        w.wechsel(null);
         w.setze(WELT, 1, 1);
-        w.wechsel(null, null);
+        w.wechsel(null);
         assertEquals(1, w.punkte().size());
     }
 
@@ -96,10 +94,32 @@ class WegpunkteTest {
     }
 
     @Test
-    void unlesbareDateiGibtNichts(@TempDir Path ordner) throws Exception {
+    void unlesbareDateiBleibtGesichert(@TempDir Path ordner) throws Exception {
         Files.writeString(ordner.resolve("wegpunkte.json"), "{kaputt");
         Wegpunkte w = new Wegpunkte();
         w.lies(ordner);
         assertTrue(w.punkte().isEmpty());
+        // Die nächste Änderung schreibt eine neue Datei; die alte liegt daneben.
+        w.setze(WELT, 1, 1);
+        assertEquals("{kaputt", Files.readString(ordner.resolve("wegpunkte.json.kaputt")));
+        Wegpunkte neu = new Wegpunkte();
+        neu.lies(ordner);
+        assertEquals(1, neu.punkte().size());
+    }
+
+    @Test
+    void farbenBleibenVerschieden() {
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        w.setze(WELT, 1, 1);
+        w.setze(WELT, 2, 2);
+        w.setze(WELT, 3, 3);
+        w.loesche(w.punkte().getFirst());
+        w.setze(WELT, 4, 4);
+        // Ein Wegpunkt einer anderen Dimension nimmt keiner Farbe den Platz.
+        w.setze("minecraft:the_nether", 5, 5);
+        assertEquals(java.util.Set.of(0, 1, 2), w.punkte().stream().filter(p -> p.dimension().equals(WELT))
+                .map(Wegpunkte.Punkt::farbe).collect(java.util.stream.Collectors.toSet()));
+        assertEquals(0, w.punkte().getLast().farbe());
     }
 }

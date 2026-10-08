@@ -14,6 +14,22 @@ import org.junit.jupiter.api.Test;
 class ReiheTest {
 
     @Test
+    void gehaltenGehtKeinDownloadHinein() {
+        Reihe reihe = new Reihe();
+        // Solange gelöscht wird, hält die Kartenliste den Schlüssel; eine freigabe verfällt.
+        assertTrue(reihe.halte("welt/baum"));
+        assertFalse(reihe.reihe("welt/baum", () -> { }));
+        assertFalse(reihe.halte("welt/baum"));
+        reihe.gibFrei("welt/baum");
+        assertFalse(reihe.belegt("welt/baum"));
+        // Läuft schon ein Download, hält die Kartenliste nichts und löscht nichts.
+        CountDownLatch los = new CountDownLatch(1);
+        assertTrue(reihe.reihe("welt/baum", () -> warte(los)));
+        assertFalse(reihe.halte("welt/baum"));
+        los.countDown();
+    }
+
+    @Test
     void andereBaeumeWartenDerselbeNicht() throws Exception {
         Reihe reihe = new Reihe();
         CountDownLatch los = new CountDownLatch(1), fertig = new CountDownLatch(2);

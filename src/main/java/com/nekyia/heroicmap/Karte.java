@@ -33,6 +33,8 @@ final class Karte extends Screen {
     private static final int RAND = 14;
     /** So lange dauert ein Durchlauf der Farben um angeheftete Marken, in ms. */
     private static final long BUNT_MS = 2000;
+    /** Weiter gezogen, in Einheiten des GUI, ist es kein Klick auf eine Marke mehr. */
+    private static final double ZUG = 3;
 
     private final Satz satz;
     private final Kacheln kacheln;
@@ -48,8 +50,14 @@ final class Karte extends Screen {
     private int menueX, menueY;
     /** Die Marken des letzten Frames, in der Reihenfolge, in der sie gezeichnet sind. */
     private final List<Marke> marken = new ArrayList<>();
-    /** Die Marke unter dem letzten Linksklick; ein Doppelklick heftet sie an. */
+    /** Die Marke des letzten Klicks, wenn es einer auf eine Marke war; ein Doppelklick heftet sie an. */
     private Marke letzte;
+    /** Die Marke unter dem Drücken der linken Taste, oder null; ein Zug macht daraus keinen Klick. */
+    private Marke gedrueckt;
+    /** War das Drücken der zweite Klick eines Doppelklicks? */
+    private boolean doppelklick;
+    /** Wie weit seit dem Drücken gezogen ist, in Einheiten des GUI. */
+    private double gezogen;
 
     /** Ein Eintrag im Menü nach Rechtsklick. */
     private record Eintrag(Component text, Runnable tut) {
@@ -171,28 +179,38 @@ final class Karte extends Screen {
         Minimap.avatar(g, spieler, ich.x(), ich.y(), 1f, Minimap.KOPF);
     }
 
-    /** Die Marke für den Ort (x, z) der Welt; liegt er ausserhalb des Schirms, am Rand in seiner Richtung. */
+    /**
+     * Die Marke für den Ort (x, z) der Welt, auf dem Raster der Kacheln; liegt er ausserhalb des
+     * Schirms, am Rand in seiner Richtung, nicht unter den Knöpfen.
+     */
     private Marke marke(double x, double z, UUID uuid, Wegpunkte.Punkt punkt) {
-        double px = blick.schirmX(Projektion.zuPixel(x, satz.scale()), width) - width / 2.0;
-        double pz = blick.schirmY(Projektion.zuPixel(z, satz.scale()), height) - height / 2.0;
-        double f = Minimap.rand(px, pz, width / 2.0 - RAND, height / 2.0 - RAND, false);
-        // Auf ganze Pixel, sonst sind die Texel des Kopfes ungleich breit.
+        float halb = Minimap.KOPF / 2f + 1;
+        double[] p = Kartenblick.marke(blick.rasterX(Projektion.zuPixel(x, satz.scale()), width),
+                blick.rasterY(Projektion.zuPixel(z, satz.scale()), height), width, height, RAND, halb,
+                width - KNOPF - 4, abgleich != null ? 48 : 24);
+        // Auf ganze Pixel wie die Kacheln, deren Kanten auf ganzen Einheiten liegen.
         int k = minecraft.getWindow().getGuiScale();
-        Marke m = new Marke(Math.round((width / 2.0 + px * f) * k) / (float) k, Math.round((height / 2.0 + pz * f) * k) / (float) k,
-                Minimap.KOPF / 2f + 1, x, z, uuid, punkt);
+        Marke m = new Marke(Math.round(p[0] * k) / (float) k, Math.round(p[1] * k) / (float) k, halb, x, z, uuid, punkt);
         marken.add(m);
         return m;
     }
 
-    /** Die oberste Marke unter (x, y), oder null. */
+    /**
+     * Die oberste Marke unter (x, y), oder null; ein Wegpunkt oder Mitspieler geht dem eigenen Kopf
+     * vor, sonst liesse sich ein Wegpunkt am eigenen Standort nicht greifen.
+     */
     private Marke treffer(double x, double y) {
+        Marke eigen = null;
         for (int i = marken.size() - 1; i >= 0; i--) {
             Marke m = marken.get(i);
             if (Math.abs(x - m.x()) <= m.halb() && Math.abs(y - m.y()) <= m.halb()) {
-                return m;
+                if (m.punkt() != null || m.spieler() != null) {
+                    return m;
+                }
+                eigen = eigen == null ? m : eigen;
             }
         }
-        return null;
+        return eigen;
     }
 
     /** Legt den Ort (x, z) der Welt in die Mitte des Schirms. */
@@ -222,20 +240,29 @@ final class Karte extends Screen {
         return List.copyOf(marken);
     }
 
+    List<Component> eintraege() {
+        return eintraege.stream().map(Eintrag::text).toList();
+    }
+
     /** Der Block unter (x, y) des Schirms. */
     private int[] block(double x, double y) {
         return new int[] {Mth.floor(blick.basisX(x, width) / satz.scale()), Mth.floor(blick.basisZ(y, height) / satz.scale())};
     }
 
     /**
-     * Linksklick auf eine Marke legt sie in die Mitte, ein Doppelklick heftet sie an die Minimap
-     * oder löst sie. Rechtsklick öffnet das Menü: „Hierher teleportieren“, nur mit execute und tp im
-     * Befehlsbaum und nicht unter einer Decke, sonst landete man auf dem Dach; darunter „Wegpunkt
-     * setzen“, auf einem Wegpunkt „Wegpunkt löschen“. Erst ein Klick auf einen Eintrag tut etwas.
-     * Siehe docs/vollbildkarte.md, „Bedienung“, und docs/wegpunkte.md.
+     * Linksklick auf eine Marke, beim Loslassen ohne Zug, legt sie in die Mitte, ein Doppelklick
+     * heftet sie an die Minimap oder löst sie. Rechtsklick öffnet das Menü: „Hierher teleportieren“,
+     * nur mit execute und tp im Befehlsbaum und nicht unter einer Decke, sonst landete man auf dem
+     * Dach; darunter „Wegpunkt setzen“, auf einem Wegpunkt „Wegpunkt löschen“. Erst ein Klick auf
+     * einen Eintrag tut etwas. Siehe docs/vollbildkarte.md, „Bedienung“;
+     * Marken: siehe docs/wegpunkte.md, „Bedienung“.
      */
     @Override
     public boolean mouseClicked(MouseButtonEvent e, boolean doppelt) {
+        // Jeder Klick, der true gibt, zählt für den nächsten Doppelklick; gemerkt bleibt nur ein Klick auf eine Marke.
+        Marke vorige = letzte;
+        letzte = null;
+        gedrueckt = null;
         if (ziel != null) {
             // Mit der linken wie der rechten Taste: Wer rechts klickt, um zu öffnen, klickt oft auch rechts darauf.
             int zeile = Mth.floor((e.y() - menueY) / ZEILE);
@@ -256,27 +283,37 @@ final class Karte extends Screen {
         Marke m = treffer(e.x(), e.y());
         if (e.button() == InputConstants.MOUSE_BUTTON_LEFT) {
             // Der erste Klick hat die Marke schon in die Mitte gelegt; der zweite zählt für dieselbe.
-            if (doppelt && letzte != null) {
-                if (letzte.punkt() != null) {
-                    Wegpunkte.INSTANZ.umschalten(letzte.punkt());
-                } else if (letzte.spieler() != null) {
-                    Wegpunkte.INSTANZ.umschalten(letzte.spieler());
-                }
-                letzte = null;
-                return true;
-            }
-            letzte = m;
-            if (m != null) {
-                zentriere(m.weltX(), m.weltZ());
-                return true;
-            }
-            return false;
+            doppelklick = doppelt && vorige != null;
+            gedrueckt = doppelklick ? vorige : m;
+            gezogen = 0;
+            // true, sonst zählt das Spiel den nächsten Klick nicht als doppelt; ziehen geht trotzdem.
+            return gedrueckt != null;
         }
         if (e.button() == InputConstants.MOUSE_BUTTON_RIGHT) {
             menue(e.x(), e.y(), m != null ? m.punkt() : null);
             return true;
         }
         return false;
+    }
+
+    /** Erst das Loslassen ohne Zug ist ein Klick auf die Marke: Wer auf ihr zu ziehen beginnt, zieht die Karte. */
+    @Override
+    public boolean mouseReleased(MouseButtonEvent e) {
+        boolean knopf = super.mouseReleased(e);
+        Marke m = gedrueckt;
+        gedrueckt = null;
+        if (m == null || e.button() != InputConstants.MOUSE_BUTTON_LEFT) {
+            return knopf;
+        }
+        if (!doppelklick) {
+            zentriere(m.weltX(), m.weltZ());
+            letzte = m;
+        } else if (m.punkt() != null) {
+            Wegpunkte.INSTANZ.umschalten(m.punkt());
+        } else if (m.spieler() != null) {
+            Wegpunkte.INSTANZ.umschalten(m.spieler());
+        }
+        return true;
     }
 
     /** Öffnet das Menü an (x, y) für den Block dort, oder für den Wegpunkt {@code punkt}. */
@@ -324,6 +361,10 @@ final class Karte extends Screen {
     public boolean mouseDragged(MouseButtonEvent ereignis, double dx, double dy) {
         // Die Tasten zählen wie in SDL, links ist 1. Siehe docs/entwicklung.md, „Maustasten“.
         if (blick != null && ereignis.button() == InputConstants.MOUSE_BUTTON_LEFT) {
+            gezogen += Math.abs(dx) + Math.abs(dy);
+            if (gezogen > ZUG) {
+                gedrueckt = null;
+            }
             blick.schiebe(dx, dy);
             return true;
         }

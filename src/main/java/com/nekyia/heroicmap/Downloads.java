@@ -61,6 +61,10 @@ final class Downloads {
     private boolean neuGefragt;
     /** Je Baum auf diesem Server, ab wann ein Abgleich wieder geht, in ms Uhr des Spielers. */
     private final Map<String, Long> abgleichAb = new HashMap<>();
+    /** Je Baum eine freigabe, deren Dimension der Spieler noch nicht betreten hat; sie wartet auf deren Hash. */
+    private final Map<String, JsonObject> wartend = new HashMap<>();
+    /** Die Hashes der Seeds je Dimension; entsteht erst beim ersten Bedarf, im Spiel. */
+    private Welten welten;
 
     private Downloads() {
     }
@@ -101,6 +105,7 @@ final class Downloads {
         neuGefragt = false;
         abgleichAb.clear();
         bestaetigt.clear();
+        wartend.clear();
         dialog = null;
         reihe.abbrechen();
     }
@@ -120,6 +125,15 @@ final class Downloads {
         return reihe.belegt(ordner.toString());
     }
 
+    /** Hält den Ordner eines Baums, solange er gelöscht wird; false, wenn ein Download wartet oder läuft. */
+    boolean halte(Path ordner) {
+        return reihe.halte(ordner.toString());
+    }
+
+    void gibFrei(Path ordner) {
+        reihe.gibFrei(ordner.toString());
+    }
+
     /** Der Massstab, den das Plugin für den Baum gespeichert hat, so wie der Mod ihn zuletzt voll lud, oder 0. */
     int aktiv(String baum) {
         Freigabe.Stand stand = stand(baum);
@@ -137,7 +151,7 @@ final class Downloads {
     }
 
     /** Der gespeicherte Stand des Baums auf diesem Server, oder null. */
-    private static Freigabe.Stand stand(String baum) {
+    private Freigabe.Stand stand(String baum) {
         Path ordner = ordner(baum);
         return ordner == null ? null : Freigabe.Stand.lies(ordner.resolve(STAND));
     }
@@ -155,6 +169,10 @@ final class Downloads {
         long bytes = feld(eintrag, massstab, "bytes"), kacheln = feld(eintrag, massstab, "kacheln");
         if (bytes < 0 || kacheln < 0) {
             return Component.translatable("heroicmap.befehl.massstab_fehlt", massstab);
+        }
+        Component unbekannt = weltUnbekannt(baum);
+        if (unbekannt != null) {
+            return unbekannt;
         }
         if (belegt(baum)) {
             return Component.translatable("heroicmap.download.belegt", baum);
@@ -194,6 +212,11 @@ final class Downloads {
         long kacheln = feld(eintrag(f.baum()), f.massstab(), "kacheln");
         if (kacheln < 0) {
             melde(Component.translatable("heroicmap.download.nicht_angeboten", f.baum()));
+            return;
+        }
+        if (ordner(f.baum()) == null) {
+            // Den Hash der Dimension kennt der Mod erst, wenn der Spieler sie betritt. Siehe docs/download.md, „Ablage“.
+            wartend.put(f.baum(), json);
             return;
         }
         if (belegt(f.baum())) {
@@ -359,21 +382,67 @@ final class Downloads {
                 ? a.getAddress() : null;
     }
 
-    /** Der Schlüssel in der Reihe: der Ordner des Baums, also je Server und Baum. */
-    private static String schluessel(String baum) {
+    /** Der Schlüssel in der Reihe: der Ordner des Baums, also je Welt und Baum. */
+    private String schluessel(String baum) {
         Path ordner = ordner(baum);
         return ordner == null ? baum : ordner.toString();
     }
 
-    /** Der Ordner eines Baums in dieser Welt, oder null im Einzelspieler. */
-    private static Path ordner(String baum) {
-        Path welt = weltOrdner();
-        return welt == null || !Freigabe.baum(baum) ? null : welt.resolve(baum);
+    /**
+     * Der Ordner eines Baums: in der Welt seiner Dimension aus dem Angebot, nicht der, in der der
+     * Spieler steht. Null im Einzelspieler, ohne Eintrag im Angebot und solange der Hash der
+     * Dimension unbekannt ist. Siehe docs/download.md, „Ablage“.
+     */
+    private Path ordner(String baum) {
+        ServerData server = Minecraft.getInstance().getCurrentServer();
+        String dimension = text(eintrag(baum), "dimension");
+        return server == null || dimension == null ? null
+                : ordner(wurzel(), Minimap.INSTANZ.ablage(), server.ip, welten(), dimension, baum);
+    }
+
+    /** Der Ordner des Baums {@code baum} der Dimension, oder null, solange ihr Hash unbekannt ist. */
+    static Path ordner(Path wurzel, Ablage ablage, String adresse, Welten welten, String dimension, String baum) {
+        Long hash = welten.hash(Welten.server(adresse), dimension);
+        return hash == null || !Freigabe.baum(baum) ? null : wurzel.resolve(weltOrdner(ablage, adresse, hash)).resolve(baum);
+    }
+
+    /** Der Fehler, wenn der Spieler die Dimension des Baums noch nicht betreten hat, sonst null. */
+    private Component weltUnbekannt(String baum) {
+        String dimension = text(eintrag(baum), "dimension");
+        return dimension != null && ordner(baum) == null && Minecraft.getInstance().getCurrentServer() != null
+                ? Component.translatable("heroicmap.befehl.welt_unbekannt", dimension) : null;
+    }
+
+    private Welten welten() {
+        if (welten == null) {
+            welten = new Welten(wurzel().resolve("welten.properties"));
+        }
+        return welten;
     }
 
     /**
-     * Der Ordner dieser Welt auf diesem Server nach der Wahl Ablage, oder null im Einzelspieler.
-     * Siehe docs/download.md, „Ablage“.
+     * Beim Betreten einer Welt: ihren Hash zur Dimension merken; danach ziehen Bäume dieser
+     * Dimension aus der alten Ablage um, und wartende freigaben laufen. Auf dem Render-Thread.
+     */
+    void weltBetreten() {
+        Minecraft mc = Minecraft.getInstance();
+        ServerData server = mc.getCurrentServer();
+        ClientLevel level = mc.level;
+        if (server == null || level == null) {
+            return;
+        }
+        welten().merke(Welten.server(server.ip), level.dimension().identifier().toString(), level.getBiomeManager().biomeZoomSeed);
+        baeume().forEach(b -> zieheUm(b.id()));
+        for (String baum : List.copyOf(wartend.keySet())) {
+            if (ordner(baum) != null) {
+                freigabe(wartend.remove(baum));
+            }
+        }
+    }
+
+    /**
+     * Der Ordner der Welt, in der der Spieler steht, nach der Wahl Ablage, oder null im
+     * Einzelspieler. Siehe docs/download.md, „Ablage“.
      */
     static Path weltOrdner() {
         Minecraft mc = Minecraft.getInstance();
@@ -404,28 +473,23 @@ final class Downloads {
     }
 
     /**
-     * Ein Baum aus der Ablage vor dem Hash des Seeds zieht in den Ordner der Welt, die ihn
-     * anbietet, einmal; so kennt der Mod seine Welt. Siehe docs/download.md, „Ablage“.
+     * Ein Baum aus der Ablage vor dem Hash des Seeds zieht in den Ordner der Welt seiner
+     * Dimension, einmal, sobald deren Hash bekannt ist. Siehe docs/download.md, „Ablage“.
      */
-    private static void zieheUm(String baum) {
+    private void zieheUm(String baum) {
         Path alt = alterOrdner(), neu = ordner(baum);
-        if (alt == null || neu == null || !Freigabe.baum(baum)) {
+        if (alt == null || neu == null) {
             return;
         }
         Path vorher = alt.resolve(baum);
         if (Files.exists(vorher.resolve(STAND)) || Files.exists(vorher.resolve("satz.json"))) {
-            zieheUm(vorher, neu);
-        }
-    }
-
-    /** Zieht {@code alt} nach {@code neu} um, wie {@link Laden#zieheUm}; ein Fehler steht nur im Log. */
-    static void zieheUm(Path alt, Path neu) {
-        try {
-            if (Laden.zieheUm(alt, neu)) {
-                LOGGER.info("Heroic Map: {} nach {} umgezogen", alt, neu);
+            try {
+                if (Laden.zieheBaumUm(vorher, neu)) {
+                    LOGGER.info("Heroic Map: {} nach {} umgezogen", vorher, neu);
+                }
+            } catch (IOException e) {
+                LOGGER.warn("Heroic Map: {} nicht nach {} umgezogen", vorher, neu, e);
             }
-        } catch (IOException e) {
-            LOGGER.warn("Heroic Map: {} nicht nach {} umgezogen", alt, neu, e);
         }
     }
 
@@ -568,6 +632,10 @@ final class Downloads {
 
     /** Der Befehl {@code abgleich} und der Knopf der Karte: fragt im gespeicherten Massstab an. Gibt den Fehler zurück, oder null. */
     Component frageAbgleich(String baum) {
+        Component unbekannt = weltUnbekannt(baum);
+        if (unbekannt != null) {
+            return unbekannt;
+        }
         int massstab = aktiv(baum);
         if (massstab == 0) {
             return Component.translatable("heroicmap.befehl.kein_satz", baum);

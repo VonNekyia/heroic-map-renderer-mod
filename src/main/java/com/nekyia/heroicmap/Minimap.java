@@ -39,7 +39,6 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix3x2fStack;
 import org.slf4j.Logger;
 
@@ -427,10 +426,9 @@ public final class Minimap {
         int oben = ecke(spieler.zo, spieler.getZ(), a, zoom, k, n);
         male(g, r, links, oben, k);
         float kopf = kopf(r.seite());
-        Vec3 ort = spieler.getPosition(a);
         String dimension = level.dimension().identifier().toString();
-        wegpunkte(g, r, ort, dimension, k, kopf);
-        mitspieler(g, mc, r, spieler, ort, dimension, a, k, kopf);
+        wegpunkte(g, r, dimension, links, oben, k, kopf);
+        mitspieler(g, mc, r, spieler, dimension, links, oben, a, k, kopf);
         // In der Mitte des Bildes, auf dem Pixel, den ecke dafür nimmt.
         avatar(g, spieler, (r.x() * k + n / 2) / (float) k, (r.y() * k + n / 2) / (float) k, a, kopf);
     }
@@ -451,20 +449,43 @@ public final class Minimap {
     }
 
     /** Die angehefteten Wegpunkte dieser Dimension, ausserhalb der Form an ihrem Rand. Siehe docs/wegpunkte.md. */
-    private void wegpunkte(GuiGraphicsExtractor g, Rahmen r, Vec3 ort, String dimension, int k, float kopf) {
-        double h = r.seite() / 2.0, innen = h - kopf / 2 - 1;
+    private void wegpunkte(GuiGraphicsExtractor g, Rahmen r, String dimension, int links, int oben, int k, float kopf) {
+        double innen = r.seite() / 2.0 - kopf / 2 - 1;
         for (Wegpunkte.Punkt p : Wegpunkte.INSTANZ.punkte()) {
-            if (!p.angeheftet() || !p.dimension().equals(dimension)) {
-                continue;
+            if (p.angeheftet() && p.dimension().equals(dimension)) {
+                float[] m = marke(r, p.x() + 0.5, p.z() + 0.5, links, oben, k, innen, true);
+                wegpunkt(g, m[0], m[1], kopf, Wegpunkte.FARBEN[p.farbe()], 0);
             }
-            double px = (p.x() + 0.5 - ort.x) * zoom, pz = (p.z() + 0.5 - ort.z) * zoom;
-            double f = rand(px, pz, innen, innen, rund);
-            wegpunkt(g, pixel(r.x() + h + px * f, k), pixel(r.y() + h + pz * f, k), kopf, Wegpunkte.FARBEN[p.farbe()], 0);
         }
     }
 
-    /** Auf ganze Pixel wie die Karte darunter, nicht auf ganze Einheiten des GUI. */
-    private static float pixel(double gui, int k) {
+    /**
+     * Wo eine Marke für den Ort (x, z) der Welt steht, in Einheiten des GUI: auf dem Pixel, auf dem
+     * die Karte den Ort zeichnet. Liegt er weiter als {@code innen} von der Mitte, mit
+     * {@code klemmen} am Rand der Form in seiner Richtung, sonst null. Siehe docs/wegpunkte.md, „Am Rand“.
+     */
+    private float[] marke(Rahmen r, double x, double z, int links, int oben, int k, double innen, boolean klemmen) {
+        double h = r.seite() / 2.0;
+        double mx = (r.x() * k + pixel(x, zoom, k, links)) / (double) k, my = (r.y() * k + pixel(z, zoom, k, oben)) / (double) k;
+        double dx = mx - (r.x() + h), dz = my - (r.y() + h);
+        double f = rand(dx, dz, innen, innen, rund);
+        if (f >= 1) {
+            return new float[] {(float) mx, (float) my};
+        }
+        return klemmen ? new float[] {gerundet(r.x() + h + dx * f, k), gerundet(r.y() + h + dz * f, k)} : null;
+    }
+
+    /**
+     * Der Pixel im Bild der Minimap, auf dem die Karte den Ort {@code welt} zeichnet; {@code links}
+     * ist die Kante des Bildes aus {@link #ecke}. Mit derselben Kante wie die Karte wackelt eine
+     * Marke beim Laufen nicht gegen sie.
+     */
+    static int pixel(double welt, int zoom, int k, int links) {
+        return (int) Math.round(Projektion.zuPixel(welt, zoom) * k) - links;
+    }
+
+    /** Auf ganze Pixel des Schirms. */
+    private static float gerundet(double gui, int k) {
         return Math.round(gui * k) / (float) k;
     }
 
@@ -484,23 +505,21 @@ public final class Minimap {
 
     /**
      * Die Mitspieler als Köpfe, in derselben Dimension und innerhalb der Form; angeheftete
-     * ausserhalb an ihrem Rand. Siehe docs/minimap.md, „Mitspieler“.
+     * ausserhalb am Rand der Form, nach innen geklemmt. Siehe docs/minimap.md, „Mitspieler“.
      */
-    private void mitspieler(GuiGraphicsExtractor g, Minecraft mc, Rahmen r, LocalPlayer spieler, Vec3 ort, String dimension,
-            float a, int k, float kopf) {
-        double h = r.seite() / 2.0, innen = h - kopf / 2 - 1;
+    private void mitspieler(GuiGraphicsExtractor g, Minecraft mc, Rahmen r, LocalPlayer spieler, String dimension,
+            int links, int oben, float a, int k, float kopf) {
+        double h = r.seite() / 2.0;
         for (Mitspieler.Eintrag e : Mitspieler.INSTANZ.sichtbar(System.currentTimeMillis())) {
             if (!e.dimension().equals(dimension) || e.uuid().equals(spieler.getUUID())) {
                 continue;
             }
             double[] lage = Mitspieler.lage(mc, e, a);
-            double px = (lage[0] - ort.x) * zoom, pz = (lage[1] - ort.z) * zoom;
             boolean angeheftet = Wegpunkte.INSTANZ.angeheftet(e.uuid());
-            double f = angeheftet ? rand(px, pz, innen, innen, rund) : rand(px, pz, h, h, rund);
-            if (f < 1 && !angeheftet) {
-                continue;
+            float[] m = marke(r, lage[0], lage[1], links, oben, k, angeheftet ? h - kopf / 2 - 1 : h, angeheftet);
+            if (m != null) {
+                Mitspieler.kopf(g, mc, e.uuid(), m[0], m[1], kopf, 0);
             }
-            Mitspieler.kopf(g, mc, e.uuid(), pixel(r.x() + h + px * f, k), pixel(r.y() + h + pz * f, k), kopf, 0);
         }
     }
 

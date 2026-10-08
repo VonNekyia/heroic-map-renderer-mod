@@ -89,5 +89,6 @@
   "heroicmap.selbst.frage": "From now on the mod draws every chunk you load in this dimension at 4 pixels per block into a map of its own for this world. The full map then shows only that map, not the server's. To stop: delete it in the map list.",
   "heroicmap.selbst.gewaehlt": "The mod now draws the map itself.",
   "heroicmap.selbst.geht_nicht": "Drawing it yourself only works on a server and not under a ceiling.",
-  "heroicmap.selbst.fehler": "The map to draw yourself could not be created; see the log for details."
+  "heroicmap.selbst.fehler": "The map to draw yourself could not be created; see the log for details.",
+  "heroicmap.befehl.welt_unbekannt": "Enter %s first; only then does the mod know which world the map belongs to."
 }

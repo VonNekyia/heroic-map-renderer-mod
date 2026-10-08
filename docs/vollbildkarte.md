@@ -34,7 +34,7 @@ sagt sie das und zeigt nichts.
 | Ziehen mit links | verschiebt die Karte, der Inhalt folgt der Maus |
 | Mausrad | zoomt, siehe „Stufen und Lupe“ |
 | Rechtsklick | öffnet ein kleines Menü für den Block unter der Maus, wie die Anzeige unten links: „Hierher teleportieren (x, z)“, siehe unten, darunter „Wegpunkt setzen“, auf einem Wegpunkt „Wegpunkt löschen“, siehe [Wegpunkte](wegpunkte.md); erst ein Klick auf einen Eintrag tut etwas, mit der linken oder rechten Taste, jeder Klick daneben schliesst es, ein Rechtsklick öffnet es dort neu |
-| Klick, Doppelklick auf eine Marke | legt einen Wegpunkt, Mitspieler oder den eigenen Spieler in die Mitte; ein Doppelklick heftet einen Wegpunkt oder Mitspieler an die Minimap, siehe [Wegpunkte](wegpunkte.md) |
+| Klick, Doppelklick auf eine Marke | legt beim Loslassen einen Wegpunkt, Mitspieler oder den eigenen Spieler in die Mitte; ein Doppelklick heftet einen Wegpunkt oder Mitspieler an die Minimap; wer auf einer Marke zieht, zieht nur die Karte; siehe [Wegpunkte](wegpunkte.md) |
 | Knopf „Karte laden …“ | zeigt die Karten des Servers, je Baum der Name und darunter ein Knopf je Massstab mit seiner Grösse (`Auswahl`), darüber die Wahl „Selbst“, siehe [Selbst gezeichnete Karte](selbst.md); die Knöpfe teilen sich die Breite des Schirms, höchstens 90 Einheiten je Knopf, so passen sie auch bei grossem GUI-Massstab; den Massstab, den der Spieler schon ganz hat (`Downloads.vollstaendig`: ein vollständiger Satz, und das Plugin misst den Abgleich an demselben Massstab), zeigt der Knopf als „Abgleich“ und gleicht ab wie der Knopf „Abgleich“, nach einer Ablehnung mit `wieder` bis dahin aus; ein Klick fragt wie `/hmap laden` erst im Dialog nach |
 | Knopf „Abgleich“ | fragt einen Abgleich des gezeigten Satzes an, wie `/hmap abgleich`; nur mit Satz. Lehnt der Server mit `wieder` ab, ist der Knopf bis dahin aus und nennt die Uhrzeit |
 | `Esc` | schliesst |
@@ -71,8 +71,9 @@ sagt sie das und zeigt nichts.
   `satz.json` neben die Massstäbe: Name und Dimension aus dem `angebot`,
   dazu der Massstab. Ein gekappter Download schreibt sie nicht.
 - **Die Karte** nimmt unter dem Ordner der Welt den Baum, dessen
-  Dimension die des Spielers ist (`Satz.fuer`), einen selbst gezeichneten
-  vor jedem anderen, siehe [Selbst gezeichnete Karte](selbst.md), „Wahl“. Kachelgrösse, Stufen und
+  Dimension die des Spielers ist (`Satz.fuer`), siehe
+  [Download](download.md), „Ablage“; einen selbst gezeichneten vor jedem
+  anderen, siehe [Selbst gezeichnete Karte](selbst.md), „Wahl“. Kachelgrösse, Stufen und
   `scale` liest sie aus `map.json` des Satzes.
 - **`map.json` kommt vom Server** und hat deshalb Grenzen (`Satz.lies`):
 

@@ -69,8 +69,10 @@ steht unter „Kosten“.
   Schirm Platz hat. Grösser zeigt mehr Gegend beim selben Zoom und
   zeichnet mehr Chunks, siehe „Neu zeichnen“, „Bereich“.
 - **Knöpfe** stehen im grösseren freien Platz neben der Minimap, 200
-  Einheiten breit oder schmaler, bis 120, wenn dort weniger Platz ist. So
-  passen sie auch bei grossem GUI-Massstab auf den Schirm.
+  Einheiten breit oder schmaler, bis 120, wenn dort weniger Platz ist.
+  „Minimap“ und „Form“ teilen sich eine Zeile, ebenso „Karte laden …“ und
+  „Kartenliste …“. So passen sie auch bei grossem GUI-Massstab auf den
+  Schirm, bis 240 Einheiten Höhe, etwa 1280 × 720 bei GUI-Massstab 3.
 - **Koordinaten:** Im Menü stehen über der Minimap `x` und `z` des Blocks
   unter der Maus fest unten links, wie auf der Karte im Browser, genau wie
   gezeichnet; nicht beim Ziehen. Zum Umschauen dient die
@@ -135,9 +137,9 @@ gibt es nicht; so hat es der User gewählt.
   Ticks wie den eigenen Spieler, siehe „Bewegung“; sonst die des Servers.
 - **Zeichnen:** der Kopf aus dem Skin (`PlayerFaceExtractor`) mit schwarzem
   Rand, so gross wie der eigene, nur in der Dimension des Spielers und
-  innerhalb der Form; ohne Skin ein weisses Quadrat. Angeheftete Mitspieler
-  stehen ausserhalb der Form an ihrem Rand, siehe [Wegpunkte](wegpunkte.md),
-  „Am Rand“. Auf der [Vollbildkarte](vollbildkarte.md) steht der Name
+  innerhalb der Form; ohne Skin ein weisses Quadrat. Angeheftete Mitspieler,
+  die ausserhalb der Form liegen, stehen an ihrem Rand, nach innen
+  geklemmt, siehe [Wegpunkte](wegpunkte.md), „Am Rand“. Auf der [Vollbildkarte](vollbildkarte.md) steht der Name
   darüber.
 
 ## Form

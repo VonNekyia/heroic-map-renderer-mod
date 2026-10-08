@@ -89,5 +89,6 @@
   "heroicmap.selbst.frage": "Ab jetzt zeichnet der Mod jeden Chunk, den du in dieser Dimension lädst, mit 4 Pixeln je Block in eine eigene Karte dieser Welt. Die Vollbildkarte zeigt dann nur sie, nicht die Karte des Servers. Beenden: in der Kartenliste löschen.",
   "heroicmap.selbst.gewaehlt": "Der Mod zeichnet die Karte jetzt selbst.",
   "heroicmap.selbst.geht_nicht": "Selbst zeichnen geht nur auf einem Server und nicht unter einer Decke.",
-  "heroicmap.selbst.fehler": "Die Karte zum selbst Zeichnen liess sich nicht anlegen; Einzelheiten im Log."
+  "heroicmap.selbst.fehler": "Die Karte zum selbst Zeichnen liess sich nicht anlegen; Einzelheiten im Log.",
+  "heroicmap.befehl.welt_unbekannt": "Betritt zuerst %s; erst dann weiss der Mod, zu welcher Welt die Karte gehört."
 }

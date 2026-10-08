@@ -8,6 +8,8 @@ code:
   - src/main/java/com/nekyia/heroicmap/Mitspieler.java
   - src/test/java/com/nekyia/heroicmap/WegpunkteTest.java
   - src/test/java/com/nekyia/heroicmap/MinimapTest.java
+  - src/main/java/com/nekyia/heroicmap/Kartenblick.java
+  - src/test/java/com/nekyia/heroicmap/KartenblickTest.java
   - src/gametest/java/com/nekyia/heroicmap/Bedienung.java
 ---
 
@@ -24,18 +26,25 @@ gewünscht.
 
 | Eingabe auf der Vollbildkarte | tut |
 |---|---|
-| Rechtsklick, „Wegpunkt setzen“ | der Eintrag unter „Hierher teleportieren“; setzt einen Wegpunkt auf den Block unter der Maus, in der nächsten von 8 Farben (`Wegpunkte.FARBEN`). Steht dort schon einer, bleibt es einer. Den Eintrag gibt es auch ohne Recht zum Teleportieren und unter einer Decke |
+| Rechtsklick, „Wegpunkt setzen“ | der Eintrag unter „Hierher teleportieren“; setzt einen Wegpunkt auf den Block unter der Maus, in der ersten der 8 Farben (`Wegpunkte.FARBEN`), die in der Dimension noch frei ist, sind alle vergeben, reihum. Steht dort schon einer, bleibt es einer. Den Eintrag gibt es auch ohne Recht zum Teleportieren und unter einer Decke |
 | Rechtsklick auf einen Wegpunkt | das Menü für seinen Block: „Hierher teleportieren“, wenn erlaubt, und „Wegpunkt löschen“ |
-| Klick auf eine Marke | legt sie in die Mitte: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück |
+| Klick auf eine Marke | legt sie beim Loslassen in die Mitte: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück. Wer auf einer Marke zu ziehen beginnt und weiter als 3 Einheiten zieht (`Karte.ZUG`), zieht nur die Karte |
 | Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder |
 
 - **Doppelklick:** Das Spiel meldet einen Klick als doppelt, wenn derselbe
-  Knopf im selben Schirm höchstens 250 ms nach dem letzten kommt, gleich wo
-  (`MouseHandler`, belegt per javap am Client 26.3). Der erste Klick hat die
-  Marke schon in die Mitte gelegt; der zweite zählt deshalb für die Marke
-  des ersten (`Karte.letzte`), nicht für die unter der Maus.
+  Knopf im selben Schirm weniger als 250 ms nach dem letzten kommt, gleich
+  wo, und nur, wenn der Schirm den letzten Klick angenommen hat
+  (`mouseClicked` gab `true`; `MouseHandler.onButton`, belegt per javap am
+  Client 26.3). Die Karte nimmt einen Klick auf eine Marke, einen Knopf
+  oder einen Eintrag des Menüs an. Der erste Klick hat die Marke schon in
+  die Mitte gelegt; der zweite zählt deshalb für die Marke des ersten
+  (`Karte.letzte`), nicht für die unter der Maus. Jeder andere Klick
+  vergisst sie; ein schneller Klick nach „Wegpunkt setzen“ heftet so nichts
+  an.
 - **Treffer:** eine halbe Kopfseite und eine Einheit um die Mitte der
-  Marke, die zuletzt gezeichnete zuerst. Die Knöpfe oben rechts gehen vor.
+  Marke. Ein Wegpunkt oder Mitspieler geht dem eigenen Kopf vor, sonst
+  liesse sich ein Wegpunkt am eigenen Standort nicht greifen; sonst die
+  zuletzt gezeichnete zuerst. Die Knöpfe oben rechts gehen vor.
 - **Ohne Namen:** Die Farbe unterscheidet die Wegpunkte; unten links stehen
   die Koordinaten unter der Maus, siehe [Vollbildkarte](vollbildkarte.md),
   „Bedienung“.
@@ -44,12 +53,18 @@ gewünscht.
 
 - **Vollbildkarte:** Eine Marke, die nicht mindestens 14 Einheiten
   (`Karte.RAND`) vom Rand des Schirms liegt, rückt auf der Linie von der
-  Mitte des Schirms zu ihr bis dorthin (`Minimap.rand`). Die Seite sagt so
-  die Richtung, nicht die Entfernung. Die 14 Einheiten lassen Platz für den
-  Namen über einem Kopf.
-- **Minimap:** Angeheftete Wegpunkte und Mitspieler ausserhalb der Form
-  stehen an ihrem Rand, rund auf dem Kreis, eckig am Quadrat, eine halbe
-  Kopfseite und eine Einheit nach innen. Mitspieler, die nicht angeheftet
+  Mitte des Schirms zu ihr bis dorthin (`Kartenblick.marke`). Die Seite
+  sagt so die Richtung, nicht die Entfernung. Die 14 Einheiten lassen Platz
+  für den Namen über einem Kopf. Den Knöpfen rechts oben weicht eine Marke
+  am Rand aus, oben nach links, rechts nach unten.
+- **Auf der Karte:** Eine Marke steht auf dem Pixel, auf dem die Karte
+  ihren Ort zeichnet, und wackelt beim Ziehen und Laufen nicht gegen sie.
+  Auf der Vollbildkarte rechnet sie von der Kante ihrer Kachel aus, die auf
+  ganzen Einheiten liegt (`Kartenblick.rasterX`); auf der Minimap von der
+  Kante des Bildes aus `Minimap.ecke` (`Minimap.pixel`).
+- **Minimap:** Angeheftete Wegpunkte und Mitspieler, die ausserhalb der
+  Form liegen, stehen an ihrem Rand in ihrer Richtung, rund am Kreis, eckig
+  am Quadrat, eine halbe Kopfseite und eine Einheit nach innen geklemmt. Mitspieler, die nicht angeheftet
   sind, stehen wie bisher nur in der Form; Wegpunkte, die nicht angeheftet
   sind, gar nicht.
 - **Mitspieler** gibt es nur, solange der Server sie nennt, siehe
@@ -69,8 +84,11 @@ gewünscht.
 - **Rand und Pfeil** wachsen mit: Kopf, Pfeil und Raute sind in Achteln
   oder Sechzehnteln gezeichnet und mit der Grösse skaliert
   (`Minimap.avatar`, `Mitspieler.kopf`, `Minimap.wegpunkt`).
-- **Auf ganze Pixel** des Schirms gelegt, sonst wären die Texel eines
-  Kopfes ungleich breit.
+- **Auf ganze Pixel** des Schirms gelegt, wie die Karte darunter.
+- **Texel:** Gleich breit sind die 8 Texel eines Gesichts nur, wenn seine
+  Seite in Pixeln ein Vielfaches von 8 ist. Bei 6 Einheiten und
+  GUI-Massstab 2 sind es 12 Pixel, die Texel also abwechselnd 1 und 2
+  Pixel breit. Ob 6 Einheiten gut aussehen, sieht der User im Spiel.
 
 ## Ablage
 
@@ -82,9 +100,6 @@ gewünscht.
   Proxy bringt so die Wegpunkte der neuen Welt. Im Einzelspieler gibt es
   keinen Ordner; dort liegen sie nur im Speicher und bleiben beim Wechsel
   der Dimension.
-- **Umzug:** Eine `wegpunkte.json` aus der Ablage vor dem Hash,
-  `heroicmap/<adresse>/`, zieht in die erste Welt, die der Spieler auf
-  diesem Server betritt, wenn es dort noch keine gibt.
 - **Format:**
 
   ```json
@@ -97,18 +112,27 @@ gewünscht.
 - **Schreiben** nach jeder Änderung, über `wegpunkte.json.tmp`, dann
   verschieben; nie liegt eine halbe Datei da.
 - **Lesen:** Ein unlesbarer Eintrag fällt weg, die übrigen bleiben. Ist die
-  Datei unlesbar, gibt es keine Wegpunkte; die nächste Änderung
-  überschreibt sie.
+  Datei unlesbar, gibt es keine Wegpunkte, und der Mod verschiebt sie nach
+  `wegpunkte.json.kaputt`; die nächste Änderung legt eine neue an. Scheitert
+  das Verschieben, bleiben neue Wegpunkte nur im Speicher.
 
 ## Tests
 
 - `WegpunkteTest`: setzen, löschen, anheften, über den Neustart behalten,
-  kaputte Einträge, nur im Speicher.
-- `MinimapTest`: `kopfWaechstMitDerSeite` und `amRandInSeinerRichtung`.
+  kaputte Einträge, eine kaputte Datei bleibt gesichert, Farben bleiben
+  nach dem Löschen verschieden, nur im Speicher.
+- `MinimapTest`: `kopfWaechstMitDerSeite`, `amRandInSeinerRichtung` und
+  `markeAufDemPixelDerKarte`.
+- `KartenblickTest`: `markenAufDemRasterDerKacheln` und
+  `markeWeichtDenKnoepfenAus`.
 - Gametest `Bedienung` mit echten Eingaben: Rechtsklick und „Wegpunkt
-  setzen“, die Karte ziehen, bis der Wegpunkt am rechten Rand steht, ein
-  Klick legt ihn in die Mitte, ein Doppelklick nach mehr als 250 ms heftet
-  ihn an.
+  setzen“; die Karte ziehen, bis der Wegpunkt am rechten Rand steht; auf
+  der Marke ziehen zieht nur die Karte; ein Klick legt sie in die Mitte;
+  ein schneller Klick nach „Wegpunkt setzen“ heftet nichts an; ein
+  Doppelklick heftet an; am eigenen Standort holt ein Klick den Spieler
+  zurück, und ein Rechtsklick bietet „Wegpunkt löschen“.
+- `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
+  [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und
   einem am Rand, siehe [Vollbildkarte](vollbildkarte.md), „Bild“.
 

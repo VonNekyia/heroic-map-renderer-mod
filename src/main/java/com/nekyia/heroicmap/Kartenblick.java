@@ -45,6 +45,44 @@ final class Kartenblick {
         return hoehe / 2.0 + (basisZ - mz) / teiler() * lupe;
     }
 
+    /**
+     * Wie {@link #schirmX}, aber auf dem Raster der gezeichneten Kacheln: Deren linke Kante liegt
+     * auf ganzen Einheiten ({@code Mth.floor} in {@code Karte}), so steht eine Marke immer auf
+     * demselben Fleck der Karte.
+     */
+    double rasterX(double basisX, int breite) {
+        double t = kachel * teiler(), start = Math.floor(basisX / t) * t;
+        return Math.floor(schirmX(start, breite)) + (basisX - start) / teiler() * lupe;
+    }
+
+    double rasterY(double basisZ, int hoehe) {
+        double t = kachel * teiler(), start = Math.floor(basisZ / t) * t;
+        return Math.floor(schirmY(start, hoehe)) + (basisZ - start) / teiler() * lupe;
+    }
+
+    /**
+     * Wo eine Marke an (x, y) des Schirms steht: drinnen, wo sie ist; sonst {@code rand} Einheiten
+     * vom Rand des Schirms auf der Linie von der Mitte zu ihr. Dort weicht sie den Knöpfen rechts
+     * oben aus, die ab x {@code knopfX} bis y {@code knopfY} reichen: oben nach links, rechts nach
+     * unten. Siehe docs/wegpunkte.md, „Am Rand“.
+     */
+    static double[] marke(double x, double y, int breite, int hoehe, double rand, double halb, int knopfX, int knopfY) {
+        double px = x - breite / 2.0, pz = y - hoehe / 2.0;
+        double f = Minimap.rand(px, pz, breite / 2.0 - rand, hoehe / 2.0 - rand, false);
+        if (f >= 1) {
+            return new double[] {x, y};
+        }
+        double mx = breite / 2.0 + px * f, my = hoehe / 2.0 + pz * f;
+        if (mx + halb > knopfX && my - halb < knopfY) {
+            if (my - rand < 1e-6) {
+                mx = knopfX - halb - 1;
+            } else {
+                my = knopfY + halb + 1;
+            }
+        }
+        return new double[] {mx, my};
+    }
+
     /** Eine Stufe feiner, auf der feinsten die Lupe grösser. */
     void naeher() {
         if (zoom < stufe) {
