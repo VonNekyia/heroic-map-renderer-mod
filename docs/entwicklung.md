@@ -1,9 +1,10 @@
 ---
 title: Bauen und testen
-description: Versionen, Gradle, Tests, CI und die Prüfung der Doku.
+description: Versionen, Gradle, Tests, Gametests, Maustasten, CI und die Prüfung der Doku.
 code:
   - build.gradle.kts
   - src/gametest/resources/fabric.mod.json
+  - src/gametest/java/com/nekyia/heroicmap/Bedienung.java
   - gradle/libs.versions.toml
   - gradle/wrapper/gradle-wrapper.properties
   - .github/workflows/ci.yml
@@ -74,6 +75,20 @@ Mods laufen deshalb auch hier.
 | `Abnahme` | nur mit `-Pabnahme=<ordner>`: die Live-Ebene gegen `top-north` scale 4 des Renderers an der Testwelt, siehe [Live-Ebene](live.md), „Abnahme“ |
 | `Server` | nur mit `-Pserver=<adresse>`: von Ende zu Ende gegen einen echten Paper-Server mit dem Plugin, Angebot, voller Download des kleinsten Massstabs des ersten Baums, jeder Dialog mit Ja, die Vollbildkarte als Bild `server-karte`; siehe unten |
 | `Uebernahme` | nur mit `-Puebernahme=<datei>`: was eine Kachel der Vollbildkarte den Render-Thread kostet, siehe [Vollbildkarte](vollbildkarte.md), „Kacheln“ |
+
+### Maustasten
+
+- **Seit 26.3 zählt das Spiel die Maustasten wie SDL:** links 1, Mitte 2,
+  rechts 3 (`InputConstants.MOUSE_BUTTON_LEFT`, `MOUSE_BUTTON_MIDDLE`,
+  `MOUSE_BUTTON_RIGHT`), nicht 0, 2 und 1 wie GLFW. `SDLEventHandler`
+  reicht die Taste von SDL unverändert in `MouseButtonInfo`, und diese
+  Zahl gibt `MouseButtonEvent.button()`; belegt per javap am Client 26.3
+  (`SDLEventHandler`, `InputConstants`, `MouseHandler.onButton`).
+- **Code und Gametests** nennen die Konstanten, keine Zahlen.
+- **`TestInput`** reicht die Zahl unverändert an `MouseHandler.onButton`
+  weiter. Ein Gametest mit 0 und 1 drückt also eine Taste, die es nicht
+  gibt, und die linke statt der rechten. So war `Bedienung` grün, obwohl
+  beim User links das Teleport-Menü öffnete und Ziehen nichts tat.
 
 ### Gegen einen echten Server
 

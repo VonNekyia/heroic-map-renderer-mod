@@ -1,5 +1,6 @@
 package com.nekyia.heroicmap;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import java.util.List;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
@@ -137,7 +138,7 @@ final class Einstellungen extends Screen {
         }
         Minimap.Rahmen r = Minimap.INSTANZ.rahmen(width, height);
         // Links wie rechts: Ziehen greift die ganze Minimap, am Griff ihre Grösse.
-        if (e.button() != 0 && e.button() != 1) {
+        if (e.button() != InputConstants.MOUSE_BUTTON_LEFT && e.button() != InputConstants.MOUSE_BUTTON_RIGHT) {
             return false;
         }
         if (Math.abs(e.x() - griffX(r)) <= GRIFF + 1 && Math.abs(e.y() - griffY(r)) <= GRIFF + 1) {
