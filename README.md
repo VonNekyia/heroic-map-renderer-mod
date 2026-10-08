@@ -10,7 +10,7 @@ dem Plugin von [heroic-map-renderer](https://github.com/VonNekyia/heroic-map-ren
 
 ## Stand
 
-Im Aufbau: Minimap, Vollbildkarte und die Live-Ebene darüber laufen. Der
+Im Aufbau: Minimap und Vollbildkarte laufen. Der
 Download ist gebaut und gegen einen kleinen Testserver geprüft; gegen einen
 echten Server geht er erst mit
 [heroic-map-renderer#151](https://github.com/VonNekyia/heroic-map-renderer/issues/151).

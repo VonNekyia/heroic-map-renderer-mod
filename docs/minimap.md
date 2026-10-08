@@ -280,9 +280,8 @@ nichts.
   belegt per javap am Client 26.3: `blockChanged`, `setBlockDirty`,
   `setBlocksDirty`, `setSectionDirtyWithNeighbors` und
   `setSectionRangeDirty`, auch das Licht eines neuen Chunks über
-  `enableChunkLight`. Dort hängt der erste Mixin des Mods
-  (`LevelExtractorMixin`) und markiert die Spalte. Der zweite, an
-  `setBlockDirty`, gehört zur [Live-Ebene](live.md).
+  `enableChunkLight`. Dort hängt der Mixin des Mods
+  (`LevelExtractorMixin`) und markiert die Spalte.
 - **Ausnahme:** `LevelExtractor.allChanged` legt alles neu an, ohne
   `setSectionDirty`, etwa wenn der Biomübergang sich ändert. Der Mod
   vergleicht deshalb je Frame `Options.biomeBlendRadius` und den Block-Atlas

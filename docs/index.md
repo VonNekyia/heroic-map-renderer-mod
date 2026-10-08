@@ -14,7 +14,6 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 
 - [Projektion](projektion.md): wo ein Block auf Minimap und Vollbildkarte liegt, genordet von oben wie `top-north`, geprüft an `projektion.json` des Renderers.
 - [Download](download.md): wie der Mod die Karte vom Plugin lädt, Kanal, Befehle, Zustimmung und Grösse, Sicherheit, Manifest, harte Grenzen, Ablage, Fortsetzen und Abgleich.
-- [Live-Ebene](live.md): was sich seit dem letzten Lauf des Renderers ändert, über der Vollbildkarte; Raster, Texturen, Biomübergang, wann gezeichnet wird, Ablage, Abgleich, Kosten, Abnahme gegen top-north.
 - [Vollbildkarte](vollbildkarte.md): Bedienung, welcher Satz, Stufen und Lupe, Kacheln lesen und behalten, Spieler und Koordinaten, das Bild aus dem Gametest und was fehlt.
 - [Minimap](minimap.md): Bedienung, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, Neu zeichnen im Worker, Kosten, Bilder und was anders ist als `top-north`.
 
@@ -25,6 +24,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 ## Entscheidungen
 
 - [0001](entscheidungen/0001-minimap-mit-dem-tesselator.md): Die Minimap mit dem Tesselator des Spiels.
+- [0002](entscheidungen/0002-vollbildkarte-nur-vom-server.md): Die Vollbildkarte nur vom Server, ohne Live-Ebene.
 
 ## Messungen
 

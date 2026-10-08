@@ -4,6 +4,8 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.logging.LogUtils;
+import java.io.IOException;
 import java.nio.file.Path;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
@@ -19,11 +21,13 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import org.slf4j.Logger;
 
 /** Meldet Minimap, Download, Tasten, Befehle, Menü und Ereignisse an. Siehe docs/minimap.md, docs/download.md. */
 public final class HeroicMap implements ClientModInitializer {
 
     public static final String ID = "heroicmap";
+    private static final Logger LOGGER = LogUtils.getLogger();
     /** Die Taste der Vollbildkarte; die Karte schliesst sich mit ihr. */
     static KeyMapping karte;
 
@@ -38,6 +42,14 @@ public final class HeroicMap implements ClientModInitializer {
         karte = KeyMappingHelper.registerKeyMapping(
                 new KeyMapping("key.heroicmap.karte", InputConstants.KEY_PERIOD, kategorie));
         Minimap.INSTANZ.lies(einstellungen());
+        // Die Live-Ebene gibt es nicht mehr; ihre alten Ordner gehen beim Start weg. Siehe docs/download.md, „Ablage“.
+        Thread.ofPlatform().daemon().name("Heroic Map Aufräumen").start(() -> {
+            try {
+                Laden.loescheOverlays(Downloads.wurzel());
+            } catch (IOException e) {
+                LOGGER.warn("Heroic Map: alter Ordner overlay nicht gelöscht", e);
+            }
+        });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             boolean geaendert = false;
             while (zeigen.consumeClick()) {
@@ -51,7 +63,6 @@ public final class HeroicMap implements ClientModInitializer {
             if (geaendert) {
                 Minimap.INSTANZ.schreibe(einstellungen());
             }
-            Live.INSTANZ.arbeite(client);
             while (karte.consumeClick()) {
                 if (client.gui.screen() == null && client.level != null) {
                     String dimension = client.level.dimension().identifier().toString();
@@ -61,13 +72,9 @@ public final class HeroicMap implements ClientModInitializer {
         });
         // Fabric meldet den Wechsel der Welt nur zu einer neuen; das Trennen eigens, und das auf
         // einem Thread von Netty, deshalb auf den Render-Thread.
-        ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> {
-            Minimap.INSTANZ.leeren();
-            Live.INSTANZ.leeren();
-        });
+        ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> Minimap.INSTANZ.leeren());
         ClientPlayConnectionEvents.DISCONNECT.register((listener, client) -> client.execute(() -> {
             Minimap.INSTANZ.leeren();
-            Live.INSTANZ.leeren();
             Downloads.INSTANZ.leeren();
             Mitspieler.INSTANZ.leeren();
         }));
