@@ -14,6 +14,7 @@ import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Matrix3x2fStack;
 
 /**
  * Die anderen Spieler, die der Server zeigen lässt: wer den Spieler in Simple Voice Chat hört.
@@ -110,15 +111,27 @@ final class Mitspieler {
         return v != null ? new double[] {v.x, v.z} : new double[] {e.x(), e.z()};
     }
 
-    /** Der Kopf aus dem Skin, {@code groesse} Einheiten gross, die Mitte bei (x, y); ohne Skin ein weisses Quadrat. */
-    static void kopf(GuiGraphicsExtractor g, Minecraft mc, Eintrag e, int x, int y, int groesse) {
+    /**
+     * Der Kopf aus dem Skin, {@code groesse} Einheiten gross, die Mitte bei (x, y), mit schwarzem
+     * Rand; ohne Skin ein weisses Quadrat. Mit {@code hervor} ungleich 0 ein Ring in dieser Farbe
+     * darum. Gezeichnet in Achteln, so wächst der Rand mit.
+     */
+    static void kopf(GuiGraphicsExtractor g, Minecraft mc, UUID uuid, float x, float y, float groesse, int hervor) {
         ClientPacketListener verbindung = mc.getConnection();
-        PlayerInfo info = verbindung == null ? null : verbindung.getPlayerInfo(e.uuid());
-        g.fill(x - groesse / 2 - 1, y - groesse / 2 - 1, x + groesse / 2 + 1, y + groesse / 2 + 1, 0xFF000000);
-        if (info != null) {
-            PlayerFaceExtractor.extractRenderState(g, info.getSkin(), x - groesse / 2, y - groesse / 2, groesse);
-        } else {
-            g.fill(x - groesse / 2, y - groesse / 2, x + groesse / 2, y + groesse / 2, 0xFFFFFFFF);
+        PlayerInfo info = verbindung == null ? null : verbindung.getPlayerInfo(uuid);
+        Matrix3x2fStack pose = g.pose();
+        pose.pushMatrix();
+        pose.translate(x, y);
+        pose.scale(groesse / 8f);
+        if (hervor != 0) {
+            g.fill(-7, -7, 7, 7, hervor);
         }
+        g.fill(-5, -5, 5, 5, 0xFF000000);
+        if (info != null) {
+            PlayerFaceExtractor.extractRenderState(g, info.getSkin(), -4, -4, 8);
+        } else {
+            g.fill(-4, -4, 4, 4, 0xFFFFFFFF);
+        }
+        pose.popMatrix();
     }
 }

@@ -65,8 +65,11 @@ public final class Minimap {
     /** Chunks je Richtung über den sichtbaren Bereich hinaus. */
     static final int VORRAT = 2;
     static final int RAND = 4;
-    /** Seite eines Kopfes der Mitspieler in Einheiten des GUI. */
-    static final int KOPF = 8;
+    /**
+     * Seite eines Kopfes oder Wegpunkts in Einheiten des GUI: so auf der Vollbildkarte und auf
+     * der Minimap mit der Vorgabe von 128 Einheiten; auf der Minimap wächst sie mit deren Seite.
+     */
+    static final int KOPF = 6;
     /** Ändert sich die Höhe des Kopfes unter einer Decke um so viele Blöcke, wird neu gezeichnet. */
     private static final int DECKE_SCHRITT = 2;
 
@@ -390,8 +393,46 @@ public final class Minimap {
         int links = ecke(spieler.xo, spieler.getX(), a, zoom, k, n);
         int oben = ecke(spieler.zo, spieler.getZ(), a, zoom, k, n);
         male(g, r, links, oben, k);
-        mitspieler(g, mc, r, spieler, level, a, k);
-        avatar(g, spieler, r.x() + r.seite() / 2, r.y() + r.seite() / 2, a);
+        float kopf = kopf(r.seite());
+        Vec3 ort = spieler.getPosition(a);
+        String dimension = level.dimension().identifier().toString();
+        wegpunkte(g, r, ort, dimension, k, kopf);
+        mitspieler(g, mc, r, spieler, ort, dimension, a, k, kopf);
+        // In der Mitte des Bildes, auf dem Pixel, den ecke dafür nimmt.
+        avatar(g, spieler, (r.x() * k + n / 2) / (float) k, (r.y() * k + n / 2) / (float) k, a, kopf);
+    }
+
+    /** Die Seite eines Kopfes auf der Minimap: {@link #KOPF} bei 128 Einheiten, mit der Seite wachsend, mindestens 4. */
+    static float kopf(int seite) {
+        return Math.max(4, KOPF * seite / (float) GROESSE);
+    }
+
+    /**
+     * Wie weit ein Punkt (px, pz) relativ zur Mitte auf seiner Richtung zur Mitte rückt, damit er
+     * in der Form liegt: rund im Kreis mit Radius hx, sonst im Rechteck ±hx, ±hz. 1, wenn er
+     * schon drinnen liegt. Siehe docs/wegpunkte.md, „Am Rand“.
+     */
+    static double rand(double px, double pz, double hx, double hz, boolean rund) {
+        double f = rund ? hx / Math.hypot(px, pz) : Math.min(hx / Math.abs(px), hz / Math.abs(pz));
+        return Math.min(1, f);
+    }
+
+    /** Die angehefteten Wegpunkte dieser Dimension, ausserhalb der Form an ihrem Rand. Siehe docs/wegpunkte.md. */
+    private void wegpunkte(GuiGraphicsExtractor g, Rahmen r, Vec3 ort, String dimension, int k, float kopf) {
+        double h = r.seite() / 2.0, innen = h - kopf / 2 - 1;
+        for (Wegpunkte.Punkt p : Wegpunkte.INSTANZ.punkte()) {
+            if (!p.angeheftet() || !p.dimension().equals(dimension)) {
+                continue;
+            }
+            double px = (p.x() + 0.5 - ort.x) * zoom, pz = (p.z() + 0.5 - ort.z) * zoom;
+            double f = rand(px, pz, innen, innen, rund);
+            wegpunkt(g, pixel(r.x() + h + px * f, k), pixel(r.y() + h + pz * f, k), kopf, Wegpunkte.FARBEN[p.farbe()], 0);
+        }
+    }
+
+    /** Auf ganze Pixel wie die Karte darunter, nicht auf ganze Einheiten des GUI. */
+    private static float pixel(double gui, int k) {
+        return Math.round(gui * k) / (float) k;
     }
 
     /** Wo zwischen zwei Ticks die Minimap den Spieler zeichnet: wie die Kamera. Siehe docs/minimap.md, „Bewegung“. */
@@ -408,25 +449,25 @@ public final class Minimap {
         return Mth.floor(Projektion.zuPixel(Mth.lerp(a, alt, neu), zoom) * k) - n / 2;
     }
 
-    /** Die Mitspieler als Köpfe, in derselben Dimension und innerhalb der Form. Siehe docs/minimap.md, „Mitspieler“. */
-    private void mitspieler(GuiGraphicsExtractor g, Minecraft mc, Rahmen r, LocalPlayer spieler, ClientLevel level, float a, int k) {
-        String dimension = level.dimension().identifier().toString();
-        double h = r.seite() / 2.0;
-        Vec3 mitte = spieler.getPosition(a);
+    /**
+     * Die Mitspieler als Köpfe, in derselben Dimension und innerhalb der Form; angeheftete
+     * ausserhalb an ihrem Rand. Siehe docs/minimap.md, „Mitspieler“.
+     */
+    private void mitspieler(GuiGraphicsExtractor g, Minecraft mc, Rahmen r, LocalPlayer spieler, Vec3 ort, String dimension,
+            float a, int k, float kopf) {
+        double h = r.seite() / 2.0, innen = h - kopf / 2 - 1;
         for (Mitspieler.Eintrag e : Mitspieler.INSTANZ.sichtbar(System.currentTimeMillis())) {
             if (!e.dimension().equals(dimension) || e.uuid().equals(spieler.getUUID())) {
                 continue;
             }
             double[] lage = Mitspieler.lage(mc, e, a);
-            double px = (lage[0] - mitte.x) * zoom, pz = (lage[1] - mitte.z) * zoom;
-            if (rund ? px * px + pz * pz <= h * h : Math.abs(px) <= h && Math.abs(pz) <= h) {
-                // Auf ganze Pixel wie die Karte darunter, nicht auf ganze Einheiten des GUI.
-                Matrix3x2fStack pose = g.pose();
-                pose.pushMatrix();
-                pose.translate(Math.round((r.x() + h + px) * k) / (float) k, Math.round((r.y() + h + pz) * k) / (float) k);
-                Mitspieler.kopf(g, mc, e, 0, 0, KOPF);
-                pose.popMatrix();
+            double px = (lage[0] - ort.x) * zoom, pz = (lage[1] - ort.z) * zoom;
+            boolean angeheftet = Wegpunkte.INSTANZ.angeheftet(e.uuid());
+            double f = angeheftet ? rand(px, pz, innen, innen, rund) : rand(px, pz, h, h, rund);
+            if (f < 1 && !angeheftet) {
+                continue;
             }
+            Mitspieler.kopf(g, mc, e.uuid(), pixel(r.x() + h + px * f, k), pixel(r.y() + h + pz * f, k), kopf, 0);
         }
     }
 
@@ -639,23 +680,46 @@ public final class Minimap {
         return bester;
     }
 
-    /** Der eigene Spieler: sein Kopf aus dem Skin, daneben ein kleiner Pfeil in Blickrichtung. Siehe docs/minimap.md, „Bedienung“. */
-    static void avatar(GuiGraphicsExtractor g, AbstractClientPlayer spieler, int x, int y, float a) {
-        int h = KOPF / 2;
-        g.fill(x - h - 1, y - h - 1, x + h + 1, y + h + 1, 0xFF000000);
-        PlayerFaceExtractor.extractRenderState(g, spieler.getSkin(), x - h, y - h, KOPF);
-        // Der Pfeil kreist um den Kopf; bei Gier 0 blickt der Spieler nach Süden, auf der Karte nach unten.
+    /**
+     * Der eigene Spieler: sein Kopf aus dem Skin, daneben ein kleiner Pfeil in Blickrichtung,
+     * {@code groesse} Einheiten gross. Gezeichnet in Achteln, so wachsen Rand und Pfeil mit.
+     * Siehe docs/minimap.md, „Bedienung“.
+     */
+    static void avatar(GuiGraphicsExtractor g, AbstractClientPlayer spieler, float x, float y, float a, float groesse) {
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.translate(x, y);
+        pose.scale(groesse / 8f);
+        g.fill(-5, -5, 5, 5, 0xFF000000);
+        PlayerFaceExtractor.extractRenderState(g, spieler.getSkin(), -4, -4, 8);
+        // Der Pfeil kreist um den Kopf; bei Gier 0 blickt der Spieler nach Süden, auf der Karte nach unten.
         pose.rotate((float) Math.toRadians(spieler.getViewYRot(a) + 180));
-        pose.translate(0, -(h + 1));
+        pose.translate(0, -5);
         for (int i = 0; i < 3; i++) {
             g.fill(-i - 1, -3 + i, i + 2, -1 + i, 0xFF000000);
         }
         for (int i = 0; i < 3; i++) {
             g.fill(-i, -2 + i, i + 1, -1 + i, 0xFFFFFFFF);
         }
+        pose.popMatrix();
+    }
+
+    /**
+     * Ein Wegpunkt: eine Raute in seiner Farbe mit schwarzem Rand, {@code groesse} Einheiten hoch;
+     * mit {@code hervor} ungleich 0 ein Ring in dieser Farbe darum. Siehe docs/wegpunkte.md.
+     */
+    static void wegpunkt(GuiGraphicsExtractor g, float x, float y, float groesse, int farbe, int hervor) {
+        Matrix3x2fStack pose = g.pose();
+        pose.pushMatrix();
+        pose.translate(x, y);
+        // In Sechzehnteln, gedreht: ein Quadrat mit halber Seite 5 ist eine Raute von rund 14 Sechzehnteln.
+        pose.scale(groesse / 16f);
+        pose.rotate((float) (Math.PI / 4));
+        if (hervor != 0) {
+            g.fill(-8, -8, 8, 8, hervor);
+        }
+        g.fill(-6, -6, 6, 6, 0xFF000000);
+        g.fill(-5, -5, 5, 5, farbe);
         pose.popMatrix();
     }
 }

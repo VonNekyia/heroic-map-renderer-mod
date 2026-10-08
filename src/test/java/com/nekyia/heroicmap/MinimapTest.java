@@ -188,6 +188,28 @@ class MinimapTest {
     }
 
     @Test
+    void kopfWaechstMitDerSeite() {
+        assertEquals(Minimap.KOPF, Minimap.kopf(Minimap.GROESSE));
+        assertEquals(2 * Minimap.KOPF, Minimap.kopf(2 * Minimap.GROESSE));
+        // Klein bleibt er erkennbar.
+        assertEquals(4, Minimap.kopf(Minimap.KLEINSTE));
+    }
+
+    @Test
+    void amRandInSeinerRichtung() {
+        // Drinnen bleibt der Punkt, wo er ist.
+        assertEquals(1, Minimap.rand(10, -20, 50, 50, false));
+        assertEquals(1, Minimap.rand(0, 0, 50, 50, true));
+        // Eckig an die nähere Kante: (200, 50) auf x = 50, also auf (50, 12,5).
+        assertEquals(0.25, Minimap.rand(200, 50, 50, 50, false));
+        // Ein Rechteck wie der Schirm: (0, 400) unten auf z = 100.
+        assertEquals(0.25, Minimap.rand(0, 400, 300, 100, false));
+        assertEquals(0.25, Minimap.rand(0, -400, 300, 100, false));
+        // Rund auf den Kreis: (30, 40) hat die Länge 50.
+        assertEquals(0.5, Minimap.rand(30, 40, 25, 25, true), 1e-12);
+    }
+
+    @Test
     void ohneDateiDieVorgabe(@TempDir Path ordner) {
         Minimap minimap = new Minimap();
         minimap.lies(ordner.resolve("fehlt.properties"));

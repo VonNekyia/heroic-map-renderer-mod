@@ -18,7 +18,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptio
 /**
  * Bilder der Minimap zum Ansehen, nicht zum Vergleichen: baut eine Szene in einer flachen
  * Welt und nimmt die Minimap bei 1, 2 und 4 Pixeln je Block auf, danach das Menü und die
- * Vollbildkarte. Mit -Pbilder=&lt;ordner&gt; landen die Bilder dort. Siehe docs/minimap.md, „Bilder“.
+ * Vollbildkarte mit zwei Wegpunkten. Mit -Pbilder=&lt;ordner&gt; landen die Bilder dort. Siehe docs/minimap.md, „Bilder“.
  */
 public final class Bilder implements FabricClientGameTest {
 
@@ -145,11 +145,17 @@ public final class Bilder implements FabricClientGameTest {
 
     /**
      * Öffnet die Vollbildkarte mit einem kleinen Satz gemalter Testkacheln um den Ursprung,
-     * scale 4, Stufen 0 bis 2, und nimmt sie auf der feinsten Stufe auf.
+     * scale 4, Stufen 0 bis 2, und nimmt sie auf der feinsten Stufe auf; dazu ein angehefteter
+     * Wegpunkt auf der Karte und einer am Rand. Siehe docs/wegpunkte.md.
      */
     private static void vollbildkarte(ClientGameTestContext context) {
         Path baum = testsatz();
-        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
+        context.runOnClient(mc -> {
+            Wegpunkte.INSTANZ.setze("minecraft:overworld", 20, -12);
+            Wegpunkte.INSTANZ.setze("minecraft:overworld", 900, 300);
+            Wegpunkte.INSTANZ.umschalten(Wegpunkte.INSTANZ.punkte().getFirst());
+            mc.gui.setScreen(new Karte(Satz.lies(baum)));
+        });
         context.waitTicks(40);
         Path bild = context.takeScreenshot(TestScreenshotOptions.of("vollbildkarte").disableCounterPrefix());
         if (!AUSGABE.isEmpty()) {
@@ -159,7 +165,10 @@ public final class Bilder implements FabricClientGameTest {
                 throw new UncheckedIOException(e);
             }
         }
-        context.runOnClient(mc -> mc.gui.setScreen(null));
+        context.runOnClient(mc -> {
+            mc.gui.setScreen(null);
+            Wegpunkte.INSTANZ.leeren();
+        });
     }
 
     private static java.util.List<String> liste() throws IOException {

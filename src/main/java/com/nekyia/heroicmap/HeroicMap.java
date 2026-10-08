@@ -73,10 +73,14 @@ public final class HeroicMap implements ClientModInitializer {
         // Fabric meldet den Wechsel der Welt nur zu einer neuen; das Trennen eigens, und das auf
         // einem Thread von Netty, deshalb auf den Render-Thread.
         ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> Minimap.INSTANZ.leeren());
+        // Die Wegpunkte gehören zum Server; im Einzelspieler nur im Speicher. Siehe docs/wegpunkte.md.
+        ClientPlayConnectionEvents.JOIN.register((listener, sender, client) -> client.execute(
+                () -> Wegpunkte.INSTANZ.lies(Downloads.serverOrdner())));
         ClientPlayConnectionEvents.DISCONNECT.register((listener, client) -> client.execute(() -> {
             Minimap.INSTANZ.leeren();
             Downloads.INSTANZ.leeren();
             Mitspieler.INSTANZ.leeren();
+            Wegpunkte.INSTANZ.leeren();
         }));
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath(ID, "minimap"), Minimap.INSTANZ::zeichne);
         Kanal.anmelden();

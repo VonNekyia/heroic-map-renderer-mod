@@ -42,6 +42,8 @@
   "heroicmap.karte.laden": "Karte laden …",
   "heroicmap.karte.abgleich": "Abgleich",
   "heroicmap.karte.teleport": "Hierher teleportieren (%s, %s)",
+  "heroicmap.karte.wegpunkt": "Wegpunkt setzen",
+  "heroicmap.karte.wegpunkt_loeschen": "Wegpunkt löschen",
   "heroicmap.auswahl.titel": "Karten dieses Servers",
   "heroicmap.auswahl.massstab": "%s px · %s",
   "heroicmap.auswahl.abgleich": "%s px · Abgleich",
