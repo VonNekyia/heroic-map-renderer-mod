@@ -80,9 +80,10 @@ Mods laufen deshalb auch hier.
 
 - **Seit 26.3 zählt das Spiel die Maustasten wie SDL:** links 1, Mitte 2,
   rechts 3 (`InputConstants.MOUSE_BUTTON_LEFT`, `MOUSE_BUTTON_MIDDLE`,
-  `MOUSE_BUTTON_RIGHT`), nicht 0, 2 und 1 wie GLFW. Diese Zahl gibt
-  `MouseButtonEvent.button()`; belegt per javap am Client 26.3
-  (`InputConstants`, `MouseHandler.onButton`).
+  `MOUSE_BUTTON_RIGHT`), nicht 0, 2 und 1 wie GLFW. `SDLEventHandler`
+  reicht die Taste von SDL unverändert in `MouseButtonInfo`, und diese
+  Zahl gibt `MouseButtonEvent.button()`; belegt per javap am Client 26.3
+  (`SDLEventHandler`, `InputConstants`, `MouseHandler.onButton`).
 - **Code und Gametests** nennen die Konstanten, keine Zahlen.
 - **`TestInput`** reicht die Zahl unverändert an `MouseHandler.onButton`
   weiter. Ein Gametest mit 0 und 1 drückt also eine Taste, die es nicht
