@@ -125,6 +125,52 @@ final class Drehung {
         return anzahl;
     }
 
+    /** Zwischenspeicher für {@link #region}: Ecken, UV und einer für den Schnitt, für Formen bis {@link #ECKEN} Ecken. */
+    record Puffer(float[] ecke, float[] ecken, float[] b, float[] uv) {
+
+        Puffer() {
+            this(new float[8], new float[2 * (4 + ECKEN)], new float[2 * (4 + ECKEN)], new float[2 * (4 + ECKEN)]);
+        }
+    }
+
+    /**
+     * Die Regionen, die beim Drehen zu sehen sein können: alle, die das Quadrat ±{@code weit} um den
+     * Spieler im Bild berühren; {@code s} ist die Seite einer Region in Pixeln. {x0, x1, z0, z1},
+     * Enden eingeschlossen.
+     */
+    static int[] regionen(Lage lage, double weit, int links, int oben, int s) {
+        return new int[] {Math.floorDiv((int) Math.floor(lage.px() - weit) + links, s), Math.floorDiv((int) Math.ceil(lage.px() + weit) + links, s),
+            Math.floorDiv((int) Math.floor(lage.py() - weit) + oben, s), Math.floorDiv((int) Math.ceil(lage.py() + weit) + oben, s)};
+    }
+
+    /**
+     * Das Vieleck einer Region auf dem Schirm: ihr Quadrat ab (qx, qy) im Bild, Seite s, mit
+     * {@code lage} gedreht und mit {@code form} geschnitten. Die Ecken stehen danach in
+     * {@code puffer.ecken()}, je Ecke die UV der Textur in {@code puffer.uv()}: aus der Drehung
+     * zurück ins Bild. Gibt die Zahl der Ecken zurück, unter 3 ist die Region nicht zu sehen.
+     */
+    static int region(Lage lage, int qx, int qy, int s, float[] form, Puffer puffer) {
+        float[] ecke = puffer.ecke(), uv = puffer.uv();
+        // Wie ungedreht: links oben, links unten, rechts unten, rechts oben.
+        setze(ecke, 0, lage, qx, qy);
+        setze(ecke, 1, lage, qx, qy + s);
+        setze(ecke, 2, lage, qx + s, qy + s);
+        setze(ecke, 3, lage, qx + s, qy);
+        int anzahl = schneide(ecke, 4, form, form.length / 2, puffer.ecken(), puffer.b());
+        float[] ecken = puffer.ecken();
+        for (int i = 0; i < anzahl; i++) {
+            uv[2 * i] = (float) ((lage.bildX(ecken[2 * i], ecken[2 * i + 1]) - qx) / s);
+            uv[2 * i + 1] = (float) ((lage.bildY(ecken[2 * i], ecken[2 * i + 1]) - qy) / s);
+        }
+        return anzahl;
+    }
+
+    /** Ecke i des Vielecks: der Punkt (x, y) des Bilds auf dem Schirm. */
+    static void setze(float[] ecke, int i, Lage lage, double x, double y) {
+        ecke[2 * i] = (float) lage.x(x, y);
+        ecke[2 * i + 1] = (float) lage.y(x, y);
+    }
+
     /** Ein Vieleck als Fächer: je Dreieck ein Viereck mit doppelter letzter Ecke, wie es die Vierecke des GUI wollen. */
     interface Ecke {
         void ecke(int i);

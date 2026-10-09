@@ -122,6 +122,7 @@ class MinimapTest {
         vorher.setzeShow(false);
         vorher.setzeAblage(Downloads.Ablage.HASH);
         vorher.setzeChunklinien(true);
+        vorher.setzeDrehen(true);
         vorher.stelle(20, 30, 200, 640, 360);
         vorher.schreibe(datei);
 
@@ -134,6 +135,7 @@ class MinimapTest {
         assertFalse(nachher.show());
         assertEquals(Downloads.Ablage.HASH, nachher.ablage());
         assertTrue(nachher.chunklinien());
+        assertTrue(nachher.drehen());
         assertEquals(vorher.rahmen(640, 360), nachher.rahmen(640, 360));
     }
 
@@ -333,6 +335,7 @@ class MinimapTest {
         // Ablage: Vorgabe IP und Hash, die Wahl des Users.
         assertEquals(Downloads.Ablage.IP, minimap.ablage());
         assertFalse(minimap.chunklinien());
+        assertFalse(minimap.drehen());
         assertEquals(Skin.OHNE, minimap.skin());
         assertEquals(new Minimap.Rahmen(640 - 128 - 4, 4, 128), minimap.rahmen(640, 360));
     }

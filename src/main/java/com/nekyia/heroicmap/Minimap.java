@@ -59,8 +59,9 @@ public final class Minimap {
     public static final Minimap INSTANZ = new Minimap();
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    /** Norden, Osten, Süden, Westen als Richtung im Bild, x nach Osten, y nach Süden. */
+    /** Norden, Osten, Süden, Westen als Richtung im Bild, x nach Osten, y nach Süden; gezeichnet in der Reihenfolge MARKEN, N zuletzt. */
     private static final double[][] RICHTUNGEN = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
+    private static final int[] MARKEN = {1, 2, 3, 0};
     /** Farbe der Chunklinien: Schwarz, zu 30 % deckend, so bleibt die Karte darunter lesbar. */
     static final int LINIE = 0x4D000000;
     /** Chunks je Seite einer Region, einer Textur. */
@@ -110,6 +111,12 @@ public final class Minimap {
     /** Solange das Menü offen ist: die Ecke des Griffs, 0 bis 3, sonst -1; und ob die Maus auf ihm liegt. */
     private int griffEcke = -1;
     private boolean griffAktiv;
+    /** Die Form der gedrehten Karte ({@link #schnitt(Rahmen, int, Skin)}) und wofür. */
+    private float[] schnitt;
+    private int schnittX, schnittY, schnittSeite, schnittMassstab, schnittBaender;
+    private boolean schnittRund;
+    /** Zwischenspeicher für die Vielecke der Regionen, auf dem Render-Thread. */
+    private final Drehung.Puffer puffer = new Drehung.Puffer();
     /** Die zuletzt gerechneten Ecken der Ornamente und wofür. */
     private Skin eckenSkin;
     private Rahmen eckenRahmen;
@@ -586,8 +593,9 @@ public final class Minimap {
             my = (r.y() * k + pixel(z, zoom, k, oben)) / (double) k;
         } else {
             double bx = Projektion.zuPixel(x, zoom) * k - links, by = Projektion.zuPixel(z, zoom) * k - oben;
-            mx = lage.x(bx, by) / k;
-            my = lage.y(bx, by) / k;
+            // Auf ganze Pixel, sonst flimmern die Texel der Köpfe beim Drehen.
+            mx = Math.round(lage.x(bx, by)) / (double) k;
+            my = Math.round(lage.y(bx, by)) / (double) k;
         }
         double dx = mx - (r.x() + h), dz = my - (r.y() + h);
         double f = rand(dx, dz, innen, innen, rund);
@@ -688,20 +696,41 @@ public final class Minimap {
      * Siehe docs/minimap.md, „Drehen“.
      */
     static Drehung.Lage lage(Rahmen r, double x, double z, float gier, int zoom, int k, int links, int oben) {
-        return Drehung.Lage.von(Drehung.winkel(gier), (r.x() + r.seite() / 2.0) * k, (r.y() + r.seite() / 2.0) * k,
+        // Die Mitte auf ganzen Pixeln, wie ungedreht der Kopf.
+        int n = r.seite() * k;
+        return Drehung.Lage.von(Drehung.winkel(gier), r.x() * k + n / 2, r.y() * k + n / 2,
                 Projektion.zuPixel(x, zoom) * k - links, Projektion.zuPixel(z, zoom) * k - oben);
+    }
+
+    /** Die Form, an der die gedrehte Karte geschnitten wird ({@link #schnitt(int, int, int, int, boolean, int)}), gemerkt. */
+    private float[] schnitt(Rahmen r, int k, Skin rahmen) {
+        int baender = rahmen == null ? 0 : rahmen.baender();
+        if (schnitt == null || schnittX != r.x() || schnittY != r.y() || schnittSeite != r.seite() || schnittMassstab != k
+                || schnittRund != rund || schnittBaender != baender) {
+            schnitt = schnitt(r.x(), r.y(), r.seite(), k, rund, baender);
+            schnittX = r.x();
+            schnittY = r.y();
+            schnittSeite = r.seite();
+            schnittMassstab = k;
+            schnittRund = rund;
+            schnittBaender = baender;
+        }
+        return schnitt;
     }
 
     /**
      * Woran die gedrehte Karte geschnitten wird, in Pixeln des Schirms: eckig das Quadrat, rund ein
-     * Vieleck aussen um den Kreis bis zum Ring oder Umriss, den die Minimap danach darüber zeichnet.
+     * Vieleck aussen um den Kreis. Ohne Rahmen liegt darunter der Umriss. Mit Rahmen ist der Ring in
+     * Einheiten gestuft und durchsichtig, wo die Mitte der Einheit innen liegt: Das Vieleck reicht
+     * deshalb √2/2 Einheiten weiter, bis in die Ecke jeder solchen Einheit, und ragt unter den Ring.
+     * Siehe docs/minimap.md, „Drehen“.
      */
-    private float[] schnitt(Rahmen r, int k, Skin rahmen) {
-        int x0 = r.x() * k, y0 = r.y() * k, n = r.seite() * k;
+    static float[] schnitt(int x, int y, int seite, int k, boolean rund, int baender) {
+        int x0 = x * k, y0 = y * k, n = seite * k;
         if (!rund) {
             return Drehung.rechteck(x0, y0, x0 + n, y0 + n);
         }
-        double radius = (r.seite() / 2.0 - (rahmen == null ? 0 : rahmen.baender())) * k;
+        double radius = (baender == 0 ? seite / 2.0 : seite / 2.0 - baender + Math.sqrt(2) / 2) * k;
         return Drehung.kreis(x0 + n / 2.0, y0 + n / 2.0, radius);
     }
 
@@ -715,7 +744,7 @@ public final class Minimap {
      * und als ein Element gezeichnet; davor ohne Rahmen der Umriss. Siehe docs/minimap.md, „Drehen“.
      */
     private void maleGedreht(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k, Drehung.Lage lage, float[] form, boolean umriss) {
-        int s = CHUNKS_JE_REGION * 16 * zoom * k, n = r.seite() * k, x0 = r.x() * k, y0 = r.y() * k, m = form.length / 2;
+        int s = CHUNKS_JE_REGION * 16 * zoom * k, n = r.seite() * k, x0 = r.x() * k, y0 = r.y() * k;
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.scale(1f / k);
@@ -727,30 +756,19 @@ public final class Minimap {
                 g.fill(x0 - k + l[2], y0 - k + l[0], x0 - k + l[3], y0 - k + l[1], 0xFF000000);
             }
         }
-        double weit = weit(n, k);
-        float[] ecke = new float[8], a = new float[2 * (4 + m)], b = new float[2 * (4 + m)];
-        for (int rz = Math.floorDiv((int) Math.floor(lage.py() - weit) + oben, s); rz <= Math.floorDiv((int) Math.ceil(lage.py() + weit) + oben, s); rz++) {
-            for (int rx = Math.floorDiv((int) Math.floor(lage.px() - weit) + links, s); rx <= Math.floorDiv((int) Math.ceil(lage.px() + weit) + links, s); rx++) {
+        int[] bereich = Drehung.regionen(lage, weit(n, k), links, oben, s);
+        for (int rz = bereich[2]; rz <= bereich[3]; rz++) {
+            for (int rx = bereich[0]; rx <= bereich[1]; rx++) {
                 Region region = regionen.get(ChunkPos.pack(rx, rz));
                 if (region == null) {
                     continue;
                 }
-                int qx = rx * s - links, qy = rz * s - oben;
-                // Wie ungedreht: links oben, links unten, rechts unten, rechts oben.
-                int[] xs = {qx, qx, qx + s, qx + s}, ys = {qy, qy + s, qy + s, qy};
-                for (int i = 0; i < 4; i++) {
-                    ecke[2 * i] = (float) lage.x(xs[i], ys[i]);
-                    ecke[2 * i + 1] = (float) lage.y(xs[i], ys[i]);
-                }
-                int anzahl = Drehung.schneide(ecke, 4, form, m, a, b);
+                int anzahl = Drehung.region(lage, rx * s - links, rz * s - oben, s, form, puffer);
                 if (anzahl < 3) {
                     continue;
                 }
-                float[] ecken = Arrays.copyOf(a, 2 * anzahl), uv = new float[2 * anzahl];
-                for (int i = 0; i < anzahl; i++) {
-                    uv[2 * i] = (float) ((lage.bildX(ecken[2 * i], ecken[2 * i + 1]) - qx) / s);
-                    uv[2 * i + 1] = (float) ((lage.bildY(ecken[2 * i], ecken[2 * i + 1]) - qy) / s);
-                }
+                // Das Element zeichnet später; Ecken und UV gehören ihm.
+                float[] ecken = Arrays.copyOf(puffer.ecken(), 2 * anzahl), uv = Arrays.copyOf(puffer.uv(), 2 * anzahl);
                 AbstractTexture textur = Minecraft.getInstance().getTextureManager().getTexture(region.id);
                 g.guiRenderState.addGuiElement(new Drehung.Bild(kopie, TextureSetup.singleTexture(textur.getTextureView(), textur.getSampler()),
                         ecken, uv, anzahl, flaeche));
@@ -777,7 +795,7 @@ public final class Minimap {
      * zeigt, auf der Mitte der Bänder; N zuletzt, zuoberst. Siehe docs/rahmen.md, „Marken“.
      */
     private void marken(GuiGraphicsExtractor g, Skin skin, Rahmen r, Drehung.Lage lage) {
-        for (int i : new int[] {1, 2, 3, 0}) {
+        for (int i : MARKEN) {
             double ux = lage.richtungX(RICHTUNGEN[i][0], RICHTUNGEN[i][1]), uy = lage.richtungY(RICHTUNGEN[i][0], RICHTUNGEN[i][1]);
             double[] p = Skin.marke(r.x(), r.y(), r.seite(), skin.baender(), rund, ux, uy);
             skin.ornament(g, Skin.markeFuer(i == 0, ux, uy) + (griffEcke >= 0 ? 1 : 0), 0, p[0], p[1]);

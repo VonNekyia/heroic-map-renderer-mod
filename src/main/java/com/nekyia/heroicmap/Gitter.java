@@ -91,23 +91,27 @@ record Gitter(Matrix3x2fc pose, int x0, int y0, int dicke, int farbe, Linien lin
         void vieleck(float[] ecken, int anzahl);
     }
 
-    /** Die Rechtecke der Linien ab (x0, y0) im Bild, gedreht mit {@code lage} und mit {@code form} geschnitten; leere fallen weg. */
+    /**
+     * Die Rechtecke der Linien ab (x0, y0) im Bild, gedreht mit {@code lage} und mit {@code form}
+     * geschnitten; leere fallen weg. Die Puffer gehören dem Render-Thread.
+     */
     static void gedreht(int dicke, Linien l, int x0, int y0, Drehung.Lage lage, float[] form, Vieleck aus) {
         int m = form.length / 2;
-        float[] ecke = new float[8], a = new float[2 * (4 + m)], b = new float[2 * (4 + m)];
+        float[] ecke = PUFFER.ecke(), a = PUFFER.ecken(), b = PUFFER.b();
         rechtecke(dicke, l, (xa, ya, xb, yb) -> {
             // Dieselbe Reihenfolge wie ungedreht: Der Umlaufsinn bleibt, das GUI verwirft nichts.
-            int[] xs = {x0 + xa, x0 + xa, x0 + xb, x0 + xb}, ys = {y0 + ya, y0 + yb, y0 + yb, y0 + ya};
-            for (int i = 0; i < 4; i++) {
-                ecke[2 * i] = (float) lage.x(xs[i], ys[i]);
-                ecke[2 * i + 1] = (float) lage.y(xs[i], ys[i]);
-            }
+            Drehung.setze(ecke, 0, lage, x0 + xa, y0 + ya);
+            Drehung.setze(ecke, 1, lage, x0 + xa, y0 + yb);
+            Drehung.setze(ecke, 2, lage, x0 + xb, y0 + yb);
+            Drehung.setze(ecke, 3, lage, x0 + xb, y0 + ya);
             int anzahl = Drehung.schneide(ecke, 4, form, m, a, b);
             if (anzahl >= 3) {
                 aus.vieleck(a, anzahl);
             }
         });
     }
+
+    private static final Drehung.Puffer PUFFER = new Drehung.Puffer();
 
     @Override
     public RenderPipeline pipeline() {

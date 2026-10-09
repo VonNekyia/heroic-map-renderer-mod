@@ -184,10 +184,10 @@ public final class Messung implements FabricClientGameTest {
         zeile("takt %s blieb bei einem Frame je Tick", art);
     }
 
-    /** Fliegt 20 Blöcke/s über die Strecke x = 0 bis FLUG_TICKS, hin nach Osten oder zurück. */
     /**
      * Was das Drehen je Frame kostet: 4 px, Zoom 4, freie Bildrate, eckig und rund, je ohne und mit
-     * Drehen, bei Gier 30; Frametime ohne und mit Minimap und die Zeit im HUD, im Stand und im Flug.
+     * Drehen; Frametime ohne und mit Minimap und die Zeit im HUD. Im Stand bei Gier 30, im Flug setzt
+     * {@link #flug} die Gier auf ±90, dort dreht die Karte um eine Vierteldrehung.
      */
     private void drehen(ClientGameTestContext context, TestServerContext server) {
         flug(context, server, true);
@@ -223,6 +223,7 @@ public final class Messung implements FabricClientGameTest {
         context.runOnClient(mc -> Minimap.INSTANZ.setzeDrehen(false));
     }
 
+    /** Fliegt 20 Blöcke/s über die Strecke x = 0 bis FLUG_TICKS, hin nach Osten oder zurück. */
     private static void flug(ClientGameTestContext context, TestServerContext server, boolean hin) {
         for (int t = 1; t <= FLUG_TICKS; t++) {
             int x = hin ? t : FLUG_TICKS - t;

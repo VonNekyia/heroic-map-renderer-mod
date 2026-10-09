@@ -195,10 +195,13 @@ Vollbildkarte bleibt genordet. So hat es der User gewünscht.
   Dreiecken (`Drehung.Bild`); die UV jeder Ecke kommen aus der Drehung
   zurück ins Bild. Gedreht bleibt der Umlaufsinn, das GUI verwirft nichts.
 - **Form:** eckig das Quadrat, rund ein Vieleck mit 64 Ecken aussen um den
-  Kreis (`Drehung.kreis`). Es ragt bei 256 Einheiten und GUI-Massstab 4
-  höchstens 0,6 Pixel über den Kreis: ohne Rahmen auf den Umriss, den die
-  Minimap vorher zeichnet, mit Rahmen unter den Ring, den sie danach
-  zeichnet.
+  Kreis (`Drehung.kreis`), gemerkt, bis sich Lage, Seite, GUI-Massstab oder
+  Rahmen ändern (`Minimap.schnitt`). Es ragt bei 256 Einheiten und
+  GUI-Massstab 4 höchstens 0,6 Pixel über den Kreis. Ohne Rahmen liegt
+  darunter der Umriss, den die Minimap vorher zeichnet. Mit Rahmen ist der
+  Ring in Einheiten gestuft und dort durchsichtig, wo die Mitte der Einheit
+  innen liegt; das Vieleck reicht darum √2/2 Einheiten weiter, bis in die
+  Ecke jeder solchen Einheit, und ragt unter den deckenden Ring.
 - **Reichweite:** Eckig gedreht sieht die Minimap bis in die Ecken, √2 so
   weit wie ungedreht (`Minimap.sicht`); sie zeichnet so viele Chunks mehr
   vor. Rund reicht der Kreis wie ungedreht.
@@ -206,14 +209,17 @@ Vollbildkarte bleibt genordet. So hat es der User gewünscht.
   sie und schneidet sie mit der Form (`Gitter.gedreht`); Kreuzungen decken
   weiter einfach.
 - **Wegpunkte und Mitspieler** drehen mit, auch am Rand (`Minimap.marke`
-  mit `lage`). Der Pfeil am eigenen Kopf zeigt nach oben.
+  mit `lage`), und liegen danach auf ganzen Pixeln, sonst flimmerten ihre
+  Texel beim Drehen. Der eigene Kopf liegt auf der Mitte, auf ganzen Pixeln
+  wie ungedreht; sein Pfeil zeigt nach oben.
 - **Im Menü** rechnet die Zeile mit den Koordinaten unter der Maus zurück
   ins Bild.
 - **Mit Rahmen** bleiben die Ornamente in den Ecken; N, O, S und W wandern
   am Rahmen, siehe [Rahmen](rahmen.md), „Marken“.
 - **Kosten** je Frame, gemessen am 09.10. bei 4 px und Zoom 4, siehe
   [Minimap, Drehen](messungen/2026-10-09-minimap-drehen.md): eckig im Stand
-  0,017 ms mehr Frametime im p50, im Flug nichts über der Streuung. Rund
+  bei Gier 30 0,017 ms mehr Frametime im p50; im Flug, um eine
+  Vierteldrehung, nichts über der Streuung. Rund
   ist gedreht billiger als ungedreht, im Stand 0,410 statt 0,715 ms, im
   HUD-Element 0,077 statt 0,335 ms: ein Vieleck je Region statt eines
   Blits je Lauf.

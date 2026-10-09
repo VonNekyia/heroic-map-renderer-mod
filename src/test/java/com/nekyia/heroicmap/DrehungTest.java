@@ -1,5 +1,6 @@
 package com.nekyia.heroicmap;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -9,6 +10,80 @@ import org.junit.jupiter.api.Test;
 
 /** Die drehende Minimap: Winkel, Drehung, Schnitt mit der Form, Marken. Siehe docs/minimap.md, „Drehen“. */
 class DrehungTest {
+
+    @Test
+    void mitRahmenKeineLueckeZumRing() {
+        // Der Ring ist in Einheiten gestuft: Jede Pixelmitte einer Einheit innerhalb der Bänder liegt im Vieleck,
+        // auch nahe den Diagonalen; was darüber ragt, liegt unter dem Ring.
+        for (int k : new int[] {2, 3, 4}) {
+            for (int seite : new int[] {128, 256}) {
+                for (int baender : new int[] {2, 3, 5}) {
+                    float[] form = Minimap.schnitt(0, 0, seite, k, true, baender);
+                    for (int y = 0; y < seite; y++) {
+                        for (int x = 0; x < seite; x++) {
+                            int band = Skin.bandRund(x, y, seite);
+                            if (band < baender || band > baender + 1) {
+                                continue;
+                            }
+                            for (int py = 0; py < k; py++) {
+                                for (int px = 0; px < k; px++) {
+                                    assertTrue(drinnen(form, x * k + px + 0.5, y * k + py + 0.5),
+                                            "k " + k + ", Seite " + seite + ", Bänder " + baender + ", Einheit " + x + ", " + y);
+                                }
+                            }
+                        }
+                    }
+                    for (int i = 0; i < form.length / 2; i++) {
+                        assertTrue(Math.hypot(form[2 * i] - seite * k / 2.0, form[2 * i + 1] - seite * k / 2.0) < seite * k / 2.0);
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    void regionUndUvFuehrenAufDenselbenBildpunkt() {
+        float[] form = Drehung.kreis(128, 128, 100);
+        Drehung.Puffer puffer = new Drehung.Puffer();
+        for (float gier : new float[] {30, 180, -123.4f}) {
+            Drehung.Lage lage = Drehung.Lage.von(Drehung.winkel(gier), 128, 128, 40.5, -70.25);
+            for (int[] q : new int[][] {{-256, -256}, {0, -128}, {-50, 30}}) {
+                int anzahl = Drehung.region(lage, q[0], q[1], 128, form, puffer);
+                for (int i = 0; i < anzahl; i++) {
+                    float u = puffer.uv()[2 * i], v = puffer.uv()[2 * i + 1];
+                    assertTrue(u > -1e-4 && u < 1 + 1e-4 && v > -1e-4 && v < 1 + 1e-4, "UV " + u + ", " + v);
+                    double bx = q[0] + u * 128, by = q[1] + v * 128;
+                    assertEquals(puffer.ecken()[2 * i], lage.x(bx, by), 1e-2, "Gier " + gier);
+                    assertEquals(puffer.ecken()[2 * i + 1], lage.y(bx, by), 1e-2, "Gier " + gier);
+                }
+            }
+        }
+        // Gier 180, ganz in der Form: das Quadrat selbst, die UV von 0 bis 1.
+        Drehung.Lage norden = Drehung.Lage.von(Drehung.winkel(180), 128, 128, 0, 0);
+        assertEquals(4, Drehung.region(norden, -20, -20, 40, Drehung.rechteck(0, 0, 256, 256), puffer));
+        assertArrayEquals(new float[] {108, 108, 108, 148, 148, 148, 148, 108}, java.util.Arrays.copyOf(puffer.ecken(), 8), 1e-4f);
+        assertArrayEquals(new float[] {0, 0, 0, 1, 1, 1, 1, 0}, java.util.Arrays.copyOf(puffer.uv(), 8), 1e-6f);
+    }
+
+    @Test
+    void regionenAuchNegativ() {
+        // ±20 um den Spieler bei (10, 10) im Bild, links und oben −300, Regionen zu 128 Pixeln: nur Region −3.
+        Drehung.Lage lage = Drehung.Lage.von(0, 0, 0, 10, 10);
+        assertArrayEquals(new int[] {-3, -3, -3, -3}, Drehung.regionen(lage, 20, -300, -300, 128));
+        assertArrayEquals(new int[] {-1, 0, -1, 0}, Drehung.regionen(lage, 20, 0, 0, 128));
+    }
+
+    /** Liegt (x, y) im konvexen Vieleck p, gleich welcher Umlaufsinn? */
+    private static boolean drinnen(float[] p, double x, double y) {
+        int m = p.length / 2, plus = 0, minus = 0;
+        for (int i = 0; i < m; i++) {
+            int j = (i + 1) % m;
+            double kreuz = (p[2 * j] - p[2 * i]) * (y - p[2 * i + 1]) - (p[2 * j + 1] - p[2 * i + 1]) * (x - p[2 * i]);
+            plus += kreuz > 0 ? 1 : 0;
+            minus += kreuz < 0 ? 1 : 0;
+        }
+        return plus == 0 || minus == 0;
+    }
 
     @Test
     void blickrichtungLiegtOben() {
