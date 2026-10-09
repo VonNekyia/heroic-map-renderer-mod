@@ -120,22 +120,22 @@ class EbenenTest {
         JsonArray objekte = JsonParser.parseString("["
                 + "{\"id\":\"a\",\"type\":\"pin\",\"at\":[120.5,-340.5]},"
                 + "{\"id\":\"b\",\"type\":\"region\",\"points\":[[0,0],[10,0],[10,10]]},"
-                + "{\"id\":\"c\",\"type\":\"pin\",\"at\":[1,2],\"size\":\"large\",\"color\":\"#40E53F80\",\"dimension\":\"minecraft:the_nether\",\"neu\":1},"
+                + "{\"id\":\"c\",\"type\":\"pin\",\"at\":[1,2],\"size\":\"large\",\"color\":\"#40E53F80\",\"dimension\":\"minecraft:the_nether\",\"neu\":1,\"symbol\":{\"large\":\"images/burg_16.png\"}},"
                 + "{\"id\":\"d\",\"type\":\"pin\",\"at\":\"kaputt\"},"
                 + "{\"id\":\"e\",\"type\":\"pin\",\"at\":[3,4],\"size\":\"small\",\"color\":\"rot\"}"
                 + "]").getAsJsonArray();
-        List<Ebenen.Nadel> n = Ebenen.nadeln(objekte);
+        List<Ebenen.Nadel> n = Ebenen.nadeln("b:staedte", "v1", objekte);
         assertEquals(3, n.size());
-        assertEquals(new Ebenen.Nadel(120.5, -340.5, Ebenen.UEBERWELT, null, 1, Ebenen.FARBE), n.get(0));
+        assertEquals(new Ebenen.Nadel(120.5, -340.5, Ebenen.UEBERWELT, null, 1, Ebenen.FARBE, "b:staedte", "v1", null, null), n.get(0));
         // Das Alpha wirkt am Schild nicht; unbekannte Felder übergeht der Mod.
-        assertEquals(new Ebenen.Nadel(1, 2, "minecraft:the_nether", null, 0, 0xFF40E53F), n.get(1));
-        assertEquals(new Ebenen.Nadel(3, 4, Ebenen.UEBERWELT, null, 2, Ebenen.FARBE), n.get(2));
+        assertEquals(new Ebenen.Nadel(1, 2, "minecraft:the_nether", null, 0, 0xFF40E53F, "b:staedte", "v1", "images/burg_16.png", null), n.get(1));
+        assertEquals(new Ebenen.Nadel(3, 4, Ebenen.UEBERWELT, null, 2, Ebenen.FARBE, "b:staedte", "v1", null, null), n.get(2));
     }
 
     @Test
     void grenzen() {
         // Ein Teil liest höchstens eine Nadel über der Grenze; so merkt die Sammlung, dass es zu viele sind.
-        assertEquals(Ebenen.MAX_NADELN + 1, Ebenen.nadeln(JsonParser.parseString("[" + viele("n", Ebenen.MAX_NADELN + 5) + "]").getAsJsonArray()).size());
+        assertEquals(Ebenen.MAX_NADELN + 1, Ebenen.nadeln("b:e", "v", JsonParser.parseString("[" + viele("n", Ebenen.MAX_NADELN + 5) + "]").getAsJsonArray()).size());
         Ebenen e = new Ebenen();
         StringBuilder ebenen = new StringBuilder();
         for (int i = 0; i < Ebenen.MAX_EBENEN + 1; i++) {
@@ -173,11 +173,18 @@ class EbenenTest {
         JsonArray objekte = JsonParser.parseString("[{\"id\":\"a\",\"type\":\"pin\",\"at\":[0,0],\"name\":\"" + name64 + "\"},"
                 + "{\"id\":\"b\",\"type\":\"pin\",\"at\":[0,0],\"name\":\"" + name65 + "\"},"
                 + "{\"id\":\"c\",\"type\":\"pin\",\"at\":[0,0],\"dimension\":\"" + "d".repeat(Ebenen.MAX_KENNUNG + 1) + "\"}]").getAsJsonArray();
-        List<Ebenen.Nadel> n = Ebenen.nadeln(objekte);
+        List<Ebenen.Nadel> n = Ebenen.nadeln("b:e", "v", objekte);
         // Ein zu langer Name fehlt, die Nadel bleibt; eine zu lange Dimension nimmt die Nadel mit.
         assertEquals(2, n.size());
         assertEquals(name64, n.get(0).name());
         assertNull(n.get(1).name());
+        // Ein zu langes Feld eines Symbols fehlt, die Nadel bleibt.
+        String feld = "images/" + "s".repeat(Ebenen.MAX_FELD - 12) + ".webp", lang = "images/" + "s".repeat(Ebenen.MAX_FELD - 11) + ".webp";
+        JsonArray symbole = JsonParser.parseString("[{\"id\":\"a\",\"type\":\"pin\",\"at\":[0,0],\"symbol\":{\"large\":\"" + feld
+                + "\",\"medium\":\"" + lang + "\"}}]").getAsJsonArray();
+        Ebenen.Nadel mitSymbol = Ebenen.nadeln("b:e", "v", symbole).getFirst();
+        assertEquals(feld, mitSymbol.symbolGross());
+        assertNull(mitSymbol.symbolMittel());
         assertNull(Ebenen.Teil.lies("{\"v\":1,\"typ\":\"ebene\",\"id\":\"" + "i".repeat(Ebenen.MAX_KENNUNG + 1)
                 + "\",\"version\":\"v\",\"teil\":1,\"teile\":1,\"objects\":[]}"));
     }
@@ -255,7 +262,7 @@ class EbenenTest {
     @Test
     void schlichterText() {
         JsonArray objekte = JsonParser.parseString("[{\"id\":\"a\",\"type\":\"pin\",\"at\":[0,0],\"name\":\"\u00a7cRot\"}]").getAsJsonArray();
-        assertEquals("Rot", Ebenen.nadeln(objekte).getFirst().name());
+        assertEquals("Rot", Ebenen.nadeln("b:e", "v", objekte).getFirst().name());
     }
 
     @Test

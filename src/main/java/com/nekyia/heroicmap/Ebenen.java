@@ -40,6 +40,8 @@ final class Ebenen {
     static final int MAX_TEILE = 256;
     /** So lang ist höchstens ein Name, eine Kennung oder eine Dimension; länger übergeht der Mod. */
     static final int MAX_TEXT = 64, MAX_KENNUNG = 129;
+    /** So lang ist höchstens ein Feld eines Symbols: {@code images/}, 64 Zeichen, {@code .webp}. */
+    static final int MAX_FELD = 76;
     static final String UEBERWELT = "minecraft:overworld";
     /** Die Farbe des Schilds ohne {@code color}. */
     static final int FARBE = 0xFFD9443A;
@@ -56,8 +58,12 @@ final class Ebenen {
         }
     }
 
-    /** Eine Nadel mit dem Fuss bei (x, z); {@code groesse} 0 ist {@code large}, 1 {@code medium}, 2 {@code small}. */
-    record Nadel(double x, double z, String dimension, String name, int groesse, int farbe) {
+    /**
+     * Eine Nadel mit dem Fuss bei (x, z); {@code groesse} 0 ist {@code large}, 1 {@code medium}, 2
+     * {@code small}. Dazu ihre Ebene und deren {@code version} und die Felder ihrer Symbole oder null.
+     */
+    record Nadel(double x, double z, String dimension, String name, int groesse, int farbe, String ebene, String version,
+            String symbolGross, String symbolMittel) {
     }
 
     /** Schild und Nadel einer Grösse: Feld zum Tönen und Rahmen mit Nadel, gleich gross, der Fuss unten in der Mitte. */
@@ -86,7 +92,8 @@ final class Ebenen {
                 }
                 String id = text(json, "id", MAX_KENNUNG), version = text(json, "version", MAX_KENNUNG);
                 return id == null || version == null ? null
-                        : new Teil(id, version, json.get("teil").getAsInt(), json.get("teile").getAsInt(), Ebenen.nadeln(json.getAsJsonArray("objects")));
+                        : new Teil(id, version, json.get("teil").getAsInt(), json.get("teile").getAsInt(),
+                                Ebenen.nadeln(id, version, json.getAsJsonArray("objects")));
             } catch (RuntimeException e) {
                 return null;
             }
@@ -179,7 +186,7 @@ final class Ebenen {
     }
 
     /** Die Nadeln aus den Objekten eines Teils, in ihrer Reihenfolge, höchstens {@link #MAX_NADELN} + 1; anderes und Kaputtes fällt weg. */
-    static List<Nadel> nadeln(JsonArray objekte) {
+    static List<Nadel> nadeln(String ebene, String version, JsonArray objekte) {
         List<Nadel> aus = new ArrayList<>();
         for (JsonElement e : objekte) {
             if (aus.size() > MAX_NADELN) {
@@ -188,7 +195,7 @@ final class Ebenen {
             try {
                 JsonObject o = e.getAsJsonObject();
                 if ("pin".equals(o.has("type") ? o.get("type").getAsString() : null)) {
-                    Nadel n = nadel(o);
+                    Nadel n = nadel(o, ebene, version);
                     if (n != null) {
                         aus.add(n);
                     }
@@ -200,9 +207,13 @@ final class Ebenen {
         return List.copyOf(aus);
     }
 
-    /** Eine Nadel; null mit einer Dimension über {@link #MAX_KENNUNG} Zeichen. Ein Name über {@link #MAX_TEXT} fehlt. */
-    private static Nadel nadel(JsonObject o) {
+    /**
+     * Eine Nadel; null mit einer Dimension über {@link #MAX_KENNUNG} Zeichen. Ein Name über
+     * {@link #MAX_TEXT} fehlt, ebenso ein Feld eines Symbols über {@link #MAX_FELD}.
+     */
+    private static Nadel nadel(JsonObject o, String ebene, String version) {
         JsonArray at = o.getAsJsonArray("at");
+        JsonObject symbol = o.has("symbol") ? o.getAsJsonObject("symbol") : new JsonObject();
         int groesse = switch (o.has("size") ? o.get("size").getAsString() : "medium") {
             case "large" -> 0;
             case "small" -> 2;
@@ -210,7 +221,14 @@ final class Ebenen {
         };
         String dimension = o.has("dimension") ? text(o, "dimension", MAX_KENNUNG) : UEBERWELT;
         return dimension == null ? null : new Nadel(at.get(0).getAsDouble(), at.get(1).getAsDouble(), dimension,
-                text(o, "name", MAX_TEXT), groesse, o.has("color") ? farbe(o.get("color").getAsString()) : FARBE);
+                text(o, "name", MAX_TEXT), groesse, o.has("color") ? farbe(o.get("color").getAsString()) : FARBE, ebene, version,
+                feld(symbol, "large"), feld(symbol, "medium"));
+    }
+
+    /** Das Feld eines Symbols wie es steht, oder null, wenn es fehlt oder länger als {@link #MAX_FELD} ist; prüfen tut {@link Symbole#uri}. */
+    private static String feld(JsonObject symbol, String groesse) {
+        String f = symbol.has(groesse) ? symbol.get(groesse).getAsString() : null;
+        return f == null || f.length() > MAX_FELD ? null : f;
     }
 
     /** {@code #RRGGBB} oder {@code #RRGGBBAA} als deckendes ARGB; das Alpha wirkt am Schild nicht. */
@@ -305,7 +323,8 @@ final class Ebenen {
 
     /**
      * Zeichnet die Nadel mit dem Fuss bei (x, y), in Einheiten des GUI auf ganzen Pixeln, um
-     * {@code stufen} Grössen kleiner; den Namen nur in ihrer Grundgrösse. Siehe docs/ebenen.md, „Nadeln“.
+     * {@code stufen} Grössen kleiner: Feld, Symbol der gezeichneten Grösse, Rahmen; den Namen nur in
+     * ihrer Grundgrösse. Siehe docs/ebenen.md, „Nadeln“.
      */
     static void zeichne(GuiGraphicsExtractor g, Font font, float x, float y, Nadel n, int stufen) {
         int groesse = n.groesse() + stufen;
@@ -318,6 +337,12 @@ final class Ebenen {
         pose.translate(x, y);
         // Das Feld steht in Graustufen; die Grafikkarte multipliziert es mit der Farbe.
         g.blitSprite(RenderPipelines.GUI_TEXTURED, s.feld(), -s.breite() / 2, -s.hoehe(), s.breite(), s.hoehe(), n.farbe());
+        int seite = groesse == 0 ? 16 : 9;
+        Identifier symbol = groesse == 2 ? null : Symbole.INSTANZ.symbol(n.ebene(), n.version(), groesse == 0 ? n.symbolGross() : n.symbolMittel(), seite);
+        if (symbol != null) {
+            // Die linke obere Ecke bei (⌊(Breite − Seite) / 2⌋, 3) im Bild des Schilds.
+            g.blit(RenderPipelines.GUI_TEXTURED, symbol, -s.breite() / 2 + (s.breite() - seite) / 2, -s.hoehe() + 3, 0, 0, seite, seite, seite, seite);
+        }
         g.blitSprite(RenderPipelines.GUI_TEXTURED, s.rahmen(), -s.breite() / 2, -s.hoehe(), s.breite(), s.hoehe());
         if (stufen == 0 && n.name() != null) {
             g.centeredText(font, n.name(), 0, 2, TEXT);
