@@ -120,6 +120,13 @@ Ohne Unterbefehl öffnet `/hmap` das Menü, siehe [Minimap](minimap.md), „Bedi
 - **Der tägliche Abgleich:** Das Plugin schickt ihn von sich aus als
   `freigabe` mit `art` `abgleich`; mit Zustimmung lädt der Mod ihn im
   Hintergrund.
+- **Abgleich ohne Stand:** Hat der Mod im Ordner des Massstabs keinen
+  Stand (`Laden.hatStand`), etwa nach dem Löschen der Karte oder in einem
+  neuen Massstab, lädt er statt des Abgleichs voll
+  (`Downloads.vollStattAbgleich`). Er fragt wie vor dem ersten Download
+  und schickt dann `anfrage voll` mit `neu: true`. Sonst brächte der
+  Abgleich je Tag nur ein Zehntel der Karte, denn sein Deckel ist 10 %
+  des Satzes. Den Abgleich dieses Tages verbraucht das trotzdem.
 - **Im Einzelspieler** gibt es keinen Server und keinen Download.
 
 ## Sicherheit

@@ -342,6 +342,17 @@ class LadenTest {
     }
 
     @Test
+    void abgleichOhneStandWirdVoll() throws Exception {
+        // Ein leeres Ziel hat keinen Stand: Statt des Abgleichs fragt der Mod voll an, eine anfrage voll bleibt voll.
+        assertTrue(Downloads.vollStattAbgleich(true, ziel));
+        assertFalse(Downloads.vollStattAbgleich(false, ziel));
+        // Ein Abgleich dorthin brächte nur seinen Deckel, ein Zehntel; voll kommt alles.
+        assertEquals(kacheln.size(), new Laden().lade(auftrag(4, 1L << 30), ziel).geladen());
+        // Mit Stand bleibt der Abgleich ein Abgleich.
+        assertFalse(Downloads.vollStattAbgleich(true, ziel));
+    }
+
+    @Test
     void abgleichHoechstensSeinDeckel() throws Exception {
         kacheln.clear();
         etags.clear();
