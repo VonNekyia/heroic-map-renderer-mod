@@ -62,6 +62,7 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
 | Drehen | aus | die Minimap dreht mit der Blickrichtung, siehe „Drehen“ |
 | Rahmen | ohne | ein Skin um die Minimap, siehe [Rahmen](rahmen.md) |
 | Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
+| Knopf „Ebenen …“ | – | je Ebene vom Server an oder aus, siehe [Ebenen](ebenen.md), „Umschalten“ |
 
 - **Zoom und Auflösung** sind getrennt. Der Zoom legt fest, wie viel
   Gegend die Minimap zeigt: bei 128 Einheiten Seite 128 Blöcke bei 1×,

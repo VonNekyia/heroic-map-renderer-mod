@@ -3,11 +3,19 @@ package com.nekyia.heroicmap;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -18,7 +26,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Die Ebenen vom Server: die Liste aus {@code ebenen}, die Objekte jeder Ebene aus den Teilen von
- * {@code ebene}. Vorerst nur Nadeln. Alles auf dem Render-Thread. Siehe docs/ebenen.md.
+ * {@code ebene}, dazu die Wahl des Spielers, welche an ist. Vorerst nur Nadeln. Alles auf dem
+ * Render-Thread. Siehe docs/ebenen.md.
  */
 final class Ebenen {
 
@@ -63,6 +72,9 @@ final class Ebenen {
     private List<Eintrag> liste = List.of();
     private final Map<String, List<Nadel>> nadeln = new HashMap<>();
     private final Map<String, Sammlung> sammlungen = new HashMap<>();
+    /** Die Wahl des Spielers je Kennung und wo sie liegt; null heisst nur im Speicher. */
+    private final Map<String, Boolean> wahl = new HashMap<>();
+    private Path datei;
 
     /** Eine Nachricht {@code ebenen} oder {@code ebene}; eine kaputte ändert nichts. */
     void empfange(JsonObject json) {
@@ -87,7 +99,7 @@ final class Ebenen {
             }
             JsonObject o = e.getAsJsonObject();
             JsonObject name = o.has("name") ? o.getAsJsonObject("name") : new JsonObject();
-            neu.add(new Eintrag(o.get("id").getAsString(), text(name, "de"), text(name, "en"),
+            neu.add(new Eintrag(o.get("id").getAsString(), schlicht(name, "de"), schlicht(name, "en"),
                     !o.has("visible") || o.get("visible").getAsBoolean(), o.has("order") ? o.get("order").getAsInt() : 0,
                     o.get("version").getAsString()));
         }
@@ -155,7 +167,7 @@ final class Ebenen {
             default -> 1;
         };
         return new Nadel(at.get(0).getAsDouble(), at.get(1).getAsDouble(),
-                o.has("dimension") ? o.get("dimension").getAsString() : UEBERWELT, o.has("name") ? o.get("name").getAsString() : null,
+                o.has("dimension") ? o.get("dimension").getAsString() : UEBERWELT, schlicht(o, "name"),
                 groesse, o.has("color") ? farbe(o.get("color").getAsString()) : FARBE);
     }
 
@@ -167,8 +179,9 @@ final class Ebenen {
         return 0xFF000000 | Integer.parseInt(text.substring(1, 7), 16);
     }
 
-    private static String text(JsonObject o, String feld) {
-        return o.has(feld) ? o.get(feld).getAsString() : null;
+    /** Ein Text vom Server als schlichter Text: Codes mit § setzt der Mod nicht. */
+    private static String schlicht(JsonObject o, String feld) {
+        return o.has(feld) ? ChatFormatting.stripFormatting(o.get(feld).getAsString()) : null;
     }
 
     /** Beim Trennen und bei einem neuen Login: Der Server schickt danach alles neu. */
@@ -180,7 +193,52 @@ final class Ebenen {
 
     /** Die Ebenen, die gezeichnet werden, unten zuerst. */
     List<Eintrag> sichtbar() {
-        return liste.stream().filter(Eintrag::sichtbar).toList();
+        return liste.stream().filter(this::an).toList();
+    }
+
+    /** Alle Ebenen für das Menü, oben zuerst. */
+    List<Eintrag> alle() {
+        return liste.reversed();
+    }
+
+    /** Ist die Ebene an: die Wahl des Spielers, sonst {@code visible}. */
+    boolean an(Eintrag e) {
+        return wahl.getOrDefault(e.id(), e.sichtbar());
+    }
+
+    /** Liest die Wahl aus {@code ebenen.properties} im Ordner der Welt; null heisst nur im Speicher. */
+    void wechsel(Path ordner) {
+        wahl.clear();
+        datei = ordner == null ? null : ordner.resolve("ebenen.properties");
+        if (datei == null || !Files.exists(datei)) {
+            return;
+        }
+        Properties p = new Properties();
+        try (Reader rein = Files.newBufferedReader(datei, StandardCharsets.UTF_8)) {
+            p.load(rein);
+        } catch (IOException | IllegalArgumentException e) {
+            LOGGER.warn("Heroic Map: {} nicht lesbar, alle Ebenen nach visible", datei);
+            return;
+        }
+        p.stringPropertyNames().forEach(id -> wahl.put(id, Boolean.parseBoolean(p.getProperty(id))));
+    }
+
+    /** Schaltet eine Ebene an oder aus und schreibt die Wahl gleich. */
+    void setze(String id, boolean an) {
+        wahl.put(id, an);
+        if (datei == null) {
+            return;
+        }
+        Properties p = new Properties();
+        wahl.forEach((k, v) -> p.setProperty(k, Boolean.toString(v)));
+        try {
+            Files.createDirectories(datei.getParent());
+            try (Writer raus = Files.newBufferedWriter(datei, StandardCharsets.UTF_8)) {
+                p.store(raus, "Heroic Map: Ebenen an oder aus");
+            }
+        } catch (IOException e) {
+            LOGGER.warn("Heroic Map: {} nicht geschrieben", datei, e);
+        }
     }
 
     /** Die Nadeln einer Ebene, die schon ganz da ist, sonst keine. */
@@ -190,7 +248,7 @@ final class Ebenen {
 
     /**
      * Um wie viele Grössen eine Nadel kleiner wird, wenn ein Block {@code p} Einheiten breit ist; ab 3
-     * fällt jede weg. Siehe docs/ebenen.md, „Grösse“.
+     * fällt jede weg. Siehe docs/ebenen.md, „Nadeln“.
      */
     static int stufen(double p) {
         return p >= 1 / 2.0 ? 0 : p >= 1 / 8.0 ? 1 : p >= 1 / 32.0 ? 2 : 3;

@@ -1,8 +1,9 @@
 ---
 title: Ebenen
-description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, und ihre Nadeln als Wappenschild mit Namen auf Minimap und Vollbildkarte zeichnet, kleiner beim Hinauszoomen; was noch fehlt.
+description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Namen auf Minimap und Vollbildkarte zeichnet, kleiner beim Hinauszoomen, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Ebenen.java
+  - src/main/java/com/nekyia/heroicmap/EbenenMenue.java
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
   - src/main/java/com/nekyia/heroicmap/Kanal.java
@@ -79,7 +80,23 @@ die Nachrichten das Plugin:
 - **Reihenfolge:** unter Wegpunkten, Mitspielern und dem eigenen Kopf; die
   Ebenen nach `order`, die höhere oben, in einer Ebene in der Reihenfolge
   der Objekte.
-- **Verborgen:** Eine Ebene mit `visible: false` zeichnet der Mod nicht.
+- **An oder aus:** siehe „Umschalten“.
+- **Text:** Namen von Ebenen und Nadeln setzt der Mod als schlichten Text;
+  Codes mit `§` streicht er.
+
+## Umschalten
+
+- **Untermenü „Ebenen …“** im Untermenü „Einstellungen …“, siehe
+  [Minimap](minimap.md), „Bedienung“ (`EbenenMenue`): je Ebene ein
+  Schalter mit ihrem Namen in der Sprache des Spiels, die oberste zuerst.
+  Passen nicht alle auf den Schirm, blättern `<` und `>`. Ohne Ebenen
+  steht dort „Der Server schickt keine Ebenen.“
+- **Vorgabe** ist `visible` der Ebene; die Wahl des Spielers geht vor.
+- **Gespeichert** gleich beim Umschalten, in `ebenen.properties` im Ordner
+  der Welt neben `wegpunkte.json`, je Kennung `an` oder `aus` als `true`
+  oder `false` (`Ebenen.wechsel`, `Ebenen.setze`). Je Welt eines Servers
+  gilt also eine eigene Wahl. Eine unlesbare Datei gilt nicht; dann zählt
+  `visible`.
 
 ## Grenzen
 
@@ -98,5 +115,4 @@ Wie im Format, mehr übergeht der Mod:
 ## Was noch fehlt
 
 - **Symbole** im Schild, 16 × 16 und 9 × 9 Pixel vom Server.
-- **Umschalten** je Ebene im Menü.
 - **Infotafel** beim Anklicken; Regionen und Kreise (#36).

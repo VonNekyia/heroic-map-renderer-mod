@@ -6,8 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonParser;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /** Die Ebenen vom Server: Liste, Teile, Nadeln und ihre Grösse. Siehe docs/ebenen.md. */
 class EbenenTest {
@@ -135,6 +139,45 @@ class EbenenTest {
         assertEquals(List.of("b:unten", "b:oben"), s.stream().map(Ebenen.Eintrag::id).toList());
         assertEquals("Top", s.get(1).name(true));
         assertEquals("Unten", s.get(0).name(false));
+    }
+
+    @Test
+    void wahlUeberstehtDenNeustart(@TempDir Path ordner) {
+        String zwei = eintrag("b:staedte", "v") + ",{\"id\":\"b:geheim\",\"name\":{\"en\":\"Hidden\"},\"visible\":false,\"order\":200,\"version\":\"v\"}";
+        Ebenen e = new Ebenen();
+        e.wechsel(ordner.resolve("welt"));
+        liste(e, zwei);
+        assertEquals(List.of("b:staedte"), e.sichtbar().stream().map(Ebenen.Eintrag::id).toList());
+        // Im Menü die oberste zuerst, auch verborgene.
+        assertEquals(List.of("b:geheim", "b:staedte"), e.alle().stream().map(Ebenen.Eintrag::id).toList());
+        e.setze("b:staedte", false);
+        e.setze("b:geheim", true);
+        Ebenen neu = new Ebenen();
+        neu.wechsel(ordner.resolve("welt"));
+        liste(neu, zwei);
+        assertEquals(List.of("b:geheim"), neu.sichtbar().stream().map(Ebenen.Eintrag::id).toList());
+        // Eine andere Welt hat ihre eigene Wahl.
+        neu.wechsel(ordner.resolve("andere"));
+        assertEquals(List.of("b:staedte"), neu.sichtbar().stream().map(Ebenen.Eintrag::id).toList());
+    }
+
+    @Test
+    void kaputteWahlGiltNicht(@TempDir Path ordner) throws IOException {
+        Files.writeString(ordner.resolve("ebenen.properties"), "b\\:staedte=false\nkaputt=\\u00zz\n");
+        Ebenen e = new Ebenen();
+        e.wechsel(ordner);
+        liste(e, eintrag("b:staedte", "v"));
+        assertEquals(1, e.sichtbar().size());
+        // Ohne Ordner nur im Speicher.
+        e.wechsel(null);
+        e.setze("b:staedte", false);
+        assertEquals(0, e.sichtbar().size());
+    }
+
+    @Test
+    void schlichterText() {
+        JsonArray objekte = JsonParser.parseString("[{\"id\":\"a\",\"type\":\"pin\",\"at\":[0,0],\"name\":\"\u00a7cRot\"}]").getAsJsonArray();
+        assertEquals("Rot", Ebenen.nadeln(new JsonArray[] {objekte}).getFirst().name());
     }
 
     @Test
