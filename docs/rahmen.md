@@ -53,6 +53,8 @@ im Atlas des GUI; F3+T und Ressourcenpakete laden ihn neu:
 - **`palette.txt`:** eine Zeile je Band, von aussen nach innen, eine Farbe
   `#RRGGBB` oder zwei, Licht und Schatten; `//` beginnt einen Kommentar
   (`Skin.lies`). Der Atlas nimmt nur PNG, die Textdatei liegt daneben.
+  Mindestens zwei Bänder: Gedreht reicht die runde Karte √2/2 Einheiten
+  unter den Ring, bei einem Band ragte sie darüber.
 - **`info.txt`:** nur `schatten=ja` oder `schatten=nein`.
 - **Namen und Beschreibungen** stehen in `de_de.json` und `en_us.json`
   unter `heroicmap.rahmen.<skin>` und `heroicmap.rahmen.<skin>.beschreibung`.

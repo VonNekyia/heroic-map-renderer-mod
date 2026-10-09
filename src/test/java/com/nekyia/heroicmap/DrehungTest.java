@@ -215,6 +215,21 @@ class DrehungTest {
         assertEquals(44, m[1], 1e-4);
     }
 
+    @Test
+    void markeGedrehtAufGanzenPixeln() {
+        // Gier 30 dreht schräg; bei GUI-Massstab 3 läge eine ungerundete Marke zwischen den Pixeln.
+        Minimap.Rahmen r = new Minimap.Rahmen(5, 7, 128);
+        int k = 3, zoom = 4, n = 384;
+        int links = Minimap.ecke(10.3, 10.3, 1f, zoom, k, n), oben = Minimap.ecke(-4.7, -4.7, 1f, zoom, k, n);
+        Drehung.Lage lage = Minimap.lage(r, 10.3, -4.7, 30, zoom, k, links, oben);
+        // Innen und weit draussen, also am Rand geklemmt.
+        for (double[] ort : new double[][] {{12.5, -1.5}, {5.5, -9.5}, {200.5, -150.5}}) {
+            float[] m = Minimap.marke(r, ort[0], ort[1], links, oben, k, zoom, true, 50, true, lage);
+            assertEquals(Math.rint(m[0] * k), m[0] * k, 1e-3);
+            assertEquals(Math.rint(m[1] * k), m[1] * k, 1e-3);
+        }
+    }
+
     private static double flaeche(float[] p, int n) {
         double f = 0;
         for (int i = 0; i < n; i++) {

@@ -125,7 +125,8 @@ final class Skin {
     /**
      * Liest {@code palette.txt}: eine Zeile je Band von aussen nach innen, eine Farbe oder zwei,
      * Licht und Schatten; {@code //} beginnt einen Kommentar. Aus {@code info.txt} nur {@code schatten}.
-     * {@code zier} ist die längere Seite der zier in Pixeln.
+     * {@code zier} ist die längere Seite der zier in Pixeln. Mindestens zwei Bänder, siehe
+     * docs/rahmen.md, „Dateien“.
      */
     static Skin lies(String name, String palette, String info, int zier) {
         List<int[]> baender = new ArrayList<>();
@@ -141,8 +142,8 @@ final class Skin {
             int a = farbe(werte[0]);
             baender.add(new int[] {a, werte.length == 2 ? farbe(werte[1]) : a});
         }
-        if (baender.isEmpty()) {
-            throw new IllegalArgumentException("palette.txt ohne Band");
+        if (baender.size() < 2) {
+            throw new IllegalArgumentException("palette.txt mit weniger als 2 Bändern");
         }
         int[] licht = baender.stream().mapToInt(b -> b[0]).toArray(), schatten = baender.stream().mapToInt(b -> b[1]).toArray();
         return new Skin(name, licht, schatten, info.lines().map(String::trim).anyMatch("schatten=ja"::equals), zier);

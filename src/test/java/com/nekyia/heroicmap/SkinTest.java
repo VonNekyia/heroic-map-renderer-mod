@@ -32,7 +32,8 @@ class SkinTest {
         assertEquals(0xFFA8A8A8, s.licht[1]);
         assertEquals(0xFF4F4D4D, s.schatten[1]);
         assertFalse(s.mitSchatten);
-        assertTrue(Skin.lies("t", "#000000", "schatten=ja", 7).mitSchatten);
+        assertTrue(Skin.lies("t", "#000000\n#111111", "schatten=ja", 7).mitSchatten);
+        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000", "", 7));
         assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000 #111111 #222222", "", 7));
         assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#00000", "", 7));
         assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "// nur Kommentar", "", 7));
@@ -61,8 +62,8 @@ class SkinTest {
     @Test
     void abstandZumRandMitRahmen() {
         assertEquals(Minimap.RAND, Minimap.rand(null));
-        assertEquals(Minimap.RAND, Minimap.rand(Skin.lies("grau", "#000000", "", 7)));
-        assertEquals(8, Minimap.rand(Skin.lies("uhr", "#000000", "", 15)));
+        assertEquals(Minimap.RAND, Minimap.rand(Skin.lies("grau", "#000000\n#000000", "", 7)));
+        assertEquals(8, Minimap.rand(Skin.lies("uhr", "#000000\n#000000", "", 15)));
     }
 
     @Test
