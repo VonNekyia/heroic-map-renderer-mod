@@ -166,10 +166,17 @@ gibt es nicht; so hat es der User gewählt.
   `heroicmap.show` auf beiden Seiten, Vorgabe alle, mit Simple Voice Chat
   auf dem Server und wenn beide `simplevoicechat` gewählt haben. Er antwortet
   `{"typ":"show","erlaubt":true}`, oder mit `"erlaubt":false` und `grund`
-  `permission` oder `simplevoicechat`; das Menü nennt den Grund als
-  Tooltip am Knopf „Mitspieler“ und unter den Knöpfen, soweit der Schirm
-  reicht (`Mitspieler.antwort`), ein anderer Grund wird ein allgemeiner
-  Text. Beim Verlassen des Servers fällt die Antwort weg.
+  `permission` oder `simplevoicechat` (`Mitspieler.antwort`); ein anderer
+  Grund wird ein allgemeiner Text. Beim Verlassen des Servers fällt die
+  Antwort weg.
+- **Ohne Plugin:** Meldet der Server den Kanal nicht, hat er das Plugin
+  nicht, und Mitspieler gehen dort nie; auch im Einzelspieler nicht.
+- **Rot:** Gehen Mitspieler nicht, ohne Plugin oder weil der Server
+  ablehnt, steht der Knopf „Mitspieler“ rot, mit dem Grund als Tooltip
+  und unter den Knöpfen, soweit der Schirm reicht (`Mitspieler.grund`). So
+  sieht jeder, dass die Wahl hier nichts bewirkt; so hat es der User
+  gewünscht. Kommt der Kanal oder die Antwort erst bei offenem Menü, baut
+  es die Knöpfe neu.
 
 - **Nachricht:** `spieler` über den Kanal, etwa einmal je Sekunde:
 

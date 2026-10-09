@@ -2,6 +2,8 @@ package com.nekyia.heroicmap;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import java.util.List;
+import java.util.Objects;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
@@ -11,6 +13,7 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import org.joml.Matrix3x2fStack;
@@ -40,8 +43,8 @@ final class Einstellungen extends Screen {
     private boolean griffLinks, griffOben;
     /** Beim Ziehen: Seite und Maus beim Greifen. */
     private int startSeite, startX, startY;
-    /** Der Knopf „Mitspieler“; lehnt der Server ab, trägt er den Grund als Tooltip. */
-    private CycleButton<Boolean> showKnopf;
+    /** Warum Mitspieler hier nicht gehen, beim Bauen der Knöpfe, oder null ({@link Mitspieler#grund}). */
+    private String grund;
     /** Linker Rand, Oberkante und Breite der Knöpfe. */
     private int spalte, oben, breite;
 
@@ -63,12 +66,15 @@ final class Einstellungen extends Screen {
         addRenderableWidget(CycleButton.builder((Integer z) -> Component.translatable("heroicmap.menue.fach", z), m.zoom())
                 .withValues(1, 2, 4, 8)
                 .create(x + breite - halb, y, halb, 20, Component.translatable("heroicmap.menue.zoom"), (b, z) -> m.setzeZoom(z)));
-        showKnopf = addRenderableWidget(CycleButton.booleanBuilder(Component.translatable("heroicmap.menue.show.simplevoicechat"),
-                        Component.translatable("heroicmap.menue.show.hidden"), m.show())
-                .create(x, y + 24, breite, 20, Component.translatable("heroicmap.menue.show"), (b, an) -> {
+        // Gehen Mitspieler hier nicht, steht der Knopf rot und trägt den Grund als Tooltip.
+        grund = Mitspieler.grund(Kanal.offen(), Mitspieler.INSTANZ.verweigert());
+        CycleButton<Boolean> show = addRenderableWidget(CycleButton.booleanBuilder(rot(Component.translatable("heroicmap.menue.show.simplevoicechat")),
+                        rot(Component.translatable("heroicmap.menue.show.hidden")), m.show())
+                .create(x, y + 24, breite, 20, rot(Component.translatable("heroicmap.menue.show")), (b, an) -> {
                     m.setzeShow(an);
                     Kanal.sendeShow();
                 }));
+        show.setTooltip(grund == null ? null : Tooltip.create(Component.translatable("heroicmap.menue.show.grund." + grund)));
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.laden"),
                 b -> minecraft.gui.setScreen(new Auswahl(this))).bounds(x, y + 48, halb, 20).build());
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.menue.liste"),
@@ -76,6 +82,18 @@ final class Einstellungen extends Screen {
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.menue.einstellungen"),
                 b -> minecraft.gui.setScreen(new Anzeige(this))).bounds(x, y + 76, halb, 20).build());
         addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x + breite - halb, y + 76, halb, 20).build());
+    }
+
+    private MutableComponent rot(MutableComponent text) {
+        return grund == null ? text : text.withStyle(ChatFormatting.RED);
+    }
+
+    /** Meldet der Server den Kanal oder antwortet auf show erst nach dem Öffnen, baut das Menü die Knöpfe neu. */
+    @Override
+    public void tick() {
+        if (!Objects.equals(grund, Mitspieler.grund(Kanal.offen(), Mitspieler.INSTANZ.verweigert()))) {
+            rebuildWidgets();
+        }
     }
 
     /**
@@ -110,13 +128,10 @@ final class Einstellungen extends Screen {
             g.centeredText(font, zeile, mitte, y, TEXT);
             y += font.lineHeight + 1;
         }
-        // Lehnt der Server show ab, steht der Grund am Knopf „Mitspieler“ und unter den Knöpfen, soweit der Schirm reicht.
-        String verweigert = Mitspieler.INSTANZ.verweigert();
-        Component grund = verweigert == null ? null : Component.translatable("heroicmap.menue.show.grund." + verweigert);
-        showKnopf.setTooltip(grund == null ? null : Tooltip.create(grund));
+        // Der Grund steht auch unter den Knöpfen, soweit der Schirm reicht.
         if (grund != null) {
             int zeileY = oben + 100;
-            for (FormattedCharSequence zeile : font.split(grund, breite)) {
+            for (FormattedCharSequence zeile : font.split(Component.translatable("heroicmap.menue.show.grund." + grund), breite)) {
                 if (zeileY + font.lineHeight > height) {
                     break;
                 }
