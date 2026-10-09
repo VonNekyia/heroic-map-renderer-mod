@@ -3,9 +3,7 @@ package com.nekyia.heroicmap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -18,7 +16,7 @@ import java.util.Map;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 
-/** Die Rahmen: Palette, Bänder, Ring und Maske, Ornamente und Griff. Siehe docs/rahmen.md. */
+/** Die Rahmen: Palette, Bänder, Ring, Ornamente und Griff. Siehe docs/rahmen.md. */
 class SkinTest {
 
     private static final String ORDNER = "/assets/heroicmap/textures/gui/sprites/rahmen/";
@@ -107,41 +105,27 @@ class SkinTest {
     }
 
     @Test
-    void ringUndMaskeRechnenGleich() {
-        // Die Karte liegt genau dort, wo der Ring endet: in Einheiten des GUI, beim GUI-Massstab 3 je 3 Pixel.
-        int s = 128, anzahl = 3, k = 3;
+    void ringLiegtInDenBaendern() {
+        // Seite 128, drei Bänder, von Hand gerechnet: In der mittleren Zeile liegen die Pixel 0 bis 2 im Ring, ab 3 die
+        // Karte. Auf der Diagonale (10, 10) ausserhalb, (19, 19) im zweiten Band, (20, 20) im dritten, (21, 21) die Karte.
+        // Wie weit die Karte unter den Ring reicht, prüft DrehungTest.mitRahmenDecktDerRingDenRand.
+        int s = 128;
         Skin skin = Skin.lies("t", "#111111\n#222222 #333333\n#444444", "", 7);
-        boolean[][] maske = new boolean[s][s];
-        for (int[] lauf : Skin.maskeRund(s, anzahl, k)) {
-            assertEquals(0, lauf[0] % k);
-            assertEquals(0, lauf[2] % k);
-            for (int y = lauf[0] / k; y < lauf[1] / k; y++) {
-                for (int x = lauf[2] / k; x < lauf[3] / k; x++) {
-                    maske[y][x] = true;
-                }
-            }
-        }
-        for (int y = 0; y < s; y++) {
-            for (int x = 0; x < s; x++) {
-                int band = Skin.bandRund(x, y, s);
-                assertEquals(band >= anzahl, maske[y][x], x + ", " + y);
-                assertEquals(band >= 0 && band < anzahl, skin.ringFarbe(x, y, s) != 0, x + ", " + y);
-            }
-        }
+        assertEquals(0xFF111111, skin.ringFarbe(0, 64, s));
+        assertEquals(0xFF222222, skin.ringFarbe(1, 64, s));
+        assertEquals(0xFF444444, skin.ringFarbe(2, 64, s));
+        assertEquals(0, skin.ringFarbe(3, 64, s));
+        assertEquals(0xFF333333, skin.ringFarbe(126, 64, s));
+        assertEquals(0xFF111111, skin.ringFarbe(127, 64, s));
+        assertEquals(0, skin.ringFarbe(10, 10, s));
+        assertEquals(0xFF222222, skin.ringFarbe(19, 19, s));
+        assertEquals(0xFF444444, skin.ringFarbe(20, 20, s));
+        assertEquals(0, skin.ringFarbe(21, 21, s));
         // Oben in der Mitte das äussere Band; im zweiten Band oben links Licht, unten rechts Schatten.
         assertEquals(0xFF111111, skin.ringFarbe(s / 2, 0, s));
         assertEquals(0xFF222222, skin.ringFarbe(s / 2, 1, s));
         assertEquals(0xFF333333, skin.ringFarbe(s / 2, s - 2, s));
         assertEquals(0, skin.ringFarbe(s / 2, s / 2, s));
-    }
-
-    @Test
-    void maskeNurBeiNeuerSeiteOderNeuemMassstab() {
-        Skin skin = Skin.lies("t", "#111111\n#222222", "", 7);
-        List<int[]> erste = skin.maske(128, 3);
-        assertSame(erste, skin.maske(128, 3));
-        assertNotSame(erste, skin.maske(128, 2));
-        assertNotSame(skin.maske(128, 2), skin.maske(100, 2));
     }
 
     @Test

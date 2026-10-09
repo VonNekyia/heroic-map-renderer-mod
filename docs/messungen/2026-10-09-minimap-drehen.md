@@ -74,3 +74,5 @@ allen vier Blöcken gleich.
   Blits je Region; gedreht ist es ein Vieleck mit höchstens 68 Ecken je
   Region. Dasselbe Vieleck könnte auch die ungedrehte runde Minimap
   zeichnen; das ist ein eigener Schritt.
+- **Nachgemessen,** auch schräg im Flug:
+  [Minimap, Vieleck auch ungedreht](2026-10-09-minimap-vieleck.md).

@@ -95,6 +95,7 @@ public final class Bilder implements FabricClientGameTest {
             }
             menue(context);
             rahmen(context);
+            umriss(context);
             drehen(context, server);
             vollbildkarte(context);
             selbst(context);
@@ -184,6 +185,37 @@ public final class Bilder implements FabricClientGameTest {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /**
+     * Die runde Minimap ohne Rahmen bei GUI-Massstab 1 und 2, ungedreht: der Rand, Pixel für Pixel.
+     * Siehe docs/minimap.md, „Form“.
+     */
+    private static void umriss(ClientGameTestContext context) {
+        int vorher = context.computeOnClient(mc -> mc.options.guiScale().get());
+        for (int gs : new int[] {1, 2}) {
+            context.runOnClient(mc -> {
+                Minimap.INSTANZ.setzeRund(true);
+                mc.options.guiScale().set(gs);
+                mc.resizeGui();
+            });
+            context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
+            context.waitTicks(2);
+            BufferedImage bild = mitRand(context, context.takeScreenshot(TestScreenshotOptions.of("rund-gs" + gs).disableCounterPrefix()));
+            if (!AUSGABE.isEmpty()) {
+                try {
+                    ImageIO.write(bild, "png", Path.of(AUSGABE, "rund-gs" + gs + ".png").toFile());
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+        }
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeRund(false);
+            mc.options.guiScale().set(vorher);
+            mc.resizeGui();
+        });
+        context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
     }
 
     /**

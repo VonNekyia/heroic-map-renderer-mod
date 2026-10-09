@@ -158,24 +158,22 @@ final class Kartenblick {
     Gitter.Linien linien(int scale, int breite, int hoehe) {
         double chunk = 16.0 * scale, abstand = chunkAbstand(scale);
         int mx = (int) (breite / abstand) + 2, mz = (int) (hoehe / abstand) + 2, nx = 0, ny = 0;
-        int[] xs = new int[mx], va = new int[mx], vb = new int[mx], ys = new int[mz], ha = new int[mz], hb = new int[mz];
+        int[] xs = new int[mx], ys = new int[mz];
         for (int c = ersterChunkX(scale, breite); nx < mx; c++) {
             int x = (int) Math.floor(rasterX(c * chunk, breite));
             if (x >= breite) {
                 break;
             }
-            xs[nx] = x;
-            vb[nx++] = hoehe;
+            xs[nx++] = x;
         }
         for (int c = ersterChunkZ(scale, hoehe); ny < mz; c++) {
             int y = (int) Math.floor(rasterY(c * chunk, hoehe));
             if (y >= hoehe) {
                 break;
             }
-            ys[ny] = y;
-            hb[ny++] = breite;
+            ys[ny++] = y;
         }
-        return new Gitter.Linien(xs, va, vb, nx, ys, ha, hb, ny);
+        return new Gitter.Linien(xs, nx, ys, ny, breite, hoehe);
     }
 
     /** Eine Stufe feiner, auf der feinsten die Lupe grösser. */

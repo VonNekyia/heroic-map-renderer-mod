@@ -156,7 +156,7 @@ final class Karte extends Screen {
 
     /** Chunklinien je 16 Blöcke als ein Element des GUI. Siehe docs/minimap.md, „Chunklinien“. */
     private void linien(GuiGraphicsExtractor g) {
-        Gitter.zeichne(g, 0, 0, width, height, 1, Minimap.LINIE, blick.linien(satz.scale(), width, height));
+        Gitter.zeichne(g, 0, 0, 1, Minimap.LINIE, blick.linien(satz.scale(), width, height));
     }
 
     /**

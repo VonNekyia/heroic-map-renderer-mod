@@ -107,15 +107,14 @@ class KartenblickTest {
         assertTrue(blick.rasterY(z * 64.0, 480) >= 0 && blick.rasterY((z - 1) * 64.0, 480) < 0, "Chunk " + z);
         // Die Linien: ab dem ersten Chunk jede auf dem Raster, bis zum Rand, über Breite und Höhe.
         Gitter.Linien l = blick.linien(4, 854, 480);
+        assertEquals(854, l.breite());
+        assertEquals(480, l.hoehe());
         for (int i = 0; i < l.nx(); i++) {
             assertEquals(Math.floor(blick.rasterX((c + i) * 64.0, 854)), l.xs()[i], 1e-9);
-            assertEquals(0, l.va()[i]);
-            assertEquals(480, l.vb()[i]);
         }
         assertTrue(l.xs()[l.nx() - 1] < 854 && blick.rasterX((c + l.nx()) * 64.0, 854) >= 854);
         for (int j = 0; j < l.ny(); j++) {
             assertEquals(Math.floor(blick.rasterY((z + j) * 64.0, 480)), l.ys()[j], 1e-9);
-            assertEquals(854, l.hb()[j]);
         }
         assertTrue(l.ys()[l.ny() - 1] < 480 && blick.rasterY((z + l.ny()) * 64.0, 480) >= 480);
         // Gröber, bei GUI-Massstab 2: Stufe 2 hat 4 Einheiten Abstand, die Karte zeichnet; Stufe 1 hätte 2, sie zeichnet keine.

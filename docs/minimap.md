@@ -137,8 +137,9 @@ Vorgabe aus. So hat es der User gewünscht.
 - **Ein Element je Frame:** Alle Linien einer Karte sind ein Element des
   GUI (`Gitter`); die Rechtecke entstehen erst beim Zeichnen. Dafür öffnet
   der Access Widener `GuiGraphicsExtractor.guiRenderState`.
-- **Rund** zeichnet die Minimap eine Linie nur, wo sie ganz in der Form
-  liegt, über dieselben Läufe wie die Karte.
+- **In der Form:** Die Minimap rechnet die Linien über das ganze Quadrat
+  und schneidet sie mit derselben Form wie die Karte (`Gitter`); rund
+  enden sie unter dem Ring, siehe „Form“.
 - **Zu dicht:** Ist der Abstand der Linien auf der Vollbildkarte kleiner
   als 4 Einheiten oder als 8 Pixel des Schirms, zeichnet sie keine; es gilt
   der grössere der beiden (`Kartenblick.LINIEN_MIN`, `LINIEN_MIN_PIXEL`,
@@ -154,10 +155,9 @@ Vorgabe aus. So hat es der User gewünscht.
   einem Element:
   - **Minimap**, Seite s Einheiten, Zoom z, GUI-Massstab k: je Richtung
     höchstens s / (16 · z) + 1 Linien, bei 256 Einheiten und Zoom 1× also
-    17 und höchstens 323 Rechtecke. Rund dazu je Linie ein Durchlauf über
-    die Läufe der Form, höchstens s · k, bei 256 Einheiten und k = 4 rund
-    35 000 Vergleiche je Frame. Die Läufe rechnet die Minimap einmal je
-    Frame für Karte und Linien.
+    17 und höchstens 323 Rechtecke. Jedes schneidet sie mit der Form
+    (`Drehung.schneide`), rund mit 64 Kanten, also höchstens rund 21 000
+    Schritte je Frame.
   - **Vollbildkarte**, b × h Einheiten, Abstand a: V ≈ b / a + 1,
     H ≈ h / a + 1. Am dichtesten sind es bei 427 × 240 Einheiten
     (1280 × 720, GUI-Massstab 3) rund 6 600 Rechtecke, bei 960 × 540
@@ -168,9 +168,6 @@ Vorgabe aus. So hat es der User gewünscht.
     Chunk-Zelle als ein Quad; erst, wenn eine Messung es verlangt.
   - **Speicher:** je Frame sechs kleine Felder von `int` und ein Element,
     keine Allokation je Linie.
-- **Später mit der drehenden Minimap:** Die Linien liegen in denselben
-  Koordinaten des Bildes wie die Regionen; dreht die Minimap, gehen sie
-  durch dieselbe Drehung und denselben Schnitt mit der Form.
 
 ![Die Minimap der Szene mit Chunklinien, bei Zoom 2×](bilder/minimap-chunklinien.png)
 
@@ -189,25 +186,13 @@ Vollbildkarte bleibt genordet. So hat es der User gewünscht.
   die Karte dreht um seinen Ort im Bild (`Minimap.lage`, `Drehung.Lage`).
   Gedreht gibt es keine ganzen Pixel mehr; ungedreht bleibt alles auf dem
   Raster wie bisher.
-- **Karte:** Je Region dreht die Minimap ihr Quadrat und schneidet es mit
-  der Form, ein konvexes Vieleck mit einem anderen, Kante für Kante
-  (`Drehung.schneide`). Jede Region ist ein Element des GUI, ein Fächer aus
-  Dreiecken (`Drehung.Bild`); die UV jeder Ecke kommen aus der Drehung
-  zurück ins Bild. Gedreht bleibt der Umlaufsinn, das GUI verwirft nichts.
-- **Form:** eckig das Quadrat, rund ein Vieleck mit 64 Ecken aussen um den
-  Kreis (`Drehung.kreis`), gemerkt, bis sich Lage, Seite, GUI-Massstab oder
-  Rahmen ändern (`Minimap.schnitt`). Es ragt bei 256 Einheiten und
-  GUI-Massstab 4 höchstens 0,6 Pixel über den Kreis. Ohne Rahmen liegt
-  darunter der Umriss, den die Minimap vorher zeichnet. Mit Rahmen ist der
-  Ring in Einheiten gestuft und dort durchsichtig, wo die Mitte der Einheit
-  innen liegt; das Vieleck reicht darum √2/2 Einheiten weiter, bis in die
-  Ecke jeder solchen Einheit, und ragt unter den deckenden Ring.
+- **Karte und Form** wie ungedreht, siehe „Form“; nur die Lage dreht.
 - **Reichweite:** Eckig gedreht sieht die Minimap bis in die Ecken, √2 so
   weit wie ungedreht (`Minimap.sicht`); sie zeichnet so viele Chunks mehr
   vor. Rund reicht der Kreis wie ungedreht.
 - **Chunklinien** rechnet sie über die ganze Gegend um den Spieler, dreht
-  sie und schneidet sie mit der Form (`Gitter.gedreht`); Kreuzungen decken
-  weiter einfach.
+  sie und schneidet sie mit der Form (`Gitter`); Kreuzungen decken weiter
+  einfach.
 - **Wegpunkte und Mitspieler** drehen mit, auch am Rand (`Minimap.marke`
   mit `lage`), und liegen danach auf ganzen Pixeln, sonst flimmerten ihre
   Texel beim Drehen. Der eigene Kopf liegt auf der Mitte, auf ganzen Pixeln
@@ -217,12 +202,11 @@ Vollbildkarte bleibt genordet. So hat es der User gewünscht.
 - **Mit Rahmen** bleiben die Ornamente in den Ecken; N, O, S und W wandern
   am Rahmen, siehe [Rahmen](rahmen.md), „Marken“.
 - **Kosten** je Frame, gemessen am 09.10. bei 4 px und Zoom 4, siehe
-  [Minimap, Drehen](messungen/2026-10-09-minimap-drehen.md): eckig im Stand
-  bei Gier 30 0,017 ms mehr Frametime im p50; im Flug, um eine
-  Vierteldrehung, nichts über der Streuung. Rund
-  ist gedreht billiger als ungedreht, im Stand 0,410 statt 0,715 ms, im
-  HUD-Element 0,077 statt 0,335 ms: ein Vieleck je Region statt eines
-  Blits je Lauf.
+  [Minimap, Vieleck auch ungedreht](messungen/2026-10-09-minimap-vieleck.md):
+  Drehen kostet im p50 eckig 0,011 ms und rund 0,009 ms Frametime im
+  Stand, im Flug nichts über der Streuung, schräg im Flug 0,008 und
+  0,009 ms. Die Messung davor, mit Läufen ungedreht, steht in
+  [Minimap, Drehen](messungen/2026-10-09-minimap-drehen.md).
 
 ## Mitspieler
 
@@ -282,20 +266,57 @@ gibt es nicht; so hat es der User gewählt.
 ## Form
 
 Der Mod zeichnet die Minimap in Pixeln des Schirms, nicht des GUI
-(`Minimap.male`), Zeile für Zeile der Form:
+(`Minimap.male`), gedreht und ungedreht auf demselben Weg:
 
-- **Läufe:** Gleich breite Zeilen fasst `Minimap.laeufe` zu einem Lauf
-  zusammen. Eckig ist das ein einziger Lauf. Rund ist es der Kreis in das
-  Quadrat, je Zeile die Sehne auf ganze Pixel gerundet; bei 384 Pixeln
-  Seite sind das 225 Läufe, etwa 1,2 je Pixel des Radius.
-- **Zeichnen:** je Region der Minimap ein Rechteck aus ihrer Textur je
-  Lauf, das sie schneidet, mit den passenden Texturkoordinaten; dazu
-  dieselbe Form eine Einheit grösser in Schwarz als Rand. Je Region gehen
-  ihre Rechtecke nacheinander, so bleibt es ein Stapel je Textur. Der Mod
-  braucht weder Scissor noch Shader noch Stencil.
-- **Kanten:** Der Kreis ist auf ganze Pixel des Schirms gestuft, ohne
-  Glättung.
-- **Kosten:** rund 0,33 ms je Frame, eckig 0,003 ms, siehe „Kosten“.
+- **Lage:** Wie das Bild auf den Schirm kommt, sagt eine `Drehung.Lage`.
+  Ungedreht verschiebt sie nur, um ganze Pixel; jede Ecke bleibt auf dem
+  Raster der Karte (`DrehungTest.ungedrehtAufDemRaster`). Gedreht siehe
+  „Drehen“.
+- **Karte:** Je Region schneidet die Minimap ihr Quadrat mit der Form, ein
+  konvexes Vieleck mit einem anderen, Kante für Kante (`Drehung.schneide`).
+  Jede Region ist ein Element des GUI, ein Fächer aus Dreiecken
+  (`Drehung.Bild`); die UV jeder Ecke kommen aus der Lage zurück ins Bild.
+  Der Umlaufsinn bleibt, das GUI verwirft nichts. Der Mod braucht weder
+  Scissor noch Shader noch Stencil.
+- **Form:** eckig das Quadrat, rund ein Vieleck mit 64 Ecken aussen um
+  einen Kreis mit dem Radius r (`Drehung.kreis`), gemerkt, bis sich Lage,
+  Seite, GUI-Massstab oder Rahmen ändern (`Minimap.schnitt`). Seine Kanten
+  berühren den Kreis, seine Ecken liegen 0,12 % weiter aussen, bei r = 512
+  Pixeln 0,6 Pixel. Was über den Rand der Karte ragt, deckt der Ring.
+- **Rand ohne Rahmen:** eckig ein schwarzes Quadrat, eine Einheit grösser,
+  vor der Karte. Rund ein schwarzer Ring, eine Einheit breit, nach Karte
+  und Linien: eine Textur mit einem Texel je Pixel des Schirms
+  (`Minimap.umrissRing`); je Zeile zwei Stücke, die Sehnen auf ganze Pixel
+  gerundet (`Minimap.umrissStuecke`, `Minimap.sehne`). Jede Pixelmitte, die
+  er innen frei lässt, liegt höchstens n/2 von der Mitte, n die Seite in
+  Pixeln; keine ausserhalb liegt näher als n/2 + k.
+- **Spielraum ohne Rahmen:** r = n/2 + 1/16 Pixel. OpenGL und Vulkan
+  rasten Ecken auf mindestens 1/16 Pixel ein (`GL_SUBPIXEL_BITS` und
+  `subPixelPrecisionBits`, je mindestens 4). Der Test verlangt darum
+  1/16 Pixel Abstand zur nächsten Kante, innen wie aussen
+  (`DrehungTest.ohneRahmenDecktDerUmrissDenRand`); ohne den Zuschlag ist
+  er rot. Das deckt das Runden auf dieses Raster, das eine Kante um
+  höchstens √2/32 ≈ 0,044 Pixel verschiebt. Schnitte die Karte die Ecken
+  ab statt zu runden, wären es bis √2/16 ≈ 0,088 Pixel; feinere Raster
+  verschieben weniger. Innen bleibt so mehr als 1/16 Pixel, weil jede freie Pixelmitte
+  näher als n/2 liegt. Aussen ist es bei GUI-Massstab 1 und 256 Einheiten
+  am knappsten, mit 0,78 Pixeln bis zum Rand des Umrisses. Bei 256
+  Einheiten und GUI-Massstab 4 ragen die Ecken 0,7 Pixel über n/2, unter
+  einen Ring von 4 Pixeln.
+- **Rand mit Rahmen:** Der Ring ist in Einheiten gestuft und dort
+  durchsichtig, wo die Mitte der Einheit innen liegt. Das Vieleck reicht
+  darum √2/2 Einheiten über die Bänder hinaus, bis in die Ecke jeder
+  solchen Einheit, und bleibt unter dem deckenden Ring, mit demselben
+  Abstand von 1/16 Pixel wie ohne Rahmen
+  (`DrehungTest.mitRahmenDecktDerRingDenRand`). Bei einem Band ragte es
+  über den Ring; darum verlangt `Skin.lies` mindestens zwei.
+- **Kanten:** Der Kreis ist gestuft, ohne Glättung: ohne Rahmen auf ganze
+  Pixel des Schirms, mit Rahmen auf Einheiten des GUI.
+- **Kosten:** siehe „Kosten“.
+
+![Der Rand der runden Minimap ohne Rahmen bei GUI-Massstab 1](bilder/rund-gs1.png)
+
+![Der Rand der runden Minimap ohne Rahmen bei GUI-Massstab 2](bilder/rund-gs2.png)
 
 ![Minimap rund bei 4 Pixeln je Block](bilder/minimap-rund.png)
 
@@ -494,7 +515,9 @@ nichts.
 
 Bei Sichtweite 12 und einem Fenster von 854 × 480, gemessen am 05. und
 06.10., siehe [Minimap, Kosten](messungen/2026-10-05-minimap-kosten.md) und
-[Minimap, rund gegen eckig](messungen/2026-10-06-minimap-rund.md):
+[Minimap, rund gegen eckig](messungen/2026-10-06-minimap-rund.md); die
+runde Form am 09.10., seit dem Vieleck, siehe
+[Minimap, Vieleck auch ungedreht](messungen/2026-10-09-minimap-vieleck.md):
 
 | Was | Bedingung | Zeit |
 |---|---|---|
@@ -506,10 +529,22 @@ Bei Sichtweite 12 und einem Fenster von 854 × 480, gemessen am 05. und
 | Kopie der Texel des Atlas | einmal je Neuladen | 3,5 bis 15 ms |
 | neue Region | bei 4 px | 0,14 bis 0,17 ms |
 | HUD-Element je Frame, eckig | 4 px, Stand, Median | 0,003 ms |
-| HUD-Element je Frame, rund | 4 px, Stand, Median, 149 Läufe | 0,33 ms |
-| Frametime im p50, rund, mehr als ohne Minimap | freie Bildrate, 4 px, Stand | 0,40 ms |
+| HUD-Element je Frame, rund | 4 px, Stand, Median, 09.10. | 0,007 ms |
+| Frametime im p50, rund, mehr als ohne Minimap | freie Bildrate, 4 px, Stand, 09.10. | 0,03 ms |
 
 Der Flug geht dabei mit 20 Blöcken/s über geladenes Gelände.
+
+**Der Umriss rund ohne Rahmen** (`Minimap.umrissRing`), geschätzt, nicht
+gemessen:
+
+- **Speicher:** eine Textur mit (n + 2k)² Texeln, bei 256 Einheiten und
+  GUI-Massstab 4 also 1032², rund 4 MiB auf der Grafikkarte. Noch einmal so
+  viel im RAM, weil die `DynamicTexture` ihr Bild behält.
+- **Neu gebaut,** wenn sich Seite oder GUI-Massstab ändern, beim Ziehen am
+  Griff also bei jedem Schritt. Geschrieben werden nur die Stücke des
+  Rings, bei 256 Einheiten und GUI-Massstab 4 rund 13 000 Pixel.
+- **Freigegeben,** sobald die Minimap eckig ist, einen Rahmen hat oder
+  nicht zu sehen ist, auch ohne Welt.
 
 Bei 8 und 16 px, gemessen am 07.10., siehe
 [Minimap, 8 und 16 px](messungen/2026-10-07-minimap-8-16px.md):
@@ -536,7 +571,8 @@ Den Gametest dazu startet:
 Der Gametest `Bilder` baut eine Szene in einer flachen Welt und nimmt die
 Minimap bei 1, 2 und 4 Pixeln je Block auf, mit dem Zoom gleich der
 Auflösung, dann rund bei 4 px, das Menü und das Untermenü
-„Einstellungen …“ (siehe „Bedienung“ und „Form“), zuletzt die
+„Einstellungen …“ (siehe „Bedienung“ und „Form“), den Rand rund ohne
+Rahmen bei GUI-Massstab 1 und 2 (siehe „Form“), zuletzt die
 Chunklinien auf Vollbildkarte und Minimap (siehe „Chunklinien“):
 
 ```bash

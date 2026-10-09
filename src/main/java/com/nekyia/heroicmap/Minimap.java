@@ -14,7 +14,6 @@ import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -111,12 +110,15 @@ public final class Minimap {
     /** Solange das Menü offen ist: die Ecke des Griffs, 0 bis 3, sonst -1; und ob die Maus auf ihm liegt. */
     private int griffEcke = -1;
     private boolean griffAktiv;
-    /** Die Form der gedrehten Karte ({@link #schnitt(Rahmen, int, Skin)}) und wofür. */
+    /** Die Form der Karte ({@link #schnitt(Rahmen, int, Skin)}) und wofür. */
     private float[] schnitt;
     private int schnittX, schnittY, schnittSeite, schnittMassstab, schnittBaender;
     private boolean schnittRund;
     /** Zwischenspeicher für die Vielecke der Regionen, auf dem Render-Thread. */
     private final Drehung.Puffer puffer = new Drehung.Puffer();
+    /** Der Ring des Umrisses ({@link #umrissRing}) und wofür. */
+    private Identifier umrissTextur;
+    private int umrissSeite, umrissMassstab;
     /** Die zuletzt gerechneten Ecken der Ornamente und wofür. */
     private Skin eckenSkin;
     private Rahmen eckenRahmen;
@@ -509,6 +511,7 @@ public final class Minimap {
         LocalPlayer spieler = mc.player;
         ClientLevel level = mc.level;
         if (!sichtbar || spieler == null || level == null) {
+            gibUmrissFrei();
             return;
         }
         arbeite(mc, level, spieler);
@@ -518,22 +521,28 @@ public final class Minimap {
         int k = mc.getWindow().getGuiScale(), n = r.seite() * k;
         int links = ecke(spieler.xo, spieler.getX(), a, zoom, k, n);
         int oben = ecke(spieler.zo, spieler.getZ(), a, zoom, k, n);
-        // Die Form einmal je Frame, für Karte und Linien; rund mit Skin innerhalb seiner Bänder.
         Skin rahmen = Skin.von(skin);
         Drehung.Lage lage = drehen ? lage(r, Mth.lerp(a, spieler.xo, spieler.getX()), Mth.lerp(a, spieler.zo, spieler.getZ()),
                 spieler.getViewYRot(a), zoom, k, links, oben) : null;
-        if (lage == null) {
-            List<int[]> form = rahmen != null && rund ? rahmen.maske(r.seite(), k) : laeufe(n, rund);
-            male(g, r, links, oben, k, form, rahmen == null);
-            if (chunklinien) {
-                linien(g, r, links, oben, k, form);
-            }
+        // Ungedreht liegt das Bild auf dem Raster der Karte, gedreht dreht es um den Spieler; der Weg ist derselbe.
+        Drehung.Lage bild = lage != null ? lage : Drehung.Lage.von(0, r.x() * k, r.y() * k, 0, 0);
+        double weit = weit(n, k);
+        double[] bereich = lage != null ? new double[] {lage.px() - weit, lage.py() - weit, lage.px() + weit, lage.py() + weit}
+                : new double[] {0, 0, n, n};
+        float[] form = schnitt(r, k, rahmen);
+        male(g, r, links, oben, k, bild, bereich, form, rahmen == null);
+        if (chunklinien) {
+            linien(g, r, links, oben, k, bild, bereich, form);
+        }
+        if (rund && rahmen == null) {
+            // Nach Karte und Linien, ihr Vieleck ragt unter den Ring. Siehe docs/minimap.md, „Form“.
+            Matrix3x2fStack pose = g.pose();
+            pose.pushMatrix();
+            pose.scale(1f / k);
+            g.blit(umrissRing(n, k), r.x() * k - k, r.y() * k - k, r.x() * k + n + k, r.y() * k + n + k, 0, 1, 0, 1);
+            pose.popMatrix();
         } else {
-            float[] form = schnitt(r, k, rahmen);
-            maleGedreht(g, r, links, oben, k, lage, form, rahmen == null);
-            if (chunklinien) {
-                linienGedreht(g, r, links, oben, k, lage, form);
-            }
+            gibUmrissFrei();
         }
         if (rahmen != null) {
             zeichneRahmen(g, rahmen, r);
@@ -654,43 +663,6 @@ public final class Minimap {
     }
 
     /**
-     * Zeichnet Rand und Regionen in Pixeln des Schirms, Lauf für Lauf der Form; eckig ist das ein
-     * einziger Lauf. Siehe docs/minimap.md, „Form“.
-     */
-    private void male(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k, List<int[]> form, boolean umriss) {
-        // Eine Region in Pixeln des Schirms nach dem Zoom; die Textur trifft sie über die Koordinaten 0 bis 1.
-        int s = CHUNKS_JE_REGION * 16 * zoom * k;
-        Matrix3x2fStack pose = g.pose();
-        pose.pushMatrix();
-        pose.scale(1f / k);
-        int x0 = r.x() * k, y0 = r.y() * k, n = r.seite() * k;
-        if (umriss) {
-            for (int[] l : laeufe(n + 2 * k, rund)) {
-                g.fill(x0 - k + l[2], y0 - k + l[0], x0 - k + l[3], y0 - k + l[1], 0xFF000000);
-            }
-        }
-        for (int rz = Math.floorDiv(oben, s); rz <= Math.floorDiv(oben + n - 1, s); rz++) {
-            for (int rx = Math.floorDiv(links, s); rx <= Math.floorDiv(links + n - 1, s); rx++) {
-                Region region = regionen.get(ChunkPos.pack(rx, rz));
-                if (region == null) {
-                    continue;
-                }
-                int qx = x0 + rx * s - links, qy = y0 + rz * s - oben;
-                // Je Region alle Läufe nacheinander, so bleibt es ein Stapel je Textur.
-                for (int[] l : form) {
-                    int ya = Math.max(y0 + l[0], qy), yb = Math.min(y0 + l[1], qy + s);
-                    int xa = Math.max(x0 + l[2], qx), xb = Math.min(x0 + l[3], qx + s);
-                    if (ya < yb && xa < xb) {
-                        g.blit(region.id, xa, ya, xb, yb, (xa - qx) / (float) s, (xb - qx) / (float) s,
-                                (ya - qy) / (float) s, (yb - qy) / (float) s);
-                    }
-                }
-            }
-        }
-        pose.popMatrix();
-    }
-
-    /**
      * Wie das Bild beim Drehen auf den Schirm kommt, in Pixeln des Schirms: der Spieler bei (x, z),
      * genau zwischen zwei Ticks, auf der Mitte der Minimap, die Blickrichtung {@code gier} oben.
      * Siehe docs/minimap.md, „Drehen“.
@@ -702,7 +674,7 @@ public final class Minimap {
                 Projektion.zuPixel(x, zoom) * k - links, Projektion.zuPixel(z, zoom) * k - oben);
     }
 
-    /** Die Form, an der die gedrehte Karte geschnitten wird ({@link #schnitt(int, int, int, int, boolean, int)}), gemerkt. */
+    /** Die Form, an der die Karte geschnitten wird ({@link #schnitt(int, int, int, int, boolean, int)}), gemerkt. */
     private float[] schnitt(Rahmen r, int k, Skin rahmen) {
         int baender = rahmen == null ? 0 : rahmen.baender();
         if (schnitt == null || schnittX != r.x() || schnittY != r.y() || schnittSeite != r.seite() || schnittMassstab != k
@@ -719,18 +691,16 @@ public final class Minimap {
     }
 
     /**
-     * Woran die gedrehte Karte geschnitten wird, in Pixeln des Schirms: eckig das Quadrat, rund ein
-     * Vieleck aussen um den Kreis. Ohne Rahmen liegt darunter der Umriss. Mit Rahmen ist der Ring in
-     * Einheiten gestuft und durchsichtig, wo die Mitte der Einheit innen liegt: Das Vieleck reicht
-     * deshalb √2/2 Einheiten weiter, bis in die Ecke jeder solchen Einheit, und ragt unter den Ring.
-     * Siehe docs/minimap.md, „Drehen“.
+     * Woran die Karte geschnitten wird, in Pixeln des Schirms: eckig das Quadrat, rund ein Vieleck
+     * aussen um den Kreis, das unter den Ring reicht; ohne Rahmen n/2 + 1/16 Pixel, mit Rahmen √2/2
+     * Einheiten über die Bänder hinaus. Siehe docs/minimap.md, „Form“.
      */
     static float[] schnitt(int x, int y, int seite, int k, boolean rund, int baender) {
         int x0 = x * k, y0 = y * k, n = seite * k;
         if (!rund) {
             return Drehung.rechteck(x0, y0, x0 + n, y0 + n);
         }
-        double radius = (baender == 0 ? seite / 2.0 : seite / 2.0 - baender + Math.sqrt(2) / 2) * k;
+        double radius = baender == 0 ? seite / 2.0 * k + 1.0 / 16 : (seite / 2.0 - baender + Math.sqrt(2) / 2) * k;
         return Drehung.kreis(x0 + n / 2.0, y0 + n / 2.0, radius);
     }
 
@@ -740,26 +710,26 @@ public final class Minimap {
     }
 
     /**
-     * Die Regionen gedreht: je Region ihr Quadrat um den Spieler gedreht, mit der Form geschnitten
-     * und als ein Element gezeichnet; davor ohne Rahmen der Umriss. Siehe docs/minimap.md, „Drehen“.
+     * Die Regionen: je Region ihr Quadrat mit {@code lage} auf den Schirm, mit der Form geschnitten
+     * und als ein Element gezeichnet; {@code bereich} ist, was im Bild zu sehen sein kann. Ohne
+     * Rahmen eckig davor der Umriss; rund zeichnet ihn {@link #zeichne} danach als Ring. Siehe
+     * docs/minimap.md, „Form“.
      */
-    private void maleGedreht(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k, Drehung.Lage lage, float[] form, boolean umriss) {
+    private void male(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k, Drehung.Lage lage, double[] bereich, float[] form,
+            boolean umriss) {
         int s = CHUNKS_JE_REGION * 16 * zoom * k, n = r.seite() * k, x0 = r.x() * k, y0 = r.y() * k;
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.scale(1f / k);
         Matrix3x2f kopie = new Matrix3x2f(pose);
         ScreenRectangle flaeche = new ScreenRectangle(x0, y0, n, n).transformMaxBounds(kopie);
-        // Erst der Umriss, wie ungedreht; das Vieleck der Karte ragt bis 0,6 Pixel über den Kreis auf ihn.
-        if (umriss) {
-            for (int[] l : laeufe(n + 2 * k, rund)) {
-                g.fill(x0 - k + l[2], y0 - k + l[0], x0 - k + l[3], y0 - k + l[1], 0xFF000000);
-            }
+        if (umriss && !rund) {
+            g.fill(x0 - k, y0 - k, x0 + n + k, y0 + n + k, 0xFF000000);
         }
-        int[] bereich = Drehung.regionen(lage, weit(n, k), links, oben, s);
-        for (int rz = bereich[2]; rz <= bereich[3]; rz++) {
-            for (int rx = bereich[0]; rx <= bereich[1]; rx++) {
-                Region region = regionen.get(ChunkPos.pack(rx, rz));
+        int[] regionen = Drehung.regionen(bereich, links, oben, s);
+        for (int rz = regionen[2]; rz <= regionen[3]; rz++) {
+            for (int rx = regionen[0]; rx <= regionen[1]; rx++) {
+                Region region = this.regionen.get(ChunkPos.pack(rx, rz));
                 if (region == null) {
                     continue;
                 }
@@ -777,16 +747,68 @@ public final class Minimap {
         pose.popMatrix();
     }
 
-    /** Die Chunklinien gedreht: über die ganze Gegend um den Spieler gerechnet, dann gedreht und mit der Form geschnitten. */
-    private void linienGedreht(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k, Drehung.Lage lage, float[] form) {
+    /**
+     * Der schwarze Umriss der runden Minimap ohne Rahmen als Textur, ein Texel je Pixel des Schirms,
+     * aus {@link #umrissStuecke}. Nur der für die letzte Seite und den letzten GUI-Massstab bleibt.
+     * Speicher siehe docs/minimap.md, „Kosten“.
+     */
+    private Identifier umrissRing(int n, int k) {
+        if (umrissTextur == null || umrissSeite != n || umrissMassstab != k) {
+            gibUmrissFrei();
+            int m = n + 2 * k;
+            Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "umriss");
+            // Neu angelegt ist die Textur ganz durchsichtig; nur die Stücke des Rings werden schwarz.
+            DynamicTexture textur = new DynamicTexture(() -> "heroicmap " + id, m, m, true);
+            NativeImage pixel = textur.getPixels();
+            for (int y = 0; y < m; y++) {
+                int[] stuecke = umrissStuecke(n, k, y);
+                for (int i = 0; i < stuecke.length; i += 2) {
+                    pixel.fillRect(stuecke[i], y, stuecke[i + 1] - stuecke[i], 1, 0xFF000000);
+                }
+            }
+            textur.upload();
+            Minecraft.getInstance().getTextureManager().register(id, textur);
+            umrissTextur = id;
+            umrissSeite = n;
+            umrissMassstab = k;
+        }
+        return umrissTextur;
+    }
+
+    private void gibUmrissFrei() {
+        if (umrissTextur != null) {
+            Minecraft.getInstance().getTextureManager().release(umrissTextur);
+            umrissTextur = null;
+        }
+    }
+
+    /**
+     * Die schwarzen Stücke der Zeile y im Umriss mit der Seite n + 2k, {x0, x1} oder {x0, x1, x2, x3},
+     * Enden ausschliesslich: der Kreis mit der Seite n + 2k ohne den mit der Seite n in seiner Mitte,
+     * je Zeile auf ganze Pixel ({@link #sehne}).
+     */
+    static int[] umrissStuecke(int n, int k, int y) {
+        int m = n + 2 * k, a = sehne(m, y);
+        if (y < k || y >= n + k) {
+            return new int[] {a, m - a};
+        }
+        int b = sehne(n, y - k) + k;
+        return new int[] {a, b, m - b, m - a};
+    }
+
+    /**
+     * Die Chunklinien als ein Element des GUI: über den {@code bereich} des Bilds gerechnet, mit
+     * {@code lage} auf den Schirm und mit der Form geschnitten. Siehe docs/minimap.md, „Chunklinien“.
+     */
+    private void linien(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k, Drehung.Lage lage, double[] bereich, float[] form) {
         int n = r.seite() * k;
-        double weit = weit(n, k);
-        int bx = (int) Math.floor(lage.px() - weit), by = (int) Math.floor(lage.py() - weit), seite = (int) Math.ceil(2 * weit) + 1;
+        int bx = (int) Math.floor(bereich[0]), by = (int) Math.floor(bereich[1]);
+        int seite = (int) Math.ceil(Math.max(bereich[2] - bx, bereich[3] - by));
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.scale(1f / k);
         Gitter.zeichne(g, bx, by, new ScreenRectangle(r.x() * k, r.y() * k, n, n), k, LINIE,
-                linien(seite, links + bx, oben + by, 16 * zoom * k, k, laeufe(seite, false)), lage, form);
+                linien(seite, links + bx, oben + by, 16 * zoom * k, k), lage, form);
         pose.popMatrix();
     }
 
@@ -842,82 +864,22 @@ public final class Minimap {
         return Math.abs(x - Math.round(gx)) <= 4 && Math.abs(y - Math.round(gy)) <= 4;
     }
 
-    /** Die Chunklinien als ein Element des GUI, in Pixeln des Schirms. Siehe docs/minimap.md, „Chunklinien“. */
-    private void linien(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k, List<int[]> form) {
-        int n = r.seite() * k;
-        Matrix3x2fStack pose = g.pose();
-        pose.pushMatrix();
-        pose.scale(1f / k);
-        Gitter.zeichne(g, r.x() * k, r.y() * k, n, n, k, LINIE, linien(n, links, oben, 16 * zoom * k, k, form));
-        pose.popMatrix();
-    }
-
     /**
-     * Die Chunklinien im Bild der Minimap mit der Seite n, auf dem Raster der Karte: Die Linie von
-     * Chunk c beginnt auf dem Pixel, auf dem die Karte Block 16·c zeichnet ({@link #pixel}), alle
-     * {@code schritt} Pixel, und ist k breit. Nur Linien ganz im Bild; rund nur, wo sie ganz in der
-     * Form liegen.
+     * Die Chunklinien im Quadrat mit der Seite n, auf dem Raster der Karte: Die Linie von Chunk c
+     * beginnt auf dem Pixel, auf dem die Karte Block 16·c zeichnet ({@link #pixel}), alle
+     * {@code schritt} Pixel, und ist k breit; nur Linien ganz im Quadrat, über seine ganze Seite.
+     * Die Form schneidet danach {@link Gitter}.
      */
-    static Gitter.Linien linien(int n, int links, int oben, int schritt, int k, List<int[]> form) {
+    static Gitter.Linien linien(int n, int links, int oben, int schritt, int k) {
         int m = n / schritt + 1, nx = 0, ny = 0;
-        int[] xs = new int[m], va = new int[m], vb = new int[m], ys = new int[m], ha = new int[m], hb = new int[m];
+        int[] xs = new int[m], ys = new int[m];
         for (int px = Math.ceilDiv(links, schritt) * schritt - links; px + k <= n; px += schritt) {
-            // Die Läufe, die die Linie ganz enthalten, folgen im Kreis aufeinander.
-            int ya = -1, yb = -1;
-            for (int[] l : form) {
-                if (l[2] <= px && px + k <= l[3]) {
-                    ya = ya < 0 ? l[0] : ya;
-                    yb = l[1];
-                }
-            }
-            if (ya >= 0) {
-                xs[nx] = px;
-                va[nx] = ya;
-                vb[nx++] = yb;
-            }
+            xs[nx++] = px;
         }
         for (int pz = Math.ceilDiv(oben, schritt) * schritt - oben; pz + k <= n; pz += schritt) {
-            int xa = 0, xb = n;
-            boolean drin = false;
-            for (int[] l : form) {
-                if (l[0] < pz + k && pz < l[1]) {
-                    xa = Math.max(xa, l[2]);
-                    xb = Math.min(xb, l[3]);
-                    drin = true;
-                }
-            }
-            if (drin && xa < xb) {
-                ys[ny] = pz;
-                ha[ny] = xa;
-                hb[ny++] = xb;
-            }
+            ys[ny++] = pz;
         }
-        return new Gitter.Linien(xs, va, vb, nx, ys, ha, hb, ny);
-    }
-
-    /**
-     * Die Zeilen einer Form mit der Seite n, zu Läufen gleicher Breite zusammengefasst, je Lauf
-     * {y0, y1, x0, x1}, Ende ausschliesslich. Rund ist es der Kreis in das Quadrat, sonst das Quadrat.
-     */
-    static List<int[]> laeufe(int n, boolean rund) {
-        List<int[]> laeufe = new ArrayList<>();
-        if (!rund) {
-            laeufe.add(new int[] {0, n, 0, n});
-            return laeufe;
-        }
-        int[] lauf = null;
-        for (int y = 0; y < n; y++) {
-            int a = sehne(n, y);
-            if (a >= n - a) {
-                lauf = null;
-            } else if (lauf != null && lauf[2] == a) {
-                lauf[1] = y + 1;
-            } else {
-                lauf = new int[] {y, y + 1, a, n - a};
-                laeufe.add(lauf);
-            }
-        }
-        return laeufe;
+        return new Gitter.Linien(xs, nx, ys, ny, n, n);
     }
 
     /** Linker Rand der Zeile y im Kreis in ein Quadrat mit der Seite n, auf ganze Pixel; der rechte ist n minus dieser. */

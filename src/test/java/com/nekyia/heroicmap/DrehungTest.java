@@ -12,33 +12,79 @@ import org.junit.jupiter.api.Test;
 class DrehungTest {
 
     @Test
-    void mitRahmenKeineLueckeZumRing() {
+    void mitRahmenDecktDerRingDenRand() {
         // Der Ring ist in Einheiten gestuft: Jede Pixelmitte einer Einheit innerhalb der Bänder liegt im Vieleck,
-        // auch nahe den Diagonalen; was darüber ragt, liegt unter dem Ring.
-        for (int k : new int[] {2, 3, 4}) {
-            for (int seite : new int[] {128, 256}) {
+        // auch nahe den Diagonalen; keine einer Einheit ausserhalb des Rings. Beides mit EINRASTEN Abstand zum Rand.
+        for (int k : new int[] {1, 2, 3, 4}) {
+            for (int seite : new int[] {Minimap.KLEINSTE, Minimap.GROESSE, 200, Minimap.GROESSTE}) {
                 for (int baender : new int[] {2, 3, 5}) {
                     float[] form = Minimap.schnitt(0, 0, seite, k, true, baender);
-                    for (int y = 0; y < seite; y++) {
-                        for (int x = 0; x < seite; x++) {
+                    for (int y = -2; y < seite + 2; y++) {
+                        for (int x = -2; x < seite + 2; x++) {
                             int band = Skin.bandRund(x, y, seite);
-                            if (band < baender || band > baender + 1) {
+                            if (band < -2 || band > baender + 1 || band >= 0 && band < baender) {
                                 continue;
                             }
                             for (int py = 0; py < k; py++) {
                                 for (int px = 0; px < k; px++) {
-                                    assertTrue(drinnen(form, x * k + px + 0.5, y * k + py + 0.5),
+                                    double a = abstand(form, x * k + px + 0.5, y * k + py + 0.5);
+                                    assertTrue(band >= baender ? a >= EINRASTEN : a <= -EINRASTEN,
                                             "k " + k + ", Seite " + seite + ", Bänder " + baender + ", Einheit " + x + ", " + y);
                                 }
                             }
                         }
                     }
-                    for (int i = 0; i < form.length / 2; i++) {
-                        assertTrue(Math.hypot(form[2 * i] - seite * k / 2.0, form[2 * i + 1] - seite * k / 2.0) < seite * k / 2.0);
+                }
+            }
+        }
+    }
+
+    @Test
+    void ohneRahmenDecktDerUmrissDenRand() {
+        // Der Umriss aus Minimap.umrissStuecke, die Textur um k nach links oben: Jede Pixelmitte, die er innen frei lässt,
+        // liegt im Vieleck, keine ausserhalb von ihm. Beides mit EINRASTEN Abstand zum Rand.
+        for (int k : new int[] {1, 2, 3, 4}) {
+            for (int seite : new int[] {Minimap.KLEINSTE, Minimap.GROESSE, 200, Minimap.GROESSTE}) {
+                int n = seite * k, m = n + 2 * k;
+                float[] form = Minimap.schnitt(0, 0, seite, k, true, 0);
+                for (int ty = -1; ty <= m; ty++) {
+                    int[] s = ty >= 0 && ty < m ? Minimap.umrissStuecke(n, k, ty) : null;
+                    for (int tx = -1; tx <= m; tx++) {
+                        if (Math.abs(Math.hypot(tx + 0.5 - m / 2.0, ty + 0.5 - m / 2.0) - m / 2.0) > k + 3) {
+                            continue;
+                        }
+                        boolean aussen = s == null || tx < s[0] || tx >= s[s.length - 1];
+                        boolean frei = !aussen && s.length == 4 && tx >= s[1] && tx < s[2];
+                        double a = abstand(form, tx - k + 0.5, ty - k + 0.5);
+                        String wo = "k " + k + ", Seite " + seite + ", Texel " + tx + ", " + ty;
+                        if (aussen) {
+                            assertTrue(a <= -EINRASTEN, wo);
+                        } else if (frei) {
+                            assertTrue(a >= EINRASTEN, wo);
+                        }
                     }
                 }
             }
         }
+    }
+
+    @Test
+    void umrissWieAufMain() {
+        // So viele schwarze Pixel zeigte der Rand ohne Rahmen auf main in Bilder.umriss, mit Läufen gezeichnet:
+        // Seite 128 bei GUI-Massstab 1 und 2.
+        assertEquals(372, schwarz(128, 1));
+        assertEquals(1628, schwarz(256, 2));
+    }
+
+    private static int schwarz(int n, int k) {
+        int summe = 0;
+        for (int y = 0; y < n + 2 * k; y++) {
+            int[] s = Minimap.umrissStuecke(n, k, y);
+            for (int i = 0; i < s.length; i += 2) {
+                summe += s[i + 1] - s[i];
+            }
+        }
+        return summe;
     }
 
     @Test
@@ -67,22 +113,35 @@ class DrehungTest {
 
     @Test
     void regionenAuchNegativ() {
-        // ±20 um den Spieler bei (10, 10) im Bild, links und oben −300, Regionen zu 128 Pixeln: nur Region −3.
-        Drehung.Lage lage = Drehung.Lage.von(0, 0, 0, 10, 10);
-        assertArrayEquals(new int[] {-3, -3, -3, -3}, Drehung.regionen(lage, 20, -300, -300, 128));
-        assertArrayEquals(new int[] {-1, 0, -1, 0}, Drehung.regionen(lage, 20, 0, 0, 128));
+        // ±20 um (10, 10) im Bild, links und oben −300, Regionen zu 128 Pixeln: nur Region −3.
+        double[] bereich = {-10, -10, 30, 30};
+        assertArrayEquals(new int[] {-3, -3, -3, -3}, Drehung.regionen(bereich, -300, -300, 128));
+        assertArrayEquals(new int[] {-1, 0, -1, 0}, Drehung.regionen(bereich, 0, 0, 128));
+        // Ungedreht das Bild der Minimap: 384 Pixel ab links 100 berühren die Regionen 0 bis 3.
+        assertArrayEquals(new int[] {0, 3, 0, 3}, Drehung.regionen(new double[] {0, 0, 384, 384}, 100, 100, 128));
     }
 
-    /** Liegt (x, y) im konvexen Vieleck p, gleich welcher Umlaufsinn? */
-    private static boolean drinnen(float[] p, double x, double y) {
-        int m = p.length / 2, plus = 0, minus = 0;
+    /**
+     * Wie viel Abstand der Test zwischen Pixelmitte und Kante verlangt, gegen das Einrasten der Ecken
+     * auf ein Raster unter dem Pixel. Siehe docs/minimap.md, „Form“.
+     */
+    private static final double EINRASTEN = 1.0 / 16;
+
+    /** Der Abstand von (x, y) zur nächsten Kante des konvexen Vielecks p, innen positiv, gleich welcher Umlaufsinn. */
+    private static double abstand(float[] p, double x, double y) {
+        int m = p.length / 2;
+        double flaeche = 0, abstand = Double.MAX_VALUE;
         for (int i = 0; i < m; i++) {
             int j = (i + 1) % m;
-            double kreuz = (p[2 * j] - p[2 * i]) * (y - p[2 * i + 1]) - (p[2 * j + 1] - p[2 * i + 1]) * (x - p[2 * i]);
-            plus += kreuz > 0 ? 1 : 0;
-            minus += kreuz < 0 ? 1 : 0;
+            flaeche += (double) p[2 * i] * p[2 * j + 1] - (double) p[2 * j] * p[2 * i + 1];
         }
-        return plus == 0 || minus == 0;
+        for (int i = 0; i < m; i++) {
+            int j = (i + 1) % m;
+            double ex = p[2 * j] - p[2 * i], ey = p[2 * j + 1] - p[2 * i + 1];
+            double kreuz = ex * (y - p[2 * i + 1]) - ey * (x - p[2 * i]);
+            abstand = Math.min(abstand, Math.signum(flaeche) * kreuz / Math.hypot(ex, ey));
+        }
+        return abstand;
     }
 
     @Test
@@ -165,20 +224,37 @@ class DrehungTest {
     }
 
     @Test
-    void gedrehteLinienBleibenInDerForm() {
-        // Linien alle 32 Pixel über 300 × 300, um 30° gedreht, mit dem Kreis um (150, 150), Radius 100, geschnitten.
-        Gitter.Linien l = Minimap.linien(300, 5, 9, 32, 2, Minimap.laeufe(300, false));
-        Drehung.Lage lage = Drehung.Lage.von(Math.toRadians(30), 150, 150, 150, 150);
+    void linienBleibenInDerForm() {
+        // Linien alle 32 Pixel über 300 × 300, ungedreht und um 30° gedreht, mit dem Kreis um (150, 150), Radius 100, geschnitten.
+        Gitter.Linien l = Minimap.linien(300, 5, 9, 32, 2);
         float[] kreis = Drehung.kreis(150, 150, 100);
         double aussen = 100 / Math.cos(Math.PI / Drehung.ECKEN);
-        int[] vielecke = {0};
-        Gitter.gedreht(2, l, 0, 0, lage, kreis, (ecken, anzahl) -> {
-            vielecke[0]++;
-            for (int i = 0; i < anzahl; i++) {
-                assertTrue(Math.hypot(ecken[2 * i] - 150, ecken[2 * i + 1] - 150) <= aussen + 1e-3);
-            }
-        });
-        assertTrue(vielecke[0] > 0);
+        for (double grad : new double[] {0, 30}) {
+            Drehung.Lage lage = Drehung.Lage.von(Math.toRadians(grad), 150, 150, 150, 150);
+            int[] vielecke = {0};
+            Gitter.gedreht(2, l, 0, 0, lage, kreis, (ecken, anzahl) -> {
+                vielecke[0]++;
+                for (int i = 0; i < anzahl; i++) {
+                    assertTrue(Math.hypot(ecken[2 * i] - 150, ecken[2 * i + 1] - 150) <= aussen + 1e-3, grad + "°");
+                }
+            });
+            assertTrue(vielecke[0] > 0);
+        }
+    }
+
+    @Test
+    void ungedrehtAufDemRaster() {
+        // Ungedreht bildet die Lage das Bild Pixel für Pixel ab; ein Quadrat, mit einem grösseren Quadrat geschnitten, bleibt ganz.
+        Drehung.Lage lage = Drehung.Lage.von(0, 40, 60, 0, 0);
+        assertEquals(40 + 17, lage.x(17, 5), 0);
+        assertEquals(60 + 5, lage.y(17, 5), 0);
+        float[] region = Drehung.rechteck(lage.x(-50, -50), lage.y(-50, -50), lage.x(46, 46), lage.y(46, 46));
+        float[] a = new float[2 * 8], b = new float[2 * 8];
+        int n = Drehung.schneide(region, 4, Drehung.rechteck(40, 60, 40 + 128, 60 + 128), 4, a, b);
+        assertEquals(46 * 46, flaeche(a, n), 0);
+        for (int i = 0; i < 2 * n; i++) {
+            assertEquals(Math.round(a[i]), a[i], 0, "ganze Pixel");
+        }
     }
 
     @Test

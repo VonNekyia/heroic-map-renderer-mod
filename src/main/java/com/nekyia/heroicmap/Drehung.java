@@ -9,12 +9,14 @@ import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
 import org.joml.Matrix3x2fc;
 
 /**
- * Die drehende Minimap: Blickrichtung oben. Die Karte dreht um den Spieler, Vielecke werden mit
- * der Form geschnitten und als Fächer gezeichnet. Siehe docs/minimap.md, „Drehen“.
+ * Wie die Minimap ihr Bild auf den Schirm bringt: mit einer Lage, die ungedreht nur verschiebt und
+ * gedreht die Blickrichtung nach oben legt; Vielecke werden mit der Form geschnitten und als Fächer
+ * gezeichnet. Siehe docs/minimap.md, „Form“.
+ * Gedreht siehe docs/minimap.md, „Drehen“.
  */
 final class Drehung {
 
-    /** Ecken des Kreises, an dem die runde Minimap schneidet; die Sehne weicht bei 256 Einheiten und GUI-Massstab 4 um 0,6 Pixel ab. */
+    /** Ecken des Vielecks um den Kreis der runden Minimap; wie weit es über den Kreis ragt, steht in docs/minimap.md, „Form“. */
     static final int ECKEN = 64;
 
     private Drehung() {
@@ -134,13 +136,13 @@ final class Drehung {
     }
 
     /**
-     * Die Regionen, die beim Drehen zu sehen sein können: alle, die das Quadrat ±{@code weit} um den
-     * Spieler im Bild berühren; {@code s} ist die Seite einer Region in Pixeln. {x0, x1, z0, z1},
-     * Enden eingeschlossen.
+     * Die Regionen, die zu sehen sein können: alle, die den Bereich {x0, y0, x1, y1} des Bilds
+     * berühren, x1 und y1 ausschliesslich; {@code s} ist die Seite einer Region in Pixeln.
+     * {rx0, rx1, rz0, rz1}, Enden eingeschlossen.
      */
-    static int[] regionen(Lage lage, double weit, int links, int oben, int s) {
-        return new int[] {Math.floorDiv((int) Math.floor(lage.px() - weit) + links, s), Math.floorDiv((int) Math.ceil(lage.px() + weit) + links, s),
-            Math.floorDiv((int) Math.floor(lage.py() - weit) + oben, s), Math.floorDiv((int) Math.ceil(lage.py() + weit) + oben, s)};
+    static int[] regionen(double[] bereich, int links, int oben, int s) {
+        return new int[] {Math.floorDiv((int) Math.floor(bereich[0]) + links, s), Math.floorDiv((int) Math.ceil(bereich[2]) - 1 + links, s),
+            Math.floorDiv((int) Math.floor(bereich[1]) + oben, s), Math.floorDiv((int) Math.ceil(bereich[3]) - 1 + oben, s)};
     }
 
     /**
