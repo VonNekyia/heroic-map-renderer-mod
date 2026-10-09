@@ -4,13 +4,14 @@ import java.util.Locale;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
 /**
- * Das Untermenü „Einstellungen …“ für Vorlieben der Anzeige: Form, Auflösung, Chunklinien und die
- * Ablage der Karten. Die Minimap im HUD bleibt sichtbar, jede Wahl wirkt gleich. Gespeichert wird
+ * Das Untermenü „Einstellungen …“ für Vorlieben der Anzeige: Form, Auflösung, Chunklinien, Rahmen
+ * und die Ablage der Karten. Die Minimap im HUD bleibt sichtbar, jede Wahl wirkt gleich. Gespeichert wird
  * beim Schliessen. Siehe docs/minimap.md, „Bedienung“.
  */
 final class Anzeige extends Screen {
@@ -37,15 +38,19 @@ final class Anzeige extends Screen {
                 .create(x, y + 24, breite, 20, Component.translatable("heroicmap.menue.massstab"), (b, px) -> m.setzeScale(px)));
         addRenderableWidget(CycleButton.onOffBuilder(m.chunklinien())
                 .create(x, y + 48, breite, 20, Component.translatable("heroicmap.menue.chunklinien"), (b, an) -> m.setzeChunklinien(an)));
+        addRenderableWidget(CycleButton.builder((String skin) -> Component.translatable("heroicmap.rahmen." + skin), m.skin())
+                .withValues(Skin.NAMEN)
+                .withTooltip(skin -> Tooltip.create(Component.translatable("heroicmap.rahmen." + skin + ".beschreibung")))
+                .create(x, y + 72, breite, 20, Component.translatable("heroicmap.menue.rahmen"), (b, skin) -> m.setzeSkin(skin)));
         addRenderableWidget(CycleButton.builder((Downloads.Ablage a) -> Component.translatable(
                         "heroicmap.menue.ablage." + a.name().toLowerCase(Locale.ROOT)), m.ablage())
                 .withValues(Downloads.Ablage.values())
-                .create(x, y + 72, breite, 20, Component.translatable("heroicmap.menue.ablage"), (b, a) -> m.setzeAblage(a)));
-        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x, y + 100, breite, 20).build());
+                .create(x, y + 96, breite, 20, Component.translatable("heroicmap.menue.ablage"), (b, a) -> m.setzeAblage(a)));
+        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x, y + 124, breite, 20).build());
     }
 
     private int oben() {
-        return Math.max(30, height / 2 - 60);
+        return Math.max(30, height / 2 - 72);
     }
 
     /** Ohne Unschärfe und Abdunkeln, damit die Minimap im HUD zu sehen ist. */

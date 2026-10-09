@@ -94,6 +94,7 @@ public final class Bilder implements FabricClientGameTest {
                 }
             }
             menue(context);
+            rahmen(context);
             vollbildkarte(context);
             selbst(context);
         }
@@ -131,6 +132,68 @@ public final class Bilder implements FabricClientGameTest {
                 Files.copy(menue, Path.of(AUSGABE, "menue.png"), StandardCopyOption.REPLACE_EXISTING);
                 Files.copy(anzeige, Path.of(AUSGABE, "anzeige.png"), StandardCopyOption.REPLACE_EXISTING);
             }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** Jeder Rahmen eckig und rund nebeneinander, bei 4 px und Zoom 4. Siehe docs/rahmen.md. */
+    private static void rahmen(ClientGameTestContext context) {
+        for (String skin : Skin.NAMEN.subList(1, Skin.NAMEN.size())) {
+            BufferedImage[] teile = new BufferedImage[2];
+            for (int i = 0; i < teile.length; i++) {
+                boolean rund = i == 1;
+                context.runOnClient(mc -> {
+                    Minimap.INSTANZ.setzeSkin(skin);
+                    Minimap.INSTANZ.setzeRund(rund);
+                });
+                context.waitTicks(2);
+                teile[i] = mitRand(context, context.takeScreenshot(TestScreenshotOptions.of("rahmen-" + skin + "-" + i).disableCounterPrefix()));
+            }
+            if (!AUSGABE.isEmpty()) {
+                BufferedImage beide = new BufferedImage(teile[0].getWidth() + teile[1].getWidth(),
+                        Math.max(teile[0].getHeight(), teile[1].getHeight()), BufferedImage.TYPE_INT_RGB);
+                beide.getGraphics().drawImage(teile[0], 0, 0, null);
+                beide.getGraphics().drawImage(teile[1], teile[0].getWidth(), 0, null);
+                try {
+                    ImageIO.write(beide, "png", Path.of(AUSGABE, "rahmen-" + skin + ".png").toFile());
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+        }
+        // Das Menü mit „uhr“: an der Ecke zur Mitte der Griff statt der zier, ohne den weissen Umriss.
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeSkin("uhr");
+            Minimap.INSTANZ.setzeRund(false);
+            mc.gui.setScreen(new Einstellungen());
+        });
+        context.waitTicks(5);
+        Path menue = context.takeScreenshot(TestScreenshotOptions.of("rahmen-menue").disableCounterPrefix());
+        context.runOnClient(mc -> {
+            mc.gui.setScreen(null);
+            Minimap.INSTANZ.setzeSkin(Skin.OHNE);
+        });
+        try {
+            // Das Menü speichert beim Schliessen; spätere Gametests sollen mit der Vorgabe beginnen.
+            Files.deleteIfExists(HeroicMap.einstellungen());
+            if (!AUSGABE.isEmpty()) {
+                Files.copy(menue, Path.of(AUSGABE, "rahmen-menue.png"), StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** Die Minimap samt Ornamenten: ihr Rahmen und so viel darum, wie sie Abstand zum Rand hält. */
+    private static BufferedImage mitRand(ClientGameTestContext context, Path bild) {
+        int[] r = context.computeOnClient(mc -> {
+            Minimap.Rahmen ra = Minimap.INSTANZ.rahmen(mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+            return new int[] {mc.getWindow().getGuiScale(), ra.x(), ra.y(), ra.seite(), Minimap.INSTANZ.rand()};
+        });
+        int gs = r[0], m = r[4];
+        try {
+            return ImageIO.read(bild.toFile()).getSubimage((r[1] - m) * gs, (r[2] - m) * gs, (r[3] + 2 * m) * gs, (r[3] + 2 * m) * gs);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

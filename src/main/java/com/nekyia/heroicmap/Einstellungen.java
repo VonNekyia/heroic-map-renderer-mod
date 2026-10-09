@@ -141,9 +141,13 @@ final class Einstellungen extends Screen {
         }
         if (Minimap.INSTANZ.sichtbar()) {
             Minimap.Rahmen r = Minimap.INSTANZ.rahmen(width, height);
-            umriss(g, r);
-            int gx = griffX(r), gy = griffY(r);
-            g.fill(gx - GRIFF, gy - GRIFF, gx + GRIFF, gy + GRIFF, TEXT);
+            // Mit Skin zeichnet die Minimap den Griff statt der zier dieser Ecke, ab dem nächsten Frame; der Umriss entfällt. Siehe docs/rahmen.md.
+            Minimap.INSTANZ.griff(Minimap.griffEcke(r, width, height), zug == Zug.GROESSE || imGriff(mausX, mausY, r));
+            if (Skin.von(Minimap.INSTANZ.skin()) == null) {
+                umriss(g, r);
+                int gx = griffX(r), gy = griffY(r);
+                g.fill(gx - GRIFF, gy - GRIFF, gx + GRIFF, gy + GRIFF, TEXT);
+            }
             koordinaten(g, r, mausX, mausY);
         }
     }
@@ -177,7 +181,7 @@ final class Einstellungen extends Screen {
         if (e.button() != InputConstants.MOUSE_BUTTON_LEFT && e.button() != InputConstants.MOUSE_BUTTON_RIGHT) {
             return false;
         }
-        if (Math.abs(e.x() - griffX(r)) <= GRIFF + 1 && Math.abs(e.y() - griffY(r)) <= GRIFF + 1) {
+        if (imGriff(e.x(), e.y(), r)) {
             zug = Zug.GROESSE;
             griffLinks = links(r);
             griffOben = oben(r);
@@ -205,7 +209,7 @@ final class Einstellungen extends Screen {
             case LAGE -> m.verschiebe(mx - festX, my - festY, width, height);
             case GROESSE -> {
                 // Relativ zum Griff: Der Griff sitzt rund nicht in der Ecke, die Seite springt so nicht.
-                int platz = Math.min(width, height) - 2 * Minimap.RAND;
+                int platz = Math.min(width, height) - 2 * m.rand();
                 int weg = Math.max(griffLinks ? startX - mx : mx - startX, griffOben ? startY - my : my - startY);
                 int s = Mth.clamp(startSeite + weg,
                         Minimap.KLEINSTE, Math.max(Minimap.KLEINSTE, Math.min(Minimap.GROESSTE, platz)));
@@ -224,22 +228,39 @@ final class Einstellungen extends Screen {
         return super.mouseReleased(e);
     }
 
-    /** Der Griff sitzt an der Ecke, die zur Mitte des Schirms zeigt; so hat er dort Platz zum Ziehen. */
+    /** Der Griff sitzt an der Ecke, die zur Mitte des Schirms zeigt ({@link Minimap#griffEcke}); so hat er dort Platz zum Ziehen. */
     private boolean links(Minimap.Rahmen r) {
-        return r.x() + r.seite() / 2 > width / 2;
+        return (Minimap.griffEcke(r, width, height) & 1) == 0;
     }
 
     private boolean oben(Minimap.Rahmen r) {
-        return r.y() + r.seite() / 2 > height / 2;
+        return (Minimap.griffEcke(r, width, height) & 2) == 0;
     }
 
-    /** Eckig sitzt der Griff in der Ecke, rund auf dem Umriss in der Diagonale dorthin. */
+    /**
+     * Die Mitte des Griffs: eckig in der Ecke, rund auf dem Umriss in der Diagonale dorthin; mit
+     * Skin auf der Mitte der Bänder, wo sonst die zier sitzt.
+     */
+    private double[] griff(Minimap.Rahmen r) {
+        Skin skin = Skin.von(Minimap.INSTANZ.skin());
+        if (skin != null) {
+            return Minimap.INSTANZ.ecken(skin, r)[Minimap.griffEcke(r, width, height)];
+        }
+        double h = r.seite() / 2.0, weg = griffWeg(r);
+        return new double[] {r.x() + h + (links(r) ? -weg : weg), r.y() + h + (oben(r) ? -weg : weg)};
+    }
+
     private int griffX(Minimap.Rahmen r) {
-        return (int) Math.round(r.x() + r.seite() / 2.0 + (links(r) ? -1 : 1) * griffWeg(r));
+        return (int) Math.round(griff(r)[0]);
     }
 
     private int griffY(Minimap.Rahmen r) {
-        return (int) Math.round(r.y() + r.seite() / 2.0 + (oben(r) ? -1 : 1) * griffWeg(r));
+        return (int) Math.round(griff(r)[1]);
+    }
+
+    private boolean imGriff(double x, double y, Minimap.Rahmen r) {
+        double[] p = griff(r);
+        return Minimap.imGriff(x, y, p[0], p[1]);
     }
 
     private static double griffWeg(Minimap.Rahmen r) {
@@ -275,6 +296,7 @@ final class Einstellungen extends Screen {
 
     @Override
     public void removed() {
+        Minimap.INSTANZ.griff(-1, false);
         Minimap.INSTANZ.schreibe(HeroicMap.einstellungen());
         // Eine andere Ablage heisst ein anderer Ordner der Welt, auch für die Wegpunkte.
         Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());

@@ -1,0 +1,5 @@
+// heroicmap Rahmen 'grau': Linie aussen -> innen, eine Zeile je 1-px-Band.
+// Zwei Werte = Licht (oben/links) Schatten (unten/rechts).
+#181717
+#A8A8A8 #4F4D4D
+#D8D8D8

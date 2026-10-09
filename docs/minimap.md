@@ -57,6 +57,7 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
 | Form | eckig | eckig oder rund, siehe „Form“ |
 | Auflösung der Minimap | 2 px je Block | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet |
 | Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte, siehe „Chunklinien“ |
+| Rahmen | ohne | ein Skin um die Minimap, siehe [Rahmen](rahmen.md) |
 | Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
 
 - **Zoom und Auflösung** sind getrennt. Der Zoom legt fest, wie viel

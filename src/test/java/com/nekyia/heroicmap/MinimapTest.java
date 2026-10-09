@@ -92,10 +92,12 @@ class MinimapTest {
     @Test
     void rahmenNachLageUndSchirm() {
         // Vorgabe: rechts oben, 4 Einheiten vom Rand.
-        assertEquals(new Minimap.Rahmen(640 - 128 - 4, 4, 128), Minimap.rahmen(640, 360, 128, 1, 0));
-        assertEquals(new Minimap.Rahmen(4, 360 - 128 - 4, 128), Minimap.rahmen(640, 360, 128, 0, 1));
+        assertEquals(new Minimap.Rahmen(640 - 128 - 4, 4, 128), Minimap.rahmen(640, 360, 128, 1, 0, Minimap.RAND));
+        assertEquals(new Minimap.Rahmen(4, 360 - 128 - 4, 128), Minimap.rahmen(640, 360, 128, 0, 1, Minimap.RAND));
         // Ein kleiner Schirm kappt die Seite.
-        assertEquals(200 - 8, Minimap.rahmen(300, 200, 256, 1, 0).seite());
+        assertEquals(200 - 8, Minimap.rahmen(300, 200, 256, 1, 0, Minimap.RAND).seite());
+        // Mit Rahmen rückt sie um dessen Einrückung vom Rand, etwa 8 bei „uhr“.
+        assertEquals(new Minimap.Rahmen(640 - 128 - 8, 8, 128), Minimap.rahmen(640, 360, 128, 1, 0, 8));
     }
 
     @Test
@@ -133,6 +135,21 @@ class MinimapTest {
         assertEquals(Downloads.Ablage.HASH, nachher.ablage());
         assertTrue(nachher.chunklinien());
         assertEquals(vorher.rahmen(640, 360), nachher.rahmen(640, 360));
+    }
+
+    @Test
+    void rahmenUebersteht(@TempDir Path ordner) throws Exception {
+        // Ohne Lage und Grösse: Die rechnen mit dem Abstand des Skins, und den kennt erst das Spiel.
+        Path datei = ordner.resolve("heroicmap.properties");
+        Minimap vorher = new Minimap();
+        vorher.setzeSkin("uhr");
+        vorher.schreibe(datei);
+        Minimap nachher = new Minimap();
+        nachher.lies(datei);
+        assertEquals("uhr", nachher.skin());
+        // Ein unbekannter Rahmen ist „ohne“.
+        nachher.setzeSkin("quatsch");
+        assertEquals(Skin.OHNE, nachher.skin());
     }
 
     @Test
@@ -316,6 +333,7 @@ class MinimapTest {
         // Ablage: Vorgabe IP und Hash, die Wahl des Users.
         assertEquals(Downloads.Ablage.IP, minimap.ablage());
         assertFalse(minimap.chunklinien());
+        assertEquals(Skin.OHNE, minimap.skin());
         assertEquals(new Minimap.Rahmen(640 - 128 - 4, 4, 128), minimap.rahmen(640, 360));
     }
 }
