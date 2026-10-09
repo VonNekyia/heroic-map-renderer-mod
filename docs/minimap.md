@@ -202,12 +202,11 @@ Vollbildkarte bleibt genordet. So hat es der User gewünscht.
 - **Mit Rahmen** bleiben die Ornamente in den Ecken; N, O, S und W wandern
   am Rahmen, siehe [Rahmen](rahmen.md), „Marken“.
 - **Kosten** je Frame, gemessen am 09.10. bei 4 px und Zoom 4, siehe
-  [Minimap, Drehen](messungen/2026-10-09-minimap-drehen.md): eckig im Stand
-  bei Gier 30 0,017 ms mehr Frametime im p50; im Flug, um eine
-  Vierteldrehung, nichts über der Streuung. Rund
-  ist gedreht billiger als ungedreht, im Stand 0,410 statt 0,715 ms, im
-  HUD-Element 0,077 statt 0,335 ms: ein Vieleck je Region statt eines
-  Blits je Lauf.
+  [Minimap, Vieleck auch ungedreht](messungen/2026-10-09-minimap-vieleck.md):
+  Drehen kostet im p50 eckig 0,011 ms und rund 0,009 ms Frametime im
+  Stand, im Flug nichts über der Streuung, schräg im Flug 0,008 und
+  0,009 ms. Die Messung davor, mit Läufen ungedreht, steht in
+  [Minimap, Drehen](messungen/2026-10-09-minimap-drehen.md).
 
 ## Mitspieler
 
@@ -504,7 +503,9 @@ nichts.
 
 Bei Sichtweite 12 und einem Fenster von 854 × 480, gemessen am 05. und
 06.10., siehe [Minimap, Kosten](messungen/2026-10-05-minimap-kosten.md) und
-[Minimap, rund gegen eckig](messungen/2026-10-06-minimap-rund.md):
+[Minimap, rund gegen eckig](messungen/2026-10-06-minimap-rund.md); die
+runde Form am 09.10., seit dem Vieleck, siehe
+[Minimap, Vieleck auch ungedreht](messungen/2026-10-09-minimap-vieleck.md):
 
 | Was | Bedingung | Zeit |
 |---|---|---|
@@ -516,8 +517,8 @@ Bei Sichtweite 12 und einem Fenster von 854 × 480, gemessen am 05. und
 | Kopie der Texel des Atlas | einmal je Neuladen | 3,5 bis 15 ms |
 | neue Region | bei 4 px | 0,14 bis 0,17 ms |
 | HUD-Element je Frame, eckig | 4 px, Stand, Median | 0,003 ms |
-| HUD-Element je Frame, rund | 4 px, Stand, Median, 149 Läufe | 0,33 ms |
-| Frametime im p50, rund, mehr als ohne Minimap | freie Bildrate, 4 px, Stand | 0,40 ms |
+| HUD-Element je Frame, rund | 4 px, Stand, Median, 09.10. | 0,007 ms |
+| Frametime im p50, rund, mehr als ohne Minimap | freie Bildrate, 4 px, Stand, 09.10. | 0,03 ms |
 
 Der Flug geht dabei mit 20 Blöcken/s über geladenes Gelände.
 
