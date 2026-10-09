@@ -3,6 +3,7 @@ package com.nekyia.heroicmap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonObject;
@@ -14,6 +15,7 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -161,6 +163,30 @@ class SymboleTest {
     }
 
     @Test
+    void sendeHaeltDieFrist() {
+        // Ohne Frist an der Anfrage: Allein get(zeit) in Laden.sende hält den schweigenden Server auf.
+        HttpRequest anfrage = HttpRequest.newBuilder(URI.create(basis + "/layers/beispiel/images/schweigt.png")).GET().build();
+        long start = System.nanoTime();
+        assertThrows(Laden.Fehler.class, () -> Laden.sende(Symbole.CLIENT, anfrage, Symbole.MAX, Laden.Grund.NETZ, Duration.ofMillis(500), "schweigt"));
+        assertTrue(System.nanoTime() - start < Duration.ofSeconds(5).toNanos(), "nach der Frist zurück");
+    }
+
+    @Test
+    void nurEinfacheWebP() throws IOException {
+        // Eine einfache VP8L lädt; eine mit VP8X oder verlustbehaftet gibt null, ohne TwelveMonkeys.
+        byte[] vp8l;
+        try (var rein = SymboleTest.class.getResourceAsStream("/farbindex.webp")) {
+            vp8l = rein.readAllBytes();
+        }
+        assertEquals(8, Kacheln.vp8l(vp8l, 8).breite());
+        byte[] vp8x = new byte[30], vp8 = new byte[30];
+        System.arraycopy("RIFF\u0016\u0000\u0000\u0000WEBPVP8X".getBytes(StandardCharsets.ISO_8859_1), 0, vp8x, 0, 16);
+        System.arraycopy("RIFF\u0016\u0000\u0000\u0000WEBPVP8 ".getBytes(StandardCharsets.ISO_8859_1), 0, vp8, 0, 16);
+        assertNull(Kacheln.vp8l(vp8x, 16));
+        assertNull(Kacheln.vp8l(vp8, 16));
+    }
+
+    @Test
     void schweigenderServerHaeltNichtAuf() {
         long start = System.nanoTime();
         assertNull(hole("schweigt.png", InetAddress.getLoopbackAddress(), Duration.ofMillis(500)));
@@ -214,6 +240,21 @@ class SymboleTest {
         }
         s.warte();
         assertEquals(Symbole.MAX_BILDER, anfragen.size());
+    }
+
+    @Test
+    void nachNeuerVersionKeineAnfrageFuerDieAlte() throws Exception {
+        Symbole s = aufbau().symbole();
+        // Die erste Anfrage hält den Thread, ein Feld der alten version wartet dahinter.
+        s.symbol("beispiel:staedte", "v1", "images/warte.png", 16);
+        s.symbol("beispiel:staedte", "v1", "images/alt.png", 16);
+        for (int i = 0; i < 100 && anfragen.isEmpty(); i++) {
+            Thread.sleep(20);
+        }
+        s.symbol("beispiel:staedte", "v2", "images/burg_16.png", 16);
+        frei.countDown();
+        s.warte();
+        assertEquals(List.of(PFAD + "warte.png", PFAD + "burg_16.png"), new ArrayList<>(anfragen));
     }
 
     @Test

@@ -1,7 +1,9 @@
 package com.nekyia.heroicmap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonParser;
@@ -194,6 +196,8 @@ class EbenenTest {
         Ebenen e = new Ebenen();
         liste(e, eintrag("b:staedte", "v1"));
         liste(e, "{\"id\":\"b:ohne_version\"}");
+        assertFalse(e.empfange(JsonParser.parseString("{\"ebenen\":[{\"id\":\"b:ohne_version\"}]}").getAsJsonObject()));
+        assertTrue(e.empfange(JsonParser.parseString("{\"ebenen\":[" + eintrag("b:staedte", "v1") + "]}").getAsJsonObject()));
         assertEquals(List.of("b:staedte"), e.sichtbar().stream().map(Ebenen.Eintrag::id).toList());
         // Ein Teil ausserhalb von teile und einer ohne lesbare Objekte lassen die Sammlung stehen.
         teil(e, "b:staedte", "v1", 1, 3, nadel("a", 1));

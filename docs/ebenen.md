@@ -126,8 +126,8 @@ die Nachrichten das Plugin:
   (`Symbole.hole`). Ein Fehler steht im Log, das Schild bleibt leer.
 - **Freigegeben** wird ein Symbol, wenn seine Ebene eine neue `version`
   bekommt oder aus der Liste fällt, und alle beim Trennen, bei einem neuen
-  Login und mit einer neuen Adresse. Danach fragt ein Auftrag, der noch
-  wartet, nicht mehr.
+  Login und mit einer neuen Adresse. Danach fragt ein Auftrag für sie, der
+  noch wartet, nicht mehr.
 
 ## Umschalten
 
@@ -162,7 +162,9 @@ So kann ein Server den Speicher des Mods nicht füllen:
 
 - **Speicher:** Halbe Sammlungen gibt es höchstens eine je Ebene der
   Liste, also 64, mit je höchstens 1000 Nadeln. Symbole höchstens 200 je
-  Ebene, also 12 800 Texturen von je 1 KiB, rund 13 MiB.
+  Ebene, also 12 800 Texturen, je 1 KiB im Speicher und auf der
+  Grafikkarte, weil die `DynamicTexture` ihr Bild behält; zusammen rund
+  25 MiB.
 - **Kosten:** Je Frame geht der Mod alle Nadeln der sichtbaren Ebenen
   durch, im schlimmsten Fall 64 000. Ein Raster nach Regionen kommt erst,
   wenn eine Messung es verlangt.

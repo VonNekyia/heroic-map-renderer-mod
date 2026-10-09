@@ -68,6 +68,8 @@ final class Symbole {
         final String version;
         final Map<String, Identifier> texturen = new HashMap<>();
         boolean voll;
+        /** Gesetzt, sobald die Felder frei sind; ein wartender Auftrag für sie fragt dann nicht mehr. */
+        volatile boolean frei;
 
         Felder(String version) {
             this.version = version;
@@ -180,14 +182,14 @@ final class Symbole {
         InetAddress server = spielserver;
         Felder ziel = f;
         holer.execute(() -> {
-            // Nach dem Trennen oder mit einer neuen Adresse fragt ein alter Auftrag nicht mehr.
-            if (r != runde.get()) {
+            // Nach dem Trennen, mit einer neuen Adresse, einer neuen version oder ohne die Ebene fragt ein alter Auftrag nicht mehr.
+            if (r != runde.get() || ziel.frei) {
                 return;
             }
             Kacheln.Bild bild = hole(client, uri, server, seite, FRIST);
             if (bild != null) {
                 renderThread.execute(() -> {
-                    if (r == runde.get() && ebenen.get(ebene) == ziel && ziel.texturen.containsKey(schluessel)) {
+                    if (r == runde.get() && !ziel.frei && ebenen.get(ebene) == ziel && ziel.texturen.containsKey(schluessel)) {
                         ziel.texturen.put(schluessel, ablage.apply(uri, bild));
                     }
                 });
@@ -245,6 +247,7 @@ final class Symbole {
     }
 
     private void gibFrei(Felder f) {
+        f.frei = true;
         f.texturen.values().stream().filter(Objects::nonNull).forEach(freigabe);
     }
 

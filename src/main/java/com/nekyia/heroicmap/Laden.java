@@ -376,7 +376,7 @@ final class Laden {
      */
     static HttpResponse<byte[]> sende(HttpClient client, HttpRequest anfrage, long max, Grund grund, Duration zeit, String was)
             throws Fehler, InterruptedException {
-        // Die Zeit der Anfrage gilt im HttpClient nur bis zu den Headern; die Frist für alles setzt get.
+        // Die Zeit der Anfrage gilt nicht in jeder JDK-Version auch für den Körper; die Frist für alles setzt get.
         CompletableFuture<HttpResponse<byte[]>> antwort = client.sendAsync(anfrage,
                 info -> info.statusCode() == 200 ? hoechstens(max, grund) : HttpResponse.BodySubscribers.replacing(null));
         try {
