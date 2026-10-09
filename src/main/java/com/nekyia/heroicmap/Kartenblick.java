@@ -127,6 +127,28 @@ final class Kartenblick {
         return new double[] {mx, my};
     }
 
+    /** Unter diesem Abstand, in Einheiten des GUI, zeichnet die Karte keine Chunklinien. */
+    static final double LINIEN_MIN = 4;
+
+    /** Abstand der Chunklinien in Einheiten des GUI: 16 Blöcke bei {@code scale} Pixeln der Basis je Block. */
+    double chunkAbstand(int scale) {
+        return 16.0 * scale / teiler() * lupe;
+    }
+
+    /** Zeichnet die Karte Chunklinien, oder lägen sie dichter als {@link #LINIEN_MIN}? */
+    boolean chunklinien(int scale) {
+        return chunkAbstand(scale) >= LINIEN_MIN;
+    }
+
+    /** Der erste Chunk, dessen Linie bei Schirm-x 0 oder rechts davon liegt. */
+    int ersterChunkX(int scale, int breite) {
+        return (int) Math.ceil(basisRasterX(0, breite) / (16.0 * scale));
+    }
+
+    int ersterChunkZ(int scale, int hoehe) {
+        return (int) Math.ceil(basisRasterZ(0, hoehe) / (16.0 * scale));
+    }
+
     /** Eine Stufe feiner, auf der feinsten die Lupe grösser. */
     void naeher() {
         if (zoom < stufe) {

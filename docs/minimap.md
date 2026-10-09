@@ -7,6 +7,8 @@ code:
   - src/main/java/com/nekyia/heroicmap/Licht.java
   - src/main/java/com/nekyia/heroicmap/HeroicMap.java
   - src/main/java/com/nekyia/heroicmap/Einstellungen.java
+  - src/main/java/com/nekyia/heroicmap/Anzeige.java
+  - src/main/java/com/nekyia/heroicmap/Kartenblick.java
   - src/main/java/com/nekyia/heroicmap/Mitspieler.java
   - src/test/java/com/nekyia/heroicmap/MitspielerTest.java
   - src/main/java/com/nekyia/heroicmap/mixin/LevelExtractorMixin.java
@@ -39,12 +41,22 @@ steht unter „Kosten“.
 |---|---|---|
 | Minimap | an | blendet die Minimap aus und ein |
 | Zoom der Minimap | 2× | 1, 2, 4 oder 8 Einheiten des GUI je Block: wie viel Gegend die Minimap zeigt |
-| Auflösung der Minimap | 2 px je Block | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet |
-| Form | eckig | eckig oder rund, siehe „Form“ |
 | Mitspieler | Simple Voice Chat | siehe „Mitspieler“ |
-| Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
 | Knopf „Karte laden …“ | – | die Karten des Servers, wie in der [Vollbildkarte](vollbildkarte.md), „Bedienung“ |
 | Knopf „Kartenliste …“ | – | alle Karten auf der Platte mit Grösse und Summe in GB, mit Löschen, siehe [Download](download.md), „Kartenliste“ |
+| Knopf „Einstellungen …“ | – | das Untermenü für Vorlieben der Anzeige (`Anzeige`), siehe unten |
+
+Das Untermenü „Einstellungen …“ hält, was man selten ändert; das Hauptmenü
+bleibt so kurz. „Fertig“ führt zurück ins Menü:
+
+![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien](bilder/anzeige.png)
+
+| Einstellung | Vorgabe | tut |
+|---|---|---|
+| Form | eckig | eckig oder rund, siehe „Form“ |
+| Auflösung der Minimap | 2 px je Block | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet |
+| Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte, siehe „Chunklinien“ |
+| Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
 
 - **Zoom und Auflösung** sind getrennt. Der Zoom legt fest, wie viel
   Gegend die Minimap zeigt: bei 128 Einheiten Seite 128 Blöcke bei 1×,
@@ -69,10 +81,12 @@ steht unter „Kosten“.
   Schirm Platz hat. Grösser zeigt mehr Gegend beim selben Zoom und
   zeichnet mehr Chunks, siehe „Neu zeichnen“, „Bereich“.
 - **Knöpfe** stehen im grösseren freien Platz neben der Minimap, 200
-  Einheiten breit oder schmaler, bis 120, wenn dort weniger Platz ist.
-  „Minimap“ und „Form“ teilen sich eine Zeile, ebenso „Karte laden …“ und
-  „Kartenliste …“. So passen sie auch bei grossem GUI-Massstab auf den
-  Schirm, bis 240 Einheiten Höhe, etwa 1280 × 720 bei GUI-Massstab 3.
+  Einheiten breit oder schmaler, bis 120, wenn dort weniger Platz ist
+  (`Einstellungen.spalte`), im Untermenü ebenso. Im Hauptmenü teilen sich
+  je zwei eine Zeile: „Minimap“ und „Zoom“, „Karte laden …“ und
+  „Kartenliste …“, „Einstellungen …“ und „Fertig“. So passen Menü und
+  Untermenü auch bei grossem GUI-Massstab auf den Schirm, bis 240
+  Einheiten Höhe, etwa 1280 × 720 bei GUI-Massstab 3.
 - **Koordinaten:** Im Menü stehen über der Minimap `x` und `z` des Blocks
   unter der Maus fest unten links, wie auf der Karte im Browser, genau wie
   gezeichnet; nicht beim Ziehen. Zum Umschauen dient die
@@ -94,6 +108,45 @@ steht unter „Kosten“.
   Karte nach unten; der Pfeil kreist deshalb um Gier + 180° gedreht um den
   Kopf. So hat es der User gewünscht.
 - **Wo ein Block liegt,** sagt die [Projektion](projektion.md).
+
+## Chunklinien
+
+Mit dem Schalter im Untermenü „Einstellungen …“ zeichnen Minimap und
+[Vollbildkarte](vollbildkarte.md) Linien auf den Grenzen der Chunks, je
+16 Blöcke; gespeichert als `chunklinien` in `heroicmap.properties`,
+Vorgabe aus. So hat es der User gewünscht.
+
+![Die selbst gezeichnete Karte der Szene mit Chunklinien](bilder/chunklinien.png)
+
+- **Aussehen:** eine Einheit des GUI breit, Schwarz zu 30 % deckend
+  (`Minimap.LINIE`), damit die Karte lesbar bleibt. Die Linie eines
+  Chunks liegt auf seinem ersten Block, westlich und nördlich.
+- **Auf dem Raster der Karte,** sonst wackelten die Linien beim Ziehen und
+  Laufen: auf der Minimap von der Kante des Bildes aus `Minimap.ecke`, wie
+  die Regionen (`Minimap.linie`, gleich `Minimap.pixel` für Block 16·c);
+  auf der Vollbildkarte von der ganzzahligen Kante aus `Kartenblick`, wie
+  Kacheln und Marken (`Kartenblick.rasterX`).
+- **Rund** zeichnet die Minimap eine Linie nur, wo sie ganz in der Form
+  liegt, über dieselben Läufe wie die Karte.
+- **Zu dicht:** Liegen die Linien näher als 4 Einheiten
+  (`Kartenblick.LINIEN_MIN`), zeichnet die Vollbildkarte keine, etwa bei
+  `scale` 4 ab zwei Stufen unter der feinsten. Auf der Minimap liegen sie
+  mindestens 16 Einheiten auseinander, bei Zoom 1×.
+- **Für jede Karte gleich,** die vom Server wie die
+  [selbst gezeichnete](selbst.md): Die Vollbildkarte rechnet nur mit
+  `scale` aus `map.json` und dem Raster der Kacheln.
+- **Kosten** je Frame, geschätzt, nicht gemessen: auf der Minimap
+  höchstens 17 Linien je Richtung, bei 256 Einheiten und Zoom 1×, rund
+  dazu je Linie ein Durchlauf über die Läufe, höchstens etwa 225; auf der
+  Vollbildkarte bei 427 × 240 Einheiten höchstens rund 170 Rechtecke. Nur
+  im sichtbaren Bereich, ohne Allokation je Linie; die Läufe der Form
+  rechnet die Minimap einmal je Frame für Karte und Linien. Zusammen
+  deutlich unter 0,1 ms.
+- **Später mit der drehenden Minimap:** Die Linien liegen in denselben
+  Koordinaten des Bildes wie die Regionen; dreht die Minimap, gehen sie
+  durch dieselbe Drehung und denselben Schnitt mit der Form.
+
+![Die Minimap der Szene mit Chunklinien, bei Zoom 4×](bilder/minimap-chunklinien.png)
 
 ## Mitspieler
 

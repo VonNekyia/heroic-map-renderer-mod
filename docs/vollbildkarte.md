@@ -191,7 +191,8 @@ Warum eine Kopie: [0003](entscheidungen/0003-kopie-des-vp8l-dekoders.md).
 
 Der eigene Kopf und die Koordinaten rechnen mit derselben Projektion wie der
 Renderer und mit `scale` aus `map.json`, siehe [Projektion](projektion.md).
-Kopf und Pfeil sind dieselben wie auf der Minimap, 6 Einheiten des GUI. Mitspieler stehen als Kopf mit Namen darüber,
+Chunklinien zeichnet die Karte auf Wunsch über den Kacheln, siehe
+[Minimap](minimap.md), „Chunklinien“. Kopf und Pfeil sind dieselben wie auf der Minimap, 6 Einheiten des GUI. Mitspieler stehen als Kopf mit Namen darüber,
 siehe [Minimap](minimap.md), „Mitspieler“. Was ausserhalb des Schirms liegt, steht am Rand, siehe
 [Wegpunkte](wegpunkte.md), „Am Rand“.
 

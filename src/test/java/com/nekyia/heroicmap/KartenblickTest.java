@@ -2,6 +2,7 @@ package com.nekyia.heroicmap;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -87,6 +88,33 @@ class KartenblickTest {
         assertArrayEquals(new int[] {244, 2}, Kartenblick.name(395, 14, 4, 400, 60, 306, 48));
         // Ganz oben nicht über den Rand.
         assertEquals(2, Kartenblick.name(100, 8, 4, 400, 60, 306, 48)[1]);
+    }
+
+    @Test
+    void chunklinienAufDemRasterUndNichtZuDicht() {
+        // scale 4: Ein Chunk sind 64 Pixel der Basis, auf der feinsten Stufe mit Lupe 1 also 64 Einheiten.
+        Kartenblick blick = new Kartenblick(256, 0, 6, 6);
+        blick.mx = 1000.75;
+        blick.mz = -77.3;
+        assertEquals(64, blick.chunkAbstand(4), 1e-9);
+        // Chunk 4 beginnt bei Pixel 256 der Basis, genau auf der Kante von Kachel 1.
+        assertEquals(blick.kachelX(1, 854), Math.floor(blick.rasterX(4 * 64.0, 854)), 1e-9);
+        assertEquals(blick.kachelY(1, 480), Math.floor(blick.rasterY(4 * 64.0, 480)), 1e-9);
+        // Die erste Linie liegt auf dem Schirm, die davor links davon.
+        int c = blick.ersterChunkX(4, 854);
+        assertTrue(blick.rasterX(c * 64.0, 854) >= 0 && blick.rasterX((c - 1) * 64.0, 854) < 0, "Chunk " + c);
+        int z = blick.ersterChunkZ(4, 480);
+        assertTrue(blick.rasterY(z * 64.0, 480) >= 0 && blick.rasterY((z - 1) * 64.0, 480) < 0, "Chunk " + z);
+        // Gröber: Stufe 2 hat 4 Einheiten Abstand, die Karte zeichnet; Stufe 1 hätte 2, sie zeichnet keine.
+        blick.zoom = 2;
+        assertEquals(4, blick.chunkAbstand(4), 1e-9);
+        assertTrue(blick.chunklinien(4));
+        blick.zoom = 1;
+        assertFalse(blick.chunklinien(4));
+        // Die Lupe rückt sie wieder auseinander: scale 1, feinste Stufe, Lupe 4 gibt 64.
+        blick.zoom = 6;
+        blick.lupe = 4;
+        assertEquals(64, blick.chunkAbstand(1), 1e-9);
     }
 
     @Test

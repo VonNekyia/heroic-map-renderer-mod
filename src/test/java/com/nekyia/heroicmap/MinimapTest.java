@@ -119,6 +119,7 @@ class MinimapTest {
         vorher.setzeRund(true);
         vorher.setzeShow(false);
         vorher.setzeAblage(Downloads.Ablage.HASH);
+        vorher.setzeChunklinien(true);
         vorher.stelle(20, 30, 200, 640, 360);
         vorher.schreibe(datei);
 
@@ -130,6 +131,7 @@ class MinimapTest {
         assertTrue(nachher.rund());
         assertFalse(nachher.show());
         assertEquals(Downloads.Ablage.HASH, nachher.ablage());
+        assertTrue(nachher.chunklinien());
         assertEquals(vorher.rahmen(640, 360), nachher.rahmen(640, 360));
     }
 
@@ -228,6 +230,20 @@ class MinimapTest {
     }
 
     @Test
+    void chunklinienAufDemRasterDerKarte() {
+        // Zoom 2, GUI-Massstab 3: 6 Pixel je Block. Die Linie von Chunk c liegt, wo die Karte Block 16·c zeichnet,
+        // gleich wo der Spieler steht; die von Chunk 8 auf der Kante der Region 1.
+        int zoom = 2, k = 3, n = 128 * k, region = Minimap.CHUNKS_JE_REGION * 16 * zoom * k;
+        for (double frac : new double[] {0, 0.3, 0.99}) {
+            int links = Minimap.ecke(100 + frac, 100 + frac, 1f, zoom, k, n);
+            for (int c : new int[] {-3, 0, 5, 8}) {
+                assertEquals(Minimap.pixel(16.0 * c, zoom, k, links), Minimap.linie(c, zoom, k, links), "Chunk " + c);
+            }
+            assertEquals(region - links, Minimap.linie(8, zoom, k, links));
+        }
+    }
+
+    @Test
     void ohneDateiDieVorgabe(@TempDir Path ordner) {
         Minimap minimap = new Minimap();
         minimap.lies(ordner.resolve("fehlt.properties"));
@@ -236,6 +252,7 @@ class MinimapTest {
         assertTrue(minimap.show());
         // Ablage: Vorgabe IP und Hash, die Wahl des Users.
         assertEquals(Downloads.Ablage.IP, minimap.ablage());
+        assertFalse(minimap.chunklinien());
         assertEquals(new Minimap.Rahmen(640 - 128 - 4, 4, 128), minimap.rahmen(640, 360));
     }
 }

@@ -111,7 +111,15 @@ public final class Bilder implements FabricClientGameTest {
         });
         context.waitTicks(5);
         Path menue = context.takeScreenshot(TestScreenshotOptions.of("menue").disableCounterPrefix());
+        // Das Untermenü „Einstellungen …“, mit Chunklinien an, so zeigt die Minimap daneben die Linien.
         context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeChunklinien(true);
+            mc.gui.setScreen(new Anzeige(mc.gui.screen()));
+        });
+        context.waitTicks(5);
+        Path anzeige = context.takeScreenshot(TestScreenshotOptions.of("anzeige").disableCounterPrefix());
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeChunklinien(false);
             Minimap.INSTANZ.setzeRund(false);
             mc.gui.setScreen(null);
         });
@@ -121,6 +129,7 @@ public final class Bilder implements FabricClientGameTest {
             if (!AUSGABE.isEmpty()) {
                 schneide(context, rund, Path.of(AUSGABE, "minimap-rund.png"));
                 Files.copy(menue, Path.of(AUSGABE, "menue.png"), StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(anzeige, Path.of(AUSGABE, "anzeige.png"), StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -227,15 +236,24 @@ public final class Bilder implements FabricClientGameTest {
         context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(welt, "minecraft:overworld"))));
         context.waitTicks(40);
         Path bild = context.takeScreenshot(TestScreenshotOptions.of("selbst").disableCounterPrefix());
+        // Dieselbe Karte mit Chunklinien, dann die Minimap im HUD mit ihnen. Siehe docs/minimap.md, „Chunklinien“.
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeChunklinien(true));
+        context.waitTicks(2);
+        Path linien = context.takeScreenshot(TestScreenshotOptions.of("chunklinien").disableCounterPrefix());
+        context.runOnClient(mc -> mc.gui.screen().onClose());
+        context.waitTicks(2);
+        Path minimapLinien = context.takeScreenshot(TestScreenshotOptions.of("minimap-chunklinien").disableCounterPrefix());
         try {
             if (!AUSGABE.isEmpty()) {
                 Files.copy(bild, Path.of(AUSGABE, "selbst.png"), StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(linien, Path.of(AUSGABE, "chunklinien.png"), StandardCopyOption.REPLACE_EXISTING);
+                schneide(context, minimapLinien, Path.of(AUSGABE, "minimap-chunklinien.png"));
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
         context.runOnClient(mc -> {
-            mc.gui.screen().onClose();
+            Minimap.INSTANZ.setzeChunklinien(false);
             Selbst.INSTANZ.fuerTest(null);
             Selbst.INSTANZ.leeren();
         });
