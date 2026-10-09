@@ -25,20 +25,26 @@ die Nachrichten das Plugin:
 
 - **`ebenen`:** die Liste, je Ebene `id`, `name`, `visible`, `order` und
   `version` (`Ebenen.liste`). Was nicht mehr darin steht, ist weg, mit
-  seinen Nadeln und halben Teilen.
+  seinen Nadeln und halben Teilen. Steht eine Kennung zweimal darin, gilt
+  der erste Eintrag.
 - **`ebene`:** ein Teil einer Ebene, `teil` von `teile`, mit seiner
   `version` (`Ebenen.teil`).
+  - Gelesen schon auf dem Thread des Netzes (`Kanal.lies`,
+    `Ebenen.Teil.lies`): Bis 1 MiB JSON parst nicht der Render-Thread.
+    Er bekommt nur die Nadeln des Teils; kein JSON bleibt liegen.
   - Ein Teil gilt nur mit der `version`, die die Liste für seine Ebene
     nennt; das Plugin schickt die Liste vor den Teilen. Welche von zwei
     `version` neuer ist, sagt ein Hash nicht, die Liste schon.
   - Erst wenn alle Teile da sind, ersetzen ihre Nadeln die der Ebene, in
     der Reihenfolge der Teile. Bis dahin bleibt die alte.
   - Nennt die Liste eine neue `version`, verwirft der Mod die halben
-    Teile der alten.
+    Teile der alten. Weil die Liste je Kennung genau eine `version` nennt,
+    entsteht so nie eine Ebene aus zwei Versionen.
 - **Vergessen** beim Trennen und bei jedem neuen Login; das Plugin schickt
   danach alles neu.
-- **Kaputt:** Eine Nachricht, die sich nicht lesen lässt, ändert nichts.
-  Ein kaputtes Objekt fehlt, die übrigen gelten.
+- **Kaputt:** Eine Nachricht, die sich nicht lesen lässt, ändert nichts,
+  auch nicht an einer halben Sammlung. Ein kaputtes Objekt fehlt, die
+  übrigen gelten.
 - **Gross:** Ein Teil hat bis 64 KiB, ein Teil mit einem einzelnen grossen
   Objekt bis 1 MiB. So viel liest der Kanal, siehe [Download](download.md),
   „Kanal“; sonst würde eine Ebene mit einer grossen Region nie ganz.
@@ -63,7 +69,8 @@ die Nachrichten das Plugin:
 - **Farbe:** Die Grafikkarte multipliziert das Feld mit `color`, ohne
   `color` `#D9443A`; das Alpha wirkt nicht. Sie rundet dabei, statt
   abzuschneiden wie die Webkarte; ein Kanal weicht so um höchstens eine
-  Stufe ab. So hat es der Reviewer entschieden.
+  Stufe ab, siehe
+  [0007](entscheidungen/0007-toenung-auf-der-grafikkarte.md).
 - **Name** in der Schrift des Spiels, mittig 2 Einheiten unter dem Fuss,
   nur in der Grundgrösse.
 - **Grösse** (`Ebenen.stufen`): massgebend ist p, wie viele Einheiten ein
@@ -71,15 +78,21 @@ die Nachrichten das Plugin:
   1/8 eine kleiner, ab 1/32 zwei kleiner, darunter gar nicht. Kleiner als
   `small` fällt sie weg.
 - **Minimap:** p ist der Zoom, also mindestens 1; die Nadeln stehen
-  immer in ihrer Grundgrösse. Gezeichnet wird eine Nadel, deren Fuss in
-  der Form liegt, auch gedreht (`Minimap.marke`). Schild und Name bleiben
-  im Quadrat der Minimap.
+  immer in ihrer Grundgrösse. Gezeichnet wird eine Nadel, deren Fuss auf
+  der sichtbaren Karte liegt, mit Rahmen innerhalb seiner Bänder, auch
+  gedreht (`Minimap.marke`). Die Nadeln kommen nach Karte und Linien und
+  vor Ring und Rahmen: Was am Rand über sie ragt, decken diese. Schild und
+  Name bleiben im Quadrat der Minimap. Rund steht ein Schild am Rand so
+  auch in den Ecken des Quadrats ausserhalb des Kreises; so ist es gewollt,
+  sonst verschwände eine Stadt am Rand.
 - **Vollbildkarte:** p ist der Abstand der Chunklinien durch 16
   (`Kartenblick.chunkAbstand`), der Fuss auf dem Raster der Kacheln wie
-  die Wegpunkte.
+  die Wegpunkte. Gezeichnet wird, was den Schirm berührt: das Schild 12
+  Einheiten zur Seite und 33 nach oben, der Name 11 nach unten und halb so
+  weit zur Seite, wie er breit ist.
 - **Reihenfolge:** unter Wegpunkten, Mitspielern und dem eigenen Kopf; die
-  Ebenen nach `order`, die höhere oben, in einer Ebene in der Reihenfolge
-  der Objekte.
+  Ebenen nach `order`, die höhere oben, bei Gleichstand die kleinere `id`
+  oben; in einer Ebene in der Reihenfolge der Objekte.
 - **An oder aus:** siehe „Umschalten“.
 - **Text:** Namen von Ebenen und Nadeln setzt der Mod als schlichten Text;
   Codes mit `§` streicht er.
@@ -100,14 +113,20 @@ die Nachrichten das Plugin:
 
 ## Grenzen
 
-Wie im Format, mehr übergeht der Mod:
+Die ersten beiden wie im Format, die übrigen sind eigene Grenzen des Mods.
+So kann ein Server den Speicher des Mods nicht füllen:
 
-| Was | Höchstens |
-|---|---|
-| Ebenen | 64; die übrigen fehlen, das Log nennt es |
-| Nadeln je Ebene | 1000 |
-| Teile je Ebene | 10 000 |
+| Was | Höchstens | Darüber |
+|---|---|---|
+| Ebenen | 64 | die übrigen fehlen, das Log nennt es |
+| Nadeln je Ebene | 1000 | die Sammlung ist verworfen, die alte Ebene bleibt |
+| Teile je Ebene | 256; für 4 MiB braucht ein Plugin rund 130 | der Teil gilt nicht |
+| Nachricht | 1 MiB | verworfen, siehe [Download](download.md), „Kanal“ |
+| Name einer Nadel oder Ebene | 64 Zeichen | der Name fehlt |
+| Kennung, `version`, Dimension | 129 Zeichen | Nachricht oder Nadel gilt nicht |
 
+- **Speicher:** Halbe Sammlungen gibt es höchstens eine je Ebene der
+  Liste, also 64, mit je höchstens 1000 Nadeln.
 - **Kosten:** Je Frame geht der Mod alle Nadeln der sichtbaren Ebenen
   durch, im schlimmsten Fall 64 000. Ein Raster nach Regionen kommt erst,
   wenn eine Messung es verlangt.

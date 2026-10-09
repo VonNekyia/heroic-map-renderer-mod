@@ -207,8 +207,12 @@ final class Karte extends Screen {
             for (Ebenen.Nadel n : Ebenen.INSTANZ.nadeln(e.id())) {
                 double x = blick.rasterX(Projektion.zuPixel(n.x(), satz.scale()), width);
                 double y = blick.rasterY(Projektion.zuPixel(n.z(), satz.scale()), height);
-                // Schild und Name reichen höchstens 40 Einheiten um den Fuss.
-                if (n.dimension().equals(dimension) && x > -40 && x < width + 40 && y > -12 && y < height + 40) {
+                // Unter dem Fuss reicht der Name 11 Einheiten, über ihm das Schild 33; seitlich das Schild 12, der Name halb so weit, wie er breit ist.
+                if (!n.dimension().equals(dimension) || y <= -12 || y >= height + 34) {
+                    continue;
+                }
+                int halb = n.name() == null || stufen > 0 ? 12 : Math.max(12, font.width(n.name()) / 2 + 1);
+                if (x > -halb && x < width + halb) {
                     Ebenen.zeichne(g, font, Math.round(x * k) / (float) k, Math.round(y * k) / (float) k, n, stufen);
                 }
             }

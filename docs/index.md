@@ -33,6 +33,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [0004](entscheidungen/0004-karte-selbst-zeichnen.md): Die Wahl „Selbst“, eine eigene Karte aus den geladenen Chunks, die die des Servers ersetzt; löst 0002 teilweise ab.
 - [0005](entscheidungen/0005-rahmen-als-skins.md): Die Rahmen als umschaltbare Skins, nur um die Minimap, ohne Rahmen als Vorgabe, ohne Nordmarke vor der Drehung; teilweise abgelöst durch 0006.
 - [0006](entscheidungen/0006-ein-weg-fuer-die-minimap.md): Ein Weg für die Minimap, gedreht wie ungedreht ein Vieleck je Region, der Ring deckt den Rand; löst 0005 in der Maske ab.
+- [0007](entscheidungen/0007-toenung-auf-der-grafikkarte.md): Die Nadeln auf der Grafikkarte tönen, je Kanal höchstens eine Stufe anders als die Webkarte.
 
 ## Messungen
 

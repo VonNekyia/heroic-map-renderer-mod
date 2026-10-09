@@ -2,7 +2,6 @@ package com.nekyia.heroicmap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonParser;
@@ -24,9 +23,21 @@ class EbenenTest {
         return "{\"id\":\"" + id + "\",\"name\":{\"de\":\"Städte\",\"en\":\"Towns\"},\"visible\":true,\"order\":100,\"version\":\"" + version + "\"}";
     }
 
+    /** Wie der Kanal: erst auf dem Thread des Netzes gelesen, dann an die Ebenen. */
     private static void teil(Ebenen e, String id, String version, int teil, int teile, String objekte) {
-        e.empfange(JsonParser.parseString("{\"v\":1,\"typ\":\"ebene\",\"jetzt\":1,\"id\":\"" + id + "\",\"version\":\"" + version
-                + "\",\"teil\":" + teil + ",\"teile\":" + teile + ",\"objects\":[" + objekte + "]}").getAsJsonObject());
+        Ebenen.Teil t = Ebenen.Teil.lies("{\"v\":1,\"typ\":\"ebene\",\"jetzt\":1,\"id\":\"" + id + "\",\"version\":\"" + version
+                + "\",\"teil\":" + teil + ",\"teile\":" + teile + ",\"objects\":[" + objekte + "]}");
+        if (t != null) {
+            e.teil(t);
+        }
+    }
+
+    private static String viele(String vorsilbe, int anzahl) {
+        StringBuilder s = new StringBuilder();
+        for (int i = 0; i < anzahl; i++) {
+            s.append(i == 0 ? "" : ",").append(nadel(vorsilbe + i, i));
+        }
+        return s.toString();
     }
 
     private static String nadel(String id, double x) {
@@ -65,6 +76,26 @@ class EbenenTest {
     }
 
     @Test
+    void keineEbeneAusZweiVersionen() {
+        // Die Folge aus dem Review: v2 Teil 1/2, dann die Liste mit v3, dann v3 Teil 2/2.
+        Ebenen e = new Ebenen();
+        liste(e, eintrag("b:staedte", "v2"));
+        teil(e, "b:staedte", "v2", 1, 2, nadel("zwei1", 1));
+        liste(e, eintrag("b:staedte", "v3"));
+        teil(e, "b:staedte", "v3", 2, 2, nadel("drei2", 2));
+        assertEquals(List.of(), e.nadeln("b:staedte"));
+        teil(e, "b:staedte", "v3", 1, 2, nadel("drei1", 1));
+        assertEquals(List.of("drei1", "drei2"), e.nadeln("b:staedte").stream().map(Ebenen.Nadel::name).toList());
+        // Nennt die Liste eine Kennung zweimal, gilt der erste Eintrag; ein Teil der zweiten version gilt nicht.
+        Ebenen f = new Ebenen();
+        liste(f, eintrag("b:staedte", "v2") + "," + eintrag("b:staedte", "v3"));
+        assertEquals(1, f.sichtbar().size());
+        teil(f, "b:staedte", "v2", 1, 2, nadel("zwei1", 1));
+        teil(f, "b:staedte", "v3", 2, 2, nadel("drei2", 2));
+        assertEquals(List.of(), f.nadeln("b:staedte"));
+    }
+
+    @Test
     void wasAusDerListeFaelltIstWeg() {
         Ebenen e = new Ebenen();
         liste(e, eintrag("b:staedte", "v1") + "," + eintrag("b:doerfer", "v1"));
@@ -93,7 +124,7 @@ class EbenenTest {
                 + "{\"id\":\"d\",\"type\":\"pin\",\"at\":\"kaputt\"},"
                 + "{\"id\":\"e\",\"type\":\"pin\",\"at\":[3,4],\"size\":\"small\",\"color\":\"rot\"}"
                 + "]").getAsJsonArray();
-        List<Ebenen.Nadel> n = Ebenen.nadeln(new JsonArray[] {objekte});
+        List<Ebenen.Nadel> n = Ebenen.nadeln(objekte);
         assertEquals(3, n.size());
         assertEquals(new Ebenen.Nadel(120.5, -340.5, Ebenen.UEBERWELT, null, 1, Ebenen.FARBE), n.get(0));
         // Das Alpha wirkt am Schild nicht; unbekannte Felder übergeht der Mod.
@@ -103,11 +134,8 @@ class EbenenTest {
 
     @Test
     void grenzen() {
-        StringBuilder viele = new StringBuilder();
-        for (int i = 0; i < Ebenen.MAX_NADELN + 5; i++) {
-            viele.append(i == 0 ? "" : ",").append(nadel("n" + i, i));
-        }
-        assertEquals(Ebenen.MAX_NADELN, Ebenen.nadeln(new JsonArray[] {JsonParser.parseString("[" + viele + "]").getAsJsonArray()}).size());
+        // Ein Teil liest höchstens eine Nadel über der Grenze; so merkt die Sammlung, dass es zu viele sind.
+        assertEquals(Ebenen.MAX_NADELN + 1, Ebenen.nadeln(JsonParser.parseString("[" + viele("n", Ebenen.MAX_NADELN + 5) + "]").getAsJsonArray()).size());
         Ebenen e = new Ebenen();
         StringBuilder ebenen = new StringBuilder();
         for (int i = 0; i < Ebenen.MAX_EBENEN + 1; i++) {
@@ -118,14 +146,60 @@ class EbenenTest {
     }
 
     @Test
+    void zuVieleNadelnVerwerfenDieSammlung() {
+        Ebenen e = new Ebenen();
+        liste(e, eintrag("b:staedte", "v1"));
+        teil(e, "b:staedte", "v1", 1, 1, nadel("alt", 1));
+        liste(e, eintrag("b:staedte", "v2"));
+        teil(e, "b:staedte", "v2", 1, 3, viele("a", 600));
+        teil(e, "b:staedte", "v2", 2, 3, viele("b", 600));
+        teil(e, "b:staedte", "v2", 3, 3, nadel("c", 1));
+        // Über 1000 in der Sammlung: verworfen, die alte bleibt.
+        assertEquals(List.of("alt"), e.nadeln("b:staedte").stream().map(Ebenen.Nadel::name).toList());
+        // Genau 1000 gehen.
+        liste(e, eintrag("b:staedte", "v3"));
+        teil(e, "b:staedte", "v3", 1, 2, viele("a", 600));
+        teil(e, "b:staedte", "v3", 2, 2, viele("b", 400));
+        assertEquals(Ebenen.MAX_NADELN, e.nadeln("b:staedte").size());
+        // Mehr als 256 Teile nimmt der Mod nicht.
+        liste(e, eintrag("b:staedte", "v4"));
+        teil(e, "b:staedte", "v4", 1, Ebenen.MAX_TEILE + 1, nadel("viel", 1));
+        assertEquals(Ebenen.MAX_NADELN, e.nadeln("b:staedte").size());
+    }
+
+    @Test
+    void langeTexteUebergangen() {
+        String name64 = "n".repeat(Ebenen.MAX_TEXT), name65 = "n".repeat(Ebenen.MAX_TEXT + 1);
+        JsonArray objekte = JsonParser.parseString("[{\"id\":\"a\",\"type\":\"pin\",\"at\":[0,0],\"name\":\"" + name64 + "\"},"
+                + "{\"id\":\"b\",\"type\":\"pin\",\"at\":[0,0],\"name\":\"" + name65 + "\"},"
+                + "{\"id\":\"c\",\"type\":\"pin\",\"at\":[0,0],\"dimension\":\"" + "d".repeat(Ebenen.MAX_KENNUNG + 1) + "\"}]").getAsJsonArray();
+        List<Ebenen.Nadel> n = Ebenen.nadeln(objekte);
+        // Ein zu langer Name fehlt, die Nadel bleibt; eine zu lange Dimension nimmt die Nadel mit.
+        assertEquals(2, n.size());
+        assertEquals(name64, n.get(0).name());
+        assertNull(n.get(1).name());
+        assertNull(Ebenen.Teil.lies("{\"v\":1,\"typ\":\"ebene\",\"id\":\"" + "i".repeat(Ebenen.MAX_KENNUNG + 1)
+                + "\",\"version\":\"v\",\"teil\":1,\"teile\":1,\"objects\":[]}"));
+    }
+
+    @Test
     void kaputteNachrichtAendertNichts() {
         Ebenen e = new Ebenen();
         liste(e, eintrag("b:staedte", "v1"));
         liste(e, "{\"id\":\"b:ohne_version\"}");
         assertEquals(List.of("b:staedte"), e.sichtbar().stream().map(Ebenen.Eintrag::id).toList());
-        teil(e, "b:staedte", "v1", 3, 2, nadel("a", 1));
-        teil(e, "b:staedte", "v1", 0, 2, nadel("a", 1));
-        assertEquals(List.of(), e.nadeln("b:staedte"));
+        // Ein Teil ausserhalb von teile und einer ohne lesbare Objekte lassen die Sammlung stehen.
+        teil(e, "b:staedte", "v1", 1, 3, nadel("a", 1));
+        teil(e, "b:staedte", "v1", 5, 2, nadel("x", 1));
+        teil(e, "b:staedte", "v1", 0, 3, nadel("x", 1));
+        assertNull(Ebenen.Teil.lies("{\"v\":1,\"typ\":\"ebene\",\"id\":\"b:staedte\",\"version\":\"v1\",\"teil\":2,\"teile\":2,\"objects\":\"x\"}"));
+        teil(e, "b:staedte", "v1", 2, 3, nadel("b", 2));
+        teil(e, "b:staedte", "v1", 3, 3, nadel("c", 3));
+        assertEquals(List.of("a", "b", "c"), e.nadeln("b:staedte").stream().map(Ebenen.Nadel::name).toList());
+        // Andere Nachrichten sind kein Teil.
+        assertNull(Ebenen.Teil.lies("{\"v\":1,\"typ\":\"spieler\"}"));
+        assertNull(Ebenen.Teil.lies("{\"v\":2,\"typ\":\"ebene\",\"id\":\"b:staedte\",\"version\":\"v1\",\"teil\":1,\"teile\":1,\"objects\":[]}"));
+        assertNull(Ebenen.Teil.lies("kein json"));
     }
 
     @Test
@@ -139,6 +213,10 @@ class EbenenTest {
         assertEquals(List.of("b:unten", "b:oben"), s.stream().map(Ebenen.Eintrag::id).toList());
         assertEquals("Top", s.get(1).name(true));
         assertEquals("Unten", s.get(0).name(false));
+        // Gleichstand bei order: Die kleinere id steht in der Liste vorn und liegt oben, wird also zuletzt gezeichnet.
+        liste(e, "{\"id\":\"b:a\",\"order\":1,\"version\":\"v\"},{\"id\":\"b:b\",\"order\":1,\"version\":\"v\"}");
+        assertEquals(List.of("b:b", "b:a"), e.sichtbar().stream().map(Ebenen.Eintrag::id).toList());
+        assertEquals(List.of("b:a", "b:b"), e.alle().stream().map(Ebenen.Eintrag::id).toList());
     }
 
     @Test
@@ -177,7 +255,7 @@ class EbenenTest {
     @Test
     void schlichterText() {
         JsonArray objekte = JsonParser.parseString("[{\"id\":\"a\",\"type\":\"pin\",\"at\":[0,0],\"name\":\"\u00a7cRot\"}]").getAsJsonArray();
-        assertEquals("Rot", Ebenen.nadeln(new JsonArray[] {objekte}).getFirst().name());
+        assertEquals("Rot", Ebenen.nadeln(objekte).getFirst().name());
     }
 
     @Test
@@ -197,7 +275,9 @@ class EbenenTest {
         assertEquals(0xFF40E53F, Ebenen.farbe("#40E53F"));
         assertEquals(0xFF40E53F, Ebenen.farbe("#40e53fDD"));
         assertEquals(Ebenen.FARBE, Ebenen.farbe("#40E53"));
-        assertNull(new Ebenen.Nadel(0, 0, Ebenen.UEBERWELT, null, 1, 0).name());
-        assertTrue(Ebenen.FARBE >>> 24 == 0xFF);
+        assertEquals(Ebenen.FARBE, Ebenen.farbe("40E53F"));
+        // Schwarz ist deckend schwarz, nicht durchsichtig.
+        assertEquals(0xFF000000, Ebenen.farbe("#000000"));
+        assertEquals(0xFF000000, Ebenen.farbe("#00000000"));
     }
 }
