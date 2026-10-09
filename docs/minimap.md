@@ -1,6 +1,6 @@
 ---
 title: Minimap
-description: Bedienung über das Menü hinter /hmap und das Untermenü „Einstellungen …“, Chunklinien, Drehen mit der Blickrichtung, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
+description: Bedienung über das Menü hinter /hmap und das Untermenü „Einstellungen …“, Chunklinien, Drehen mit der Blickrichtung, Koordinaten unter der Minimap, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
 code:
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/ChunkMaler.java
@@ -60,6 +60,7 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
 | Auflösung der Minimap | 2 px je Block | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet |
 | Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte, siehe „Chunklinien“ |
 | Drehen | an | die Minimap dreht mit der Blickrichtung, siehe „Drehen“ |
+| Koordinaten | xz | aus, `x z` oder `x y z` des Spielers unter der Minimap, siehe „Koordinaten“ |
 | Rahmen | ohne | ein Skin um die Minimap, siehe [Rahmen](rahmen.md) |
 | Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
 | Knopf „Ebenen …“ | – | je Ebene vom Server an oder aus, siehe [Ebenen](ebenen.md), „Umschalten“ |
@@ -90,7 +91,8 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
   Einheiten breit oder schmaler, bis 120, wenn dort weniger Platz ist
   (`Einstellungen.spalte`), im Untermenü ebenso. Im Hauptmenü teilen sich
   je zwei eine Zeile: „Minimap“ und „Zoom“, „Karte laden …“ und
-  „Kartenliste …“, „Einstellungen …“ und „Fertig“. So passen Menü und
+  „Kartenliste …“, „Einstellungen …“ und „Fertig“; im Untermenü
+  „Koordinaten“ und „Ebenen …“. So passen Menü und
   Untermenü auch bei grossem GUI-Massstab auf den Schirm, bis 240
   Einheiten Höhe, etwa 1280 × 720 bei GUI-Massstab 3.
 - **Koordinaten:** Im Menü stehen über der Minimap `x` und `z` des Blocks
@@ -218,6 +220,23 @@ seit dem 10.10. als Vorgabe.
   Stand, im Flug nichts über der Streuung, schräg im Flug 0,008 und
   0,009 ms. Die Messung davor, mit Läufen ungedreht, steht in
   [Minimap, Drehen](messungen/2026-10-09-minimap-drehen.md).
+
+## Koordinaten
+
+Unter der Minimap stehen die Blockkoordinaten des Spielers, abgerundet wie
+im Debug-Bildschirm des Spiels (`Mth.floor`). So hat es der User gewünscht.
+
+- **Schalter** „Koordinaten“ im Untermenü: aus, `xz` oder `xyz`, Vorgabe
+  `xz` (`Minimap.Koordinaten`). Gespeichert als `koordinaten` in
+  `heroicmap.properties`, `aus`, `xz` oder `xyz`; ein anderer Wert gilt als
+  Vorgabe.
+- **Lage:** mittig unter der Minimap, in der Schrift des Spiels, weiss mit
+  Schatten. 2 Einheiten Abstand unter dem Ring, mit Rahmen unter den
+  Ornamenten, die halb über die Ecken ragen (`Skin.einrueckung`). Sie folgt
+  Grösse und Lage der Minimap. Ist unten kein Platz mehr, steht die Zeile
+  ebenso über der Minimap (`Minimap.koordinatenLage`).
+- **Nicht gedreht:** Die Zeile bleibt waagrecht, auch wenn die Minimap
+  dreht.
 
 ## Mitspieler
 

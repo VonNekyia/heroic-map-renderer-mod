@@ -3,6 +3,7 @@ package com.nekyia.heroicmap;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -145,6 +146,32 @@ class MinimapTest {
         Minimap neu = new Minimap();
         neu.lies(datei);
         assertFalse(neu.drehen());
+    }
+
+    @Test
+    void koordinatenDreiModiUndGespeichert(@TempDir Path ordner) throws Exception {
+        // Blockkoordinaten, auch negativ abgerundet.
+        assertNull(Minimap.werte(Minimap.Koordinaten.AUS, 1.5, 64.2, -0.5));
+        assertArrayEquals(new Object[] {1, -1}, Minimap.werte(Minimap.Koordinaten.XZ, 1.5, 64.2, -0.5));
+        assertArrayEquals(new Object[] {1, 64, -1}, Minimap.werte(Minimap.Koordinaten.XYZ, 1.5, 64.2, -0.5));
+        Path datei = ordner.resolve("heroicmap.properties");
+        for (Minimap.Koordinaten k : Minimap.Koordinaten.values()) {
+            Minimap m = new Minimap();
+            m.setzeKoordinaten(k);
+            m.schreibe(datei);
+            Minimap neu = new Minimap();
+            neu.lies(datei);
+            assertEquals(k, neu.koordinaten());
+        }
+    }
+
+    @Test
+    void koordinatenUnterOderUeberDerMinimap() {
+        // Mittig unter der Minimap; ganz unten am Schirm darüber.
+        Minimap.Rahmen r = new Minimap.Rahmen(100, 10, 128);
+        assertArrayEquals(new int[] {100 + (128 - 60) / 2, 10 + 128 + 1 + 2}, Minimap.koordinatenLage(r, 1, 360, 60, 9));
+        Minimap.Rahmen unten = new Minimap.Rahmen(100, 360 - 128 - 4, 128);
+        assertArrayEquals(new int[] {100 + (128 - 60) / 2, 360 - 128 - 4 - 4 - 2 - 9}, Minimap.koordinatenLage(unten, 4, 360, 60, 9));
     }
 
     @Test
@@ -316,6 +343,7 @@ class MinimapTest {
         // Ablage: Vorgabe IP und Hash, die Wahl des Users.
         assertEquals(Downloads.Ablage.IP, minimap.ablage());
         assertFalse(minimap.chunklinien());
+        assertEquals(Minimap.Koordinaten.XZ, minimap.koordinaten());
         // Drehen: Vorgabe an, der Wunsch des Users.
         assertTrue(minimap.drehen());
         assertEquals(Skin.OHNE, minimap.skin());
