@@ -170,9 +170,10 @@ final class Skin {
             }
             Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "rahmen/" + name + "/ring");
             DynamicTexture textur = new DynamicTexture(() -> "heroicmap " + id, s, s, true);
+            NativeImage pixel = textur.getPixels();
             for (int y = 0; y < s; y++) {
                 for (int x = 0; x < s; x++) {
-                    textur.setPixel(x, y, ringFarbe(x, y, s));
+                    pixel.setPixel(x, y, ringFarbe(x, y, s));
                 }
             }
             textur.upload();
@@ -271,9 +272,10 @@ final class Skin {
             boolean rechts = (e & 1) != 0, unten = (e & 2) != 0;
             Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "rahmen/" + name + "/" + teil + "_" + e);
             DynamicTexture textur = new DynamicTexture(() -> "heroicmap " + id, w, h, true);
+            NativeImage pixel = textur.getPixels();
             for (int y = 0; y < h; y++) {
                 for (int x = 0; x < w; x++) {
-                    textur.setPixel(rechts ? w - 1 - x : x, unten ? h - 1 - y : y, quelle.getPixel(x, y));
+                    pixel.setPixel(rechts ? w - 1 - x : x, unten ? h - 1 - y : y, quelle.getPixel(x, y));
                 }
             }
             textur.upload();
