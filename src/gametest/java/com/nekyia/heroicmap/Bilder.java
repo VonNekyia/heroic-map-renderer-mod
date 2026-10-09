@@ -162,10 +162,27 @@ public final class Bilder implements FabricClientGameTest {
                 }
             }
         }
+        // Das Menü mit „uhr“: an der Ecke zur Mitte der Griff statt der zier, ohne den weissen Umriss.
         context.runOnClient(mc -> {
-            Minimap.INSTANZ.setzeSkin(Skin.OHNE);
+            Minimap.INSTANZ.setzeSkin("uhr");
             Minimap.INSTANZ.setzeRund(false);
+            mc.gui.setScreen(new Einstellungen());
         });
+        context.waitTicks(5);
+        Path menue = context.takeScreenshot(TestScreenshotOptions.of("rahmen-menue").disableCounterPrefix());
+        context.runOnClient(mc -> {
+            mc.gui.setScreen(null);
+            Minimap.INSTANZ.setzeSkin(Skin.OHNE);
+        });
+        try {
+            // Das Menü speichert beim Schliessen; spätere Gametests sollen mit der Vorgabe beginnen.
+            Files.deleteIfExists(HeroicMap.einstellungen());
+            if (!AUSGABE.isEmpty()) {
+                Files.copy(menue, Path.of(AUSGABE, "rahmen-menue.png"), StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /** Die Minimap samt Ornamenten: ihr Rahmen und so viel darum, wie sie Abstand zum Rand hält. */
@@ -215,24 +232,15 @@ public final class Bilder implements FabricClientGameTest {
         });
         context.waitTicks(40);
         Path bild = context.takeScreenshot(TestScreenshotOptions.of("vollbildkarte").disableCounterPrefix());
-        // Dieselbe Karte mit Rahmen: Knöpfe, Zeile und Marken rücken nach innen. Siehe docs/rahmen.md.
-        context.runOnClient(mc -> {
-            Minimap.INSTANZ.setzeSkin("uhr");
-            mc.gui.setScreen(new Karte(Satz.lies(baum)));
-        });
-        context.waitTicks(40);
-        Path mitRahmen = context.takeScreenshot(TestScreenshotOptions.of("vollbildkarte-rahmen").disableCounterPrefix());
         if (!AUSGABE.isEmpty()) {
             try {
                 Files.copy(bild, Path.of(AUSGABE, "vollbildkarte.png"), StandardCopyOption.REPLACE_EXISTING);
-                Files.copy(mitRahmen, Path.of(AUSGABE, "vollbildkarte-rahmen.png"), StandardCopyOption.REPLACE_EXISTING);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
         }
         context.runOnClient(mc -> {
             mc.gui.setScreen(null);
-            Minimap.INSTANZ.setzeSkin(Skin.OHNE);
             Wegpunkte.INSTANZ.leeren();
         });
     }

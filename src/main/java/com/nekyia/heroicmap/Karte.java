@@ -43,9 +43,6 @@ final class Karte extends Screen {
     private Component hinweis;
     /** Wo die Knöpfe rechts oben beginnen und enden; Marken und Namen weichen ihnen aus. */
     private int knopfX, knopfUnten;
-    /** Der Rahmen oder null; wie weit er eingerückt ist, und wie weit Knöpfe, Zeile und Marken nach innen rücken. Siehe docs/rahmen.md. */
-    private Skin skin;
-    private int einrueckung, innen;
     /** Der Knopf für den Abgleich, oder null ohne Satz vom Server; er ist aus, bis ein Abgleich wieder geht. */
     private Button abgleich;
     private String baum;
@@ -91,18 +88,15 @@ final class Karte extends Screen {
             blick.mx = Projektion.zuPixel(spieler.getX(), satz.scale());
             blick.mz = Projektion.zuPixel(spieler.getZ(), satz.scale());
         }
-        skin = Skin.von(Minimap.INSTANZ.skin());
-        einrueckung = skin == null ? 0 : skin.einrueckung();
-        innen = skin == null ? 0 : einrueckung + skin.baender();
-        int x = width - KNOPF - 4 - innen;
+        int x = width - KNOPF - 4;
         Button unterster = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.laden"),
-                b -> minecraft.gui.setScreen(new Auswahl(this))).bounds(x, 4 + innen, KNOPF, 20).build());
+                b -> minecraft.gui.setScreen(new Auswahl(this))).bounds(x, 4, KNOPF, 20).build());
         // Eine selbst gezeichnete Karte hat keinen Abgleich. Siehe docs/selbst.md, „Wahl“.
         if (satz != null && !Selbst.selbst(satz.ordner().getParent())) {
             // Der Baum ist der Ordner über dem Massstab.
             baum = satz.ordner().getParent().getFileName().toString();
             abgleich = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.abgleich"),
-                    b -> hinweis = Downloads.INSTANZ.frageAbgleich(baum)).bounds(x, 28 + innen, KNOPF, 20).build());
+                    b -> hinweis = Downloads.INSTANZ.frageAbgleich(baum)).bounds(x, 28, KNOPF, 20).build());
             unterster = abgleich;
         }
         knopfX = x;
@@ -135,15 +129,12 @@ final class Karte extends Screen {
         if (Minimap.INSTANZ.chunklinien() && blick.chunklinien(satz.scale(), minecraft.getWindow().getGuiScale())) {
             linien(g);
         }
-        if (skin != null) {
-            rahmen(g);
-        }
         marken(g);
         int[] block = block(mausX, mausY);
         g.text(font, Component.literal(satz.name() + "   ").append(Component.translatable("heroicmap.koordinaten", block[0], block[1])),
-                4 + innen, height - 12 - innen, TEXT);
+                4, height - 12, TEXT);
         if (hinweis != null) {
-            g.text(font, hinweis, 4 + innen, height - 24 - innen, TEXT);
+            g.text(font, hinweis, 4, height - 24, TEXT);
         }
         // Höchstens ein Abgleich je Tag: Nach einer Ablehnung mit wieder ist der Knopf bis dahin aus.
         if (abgleich != null) {
@@ -160,16 +151,6 @@ final class Karte extends Screen {
             for (int i = 0; i < eintraege.size(); i++) {
                 g.text(font, eintraege.get(i).text(), menueX + 4, menueY + i * ZEILE + 3, TEXT);
             }
-        }
-    }
-
-    /** Der Rahmen um die Karte, eingerückt um die halbe zier, mit der zier in jeder Ecke. Siehe docs/rahmen.md. */
-    private void rahmen(GuiGraphicsExtractor g) {
-        int w = width - 2 * einrueckung, h = height - 2 * einrueckung;
-        skin.baender(g, einrueckung, einrueckung, w, h);
-        double[][] ecken = Skin.ecken(einrueckung, einrueckung, w, h, skin.baender(), false);
-        for (int e = 0; e < ecken.length; e++) {
-            skin.ornament(g, "zier", false, e, ecken[e][0], ecken[e][1]);
         }
     }
 
@@ -219,7 +200,7 @@ final class Karte extends Screen {
     private Marke marke(double x, double z, UUID uuid, Wegpunkte.Punkt punkt) {
         float halb = Minimap.KOPF / 2f + 1;
         double[] p = Kartenblick.marke(blick.rasterX(Projektion.zuPixel(x, satz.scale()), width),
-                blick.rasterY(Projektion.zuPixel(z, satz.scale()), height), width, height, RAND + innen, halb,
+                blick.rasterY(Projektion.zuPixel(z, satz.scale()), height), width, height, RAND, halb,
                 knopfX, knopfUnten);
         // Auf ganze Pixel wie die Kacheln, deren Kanten auf ganzen Einheiten liegen.
         int k = minecraft.getWindow().getGuiScale();

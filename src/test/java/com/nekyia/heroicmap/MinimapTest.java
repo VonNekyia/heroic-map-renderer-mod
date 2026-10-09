@@ -122,7 +122,6 @@ class MinimapTest {
         vorher.setzeShow(false);
         vorher.setzeAblage(Downloads.Ablage.HASH);
         vorher.setzeChunklinien(true);
-        vorher.setzeSkin("uhr");
         vorher.stelle(20, 30, 200, 640, 360);
         vorher.schreibe(datei);
 
@@ -135,11 +134,22 @@ class MinimapTest {
         assertFalse(nachher.show());
         assertEquals(Downloads.Ablage.HASH, nachher.ablage());
         assertTrue(nachher.chunklinien());
+        assertEquals(vorher.rahmen(640, 360), nachher.rahmen(640, 360));
+    }
+
+    @Test
+    void rahmenUebersteht(@TempDir Path ordner) throws Exception {
+        // Ohne Lage und Grösse: Die rechnen mit dem Abstand des Skins, und den kennt erst das Spiel.
+        Path datei = ordner.resolve("heroicmap.properties");
+        Minimap vorher = new Minimap();
+        vorher.setzeSkin("uhr");
+        vorher.schreibe(datei);
+        Minimap nachher = new Minimap();
+        nachher.lies(datei);
         assertEquals("uhr", nachher.skin());
         // Ein unbekannter Rahmen ist „ohne“.
         nachher.setzeSkin("quatsch");
         assertEquals(Skin.OHNE, nachher.skin());
-        assertEquals(vorher.rahmen(640, 360), nachher.rahmen(640, 360));
     }
 
     @Test

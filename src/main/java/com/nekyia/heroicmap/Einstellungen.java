@@ -141,10 +141,10 @@ final class Einstellungen extends Screen {
         }
         if (Minimap.INSTANZ.sichtbar()) {
             Minimap.Rahmen r = Minimap.INSTANZ.rahmen(width, height);
-            umriss(g, r);
-            // Mit Skin zeichnet die Minimap den Griff statt der zier dieser Ecke, ab dem nächsten Frame. Siehe docs/rahmen.md.
-            Minimap.INSTANZ.griff(ecke(r), zug == Zug.GROESSE || imGriff(mausX, mausY, r));
+            // Mit Skin zeichnet die Minimap den Griff statt der zier dieser Ecke, ab dem nächsten Frame; der Umriss entfällt. Siehe docs/rahmen.md.
+            Minimap.INSTANZ.griff(Minimap.griffEcke(r, width, height), zug == Zug.GROESSE || imGriff(mausX, mausY, r));
             if (Skin.von(Minimap.INSTANZ.skin()) == null) {
+                umriss(g, r);
                 int gx = griffX(r), gy = griffY(r);
                 g.fill(gx - GRIFF, gy - GRIFF, gx + GRIFF, gy + GRIFF, TEXT);
             }
@@ -237,11 +237,6 @@ final class Einstellungen extends Screen {
         return r.y() + r.seite() / 2 > height / 2;
     }
 
-    /** Die Ecke des Griffs, 0 oben links bis 3 unten rechts, wie {@link Skin#ecken}. */
-    private int ecke(Minimap.Rahmen r) {
-        return (links(r) ? 0 : 1) | (oben(r) ? 0 : 2);
-    }
-
     /**
      * Die Mitte des Griffs: eckig in der Ecke, rund auf dem Umriss in der Diagonale dorthin; mit
      * Skin auf der Mitte der Bänder, wo sonst die zier sitzt.
@@ -249,7 +244,7 @@ final class Einstellungen extends Screen {
     private double[] griff(Minimap.Rahmen r) {
         Skin skin = Skin.von(Minimap.INSTANZ.skin());
         if (skin != null) {
-            return Skin.ecken(r.x(), r.y(), r.seite(), r.seite(), skin.baender(), Minimap.INSTANZ.rund())[ecke(r)];
+            return Minimap.INSTANZ.ecken(skin, r)[Minimap.griffEcke(r, width, height)];
         }
         double h = r.seite() / 2.0, weg = griffWeg(r);
         return new double[] {r.x() + h + (links(r) ? -weg : weg), r.y() + h + (oben(r) ? -weg : weg)};
@@ -263,9 +258,9 @@ final class Einstellungen extends Screen {
         return (int) Math.round(griff(r)[1]);
     }
 
-    /** Liegt (x, y) auf dem Griff, 9 × 9 Einheiten um seine Mitte? */
     private boolean imGriff(double x, double y, Minimap.Rahmen r) {
-        return Math.abs(x - griffX(r)) <= GRIFF + 1 && Math.abs(y - griffY(r)) <= GRIFF + 1;
+        double[] p = griff(r);
+        return Minimap.imGriff(x, y, p[0], p[1]);
     }
 
     private static double griffWeg(Minimap.Rahmen r) {

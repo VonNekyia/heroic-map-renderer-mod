@@ -3,3 +3,4 @@ accessible field net/minecraft/client/renderer/texture/SpriteContents originalIm
 accessible field net/minecraft/client/renderer/texture/TextureAtlas sprites Ljava/util/List;
 accessible field net/minecraft/world/level/biome/BiomeManager biomeZoomSeed J
 accessible field net/minecraft/client/gui/GuiGraphicsExtractor guiRenderState Lnet/minecraft/client/renderer/state/gui/GuiRenderState;
+accessible method net/minecraft/client/gui/GuiGraphicsExtractor innerBlit (Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;Lnet/minecraft/resources/Identifier;IIIIFFFFI)V

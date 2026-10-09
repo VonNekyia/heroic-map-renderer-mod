@@ -9,17 +9,21 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.data.AtlasIds;
 import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
 
 /**
- * Ein Rahmen der Karte: Bänder aus {@code palette.txt}, Ornamente als Bilder, je Skin ein Ordner
- * unter {@code textures/rahmen/<name>/}. „ohne“ ist kein Skin, sondern der Umriss wie bisher.
- * Siehe docs/rahmen.md.
+ * Ein Rahmen der Minimap: Bänder aus {@code palette.txt}, Ornamente als Sprites im Atlas des GUI,
+ * je Skin ein Ordner unter {@code textures/gui/sprites/rahmen/<name>/}. „ohne“ ist kein Skin,
+ * sondern der Umriss wie bisher. Siehe docs/rahmen.md.
  */
 final class Skin {
 
@@ -28,31 +32,40 @@ final class Skin {
     static final String OHNE = "ohne";
     /** Der Schatten eines Ornaments: Schwarz zu 50 %, um (+1, +1) versetzt. */
     static final int SCHATTEN = 0x80000000;
+    /** Die Ornamente: zier und griff, je mit {@code _aktiv} eins dahinter. */
+    static final int ZIER = 0, GRIFF = 2;
+    private static final String[] TEILE = {"zier", "zier_aktiv", "griff", "griff_aktiv"};
     private static final Logger LOGGER = LogUtils.getLogger();
+    /** Geladene Skins, ein Fehlschlag als null, bis der Atlas des GUI neu lädt. */
     private static final Map<String, Skin> GELADEN = new HashMap<>();
+    private static List<?> atlasStand;
 
     /** Ein Rechteck eines Bands, Enden ausschliesslich; licht heisst die Farbe oben und links. */
     interface Band {
         void fill(int xa, int ya, int xb, int yb, int band, boolean licht);
     }
 
-    /** Ein Ornament in einer Ecke, schon gespiegelt. */
-    private record Bild(Identifier id, int breite, int hoehe) {
-    }
-
     final String name;
     /** Je Band von aussen nach innen: die Farbe oben und links, die unten und rechts. */
     final int[] licht, schatten;
     final boolean mitSchatten;
-    private final Map<String, Bild> bilder = new HashMap<>();
+    /** Die längere Seite der zier, in Pixeln. */
+    final int zier;
+    private final Identifier[] sprites = new Identifier[TEILE.length];
     private Identifier ring;
     private int ringSeite;
+    private List<int[]> maske;
+    private int maskeSeite, maskeMassstab;
 
-    private Skin(String name, int[] licht, int[] schatten, boolean mitSchatten) {
+    private Skin(String name, int[] licht, int[] schatten, boolean mitSchatten, int zier) {
         this.name = name;
         this.licht = licht;
         this.schatten = schatten;
         this.mitSchatten = mitSchatten;
+        this.zier = zier;
+        for (int i = 0; i < TEILE.length; i++) {
+            sprites[i] = sprite(name, TEILE[i]);
+        }
     }
 
     /** Der Skin mit diesem Namen, oder null für „ohne“, einen unbekannten oder unlesbaren. */
@@ -60,33 +73,60 @@ final class Skin {
         if (OHNE.equals(name) || !NAMEN.contains(name)) {
             return null;
         }
-        return GELADEN.computeIfAbsent(name, Skin::laden);
+        TextureAtlas atlas = gui();
+        if (atlas.sprites != atlasStand) {
+            // F3+T oder ein Ressourcenpaket: Paletten, Ringe und Masken neu.
+            GELADEN.values().forEach(s -> {
+                if (s != null) {
+                    s.freigeben();
+                }
+            });
+            GELADEN.clear();
+            atlasStand = atlas.sprites;
+        }
+        return von(name, Skin::laden);
+    }
+
+    /** Lädt einen Skin nur einmal; auch ein Fehlschlag bleibt gemerkt, sonst stünde je Frame eine Warnung im Log. */
+    static Skin von(String name, Function<String, Skin> lader) {
+        if (!GELADEN.containsKey(name)) {
+            GELADEN.put(name, lader.apply(name));
+        }
+        return GELADEN.get(name);
     }
 
     private static Skin laden(String name) {
         try {
-            return lies(name, text(name, "palette.txt"), text(name, "info.txt"));
+            TextureAtlasSprite zier = gui().getSprite(sprite(name, "zier"));
+            return lies(name, text(name, "palette.txt"), text(name, "info.txt"),
+                    Math.max(zier.contents().width(), zier.contents().height()));
         } catch (IOException | RuntimeException e) {
             LOGGER.warn("Heroic Map: Rahmen {} unlesbar", name, e);
             return null;
         }
     }
 
-    private static String text(String name, String datei) throws IOException {
-        try (InputStream rein = Minecraft.getInstance().getResourceManager().open(datei(name, datei))) {
-            return new String(rein.readAllBytes(), StandardCharsets.UTF_8);
-        }
+    private static TextureAtlas gui() {
+        return Minecraft.getInstance().getAtlasManager().getAtlasOrThrow(AtlasIds.GUI);
     }
 
-    private static Identifier datei(String name, String datei) {
-        return Identifier.fromNamespaceAndPath(HeroicMap.ID, "textures/rahmen/" + name + "/" + datei);
+    private static Identifier sprite(String name, String teil) {
+        return Identifier.fromNamespaceAndPath(HeroicMap.ID, "rahmen/" + name + "/" + teil);
+    }
+
+    private static String text(String name, String datei) throws IOException {
+        Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "textures/gui/sprites/rahmen/" + name + "/" + datei);
+        try (InputStream rein = Minecraft.getInstance().getResourceManager().open(id)) {
+            return new String(rein.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     /**
      * Liest {@code palette.txt}: eine Zeile je Band von aussen nach innen, eine Farbe oder zwei,
      * Licht und Schatten; {@code //} beginnt einen Kommentar. Aus {@code info.txt} nur {@code schatten}.
+     * {@code zier} ist die längere Seite der zier in Pixeln.
      */
-    static Skin lies(String name, String palette, String info) {
+    static Skin lies(String name, String palette, String info, int zier) {
         List<int[]> baender = new ArrayList<>();
         for (String zeile : palette.lines().toList()) {
             int kommentar = zeile.indexOf("//");
@@ -104,7 +144,7 @@ final class Skin {
             throw new IllegalArgumentException("palette.txt ohne Band");
         }
         int[] licht = baender.stream().mapToInt(b -> b[0]).toArray(), schatten = baender.stream().mapToInt(b -> b[1]).toArray();
-        return new Skin(name, licht, schatten, info.lines().map(String::trim).anyMatch("schatten=ja"::equals));
+        return new Skin(name, licht, schatten, info.lines().map(String::trim).anyMatch("schatten=ja"::equals), zier);
     }
 
     private static int farbe(String text) {
@@ -116,6 +156,16 @@ final class Skin {
 
     int baender() {
         return licht.length;
+    }
+
+    /** Wie weit die Minimap mit diesem Rahmen mindestens vom Rand des Schirms bleibt; siehe {@link #einrueckung(int)}. */
+    int einrueckung() {
+        return einrueckung(zier);
+    }
+
+    /** Die halbe Seite der zier, aufgerundet: So bleibt die zier in der Ecke ganz auf dem Schirm. */
+    static int einrueckung(int zier) {
+        return (zier + 1) / 2;
     }
 
     /** Das Band des Pixels (x, y) im Rechteck w × h, von aussen gezählt. */
@@ -165,9 +215,7 @@ final class Skin {
     /** Der Ring für die runde Minimap mit der Seite s, ein Texel je Einheit des GUI; nur der für die letzte Seite bleibt. */
     Identifier ring(int s) {
         if (ring == null || ringSeite != s) {
-            if (ring != null) {
-                Minecraft.getInstance().getTextureManager().release(ring);
-            }
+            freigeben();
             Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "rahmen/" + name + "/ring");
             DynamicTexture textur = new DynamicTexture(() -> "heroicmap " + id, s, s, true);
             NativeImage pixel = textur.getPixels();
@@ -182,6 +230,23 @@ final class Skin {
             ringSeite = s;
         }
         return ring;
+    }
+
+    private void freigeben() {
+        if (ring != null) {
+            Minecraft.getInstance().getTextureManager().release(ring);
+            ring = null;
+        }
+    }
+
+    /** Die Maske der runden Karte ({@link #maskeRund}), gemerkt, bis sich Seite oder GUI-Massstab ändern. */
+    List<int[]> maske(int s, int k) {
+        if (maske == null || maskeSeite != s || maskeMassstab != k) {
+            maske = maskeRund(s, baender(), k);
+            maskeSeite = s;
+            maskeMassstab = k;
+        }
+        return maske;
     }
 
     /**
@@ -222,68 +287,34 @@ final class Skin {
         return new double[][] {{cx - q, cy - q}, {cx + q, cy - q}, {cx - q, cy + q}, {cx + q, cy + q}};
     }
 
-    /** Wie weit die Vollbildkarte ihren Rahmen einrückt, in Einheiten des GUI; siehe {@link #einrueckung(int)}. */
-    int einrueckung() {
-        Bild zier = bild("zier", 0);
-        return zier == null ? 0 : einrueckung(Math.max(zier.breite(), zier.hoehe()));
-    }
-
-    /** Die halbe Seite der zier, aufgerundet: So bleibt die zier in der Ecke ganz auf dem Schirm. */
-    static int einrueckung(int zier) {
-        return (zier + 1) / 2;
-    }
-
     /** Die linke obere Ecke eines Bilds der Breite w, dessen Mitte auf p liegen soll. */
     static int lage(double p, int w) {
         return (int) Math.floor(p - w / 2.0 + 0.5);
     }
 
+    /** Spiegelt das Sprite für die Ecke e (0 oben links bis 3 unten rechts) waagrecht? zier ist für oben links gezeichnet, griff für unten rechts. */
+    static boolean spiegeltX(int e, boolean griff) {
+        return ((e ^ (griff ? 3 : 0)) & 1) != 0;
+    }
+
+    static boolean spiegeltY(int e, boolean griff) {
+        return ((e ^ (griff ? 3 : 0)) & 2) != 0;
+    }
+
     /**
-     * Zeichnet das Ornament {@code teil} der Ecke e (0 oben links, 1 oben rechts, 2 unten links,
-     * 3 unten rechts) mit der Mitte auf (px, py), mit Schatten, wenn der Skin ihn will. Gezeichnet
-     * ist zier für oben links, griff für unten rechts; die anderen Ecken spiegeln die Pixel, denn
-     * das GUI verwirft gespiegelte Flächen.
+     * Zeichnet das Ornament {@code teil} ({@link #ZIER} oder {@link #GRIFF}, plus 1 für aktiv) der
+     * Ecke e mit der Mitte auf (px, py), mit Schatten, wenn der Skin ihn will. Gespiegelt über
+     * vertauschte UV: Die Ecken des Quads bleiben in derselben Reihenfolge, das GUI verwirft es nicht.
      */
-    void ornament(GuiGraphicsExtractor g, String teil, boolean aktiv, int e, double px, double py) {
-        Bild bild = bild(teil + (aktiv ? "_aktiv" : ""), e ^ ("griff".equals(teil) ? 3 : 0));
-        if (bild == null) {
-            return;
-        }
-        int x = lage(px, bild.breite()), y = lage(py, bild.hoehe());
+    void ornament(GuiGraphicsExtractor g, int teil, int e, double px, double py) {
+        TextureAtlasSprite s = gui().getSprite(sprites[teil]);
+        int w = s.contents().width(), h = s.contents().height(), x = lage(px, w), y = lage(py, h);
+        boolean griff = teil >= GRIFF, sx = spiegeltX(e, griff), sy = spiegeltY(e, griff);
+        float u0 = sx ? s.getU1() : s.getU0(), u1 = sx ? s.getU0() : s.getU1();
+        float v0 = sy ? s.getV1() : s.getV0(), v1 = sy ? s.getV0() : s.getV1();
         if (mitSchatten) {
-            g.blit(RenderPipelines.GUI_TEXTURED, bild.id(), x + 1, y + 1, 0, 0, bild.breite(), bild.hoehe(),
-                    bild.breite(), bild.hoehe(), SCHATTEN);
+            g.innerBlit(RenderPipelines.GUI_TEXTURED, s.atlasLocation(), x + 1, x + 1 + w, y + 1, y + 1 + h, u0, u1, v0, v1, SCHATTEN);
         }
-        g.blit(RenderPipelines.GUI_TEXTURED, bild.id(), x, y, 0, 0, bild.breite(), bild.hoehe(), bild.breite(), bild.hoehe());
-    }
-
-    private Bild bild(String teil, int e) {
-        String schluessel = teil + "/" + e;
-        if (!bilder.containsKey(schluessel)) {
-            bilder.put(schluessel, lade(teil, e));
-        }
-        return bilder.get(schluessel);
-    }
-
-    private Bild lade(String teil, int e) {
-        try (InputStream rein = Minecraft.getInstance().getResourceManager().open(datei(name, teil + ".png"));
-                NativeImage quelle = NativeImage.read(rein)) {
-            int w = quelle.getWidth(), h = quelle.getHeight();
-            boolean rechts = (e & 1) != 0, unten = (e & 2) != 0;
-            Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "rahmen/" + name + "/" + teil + "_" + e);
-            DynamicTexture textur = new DynamicTexture(() -> "heroicmap " + id, w, h, true);
-            NativeImage pixel = textur.getPixels();
-            for (int y = 0; y < h; y++) {
-                for (int x = 0; x < w; x++) {
-                    pixel.setPixel(rechts ? w - 1 - x : x, unten ? h - 1 - y : y, quelle.getPixel(x, y));
-                }
-            }
-            textur.upload();
-            Minecraft.getInstance().getTextureManager().register(id, textur);
-            return new Bild(id, w, h);
-        } catch (IOException | RuntimeException kaputt) {
-            LOGGER.warn("Heroic Map: Ornament {}/{} unlesbar", name, teil, kaputt);
-            return null;
-        }
+        g.innerBlit(RenderPipelines.GUI_TEXTURED, s.atlasLocation(), x, x + w, y, y + h, u0, u1, v0, v1, -1);
     }
 }

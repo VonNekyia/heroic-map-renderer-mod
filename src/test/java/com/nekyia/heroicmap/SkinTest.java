@@ -3,6 +3,9 @@ package com.nekyia.heroicmap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -15,22 +18,24 @@ import java.util.Map;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 
-/** Die Rahmen: Palette, Bänder, Ring und Maske, Ornamente. Siehe docs/rahmen.md. */
+/** Die Rahmen: Palette, Bänder, Ring und Maske, Ornamente und Griff. Siehe docs/rahmen.md. */
 class SkinTest {
+
+    private static final String ORDNER = "/assets/heroicmap/textures/gui/sprites/rahmen/";
 
     @Test
     void paletteMitKommentarenUndLichtUndSchatten() {
-        Skin s = Skin.lies("t", "// Kopf\n#181717\n#A8A8A8 #4F4D4D  // Licht und Schatten\n\n#D8D8D8\n", "name.de=X\nschatten=nein\n");
+        Skin s = Skin.lies("t", "// Kopf\n#181717\n#A8A8A8 #4F4D4D  // Licht und Schatten\n\n#D8D8D8\n", "schatten=nein\n", 7);
         assertEquals(3, s.baender());
         assertEquals(0xFF181717, s.licht[0]);
         assertEquals(0xFF181717, s.schatten[0]);
         assertEquals(0xFFA8A8A8, s.licht[1]);
         assertEquals(0xFF4F4D4D, s.schatten[1]);
         assertFalse(s.mitSchatten);
-        assertTrue(Skin.lies("t", "#000000", "schatten=ja").mitSchatten);
-        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000 #111111 #222222", ""));
-        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#00000", ""));
-        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "// nur Kommentar", ""));
+        assertTrue(Skin.lies("t", "#000000", "schatten=ja", 7).mitSchatten);
+        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000 #111111 #222222", "", 7));
+        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#00000", "", 7));
+        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "// nur Kommentar", "", 7));
     }
 
     @Test
@@ -39,19 +44,39 @@ class SkinTest {
         assertEquals(Skin.OHNE, Skin.NAMEN.getFirst());
         assertEquals(baender.size() + 1, Skin.NAMEN.size());
         for (String name : Skin.NAMEN.subList(1, Skin.NAMEN.size())) {
-            Skin s = Skin.lies(name, text(name, "palette.txt"), text(name, "info.txt"));
+            BufferedImage zier = bild(name, "zier");
+            Skin s = Skin.lies(name, text(name, "palette.txt"), text(name, "info.txt"), Math.max(zier.getWidth(), zier.getHeight()));
             assertEquals(baender.get(name), s.baender(), name);
             for (String teil : List.of("zier", "zier_aktiv", "griff", "griff_aktiv")) {
-                BufferedImage bild = bild(name, teil);
-                assertNotNull(bild, name + "/" + teil);
-                // Die Vollbildkarte rückt um die halbe zier ein: So bleibt sie in der Ecke ganz auf dem Schirm.
-                if (teil.equals("zier")) {
-                    int e = Skin.einrueckung(Math.max(bild.getWidth(), bild.getHeight()));
-                    assertTrue(Skin.lage(e + s.baender() / 2.0, bild.getWidth()) >= 0, name);
-                    assertTrue(Skin.lage(e + s.baender() / 2.0, bild.getHeight()) >= 0, name);
-                }
+                assertNotNull(bild(name, teil), name + "/" + teil);
             }
+            // Mit Rahmen hält die Minimap so viel Abstand, dass die zier in der Ecke ganz auf dem Schirm bleibt.
+            int rand = Minimap.rand(s);
+            double[][] ecken = Skin.ecken(rand, rand, 128, 128, s.baender(), false);
+            assertTrue(Skin.lage(ecken[0][0], zier.getWidth()) >= 0, name);
+            assertTrue(Skin.lage(ecken[0][1], zier.getHeight()) >= 0, name);
         }
+    }
+
+    @Test
+    void abstandZumRandMitRahmen() {
+        assertEquals(Minimap.RAND, Minimap.rand(null));
+        assertEquals(Minimap.RAND, Minimap.rand(Skin.lies("grau", "#000000", "", 7)));
+        assertEquals(8, Minimap.rand(Skin.lies("uhr", "#000000", "", 15)));
+    }
+
+    @Test
+    void fehlschlagBleibtGemerkt() {
+        int[] versuche = {0};
+        assertNull(Skin.von("test-fehlschlag", name -> {
+            versuche[0]++;
+            return null;
+        }));
+        assertNull(Skin.von("test-fehlschlag", name -> {
+            versuche[0]++;
+            return null;
+        }));
+        assertEquals(1, versuche[0]);
     }
 
     @Test
@@ -84,7 +109,7 @@ class SkinTest {
     void ringUndMaskeRechnenGleich() {
         // Die Karte liegt genau dort, wo der Ring endet: in Einheiten des GUI, beim GUI-Massstab 3 je 3 Pixel.
         int s = 128, anzahl = 3, k = 3;
-        Skin skin = Skin.lies("t", "#111111\n#222222 #333333\n#444444", "");
+        Skin skin = Skin.lies("t", "#111111\n#222222 #333333\n#444444", "", 7);
         boolean[][] maske = new boolean[s][s];
         for (int[] lauf : Skin.maskeRund(s, anzahl, k)) {
             assertEquals(0, lauf[0] % k);
@@ -110,6 +135,15 @@ class SkinTest {
     }
 
     @Test
+    void maskeNurBeiNeuerSeiteOderNeuemMassstab() {
+        Skin skin = Skin.lies("t", "#111111\n#222222", "", 7);
+        List<int[]> erste = skin.maske(128, 3);
+        assertSame(erste, skin.maske(128, 3));
+        assertNotSame(erste, skin.maske(128, 2));
+        assertNotSame(skin.maske(128, 2), skin.maske(100, 2));
+    }
+
+    @Test
     void ornamenteAufDerMitteDerBaender() {
         double[][] eckig = Skin.ecken(10, 20, 100, 60, 3, false);
         assertEquals(11.5, eckig[0][0], 1e-9);
@@ -130,15 +164,44 @@ class SkinTest {
         assertEquals(8, Skin.einrueckung(15));
     }
 
+    @Test
+    void spiegelnJeEcke() {
+        // zier ist für oben links gezeichnet, griff für unten rechts; Ecken 0 oben links bis 3 unten rechts.
+        boolean[][] zier = {{false, false}, {true, false}, {false, true}, {true, true}};
+        for (int e = 0; e < 4; e++) {
+            assertEquals(zier[e][0], Skin.spiegeltX(e, false), "zier " + e);
+            assertEquals(zier[e][1], Skin.spiegeltY(e, false), "zier " + e);
+            assertEquals(!zier[e][0], Skin.spiegeltX(e, true), "griff " + e);
+            assertEquals(!zier[e][1], Skin.spiegeltY(e, true), "griff " + e);
+        }
+    }
+
+    @Test
+    void griffZurMitteDesSchirms() {
+        // Rechts oben auf 640 × 360: Der Griff sitzt unten links, mit Rahmen auf der Mitte der Bänder.
+        Minimap.Rahmen oben = new Minimap.Rahmen(504, 8, 128);
+        assertEquals(2, Minimap.griffEcke(oben, 640, 360));
+        assertEquals(1, Minimap.griffEcke(new Minimap.Rahmen(8, 224, 128), 640, 360));
+        assertEquals(3, Minimap.griffEcke(new Minimap.Rahmen(8, 8, 128), 640, 360));
+        double[] griff = Skin.ecken(oben.x(), oben.y(), oben.seite(), oben.seite(), 2, false)[Minimap.griffEcke(oben, 640, 360)];
+        assertEquals(505, griff[0], 1e-9);
+        assertEquals(135, griff[1], 1e-9);
+        // Greifen lässt er sich 9 × 9 Einheiten um seine Mitte.
+        assertTrue(Minimap.imGriff(501, 131, griff[0], griff[1]));
+        assertTrue(Minimap.imGriff(509, 139, griff[0], griff[1]));
+        assertFalse(Minimap.imGriff(500, 135, griff[0], griff[1]));
+        assertFalse(Minimap.imGriff(505, 140, griff[0], griff[1]));
+    }
+
     private static String text(String skin, String datei) throws IOException {
-        try (InputStream rein = SkinTest.class.getResourceAsStream("/assets/heroicmap/textures/rahmen/" + skin + "/" + datei)) {
+        try (InputStream rein = SkinTest.class.getResourceAsStream(ORDNER + skin + "/" + datei)) {
             assertNotNull(rein, skin + "/" + datei);
             return new String(rein.readAllBytes(), StandardCharsets.UTF_8);
         }
     }
 
     private static BufferedImage bild(String skin, String teil) throws IOException {
-        try (InputStream rein = SkinTest.class.getResourceAsStream("/assets/heroicmap/textures/rahmen/" + skin + "/" + teil + ".png")) {
+        try (InputStream rein = SkinTest.class.getResourceAsStream(ORDNER + skin + "/" + teil + ".png")) {
             return rein == null ? null : ImageIO.read(rein);
         }
     }

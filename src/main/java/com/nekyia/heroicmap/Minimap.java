@@ -101,6 +101,11 @@ public final class Minimap {
     /** Solange das Menü offen ist: die Ecke des Griffs, 0 bis 3, sonst -1; und ob die Maus auf ihm liegt. */
     private int griffEcke = -1;
     private boolean griffAktiv;
+    /** Die zuletzt gerechneten Ecken der Ornamente und wofür. */
+    private Skin eckenSkin;
+    private Rahmen eckenRahmen;
+    private boolean eckenRund;
+    private double[][] ecken;
     private int groesse = GROESSE;
     /** Wie die Ordner der Welten heissen, siehe docs/download.md, „Ablage“. */
     private Downloads.Ablage ablage = Downloads.Ablage.IP;
@@ -293,7 +298,10 @@ public final class Minimap {
 
     /** Der Abstand zum Rand des Schirms: {@link #RAND}, mit Rahmen mindestens dessen Einrückung, so bleibt die zier ganz auf dem Schirm. */
     int rand() {
-        Skin rahmen = Skin.von(skin);
+        return rand(Skin.von(skin));
+    }
+
+    static int rand(Skin rahmen) {
         return rahmen == null ? RAND : Math.max(RAND, rahmen.einrueckung());
     }
 
@@ -474,7 +482,7 @@ public final class Minimap {
         int oben = ecke(spieler.zo, spieler.getZ(), a, zoom, k, n);
         // Die Form einmal je Frame, für Karte und Linien; rund mit Skin innerhalb seiner Bänder.
         Skin rahmen = Skin.von(skin);
-        List<int[]> form = rahmen != null && rund ? Skin.maskeRund(r.seite(), rahmen.baender(), k) : laeufe(n, rund);
+        List<int[]> form = rahmen != null && rund ? rahmen.maske(r.seite(), k) : laeufe(n, rund);
         male(g, r, links, oben, k, form, rahmen == null);
         if (chunklinien) {
             linien(g, r, links, oben, k, form);
@@ -628,11 +636,33 @@ public final class Minimap {
         } else {
             skin.baender(g, r.x(), r.y(), r.seite(), r.seite());
         }
-        double[][] ecken = Skin.ecken(r.x(), r.y(), r.seite(), r.seite(), skin.baender(), rund);
+        double[][] ecken = ecken(skin, r);
         for (int e = 0; e < ecken.length; e++) {
-            boolean griff = e == griffEcke;
-            skin.ornament(g, griff ? "griff" : "zier", griff ? griffAktiv : griffEcke >= 0, e, ecken[e][0], ecken[e][1]);
+            int teil = e == griffEcke ? Skin.GRIFF + (griffAktiv ? 1 : 0) : Skin.ZIER + (griffEcke >= 0 ? 1 : 0);
+            skin.ornament(g, teil, e, ecken[e][0], ecken[e][1]);
         }
+    }
+
+    /** Wo die Ornamente des Rahmens sitzen ({@link Skin#ecken}), neu gerechnet nur, wenn sich Skin, Lage oder Form ändern. */
+    double[][] ecken(Skin skin, Rahmen r) {
+        if (skin != eckenSkin || !r.equals(eckenRahmen) || rund != eckenRund) {
+            ecken = Skin.ecken(r.x(), r.y(), r.seite(), r.seite(), skin.baender(), rund);
+            eckenSkin = skin;
+            eckenRahmen = r;
+            eckenRund = rund;
+        }
+        return ecken;
+    }
+
+    /** Die Ecke des Griffs im Menü, die zur Mitte des Schirms zeigt: 0 oben links bis 3 unten rechts, wie {@link Skin#ecken}. */
+    static int griffEcke(Rahmen r, int breite, int hoehe) {
+        boolean links = r.x() + r.seite() / 2 > breite / 2, oben = r.y() + r.seite() / 2 > hoehe / 2;
+        return (links ? 0 : 1) | (oben ? 0 : 2);
+    }
+
+    /** Liegt (x, y) auf dem Griff mit der Mitte (gx, gy), 9 × 9 Einheiten um sie? */
+    static boolean imGriff(double x, double y, double gx, double gy) {
+        return Math.abs(x - Math.round(gx)) <= 4 && Math.abs(y - Math.round(gy)) <= 4;
     }
 
     /** Die Chunklinien als ein Element des GUI, in Pixeln des Schirms. Siehe docs/minimap.md, „Chunklinien“. */
