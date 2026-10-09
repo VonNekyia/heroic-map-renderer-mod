@@ -73,6 +73,15 @@ class MitspielerTest {
     }
 
     @Test
+    void ohnePluginGehenMitspielerNicht() {
+        // Ohne Kanal fehlt das Plugin, auch ohne Antwort; mit Kanal zählt nur die Antwort.
+        assertEquals("plugin", Mitspieler.grund(false, null));
+        assertEquals("plugin", Mitspieler.grund(false, "permission"));
+        assertEquals("simplevoicechat", Mitspieler.grund(true, "simplevoicechat"));
+        assertEquals(null, Mitspieler.grund(true, null));
+    }
+
+    @Test
     void verfaelltNachDerFristUndBeimVerlassen() {
         Mitspieler m = new Mitspieler();
         m.empfange(json(eintrag(SAM, "Sam", "1")), 10_000);

@@ -54,6 +54,8 @@ public final class Minimap {
     public static final Minimap INSTANZ = new Minimap();
     private static final Logger LOGGER = LogUtils.getLogger();
 
+    /** Farbe der Chunklinien: Schwarz, zu 30 % deckend, so bleibt die Karte darunter lesbar. */
+    static final int LINIE = 0x4D000000;
     /** Chunks je Seite einer Region, einer Textur. */
     static final int CHUNKS_JE_REGION = 8;
     /** Zeit je Frame auf dem Render-Thread für Abzüge und fertige Bilder. */
@@ -92,6 +94,8 @@ public final class Minimap {
     private boolean rund;
     /** Die Wahl {@code show}: Mitspieler über Simple Voice Chat zeigen und gezeigt werden, oder versteckt. */
     private boolean show = true;
+    /** Chunklinien auf Minimap und Vollbildkarte, eine Vorliebe aus dem Untermenü. Siehe docs/minimap.md, „Chunklinien“. */
+    private boolean chunklinien;
     private int groesse = GROESSE;
     /** Wie die Ordner der Welten heissen, siehe docs/download.md, „Ablage“. */
     private Downloads.Ablage ablage = Downloads.Ablage.IP;
@@ -104,6 +108,8 @@ public final class Minimap {
     private long uebernommen;
     /** Wann {@code arbeite} zuletzt lief, in ns; ohne HUD läuft es nicht. */
     private long gearbeitet;
+    /** Nur für den Gametest: gilt immer als beschäftigt. Siehe docs/selbst.md, „Bild“. */
+    private volatile boolean beschaeftigtFuerTest;
     private final Long2ObjectMap<Region> regionen = new Long2ObjectOpenHashMap<>();
     private final ArrayDeque<CompletableFuture<Bild>> laufend = new ArrayDeque<>();
     /** Zählt jedes Leeren mit; ein Bild aus einem älteren Stand fällt weg. */
@@ -226,6 +232,14 @@ public final class Minimap {
         return show;
     }
 
+    boolean chunklinien() {
+        return chunklinien;
+    }
+
+    void setzeChunklinien(boolean chunklinien) {
+        this.chunklinien = chunklinien;
+    }
+
     void setzeShow(boolean show) {
         this.show = show;
     }
@@ -305,6 +319,7 @@ public final class Minimap {
         zoom = z == 1 || z == 4 || z == 8 ? z : 2;
         rund = "rund".equals(p.getProperty("form"));
         show = !"hidden".equals(p.getProperty("show"));
+        chunklinien = "true".equals(p.getProperty("chunklinien"));
         ablage = switch (String.valueOf(p.getProperty("ablage")).trim()) {
             case "hash" -> Downloads.Ablage.HASH;
             case "ip_port" -> Downloads.Ablage.IP_PORT;
@@ -322,6 +337,7 @@ public final class Minimap {
         p.setProperty("zoom", Integer.toString(zoom));
         p.setProperty("form", rund ? "rund" : "eckig");
         p.setProperty("show", show ? "simplevoicechat" : "hidden");
+        p.setProperty("chunklinien", Boolean.toString(chunklinien));
         p.setProperty("ablage", ablage.name().toLowerCase(Locale.ROOT));
         p.setProperty("groesse", Integer.toString(groesse));
         p.setProperty("lage_x", Float.toString(lageX));
@@ -368,7 +384,11 @@ public final class Minimap {
      * Arbeit gilt sie nicht mehr als beschäftigt.
      */
     boolean beschaeftigt() {
-        return sichtbar && !fertig() && System.nanoTime() - gearbeitet < 1_000_000_000L;
+        return beschaeftigtFuerTest || sichtbar && !fertig() && System.nanoTime() - gearbeitet < 1_000_000_000L;
+    }
+
+    void fuerTestBeschaeftigt(boolean an) {
+        beschaeftigtFuerTest = an;
     }
 
     /** Die Texel des Block-Atlas, nach einem Neuladen neu kopiert; auf dem Render-Thread. */
@@ -425,7 +445,12 @@ public final class Minimap {
         int k = mc.getWindow().getGuiScale(), n = r.seite() * k;
         int links = ecke(spieler.xo, spieler.getX(), a, zoom, k, n);
         int oben = ecke(spieler.zo, spieler.getZ(), a, zoom, k, n);
-        male(g, r, links, oben, k);
+        // Die Form einmal je Frame, für Karte und Linien.
+        List<int[]> form = laeufe(n, rund);
+        male(g, r, links, oben, k, form);
+        if (chunklinien) {
+            linien(g, r, links, oben, k, form);
+        }
         float kopf = kopf(r.seite());
         String dimension = level.dimension().identifier().toString();
         wegpunkte(g, r, dimension, links, oben, k, kopf);
@@ -528,7 +553,7 @@ public final class Minimap {
      * Zeichnet Rand und Regionen in Pixeln des Schirms, Lauf für Lauf der Form; eckig ist das ein
      * einziger Lauf. Siehe docs/minimap.md, „Form“.
      */
-    private void male(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k) {
+    private void male(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k, List<int[]> form) {
         // Eine Region in Pixeln des Schirms nach dem Zoom; die Textur trifft sie über die Koordinaten 0 bis 1.
         int s = CHUNKS_JE_REGION * 16 * zoom * k;
         Matrix3x2fStack pose = g.pose();
@@ -538,7 +563,6 @@ public final class Minimap {
         for (int[] l : laeufe(n + 2 * k, rund)) {
             g.fill(x0 - k + l[2], y0 - k + l[0], x0 - k + l[3], y0 - k + l[1], 0xFF000000);
         }
-        List<int[]> form = laeufe(n, rund);
         for (int rz = Math.floorDiv(oben, s); rz <= Math.floorDiv(oben + n - 1, s); rz++) {
             for (int rx = Math.floorDiv(links, s); rx <= Math.floorDiv(links + n - 1, s); rx++) {
                 Region region = regionen.get(ChunkPos.pack(rx, rz));
@@ -558,6 +582,59 @@ public final class Minimap {
             }
         }
         pose.popMatrix();
+    }
+
+    /** Die Chunklinien als ein Element des GUI, in Pixeln des Schirms. Siehe docs/minimap.md, „Chunklinien“. */
+    private void linien(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k, List<int[]> form) {
+        int n = r.seite() * k;
+        Matrix3x2fStack pose = g.pose();
+        pose.pushMatrix();
+        pose.scale(1f / k);
+        Gitter.zeichne(g, r.x() * k, r.y() * k, n, n, k, LINIE, linien(n, links, oben, 16 * zoom * k, k, form));
+        pose.popMatrix();
+    }
+
+    /**
+     * Die Chunklinien im Bild der Minimap mit der Seite n, auf dem Raster der Karte: Die Linie von
+     * Chunk c beginnt auf dem Pixel, auf dem die Karte Block 16·c zeichnet ({@link #pixel}), alle
+     * {@code schritt} Pixel, und ist k breit. Nur Linien ganz im Bild; rund nur, wo sie ganz in der
+     * Form liegen.
+     */
+    static Gitter.Linien linien(int n, int links, int oben, int schritt, int k, List<int[]> form) {
+        int m = n / schritt + 1, nx = 0, ny = 0;
+        int[] xs = new int[m], va = new int[m], vb = new int[m], ys = new int[m], ha = new int[m], hb = new int[m];
+        for (int px = Math.ceilDiv(links, schritt) * schritt - links; px + k <= n; px += schritt) {
+            // Die Läufe, die die Linie ganz enthalten, folgen im Kreis aufeinander.
+            int ya = -1, yb = -1;
+            for (int[] l : form) {
+                if (l[2] <= px && px + k <= l[3]) {
+                    ya = ya < 0 ? l[0] : ya;
+                    yb = l[1];
+                }
+            }
+            if (ya >= 0) {
+                xs[nx] = px;
+                va[nx] = ya;
+                vb[nx++] = yb;
+            }
+        }
+        for (int pz = Math.ceilDiv(oben, schritt) * schritt - oben; pz + k <= n; pz += schritt) {
+            int xa = 0, xb = n;
+            boolean drin = false;
+            for (int[] l : form) {
+                if (l[0] < pz + k && pz < l[1]) {
+                    xa = Math.max(xa, l[2]);
+                    xb = Math.min(xb, l[3]);
+                    drin = true;
+                }
+            }
+            if (drin && xa < xb) {
+                ys[ny] = pz;
+                ha[ny] = xa;
+                hb[ny++] = xb;
+            }
+        }
+        return new Gitter.Linien(xs, va, vb, nx, ys, ha, hb, ny);
     }
 
     /**

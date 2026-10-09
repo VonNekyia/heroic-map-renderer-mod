@@ -1,12 +1,15 @@
 ---
 title: Minimap
-description: Bedienung über das Menü hinter /hmap, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
+description: Bedienung über das Menü hinter /hmap und das Untermenü „Einstellungen …“, Chunklinien, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
 code:
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/ChunkMaler.java
   - src/main/java/com/nekyia/heroicmap/Licht.java
   - src/main/java/com/nekyia/heroicmap/HeroicMap.java
   - src/main/java/com/nekyia/heroicmap/Einstellungen.java
+  - src/main/java/com/nekyia/heroicmap/Anzeige.java
+  - src/main/java/com/nekyia/heroicmap/Kartenblick.java
+  - src/main/java/com/nekyia/heroicmap/Gitter.java
   - src/main/java/com/nekyia/heroicmap/Mitspieler.java
   - src/test/java/com/nekyia/heroicmap/MitspielerTest.java
   - src/main/java/com/nekyia/heroicmap/mixin/LevelExtractorMixin.java
@@ -33,18 +36,28 @@ steht unter „Kosten“.
 
 `/hmap` öffnet das Menü (`Einstellungen`):
 
-![Das Menü über der Szene des Gametests, die Minimap rund](bilder/menue.png)
+![Das Menü über der Szene des Gametests, die Minimap rund; im Einzelspieler ohne Plugin steht „Mitspieler“ rot](bilder/menue.png)
 
 | Einstellung | Vorgabe | tut |
 |---|---|---|
 | Minimap | an | blendet die Minimap aus und ein |
 | Zoom der Minimap | 2× | 1, 2, 4 oder 8 Einheiten des GUI je Block: wie viel Gegend die Minimap zeigt |
-| Auflösung der Minimap | 2 px je Block | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet |
-| Form | eckig | eckig oder rund, siehe „Form“ |
 | Mitspieler | Simple Voice Chat | siehe „Mitspieler“ |
-| Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
 | Knopf „Karte laden …“ | – | die Karten des Servers, wie in der [Vollbildkarte](vollbildkarte.md), „Bedienung“ |
 | Knopf „Kartenliste …“ | – | alle Karten auf der Platte mit Grösse und Summe in GB, mit Löschen, siehe [Download](download.md), „Kartenliste“ |
+| Knopf „Einstellungen …“ | – | das Untermenü für Vorlieben der Anzeige (`Anzeige`), siehe unten |
+
+Das Untermenü „Einstellungen …“ hält, was man selten ändert; das Hauptmenü
+bleibt so kurz. „Fertig“ führt zurück ins Menü:
+
+![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien](bilder/anzeige.png)
+
+| Einstellung | Vorgabe | tut |
+|---|---|---|
+| Form | eckig | eckig oder rund, siehe „Form“ |
+| Auflösung der Minimap | 2 px je Block | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet |
+| Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte, siehe „Chunklinien“ |
+| Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
 
 - **Zoom und Auflösung** sind getrennt. Der Zoom legt fest, wie viel
   Gegend die Minimap zeigt: bei 128 Einheiten Seite 128 Blöcke bei 1×,
@@ -69,10 +82,12 @@ steht unter „Kosten“.
   Schirm Platz hat. Grösser zeigt mehr Gegend beim selben Zoom und
   zeichnet mehr Chunks, siehe „Neu zeichnen“, „Bereich“.
 - **Knöpfe** stehen im grösseren freien Platz neben der Minimap, 200
-  Einheiten breit oder schmaler, bis 120, wenn dort weniger Platz ist.
-  „Minimap“ und „Form“ teilen sich eine Zeile, ebenso „Karte laden …“ und
-  „Kartenliste …“. So passen sie auch bei grossem GUI-Massstab auf den
-  Schirm, bis 240 Einheiten Höhe, etwa 1280 × 720 bei GUI-Massstab 3.
+  Einheiten breit oder schmaler, bis 120, wenn dort weniger Platz ist
+  (`Einstellungen.spalte`), im Untermenü ebenso. Im Hauptmenü teilen sich
+  je zwei eine Zeile: „Minimap“ und „Zoom“, „Karte laden …“ und
+  „Kartenliste …“, „Einstellungen …“ und „Fertig“. So passen Menü und
+  Untermenü auch bei grossem GUI-Massstab auf den Schirm, bis 240
+  Einheiten Höhe, etwa 1280 × 720 bei GUI-Massstab 3.
 - **Koordinaten:** Im Menü stehen über der Minimap `x` und `z` des Blocks
   unter der Maus fest unten links, wie auf der Karte im Browser, genau wie
   gezeichnet; nicht beim Ziehen. Zum Umschauen dient die
@@ -95,6 +110,66 @@ steht unter „Kosten“.
   Kopf. So hat es der User gewünscht.
 - **Wo ein Block liegt,** sagt die [Projektion](projektion.md).
 
+## Chunklinien
+
+Mit dem Schalter im Untermenü „Einstellungen …“ zeichnen Minimap und
+[Vollbildkarte](vollbildkarte.md) Linien auf den Grenzen der Chunks, je
+16 Blöcke; gespeichert als `chunklinien` in `heroicmap.properties`,
+Vorgabe aus. So hat es der User gewünscht.
+
+![Die selbst gezeichnete Karte der Szene mit Chunklinien](bilder/chunklinien.png)
+
+- **Aussehen:** eine Einheit des GUI breit, Schwarz zu 30 % deckend
+  (`Minimap.LINIE`), damit die Karte lesbar bleibt. Die Linie eines
+  Chunks liegt auf seinem ersten Block, westlich und nördlich.
+- **Auf dem Raster der Karte,** sonst wackelten die Linien beim Ziehen und
+  Laufen: auf der Minimap von der Kante des Bildes aus `Minimap.ecke`, wie
+  die Regionen (`Minimap.linien`, gleich `Minimap.pixel` für Block 16·c);
+  auf der Vollbildkarte von der ganzzahligen Kante aus `Kartenblick`, wie
+  Kacheln und Marken (`Kartenblick.linien`, `Kartenblick.rasterX`).
+- **Kreuzungen:** Die waagrechten Linien sparen die Spalten der
+  senkrechten aus (`Gitter.rechtecke`). So ist eine Kreuzung so dunkel wie
+  die Linie, nicht 51 % statt 30 %; so ist es im Review entschieden.
+- **Ein Element je Frame:** Alle Linien einer Karte sind ein Element des
+  GUI (`Gitter`); die Rechtecke entstehen erst beim Zeichnen. Dafür öffnet
+  der Access Widener `GuiGraphicsExtractor.guiRenderState`.
+- **Rund** zeichnet die Minimap eine Linie nur, wo sie ganz in der Form
+  liegt, über dieselben Läufe wie die Karte.
+- **Zu dicht:** Ist der Abstand der Linien auf der Vollbildkarte kleiner
+  als 4 Einheiten oder als 8 Pixel des Schirms, zeichnet sie keine; es gilt
+  der grössere der beiden (`Kartenblick.LINIEN_MIN`, `LINIEN_MIN_PIXEL`,
+  `Kartenblick.chunklinien`). Die 8 Pixel greifen nur bei GUI-Massstab 1,
+  dort sind es 8 Einheiten. Der Abstand ist `16 · scale / teiler · lupe`;
+  auf welcher Stufe das eintritt, hängt am Satz. Auf der Minimap liegen sie
+  mindestens 16 Einheiten auseinander, bei Zoom 1×.
+- **Für jede Karte gleich,** die vom Server wie die
+  [selbst gezeichnete](selbst.md): Die Vollbildkarte rechnet nur mit
+  `scale` aus `map.json` und dem Raster der Kacheln.
+- **Kosten** je Frame, geschätzt, nicht gemessen. Mit V senkrechten und
+  H waagrechten Linien sind es V + H · (V + 1) Rechtecke zu je 4 Ecken, in
+  einem Element:
+  - **Minimap**, Seite s Einheiten, Zoom z, GUI-Massstab k: je Richtung
+    höchstens s / (16 · z) + 1 Linien, bei 256 Einheiten und Zoom 1× also
+    17 und höchstens 323 Rechtecke. Rund dazu je Linie ein Durchlauf über
+    die Läufe der Form, höchstens s · k, bei 256 Einheiten und k = 4 rund
+    35 000 Vergleiche je Frame. Die Läufe rechnet die Minimap einmal je
+    Frame für Karte und Linien.
+  - **Vollbildkarte**, b × h Einheiten, Abstand a: V ≈ b / a + 1,
+    H ≈ h / a + 1. Am dichtesten sind es bei 427 × 240 Einheiten
+    (1280 × 720, GUI-Massstab 3) rund 6 600 Rechtecke, bei 960 × 540
+    (1920 × 1080, GUI-Massstab 2) rund 32 600. Der schlechteste Fall ist
+    3840 × 2160: bei GUI-Massstab 1 mit a ≥ 8, bei 2 mit a ≥ 4, je rund
+    130 000 Rechtecke (`KartenblickTest.chunklinienBeiGuiMassstab1Auf4k`).
+    Wird das zu teuer, wäre der nächste Schritt ein kachelbares Muster einer
+    Chunk-Zelle als ein Quad; erst, wenn eine Messung es verlangt.
+  - **Speicher:** je Frame sechs kleine Felder von `int` und ein Element,
+    keine Allokation je Linie.
+- **Später mit der drehenden Minimap:** Die Linien liegen in denselben
+  Koordinaten des Bildes wie die Regionen; dreht die Minimap, gehen sie
+  durch dieselbe Drehung und denselben Schnitt mit der Form.
+
+![Die Minimap der Szene mit Chunklinien, bei Zoom 2×](bilder/minimap-chunklinien.png)
+
 ## Mitspieler
 
 Andere Spieler zeigt der Mod nur, wenn der Server sie nennt. Eigene Gruppen
@@ -113,10 +188,17 @@ gibt es nicht; so hat es der User gewählt.
   `heroicmap.show` auf beiden Seiten, Vorgabe alle, mit Simple Voice Chat
   auf dem Server und wenn beide `simplevoicechat` gewählt haben. Er antwortet
   `{"typ":"show","erlaubt":true}`, oder mit `"erlaubt":false` und `grund`
-  `permission` oder `simplevoicechat`; das Menü nennt den Grund als
-  Tooltip am Knopf „Mitspieler“ und unter den Knöpfen, soweit der Schirm
-  reicht (`Mitspieler.antwort`), ein anderer Grund wird ein allgemeiner
-  Text. Beim Verlassen des Servers fällt die Antwort weg.
+  `permission` oder `simplevoicechat` (`Mitspieler.antwort`); ein anderer
+  Grund wird ein allgemeiner Text. Beim Verlassen des Servers fällt die
+  Antwort weg.
+- **Ohne Plugin:** Meldet der Server den Kanal nicht, hat er das Plugin
+  nicht, und Mitspieler gehen dort nie; auch im Einzelspieler nicht.
+- **Rot:** Gehen Mitspieler nicht, ohne Plugin oder weil der Server
+  ablehnt, steht der Knopf „Mitspieler“ rot, mit dem Grund als Tooltip
+  und unter den Knöpfen, soweit der Schirm reicht (`Mitspieler.grund`). So
+  sieht jeder, dass die Wahl hier nichts bewirkt; so hat es der User
+  gewünscht. Kommt der Kanal oder die Antwort erst bei offenem Menü, baut
+  es die Knöpfe neu.
 
 - **Nachricht:** `spieler` über den Kanal, etwa einmal je Sekunde:
 
@@ -399,8 +481,9 @@ Den Gametest dazu startet:
 
 Der Gametest `Bilder` baut eine Szene in einer flachen Welt und nimmt die
 Minimap bei 1, 2 und 4 Pixeln je Block auf, mit dem Zoom gleich der
-Auflösung, dann rund bei 4 px und das
-Menü (siehe „Bedienung“ und „Form“):
+Auflösung, dann rund bei 4 px, das Menü und das Untermenü
+„Einstellungen …“ (siehe „Bedienung“ und „Form“), zuletzt die
+Chunklinien auf Vollbildkarte und Minimap (siehe „Chunklinien“):
 
 ```bash
 ./gradlew runClientGameTest -Pbilder=docs/bilder

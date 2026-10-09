@@ -64,6 +64,7 @@
   "heroicmap.menue.show": "Mitspieler",
   "heroicmap.menue.show.simplevoicechat": "Simple Voice Chat",
   "heroicmap.menue.show.hidden": "Versteckt",
+  "heroicmap.menue.show.grund.plugin": "Auf diesem Server fehlt das Plugin von Heroic Map; Mitspieler gehen hier nicht.",
   "heroicmap.menue.show.grund.permission": "Der Server erlaubt dir keine Mitspieler auf der Karte.",
   "heroicmap.menue.show.grund.simplevoicechat": "Auf dem Server fehlt Simple Voice Chat.",
   "heroicmap.menue.show.grund.sonst": "Der Server lehnt Mitspieler auf der Karte ab.",
@@ -93,5 +94,8 @@
   "heroicmap.befehl.welt_unbekannt": "Betritt zuerst %s; erst dann weiss der Mod, zu welcher Welt die Karte gehört.",
   "heroicmap.liste.frage_selbst": "%s mit %s geht von der Platte. Die eigene Karte beginnt von vorn, sobald du wieder „Selbst“ wählst.",
   "heroicmap.befehl.name": "Den Namen %s nimmt der Mod nicht als Karte; er fragt nichts an.",
-  "heroicmap.selbst.schreibfehler": "Die eigene Karte lässt sich nicht schreiben, etwa weil die Platte voll ist; sie zeichnet bis zum nächsten Wechsel der Welt nicht weiter. Einzelheiten im Log."
+  "heroicmap.selbst.schreibfehler": "Die eigene Karte lässt sich nicht schreiben, etwa weil die Platte voll ist; sie zeichnet bis zum nächsten Wechsel der Welt nicht weiter. Einzelheiten im Log.",
+  "heroicmap.menue.einstellungen": "Einstellungen …",
+  "heroicmap.anzeige.titel": "Einstellungen",
+  "heroicmap.menue.chunklinien": "Chunklinien"
 }

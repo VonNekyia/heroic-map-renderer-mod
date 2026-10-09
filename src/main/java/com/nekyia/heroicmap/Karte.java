@@ -126,6 +126,9 @@ final class Karte extends Screen {
                 }
             }
         }
+        if (Minimap.INSTANZ.chunklinien() && blick.chunklinien(satz.scale(), minecraft.getWindow().getGuiScale())) {
+            linien(g);
+        }
         marken(g);
         int[] block = block(mausX, mausY);
         g.text(font, Component.literal(satz.name() + "   ").append(Component.translatable("heroicmap.koordinaten", block[0], block[1])),
@@ -149,6 +152,11 @@ final class Karte extends Screen {
                 g.text(font, eintraege.get(i).text(), menueX + 4, menueY + i * ZEILE + 3, TEXT);
             }
         }
+    }
+
+    /** Chunklinien je 16 Blöcke als ein Element des GUI. Siehe docs/minimap.md, „Chunklinien“. */
+    private void linien(GuiGraphicsExtractor g) {
+        Gitter.zeichne(g, 0, 0, width, height, 1, Minimap.LINIE, blick.linien(satz.scale(), width, height));
     }
 
     /**

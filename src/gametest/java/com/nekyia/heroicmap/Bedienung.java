@@ -293,9 +293,28 @@ public final class Bedienung implements FabricClientGameTest {
             mc.resizeGui();
         });
         context.waitTicks(2);
-        context.runOnClient(mc -> mc.gui.setScreen(new Einstellungen()));
+        String fehler = null;
+        for (boolean unter : new boolean[] {false, true}) {
+            context.runOnClient(mc -> mc.gui.setScreen(unter ? new Anzeige(new Einstellungen()) : new Einstellungen()));
+            context.waitTicks(2);
+            String f = passt(context);
+            fehler = fehler != null ? fehler : f == null ? null : (unter ? "Untermenü: " : "") + f;
+        }
+        context.getInput().resizeWindow(vorher[0], vorher[1]);
+        context.runOnClient(mc -> {
+            mc.gui.setScreen(null);
+            mc.options.guiScale().set(vorher[2]);
+            mc.resizeGui();
+        });
         context.waitTicks(2);
-        String fehler = context.computeOnClient(mc -> {
+        if (fehler != null) {
+            throw new AssertionError("Menü bei 1280 × 720, GUI-Massstab 3: " + fehler);
+        }
+    }
+
+    /** Endet jeder Knopf des offenen Schirms innerhalb der Höhe 240? Sonst was nicht passt. */
+    private static String passt(ClientGameTestContext context) {
+        return context.computeOnClient(mc -> {
             int hoehe = mc.getWindow().getGuiScaledHeight();
             if (hoehe != 240) {
                 return "Höhe " + hoehe + " statt 240";
@@ -307,16 +326,6 @@ public final class Bedienung implements FabricClientGameTest {
             }
             return null;
         });
-        context.getInput().resizeWindow(vorher[0], vorher[1]);
-        context.runOnClient(mc -> {
-            mc.gui.setScreen(null);
-            mc.options.guiScale().set(vorher[2]);
-            mc.resizeGui();
-        });
-        context.waitTicks(2);
-        if (fehler != null) {
-            throw new AssertionError("Menü bei 1280 × 720, GUI-Massstab 3: " + fehler);
-        }
     }
 
     private static Minimap.Rahmen rahmen(ClientGameTestContext context) {

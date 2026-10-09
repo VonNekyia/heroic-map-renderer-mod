@@ -95,7 +95,7 @@ public final class Bilder implements FabricClientGameTest {
             }
             menue(context);
             vollbildkarte(context);
-            selbst(context, server);
+            selbst(context);
         }
     }
 
@@ -111,7 +111,15 @@ public final class Bilder implements FabricClientGameTest {
         });
         context.waitTicks(5);
         Path menue = context.takeScreenshot(TestScreenshotOptions.of("menue").disableCounterPrefix());
+        // Das Untermenü „Einstellungen …“, mit Chunklinien an, so zeigt die Minimap daneben die Linien.
         context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeChunklinien(true);
+            mc.gui.setScreen(new Anzeige(mc.gui.screen()));
+        });
+        context.waitTicks(5);
+        Path anzeige = context.takeScreenshot(TestScreenshotOptions.of("anzeige").disableCounterPrefix());
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeChunklinien(false);
             Minimap.INSTANZ.setzeRund(false);
             mc.gui.setScreen(null);
         });
@@ -121,6 +129,7 @@ public final class Bilder implements FabricClientGameTest {
             if (!AUSGABE.isEmpty()) {
                 schneide(context, rund, Path.of(AUSGABE, "minimap-rund.png"));
                 Files.copy(menue, Path.of(AUSGABE, "menue.png"), StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(anzeige, Path.of(AUSGABE, "anzeige.png"), StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -175,11 +184,11 @@ public final class Bilder implements FabricClientGameTest {
 
     /**
      * Die selbst gezeichnete Karte der Szene, gewählt wie ein Spieler: Karte ohne Satz, „Karte
-     * laden …“, „Selbst“, Ja, Zurück; die Karte zeigt dann die eigene. Während die Minimap jeden
-     * Tick zu tun hat, wird um den Spieler trotzdem alles gezeichnet; dann schreiben und auf der
-     * feinsten Stufe aufnehmen. Siehe docs/selbst.md, „Bild“.
+     * laden …“, „Selbst“, Ja, Zurück; die Karte zeigt dann die eigene. Auch wenn die Minimap als
+     * beschäftigt gilt, wird um den Spieler alles gezeichnet; dann schreiben und auf der feinsten
+     * Stufe aufnehmen. Siehe docs/selbst.md, „Bild“.
      */
-    private static void selbst(ClientGameTestContext context, TestServerContext server) {
+    private static void selbst(ClientGameTestContext context) {
         Path welt = FabricLoader.getInstance().getGameDir().resolve(HeroicMap.ID).resolve("test").resolve("selbst");
         try {
             Laden.loesche(welt);
@@ -188,6 +197,8 @@ public final class Bilder implements FabricClientGameTest {
         }
         context.runOnClient(mc -> {
             Selbst.INSTANZ.fuerTest(welt);
+            // Die Minimap gilt ab der Wahl als beschäftigt: Die eigene Karte bekommt höchstens einen Chunk je Tick.
+            Minimap.INSTANZ.fuerTestBeschaeftigt(true);
             Karte ohne = new Karte(null);
             mc.gui.setScreen(ohne);
             mc.gui.setScreen(new Auswahl(ohne));
@@ -206,36 +217,34 @@ public final class Bilder implements FabricClientGameTest {
         }
         context.runOnClient(mc -> mc.gui.screen().onClose());
 
-        // Ein Block im Bereich der Minimap, ausserhalb des geprüften Radius, wechselt jeden Tick.
-        boolean fertig = false;
-        int ruhig = 0, ticks = 0;
-        for (int i = 0; i < 1200 && !fertig; i++) {
-            server.runCommand("setblock 50 -60 0 " + (i % 2 == 0 ? "stone" : "air"));
-            context.waitTick();
-            ticks++;
-            ruhig += context.computeOnClient(mc -> Minimap.INSTANZ.beschaeftigt()) ? 0 : 1;
-            fertig = context.computeOnClient(mc -> Selbst.INSTANZ.fertig(mc.player.chunkPosition(), 2));
-        }
-        // Nur wenn die Minimap jeden Tick zu tun hatte, prüft der Test den Vorrang.
-        if (ruhig > 0) {
-            throw new AssertionError("Die Minimap war in " + ruhig + " von " + ticks + " Ticks nicht beschäftigt");
-        }
-        if (!fertig) {
-            throw new AssertionError("Die eigene Karte wurde neben der beschäftigten Minimap nicht fertig");
-        }
+        context.waitFor(mc -> Selbst.INSTANZ.fertig(mc.player.chunkPosition(), 2), 1200);
+        context.runOnClient(mc -> Minimap.INSTANZ.fuerTestBeschaeftigt(false));
         context.computeOnClient(mc -> Selbst.INSTANZ.schreibeJetzt()).join();
         context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(welt, "minecraft:overworld"))));
         context.waitTicks(40);
         Path bild = context.takeScreenshot(TestScreenshotOptions.of("selbst").disableCounterPrefix());
+        // Dieselbe Karte mit Chunklinien, dann die Minimap im HUD mit ihnen. Siehe docs/minimap.md, „Chunklinien“.
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeChunklinien(true));
+        context.waitTicks(2);
+        Path linien = context.takeScreenshot(TestScreenshotOptions.of("chunklinien").disableCounterPrefix());
+        context.runOnClient(mc -> {
+            mc.gui.screen().onClose();
+            Minimap.INSTANZ.setzeZoom(2);
+        });
+        context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
+        context.waitTicks(2);
+        Path minimapLinien = context.takeScreenshot(TestScreenshotOptions.of("minimap-chunklinien").disableCounterPrefix());
         try {
             if (!AUSGABE.isEmpty()) {
                 Files.copy(bild, Path.of(AUSGABE, "selbst.png"), StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(linien, Path.of(AUSGABE, "chunklinien.png"), StandardCopyOption.REPLACE_EXISTING);
+                schneide(context, minimapLinien, Path.of(AUSGABE, "minimap-chunklinien.png"));
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
         context.runOnClient(mc -> {
-            mc.gui.screen().onClose();
+            Minimap.INSTANZ.setzeChunklinien(false);
             Selbst.INSTANZ.fuerTest(null);
             Selbst.INSTANZ.leeren();
         });

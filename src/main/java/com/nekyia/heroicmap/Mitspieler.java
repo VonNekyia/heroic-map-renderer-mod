@@ -102,6 +102,14 @@ final class Mitspieler {
     }
 
     /**
+     * Warum Mitspieler hier nicht gehen, oder null: plugin, wenn der Server den Kanal nicht meldet,
+     * sonst der Grund der Ablehnung. Das Menü zeigt den Knopf dann rot. Siehe docs/minimap.md, „Mitspieler“.
+     */
+    static String grund(boolean kanalOffen, String verweigert) {
+        return kanalOffen ? verweigert : "plugin";
+    }
+
+    /**
      * x und z: hat der Client den Spieler als Entity mit dieser UUID, dessen Lage beim Anteil
      * {@code a} zwischen zwei Ticks, die ist flüssiger; sonst die des Servers.
      */
