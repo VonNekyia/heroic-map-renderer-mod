@@ -11,7 +11,7 @@ import net.minecraft.network.chat.Component;
 
 /**
  * Das Untermenü „Einstellungen …“ für Vorlieben der Anzeige: Form, Auflösung, Chunklinien, Drehen,
- * Rahmen und die Ablage der Karten. Die Minimap im HUD bleibt sichtbar, jede Wahl wirkt gleich. Gespeichert wird
+ * Rahmen, die Ablage der Karten und das Untermenü „Ebenen …“. Die Minimap im HUD bleibt sichtbar, jede Wahl wirkt gleich. Gespeichert wird
  * beim Schliessen. Siehe docs/minimap.md, „Bedienung“.
  */
 final class Anzeige extends Screen {
@@ -48,7 +48,9 @@ final class Anzeige extends Screen {
                         "heroicmap.menue.ablage." + a.name().toLowerCase(Locale.ROOT)), m.ablage())
                 .withValues(Downloads.Ablage.values())
                 .create(x, y + 120, breite, 20, Component.translatable("heroicmap.menue.ablage"), (b, a) -> m.setzeAblage(a)));
-        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x, y + 148, breite, 20).build());
+        addRenderableWidget(Button.builder(Component.translatable("heroicmap.menue.ebenen"),
+                b -> minecraft.gui.setScreen(new EbenenMenue(this))).bounds(x, y + 144, breite, 20).build());
+        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x, y + 172, breite, 20).build());
     }
 
     private int oben() {
@@ -70,8 +72,9 @@ final class Anzeige extends Screen {
     @Override
     public void removed() {
         Minimap.INSTANZ.schreibe(HeroicMap.einstellungen());
-        // Eine andere Ablage heisst ein anderer Ordner der Welt, auch für die Wegpunkte.
+        // Eine andere Ablage heisst ein anderer Ordner der Welt, auch für Wegpunkte und Ebenen.
         Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());
+        Ebenen.INSTANZ.wechsel(Downloads.weltOrdner());
     }
 
     @Override

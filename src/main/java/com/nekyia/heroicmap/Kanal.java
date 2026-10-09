@@ -12,14 +12,19 @@ import net.minecraft.resources.Identifier;
 
 /**
  * Der Kanal {@code heroicmap:karte} zum Plugin: UTF-8-JSON ohne Längenpräfix, in beide
- * Richtungen. Siehe docs/download.md, „Kanal“.
+ * Richtungen. Einen Teil {@code ebene} liest schon der Thread des Netzes ({@code teil}), alles
+ * andere geht als Text weiter. Siehe docs/download.md, „Kanal“.
  */
-record Kanal(String json) implements CustomPacketPayload {
+record Kanal(String json, Ebenen.Teil teil) implements CustomPacketPayload {
 
     static final Type<Kanal> TYPE = new Type<>(Identifier.fromNamespaceAndPath(HeroicMap.ID, "karte"));
-    /** Das Plugin schickt weniger als 1 KiB; mehr liest der Mod nicht. */
-    static final int MAX = 64 << 10;
+    /** Ein Teil einer Ebene hat bis 1 MiB, wenn ein Objekt allein so gross ist; mehr liest der Mod nicht. */
+    static final int MAX = 1 << 20;
     static final StreamCodec<FriendlyByteBuf, Kanal> CODEC = CustomPacketPayload.codec(Kanal::schreibe, Kanal::lies);
+
+    Kanal(String json) {
+        this(json, null);
+    }
 
     private void schreibe(FriendlyByteBuf puffer) {
         puffer.writeBytes(json.getBytes(StandardCharsets.UTF_8));
@@ -33,7 +38,10 @@ record Kanal(String json) implements CustomPacketPayload {
         }
         byte[] daten = new byte[n];
         puffer.readBytes(daten);
-        return new Kanal(new String(daten, StandardCharsets.UTF_8));
+        String text = new String(daten, StandardCharsets.UTF_8);
+        // Bis 1 MiB JSON nicht auf dem Render-Thread; dorthin gehen nur die Nadeln.
+        Ebenen.Teil teil = Ebenen.Teil.lies(text);
+        return teil != null ? new Kanal("", teil) : new Kanal(text);
     }
 
     @Override
@@ -45,7 +53,13 @@ record Kanal(String json) implements CustomPacketPayload {
     static void anmelden() {
         PayloadTypeRegistry.clientboundPlay().register(TYPE, CODEC);
         PayloadTypeRegistry.serverboundPlay().register(TYPE, CODEC);
-        ClientPlayNetworking.registerGlobalReceiver(TYPE, (nachricht, kontext) -> Downloads.INSTANZ.empfange(nachricht.json()));
+        ClientPlayNetworking.registerGlobalReceiver(TYPE, (nachricht, kontext) -> {
+            if (nachricht.teil() != null) {
+                Ebenen.INSTANZ.teil(nachricht.teil());
+            } else {
+                Downloads.INSTANZ.empfange(nachricht.json());
+            }
+        });
         // Sobald der Server den Kanal anmeldet, erfährt er die Wahl show.
         ServerboundPlayChannelEvents.REGISTER.register((verbindung, sender, mc, kanaele) -> {
             if (kanaele.contains(TYPE.id())) {

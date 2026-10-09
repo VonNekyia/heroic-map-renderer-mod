@@ -79,13 +79,18 @@ public final class HeroicMap implements ClientModInitializer {
             // Erst den Hash der Welt merken; Wegpunkte und Bäume liegen unter ihm. Siehe docs/download.md, „Ablage“.
             Downloads.INSTANZ.weltBetreten();
             Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());
+            Ebenen.INSTANZ.wechsel(Downloads.weltOrdner());
         });
         // Auch ein Wechsel des Backends hinter einem Proxy ist ein neuer Login, ohne DISCONNECT.
-        ClientPlayConnectionEvents.INIT.register((listener, client) -> client.execute(Downloads.INSTANZ::neueSitzung));
+        ClientPlayConnectionEvents.INIT.register((listener, client) -> client.execute(() -> {
+            Downloads.INSTANZ.neueSitzung();
+            Ebenen.INSTANZ.leeren();
+        }));
         ClientPlayConnectionEvents.DISCONNECT.register((listener, client) -> client.execute(() -> {
             Minimap.INSTANZ.leeren();
             Downloads.INSTANZ.leeren();
             Mitspieler.INSTANZ.leeren();
+            Ebenen.INSTANZ.leeren();
             Wegpunkte.INSTANZ.leeren();
             Selbst.INSTANZ.leeren();
         }));

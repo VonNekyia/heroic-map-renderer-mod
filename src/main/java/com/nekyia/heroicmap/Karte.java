@@ -171,6 +171,7 @@ final class Karte extends Screen {
             return;
         }
         String dimension = spieler.level().dimension().identifier().toString();
+        nadeln(g, dimension);
         int bunt = Mth.hsvToArgb((System.currentTimeMillis() % BUNT_MS) / (float) BUNT_MS, 1f, 1f, 255);
         for (Wegpunkte.Punkt p : Wegpunkte.INSTANZ.punkte()) {
             if (p.dimension().equals(dimension)) {
@@ -191,6 +192,31 @@ final class Karte extends Screen {
         }
         Marke ich = marke(spieler.getX(), spieler.getZ(), null, null);
         Minimap.avatar(g, spieler, ich.x(), ich.y(), 1f, Minimap.KOPF, false);
+    }
+
+    /**
+     * Die Nadeln der sichtbaren Ebenen in dieser Dimension, auf dem Raster der Kacheln; kleiner, je
+     * weniger Einheiten ein Block breit ist. Siehe docs/ebenen.md, „Nadeln“.
+     */
+    private void nadeln(GuiGraphicsExtractor g, String dimension) {
+        int stufen = Ebenen.stufen(blick.chunkAbstand(satz.scale()) / 16), k = minecraft.getWindow().getGuiScale();
+        if (stufen >= 3) {
+            return;
+        }
+        for (Ebenen.Eintrag e : Ebenen.INSTANZ.sichtbar()) {
+            for (Ebenen.Nadel n : Ebenen.INSTANZ.nadeln(e.id())) {
+                double x = blick.rasterX(Projektion.zuPixel(n.x(), satz.scale()), width);
+                double y = blick.rasterY(Projektion.zuPixel(n.z(), satz.scale()), height);
+                // Unter dem Fuss reicht der Name 11 Einheiten, über ihm das Schild 33; seitlich das Schild 12, der Name halb so weit, wie er breit ist.
+                if (!n.dimension().equals(dimension) || y <= -12 || y >= height + 34) {
+                    continue;
+                }
+                int halb = n.name() == null || stufen > 0 ? 12 : Math.max(12, font.width(n.name()) / 2 + 1);
+                if (x > -halb && x < width + halb) {
+                    Ebenen.zeichne(g, font, Math.round(x * k) / (float) k, Math.round(y * k) / (float) k, n, stufen);
+                }
+            }
+        }
     }
 
     /**

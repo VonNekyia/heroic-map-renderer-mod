@@ -94,6 +94,9 @@ final class Downloads {
             case "abgelehnt" -> abgelehnt(json);
             case "spieler" -> Mitspieler.INSTANZ.empfange(json, System.currentTimeMillis());
             case "show" -> Mitspieler.INSTANZ.antwort(json);
+            case "ebenen" -> Ebenen.INSTANZ.empfange(json);
+            // Einen lesbaren Teil hat schon der Kanal an die Ebenen gegeben.
+            case "ebene" -> LOGGER.warn("Heroic Map: Teil einer Ebene nicht lesbar");
             default -> {
             }
         }
