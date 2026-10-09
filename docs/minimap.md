@@ -35,7 +35,7 @@ steht unter „Kosten“.
 
 `/hmap` öffnet das Menü (`Einstellungen`):
 
-![Das Menü über der Szene des Gametests, die Minimap rund](bilder/menue.png)
+![Das Menü über der Szene des Gametests, die Minimap rund; im Einzelspieler ohne Plugin steht „Mitspieler“ rot](bilder/menue.png)
 
 | Einstellung | Vorgabe | tut |
 |---|---|---|
