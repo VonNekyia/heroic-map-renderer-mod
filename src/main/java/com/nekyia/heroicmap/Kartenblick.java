@@ -129,15 +129,17 @@ final class Kartenblick {
 
     /** Unter diesem Abstand, in Einheiten des GUI, zeichnet die Karte keine Chunklinien. */
     static final double LINIEN_MIN = 4;
+    /** Ebenso in Pixeln des Schirms; es gilt der grössere der beiden Abstände. */
+    static final double LINIEN_MIN_PIXEL = 8;
 
     /** Abstand der Chunklinien in Einheiten des GUI: 16 Blöcke bei {@code scale} Pixeln der Basis je Block. */
     double chunkAbstand(int scale) {
         return 16.0 * scale / teiler() * lupe;
     }
 
-    /** Zeichnet die Karte Chunklinien, oder lägen sie dichter als {@link #LINIEN_MIN}? */
-    boolean chunklinien(int scale) {
-        return chunkAbstand(scale) >= LINIEN_MIN;
+    /** Zeichnet die Karte Chunklinien, oder lägen sie dichter als {@link #LINIEN_MIN} und {@link #LINIEN_MIN_PIXEL}? */
+    boolean chunklinien(int scale, int guiMassstab) {
+        return chunkAbstand(scale) >= Math.max(LINIEN_MIN, LINIEN_MIN_PIXEL / guiMassstab);
     }
 
     /** Der erste Chunk, dessen Linie bei Schirm-x 0 oder rechts davon liegt. */

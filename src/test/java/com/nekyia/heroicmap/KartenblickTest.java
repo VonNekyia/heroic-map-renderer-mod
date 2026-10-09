@@ -118,16 +118,35 @@ class KartenblickTest {
             assertEquals(854, l.hb()[j]);
         }
         assertTrue(l.ys()[l.ny() - 1] < 480 && blick.rasterY((z + l.ny()) * 64.0, 480) >= 480);
-        // Gröber: Stufe 2 hat 4 Einheiten Abstand, die Karte zeichnet; Stufe 1 hätte 2, sie zeichnet keine.
+        // Gröber, bei GUI-Massstab 2: Stufe 2 hat 4 Einheiten Abstand, die Karte zeichnet; Stufe 1 hätte 2, sie zeichnet keine.
         blick.zoom = 2;
         assertEquals(4, blick.chunkAbstand(4), 1e-9);
-        assertTrue(blick.chunklinien(4));
+        assertTrue(blick.chunklinien(4, 2));
         blick.zoom = 1;
-        assertFalse(blick.chunklinien(4));
+        assertFalse(blick.chunklinien(4, 2));
         // Die Lupe rückt sie wieder auseinander: scale 1, feinste Stufe, Lupe 4 gibt 64.
         blick.zoom = 6;
         blick.lupe = 4;
         assertEquals(64, blick.chunkAbstand(1), 1e-9);
+    }
+
+    @Test
+    void chunklinienBeiGuiMassstab1Auf4k() {
+        // 3840 × 2160 Einheiten. Bei GUI-Massstab 1 sind 8 Pixel des Schirms 8 Einheiten: 4 Einheiten reichen nicht mehr.
+        Kartenblick blick = new Kartenblick(256, 0, 6, 6);
+        blick.zoom = 2;
+        assertEquals(4, blick.chunkAbstand(4), 1e-9);
+        assertFalse(blick.chunklinien(4, 1));
+        assertTrue(blick.chunklinien(4, 2));
+        blick.zoom = 3;
+        assertEquals(8, blick.chunkAbstand(4), 1e-9);
+        assertTrue(blick.chunklinien(4, 1));
+        // Der schlechteste Fall danach: rund 130 000 Rechtecke. Siehe docs/minimap.md, „Chunklinien“.
+        Gitter.Linien l = blick.linien(4, 3840, 2160);
+        int[] rechtecke = {0};
+        Gitter.rechtecke(1, l, (xa, ya, xb, yb) -> rechtecke[0]++);
+        assertTrue(rechtecke[0] <= l.nx() + l.ny() * (l.nx() + 1));
+        assertTrue(rechtecke[0] > 125_000 && rechtecke[0] < 135_000, rechtecke[0] + " Rechtecke");
     }
 
     @Test

@@ -126,7 +126,7 @@ final class Karte extends Screen {
                 }
             }
         }
-        if (Minimap.INSTANZ.chunklinien() && blick.chunklinien(satz.scale())) {
+        if (Minimap.INSTANZ.chunklinien() && blick.chunklinien(satz.scale(), minecraft.getWindow().getGuiScale())) {
             linien(g);
         }
         marken(g);

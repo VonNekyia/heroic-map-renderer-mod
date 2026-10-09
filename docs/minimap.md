@@ -136,9 +136,11 @@ Vorgabe aus. So hat es der User gewünscht.
 - **Rund** zeichnet die Minimap eine Linie nur, wo sie ganz in der Form
   liegt, über dieselben Läufe wie die Karte.
 - **Zu dicht:** Ist der Abstand der Linien auf der Vollbildkarte kleiner
-  als 4 Einheiten (`Kartenblick.LINIEN_MIN`, `Kartenblick.chunklinien`),
-  zeichnet sie keine. Der Abstand ist `16 · scale / teiler · lupe`; auf
-  welcher Stufe das eintritt, hängt am Satz. Auf der Minimap liegen sie
+  als 4 Einheiten oder als 8 Pixel des Schirms, zeichnet sie keine; es gilt
+  der grössere der beiden (`Kartenblick.LINIEN_MIN`, `LINIEN_MIN_PIXEL`,
+  `Kartenblick.chunklinien`). Die 8 Pixel greifen nur bei GUI-Massstab 1,
+  dort sind es 8 Einheiten. Der Abstand ist `16 · scale / teiler · lupe`;
+  auf welcher Stufe das eintritt, hängt am Satz. Auf der Minimap liegen sie
   mindestens 16 Einheiten auseinander, bei Zoom 1×.
 - **Für jede Karte gleich,** die vom Server wie die
   [selbst gezeichnete](selbst.md): Die Vollbildkarte rechnet nur mit
@@ -152,12 +154,14 @@ Vorgabe aus. So hat es der User gewünscht.
     die Läufe der Form, höchstens s · k, bei 256 Einheiten und k = 4 rund
     35 000 Vergleiche je Frame. Die Läufe rechnet die Minimap einmal je
     Frame für Karte und Linien.
-  - **Vollbildkarte**, b × h Einheiten, Abstand a ≥ 4: V ≈ b / a + 1,
-    H ≈ h / a + 1. Bei a = 4 sind es bei 427 × 240 Einheiten
+  - **Vollbildkarte**, b × h Einheiten, Abstand a: V ≈ b / a + 1,
+    H ≈ h / a + 1. Am dichtesten sind es bei 427 × 240 Einheiten
     (1280 × 720, GUI-Massstab 3) rund 6 600 Rechtecke, bei 960 × 540
     (1920 × 1080, GUI-Massstab 2) rund 32 600. Der schlechteste Fall ist
-    GUI-Massstab 1 auf 3840 × 2160 mit rund 520 000; dort hülfe ein
-    grösserer Mindestabstand.
+    3840 × 2160: bei GUI-Massstab 1 mit a ≥ 8, bei 2 mit a ≥ 4, je rund
+    130 000 Rechtecke (`KartenblickTest.chunklinienBeiGuiMassstab1Auf4k`).
+    Wird das zu teuer, wäre der nächste Schritt ein kachelbares Muster einer
+    Chunk-Zelle als ein Quad; erst, wenn eine Messung es verlangt.
   - **Speicher:** je Frame sechs kleine Felder von `int` und ein Element,
     keine Allokation je Linie.
 - **Später mit der drehenden Minimap:** Die Linien liegen in denselben
