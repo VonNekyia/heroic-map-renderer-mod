@@ -127,6 +127,8 @@ public final class Messung implements FabricClientGameTest {
                     Minimap.INSTANZ.setzeScale(scale);
                     Minimap.INSTANZ.setzeZoom(zoom);
                     Minimap.INSTANZ.setzeRund(rund);
+                    // Wie die Messreihen davor: genordet.
+                    Minimap.INSTANZ.setzeDrehen(false);
                 });
                 zeige(context, true);
                 String art = "fps=" + (fps == 260 ? "frei" : fps) + " scale=" + scale + " zoom=" + zoom + " form=" + (rund ? "rund" : "eckig");

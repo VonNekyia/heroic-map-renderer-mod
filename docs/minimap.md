@@ -59,7 +59,7 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
 | Form | eckig | eckig oder rund, siehe „Form“ |
 | Auflösung der Minimap | 2 px je Block | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet |
 | Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte, siehe „Chunklinien“ |
-| Drehen | aus | die Minimap dreht mit der Blickrichtung, siehe „Drehen“ |
+| Drehen | an | die Minimap dreht mit der Blickrichtung, siehe „Drehen“ |
 | Rahmen | ohne | ein Skin um die Minimap, siehe [Rahmen](rahmen.md) |
 | Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
 | Knopf „Ebenen …“ | – | je Ebene vom Server an oder aus, siehe [Ebenen](ebenen.md), „Umschalten“ |
@@ -175,9 +175,19 @@ Vorgabe aus. So hat es der User gewünscht.
 ## Drehen
 
 Mit dem Schalter „Drehen“ im Untermenü „Einstellungen …“ dreht die Minimap
-mit der Blickrichtung: Was vor dem Spieler liegt, liegt oben. Gespeichert
-als `drehen` in `heroicmap.properties`, Vorgabe aus. Nur die Minimap, die
-Vollbildkarte bleibt genordet. So hat es der User gewünscht.
+mit der Blickrichtung: Was vor dem Spieler liegt, liegt oben. Nur die
+Minimap, die Vollbildkarte bleibt genordet. So hat es der User gewünscht,
+seit dem 10.10. als Vorgabe.
+
+- **Vorgabe an.** Gespeichert als `drehen_wahl` in `heroicmap.properties`,
+  nur wenn der Spieler den Schalter selbst gesetzt hat; sonst gilt die
+  Vorgabe, auch wenn sie sich wieder ändert.
+- **Aus einer älteren Version** stand `drehen` immer in der Datei. Ein
+  `drehen=true` gilt als gewählt, denn die Vorgabe war aus. Ein
+  `drehen=false` lässt sich nicht von der alten Vorgabe unterscheiden;
+  dort gilt die neue Vorgabe.
+- **Die Gametests** `Bilder` und `Messung` schalten Drehen aus, denn ihre
+  Bilder und Messreihen zeigen die Minimap genordet.
 
 ![Die drehende Minimap bei Gier 30 mit Chunklinien: eckig ohne Rahmen, rund mit „uhr“, eckig mit „kompass“](bilder/drehen.png)
 
