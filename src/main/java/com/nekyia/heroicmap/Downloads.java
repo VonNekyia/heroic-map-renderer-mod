@@ -94,7 +94,13 @@ final class Downloads {
             case "abgelehnt" -> abgelehnt(json);
             case "spieler" -> Mitspieler.INSTANZ.empfange(json, System.currentTimeMillis());
             case "show" -> Mitspieler.INSTANZ.antwort(json);
-            case "ebenen" -> Ebenen.INSTANZ.empfange(json);
+            case "ebenen" -> {
+                // Die Adresse nur aus einer Liste, die gilt; Symbole von Ebenen, die fehlen, frei.
+                if (Ebenen.INSTANZ.empfange(json)) {
+                    Symbole.INSTANZ.basis(json, verbindung());
+                    Symbole.INSTANZ.behalte(Ebenen.INSTANZ.kennungen());
+                }
+            }
             // Einen lesbaren Teil hat schon der Kanal an die Ebenen gegeben.
             case "ebene" -> LOGGER.warn("Heroic Map: Teil einer Ebene nicht lesbar");
             default -> {
@@ -413,7 +419,7 @@ final class Downloads {
     }
 
     /** Die Adresse der echten Verbindung zum Spielserver, oder null. */
-    private static InetAddress verbindung() {
+    static InetAddress verbindung() {
         ClientPacketListener verbindung = Minecraft.getInstance().getConnection();
         return verbindung != null && verbindung.getConnection().getRemoteAddress() instanceof InetSocketAddress a
                 ? a.getAddress() : null;

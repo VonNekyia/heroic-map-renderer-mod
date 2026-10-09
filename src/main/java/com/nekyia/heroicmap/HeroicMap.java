@@ -85,12 +85,14 @@ public final class HeroicMap implements ClientModInitializer {
         ClientPlayConnectionEvents.INIT.register((listener, client) -> client.execute(() -> {
             Downloads.INSTANZ.neueSitzung();
             Ebenen.INSTANZ.leeren();
+            Symbole.INSTANZ.leeren();
         }));
         ClientPlayConnectionEvents.DISCONNECT.register((listener, client) -> client.execute(() -> {
             Minimap.INSTANZ.leeren();
             Downloads.INSTANZ.leeren();
             Mitspieler.INSTANZ.leeren();
             Ebenen.INSTANZ.leeren();
+            Symbole.INSTANZ.leeren();
             Wegpunkte.INSTANZ.leeren();
             Selbst.INSTANZ.leeren();
         }));

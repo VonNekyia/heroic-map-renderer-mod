@@ -1,13 +1,15 @@
 ---
 title: Ebenen
-description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Namen auf Minimap und Vollbildkarte zeichnet, kleiner beim Hinauszoomen, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
+description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Symbol und Namen auf Minimap und Vollbildkarte zeichnet, kleiner beim Hinauszoomen, die Symbole vom Server holt, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Ebenen.java
   - src/main/java/com/nekyia/heroicmap/EbenenMenue.java
+  - src/main/java/com/nekyia/heroicmap/Symbole.java
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
   - src/main/java/com/nekyia/heroicmap/Kanal.java
   - src/test/java/com/nekyia/heroicmap/EbenenTest.java
+  - src/test/java/com/nekyia/heroicmap/SymboleTest.java
 ---
 
 # Ebenen
@@ -66,6 +68,11 @@ die Nachrichten das Plugin:
   | `small` | 9 × 15 | Mitte der Unterkante |
 
   Ohne `size` gilt `medium`.
+- **Symbol** über dem gefärbten Feld und unter dem Rahmen, Pixel auf
+  Pixel, die linke obere Ecke bei (⌊(Breite − Seite) / 2⌋, 3) im Bild des
+  Schilds: `symbol.large` 16 × 16 in `large`, `symbol.medium` 9 × 9 in
+  `medium`, `small` ohne. Steht die Nadel eine Grösse kleiner, gilt das
+  Symbol dieser Grösse; fehlt es, bleibt das Schild leer. Siehe „Symbole“.
 - **Farbe:** Die Grafikkarte multipliziert das Feld mit `color`, ohne
   `color` `#D9443A`; das Alpha wirkt nicht. Sie rundet dabei, statt
   abzuschneiden wie die Webkarte; ein Kanal weicht so um höchstens eine
@@ -97,6 +104,31 @@ die Nachrichten das Plugin:
 - **Text:** Namen von Ebenen und Nadeln setzt der Mod als schlichten Text;
   Codes mit `§` streicht er.
 
+## Symbole
+
+- **Adresse** aus der Liste `ebenen`, nur wenn die Liste gilt: `url`,
+  sonst `port` an der IP der Verbindung zum Spielserver,
+  `http://<ip>:<port>/tiles`, IPv6 in eckigen Klammern, wie bei der
+  `freigabe` (`Symbole.basis`). Fehlt beides, gibt es keine Symbole.
+- **Ein Symbol** liegt unter `<Adresse>/layers/<modname>/<Feld>`,
+  `modname` vor dem `:` der Kennung (`Symbole.uri`). Das Feld ist
+  `images/<Name>.png` oder `.webp`, ohne Unterordner und ohne Punkt vorn;
+  anderes holt der Mod nicht.
+- **Geholt** erst, wenn eine Nadel es zeichnet, in einem eigenen Thread,
+  einmal je Ebene, Feld, Seite und `version`, höchstens 200 je Ebene wie
+  die Bilder im Format. Eine neue `version` gibt alle Symbole der Ebene
+  frei und holt neu, denn unter gleichem Namen kann ein Bild neu sein.
+- **Geprüft** wie der Download der Karte, siehe [Download](download.md),
+  „Sicherheit“: die Adresse gegen das Heimnetz, keine Weiterleitung, kein
+  Proxy, ohne Token. Höchstens 256 KiB, Header und Körper zusammen in
+  höchstens 10 s, über denselben Weg wie die Kacheln (`Laden.sende`).
+  PNG oder WebP nur als einfaches `VP8L`, genau in seiner Grösse
+  (`Symbole.hole`). Ein Fehler steht im Log, das Schild bleibt leer.
+- **Freigegeben** wird ein Symbol, wenn seine Ebene eine neue `version`
+  bekommt oder aus der Liste fällt, und alle beim Trennen, bei einem neuen
+  Login und mit einer neuen Adresse. Danach fragt ein Auftrag für sie, der
+  noch wartet, nicht mehr.
+
 ## Umschalten
 
 - **Untermenü „Ebenen …“** im Untermenü „Einstellungen …“, siehe
@@ -124,14 +156,19 @@ So kann ein Server den Speicher des Mods nicht füllen:
 | Nachricht | 1 MiB | verworfen, siehe [Download](download.md), „Kanal“ |
 | Name einer Nadel oder Ebene | 64 Zeichen | der Name fehlt |
 | Kennung, `version`, Dimension | 129 Zeichen | Nachricht oder Nadel gilt nicht |
+| Feld eines Symbols | 76 Zeichen | das Symbol fehlt |
+| Symbole je Ebene | 200 | die übrigen fehlen, das Log nennt es |
+| Bild eines Symbols | 256 KiB, 10 s | das Symbol fehlt |
 
 - **Speicher:** Halbe Sammlungen gibt es höchstens eine je Ebene der
-  Liste, also 64, mit je höchstens 1000 Nadeln.
+  Liste, also 64, mit je höchstens 1000 Nadeln. Symbole höchstens 200 je
+  Ebene, also 12 800 Texturen, je 1 KiB im Speicher und auf der
+  Grafikkarte, weil die `DynamicTexture` ihr Bild behält; zusammen rund
+  25 MiB.
 - **Kosten:** Je Frame geht der Mod alle Nadeln der sichtbaren Ebenen
   durch, im schlimmsten Fall 64 000. Ein Raster nach Regionen kommt erst,
   wenn eine Messung es verlangt.
 
 ## Was noch fehlt
 
-- **Symbole** im Schild, 16 × 16 und 9 × 9 Pixel vom Server.
 - **Infotafel** beim Anklicken; Regionen und Kreise (#36).

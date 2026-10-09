@@ -355,31 +355,42 @@ final class Laden {
                 .timeout(zeit)
                 .GET()
                 .build();
-        // Die Zeit der Anfrage gilt im HttpClient nur bis zu den Headern; die Frist für alles setzt get.
+        HttpResponse<byte[]> fertig = sende(client, anfrage, max, grund, zeit, pfad);
+        int status = fertig.statusCode();
+        if (status != 200) {
+            Grund warum = switch (status) {
+                case 401, 403 -> Grund.ABGELEHNT;
+                case 429 -> Grund.BUDGET;
+                default -> Grund.NETZ;
+            };
+            throw new Fehler(warum, pfad + ": " + status);
+        }
+        return fertig;
+    }
+
+    /**
+     * Schickt {@code anfrage} und sammelt den Körper einer Antwort 200, höchstens {@code max} Byte,
+     * darüber {@code grund}. Header und Körper zusammen dauern höchstens {@code zeit}; danach bricht
+     * ab, was noch läuft. Eine andere Antwort kommt mit ihrem Status und ohne Körper. Für Kacheln und
+     * Symbole; {@code was} steht in den Fehlern.
+     */
+    static HttpResponse<byte[]> sende(HttpClient client, HttpRequest anfrage, long max, Grund grund, Duration zeit, String was)
+            throws Fehler, InterruptedException {
+        // Die Zeit der Anfrage gilt nicht in jeder JDK-Version auch für den Körper; die Frist für alles setzt get.
         CompletableFuture<HttpResponse<byte[]>> antwort = client.sendAsync(anfrage,
                 info -> info.statusCode() == 200 ? hoechstens(max, grund) : HttpResponse.BodySubscribers.replacing(null));
         try {
-            HttpResponse<byte[]> fertig = antwort.get(zeit.toMillis(), TimeUnit.MILLISECONDS);
-            int status = fertig.statusCode();
-            if (status != 200) {
-                Grund warum = switch (status) {
-                    case 401, 403 -> Grund.ABGELEHNT;
-                    case 429 -> Grund.BUDGET;
-                    default -> Grund.NETZ;
-                };
-                throw new Fehler(warum, pfad + ": " + status);
-            }
-            return fertig;
+            return antwort.get(zeit.toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
-            throw new Fehler(Grund.NETZ, pfad + ": nicht fertig in " + zeit.toSeconds() + " s");
+            throw new Fehler(Grund.NETZ, was + ": nicht fertig in " + zeit.toSeconds() + " s");
         } catch (ExecutionException e) {
             if (e.getCause() instanceof Fehler fehler) {
                 throw fehler;
             }
             // Verbindung, Frist des HttpClient, abgerissener Körper: alles Netz; die Ursache bleibt fürs Log.
-            throw new Fehler(Grund.NETZ, pfad, e.getCause());
+            throw new Fehler(Grund.NETZ, was, e.getCause());
         } finally {
-            // Bricht ab, was noch läuft: nach der Frist, oder wenn der Download endet.
+            // Bricht ab, was noch läuft: nach der Frist, oder wenn der Abruf endet.
             antwort.cancel(true);
         }
     }
