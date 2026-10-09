@@ -55,8 +55,6 @@ final class Skin {
     private final Identifier[] sprites = new Identifier[TEILE.length];
     private Identifier ring;
     private int ringSeite;
-    private List<int[]> maske;
-    private int maskeSeite, maskeMassstab;
 
     private Skin(String name, int[] licht, int[] schatten, boolean mitSchatten, int zier) {
         this.name = name;
@@ -239,41 +237,6 @@ final class Skin {
             Minecraft.getInstance().getTextureManager().release(ring);
             ring = null;
         }
-    }
-
-    /** Die Maske der runden Karte ({@link #maskeRund}), gemerkt, bis sich Seite oder GUI-Massstab ändern. */
-    List<int[]> maske(int s, int k) {
-        if (maske == null || maskeSeite != s || maskeMassstab != k) {
-            maske = maskeRund(s, baender(), k);
-            maskeSeite = s;
-            maskeMassstab = k;
-        }
-        return maske;
-    }
-
-    /**
-     * Was von der runden Minimap mit der Seite s innerhalb der Bänder liegt, als Läufe wie
-     * {@link Minimap#laeufe}, in Pixeln des Schirms beim GUI-Massstab k: dieselbe Rechnung wie
-     * der Ring, je Einheit des GUI.
-     */
-    static List<int[]> maskeRund(int s, int baender, int k) {
-        List<int[]> laeufe = new ArrayList<>();
-        int[] lauf = null;
-        for (int y = 0; y < s; y++) {
-            int a = 0;
-            while (a < s - a && bandRund(a, y, s) < baender) {
-                a++;
-            }
-            if (a >= s - a) {
-                lauf = null;
-            } else if (lauf != null && lauf[2] == a * k) {
-                lauf[1] = (y + 1) * k;
-            } else {
-                lauf = new int[] {y * k, (y + 1) * k, a * k, (s - a) * k};
-                laeufe.add(lauf);
-            }
-        }
-        return laeufe;
     }
 
     /**

@@ -75,10 +75,9 @@ im Atlas des GUI; F3+T und Ressourcenpakete laden ihn neu:
   des Pixels zur Mitte, R die halbe Seite; in Licht, wenn
   `dx + dy < 0`. Gezeichnet als ein Ring, eine Textur mit einem Texel je
   Einheit des GUI (`Skin.ring`).
-- **Die Karte rund** liegt nur, wo das Band mindestens so gross ist wie die
-  Zahl der Bänder: dieselbe Rechnung als Maske, je Einheit des GUI und dann
-  mal GUI-Massstab (`Skin.maskeRund`). So endet die Karte genau am Ring,
-  auch die Chunklinien.
+- **Die Karte rund** reicht als Vieleck unter den Ring, siehe
+  [Minimap](minimap.md), „Form“. Sichtbar endet sie so genau am Ring, auch
+  die Chunklinien.
 - **Breite** in Einheiten des GUI, sie wächst mit dem GUI-Massstab.
 
 ## Ornamente
@@ -132,10 +131,10 @@ Geschätzt, nicht gemessen:
 
 - **Eckig** je Frame höchstens 20 Rechtecke für 5 Bänder und 4 Ornamente,
   mit Schatten 8 Bilder.
-- **Rund** je Frame ein Bild für den Ring. Ring und Maske rechnet der Mod
-  nur, wenn sich Seite oder GUI-Massstab ändern, und behält je Skin nur
-  die letzten (`Skin.ring`, `Skin.maske`); bei 256 Einheiten sind das
-  256 × 256 Texel, 256 KiB, und rund 9 000 Wurzeln einmal.
+- **Rund** je Frame ein Bild für den Ring. Den Ring rechnet der Mod nur,
+  wenn sich die Seite ändert, und behält je Skin nur den letzten
+  (`Skin.ring`); bei 256 Einheiten sind das 256 × 256 Texel, 256 KiB, und
+  eine Wurzel je Texel einmal.
 - **Ornamente:** Wo sie sitzen, rechnet die Minimap nur neu, wenn sich
   Skin, Lage oder Form ändern (`Minimap.ecken`); die Namen der Sprites
   stehen je Skin fest.

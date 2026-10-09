@@ -186,8 +186,8 @@ public final class Messung implements FabricClientGameTest {
 
     /**
      * Was das Drehen je Frame kostet: 4 px, Zoom 4, freie Bildrate, eckig und rund, je ohne und mit
-     * Drehen; Frametime ohne und mit Minimap und die Zeit im HUD. Im Stand bei Gier 30, im Flug setzt
-     * {@link #flug} die Gier auf ±90, dort dreht die Karte um eine Vierteldrehung.
+     * Drehen; Frametime ohne und mit Minimap und die Zeit im HUD. Im Stand bei Gier 30. Im Flug setzt
+     * {@link #flug} die Gier auf ±90, dort dreht die Karte um eine Vierteldrehung; schräg 30 daneben.
      */
     private void drehen(ClientGameTestContext context, TestServerContext server) {
         flug(context, server, true);
@@ -211,12 +211,15 @@ public final class Messung implements FabricClientGameTest {
                     frames(context, art + " stand", an, runde, () -> context.waitTicks(STAND_TICKS));
                 }
             }
-            for (int runde = 1; runde <= RUNDEN; runde++) {
-                for (boolean an : new boolean[] {false, true}) {
-                    zeige(context, an);
-                    boolean richtung = hin;
-                    frames(context, art + " flug", an, runde, () -> flug(context, server, richtung));
-                    hin = !hin;
+            for (int schraeg : new int[] {0, 30}) {
+                for (int runde = 1; runde <= RUNDEN; runde++) {
+                    for (boolean an : new boolean[] {false, true}) {
+                        zeige(context, an);
+                        boolean richtung = hin;
+                        frames(context, art + (schraeg == 0 ? " flug" : " flug-schraeg"), an, runde,
+                                () -> flug(context, server, richtung, schraeg));
+                        hin = !hin;
+                    }
                 }
             }
         }
@@ -225,9 +228,14 @@ public final class Messung implements FabricClientGameTest {
 
     /** Fliegt 20 Blöcke/s über die Strecke x = 0 bis FLUG_TICKS, hin nach Osten oder zurück. */
     private static void flug(ClientGameTestContext context, TestServerContext server, boolean hin) {
+        flug(context, server, hin, 0);
+    }
+
+    /** Wie {@link #flug(ClientGameTestContext, TestServerContext, boolean)}, der Blick {@code schraeg} Grad neben der Flugrichtung. */
+    private static void flug(ClientGameTestContext context, TestServerContext server, boolean hin, int schraeg) {
         for (int t = 1; t <= FLUG_TICKS; t++) {
             int x = hin ? t : FLUG_TICKS - t;
-            server.runCommand("tp @a " + x + " " + HOEHE + " 0 " + (hin ? -90 : 90) + " 20");
+            server.runCommand("tp @a " + x + " " + HOEHE + " 0 " + ((hin ? -90 : 90) + schraeg) + " 20");
             context.waitTick();
         }
     }

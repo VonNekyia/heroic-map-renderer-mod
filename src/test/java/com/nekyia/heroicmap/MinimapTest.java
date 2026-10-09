@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -64,29 +63,16 @@ class MinimapTest {
     }
 
     @Test
-    void eckigIstEinLauf() {
-        List<int[]> laeufe = Minimap.laeufe(384, false);
-        assertEquals(1, laeufe.size());
-        assertArrayEquals(new int[] {0, 384, 0, 384}, laeufe.getFirst());
-    }
-
-    @Test
     void rundIstDerKreis() {
+        // Je Zeile die Sehne, symmetrisch zur Mitte und nie leer; zusammen die Fläche des Kreises.
         int n = 384;
-        List<int[]> laeufe = Minimap.laeufe(n, true);
         long flaeche = 0;
-        int y = 0;
-        for (int[] l : laeufe) {
-            // Läufe schliessen lückenlos aneinander, jeder ist symmetrisch zur Mitte.
-            assertEquals(y, l[0]);
-            assertEquals(n, l[2] + l[3]);
-            flaeche += (long) (l[1] - l[0]) * (l[3] - l[2]);
-            y = l[1];
+        for (int y = 0; y < n; y++) {
+            int a = Minimap.sehne(n, y);
+            assertTrue(a < n - a, "Zeile " + y);
+            flaeche += n - 2 * a;
         }
-        assertEquals(n, y);
         assertEquals(Math.PI * n * n / 4, flaeche, Math.PI * n * n / 4 * 0.005);
-        // Gleich breite Zeilen sind zusammengefasst: etwa 1,2 Läufe je Pixel des Radius, nicht n.
-        assertTrue(laeufe.size() < n * 0.7, "Läufe: " + laeufe.size());
     }
 
     @Test
@@ -252,9 +238,8 @@ class MinimapTest {
     void chunklinienAufDemRasterDerKarte() {
         // Zoom 2, GUI-Massstab 3: ein Chunk sind 96 Pixel des Bildes, eine Linie 3 breit.
         int zoom = 2, k = 3, n = 128 * k, schritt = 16 * zoom * k;
-        List<int[]> eckig = Minimap.laeufe(n, false);
         for (int links : new int[] {-1000, -50, -1, 0, 1, 3, 50, 94, 95, 96, 1000}) {
-            Gitter.Linien l = Minimap.linien(n, links, links, schritt, k, eckig);
+            Gitter.Linien l = Minimap.linien(n, links, links, schritt, k);
             // Die erste ganz im Bild, die davor nicht; die letzte ganz im Bild, die danach nicht. Bei links 3 endet die letzte genau am Rand.
             assertTrue(l.xs()[0] >= 0 && l.xs()[0] - schritt < 0, "links " + links);
             assertTrue(l.xs()[l.nx() - 1] + k <= n && l.xs()[l.nx() - 1] + schritt + k > n, "links " + links);
@@ -268,34 +253,6 @@ class MinimapTest {
             assertArrayEquals(l.xs(), l.ys());
             assertEquals(l.nx(), l.ny());
         }
-    }
-
-    @Test
-    void chunklinienRundNurInDerForm() {
-        // Zoom 1, GUI-Massstab 2: Linien alle 32 Pixel. Jedes Pixel einer Linie liegt in der Form, keins doppelt.
-        int k = 2, n = 128 * k;
-        List<int[]> rund = Minimap.laeufe(n, true);
-        boolean[][] form = new boolean[n][n];
-        for (int[] lauf : rund) {
-            for (int y = lauf[0]; y < lauf[1]; y++) {
-                for (int x = lauf[2]; x < lauf[3]; x++) {
-                    form[y][x] = true;
-                }
-            }
-        }
-        Gitter.Linien l = Minimap.linien(n, 7, -13, 16 * k, k, rund);
-        int[][] decke = decke(n, n, k, l);
-        int gedeckt = 0;
-        for (int y = 0; y < n; y++) {
-            for (int x = 0; x < n; x++) {
-                assertTrue(decke[y][x] <= 1, x + ", " + y);
-                assertTrue(decke[y][x] == 0 || form[y][x], x + ", " + y);
-                gedeckt += decke[y][x];
-            }
-        }
-        assertEquals(8, l.nx());
-        assertEquals(8, l.ny());
-        assertTrue(gedeckt > 0);
     }
 
     @Test

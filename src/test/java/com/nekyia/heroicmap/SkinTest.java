@@ -3,9 +3,7 @@ package com.nekyia.heroicmap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -107,24 +105,13 @@ class SkinTest {
     }
 
     @Test
-    void ringUndMaskeRechnenGleich() {
-        // Die Karte liegt genau dort, wo der Ring endet: in Einheiten des GUI, beim GUI-Massstab 3 je 3 Pixel.
-        int s = 128, anzahl = 3, k = 3;
+    void ringLiegtInDenBaendern() {
+        // Wie weit die Karte unter den Ring reicht, prüft DrehungTest.mitRahmenDecktDerRingDenRand.
+        int s = 128, anzahl = 3;
         Skin skin = Skin.lies("t", "#111111\n#222222 #333333\n#444444", "", 7);
-        boolean[][] maske = new boolean[s][s];
-        for (int[] lauf : Skin.maskeRund(s, anzahl, k)) {
-            assertEquals(0, lauf[0] % k);
-            assertEquals(0, lauf[2] % k);
-            for (int y = lauf[0] / k; y < lauf[1] / k; y++) {
-                for (int x = lauf[2] / k; x < lauf[3] / k; x++) {
-                    maske[y][x] = true;
-                }
-            }
-        }
         for (int y = 0; y < s; y++) {
             for (int x = 0; x < s; x++) {
                 int band = Skin.bandRund(x, y, s);
-                assertEquals(band >= anzahl, maske[y][x], x + ", " + y);
                 assertEquals(band >= 0 && band < anzahl, skin.ringFarbe(x, y, s) != 0, x + ", " + y);
             }
         }
@@ -133,15 +120,6 @@ class SkinTest {
         assertEquals(0xFF222222, skin.ringFarbe(s / 2, 1, s));
         assertEquals(0xFF333333, skin.ringFarbe(s / 2, s - 2, s));
         assertEquals(0, skin.ringFarbe(s / 2, s / 2, s));
-    }
-
-    @Test
-    void maskeNurBeiNeuerSeiteOderNeuemMassstab() {
-        Skin skin = Skin.lies("t", "#111111\n#222222", "", 7);
-        List<int[]> erste = skin.maske(128, 3);
-        assertSame(erste, skin.maske(128, 3));
-        assertNotSame(erste, skin.maske(128, 2));
-        assertNotSame(skin.maske(128, 2), skin.maske(100, 2));
     }
 
     @Test
