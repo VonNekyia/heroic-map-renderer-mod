@@ -544,6 +544,7 @@ public final class Minimap {
             linien(g, r, links, oben, k, bild, bereich, form);
         }
         String dimension = level.dimension().identifier().toString();
+        formen(g, r, links, oben, k, bild, bereich, form, dimension);
         // Vor Ring und Rahmen: Was am Rand über sie ragt, decken sie.
         nadeln(g, mc.font, r, dimension, links, oben, k, lage, rahmen == null ? 0 : rahmen.baender());
         if (rund && rahmen == null) {
@@ -586,6 +587,31 @@ public final class Minimap {
     static double rand(double px, double pz, double hx, double hz, boolean rund) {
         double f = rund ? hx / Math.hypot(px, pz) : Math.min(hx / Math.abs(px), hz / Math.abs(pz));
         return Math.min(1, f);
+    }
+
+    /**
+     * Die Flächen, Kreise und Linien der sichtbaren Ebenen in dieser Dimension, in Pixeln des Schirms
+     * mit {@code lage} wie die Karte und mit ihrer Form geschnitten; {@code bereich} ist, was vom Bild zu
+     * sehen sein kann. Siehe docs/ebenen.md, „Flächen, Kreise und Linien“.
+     */
+    private void formen(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k, Drehung.Lage lage, double[] bereich, float[] form,
+            String dimension) {
+        int n = r.seite() * k;
+        double block = (double) zoom * k;
+        Matrix3x2fStack pose = g.pose();
+        pose.pushMatrix();
+        pose.scale(1f / k);
+        Matrix3x2f kopie = new Matrix3x2f(pose);
+        Formen.Ansicht a = new Formen.Ansicht((wx, wz, aus) -> {
+            double bx = Projektion.zuPixel(wx, zoom) * k - links, by = Projektion.zuPixel(wz, zoom) * k - oben;
+            aus[0] = lage.x(bx, by);
+            aus[1] = lage.y(bx, by);
+        }, block, k, 1, form, new double[] {(bereich[0] + links) / block, (bereich[1] + oben) / block, (bereich[2] + links) / block,
+                (bereich[3] + oben) / block}, kopie, new ScreenRectangle(r.x() * k, r.y() * k, n, n).transformMaxBounds(kopie));
+        for (Ebenen.Eintrag e : Ebenen.INSTANZ.sichtbar()) {
+            Formen.zeichne(g, a, dimension, Ebenen.INSTANZ.formen(e.id()));
+        }
+        pose.popMatrix();
     }
 
     /**

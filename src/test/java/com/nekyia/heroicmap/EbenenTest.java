@@ -1,5 +1,6 @@
 package com.nekyia.heroicmap;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -267,6 +268,93 @@ class EbenenTest {
     void schlichterText() {
         JsonArray objekte = JsonParser.parseString("[{\"id\":\"a\",\"type\":\"pin\",\"at\":[0,0],\"name\":\"\u00a7cRot\"}]").getAsJsonArray();
         assertEquals("Rot", Ebenen.nadeln("b:e", "v", objekte).getFirst().name());
+    }
+
+    @Test
+    void formenMitVorgaben() {
+        JsonArray objekte = JsonParser.parseString("["
+                + "{\"id\":\"r\",\"type\":\"region\",\"polygons\":[{\"outer\":[[0,0],[10,0],[10,10],[0,10]]}],\"fill\":\"#40E53F55\"},"
+                + "{\"id\":\"k\",\"type\":\"circle\",\"center\":[5,5],\"radius\":100,\"stroke\":{\"color\":\"#FFFFFFAA\",\"style\":\"dashed\"}},"
+                + "{\"id\":\"l\",\"type\":\"line\",\"points\":[[0,0],[5,5]],\"stroke\":{\"width\":3,\"style\":\"dashed\",\"dash\":[10,4]}},"
+                + "{\"id\":\"n\",\"type\":\"region\",\"polygons\":[{\"outer\":[[0,0],[1,0],[1,1]]}],\"stroke\":{\"width\":0}},"
+                + "{\"id\":\"p\",\"type\":\"pin\",\"at\":[0,0]}"
+                + "]").getAsJsonArray();
+        List<Ebenen.Form> f = Ebenen.formen(objekte);
+        assertEquals(4, f.size());
+        // Füllung mit Alpha; der Rand ohne Angabe 2 breit in der Füllung ohne Alpha.
+        Ebenen.Flaeche r = (Ebenen.Flaeche) f.get(0);
+        assertEquals(0x5540E53F, r.fuellung());
+        assertEquals(new Ebenen.Rand(0xFF40E53F, 2, 0, 0), r.rand());
+        assertArrayEquals(new int[] {0, 0, 10, 10}, r.rechtecke());
+        assertArrayEquals(new double[] {0, 0, 10, 10}, r.box());
+        // Gestrichelt ohne dash: 8 und 6.
+        Ebenen.Kreis k = (Ebenen.Kreis) f.get(1);
+        assertEquals(0, k.fuellung());
+        assertEquals(new Ebenen.Rand(0xAAFFFFFF, 2, 8, 6), k.rand());
+        // Ohne Farbe und ohne Füllung #2B2B2B.
+        assertEquals(new Ebenen.Rand(Ebenen.RANDFARBE, 3, 10, 4), ((Ebenen.Linie) f.get(2)).rand());
+        // width 0 heisst ohne Rand.
+        assertNull(((Ebenen.Flaeche) f.get(3)).rand());
+        assertNull(((Ebenen.Flaeche) f.get(3)).rechtecke());
+    }
+
+    @Test
+    void formenGrenzen() {
+        StringBuilder lang = new StringBuilder();
+        for (int i = 0; i <= Ebenen.MAX_PUNKTE; i++) {
+            lang.append(i == 0 ? "" : ",").append("[").append(i).append(",0]");
+        }
+        StringBuilder loecher = new StringBuilder();
+        for (int i = 0; i <= Ebenen.MAX_LOECHER; i++) {
+            loecher.append(i == 0 ? "" : ",").append("[[1,1],[2,1],[2,2]]");
+        }
+        JsonArray objekte = JsonParser.parseString("["
+                + "{\"type\":\"line\",\"points\":[" + lang + "]},"
+                + "{\"type\":\"circle\",\"center\":[0,0],\"radius\":" + (Ebenen.MAX_RADIUS + 1) + "},"
+                + "{\"type\":\"circle\",\"center\":[0,0],\"radius\":0},"
+                + "{\"type\":\"region\",\"polygons\":[{\"outer\":[[0,0],[10,0],[10,10]],\"holes\":[" + loecher + "]}]},"
+                + "{\"type\":\"region\",\"polygons\":[{\"outer\":[[0,0],[10,0]]}]},"
+                + "{\"type\":\"line\",\"points\":[[0,0]]},"
+                + "{\"type\":\"line\",\"points\":[[0,0],[30000001,0]]},"
+                + "{\"type\":\"circle\",\"center\":[0,0],\"radius\":" + Ebenen.MAX_RADIUS + "}"
+                + "]").getAsJsonArray();
+        // Nur der letzte Kreis hält alle Grenzen ein.
+        List<Ebenen.Form> f = Ebenen.formen(objekte);
+        assertEquals(1, f.size());
+        assertEquals(Ebenen.MAX_RADIUS, ((Ebenen.Kreis) f.getFirst()).radius());
+    }
+
+    @Test
+    void formenKommenMitDerEbene() {
+        Ebenen e = new Ebenen();
+        liste(e, eintrag("b:staedte", "v1"));
+        teil(e, "b:staedte", "v1", 1, 2, nadel("a", 1));
+        teil(e, "b:staedte", "v1", 2, 2, "{\"id\":\"k\",\"type\":\"circle\",\"center\":[0,0],\"radius\":5,\"dimension\":\"minecraft:the_nether\"}");
+        assertEquals(1, e.nadeln("b:staedte").size());
+        assertEquals(1, e.formen("b:staedte").size());
+        assertEquals("minecraft:the_nether", e.formen("b:staedte").getFirst().dimension());
+        liste(e, eintrag("b:andere", "v1"));
+        assertEquals(List.of(), e.formen("b:staedte"));
+    }
+
+    @Test
+    void zuVieleObjekteVerwerfenDieSammlung() {
+        Ebenen e = new Ebenen();
+        liste(e, eintrag("b:staedte", "v1"));
+        StringBuilder kreise = new StringBuilder();
+        for (int i = 0; i < 6000; i++) {
+            kreise.append(i == 0 ? "" : ",").append("{\"type\":\"circle\",\"center\":[0,0],\"radius\":5}");
+        }
+        teil(e, "b:staedte", "v1", 1, 2, kreise.toString());
+        teil(e, "b:staedte", "v1", 2, 2, kreise.toString());
+        assertEquals(List.of(), e.formen("b:staedte"));
+    }
+
+    @Test
+    void farbeMitAlpha() {
+        assertEquals(0x5540E53F, Ebenen.farbeMitAlpha("#40E53F55", 0));
+        assertEquals(0xFF40E53F, Ebenen.farbeMitAlpha("#40e53f", 0));
+        assertEquals(7, Ebenen.farbeMitAlpha("rot", 7));
     }
 
     @Test

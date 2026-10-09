@@ -1,15 +1,19 @@
 ---
 title: Ebenen
-description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Symbol und Namen auf Minimap und Vollbildkarte zeichnet, kleiner beim Hinauszoomen, die Symbole vom Server holt, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
+description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Symbol und Namen auf Minimap und Vollbildkarte zeichnet, kleiner beim Hinauszoomen, die Symbole vom Server holt, Flächen, Kreise und Linien flach zeichnet, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Ebenen.java
   - src/main/java/com/nekyia/heroicmap/EbenenMenue.java
   - src/main/java/com/nekyia/heroicmap/Symbole.java
+  - src/main/java/com/nekyia/heroicmap/Formen.java
+  - src/main/java/com/nekyia/heroicmap/Raster.java
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
   - src/main/java/com/nekyia/heroicmap/Kanal.java
   - src/test/java/com/nekyia/heroicmap/EbenenTest.java
   - src/test/java/com/nekyia/heroicmap/SymboleTest.java
+  - src/test/java/com/nekyia/heroicmap/FormenTest.java
+  - src/test/java/com/nekyia/heroicmap/RasterTest.java
 ---
 
 # Ebenen
@@ -129,6 +133,45 @@ die Nachrichten das Plugin:
   Login und mit einer neuen Adresse. Danach fragt ein Auftrag für sie, der
   noch wartet, nicht mehr.
 
+## Flächen, Kreise und Linien
+
+Regionen, Kreise und Linien zeichnet der Mod flach, wie das Format es für
+die Kameras von oben sagt: Seine Karten sind von oben gesehen, ein Kreis
+bleibt rund. Was er zeichnet, kommt aus `Ebenen.formen`, gelesen auf dem
+Thread des Netzes wie die Nadeln.
+
+- **Füllung** (`fill`, mit Alpha): bei einer Region als Blöcke
+  (`Raster.rechtecke`). Je Reihe von Blöcken zählt ein Block, dessen Mitte
+  nach der Regel gerade/ungerade innen liegt, über alle Ringe; gleiche
+  Spannen übereinander werden ein Rechteck. Für Flächen auf ganzen Zahlen,
+  etwa Claims aus Chunks, ist das genau. Jeder Block liegt in genau einem
+  Rechteck, so doppelt sich das Alpha nicht, auch nicht an Löchern.
+  Gerechnet einmal je `version`, schon auf dem Thread des Netzes. Beim
+  Kreis ein Vieleck, siehe unten.
+- **Rand** (`stroke`): Vorgabe 2 breit, `width` 0 heisst ohne. Die
+  Farbe ist ohne Angabe bei Region und Kreis die Füllung ohne Alpha, sonst
+  `#2B2B2B`. Breite, Strich und Lücke stehen in Einheiten der Oberfläche
+  des Mods, wie die Nadeln. Je Strecke ein Rechteck; gestrichelt laufen
+  die Striche über die Ecken weiter (`Formen.streifen`). Ecken sind nicht
+  verbunden: Bei breiten Rändern bleibt aussen eine Kerbe, innen
+  überlappen zwei Rechtecke, mit Alpha etwas dunkler.
+- **Kreis:** ein Vieleck mit so vielen Ecken, dass die Sehne höchstens
+  einen halben Pixel vom Kreis abweicht, mindestens 16, höchstens 4096
+  (`Formen.ecken`).
+- **Linie:** ein Rand ohne Fläche. Zu sehen sind Linien, sobald das
+  Plugin sie schickt; laut Format schickt es bisher nur Nadeln, Regionen
+  und Kreise.
+- **Minimap:** nach Karte und Chunklinien, vor den Nadeln, auch gedreht;
+  mit der Form der Minimap geschnitten wie die Karte (`Drehung.schneide`).
+- **Vollbildkarte:** auf dem Raster der Kacheln, nach den Chunklinien, vor
+  Nadeln und Wegpunkten.
+- **Reihenfolge:** Ebenen nach `order`; in einer Ebene erst alle Füllungen,
+  dann Ränder und Linien. Nadeln liegen über allen Formen.
+- **Nur, was zu sehen ist:** Formen ausserhalb des sichtbaren Teils der
+  Welt zeichnet der Mod nicht; Strecken neben dem Schnitt schieben nur das
+  Muster der Striche weiter. Jede Füllung und jeder Rand ist ein Element
+  des GUI in einer Farbe.
+
 ## Umschalten
 
 - **Untermenü „Ebenen …“** im Untermenü „Einstellungen …“, siehe
@@ -159,6 +202,15 @@ So kann ein Server den Speicher des Mods nicht füllen:
 | Feld eines Symbols | 76 Zeichen | das Symbol fehlt |
 | Symbole je Ebene | 200 | die übrigen fehlen, das Log nennt es |
 | Bild eines Symbols | 256 KiB, 10 s | das Symbol fehlt |
+| Objekte je Ebene | 10 000, wie im Format | die Sammlung ist verworfen |
+| Punkte je Form, über alle Ringe | 10 000, wie im Format | die Form fehlt |
+| Löcher je Polygon | 100, wie im Format | die Form fehlt |
+| Radius eines Kreises | 100 000 Blöcke, wie im Format | der Kreis fehlt |
+| Koordinate | ±30 000 000 | die Form fehlt |
+| Reihen der Füllung einer Fläche | 65 536 | ohne Füllung, der Rand bleibt |
+| Rechtecke der Füllung je Fläche | 100 000 | ohne Füllung, der Rand bleibt |
+| Rechtecke je Ebene | 500 000 | die Sammlung ist verworfen |
+| Breite eines Rands, Strich, Lücke | 64, 1000, 1000 Einheiten | gekappt |
 
 - **Speicher:** Halbe Sammlungen gibt es höchstens eine je Ebene der
   Liste, also 64, mit je höchstens 1000 Nadeln. Symbole höchstens 200 je
@@ -171,4 +223,6 @@ So kann ein Server den Speicher des Mods nicht füllen:
 
 ## Was noch fehlt
 
-- **Infotafel** beim Anklicken; Regionen und Kreise (#36).
+- **Infotafel** beim Zeigen und Anklicken.
+- **Kartenschrift** (`label`).
+- **Anheften** an Regionen (#36).
