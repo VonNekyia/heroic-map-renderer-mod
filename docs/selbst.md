@@ -153,11 +153,12 @@ mit der des Servers. Warum: [0004](entscheidungen/0004-karte-selbst-zeichnen.md)
 
 Der Gametest `Bilder` wählt in der Szene „Selbst“ wie ein Spieler: Karte
 ohne Satz, „Karte laden …“, „Selbst“, Ja, Zurück; die Karte zeigt dann die
-eigene. Danach wechselt im Bereich der Minimap jeden Tick ein Block,
-ausserhalb des geprüften Umkreises; um den Spieler wird trotzdem alles
-gezeichnet. Dann schreibt er und nimmt die Vollbildkarte auf der feinsten
-Stufe auf, siehe [Minimap](minimap.md), „Bilder“. Der graue Punkt rechts
-ist der Block, den der Test jeden Tick wechselt.
+eigene. Danach wechselt bei Zoom 2× jeden Tick in jedem Chunk der
+Minimap ausserhalb des geprüften Umkreises ein Block unter der Oberfläche,
+56 Chunks, mehr, als ihr Worker in einem Tick zeichnet; so hat sie jeden
+Tick zu tun, und um den Spieler wird trotzdem alles gezeichnet. Dann
+schreibt er und nimmt die Vollbildkarte auf der feinsten
+Stufe auf, siehe [Minimap](minimap.md), „Bilder“.
 
 ## Was fehlt
 

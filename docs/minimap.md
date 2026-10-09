@@ -146,7 +146,7 @@ Vorgabe aus. So hat es der User gewünscht.
   Koordinaten des Bildes wie die Regionen; dreht die Minimap, gehen sie
   durch dieselbe Drehung und denselben Schnitt mit der Form.
 
-![Die Minimap der Szene mit Chunklinien, bei Zoom 4×](bilder/minimap-chunklinien.png)
+![Die Minimap der Szene mit Chunklinien, bei Zoom 2×](bilder/minimap-chunklinien.png)
 
 ## Mitspieler
 

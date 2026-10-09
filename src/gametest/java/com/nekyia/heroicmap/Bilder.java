@@ -215,11 +215,21 @@ public final class Bilder implements FabricClientGameTest {
         }
         context.runOnClient(mc -> mc.gui.screen().onClose());
 
-        // Ein Block im Bereich der Minimap, ausserhalb des geprüften Radius, wechselt jeden Tick.
+        // Bei Zoom 2 wechselt jeden Tick in jedem Chunk der Minimap ausserhalb des geprüften Radius, Abstand 3
+        // und 4, ein Block unter der Oberfläche: 56 Chunks, mehr, als ihr Worker in einem Tick zeichnet.
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeZoom(2));
         boolean fertig = false;
         int ruhig = 0, ticks = 0;
         for (int i = 0; i < 1200 && !fertig; i++) {
-            server.runCommand("setblock 50 -60 0 " + (i % 2 == 0 ? "stone" : "air"));
+            String block = i % 2 == 0 ? "stone" : "dirt";
+            for (int d : new int[] {3, 4}) {
+                // Je Seite des Rings eine Linie durch die Mitte seiner Chunks.
+                int a = -16 * d + 8, b = 16 * d + 8;
+                server.runCommand("fill " + a + " -63 " + a + " " + b + " -63 " + a + " " + block);
+                server.runCommand("fill " + a + " -63 " + b + " " + b + " -63 " + b + " " + block);
+                server.runCommand("fill " + a + " -63 " + a + " " + a + " -63 " + b + " " + block);
+                server.runCommand("fill " + b + " -63 " + a + " " + b + " -63 " + b + " " + block);
+            }
             context.waitTick();
             ticks++;
             ruhig += context.computeOnClient(mc -> Minimap.INSTANZ.beschaeftigt()) ? 0 : 1;
@@ -241,6 +251,7 @@ public final class Bilder implements FabricClientGameTest {
         context.waitTicks(2);
         Path linien = context.takeScreenshot(TestScreenshotOptions.of("chunklinien").disableCounterPrefix());
         context.runOnClient(mc -> mc.gui.screen().onClose());
+        context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
         context.waitTicks(2);
         Path minimapLinien = context.takeScreenshot(TestScreenshotOptions.of("minimap-chunklinien").disableCounterPrefix());
         try {
