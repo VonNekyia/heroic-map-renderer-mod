@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.gui.components.PlayerFaceExtractor;
@@ -552,6 +553,7 @@ public final class Minimap {
         }
         float kopf = kopf(r.seite());
         String dimension = level.dimension().identifier().toString();
+        nadeln(g, mc.font, r, dimension, links, oben, k, lage);
         wegpunkte(g, r, dimension, links, oben, k, kopf, lage);
         mitspieler(g, mc, r, spieler, dimension, links, oben, a, k, kopf, lage);
         // In der Mitte des Bildes, auf dem Pixel, den ecke dafür nimmt; gedreht genau in der Mitte, der Pfeil nach oben.
@@ -575,6 +577,28 @@ public final class Minimap {
     static double rand(double px, double pz, double hx, double hz, boolean rund) {
         double f = rund ? hx / Math.hypot(px, pz) : Math.min(hx / Math.abs(px), hz / Math.abs(pz));
         return Math.min(1, f);
+    }
+
+    /**
+     * Die Nadeln der sichtbaren Ebenen in dieser Dimension, deren Fuss in der Form liegt; Schild und
+     * Name bleiben im Quadrat der Minimap. Ein Block ist hier {@code zoom} Einheiten breit, die Nadel
+     * also in ihrer Grundgrösse. Siehe docs/ebenen.md, „Nadeln“.
+     */
+    private void nadeln(GuiGraphicsExtractor g, Font font, Rahmen r, String dimension, int links, int oben, int k, Drehung.Lage lage) {
+        int stufen = Ebenen.stufen(zoom);
+        g.enableScissor(r.x(), r.y(), r.x() + r.seite(), r.y() + r.seite());
+        // ponytail: alle Nadeln je Frame, höchstens 64 000; ein Raster nach Regionen, wenn das je zählt.
+        for (Ebenen.Eintrag e : Ebenen.INSTANZ.sichtbar()) {
+            for (Ebenen.Nadel n : Ebenen.INSTANZ.nadeln(e.id())) {
+                if (n.dimension().equals(dimension)) {
+                    float[] m = marke(r, n.x(), n.z(), links, oben, k, zoom, rund, r.seite() / 2.0, false, lage);
+                    if (m != null) {
+                        Ebenen.zeichne(g, font, m[0], m[1], n, stufen);
+                    }
+                }
+            }
+        }
+        g.disableScissor();
     }
 
     /** Die angehefteten Wegpunkte dieser Dimension, ausserhalb der Form an ihrem Rand. Siehe docs/wegpunkte.md. */

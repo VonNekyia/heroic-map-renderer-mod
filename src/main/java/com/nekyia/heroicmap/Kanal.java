@@ -17,8 +17,8 @@ import net.minecraft.resources.Identifier;
 record Kanal(String json) implements CustomPacketPayload {
 
     static final Type<Kanal> TYPE = new Type<>(Identifier.fromNamespaceAndPath(HeroicMap.ID, "karte"));
-    /** Das Plugin schickt weniger als 1 KiB; mehr liest der Mod nicht. */
-    static final int MAX = 64 << 10;
+    /** Ein Teil einer Ebene hat bis 1 MiB, wenn ein Objekt allein so gross ist; mehr liest der Mod nicht. */
+    static final int MAX = 1 << 20;
     static final StreamCodec<FriendlyByteBuf, Kanal> CODEC = CustomPacketPayload.codec(Kanal::schreibe, Kanal::lies);
 
     private void schreibe(FriendlyByteBuf puffer) {
