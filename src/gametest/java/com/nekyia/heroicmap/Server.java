@@ -57,6 +57,8 @@ public final class Server implements FabricClientGameTest {
         context.waitFor(mc -> Kanal.offen() && !Downloads.INSTANZ.baeume().isEmpty(), 2400);
         Downloads.Baum baum = context.computeOnClient(mc -> Downloads.INSTANZ.baeume().getFirst());
         int massstab = baum.bytes().firstKey();
+        // Gleich nach dem Login, ohne Wechsel der Dimension: Kennt der Mod den Hash der Welt nicht, kommt hier
+        // „Betritt erst …“. Beim Login entsteht das Level vor dem Spieler. Siehe docs/download.md, „Ablage“.
         Component fehler = context.computeOnClient(mc -> Downloads.INSTANZ.frageVoll(baum.id(), massstab));
         if (fehler != null) {
             throw new AssertionError("Kein Download angefragt: " + fehler.getString());

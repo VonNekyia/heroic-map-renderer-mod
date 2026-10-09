@@ -16,6 +16,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/Kartenliste.java
   - src/test/java/com/nekyia/heroicmap/AblageTest.java
   - src/main/resources/heroicmap.accesswidener
+  - src/gametest/java/com/nekyia/heroicmap/Anmeldung.java
   - src/main/java/com/nekyia/heroicmap/Welten.java
 ---
 
@@ -239,6 +240,14 @@ Einzelheiten stehen im Log.
   und Strich werden `_`. Ein Baum heisst nur `[a-z0-9_-]`, höchstens 64
   Zeichen. Namen, die Windows für Geräte hält (`con`, `nul`, `com1` …),
   lehnt der Mod als Baum ab und stellt dem Server ein `_` voran.
+- **Server beim Login:** Welcher Server es ist, liest der Mod aus der
+  Verbindung des Levels (`Downloads.server`), nicht über
+  `Minecraft.getCurrentServer`. Das geht über den Spieler, und beim Login
+  entsteht das Level vor ihm: `handleLogin` ruft `setLevel`, worin der Mod
+  die Welt merkt, bevor es den `LocalPlayer` anlegt, belegt per javap. Über
+  den Spieler war der Server dort null; der Mod merkte die erste Welt
+  nicht und meldete „Betritt erst …“, bis der Spieler die Dimension
+  wechselte. Der Gametest `Anmeldung` prüft diese Reihenfolge.
 - **Hash je Dimension:** Paper hat einen Seed je Welt, belegt per javap an
   Paper 26.3 (`ServerLevel.getSeed` aus den `worldGenSettings` der Welt).
   Ein Baum liegt deshalb unter dem Hash seiner Dimension aus dem

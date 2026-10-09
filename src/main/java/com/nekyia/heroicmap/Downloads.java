@@ -230,7 +230,7 @@ final class Downloads {
     }
 
     private void freigabe(JsonObject json) {
-        ServerData server = Minecraft.getInstance().getCurrentServer();
+        ServerData server = server();
         if (server == null) {
             return;
         }
@@ -428,7 +428,7 @@ final class Downloads {
      * Dimension unbekannt ist. Siehe docs/download.md, „Ablage“.
      */
     private Path ordner(String baum) {
-        ServerData server = Minecraft.getInstance().getCurrentServer();
+        ServerData server = server();
         String dimension = text(eintrag(baum), "dimension");
         return server == null || dimension == null ? null
                 : ordner(wurzel(), Minimap.INSTANZ.ablage(), server.ip, welten(), dimension, baum);
@@ -442,7 +442,7 @@ final class Downloads {
 
     /** Der Fehler, wenn der Spieler die Dimension des Baums auf diesem Backend noch nicht betreten hat, sonst null. */
     private Component weltUnbekannt(String baum) {
-        ServerData server = Minecraft.getInstance().getCurrentServer();
+        ServerData server = server();
         String dimension = text(eintrag(baum), "dimension");
         Long hash = server == null || dimension == null ? null : welten().hash(Welten.server(server.ip), dimension);
         return server != null && weltUnbekannt(baum, dimension, hash)
@@ -475,7 +475,7 @@ final class Downloads {
      */
     void weltBetreten() {
         Minecraft mc = Minecraft.getInstance();
-        ServerData server = mc.getCurrentServer();
+        ServerData server = server();
         ClientLevel level = mc.level;
         if (server == null || level == null) {
             return;
@@ -495,7 +495,7 @@ final class Downloads {
      */
     static Path weltOrdner() {
         Minecraft mc = Minecraft.getInstance();
-        ServerData server = mc.getCurrentServer();
+        ServerData server = server();
         ClientLevel level = mc.level;
         return server == null || level == null ? null
                 : wurzel().resolve(weltOrdner(Minimap.INSTANZ.ablage(), server.ip, level.getBiomeManager().biomeZoomSeed));
@@ -515,9 +515,19 @@ final class Downloads {
         };
     }
 
+    /**
+     * Der Server dieser Verbindung, oder null im Einzelspieler; aus der Verbindung des Levels.
+     * {@code Minecraft.getCurrentServer} geht über den Spieler, und beim Login entsteht das Level
+     * vor ihm: Beim Betreten der ersten Welt wäre der Server sonst unbekannt. Siehe docs/download.md, „Ablage“.
+     */
+    static ServerData server() {
+        Minecraft mc = Minecraft.getInstance();
+        return mc.level != null ? mc.level.connection.getServerData() : mc.getCurrentServer();
+    }
+
     /** Der Ordner dieses Servers in der Ablage vor dem Hash des Seeds, oder null im Einzelspieler. */
     static Path alterOrdner() {
-        ServerData server = Minecraft.getInstance().getCurrentServer();
+        ServerData server = server();
         return server == null ? null : wurzel().resolve(name(server.ip));
     }
 
