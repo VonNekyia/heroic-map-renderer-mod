@@ -82,9 +82,10 @@ steht unter „Kosten“.
   [Vollbildkarte](vollbildkarte.md). „Minimap zeigen oder verbergen“ und
   „Zoom der Minimap“ gibt es auch als Tasten, ohne Belegung, unter
   Steuerung, Gruppe „Heroic Map“; was sie ändern, speichert der Mod gleich.
-- **Der eigene Spieler** ist sein Kopf aus dem Skin, 8 Einheiten mit
-  schwarzem Rand, daneben ein kleiner Pfeil in Blickrichtung
-  (`Minimap.avatar`). Bei Gier 0 blickt der Spieler nach Süden, auf der
+- **Der eigene Spieler** ist sein Kopf aus dem Skin mit schwarzem Rand,
+  daneben ein kleiner Pfeil in Blickrichtung (`Minimap.avatar`). Er ist
+  6 Einheiten gross bei 128 Einheiten Seite und wächst mit der Seite, siehe
+  [Wegpunkte](wegpunkte.md), „Grösse“. Bei Gier 0 blickt der Spieler nach Süden, auf der
   Karte nach unten; der Pfeil kreist deshalb um Gier + 180° gedreht um den
   Kopf. So hat es der User gewünscht.
 - **Wo ein Block liegt,** sagt die [Projektion](projektion.md).
@@ -129,10 +130,12 @@ gibt es nicht; so hat es der User gewählt.
 - **Lage:** Hat der Client einen genannten Spieler als Entity mit derselben
   UUID, nimmt der Mod dessen Position, die ist flüssiger, zwischen zwei
   Ticks wie den eigenen Spieler, siehe „Bewegung“; sonst die des Servers.
-- **Zeichnen:** der Kopf aus dem Skin (`PlayerFaceExtractor`), 8 Einheiten
-  des GUI mit schwarzem Rand, nur in der Dimension des Spielers und
-  innerhalb der Form; ohne Skin ein weisses Quadrat. Auf der
-  [Vollbildkarte](vollbildkarte.md) steht der Name darüber.
+- **Zeichnen:** der Kopf aus dem Skin (`PlayerFaceExtractor`) mit schwarzem
+  Rand, so gross wie der eigene, nur in der Dimension des Spielers und
+  innerhalb der Form; ohne Skin ein weisses Quadrat. Angeheftete Mitspieler,
+  die ausserhalb der Form liegen, stehen an ihrem Rand, nach innen
+  geklemmt, siehe [Wegpunkte](wegpunkte.md), „Am Rand“. Auf der [Vollbildkarte](vollbildkarte.md) steht der Name
+  darüber.
 
 ## Form
 

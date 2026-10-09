@@ -1,6 +1,6 @@
 ---
 title: Vollbildkarte
-description: Die Karte über den ganzen Schirm aus den geladenen Kacheln, mit Bedienung, welchem Satz sie zeigt, Stufen und Lupe, wie Kacheln gelesen und behalten werden, Spieler und Koordinaten, dem Bild aus dem Gametest und was fehlt.
+description: Die Karte über den ganzen Schirm aus den geladenen Kacheln, mit Bedienung samt Menü nach Rechtsklick, welchem Satz sie zeigt, Stufen und Lupe, wie Kacheln gelesen und behalten werden, Spieler und Koordinaten, dem Bild aus dem Gametest und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Karte.java
   - src/main/java/com/nekyia/heroicmap/Kartenblick.java
@@ -33,14 +33,16 @@ sagt sie das und zeigt nichts.
 | Taste `.` | öffnet die Karte, schliesst sie wieder; frei belegbar unter „Heroic Map“, die einzige vorbelegte Taste des Mods |
 | Ziehen mit links | verschiebt die Karte, der Inhalt folgt der Maus |
 | Mausrad | zoomt, siehe „Stufen und Lupe“ |
-| Rechtsklick | öffnet ein kleines Menü „Hierher teleportieren (x, z)“ für den Block unter der Maus, wie die Anzeige unten links; erst ein Klick darauf teleportiert, mit der linken oder rechten Taste, jeder Klick daneben schliesst es, ein Rechtsklick öffnet es dort neu; siehe unten |
+| Rechtsklick | öffnet ein kleines Menü für den Block unter der Maus, wie die Anzeige unten links: „Hierher teleportieren (x, z)“, siehe unten, darunter „Wegpunkt setzen“, auf einem Wegpunkt „Wegpunkt löschen“, siehe [Wegpunkte](wegpunkte.md); erst ein Klick auf einen Eintrag tut etwas, mit der linken oder rechten Taste, jeder Klick daneben schliesst es, ein Rechtsklick öffnet es dort neu |
+| Klick, Doppelklick auf eine Marke | legt beim Loslassen einen Wegpunkt, Mitspieler oder den eigenen Spieler in die Mitte; ein Doppelklick heftet einen Wegpunkt oder Mitspieler an die Minimap; wer auf einer Marke zieht, zieht nur die Karte; siehe [Wegpunkte](wegpunkte.md) |
 | Knopf „Karte laden …“ | zeigt die Karten des Servers, je Baum der Name und darunter ein Knopf je Massstab mit seiner Grösse (`Auswahl`); die Knöpfe teilen sich die Breite des Schirms, höchstens 90 Einheiten je Knopf, so passen sie auch bei grossem GUI-Massstab; den Massstab, den der Spieler schon ganz hat (`Downloads.vollstaendig`: ein vollständiger Satz, und das Plugin misst den Abgleich an demselben Massstab), zeigt der Knopf als „Abgleich“ und gleicht ab wie der Knopf „Abgleich“, nach einer Ablehnung mit `wieder` bis dahin aus; ein Klick fragt wie `/hmap laden` erst im Dialog nach |
 | Knopf „Abgleich“ | fragt einen Abgleich des gezeigten Satzes an, wie `/hmap abgleich`; nur mit Satz. Lehnt der Server mit `wieder` ab, ist der Knopf bis dahin aus und nennt die Uhrzeit |
 | `Esc` | schliesst |
 
 - **Das Spiel läuft weiter,** die Karte hält es nicht an (`isPauseScreen`).
 - **Unten links** stehen der Name des Satzes und `x`, `z` des Blocks unter
-  der Maus, fest wie auf der Karte im Browser; so will es der User.
+  der Maus, so wie die Kacheln ihn zeichnen (`Kartenblick.basisRasterX`),
+  fest wie auf der Karte im Browser; so will es der User.
 - **Beim Öffnen** liegt der Spieler in der Mitte.
 - **Geht ein Knopf nicht,** etwa weil der Server den Baum nicht anbietet oder
   schon ein Download läuft, steht der Grund über den Koordinaten.
@@ -54,7 +56,7 @@ sagt sie das und zeigt nichts.
   Block, der Bewegung aufhält, ohne Laub, auch in Chunks, die der Client
   nicht hat. Der Mod schickt ihn mit `sendCommand`; darin stehen nur die
   Dimension des Spielers und die beiden Zahlen, kein Text vom Server.
-- **Nur mit Recht:** Den Eintrag gibt es nur, wenn der Befehlsbaum des
+- **Nur mit Recht:** Den Eintrag „Hierher teleportieren“ gibt es nur, wenn der Befehlsbaum des
   Servers `execute` und `tp` enthält (`Teleport.erlaubt`); der Server
   schickt nur Befehle, die der Spieler nutzen darf. Die Rechte prüft er
   beim Ausführen noch einmal, der Mod umgeht nichts.
@@ -183,13 +185,15 @@ Warum eine Kopie: [0003](entscheidungen/0003-kopie-des-vp8l-dekoders.md).
 
 Der eigene Kopf und die Koordinaten rechnen mit derselben Projektion wie der
 Renderer und mit `scale` aus `map.json`, siehe [Projektion](projektion.md).
-Kopf und Pfeil sind dieselben wie auf der Minimap. Mitspieler stehen als Kopf mit Namen darüber,
-siehe [Minimap](minimap.md), „Mitspieler“.
+Kopf und Pfeil sind dieselben wie auf der Minimap, 6 Einheiten des GUI. Mitspieler stehen als Kopf mit Namen darüber,
+siehe [Minimap](minimap.md), „Mitspieler“. Was ausserhalb des Schirms liegt, steht am Rand, siehe
+[Wegpunkte](wegpunkte.md), „Am Rand“.
 
 ## Bild
 
 `docs/bilder/vollbildkarte.png` nimmt der Gametest `Bilder` auf, siehe
-[Bauen und testen](entwicklung.md), „Gametests“. Er legt einen gemalten
+[Bauen und testen](entwicklung.md), „Gametests“, mit einem angehefteten
+Wegpunkt und einem am Rand. Er legt einen gemalten
 Testsatz an, `scale` 4, Stufen 0 bis 2, 24 Kacheln, aus
 `src/gametest/resources/satz/`. Der Satz ist keine gerenderte Welt; er
 prüft, dass TwelveMonkeys im Spiel lädt und die Kacheln richtig liegen.

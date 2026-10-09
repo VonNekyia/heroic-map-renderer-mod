@@ -45,6 +45,88 @@ final class Kartenblick {
         return hoehe / 2.0 + (basisZ - mz) / teiler() * lupe;
     }
 
+    /**
+     * Die Kante des Pixels 0 der Basis auf dem Schirm, ganzzahlig. Kacheln, Marken und Klicks
+     * rechnen alle von ihr aus, so liegen sie auf demselben Raster, auch in Doubles.
+     */
+    int kanteX(int breite) {
+        return (int) Math.floor(schirmX(0, breite));
+    }
+
+    int kanteZ(int hoehe) {
+        return (int) Math.floor(schirmY(0, hoehe));
+    }
+
+    /** Die linke Kante der Kachel {@code tx} der aktuellen Stufe auf dem Schirm. */
+    int kachelX(int tx, int breite) {
+        return kanteX(breite) + tx * kachel * lupe;
+    }
+
+    int kachelY(int ty, int hoehe) {
+        return kanteZ(hoehe) + ty * kachel * lupe;
+    }
+
+    /** Wo die Karte den Pixel {@code basisX} der Basis zeichnet: von der Kante aus, wie die Kacheln. */
+    double rasterX(double basisX, int breite) {
+        return kanteX(breite) + basisX / teiler() * lupe;
+    }
+
+    double rasterY(double basisZ, int hoehe) {
+        return kanteZ(hoehe) + basisZ / teiler() * lupe;
+    }
+
+    /** Die Umkehrung von {@link #rasterX}: der Pixel der Basis, den die Karte unter dem Schirm-x zeichnet. */
+    double basisRasterX(double schirmX, int breite) {
+        return (schirmX - kanteX(breite)) * teiler() / lupe;
+    }
+
+    double basisRasterZ(double schirmY, int hoehe) {
+        return (schirmY - kanteZ(hoehe)) * teiler() / lupe;
+    }
+
+    /**
+     * Wo der Name über einer Marke mit der Mitte (x, y) und der halben Seite {@code halb} beginnt,
+     * links und oben: mittig über ihr, aber ganz auf dem Schirm. Träfe er dort die Knöpfe rechts
+     * oben, ab x {@code knopfX} bis y {@code knopfUnten}, steht er unter der Marke, so bleibt er
+     * bei seinem Kopf; erst wenn auch das sie träfe, links neben ihnen. Siehe docs/wegpunkte.md, „Am Rand“.
+     */
+    static int[] name(double x, double y, double halb, int breite, int textBreite, int knopfX, int knopfUnten) {
+        int nx = Math.max(2, Math.min((int) Math.round(x - textBreite / 2.0), breite - textBreite - 2));
+        int ny = Math.max(2, (int) Math.floor(y - halb) - 10);
+        int unter = (int) Math.ceil(y + halb) + 2;
+        if (nx + textBreite > knopfX && ny < knopfUnten) {
+            if (unter >= knopfUnten) {
+                ny = unter;
+            } else {
+                nx = Math.max(2, knopfX - textBreite - 2);
+            }
+        }
+        return new int[] {nx, ny};
+    }
+
+    /**
+     * Wo eine Marke an (x, y) des Schirms steht: drinnen, wo sie ist; sonst {@code rand} Einheiten
+     * vom Rand des Schirms auf der Linie von der Mitte zu ihr. Dort weicht sie den Knöpfen rechts
+     * oben aus, die ab x {@code knopfX} bis y {@code knopfY} reichen: oben nach links, rechts nach
+     * unten. Siehe docs/wegpunkte.md, „Am Rand“.
+     */
+    static double[] marke(double x, double y, int breite, int hoehe, double rand, double halb, int knopfX, int knopfY) {
+        double px = x - breite / 2.0, pz = y - hoehe / 2.0;
+        double f = Minimap.rand(px, pz, breite / 2.0 - rand, hoehe / 2.0 - rand, false);
+        if (f >= 1) {
+            return new double[] {x, y};
+        }
+        double mx = breite / 2.0 + px * f, my = hoehe / 2.0 + pz * f;
+        if (mx + halb > knopfX && my - halb < knopfY) {
+            if (my - rand < 1e-6) {
+                mx = knopfX - halb - 1;
+            } else {
+                my = knopfY + halb + 1;
+            }
+        }
+        return new double[] {mx, my};
+    }
+
     /** Eine Stufe feiner, auf der feinsten die Lupe grösser. */
     void naeher() {
         if (zoom < stufe) {
