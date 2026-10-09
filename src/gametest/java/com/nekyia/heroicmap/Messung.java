@@ -38,6 +38,8 @@ import net.minecraft.world.level.levelgen.presets.WorldPresets;
 public final class Messung implements FabricClientGameTest {
 
     private static final String AUSGABE = System.getProperty("heroicmap.messung", "");
+    /** Mit {@code -PmessungDrehen=true} nur die Läufe zum Drehen, siehe docs/minimap.md, „Drehen“. */
+    private static final boolean NUR_DREHEN = Boolean.getBoolean("heroicmap.messung.drehen");
     private static final int SICHTWEITE = 12;
     private static final int RUNDEN = 3;
     private static final int STAND_TICKS = 100;
@@ -93,6 +95,11 @@ public final class Messung implements FabricClientGameTest {
             server.runCommand("tp @a 0 " + HOEHE + " 0 -90 20");
             warteAufChunks(context);
 
+            if (NUR_DREHEN) {
+                drehen(context, server);
+                schreibe();
+                return;
+            }
             atlas(context);
             for (int scale : new int[] {1, 2, 4, 8, 16}) {
                 for (int runde = 1; runde <= RUNDEN; runde++) {
@@ -141,6 +148,10 @@ public final class Messung implements FabricClientGameTest {
             }
 
         }
+        schreibe();
+    }
+
+    private void schreibe() {
         try {
             Files.writeString(Path.of(AUSGABE), bericht);
         } catch (IOException e) {
@@ -174,6 +185,44 @@ public final class Messung implements FabricClientGameTest {
     }
 
     /** Fliegt 20 Blöcke/s über die Strecke x = 0 bis FLUG_TICKS, hin nach Osten oder zurück. */
+    /**
+     * Was das Drehen je Frame kostet: 4 px, Zoom 4, freie Bildrate, eckig und rund, je ohne und mit
+     * Drehen, bei Gier 30; Frametime ohne und mit Minimap und die Zeit im HUD, im Stand und im Flug.
+     */
+    private void drehen(ClientGameTestContext context, TestServerContext server) {
+        flug(context, server, true);
+        flug(context, server, false);
+        boolean hin = true;
+        for (int[] lauf : new int[][] {{0, 0}, {0, 1}, {1, 0}, {1, 1}}) {
+            boolean rund = lauf[0] == 1, drehen = lauf[1] == 1;
+            context.runOnClient(mc -> {
+                Minimap.INSTANZ.setzeScale(4);
+                Minimap.INSTANZ.setzeZoom(4);
+                Minimap.INSTANZ.setzeRund(rund);
+                Minimap.INSTANZ.setzeDrehen(drehen);
+                mc.player.setYRot(30);
+            });
+            zeige(context, true);
+            String art = "fps=frei scale=4 zoom=4 form=" + (rund ? "rund" : "eckig") + " drehen=" + (drehen ? "an" : "aus");
+            warteAufFreieFrames(context, art);
+            for (int runde = 1; runde <= RUNDEN; runde++) {
+                for (boolean an : new boolean[] {false, true}) {
+                    zeige(context, an);
+                    frames(context, art + " stand", an, runde, () -> context.waitTicks(STAND_TICKS));
+                }
+            }
+            for (int runde = 1; runde <= RUNDEN; runde++) {
+                for (boolean an : new boolean[] {false, true}) {
+                    zeige(context, an);
+                    boolean richtung = hin;
+                    frames(context, art + " flug", an, runde, () -> flug(context, server, richtung));
+                    hin = !hin;
+                }
+            }
+        }
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeDrehen(false));
+    }
+
     private static void flug(ClientGameTestContext context, TestServerContext server, boolean hin) {
         for (int t = 1; t <= FLUG_TICKS; t++) {
             int x = hin ? t : FLUG_TICKS - t;

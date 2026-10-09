@@ -1,6 +1,6 @@
 ---
 title: Rahmen
-description: Die Rahmen der Minimap als umschaltbare Skins - Wahl im Untermenü, die sechs Skins, ihre Dateien und Quellen, Bänder eckig und rund, Ornamente und Griff im Menü, Abstand zum Rand, Kosten und Bilder.
+description: Die Rahmen der Minimap als umschaltbare Skins - Wahl im Untermenü, die sechs Skins, ihre Dateien und Quellen, Bänder eckig und rund, Ornamente und Griff im Menü, die wandernden Marken beim Drehen, Abstand zum Rand, Kosten und Bilder.
 code:
   - src/main/java/com/nekyia/heroicmap/Skin.java
   - src/main/java/com/nekyia/heroicmap/Minimap.java
@@ -48,6 +48,8 @@ im Atlas des GUI; F3+T und Ressourcenpakete laden ihn neu:
   oben links.
 - **`griff.png`, `griff_aktiv.png`:** der Griff, 7 × 7, gezeichnet für
   unten rechts.
+- **`norden.png`, `marke.png`, `marke_quer.png`,** je mit `_aktiv`: die
+  Marken beim Drehen, siehe „Marken“.
 - **`palette.txt`:** eine Zeile je Band, von aussen nach innen, eine Farbe
   `#RRGGBB` oder zwei, Licht und Schatten; `//` beginnt einen Kommentar
   (`Skin.lies`). Der Atlas nimmt nur PNG, die Textdatei liegt daneben.
@@ -59,9 +61,7 @@ im Atlas des GUI; F3+T und Ressourcenpakete laden ihn neu:
 - **Geladen** einmal je Skin, auch ein Fehlschlag bleibt gemerkt, bis der
   Atlas neu lädt (`Skin.von`); sonst stünde je Frame eine Warnung im Log.
 - **Quellen** unter `docs/bilder/quellen/rahmen/`: je Skin die Datei von
-  Aseprite, eine Ebene je Bild, und die fertigen `norden`, `marke` und
-  `marke_quer`. Die drei kommen erst mit der drehenden Minimap ins Jar;
-  ohne Drehung zeigt der Rahmen keine Marken, so hat es der User gewählt.
+  Aseprite, eine Ebene je Bild.
 
 ## Bänder
 
@@ -103,6 +103,19 @@ im Atlas des GUI; F3+T und Ressourcenpakete laden ihn neu:
   bisher.
 
 ![Das Menü mit dem Rahmen „uhr“, unten links der Griff](bilder/rahmen-menue.png)
+
+## Marken
+
+- **Nur beim Drehen,** siehe [Minimap](minimap.md), „Drehen“; ohne Drehung
+  zeigt der Rahmen keine Marken, so hat es der User gewählt. Ohne Rahmen
+  gibt es keine, die Bilder gehören zum Skin.
+- **Wo:** von der Mitte der Minimap in die Himmelsrichtung, auf der Mitte
+  der Bänder, rund auf dem Kreis, eckig auf dem Quadrat (`Skin.marke`).
+  So wandern sie beim Drehen am Rahmen entlang.
+- **Bild:** Norden `norden`, die anderen oben und unten `marke`, links und
+  rechts `marke_quer`, je nachdem, ob die Richtung mehr nach oben oder mehr
+  zur Seite zeigt (`Skin.markeFuer`); im Menü `_aktiv`. Nie gedreht.
+- **Reihenfolge:** Bänder, zier, die Marken, `norden` zuoberst.
 
 ## Abstand zum Rand
 

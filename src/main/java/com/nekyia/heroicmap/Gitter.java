@@ -13,10 +13,11 @@ import org.joml.Matrix3x2fc;
 /**
  * Die Chunklinien als ein einziges Element des GUI je Frame: senkrechte Linien ganz, waagrechte
  * ohne die Spalten der senkrechten, so deckt keine Kreuzung doppelt. Die Rechtecke entstehen erst
- * beim Zeichnen. Siehe docs/minimap.md, „Chunklinien“.
+ * beim Zeichnen. Mit {@code lage} gedreht und mit der {@code form} geschnitten, siehe
+ * docs/minimap.md, „Drehen“. Siehe docs/minimap.md, „Chunklinien“.
  */
-record Gitter(Matrix3x2fc pose, int x0, int y0, int dicke, int farbe, Linien linien, ScreenRectangle bounds)
-        implements GuiElementRenderState {
+record Gitter(Matrix3x2fc pose, int x0, int y0, int dicke, int farbe, Linien linien, ScreenRectangle bounds,
+        Drehung.Lage lage, float[] form) implements GuiElementRenderState {
 
     /**
      * Die Linien in Pixeln ab (x0, y0): senkrechte Linie i bei {@code xs[i]}, aufsteigend, von
@@ -35,7 +36,17 @@ record Gitter(Matrix3x2fc pose, int x0, int y0, int dicke, int farbe, Linien lin
     static void zeichne(GuiGraphicsExtractor g, int x0, int y0, int w, int h, int dicke, int farbe, Linien linien) {
         Matrix3x2f pose = new Matrix3x2f(g.pose());
         g.guiRenderState.addGuiElement(new Gitter(pose, x0, y0, dicke, farbe, linien,
-                new ScreenRectangle(x0, y0, w, h).transformMaxBounds(pose)));
+                new ScreenRectangle(x0, y0, w, h).transformMaxBounds(pose), null, null));
+    }
+
+    /**
+     * Wie {@link #zeichne}, die Linien ab (x0, y0) im Bild, gedreht mit {@code lage} und mit dem
+     * konvexen Vieleck {@code form} geschnitten; {@code flaeche} begrenzt sie auf dem Schirm.
+     */
+    static void zeichne(GuiGraphicsExtractor g, int x0, int y0, ScreenRectangle flaeche, int dicke, int farbe, Linien linien,
+            Drehung.Lage lage, float[] form) {
+        Matrix3x2f pose = new Matrix3x2f(g.pose());
+        g.guiRenderState.addGuiElement(new Gitter(pose, x0, y0, dicke, farbe, linien, flaeche.transformMaxBounds(pose), lage, form));
     }
 
     /** Die Rechtecke der Linien: erst alle senkrechten, dann die waagrechten in Stücken zwischen ihnen. */
@@ -62,11 +73,39 @@ record Gitter(Matrix3x2fc pose, int x0, int y0, int dicke, int farbe, Linien lin
 
     @Override
     public void buildVertices(VertexConsumer v) {
-        rechtecke(dicke, linien, (xa, ya, xb, yb) -> {
-            v.addVertexWith2DPose(pose, x0 + xa, y0 + ya).setColor(farbe);
-            v.addVertexWith2DPose(pose, x0 + xa, y0 + yb).setColor(farbe);
-            v.addVertexWith2DPose(pose, x0 + xb, y0 + yb).setColor(farbe);
-            v.addVertexWith2DPose(pose, x0 + xb, y0 + ya).setColor(farbe);
+        if (lage == null) {
+            rechtecke(dicke, linien, (xa, ya, xb, yb) -> {
+                v.addVertexWith2DPose(pose, x0 + xa, y0 + ya).setColor(farbe);
+                v.addVertexWith2DPose(pose, x0 + xa, y0 + yb).setColor(farbe);
+                v.addVertexWith2DPose(pose, x0 + xb, y0 + yb).setColor(farbe);
+                v.addVertexWith2DPose(pose, x0 + xb, y0 + ya).setColor(farbe);
+            });
+            return;
+        }
+        gedreht(dicke, linien, x0, y0, lage, form, (ecken, anzahl) -> Drehung.faecher(anzahl,
+                i -> v.addVertexWith2DPose(pose, ecken[2 * i], ecken[2 * i + 1]).setColor(farbe)));
+    }
+
+    /** Ein Vieleck auf dem Schirm, {@code anzahl} Ecken in {@code ecken}. */
+    interface Vieleck {
+        void vieleck(float[] ecken, int anzahl);
+    }
+
+    /** Die Rechtecke der Linien ab (x0, y0) im Bild, gedreht mit {@code lage} und mit {@code form} geschnitten; leere fallen weg. */
+    static void gedreht(int dicke, Linien l, int x0, int y0, Drehung.Lage lage, float[] form, Vieleck aus) {
+        int m = form.length / 2;
+        float[] ecke = new float[8], a = new float[2 * (4 + m)], b = new float[2 * (4 + m)];
+        rechtecke(dicke, l, (xa, ya, xb, yb) -> {
+            // Dieselbe Reihenfolge wie ungedreht: Der Umlaufsinn bleibt, das GUI verwirft nichts.
+            int[] xs = {x0 + xa, x0 + xa, x0 + xb, x0 + xb}, ys = {y0 + ya, y0 + yb, y0 + yb, y0 + ya};
+            for (int i = 0; i < 4; i++) {
+                ecke[2 * i] = (float) lage.x(xs[i], ys[i]);
+                ecke[2 * i + 1] = (float) lage.y(xs[i], ys[i]);
+            }
+            int anzahl = Drehung.schneide(ecke, 4, form, m, a, b);
+            if (anzahl >= 3) {
+                aus.vieleck(a, anzahl);
+            }
         });
     }
 

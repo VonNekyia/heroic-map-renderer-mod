@@ -95,6 +95,7 @@ public final class Bilder implements FabricClientGameTest {
             }
             menue(context);
             rahmen(context);
+            drehen(context, server);
             vollbildkarte(context);
             selbst(context);
         }
@@ -183,6 +184,55 @@ public final class Bilder implements FabricClientGameTest {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /**
+     * Die drehende Minimap bei Gier 30, mit Chunklinien: eckig ohne Rahmen, rund mit „uhr“, eckig mit
+     * „kompass“, nebeneinander. Siehe docs/minimap.md, „Drehen“.
+     */
+    private static void drehen(ClientGameTestContext context, TestServerContext server) {
+        server.runCommand("tp @a 0.5 -30 0.5 30 90");
+        String[][] arten = {{Skin.OHNE, "eckig"}, {"uhr", "rund"}, {"kompass", "eckig"}};
+        BufferedImage[] teile = new BufferedImage[arten.length];
+        for (int i = 0; i < arten.length; i++) {
+            String skin = arten[i][0];
+            boolean rund = arten[i][1].equals("rund");
+            context.runOnClient(mc -> {
+                Minimap.INSTANZ.setzeDrehen(true);
+                Minimap.INSTANZ.setzeChunklinien(true);
+                Minimap.INSTANZ.setzeSkin(skin);
+                Minimap.INSTANZ.setzeRund(rund);
+            });
+            context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getYRot() - 30) < 0.1f && Minimap.INSTANZ.fertig(), 1200);
+            context.waitTicks(2);
+            teile[i] = mitRand(context, context.takeScreenshot(TestScreenshotOptions.of("drehen-" + i).disableCounterPrefix()));
+        }
+        if (!AUSGABE.isEmpty()) {
+            int breite = 0, hoehe = 0;
+            for (BufferedImage t : teile) {
+                breite += t.getWidth();
+                hoehe = Math.max(hoehe, t.getHeight());
+            }
+            BufferedImage alle = new BufferedImage(breite, hoehe, BufferedImage.TYPE_INT_RGB);
+            int x = 0;
+            for (BufferedImage t : teile) {
+                alle.getGraphics().drawImage(t, x, 0, null);
+                x += t.getWidth();
+            }
+            try {
+                ImageIO.write(alle, "png", Path.of(AUSGABE, "drehen.png").toFile());
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        server.runCommand("tp @a 0.5 -30 0.5 0 90");
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeDrehen(false);
+            Minimap.INSTANZ.setzeChunklinien(false);
+            Minimap.INSTANZ.setzeSkin(Skin.OHNE);
+            Minimap.INSTANZ.setzeRund(false);
+        });
+        context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getYRot()) < 0.1f && Minimap.INSTANZ.fertig(), 1200);
     }
 
     /** Die Minimap samt Ornamenten: ihr Rahmen und so viel darum, wie sie Abstand zum Rand hält. */

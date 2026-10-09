@@ -1,6 +1,6 @@
 ---
 title: Minimap
-description: Bedienung über das Menü hinter /hmap und das Untermenü „Einstellungen …“, Chunklinien, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
+description: Bedienung über das Menü hinter /hmap und das Untermenü „Einstellungen …“, Chunklinien, Drehen mit der Blickrichtung, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
 code:
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/ChunkMaler.java
@@ -10,6 +10,8 @@ code:
   - src/main/java/com/nekyia/heroicmap/Anzeige.java
   - src/main/java/com/nekyia/heroicmap/Kartenblick.java
   - src/main/java/com/nekyia/heroicmap/Gitter.java
+  - src/main/java/com/nekyia/heroicmap/Drehung.java
+  - src/test/java/com/nekyia/heroicmap/DrehungTest.java
   - src/main/java/com/nekyia/heroicmap/Mitspieler.java
   - src/test/java/com/nekyia/heroicmap/MitspielerTest.java
   - src/main/java/com/nekyia/heroicmap/mixin/LevelExtractorMixin.java
@@ -57,6 +59,7 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
 | Form | eckig | eckig oder rund, siehe „Form“ |
 | Auflösung der Minimap | 2 px je Block | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet |
 | Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte, siehe „Chunklinien“ |
+| Drehen | aus | die Minimap dreht mit der Blickrichtung, siehe „Drehen“ |
 | Rahmen | ohne | ein Skin um die Minimap, siehe [Rahmen](rahmen.md) |
 | Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
 
@@ -170,6 +173,44 @@ Vorgabe aus. So hat es der User gewünscht.
   durch dieselbe Drehung und denselben Schnitt mit der Form.
 
 ![Die Minimap der Szene mit Chunklinien, bei Zoom 2×](bilder/minimap-chunklinien.png)
+
+## Drehen
+
+Mit dem Schalter „Drehen“ im Untermenü „Einstellungen …“ dreht die Minimap
+mit der Blickrichtung: Was vor dem Spieler liegt, liegt oben. Gespeichert
+als `drehen` in `heroicmap.properties`, Vorgabe aus. Nur die Minimap, die
+Vollbildkarte bleibt genordet. So hat es der User gewünscht.
+
+![Die drehende Minimap bei Gier 30 mit Chunklinien: eckig ohne Rahmen, rund mit „uhr“, eckig mit „kompass“](bilder/drehen.png)
+
+- **Winkel:** 180° − Gier (`Drehung.winkel`), zwischen zwei Ticks wie die
+  Kamera (`LocalPlayer.getViewYRot`). Bei Blick nach Norden dreht nichts.
+- **Um den Spieler:** Der Spieler liegt genau auf der Mitte der Minimap,
+  die Karte dreht um seinen Ort im Bild (`Minimap.lage`, `Drehung.Lage`).
+  Gedreht gibt es keine ganzen Pixel mehr; ungedreht bleibt alles auf dem
+  Raster wie bisher.
+- **Karte:** Je Region dreht die Minimap ihr Quadrat und schneidet es mit
+  der Form, ein konvexes Vieleck mit einem anderen, Kante für Kante
+  (`Drehung.schneide`). Jede Region ist ein Element des GUI, ein Fächer aus
+  Dreiecken (`Drehung.Bild`); die UV jeder Ecke kommen aus der Drehung
+  zurück ins Bild. Gedreht bleibt der Umlaufsinn, das GUI verwirft nichts.
+- **Form:** eckig das Quadrat, rund ein Vieleck mit 64 Ecken aussen um den
+  Kreis (`Drehung.kreis`). Es ragt bei 256 Einheiten und GUI-Massstab 4
+  höchstens 0,6 Pixel über den Kreis: ohne Rahmen auf den Umriss, den die
+  Minimap vorher zeichnet, mit Rahmen unter den Ring, den sie danach
+  zeichnet.
+- **Reichweite:** Eckig gedreht sieht die Minimap bis in die Ecken, √2 so
+  weit wie ungedreht (`Minimap.sicht`); sie zeichnet so viele Chunks mehr
+  vor. Rund reicht der Kreis wie ungedreht.
+- **Chunklinien** rechnet sie über die ganze Gegend um den Spieler, dreht
+  sie und schneidet sie mit der Form (`Gitter.gedreht`); Kreuzungen decken
+  weiter einfach.
+- **Wegpunkte und Mitspieler** drehen mit, auch am Rand (`Minimap.marke`
+  mit `lage`). Der Pfeil am eigenen Kopf zeigt nach oben.
+- **Im Menü** rechnet die Zeile mit den Koordinaten unter der Maus zurück
+  ins Bild.
+- **Mit Rahmen** bleiben die Ornamente in den Ecken; N, O, S und W wandern
+  am Rahmen, siehe [Rahmen](rahmen.md), „Marken“.
 
 ## Mitspieler
 
