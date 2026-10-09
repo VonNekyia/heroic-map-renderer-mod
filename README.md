@@ -1,5 +1,7 @@
 # heroic-map-renderer-mod
 
+[![Server mit dem Plugin](https://img.shields.io/bstats/servers/34598)](https://bstats.org/plugin/bukkit/heroic-map-renderer-plugin/34598)
+
 Ein Fabric-Mod für Minecraft mit Minimap und Vollbildkarte, für Server mit
 dem Plugin von [heroic-map-renderer](https://github.com/VonNekyia/heroic-map-renderer).
 
