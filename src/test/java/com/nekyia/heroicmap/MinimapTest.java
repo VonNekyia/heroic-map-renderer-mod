@@ -126,6 +126,28 @@ class MinimapTest {
     }
 
     @Test
+    void drehenNurGewaehltGespeichert(@TempDir Path ordner) throws Exception {
+        Path datei = ordner.resolve("heroicmap.properties");
+        // Aus einer älteren Version: drehen=true war gewählt, drehen=false ist von der alten Vorgabe nicht zu unterscheiden.
+        Files.writeString(datei, "drehen=true\n");
+        Minimap m = new Minimap();
+        m.lies(datei);
+        assertTrue(m.drehen());
+        Files.writeString(datei, "drehen=false\n");
+        m.lies(datei);
+        assertTrue(m.drehen());
+        // Ohne Wahl schreibt der Mod nichts zu Drehen; so gilt später eine andere Vorgabe.
+        m.schreibe(datei);
+        assertFalse(Files.readString(datei).contains("drehen"));
+        // Selbst ausgeschaltet bleibt aus, auch über den Neustart.
+        m.setzeDrehen(false);
+        m.schreibe(datei);
+        Minimap neu = new Minimap();
+        neu.lies(datei);
+        assertFalse(neu.drehen());
+    }
+
+    @Test
     void rahmenUebersteht(@TempDir Path ordner) throws Exception {
         // Ohne Lage und Grösse: Die rechnen mit dem Abstand des Skins, und den kennt erst das Spiel.
         Path datei = ordner.resolve("heroicmap.properties");
@@ -169,6 +191,9 @@ class MinimapTest {
         Minimap minimap = new Minimap();
         minimap.setzeScale(4);
         minimap.setzeZoom(1);
+        // Eckig und gedreht, die Vorgabe, reicht sie in den Ecken weiter; genordet so weit wie die Seite.
+        assertEquals(Minimap.reichweite(1, Minimap.sicht(Minimap.GROESSE, true, false)), minimap.reichweite());
+        minimap.setzeDrehen(false);
         assertEquals(Minimap.reichweite(1, Minimap.GROESSE), minimap.reichweite());
     }
 
@@ -291,7 +316,8 @@ class MinimapTest {
         // Ablage: Vorgabe IP und Hash, die Wahl des Users.
         assertEquals(Downloads.Ablage.IP, minimap.ablage());
         assertFalse(minimap.chunklinien());
-        assertFalse(minimap.drehen());
+        // Drehen: Vorgabe an, der Wunsch des Users.
+        assertTrue(minimap.drehen());
         assertEquals(Skin.OHNE, minimap.skin());
         assertEquals(new Minimap.Rahmen(640 - 128 - 4, 4, 128), minimap.rahmen(640, 360));
     }

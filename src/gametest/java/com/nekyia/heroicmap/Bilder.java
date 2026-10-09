@@ -81,6 +81,8 @@ public final class Bilder implements FabricClientGameTest {
             }
             server.runCommand("tp @a 0.5 -30 0.5 0 90");
             spiel.getConnection().waitForChunksRender();
+            // Die Bilder zeigen die Minimap genordet; gedreht nur in drehen().
+            context.runOnClient(mc -> Minimap.INSTANZ.setzeDrehen(false));
             for (int scale : new int[] {1, 2, 4}) {
                 context.runOnClient(mc -> {
                     Minimap.INSTANZ.setzeScale(scale);

@@ -105,7 +105,9 @@ public final class Minimap {
     /** Chunklinien auf Minimap und Vollbildkarte, eine Vorliebe aus dem Untermenü. Siehe docs/minimap.md, „Chunklinien“. */
     private boolean chunklinien;
     /** Dreht die Minimap mit der Blickrichtung, die oben liegt. Siehe docs/minimap.md, „Drehen“. */
-    private boolean drehen;
+    private boolean drehen = true;
+    /** Hat der Spieler Drehen selbst gewählt? Nur dann steht es in der Datei, sonst gilt die Vorgabe. */
+    private boolean drehenGewaehlt;
     /** Der Rahmen, ein Name aus {@link Skin#NAMEN}; „ohne“ ist der Umriss. Siehe docs/rahmen.md. */
     private String skin = Skin.OHNE;
     /** Solange das Menü offen ist: die Ecke des Griffs, 0 bis 3, sonst -1; und ob die Maus auf ihm liegt. */
@@ -316,6 +318,7 @@ public final class Minimap {
             mitte = null;
         }
         this.drehen = drehen;
+        drehenGewaehlt = true;
     }
 
     /** Lage und Seite auf dem Schirm, in Einheiten des GUI. */
@@ -387,7 +390,10 @@ public final class Minimap {
         rund = "rund".equals(p.getProperty("form"));
         show = !"hidden".equals(p.getProperty("show"));
         chunklinien = "true".equals(p.getProperty("chunklinien"));
-        drehen = "true".equals(p.getProperty("drehen"));
+        // Vorgabe an. Ein altes drehen=true war gewählt, denn die Vorgabe war aus; ein altes drehen=false nicht unterscheidbar.
+        String wahl = p.getProperty("drehen_wahl");
+        drehenGewaehlt = wahl != null || "true".equals(p.getProperty("drehen"));
+        drehen = wahl == null || "true".equals(wahl);
         setzeSkin(String.valueOf(p.getProperty("rahmen")).trim());
         ablage = switch (String.valueOf(p.getProperty("ablage")).trim()) {
             case "hash" -> Downloads.Ablage.HASH;
@@ -407,7 +413,9 @@ public final class Minimap {
         p.setProperty("form", rund ? "rund" : "eckig");
         p.setProperty("show", show ? "simplevoicechat" : "hidden");
         p.setProperty("chunklinien", Boolean.toString(chunklinien));
-        p.setProperty("drehen", Boolean.toString(drehen));
+        if (drehenGewaehlt) {
+            p.setProperty("drehen_wahl", Boolean.toString(drehen));
+        }
         p.setProperty("rahmen", skin);
         p.setProperty("ablage", ablage.name().toLowerCase(Locale.ROOT));
         p.setProperty("groesse", Integer.toString(groesse));
