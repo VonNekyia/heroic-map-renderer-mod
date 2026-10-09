@@ -1,8 +1,10 @@
 ---
 title: Rahmen
-description: Die Rahmen der Minimap als umschaltbare Skins - Wahl im Untermenü, die sechs Skins, ihre Dateien und Quellen, Bänder eckig und rund, Ornamente und Griff im Menü, die wandernden Marken beim Drehen, Abstand zum Rand, Kosten und Bilder.
+description: Die Rahmen der Minimap als umschaltbare Skins - Wahl im Untermenü, die Vorgabe „biom“ nach dem Biom unter dem Spieler, die sechs festen Skins, ihre Dateien und Quellen, Bänder eckig und rund, Ornamente und Griff im Menü, die wandernden Marken beim Drehen, Abstand zum Rand, Kosten und Bilder.
 code:
   - src/main/java/com/nekyia/heroicmap/Skin.java
+  - src/main/java/com/nekyia/heroicmap/Biom.java
+  - src/test/java/com/nekyia/heroicmap/BiomTest.java
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/Einstellungen.java
   - src/main/java/com/nekyia/heroicmap/Anzeige.java
@@ -15,21 +17,33 @@ code:
 
 Um die Minimap kann ein Rahmen liegen, ein Skin aus dem Paket des
 Designers: Bänder in festen Farben und Ornamente in den Ecken. Die Wahl
-steht im Untermenü „Einstellungen …“; die Vorgabe ist ohne Rahmen, der
-dünne Umriss wie bisher. Die Vollbildkarte bekommt keinen Rahmen. Warum
-so: [0005](entscheidungen/0005-rahmen-als-skins.md).
+steht im Untermenü „Einstellungen …“; die Vorgabe ist „biom“, ein Rahmen,
+der mit dem Biom unter dem Spieler wechselt. „Ohne“ ist der dünne Umriss
+wie bisher. Die Vollbildkarte bekommt keinen Rahmen. Warum so:
+[0005](entscheidungen/0005-rahmen-als-skins.md) und
+[0008](entscheidungen/0008-biom-rahmen-als-vorgabe.md).
 
 ## Wahl
 
 - **Wo:** Knopf „Rahmen“ im Untermenü „Einstellungen …“, siehe
   [Minimap](minimap.md), „Bedienung“. Der Tooltip beschreibt den Skin.
-- **Gespeichert** als `rahmen` in `heroicmap.properties`, Vorgabe `ohne`;
-  ein unbekannter Name gilt als `ohne` (`Minimap.setzeSkin`).
+- **Vorgabe `biom`.** Gespeichert als `rahmen_wahl` in
+  `heroicmap.properties`, nur wenn der Spieler den Rahmen selbst gewählt
+  hat, auch „ohne“; sonst gilt die Vorgabe, auch wenn sie sich wieder
+  ändert. Ein unbekannter Name gilt als nicht gewählt.
+- **Aus einer älteren Version** stand `rahmen` immer in der Datei. Ein
+  Rahmen ausser `ohne` gilt als gewählt, denn die Vorgabe war `ohne`. Ein
+  `rahmen=ohne` lässt sich nicht von der alten Vorgabe unterscheiden; dort
+  gilt die neue Vorgabe. Wie bei Drehen, siehe [Minimap](minimap.md),
+  „Drehen“.
+- **Die Gametests** `Bilder` und `Messung` stellen „ohne“ ein, denn ihre
+  Bilder und Messreihen zeigen die Minimap ohne Rahmen.
 
 ## Skins
 
 | Skin | Bänder | Schatten | zier |
 |---|---|---|---|
+| `biom` | 2 | ja | 9 × 9 bis 12 × 12, siehe „Biom“ |
 | `grau` | 3 | nein | 7 × 7 |
 | `holz` | 4 | nein | 7 × 7 |
 | `papier` | 5 | nein | 7 × 7 |
@@ -38,6 +52,64 @@ so: [0005](entscheidungen/0005-rahmen-als-skins.md).
 | `kartograph` | 2 | ja | 13 × 13 |
 
 ![Der Rahmen „uhr“ eckig und rund](bilder/rahmen-uhr.png)
+
+## Biom
+
+Der Rahmen `biom` zeigt einen von acht Skins, je nach dem Biom unter dem
+Spieler (`Biom`, `Minimap.skinJetzt`). So hat es der User gewünscht, als
+Vorgabe.
+
+- **Kategorien:** `waelder`, `grasland`, `gebirge`, `schnee`, `wueste`,
+  `tropen`, `feuchtgebiete`, `gewaesser`; je ein Ordner
+  `rahmen/biom/<kategorie>/` wie ein fester Skin, aufgebaut wie `kompass`,
+  `uhr` und `kartograph`.
+- **Zuordnung** in fester Rangfolge, die erste passende Zeile gewinnt
+  (`Biom.kategorie`). Je Zeile Tags der Biome und Biome des Spiels mit
+  Namen:
+
+  | Kategorie | Tags | Biome |
+  |---|---|---|
+  | `schnee` | `c:is_snowy`, `c:is_icy`, `c:is_aquatic_icy` | `snowy_plains`, `ice_spikes`, `snowy_taiga`, `snowy_beach`, `snowy_slopes`, `grove`, `frozen_peaks`, `jagged_peaks`, `frozen_river`, `frozen_ocean`, `deep_frozen_ocean` |
+  | `feuchtgebiete` | `c:is_swamp` | `swamp`, `mangrove_swamp` |
+  | `tropen` | `minecraft:is_jungle` | |
+  | `wueste` | `c:is_desert`, `minecraft:is_badlands` | `desert` |
+  | `gewaesser` | `minecraft:is_ocean`, `minecraft:is_river`, `minecraft:is_beach`, `c:is_mushroom` | `mushroom_fields` |
+  | `waelder` | `minecraft:is_forest`, `minecraft:is_taiga` | `cherry_grove` |
+  | `grasland` | `c:is_plains`, `minecraft:is_savanna` | `plains`, `sunflower_plains`, `meadow` |
+  | `gebirge` | `minecraft:is_mountain`, `minecraft:is_hill` | `stony_shore` |
+
+- **Warum Namen neben Tags:** Der Server schickt dem Client die Tags der
+  Biome, denn `Registries.BIOME` steht in
+  `RegistryDataLoader.SYNCHRONIZED_REGISTRIES` (26.3, per javap). Die
+  Tags `c:` kommen aber aus Fabric API; ein Server ohne sie, etwa Paper,
+  schickt nur die des Spiels. Für Schnee, Sumpf, Wüste, Ebene und Pilze hat
+  das Spiel keinen Tag, darum stehen diese Biome mit Namen da.
+- **Rangfolge:** Schnee vor Wald, so ist die verschneite Taiga Schnee,
+  obwohl sie in `minecraft:is_taiga` liegt. Grasland vor Gebirge, denn
+  `minecraft:is_mountain` enthält `meadow` und `cherry_grove`; Wiese ist
+  Grasland, der Kirschhain Wald, so schlägt es der Designer vor.
+- **Rückfall über den Namen:** Passt keine Zeile, etwa bei Biomen aus
+  Datapacks, entscheidet ein Wort im Namen, in derselben Rangfolge: etwa
+  `snowy` oder `frozen` Schnee, `forest` oder `taiga` Wald, `peaks` oder
+  `hills` Gebirge (`Biom.WOERTER`). Ein Wort ist ein ganzes Stück zwischen
+  `_` oder `/`. Sonst Grasland.
+- **Nether und End** (`minecraft:is_nether`, `minecraft:is_end`) nehmen
+  Grasland, auch der Wald im Nether. Höhlen wie `lush_caves` und
+  `deep_dark` passen auf nichts und nehmen ebenso Grasland.
+- **Wechsel:** erst, wenn der Spieler 2 s in der neuen Kategorie ist
+  (`Biom.WARTEN_MS`); jeder Schritt zurück setzt die Zeit neu, so flackert
+  der Rahmen an Grenzen nicht. Die erste Kategorie nach dem Start gilt
+  sofort. Dann blendet der alte Rahmen in 0,3 s aus und der neue ein
+  (`Biom.BLENDE_MS`): beide gezeichnet, der alte zu 1 − t deckend, der neue
+  zu t.
+- **Abstand zum Rand:** der grösste aller acht, 6 Einheiten, denn die zier
+  ist 9 bis 12 Pixel gross (`Minimap.rand`). So springt die Minimap beim
+  Wechsel nicht; ebenso die Koordinaten darunter.
+- **Kosten:** Das Biom unter dem Spieler liest die Minimap je Frame; die
+  Kategorie rechnet sie nur neu, wenn sich das Biom ändert. Während der
+  Überblendung zeichnet sie zwei Rahmen.
+
+![Der Rahmen „biom“ in der Szene des Gametests](bilder/rahmen-biom.png)
 
 ## Dateien
 
@@ -58,11 +130,13 @@ im Atlas des GUI; F3+T und Ressourcenpakete laden ihn neu:
 - **Namen und Beschreibungen** stehen in `de_de.json` und `en_us.json`
   unter `heroicmap.rahmen.<skin>` und `heroicmap.rahmen.<skin>.beschreibung`.
 - **Ein neuer Skin** ist ein Ordner, ein Eintrag in `Skin.NAMEN` und zwei
-  Schlüssel je Sprache.
+  Schlüssel je Sprache. `Skin.ORDNER` sind die Ordner, die der Mod lädt:
+  die festen Skins und je Kategorie von `biom` einer.
 - **Geladen** einmal je Skin, auch ein Fehlschlag bleibt gemerkt, bis der
   Atlas neu lädt (`Skin.von`); sonst stünde je Frame eine Warnung im Log.
 - **Quellen** unter `docs/bilder/quellen/rahmen/`: je Skin die Datei von
-  Aseprite, eine Ebene je Bild.
+  Aseprite, eine Ebene je Bild; für `biom` je Kategorie eine unter
+  `biom/`.
 
 ## Bänder
 
@@ -121,7 +195,8 @@ im Atlas des GUI; F3+T und Ressourcenpakete laden ihn neu:
 
 Die Minimap hält 4 Einheiten Abstand zum Rand des Schirms, mit Rahmen
 mindestens die halbe zier, aufgerundet (`Minimap.rand`,
-`Skin.einrueckung`), bei `uhr` 8; so bleibt die zier ganz auf dem Schirm.
+`Skin.einrueckung`), bei `uhr` 8, bei `biom` 6; so bleibt die zier ganz
+auf dem Schirm.
 Der schwarze Umriss entfällt mit Rahmen.
 
 ## Kosten

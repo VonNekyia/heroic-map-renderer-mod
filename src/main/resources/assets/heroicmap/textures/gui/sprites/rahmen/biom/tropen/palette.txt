@@ -1,0 +1,4 @@
+// heroicmap Rahmen 'tropen': Linie aussen -> innen, eine Zeile je 1-px-Band.
+// Zwei Werte = Licht (oben/links) Schatten (unten/rechts).
+#1E1B18
+#7FE0A8

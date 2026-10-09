@@ -143,7 +143,7 @@ final class Einstellungen extends Screen {
             Minimap.Rahmen r = Minimap.INSTANZ.rahmen(width, height);
             // Mit Skin zeichnet die Minimap den Griff statt der zier dieser Ecke, ab dem nächsten Frame; der Umriss entfällt. Siehe docs/rahmen.md.
             Minimap.INSTANZ.griff(Minimap.griffEcke(r, width, height), zug == Zug.GROESSE || imGriff(mausX, mausY, r));
-            if (Skin.von(Minimap.INSTANZ.skin()) == null) {
+            if (Minimap.INSTANZ.skinJetzt() == null) {
                 umriss(g, r);
                 int gx = griffX(r), gy = griffY(r);
                 g.fill(gx - GRIFF, gy - GRIFF, gx + GRIFF, gy + GRIFF, TEXT);
@@ -249,7 +249,7 @@ final class Einstellungen extends Screen {
      * Skin auf der Mitte der Bänder, wo sonst die zier sitzt.
      */
     private double[] griff(Minimap.Rahmen r) {
-        Skin skin = Skin.von(Minimap.INSTANZ.skin());
+        Skin skin = Minimap.INSTANZ.skinJetzt();
         if (skin != null) {
             return Minimap.INSTANZ.ecken(skin, r)[Minimap.griffEcke(r, width, height)];
         }

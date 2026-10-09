@@ -11,8 +11,10 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 
@@ -39,10 +41,12 @@ class SkinTest {
 
     @Test
     void dieSkinsDesPakets() throws IOException {
-        Map<String, Integer> baender = Map.of("grau", 3, "holz", 4, "papier", 5, "kompass", 2, "uhr", 2, "kartograph", 2);
+        Map<String, Integer> baender = new HashMap<>(Map.of("grau", 3, "holz", 4, "papier", 5, "kompass", 2, "uhr", 2, "kartograph", 2));
+        // Je Kategorie des Rahmens „biom“ ein Ordner, alle mit zwei Bändern.
+        Biom.KATEGORIEN.forEach(k -> baender.put(Skin.BIOM + "/" + k, 2));
         assertEquals(Skin.OHNE, Skin.NAMEN.getFirst());
-        assertEquals(baender.size() + 1, Skin.NAMEN.size());
-        for (String name : Skin.NAMEN.subList(1, Skin.NAMEN.size())) {
+        assertEquals(baender.keySet(), Set.copyOf(Skin.ORDNER));
+        for (String name : Skin.ORDNER) {
             BufferedImage zier = bild(name, "zier");
             Skin s = Skin.lies(name, text(name, "palette.txt"), text(name, "info.txt"), Math.max(zier.getWidth(), zier.getHeight()));
             assertEquals(baender.get(name), s.baender(), name);

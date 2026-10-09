@@ -61,7 +61,7 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
 | Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte, siehe „Chunklinien“ |
 | Drehen | an | die Minimap dreht mit der Blickrichtung, siehe „Drehen“ |
 | Koordinaten | xz | aus, `x z` oder `x y z` des Spielers unter der Minimap, siehe „Koordinaten“ |
-| Rahmen | ohne | ein Skin um die Minimap, siehe [Rahmen](rahmen.md) |
+| Rahmen | biom | ein Skin um die Minimap, als Vorgabe nach dem Biom unter dem Spieler, siehe [Rahmen](rahmen.md) |
 | Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
 | Knopf „Ebenen …“ | – | je Ebene vom Server an oder aus, siehe [Ebenen](ebenen.md), „Umschalten“ |
 
