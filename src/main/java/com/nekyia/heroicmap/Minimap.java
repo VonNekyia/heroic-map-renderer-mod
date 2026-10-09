@@ -15,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -28,8 +29,11 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.gui.components.PlayerFaceExtractor;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
+import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -39,6 +43,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import org.joml.Matrix3x2f;
 import org.joml.Matrix3x2fStack;
 import org.slf4j.Logger;
 
@@ -54,6 +59,9 @@ public final class Minimap {
     public static final Minimap INSTANZ = new Minimap();
     private static final Logger LOGGER = LogUtils.getLogger();
 
+    /** Norden, Osten, Süden, Westen als Richtung im Bild, x nach Osten, y nach Süden; gezeichnet in der Reihenfolge MARKEN, N zuletzt. */
+    private static final double[][] RICHTUNGEN = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
+    private static final int[] MARKEN = {1, 2, 3, 0};
     /** Farbe der Chunklinien: Schwarz, zu 30 % deckend, so bleibt die Karte darunter lesbar. */
     static final int LINIE = 0x4D000000;
     /** Chunks je Seite einer Region, einer Textur. */
@@ -96,11 +104,19 @@ public final class Minimap {
     private boolean show = true;
     /** Chunklinien auf Minimap und Vollbildkarte, eine Vorliebe aus dem Untermenü. Siehe docs/minimap.md, „Chunklinien“. */
     private boolean chunklinien;
+    /** Dreht die Minimap mit der Blickrichtung, die oben liegt. Siehe docs/minimap.md, „Drehen“. */
+    private boolean drehen;
     /** Der Rahmen, ein Name aus {@link Skin#NAMEN}; „ohne“ ist der Umriss. Siehe docs/rahmen.md. */
     private String skin = Skin.OHNE;
     /** Solange das Menü offen ist: die Ecke des Griffs, 0 bis 3, sonst -1; und ob die Maus auf ihm liegt. */
     private int griffEcke = -1;
     private boolean griffAktiv;
+    /** Die Form der gedrehten Karte ({@link #schnitt(Rahmen, int, Skin)}) und wofür. */
+    private float[] schnitt;
+    private int schnittX, schnittY, schnittSeite, schnittMassstab, schnittBaender;
+    private boolean schnittRund;
+    /** Zwischenspeicher für die Vielecke der Regionen, auf dem Render-Thread. */
+    private final Drehung.Puffer puffer = new Drehung.Puffer();
     /** Die zuletzt gerechneten Ecken der Ornamente und wofür. */
     private Skin eckenSkin;
     private Rahmen eckenRahmen;
@@ -281,7 +297,22 @@ public final class Minimap {
     }
 
     void setzeRund(boolean rund) {
+        if (drehen && rund != this.rund) {
+            // Die Reichweite ändert sich mit der Form; der nächste Frame passt den Bereich an.
+            mitte = null;
+        }
         this.rund = rund;
+    }
+
+    boolean drehen() {
+        return drehen;
+    }
+
+    void setzeDrehen(boolean drehen) {
+        if (drehen != this.drehen) {
+            mitte = null;
+        }
+        this.drehen = drehen;
     }
 
     /** Lage und Seite auf dem Schirm, in Einheiten des GUI. */
@@ -353,6 +384,7 @@ public final class Minimap {
         rund = "rund".equals(p.getProperty("form"));
         show = !"hidden".equals(p.getProperty("show"));
         chunklinien = "true".equals(p.getProperty("chunklinien"));
+        drehen = "true".equals(p.getProperty("drehen"));
         setzeSkin(String.valueOf(p.getProperty("rahmen")).trim());
         ablage = switch (String.valueOf(p.getProperty("ablage")).trim()) {
             case "hash" -> Downloads.Ablage.HASH;
@@ -372,6 +404,7 @@ public final class Minimap {
         p.setProperty("form", rund ? "rund" : "eckig");
         p.setProperty("show", show ? "simplevoicechat" : "hidden");
         p.setProperty("chunklinien", Boolean.toString(chunklinien));
+        p.setProperty("drehen", Boolean.toString(drehen));
         p.setProperty("rahmen", skin);
         p.setProperty("ablage", ablage.name().toLowerCase(Locale.ROOT));
         p.setProperty("groesse", Integer.toString(groesse));
@@ -434,7 +467,12 @@ public final class Minimap {
 
     /** Chunks je Richtung um den Spieler, die die Minimap zeichnet: sichtbar plus Vorrat. */
     int reichweite() {
-        return reichweite(zoom, groesse);
+        return reichweite(zoom, sicht(groesse, drehen, rund));
+    }
+
+    /** Wie viel Gegend die Minimap braucht, als Seite eines Quadrats: eckig und gedreht reicht sie in den Ecken √2 weiter. */
+    static int sicht(int groesse, boolean drehen, boolean rund) {
+        return drehen && !rund ? (int) Math.ceil(groesse * Math.sqrt(2)) : groesse;
     }
 
     static int reichweite(int zoom, int groesse) {
@@ -482,20 +520,37 @@ public final class Minimap {
         int oben = ecke(spieler.zo, spieler.getZ(), a, zoom, k, n);
         // Die Form einmal je Frame, für Karte und Linien; rund mit Skin innerhalb seiner Bänder.
         Skin rahmen = Skin.von(skin);
-        List<int[]> form = rahmen != null && rund ? rahmen.maske(r.seite(), k) : laeufe(n, rund);
-        male(g, r, links, oben, k, form, rahmen == null);
-        if (chunklinien) {
-            linien(g, r, links, oben, k, form);
+        Drehung.Lage lage = drehen ? lage(r, Mth.lerp(a, spieler.xo, spieler.getX()), Mth.lerp(a, spieler.zo, spieler.getZ()),
+                spieler.getViewYRot(a), zoom, k, links, oben) : null;
+        if (lage == null) {
+            List<int[]> form = rahmen != null && rund ? rahmen.maske(r.seite(), k) : laeufe(n, rund);
+            male(g, r, links, oben, k, form, rahmen == null);
+            if (chunklinien) {
+                linien(g, r, links, oben, k, form);
+            }
+        } else {
+            float[] form = schnitt(r, k, rahmen);
+            maleGedreht(g, r, links, oben, k, lage, form, rahmen == null);
+            if (chunklinien) {
+                linienGedreht(g, r, links, oben, k, lage, form);
+            }
         }
         if (rahmen != null) {
             zeichneRahmen(g, rahmen, r);
+            if (lage != null) {
+                marken(g, rahmen, r, lage);
+            }
         }
         float kopf = kopf(r.seite());
         String dimension = level.dimension().identifier().toString();
-        wegpunkte(g, r, dimension, links, oben, k, kopf);
-        mitspieler(g, mc, r, spieler, dimension, links, oben, a, k, kopf);
-        // In der Mitte des Bildes, auf dem Pixel, den ecke dafür nimmt.
-        avatar(g, spieler, (r.x() * k + n / 2) / (float) k, (r.y() * k + n / 2) / (float) k, a, kopf);
+        wegpunkte(g, r, dimension, links, oben, k, kopf, lage);
+        mitspieler(g, mc, r, spieler, dimension, links, oben, a, k, kopf, lage);
+        // In der Mitte des Bildes, auf dem Pixel, den ecke dafür nimmt; gedreht genau in der Mitte, der Pfeil nach oben.
+        if (lage == null) {
+            avatar(g, spieler, (r.x() * k + n / 2) / (float) k, (r.y() * k + n / 2) / (float) k, a, kopf, false);
+        } else {
+            avatar(g, spieler, (float) (lage.cx() / k), (float) (lage.cy() / k), a, kopf, true);
+        }
     }
 
     /** Die Seite eines Kopfes auf der Minimap: {@link #KOPF} bei 128 Einheiten, mit der Seite wachsend, mindestens 4. */
@@ -514,11 +569,11 @@ public final class Minimap {
     }
 
     /** Die angehefteten Wegpunkte dieser Dimension, ausserhalb der Form an ihrem Rand. Siehe docs/wegpunkte.md. */
-    private void wegpunkte(GuiGraphicsExtractor g, Rahmen r, String dimension, int links, int oben, int k, float kopf) {
+    private void wegpunkte(GuiGraphicsExtractor g, Rahmen r, String dimension, int links, int oben, int k, float kopf, Drehung.Lage lage) {
         double innen = r.seite() / 2.0 - kopf / 2 - 1;
         for (Wegpunkte.Punkt p : Wegpunkte.INSTANZ.punkte()) {
             if (p.angeheftet() && p.dimension().equals(dimension)) {
-                float[] m = marke(r, p.x() + 0.5, p.z() + 0.5, links, oben, k, zoom, rund, innen, true);
+                float[] m = marke(r, p.x() + 0.5, p.z() + 0.5, links, oben, k, zoom, rund, innen, true, lage);
                 wegpunkt(g, m[0], m[1], kopf, Wegpunkte.FARBEN[p.farbe()], 0);
             }
         }
@@ -527,11 +582,21 @@ public final class Minimap {
     /**
      * Wo eine Marke für den Ort (x, z) der Welt steht, in Einheiten des GUI: auf dem Pixel, auf dem
      * die Karte den Ort zeichnet. Liegt er weiter als {@code innen} von der Mitte, mit
-     * {@code klemmen} am Rand der Form in seiner Richtung, sonst null. Siehe docs/wegpunkte.md, „Am Rand“.
+     * {@code klemmen} am Rand der Form in seiner Richtung, sonst null. Mit {@code lage} gedreht um den
+     * Spieler, dann ohne Raster. Siehe docs/wegpunkte.md, „Am Rand“.
      */
-    static float[] marke(Rahmen r, double x, double z, int links, int oben, int k, int zoom, boolean rund, double innen, boolean klemmen) {
-        double h = r.seite() / 2.0;
-        double mx = (r.x() * k + pixel(x, zoom, k, links)) / (double) k, my = (r.y() * k + pixel(z, zoom, k, oben)) / (double) k;
+    static float[] marke(Rahmen r, double x, double z, int links, int oben, int k, int zoom, boolean rund, double innen, boolean klemmen,
+            Drehung.Lage lage) {
+        double h = r.seite() / 2.0, mx, my;
+        if (lage == null) {
+            mx = (r.x() * k + pixel(x, zoom, k, links)) / (double) k;
+            my = (r.y() * k + pixel(z, zoom, k, oben)) / (double) k;
+        } else {
+            double bx = Projektion.zuPixel(x, zoom) * k - links, by = Projektion.zuPixel(z, zoom) * k - oben;
+            // Auf ganze Pixel, sonst flimmern die Texel der Köpfe beim Drehen.
+            mx = Math.round(lage.x(bx, by)) / (double) k;
+            my = Math.round(lage.y(bx, by)) / (double) k;
+        }
         double dx = mx - (r.x() + h), dz = my - (r.y() + h);
         double f = rand(dx, dz, innen, innen, rund);
         if (f >= 1) {
@@ -573,15 +638,15 @@ public final class Minimap {
      * ausserhalb am Rand der Form, nach innen geklemmt. Siehe docs/minimap.md, „Mitspieler“.
      */
     private void mitspieler(GuiGraphicsExtractor g, Minecraft mc, Rahmen r, LocalPlayer spieler, String dimension,
-            int links, int oben, float a, int k, float kopf) {
+            int links, int oben, float a, int k, float kopf, Drehung.Lage lage) {
         double h = r.seite() / 2.0;
         for (Mitspieler.Eintrag e : Mitspieler.INSTANZ.sichtbar(System.currentTimeMillis())) {
             if (!e.dimension().equals(dimension) || e.uuid().equals(spieler.getUUID())) {
                 continue;
             }
-            double[] lage = Mitspieler.lage(mc, e, a);
+            double[] ort = Mitspieler.lage(mc, e, a);
             boolean angeheftet = Wegpunkte.INSTANZ.angeheftet(e.uuid());
-            float[] m = marke(r, lage[0], lage[1], links, oben, k, zoom, rund, angeheftet ? h - kopf / 2 - 1 : h, angeheftet);
+            float[] m = marke(r, ort[0], ort[1], links, oben, k, zoom, rund, angeheftet ? h - kopf / 2 - 1 : h, angeheftet, lage);
             if (m != null) {
                 Mitspieler.kopf(g, mc, e.uuid(), m[0], m[1], kopf, 0);
             }
@@ -623,6 +688,118 @@ public final class Minimap {
             }
         }
         pose.popMatrix();
+    }
+
+    /**
+     * Wie das Bild beim Drehen auf den Schirm kommt, in Pixeln des Schirms: der Spieler bei (x, z),
+     * genau zwischen zwei Ticks, auf der Mitte der Minimap, die Blickrichtung {@code gier} oben.
+     * Siehe docs/minimap.md, „Drehen“.
+     */
+    static Drehung.Lage lage(Rahmen r, double x, double z, float gier, int zoom, int k, int links, int oben) {
+        // Die Mitte auf ganzen Pixeln, wie ungedreht der Kopf.
+        int n = r.seite() * k;
+        return Drehung.Lage.von(Drehung.winkel(gier), r.x() * k + n / 2, r.y() * k + n / 2,
+                Projektion.zuPixel(x, zoom) * k - links, Projektion.zuPixel(z, zoom) * k - oben);
+    }
+
+    /** Die Form, an der die gedrehte Karte geschnitten wird ({@link #schnitt(int, int, int, int, boolean, int)}), gemerkt. */
+    private float[] schnitt(Rahmen r, int k, Skin rahmen) {
+        int baender = rahmen == null ? 0 : rahmen.baender();
+        if (schnitt == null || schnittX != r.x() || schnittY != r.y() || schnittSeite != r.seite() || schnittMassstab != k
+                || schnittRund != rund || schnittBaender != baender) {
+            schnitt = schnitt(r.x(), r.y(), r.seite(), k, rund, baender);
+            schnittX = r.x();
+            schnittY = r.y();
+            schnittSeite = r.seite();
+            schnittMassstab = k;
+            schnittRund = rund;
+            schnittBaender = baender;
+        }
+        return schnitt;
+    }
+
+    /**
+     * Woran die gedrehte Karte geschnitten wird, in Pixeln des Schirms: eckig das Quadrat, rund ein
+     * Vieleck aussen um den Kreis. Ohne Rahmen liegt darunter der Umriss. Mit Rahmen ist der Ring in
+     * Einheiten gestuft und durchsichtig, wo die Mitte der Einheit innen liegt: Das Vieleck reicht
+     * deshalb √2/2 Einheiten weiter, bis in die Ecke jeder solchen Einheit, und ragt unter den Ring.
+     * Siehe docs/minimap.md, „Drehen“.
+     */
+    static float[] schnitt(int x, int y, int seite, int k, boolean rund, int baender) {
+        int x0 = x * k, y0 = y * k, n = seite * k;
+        if (!rund) {
+            return Drehung.rechteck(x0, y0, x0 + n, y0 + n);
+        }
+        double radius = (baender == 0 ? seite / 2.0 : seite / 2.0 - baender + Math.sqrt(2) / 2) * k;
+        return Drehung.kreis(x0 + n / 2.0, y0 + n / 2.0, radius);
+    }
+
+    /** Wie weit um den Spieler die gedrehte Karte reicht, in Pixeln des Bilds: rund bis zum Kreis, eckig bis in die Ecken. */
+    private double weit(int n, int k) {
+        return (rund ? n / 2.0 : n / Math.sqrt(2)) + k;
+    }
+
+    /**
+     * Die Regionen gedreht: je Region ihr Quadrat um den Spieler gedreht, mit der Form geschnitten
+     * und als ein Element gezeichnet; davor ohne Rahmen der Umriss. Siehe docs/minimap.md, „Drehen“.
+     */
+    private void maleGedreht(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k, Drehung.Lage lage, float[] form, boolean umriss) {
+        int s = CHUNKS_JE_REGION * 16 * zoom * k, n = r.seite() * k, x0 = r.x() * k, y0 = r.y() * k;
+        Matrix3x2fStack pose = g.pose();
+        pose.pushMatrix();
+        pose.scale(1f / k);
+        Matrix3x2f kopie = new Matrix3x2f(pose);
+        ScreenRectangle flaeche = new ScreenRectangle(x0, y0, n, n).transformMaxBounds(kopie);
+        // Erst der Umriss, wie ungedreht; das Vieleck der Karte ragt bis 0,6 Pixel über den Kreis auf ihn.
+        if (umriss) {
+            for (int[] l : laeufe(n + 2 * k, rund)) {
+                g.fill(x0 - k + l[2], y0 - k + l[0], x0 - k + l[3], y0 - k + l[1], 0xFF000000);
+            }
+        }
+        int[] bereich = Drehung.regionen(lage, weit(n, k), links, oben, s);
+        for (int rz = bereich[2]; rz <= bereich[3]; rz++) {
+            for (int rx = bereich[0]; rx <= bereich[1]; rx++) {
+                Region region = regionen.get(ChunkPos.pack(rx, rz));
+                if (region == null) {
+                    continue;
+                }
+                int anzahl = Drehung.region(lage, rx * s - links, rz * s - oben, s, form, puffer);
+                if (anzahl < 3) {
+                    continue;
+                }
+                // Das Element zeichnet später; Ecken und UV gehören ihm.
+                float[] ecken = Arrays.copyOf(puffer.ecken(), 2 * anzahl), uv = Arrays.copyOf(puffer.uv(), 2 * anzahl);
+                AbstractTexture textur = Minecraft.getInstance().getTextureManager().getTexture(region.id);
+                g.guiRenderState.addGuiElement(new Drehung.Bild(kopie, TextureSetup.singleTexture(textur.getTextureView(), textur.getSampler()),
+                        ecken, uv, anzahl, flaeche));
+            }
+        }
+        pose.popMatrix();
+    }
+
+    /** Die Chunklinien gedreht: über die ganze Gegend um den Spieler gerechnet, dann gedreht und mit der Form geschnitten. */
+    private void linienGedreht(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k, Drehung.Lage lage, float[] form) {
+        int n = r.seite() * k;
+        double weit = weit(n, k);
+        int bx = (int) Math.floor(lage.px() - weit), by = (int) Math.floor(lage.py() - weit), seite = (int) Math.ceil(2 * weit) + 1;
+        Matrix3x2fStack pose = g.pose();
+        pose.pushMatrix();
+        pose.scale(1f / k);
+        Gitter.zeichne(g, bx, by, new ScreenRectangle(r.x() * k, r.y() * k, n, n), k, LINIE,
+                linien(seite, links + bx, oben + by, 16 * zoom * k, k, laeufe(seite, false)), lage, form);
+        pose.popMatrix();
+    }
+
+    /**
+     * Die Marken N, O, S, W beim Drehen: wo die Himmelsrichtung von der Mitte aus über den Rahmen
+     * zeigt, auf der Mitte der Bänder; N zuletzt, zuoberst. Siehe docs/rahmen.md, „Marken“.
+     */
+    private void marken(GuiGraphicsExtractor g, Skin skin, Rahmen r, Drehung.Lage lage) {
+        for (int i : MARKEN) {
+            double ux = lage.richtungX(RICHTUNGEN[i][0], RICHTUNGEN[i][1]), uy = lage.richtungY(RICHTUNGEN[i][0], RICHTUNGEN[i][1]);
+            double[] p = Skin.marke(r.x(), r.y(), r.seite(), skin.baender(), rund, ux, uy);
+            skin.ornament(g, Skin.markeFuer(i == 0, ux, uy) + (griffEcke >= 0 ? 1 : 0), 0, p[0], p[1]);
+        }
     }
 
     /**
@@ -894,18 +1071,20 @@ public final class Minimap {
 
     /**
      * Der eigene Spieler: sein Kopf aus dem Skin, daneben ein kleiner Pfeil in Blickrichtung,
-     * {@code groesse} Einheiten gross. Gezeichnet in Achteln, so wachsen Rand und Pfeil mit.
+     * {@code groesse} Einheiten gross, mit {@code oben} nach oben. Gezeichnet in Achteln, so wachsen Rand und Pfeil mit.
      * Siehe docs/minimap.md, „Bedienung“.
      */
-    static void avatar(GuiGraphicsExtractor g, AbstractClientPlayer spieler, float x, float y, float a, float groesse) {
+    static void avatar(GuiGraphicsExtractor g, AbstractClientPlayer spieler, float x, float y, float a, float groesse, boolean oben) {
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.translate(x, y);
         pose.scale(groesse / 8f);
         g.fill(-5, -5, 5, 5, 0xFF000000);
         PlayerFaceExtractor.extractRenderState(g, spieler.getSkin(), -4, -4, 8);
-        // Der Pfeil kreist um den Kopf; bei Gier 0 blickt der Spieler nach Süden, auf der Karte nach unten.
-        pose.rotate((float) Math.toRadians(spieler.getViewYRot(a) + 180));
+        // Der Pfeil kreist um den Kopf; bei Gier 0 blickt der Spieler nach Süden, auf der Karte nach unten. Dreht die Karte, zeigt er nach oben.
+        if (!oben) {
+            pose.rotate((float) Math.toRadians(spieler.getViewYRot(a) + 180));
+        }
         pose.translate(0, -5);
         for (int i = 0; i < 3; i++) {
             g.fill(-i - 1, -3 + i, i + 2, -1 + i, 0xFF000000);

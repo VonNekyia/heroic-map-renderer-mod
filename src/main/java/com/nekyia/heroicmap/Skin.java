@@ -32,9 +32,10 @@ final class Skin {
     static final String OHNE = "ohne";
     /** Der Schatten eines Ornaments: Schwarz zu 50 %, um (+1, +1) versetzt. */
     static final int SCHATTEN = 0x80000000;
-    /** Die Ornamente: zier und griff, je mit {@code _aktiv} eins dahinter. */
-    static final int ZIER = 0, GRIFF = 2;
-    private static final String[] TEILE = {"zier", "zier_aktiv", "griff", "griff_aktiv"};
+    /** Die Ornamente: zier, griff und die Marken beim Drehen, je mit {@code _aktiv} eins dahinter. */
+    static final int ZIER = 0, GRIFF = 2, NORDEN = 4, MARKE = 6, MARKE_QUER = 8;
+    private static final String[] TEILE = {"zier", "zier_aktiv", "griff", "griff_aktiv", "norden", "norden_aktiv",
+        "marke", "marke_aktiv", "marke_quer", "marke_quer_aktiv"};
     private static final Logger LOGGER = LogUtils.getLogger();
     /** Geladene Skins, ein Fehlschlag als null, bis der Atlas des GUI neu lädt. */
     private static final Map<String, Skin> GELADEN = new HashMap<>();
@@ -124,7 +125,8 @@ final class Skin {
     /**
      * Liest {@code palette.txt}: eine Zeile je Band von aussen nach innen, eine Farbe oder zwei,
      * Licht und Schatten; {@code //} beginnt einen Kommentar. Aus {@code info.txt} nur {@code schatten}.
-     * {@code zier} ist die längere Seite der zier in Pixeln.
+     * {@code zier} ist die längere Seite der zier in Pixeln. Mindestens zwei Bänder, siehe
+     * docs/rahmen.md, „Dateien“.
      */
     static Skin lies(String name, String palette, String info, int zier) {
         List<int[]> baender = new ArrayList<>();
@@ -140,8 +142,8 @@ final class Skin {
             int a = farbe(werte[0]);
             baender.add(new int[] {a, werte.length == 2 ? farbe(werte[1]) : a});
         }
-        if (baender.isEmpty()) {
-            throw new IllegalArgumentException("palette.txt ohne Band");
+        if (baender.size() < 2) {
+            throw new IllegalArgumentException("palette.txt mit weniger als 2 Bändern");
         }
         int[] licht = baender.stream().mapToInt(b -> b[0]).toArray(), schatten = baender.stream().mapToInt(b -> b[1]).toArray();
         return new Skin(name, licht, schatten, info.lines().map(String::trim).anyMatch("schatten=ja"::equals), zier);
@@ -287,6 +289,21 @@ final class Skin {
         return new double[][] {{cx - q, cy - q}, {cx + q, cy - q}, {cx - q, cy + q}, {cx + q, cy + q}};
     }
 
+    /**
+     * Wo eine Marke beim Drehen sitzt, in Einheiten des GUI: von der Mitte der Minimap (x, y, Seite
+     * s) in Richtung (ux, uy), auf der Mitte der Bänder; rund auf dem Kreis, eckig auf dem Quadrat.
+     */
+    static double[] marke(double x, double y, double s, int baender, boolean rund, double ux, double uy) {
+        double h = s / 2 - baender / 2.0, laenge = Math.hypot(ux, uy);
+        double t = rund ? h / laenge : h / Math.max(Math.abs(ux), Math.abs(uy));
+        return new double[] {x + s / 2 + ux * t, y + s / 2 + uy * t};
+    }
+
+    /** Welches Bild eine Marke nimmt: N die Nordmarke, sonst oben und unten marke, links und rechts marke_quer. */
+    static int markeFuer(boolean norden, double ux, double uy) {
+        return norden ? NORDEN : Math.abs(uy) >= Math.abs(ux) ? MARKE : MARKE_QUER;
+    }
+
     /** Die linke obere Ecke eines Bilds der Breite w, dessen Mitte auf p liegen soll. */
     static int lage(double p, int w) {
         return (int) Math.floor(p - w / 2.0 + 0.5);
@@ -309,7 +326,7 @@ final class Skin {
     void ornament(GuiGraphicsExtractor g, int teil, int e, double px, double py) {
         TextureAtlasSprite s = gui().getSprite(sprites[teil]);
         int w = s.contents().width(), h = s.contents().height(), x = lage(px, w), y = lage(py, h);
-        boolean griff = teil >= GRIFF, sx = spiegeltX(e, griff), sy = spiegeltY(e, griff);
+        boolean griff = teil == GRIFF || teil == GRIFF + 1, sx = spiegeltX(e, griff), sy = spiegeltY(e, griff);
         float u0 = sx ? s.getU1() : s.getU0(), u1 = sx ? s.getU0() : s.getU1();
         float v0 = sy ? s.getV1() : s.getV0(), v1 = sy ? s.getV0() : s.getV1();
         if (mitSchatten) {

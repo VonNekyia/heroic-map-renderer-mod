@@ -122,6 +122,7 @@ class MinimapTest {
         vorher.setzeShow(false);
         vorher.setzeAblage(Downloads.Ablage.HASH);
         vorher.setzeChunklinien(true);
+        vorher.setzeDrehen(true);
         vorher.stelle(20, 30, 200, 640, 360);
         vorher.schreibe(datei);
 
@@ -134,6 +135,7 @@ class MinimapTest {
         assertFalse(nachher.show());
         assertEquals(Downloads.Ablage.HASH, nachher.ablage());
         assertTrue(nachher.chunklinien());
+        assertTrue(nachher.drehen());
         assertEquals(vorher.rahmen(640, 360), nachher.rahmen(640, 360));
     }
 
@@ -239,7 +241,7 @@ class MinimapTest {
         Minimap.Rahmen r = new Minimap.Rahmen(20, 30, 128);
         for (double frac : new double[] {0, 0.1, 0.25, 0.5, 0.75, 0.99}) {
             int links = Minimap.ecke(12 + frac, 12 + frac, 1f, zoom, k, n), oben = Minimap.ecke(-3, -3, 1f, zoom, k, n);
-            float[] m = Minimap.marke(r, 10.5, -2.5, links, oben, k, zoom, false, 64, false);
+            float[] m = Minimap.marke(r, 10.5, -2.5, links, oben, k, zoom, false, 64, false, null);
             // Links beginnt Block 10 bei Pixel r.x·k + 10·3 − links; die Marke liegt 2 Pixel weiter.
             assertEquals(r.x() * k + 10 * zoom * k - links + 2, m[0] * k, 1e-4, "frac " + frac);
             assertEquals(r.y() * k + (-3) * zoom * k - oben + 2, m[1] * k, 1e-4, "frac " + frac);
@@ -333,6 +335,7 @@ class MinimapTest {
         // Ablage: Vorgabe IP und Hash, die Wahl des Users.
         assertEquals(Downloads.Ablage.IP, minimap.ablage());
         assertFalse(minimap.chunklinien());
+        assertFalse(minimap.drehen());
         assertEquals(Skin.OHNE, minimap.skin());
         assertEquals(new Minimap.Rahmen(640 - 128 - 4, 4, 128), minimap.rahmen(640, 360));
     }
