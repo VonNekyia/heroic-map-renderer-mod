@@ -228,13 +228,13 @@ final class Einstellungen extends Screen {
         return super.mouseReleased(e);
     }
 
-    /** Der Griff sitzt an der Ecke, die zur Mitte des Schirms zeigt; so hat er dort Platz zum Ziehen. */
+    /** Der Griff sitzt an der Ecke, die zur Mitte des Schirms zeigt ({@link Minimap#griffEcke}); so hat er dort Platz zum Ziehen. */
     private boolean links(Minimap.Rahmen r) {
-        return r.x() + r.seite() / 2 > width / 2;
+        return (Minimap.griffEcke(r, width, height) & 1) == 0;
     }
 
     private boolean oben(Minimap.Rahmen r) {
-        return r.y() + r.seite() / 2 > height / 2;
+        return (Minimap.griffEcke(r, width, height) & 2) == 0;
     }
 
     /**
