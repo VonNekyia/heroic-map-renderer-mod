@@ -265,6 +265,13 @@ final class Downloads {
             melde(Component.translatable("heroicmap.download.verfaellt_belegt", f.baum()));
             return;
         }
+        if (vollStattAbgleich(f.abgleich(), ordner(f.baum()).resolve(String.valueOf(f.massstab())))) {
+            Component fehler = frageVoll(f.baum(), f.massstab());
+            if (fehler != null) {
+                melde(fehler);
+            }
+            return;
+        }
         String spielserver = ServerAddress.parseString(server.ip).getHost();
         String host = f.url().getHost();
         // Gemessen wird am gespeicherten oder bestätigten Stand, nie an Zahlen aus dem angebot allein.
@@ -286,6 +293,16 @@ final class Downloads {
         })) {
             melde(Component.translatable("heroicmap.download.verfaellt_dialog", f.baum()));
         }
+    }
+
+    /**
+     * Lädt der Mod statt eines Abgleichs voll? Ja, wenn er im Ordner des Massstabs keinen Stand hat,
+     * etwa nach dem Löschen der Karte: Ein Abgleich brächte je Tag nur ein Zehntel. Dann fragt er wie
+     * vor dem ersten Download und schickt {@code anfrage voll} mit {@code neu: true}. Siehe
+     * docs/download.md, „Zustimmung und Grösse“.
+     */
+    static boolean vollStattAbgleich(boolean abgleich, Path massstabOrdner) {
+        return abgleich && !Laden.hatStand(massstabOrdner);
     }
 
     private void abgelehnt(JsonObject json) {
