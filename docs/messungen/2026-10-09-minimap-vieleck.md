@@ -73,10 +73,22 @@ p50, nachher bei 0,290 bis 0,297 ms, je Block der vier Formen.
   0,03 ms Frametime über der ohne Minimap, vorher rund 0,4 ms.
 - **Rund gedreht** zeichnete den Umriss ebenfalls je Lauf; das Bild spart
   im HUD-Element 0,027 ms.
-- **Eckig** ändert sich nicht, im HUD-Element gleich. Vorher lag die
-  Frametime auch ohne Minimap etwas höher; das ist die Streuung zwischen
-  zwei Läufen, nicht der Code.
+- **Eckig** ist im HUD-Element gleich. Die Frametime liegt innerhalb der
+  Drift zwischen den beiden Läufen, siehe „Grenzen“.
 - **Drehen** kostet im p50 eckig 0,011 ms und rund 0,009 ms im Stand, im
   Flug nichts über der Streuung, schräg im Flug 0,008 und 0,009 ms.
-- **Gegen die Messung davor** liegt das HUD-Element rund ungedreht auf main
-  bei 0,165 statt 0,335 ms. Verglichen wird nur innerhalb dieser Reihe.
+
+## Grenzen
+
+- **Immer main zuerst:** Die Reihe lief main, dann den Branch, ohne
+  Wechsel. Ohne Minimap lag die Frametime danach 0,003 bis 0,020 ms tiefer.
+  Was kleiner ist als diese Drift, etwa ob eckig gleich bleibt, zeigt die
+  Messung nicht. Rund ungedreht ist der Unterschied mit 0,377 ms ein
+  Vielfaches davon.
+- **Das HUD-Element zwischen zwei Reihen:** Gegen die Reihe
+  [Minimap, Drehen](2026-10-09-minimap-drehen.md) liegt es auf main für
+  alle Formen etwa bei der Hälfte: rund ungedreht 0,165 statt 0,335 ms,
+  eckig 0,002 statt 0,004 ms. Der Weg rund ungedreht ist von `d046f22` bis
+  `11e0f20` derselbe, die Frametime bleibt fast gleich. Warum, ist
+  ungeklärt. Zeiten im HUD-Element vergleicht darum nur, wer in einer
+  Reihe misst.

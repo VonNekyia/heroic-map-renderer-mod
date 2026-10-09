@@ -124,7 +124,7 @@ final class Skin {
      * Liest {@code palette.txt}: eine Zeile je Band von aussen nach innen, eine Farbe oder zwei,
      * Licht und Schatten; {@code //} beginnt einen Kommentar. Aus {@code info.txt} nur {@code schatten}.
      * {@code zier} ist die längere Seite der zier in Pixeln. Mindestens zwei Bänder, siehe
-     * docs/rahmen.md, „Dateien“.
+     * docs/minimap.md, „Form“.
      */
     static Skin lies(String name, String palette, String info, int zier) {
         List<int[]> baender = new ArrayList<>();

@@ -30,7 +30,8 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [0002](entscheidungen/0002-vollbildkarte-nur-vom-server.md): Die Vollbildkarte nur vom Server, ohne Live-Ebene; teilweise abgelöst durch 0004.
 - [0003](entscheidungen/0003-kopie-des-vp8l-dekoders.md): Eine geänderte Kopie des VP8L-Dekoders von TwelveMonkeys, bis TwelveMonkeys den Farbindex hinter der Palette richtig liest.
 - [0004](entscheidungen/0004-karte-selbst-zeichnen.md): Die Wahl „Selbst“, eine eigene Karte aus den geladenen Chunks, die die des Servers ersetzt; löst 0002 teilweise ab.
-- [0005](entscheidungen/0005-rahmen-als-skins.md): Die Rahmen als umschaltbare Skins, nur um die Minimap, ohne Rahmen als Vorgabe, ohne Nordmarke vor der Drehung.
+- [0005](entscheidungen/0005-rahmen-als-skins.md): Die Rahmen als umschaltbare Skins, nur um die Minimap, ohne Rahmen als Vorgabe, ohne Nordmarke vor der Drehung; teilweise abgelöst durch 0006.
+- [0006](entscheidungen/0006-ein-weg-fuer-die-minimap.md): Ein Weg für die Minimap, gedreht wie ungedreht ein Vieleck je Region, der Ring deckt den Rand; löst 0005 in der Maske ab.
 
 ## Messungen
 

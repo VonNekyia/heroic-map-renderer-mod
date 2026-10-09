@@ -278,26 +278,35 @@ Der Mod zeichnet die Minimap in Pixeln des Schirms, nicht des GUI
   (`Drehung.Bild`); die UV jeder Ecke kommen aus der Lage zurück ins Bild.
   Der Umlaufsinn bleibt, das GUI verwirft nichts. Der Mod braucht weder
   Scissor noch Shader noch Stencil.
-- **Form:** eckig das Quadrat, rund ein Vieleck mit 64 Ecken aussen um den
-  Kreis (`Drehung.kreis`), gemerkt, bis sich Lage, Seite, GUI-Massstab oder
-  Rahmen ändern (`Minimap.schnitt`). Es ragt bei 256 Einheiten und
-  GUI-Massstab 4 höchstens 0,6 Pixel über den Kreis; der Ring darüber
-  deckt das.
+- **Form:** eckig das Quadrat, rund ein Vieleck mit 64 Ecken aussen um
+  einen Kreis mit dem Radius r (`Drehung.kreis`), gemerkt, bis sich Lage,
+  Seite, GUI-Massstab oder Rahmen ändern (`Minimap.schnitt`). Seine Kanten
+  berühren den Kreis, seine Ecken liegen 0,12 % weiter aussen, bei r = 512
+  Pixeln 0,6 Pixel. Was über den Rand der Karte ragt, deckt der Ring.
 - **Rand ohne Rahmen:** eckig ein schwarzes Quadrat, eine Einheit grösser,
   vor der Karte. Rund ein schwarzer Ring, eine Einheit breit, nach Karte
   und Linien: eine Textur mit einem Texel je Pixel des Schirms
-  (`Minimap.umrissRing`), je Zeile die Sehne auf ganze Pixel gerundet
-  (`Minimap.sehne`). Jede Pixelmitte innerhalb liegt so höchstens n/2 von
-  der Mitte, n die Seite in Pixeln. Das Vieleck hat den Radius n/2 + ½
-  Pixel: Der halbe Pixel ist Spielraum für die Grafikkarte, die Ecken auf
-  Bruchteile eines Pixels rundet. Der Ring ist mindestens einen Pixel
-  breit und deckt ihn (`DrehungTest.ohneRahmenDecktDerUmrissDenRand`).
+  (`Minimap.umrissRing`); je Zeile zwei Stücke, die Sehnen auf ganze Pixel
+  gerundet (`Minimap.umrissStuecke`, `Minimap.sehne`). Jede Pixelmitte, die
+  er innen frei lässt, liegt höchstens n/2 von der Mitte, n die Seite in
+  Pixeln; keine ausserhalb liegt näher als n/2 + k.
+- **Spielraum ohne Rahmen:** r = n/2 + 1/16 Pixel. OpenGL und Vulkan
+  rasten Ecken auf mindestens 1/16 Pixel ein (`GL_SUBPIXEL_BITS` und
+  `subPixelPrecisionBits`, je mindestens 4). Der Test verlangt darum
+  1/16 Pixel Abstand zur nächsten Kante, innen wie aussen
+  (`DrehungTest.ohneRahmenDecktDerUmrissDenRand`); ohne den Zuschlag ist
+  er rot. Innen bleibt so mehr als 1/16 Pixel, weil jede freie Pixelmitte
+  näher als n/2 liegt. Aussen ist es bei GUI-Massstab 1 und 256 Einheiten
+  am knappsten, mit 0,78 Pixeln bis zum Rand des Umrisses. Bei 256
+  Einheiten und GUI-Massstab 4 ragen die Ecken 0,7 Pixel über n/2, unter
+  einen Ring von 4 Pixeln.
 - **Rand mit Rahmen:** Der Ring ist in Einheiten gestuft und dort
   durchsichtig, wo die Mitte der Einheit innen liegt. Das Vieleck reicht
   darum √2/2 Einheiten über die Bänder hinaus, bis in die Ecke jeder
-  solchen Einheit, und bleibt unter dem deckenden Ring; das geht ab zwei
-  Bändern (`DrehungTest.mitRahmenDecktDerRingDenRand`), siehe
-  [Rahmen](rahmen.md), „Dateien“.
+  solchen Einheit, und bleibt unter dem deckenden Ring, mit demselben
+  Abstand von 1/16 Pixel wie ohne Rahmen
+  (`DrehungTest.mitRahmenDecktDerRingDenRand`). Bei einem Band ragte es
+  über den Ring; darum verlangt `Skin.lies` mindestens zwei.
 - **Kanten:** Der Kreis ist gestuft, ohne Glättung: ohne Rahmen auf ganze
   Pixel des Schirms, mit Rahmen auf Einheiten des GUI.
 - **Kosten:** siehe „Kosten“.
@@ -521,6 +530,17 @@ runde Form am 09.10., seit dem Vieleck, siehe
 | Frametime im p50, rund, mehr als ohne Minimap | freie Bildrate, 4 px, Stand, 09.10. | 0,03 ms |
 
 Der Flug geht dabei mit 20 Blöcken/s über geladenes Gelände.
+
+**Der Umriss rund ohne Rahmen** (`Minimap.umrissRing`), geschätzt, nicht
+gemessen:
+
+- **Speicher:** eine Textur mit (n + 2k)² Texeln, bei 256 Einheiten und
+  GUI-Massstab 4 also 1032², rund 4 MiB auf der Grafikkarte. Noch einmal so
+  viel im RAM, weil die `DynamicTexture` ihr Bild behält.
+- **Neu gebaut,** wenn sich Seite oder GUI-Massstab ändern, beim Ziehen am
+  Griff also bei jedem Schritt. Geschrieben werden nur die Stücke des
+  Rings, bei 256 Einheiten und GUI-Massstab 4 rund 13 000 Pixel.
+- **Freigegeben,** sobald die Minimap eckig ist oder einen Rahmen hat.
 
 Bei 8 und 16 px, gemessen am 07.10., siehe
 [Minimap, 8 und 16 px](messungen/2026-10-07-minimap-8-16px.md):

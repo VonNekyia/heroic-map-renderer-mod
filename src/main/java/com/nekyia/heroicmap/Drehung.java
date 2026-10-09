@@ -9,12 +9,14 @@ import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
 import org.joml.Matrix3x2fc;
 
 /**
- * Die drehende Minimap: Blickrichtung oben. Die Karte dreht um den Spieler, Vielecke werden mit
- * der Form geschnitten und als Fächer gezeichnet. Siehe docs/minimap.md, „Drehen“.
+ * Wie die Minimap ihr Bild auf den Schirm bringt: mit einer Lage, die ungedreht nur verschiebt und
+ * gedreht die Blickrichtung nach oben legt; Vielecke werden mit der Form geschnitten und als Fächer
+ * gezeichnet. Siehe docs/minimap.md, „Form“.
+ * Gedreht siehe docs/minimap.md, „Drehen“.
  */
 final class Drehung {
 
-    /** Ecken des Kreises, an dem die runde Minimap schneidet; die Sehne weicht bei 256 Einheiten und GUI-Massstab 4 um 0,6 Pixel ab. */
+    /** Ecken des Vielecks um den Kreis der runden Minimap; wie weit es über den Kreis ragt, steht in docs/minimap.md, „Form“. */
     static final int ECKEN = 64;
 
     private Drehung() {

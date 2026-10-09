@@ -13,18 +13,18 @@ import org.joml.Matrix3x2fc;
 /**
  * Die Chunklinien als ein einziges Element des GUI je Frame: senkrechte Linien ganz, waagrechte
  * ohne die Spalten der senkrechten, so deckt keine Kreuzung doppelt. Die Rechtecke entstehen erst
- * beim Zeichnen. Mit {@code lage} gedreht und mit der {@code form} geschnitten, siehe
- * docs/minimap.md, „Drehen“. Siehe docs/minimap.md, „Chunklinien“.
+ * beim Zeichnen. Mit {@code lage} auf den Schirm und mit der {@code form} geschnitten, siehe
+ * docs/minimap.md, „Form“. Siehe docs/minimap.md, „Chunklinien“.
  */
 record Gitter(Matrix3x2fc pose, int x0, int y0, int dicke, int farbe, Linien linien, ScreenRectangle bounds,
         Drehung.Lage lage, float[] form) implements GuiElementRenderState {
 
     /**
-     * Die Linien in Pixeln ab (x0, y0): senkrechte Linie i bei {@code xs[i]}, aufsteigend, von
-     * {@code va[i]} bis {@code vb[i]}; waagrechte Linie j bei {@code ys[j]} von {@code ha[j]} bis
-     * {@code hb[j]}. Enden ausschliesslich.
+     * Die Linien in Pixeln ab (x0, y0) auf der Fläche {@code breite} × {@code hoehe}: senkrechte
+     * Linie i bei {@code xs[i]}, aufsteigend, über die ganze Höhe; waagrechte Linie j bei
+     * {@code ys[j]} über die ganze Breite.
      */
-    record Linien(int[] xs, int[] va, int[] vb, int nx, int[] ys, int[] ha, int[] hb, int ny) {
+    record Linien(int[] xs, int nx, int[] ys, int ny, int breite, int hoehe) {
     }
 
     /** Ein Rechteck, Enden ausschliesslich. */
@@ -52,21 +52,18 @@ record Gitter(Matrix3x2fc pose, int x0, int y0, int dicke, int farbe, Linien lin
     /** Die Rechtecke der Linien: erst alle senkrechten, dann die waagrechten in Stücken zwischen ihnen. */
     static void rechtecke(int dicke, Linien l, Rechteck aus) {
         for (int i = 0; i < l.nx(); i++) {
-            aus.fill(l.xs()[i], l.va()[i], l.xs()[i] + dicke, l.vb()[i]);
+            aus.fill(l.xs()[i], 0, l.xs()[i] + dicke, l.hoehe());
         }
         for (int j = 0; j < l.ny(); j++) {
-            int y = l.ys()[j], von = l.ha()[j], bis = l.hb()[j];
-            for (int i = 0; i < l.nx() && l.xs()[i] < bis; i++) {
-                // Nur eine senkrechte, die diese Zeile wirklich kreuzt, spart Spalten aus.
-                if (l.xs()[i] + dicke > von && l.va()[i] < y + dicke && y < l.vb()[i]) {
-                    if (l.xs()[i] > von) {
-                        aus.fill(von, y, l.xs()[i], y + dicke);
-                    }
-                    von = l.xs()[i] + dicke;
+            int y = l.ys()[j], von = 0;
+            for (int i = 0; i < l.nx(); i++) {
+                if (l.xs()[i] > von) {
+                    aus.fill(von, y, l.xs()[i], y + dicke);
                 }
+                von = l.xs()[i] + dicke;
             }
-            if (von < bis) {
-                aus.fill(von, y, bis, y + dicke);
+            if (von < l.breite()) {
+                aus.fill(von, y, l.breite(), y + dicke);
             }
         }
     }

@@ -106,15 +106,21 @@ class SkinTest {
 
     @Test
     void ringLiegtInDenBaendern() {
+        // Seite 128, drei Bänder, von Hand gerechnet: In der mittleren Zeile liegen die Pixel 0 bis 2 im Ring, ab 3 die
+        // Karte. Auf der Diagonale (10, 10) ausserhalb, (19, 19) im zweiten Band, (20, 20) im dritten, (21, 21) die Karte.
         // Wie weit die Karte unter den Ring reicht, prüft DrehungTest.mitRahmenDecktDerRingDenRand.
-        int s = 128, anzahl = 3;
+        int s = 128;
         Skin skin = Skin.lies("t", "#111111\n#222222 #333333\n#444444", "", 7);
-        for (int y = 0; y < s; y++) {
-            for (int x = 0; x < s; x++) {
-                int band = Skin.bandRund(x, y, s);
-                assertEquals(band >= 0 && band < anzahl, skin.ringFarbe(x, y, s) != 0, x + ", " + y);
-            }
-        }
+        assertEquals(0xFF111111, skin.ringFarbe(0, 64, s));
+        assertEquals(0xFF222222, skin.ringFarbe(1, 64, s));
+        assertEquals(0xFF444444, skin.ringFarbe(2, 64, s));
+        assertEquals(0, skin.ringFarbe(3, 64, s));
+        assertEquals(0xFF333333, skin.ringFarbe(126, 64, s));
+        assertEquals(0xFF111111, skin.ringFarbe(127, 64, s));
+        assertEquals(0, skin.ringFarbe(10, 10, s));
+        assertEquals(0xFF222222, skin.ringFarbe(19, 19, s));
+        assertEquals(0xFF444444, skin.ringFarbe(20, 20, s));
+        assertEquals(0, skin.ringFarbe(21, 21, s));
         // Oben in der Mitte das äussere Band; im zweiten Band oben links Licht, unten rechts Schatten.
         assertEquals(0xFF111111, skin.ringFarbe(s / 2, 0, s));
         assertEquals(0xFF222222, skin.ringFarbe(s / 2, 1, s));

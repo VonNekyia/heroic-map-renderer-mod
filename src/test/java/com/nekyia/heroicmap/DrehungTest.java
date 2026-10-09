@@ -2,7 +2,6 @@ package com.nekyia.heroicmap;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -15,7 +14,7 @@ class DrehungTest {
     @Test
     void mitRahmenDecktDerRingDenRand() {
         // Der Ring ist in Einheiten gestuft: Jede Pixelmitte einer Einheit innerhalb der Bänder liegt im Vieleck,
-        // auch nahe den Diagonalen; keine einer Einheit ausserhalb des Rings.
+        // auch nahe den Diagonalen; keine einer Einheit ausserhalb des Rings. Beides mit EINRASTEN Abstand zum Rand.
         for (int k : new int[] {1, 2, 3, 4}) {
             for (int seite : new int[] {Minimap.KLEINSTE, Minimap.GROESSE, 200, Minimap.GROESSTE}) {
                 for (int baender : new int[] {2, 3, 5}) {
@@ -28,7 +27,8 @@ class DrehungTest {
                             }
                             for (int py = 0; py < k; py++) {
                                 for (int px = 0; px < k; px++) {
-                                    assertEquals(band >= baender, drinnen(form, x * k + px + 0.5, y * k + py + 0.5),
+                                    double a = abstand(form, x * k + px + 0.5, y * k + py + 0.5);
+                                    assertTrue(band >= baender ? a >= EINRASTEN : a <= -EINRASTEN,
                                             "k " + k + ", Seite " + seite + ", Bänder " + baender + ", Einheit " + x + ", " + y);
                                 }
                             }
@@ -41,30 +41,50 @@ class DrehungTest {
 
     @Test
     void ohneRahmenDecktDerUmrissDenRand() {
-        // Der Umriss ist ein Ring in Pixeln, k breit, je Zeile auf ganze Pixel: Jede Pixelmitte innerhalb liegt im Vieleck,
-        // keine ausserhalb des Umrisses.
+        // Der Umriss aus Minimap.umrissStuecke, die Textur um k nach links oben: Jede Pixelmitte, die er innen frei lässt,
+        // liegt im Vieleck, keine ausserhalb von ihm. Beides mit EINRASTEN Abstand zum Rand.
         for (int k : new int[] {1, 2, 3, 4}) {
             for (int seite : new int[] {Minimap.KLEINSTE, Minimap.GROESSE, 200, Minimap.GROESSTE}) {
                 int n = seite * k, m = n + 2 * k;
                 float[] form = Minimap.schnitt(0, 0, seite, k, true, 0);
-                for (int y = -k - 1; y < n + k + 1; y++) {
-                    int a = Minimap.sehne(n, y), b = Minimap.sehne(m, y + k) - k;
-                    for (int x = -k - 1; x < n + k + 1; x++) {
-                        if (Math.hypot(x + 0.5 - n / 2.0, y + 0.5 - n / 2.0) < n / 2.0 - 2) {
+                for (int ty = -1; ty <= m; ty++) {
+                    int[] s = ty >= 0 && ty < m ? Minimap.umrissStuecke(n, k, ty) : null;
+                    for (int tx = -1; tx <= m; tx++) {
+                        if (Math.abs(Math.hypot(tx + 0.5 - m / 2.0, ty + 0.5 - m / 2.0) - m / 2.0) > k + 3) {
                             continue;
                         }
-                        boolean karte = y >= 0 && y < n && a <= x && x < n - a;
-                        boolean umriss = y >= -k && y < n + k && b <= x && x < n - b;
-                        boolean drin = drinnen(form, x + 0.5, y + 0.5);
-                        if (karte) {
-                            assertTrue(drin, "k " + k + ", Seite " + seite + ", Pixel " + x + ", " + y);
-                        } else if (!umriss) {
-                            assertFalse(drin, "k " + k + ", Seite " + seite + ", Pixel " + x + ", " + y);
+                        boolean aussen = s == null || tx < s[0] || tx >= s[s.length - 1];
+                        boolean frei = !aussen && s.length == 4 && tx >= s[1] && tx < s[2];
+                        double a = abstand(form, tx - k + 0.5, ty - k + 0.5);
+                        String wo = "k " + k + ", Seite " + seite + ", Texel " + tx + ", " + ty;
+                        if (aussen) {
+                            assertTrue(a <= -EINRASTEN, wo);
+                        } else if (frei) {
+                            assertTrue(a >= EINRASTEN, wo);
                         }
                     }
                 }
             }
         }
+    }
+
+    @Test
+    void umrissWieAufMain() {
+        // So viele schwarze Pixel zeigte der Rand ohne Rahmen auf main in Bilder.umriss, mit Läufen gezeichnet:
+        // Seite 128 bei GUI-Massstab 1 und 2.
+        assertEquals(372, schwarz(128, 1));
+        assertEquals(1628, schwarz(256, 2));
+    }
+
+    private static int schwarz(int n, int k) {
+        int summe = 0;
+        for (int y = 0; y < n + 2 * k; y++) {
+            int[] s = Minimap.umrissStuecke(n, k, y);
+            for (int i = 0; i < s.length; i += 2) {
+                summe += s[i + 1] - s[i];
+            }
+        }
+        return summe;
     }
 
     @Test
@@ -101,16 +121,27 @@ class DrehungTest {
         assertArrayEquals(new int[] {0, 3, 0, 3}, Drehung.regionen(new double[] {0, 0, 384, 384}, 100, 100, 128));
     }
 
-    /** Liegt (x, y) im konvexen Vieleck p, gleich welcher Umlaufsinn? */
-    private static boolean drinnen(float[] p, double x, double y) {
-        int m = p.length / 2, plus = 0, minus = 0;
+    /**
+     * Wie weit die Grafikkarte eine Kante höchstens verschiebt, wenn sie die Ecken auf ein Raster
+     * unter dem Pixel einrastet. Siehe docs/minimap.md, „Form“.
+     */
+    private static final double EINRASTEN = 1.0 / 16;
+
+    /** Der Abstand von (x, y) zur nächsten Kante des konvexen Vielecks p, innen positiv, gleich welcher Umlaufsinn. */
+    private static double abstand(float[] p, double x, double y) {
+        int m = p.length / 2;
+        double flaeche = 0, abstand = Double.MAX_VALUE;
         for (int i = 0; i < m; i++) {
             int j = (i + 1) % m;
-            double kreuz = (p[2 * j] - p[2 * i]) * (y - p[2 * i + 1]) - (p[2 * j + 1] - p[2 * i + 1]) * (x - p[2 * i]);
-            plus += kreuz > 0 ? 1 : 0;
-            minus += kreuz < 0 ? 1 : 0;
+            flaeche += (double) p[2 * i] * p[2 * j + 1] - (double) p[2 * j] * p[2 * i + 1];
         }
-        return plus == 0 || minus == 0;
+        for (int i = 0; i < m; i++) {
+            int j = (i + 1) % m;
+            double ex = p[2 * j] - p[2 * i], ey = p[2 * j + 1] - p[2 * i + 1];
+            double kreuz = ex * (y - p[2 * i + 1]) - ey * (x - p[2 * i]);
+            abstand = Math.min(abstand, Math.signum(flaeche) * kreuz / Math.hypot(ex, ey));
+        }
+        return abstand;
     }
 
     @Test

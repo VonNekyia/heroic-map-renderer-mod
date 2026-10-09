@@ -110,7 +110,7 @@ public final class Minimap {
     /** Solange das Menü offen ist: die Ecke des Griffs, 0 bis 3, sonst -1; und ob die Maus auf ihm liegt. */
     private int griffEcke = -1;
     private boolean griffAktiv;
-    /** Die Form der gedrehten Karte ({@link #schnitt(Rahmen, int, Skin)}) und wofür. */
+    /** Die Form der Karte ({@link #schnitt(Rahmen, int, Skin)}) und wofür. */
     private float[] schnitt;
     private int schnittX, schnittY, schnittSeite, schnittMassstab, schnittBaender;
     private boolean schnittRund;
@@ -534,12 +534,14 @@ public final class Minimap {
             linien(g, r, links, oben, k, bild, bereich, form);
         }
         if (rund && rahmen == null) {
-            // Nach Karte und Linien: Ihr Vieleck ragt bis 0,6 Pixel über den Kreis, der Ring deckt es.
+            // Nach Karte und Linien, ihr Vieleck ragt unter den Ring. Siehe docs/minimap.md, „Form“.
             Matrix3x2fStack pose = g.pose();
             pose.pushMatrix();
             pose.scale(1f / k);
             g.blit(umrissRing(n, k), r.x() * k - k, r.y() * k - k, r.x() * k + n + k, r.y() * k + n + k, 0, 1, 0, 1);
             pose.popMatrix();
+        } else {
+            gibUmrissFrei();
         }
         if (rahmen != null) {
             zeichneRahmen(g, rahmen, r);
@@ -671,7 +673,7 @@ public final class Minimap {
                 Projektion.zuPixel(x, zoom) * k - links, Projektion.zuPixel(z, zoom) * k - oben);
     }
 
-    /** Die Form, an der die gedrehte Karte geschnitten wird ({@link #schnitt(int, int, int, int, boolean, int)}), gemerkt. */
+    /** Die Form, an der die Karte geschnitten wird ({@link #schnitt(int, int, int, int, boolean, int)}), gemerkt. */
     private float[] schnitt(Rahmen r, int k, Skin rahmen) {
         int baender = rahmen == null ? 0 : rahmen.baender();
         if (schnitt == null || schnittX != r.x() || schnittY != r.y() || schnittSeite != r.seite() || schnittMassstab != k
@@ -689,7 +691,7 @@ public final class Minimap {
 
     /**
      * Woran die Karte geschnitten wird, in Pixeln des Schirms: eckig das Quadrat, rund ein Vieleck
-     * aussen um den Kreis, das unter den Ring reicht; ohne Rahmen n/2 + ½ Pixel, mit Rahmen √2/2
+     * aussen um den Kreis, das unter den Ring reicht; ohne Rahmen n/2 + 1/16 Pixel, mit Rahmen √2/2
      * Einheiten über die Bänder hinaus. Siehe docs/minimap.md, „Form“.
      */
     static float[] schnitt(int x, int y, int seite, int k, boolean rund, int baender) {
@@ -697,7 +699,7 @@ public final class Minimap {
         if (!rund) {
             return Drehung.rechteck(x0, y0, x0 + n, y0 + n);
         }
-        double radius = baender == 0 ? seite / 2.0 * k + 0.5 : (seite / 2.0 - baender + Math.sqrt(2) / 2) * k;
+        double radius = baender == 0 ? seite / 2.0 * k + 1.0 / 16 : (seite / 2.0 - baender + Math.sqrt(2) / 2) * k;
         return Drehung.kreis(x0 + n / 2.0, y0 + n / 2.0, radius);
     }
 
@@ -745,27 +747,22 @@ public final class Minimap {
     }
 
     /**
-     * Der schwarze Umriss der runden Minimap ohne Rahmen als Textur, ein Texel je Pixel des Schirms:
-     * der Kreis mit der Seite n + 2k ohne den mit der Seite n, je Zeile auf ganze Pixel
-     * ({@link #sehne}). Nur der für die letzte Seite und den letzten GUI-Massstab bleibt.
+     * Der schwarze Umriss der runden Minimap ohne Rahmen als Textur, ein Texel je Pixel des Schirms,
+     * aus {@link #umrissStuecke}. Nur der für die letzte Seite und den letzten GUI-Massstab bleibt.
+     * Speicher siehe docs/minimap.md, „Kosten“.
      */
     private Identifier umrissRing(int n, int k) {
         if (umrissTextur == null || umrissSeite != n || umrissMassstab != k) {
-            if (umrissTextur != null) {
-                Minecraft.getInstance().getTextureManager().release(umrissTextur);
-            }
+            gibUmrissFrei();
             int m = n + 2 * k;
             Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "umriss");
+            // Neu angelegt ist die Textur ganz durchsichtig; nur die Stücke des Rings werden schwarz.
             DynamicTexture textur = new DynamicTexture(() -> "heroicmap " + id, m, m, true);
             NativeImage pixel = textur.getPixels();
             for (int y = 0; y < m; y++) {
-                for (int x = sehne(m, y); x < m - sehne(m, y); x++) {
-                    pixel.setPixel(x, y, 0xFF000000);
-                }
-            }
-            for (int y = 0; y < n; y++) {
-                for (int x = sehne(n, y); x < n - sehne(n, y); x++) {
-                    pixel.setPixel(x + k, y + k, 0);
+                int[] stuecke = umrissStuecke(n, k, y);
+                for (int i = 0; i < stuecke.length; i += 2) {
+                    pixel.fillRect(stuecke[i], y, stuecke[i + 1] - stuecke[i], 1, 0xFF000000);
                 }
             }
             textur.upload();
@@ -775,6 +772,27 @@ public final class Minimap {
             umrissMassstab = k;
         }
         return umrissTextur;
+    }
+
+    private void gibUmrissFrei() {
+        if (umrissTextur != null) {
+            Minecraft.getInstance().getTextureManager().release(umrissTextur);
+            umrissTextur = null;
+        }
+    }
+
+    /**
+     * Die schwarzen Stücke der Zeile y im Umriss mit der Seite n + 2k, {x0, x1} oder {x0, x1, x2, x3},
+     * Enden ausschliesslich: der Kreis mit der Seite n + 2k ohne den mit der Seite n in seiner Mitte,
+     * je Zeile auf ganze Pixel ({@link #sehne}).
+     */
+    static int[] umrissStuecke(int n, int k, int y) {
+        int m = n + 2 * k, a = sehne(m, y);
+        if (y < k || y >= n + k) {
+            return new int[] {a, m - a};
+        }
+        int b = sehne(n, y - k) + k;
+        return new int[] {a, b, m - b, m - a};
     }
 
     /**
@@ -853,16 +871,14 @@ public final class Minimap {
      */
     static Gitter.Linien linien(int n, int links, int oben, int schritt, int k) {
         int m = n / schritt + 1, nx = 0, ny = 0;
-        int[] xs = new int[m], va = new int[m], vb = new int[m], ys = new int[m], ha = new int[m], hb = new int[m];
+        int[] xs = new int[m], ys = new int[m];
         for (int px = Math.ceilDiv(links, schritt) * schritt - links; px + k <= n; px += schritt) {
-            xs[nx] = px;
-            vb[nx++] = n;
+            xs[nx++] = px;
         }
         for (int pz = Math.ceilDiv(oben, schritt) * schritt - oben; pz + k <= n; pz += schritt) {
-            ys[ny] = pz;
-            hb[ny++] = n;
+            ys[ny++] = pz;
         }
-        return new Gitter.Linien(xs, va, vb, nx, ys, ha, hb, ny);
+        return new Gitter.Linien(xs, nx, ys, ny, n, n);
     }
 
     /** Linker Rand der Zeile y im Kreis in ein Quadrat mit der Seite n, auf ganze Pixel; der rechte ist n minus dieser. */

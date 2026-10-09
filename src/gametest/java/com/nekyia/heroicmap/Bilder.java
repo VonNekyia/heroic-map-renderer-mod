@@ -189,10 +189,13 @@ public final class Bilder implements FabricClientGameTest {
 
     /**
      * Die runde Minimap ohne Rahmen bei GUI-Massstab 1 und 3, ungedreht: der Rand, Pixel für Pixel.
-     * Siehe docs/minimap.md, „Form“.
+     * Das Fenster ist dafür 1280 × 720 gross; bei 854 × 480 lässt das Spiel höchstens GUI-Massstab 2
+     * zu. Siehe docs/minimap.md, „Form“.
      */
     private static void umriss(ClientGameTestContext context) {
         int vorher = context.computeOnClient(mc -> mc.options.guiScale().get());
+        int[] fenster = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight()});
+        context.getInput().resizeWindow(1280, 720);
         for (int gs : new int[] {1, 3}) {
             context.runOnClient(mc -> {
                 Minimap.INSTANZ.setzeRund(true);
@@ -201,6 +204,10 @@ public final class Bilder implements FabricClientGameTest {
             });
             context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
             context.waitTicks(2);
+            int gesetzt = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+            if (gesetzt != gs) {
+                throw new AssertionError("GUI-Massstab " + gesetzt + " statt " + gs);
+            }
             BufferedImage bild = mitRand(context, context.takeScreenshot(TestScreenshotOptions.of("rund-gs" + gs).disableCounterPrefix()));
             if (!AUSGABE.isEmpty()) {
                 try {
@@ -210,6 +217,7 @@ public final class Bilder implements FabricClientGameTest {
                 }
             }
         }
+        context.getInput().resizeWindow(fenster[0], fenster[1]);
         context.runOnClient(mc -> {
             Minimap.INSTANZ.setzeRund(false);
             mc.options.guiScale().set(vorher);

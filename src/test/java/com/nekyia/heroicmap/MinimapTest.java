@@ -240,6 +240,8 @@ class MinimapTest {
         int zoom = 2, k = 3, n = 128 * k, schritt = 16 * zoom * k;
         for (int links : new int[] {-1000, -50, -1, 0, 1, 3, 50, 94, 95, 96, 1000}) {
             Gitter.Linien l = Minimap.linien(n, links, links, schritt, k);
+            assertEquals(n, l.breite());
+            assertEquals(n, l.hoehe());
             // Die erste ganz im Bild, die davor nicht; die letzte ganz im Bild, die danach nicht. Bei links 3 endet die letzte genau am Rand.
             assertTrue(l.xs()[0] >= 0 && l.xs()[0] - schritt < 0, "links " + links);
             assertTrue(l.xs()[l.nx() - 1] + k <= n && l.xs()[l.nx() - 1] + schritt + k > n, "links " + links);
@@ -247,8 +249,6 @@ class MinimapTest {
                 // Jede Linie, wo die Karte den ersten Block ihres Chunks zeichnet.
                 int chunk = Math.floorDiv(l.xs()[i] + links, schritt);
                 assertEquals(Minimap.pixel(16.0 * chunk, zoom, k, links), l.xs()[i], "links " + links + ", Chunk " + chunk);
-                assertEquals(0, l.va()[i]);
-                assertEquals(n, l.vb()[i]);
             }
             assertArrayEquals(l.xs(), l.ys());
             assertEquals(l.nx(), l.ny());
@@ -258,8 +258,7 @@ class MinimapTest {
     @Test
     void kreuzungenDeckenEinfach() {
         // Zwei senkrechte, eine waagrechte Linie, 2 breit, auf 50 × 40: Jedes Pixel einer Linie genau einmal.
-        Gitter.Linien l = new Gitter.Linien(new int[] {10, 30}, new int[] {0, 0}, new int[] {40, 40}, 2,
-                new int[] {20}, new int[] {0}, new int[] {50}, 1);
+        Gitter.Linien l = new Gitter.Linien(new int[] {10, 30}, 2, new int[] {20}, 1, 50, 40);
         int[][] decke = decke(50, 40, 2, l);
         for (int y = 0; y < 40; y++) {
             for (int x = 0; x < 50; x++) {
