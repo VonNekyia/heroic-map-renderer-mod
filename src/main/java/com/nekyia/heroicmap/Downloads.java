@@ -95,8 +95,11 @@ final class Downloads {
             case "spieler" -> Mitspieler.INSTANZ.empfange(json, System.currentTimeMillis());
             case "show" -> Mitspieler.INSTANZ.antwort(json);
             case "ebenen" -> {
-                Symbole.INSTANZ.basis(json, verbindung());
-                Ebenen.INSTANZ.empfange(json);
+                // Die Adresse nur aus einer Liste, die gilt; Symbole von Ebenen, die fehlen, frei.
+                if (Ebenen.INSTANZ.empfange(json)) {
+                    Symbole.INSTANZ.basis(json, verbindung());
+                    Symbole.INSTANZ.behalte(Ebenen.INSTANZ.kennungen());
+                }
             }
             // Einen lesbaren Teil hat schon der Kanal an die Ebenen gegeben.
             case "ebene" -> LOGGER.warn("Heroic Map: Teil einer Ebene nicht lesbar");

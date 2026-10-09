@@ -223,6 +223,15 @@ final class Kacheln implements AutoCloseable {
     }
 
     /**
+     * Nur eine einfache verlustfreie WebP, genau {@code seite} × {@code seite}, sonst null; ohne den Weg
+     * über TwelveMonkeys. Für die Symbole der Ebenen, siehe docs/ebenen.md, „Symbole“.
+     */
+    static Bild vp8l(byte[] webp, int seite) throws IOException {
+        BufferedImage bild = verlustfrei(webp, seite);
+        return bild == null ? null : new Bild(seite, seite, bild.getRGB(0, 0, seite, seite, null, 0, seite));
+    }
+
+    /**
      * Eine einfache verlustfreie WebP, {@code RIFF} mit nur dem Chunk {@code VP8L}, mit der Kopie
      * des Dekoders, ins selbe Bildformat wie TwelveMonkeys; jede andere WebP gibt null.
      */

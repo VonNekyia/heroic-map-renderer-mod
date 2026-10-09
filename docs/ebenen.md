@@ -106,24 +106,28 @@ die Nachrichten das Plugin:
 
 ## Symbole
 
-- **Adresse** aus der Liste `ebenen`: `url`, sonst `port` an der IP der
-  Verbindung zum Spielserver, `http://<ip>:<port>/tiles`, IPv6 in eckigen
-  Klammern, wie bei der `freigabe` (`Symbole.basis`). Fehlt beides, gibt
-  es keine Symbole.
+- **Adresse** aus der Liste `ebenen`, nur wenn die Liste gilt: `url`,
+  sonst `port` an der IP der Verbindung zum Spielserver,
+  `http://<ip>:<port>/tiles`, IPv6 in eckigen Klammern, wie bei der
+  `freigabe` (`Symbole.basis`). Fehlt beides, gibt es keine Symbole.
 - **Ein Symbol** liegt unter `<Adresse>/layers/<modname>/<Feld>`,
   `modname` vor dem `:` der Kennung (`Symbole.uri`). Das Feld ist
   `images/<Name>.png` oder `.webp`, ohne Unterordner und ohne Punkt vorn;
   anderes holt der Mod nicht.
 - **Geholt** erst, wenn eine Nadel es zeichnet, in einem eigenen Thread,
-  einmal je Ebene, Feld und `version`; eine neue `version` holt es neu,
-  denn unter gleichem Namen kann ein Bild neu sein.
-- **Geprüft** wie jeder Download, siehe [Download](download.md),
+  einmal je Ebene, Feld, Seite und `version`, höchstens 200 je Ebene wie
+  die Bilder im Format. Eine neue `version` gibt alle Symbole der Ebene
+  frei und holt neu, denn unter gleichem Namen kann ein Bild neu sein.
+- **Geprüft** wie der Download der Karte, siehe [Download](download.md),
   „Sicherheit“: die Adresse gegen das Heimnetz, keine Weiterleitung, kein
-  Proxy. Ohne Token. Höchstens 256 KiB, PNG oder WebP genau in seiner
-  Grösse (`Symbole.hole`). Ein Fehler steht einmal im Log, das Schild
-  bleibt leer.
-- **Freigegeben** beim Trennen, bei einem neuen Login und mit einer neuen
-  Adresse.
+  Proxy, ohne Token. Höchstens 256 KiB, Header und Körper zusammen in
+  höchstens 10 s, über denselben Weg wie die Kacheln (`Laden.sende`).
+  PNG oder WebP nur als einfaches `VP8L`, genau in seiner Grösse
+  (`Symbole.hole`). Ein Fehler steht im Log, das Schild bleibt leer.
+- **Freigegeben** wird ein Symbol, wenn seine Ebene eine neue `version`
+  bekommt oder aus der Liste fällt, und alle beim Trennen, bei einem neuen
+  Login und mit einer neuen Adresse. Danach fragt ein Auftrag, der noch
+  wartet, nicht mehr.
 
 ## Umschalten
 
@@ -152,9 +156,13 @@ So kann ein Server den Speicher des Mods nicht füllen:
 | Nachricht | 1 MiB | verworfen, siehe [Download](download.md), „Kanal“ |
 | Name einer Nadel oder Ebene | 64 Zeichen | der Name fehlt |
 | Kennung, `version`, Dimension | 129 Zeichen | Nachricht oder Nadel gilt nicht |
+| Feld eines Symbols | 76 Zeichen | das Symbol fehlt |
+| Symbole je Ebene | 200 | die übrigen fehlen, das Log nennt es |
+| Bild eines Symbols | 256 KiB, 10 s | das Symbol fehlt |
 
 - **Speicher:** Halbe Sammlungen gibt es höchstens eine je Ebene der
-  Liste, also 64, mit je höchstens 1000 Nadeln.
+  Liste, also 64, mit je höchstens 1000 Nadeln. Symbole höchstens 200 je
+  Ebene, also 12 800 Texturen von je 1 KiB, rund 13 MiB.
 - **Kosten:** Je Frame geht der Mod alle Nadeln der sichtbaren Ebenen
   durch, im schlimmsten Fall 64 000. Ein Raster nach Regionen kommt erst,
   wenn eine Messung es verlangt.

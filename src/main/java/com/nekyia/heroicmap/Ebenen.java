@@ -120,12 +120,14 @@ final class Ebenen {
     private final Map<String, Boolean> wahl = new HashMap<>();
     private Path datei;
 
-    /** Die Liste {@code ebenen}; eine kaputte ändert nichts. */
-    void empfange(JsonObject json) {
+    /** Die Liste {@code ebenen}; eine kaputte ändert nichts und gibt false. */
+    boolean empfange(JsonObject json) {
         try {
             liste(json);
+            return true;
         } catch (RuntimeException e) {
             LOGGER.warn("Heroic Map: Liste der Ebenen nicht lesbar: {}", e.toString());
+            return false;
         }
     }
 
@@ -261,6 +263,11 @@ final class Ebenen {
     /** Die Ebenen, die gezeichnet werden, unten zuerst. */
     List<Eintrag> sichtbar() {
         return liste.stream().filter(this::an).toList();
+    }
+
+    /** Die Kennungen der Liste. */
+    List<String> kennungen() {
+        return liste.stream().map(Eintrag::id).toList();
     }
 
     /** Alle Ebenen für das Menü, oben zuerst. */

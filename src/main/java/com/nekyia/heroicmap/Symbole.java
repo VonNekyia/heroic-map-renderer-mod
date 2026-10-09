@@ -3,7 +3,6 @@ package com.nekyia.heroicmap;
 import com.google.gson.JsonObject;
 import com.mojang.blaze3d.platform.NativeImage;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.URI;
@@ -11,11 +10,17 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -25,44 +30,72 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Die Symbole der Nadeln vom Server des Renderers: geholt, wenn eine Nadel sie zum ersten Mal
- * zeichnet, ohne Token, mit derselben Prüfung der Adresse wie jeder Download, genau 16 × 16 oder
+ * zeichnet, ohne Token, mit denselben harten Grenzen wie der Download der Karte, genau 16 × 16 oder
  * 9 × 9 Pixel. Ohne Adresse oder nach einem Fehler bleibt das Schild leer. Die Zustände gehören dem
  * Render-Thread, geholt wird in einem eigenen. Siehe docs/ebenen.md, „Symbole“.
  */
 final class Symbole {
 
-    static final Symbole INSTANZ = new Symbole();
     /** Höchstens so gross ist ein Bild einer Ebene; ein Symbol ist viel kleiner. */
     static final int MAX = 256 << 10;
+    /** Höchstens so viele Bilder hat eine Ebene, siehe das Format; mehr Symbole holt der Mod nicht. */
+    static final int MAX_BILDER = 200;
+    /** So lange darf ein Abruf dauern, Header und Körper zusammen. */
+    static final Duration FRIST = Duration.ofSeconds(10);
     /** Ein Feld wie {@code images/burg_16.png}: ohne Unterordner, ohne Punkt vorn, nur PNG und WebP. */
     private static final Pattern FELD = Pattern.compile("images/[a-z0-9_-][a-z0-9_.-]{0,63}\\.(png|webp)");
     private static final Pattern MODNAME = Pattern.compile("[a-z0-9_-][a-z0-9_.-]{0,63}");
     private static final Logger LOGGER = LoggerFactory.getLogger(HeroicMap.ID);
+    private static final AtomicInteger ZAEHLER = new AtomicInteger();
 
-    /** Was zu einem Feld einer Ebene gehört: seine {@code version} und die Textur, null solange es lädt oder nach einem Fehler. */
-    private record Stand(String version, Identifier textur) {
-    }
-
-    private final HttpClient client = HttpClient.newBuilder()
+    /** Wie beim Download: ohne Weiterleitung, denn sie ginge an der Prüfung der Adresse vorbei, und ohne Proxy. */
+    static final HttpClient CLIENT = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1)
             .followRedirects(HttpClient.Redirect.NEVER)
-            .connectTimeout(Duration.ofSeconds(10))
-            // Ein Proxy des Systems ginge an der Prüfung der Adresse vorbei.
+            .connectTimeout(FRIST)
             .proxy(HttpClient.Builder.NO_PROXY)
             .build();
-    private final ExecutorService holer = Executors.newSingleThreadExecutor(r -> {
+
+    static final Symbole INSTANZ = new Symbole(CLIENT, Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "heroicmap-symbole");
         t.setDaemon(true);
         return t;
-    });
-    private final Map<String, Stand> staende = new HashMap<>();
+    }), r -> Minecraft.getInstance().execute(r), Symbole::lege, t -> Minecraft.getInstance().getTextureManager().release(t));
+
+    /** Die Symbole einer Ebene in einer {@code version}: je Feld und Seite die Textur, null solange sie lädt oder nach einem Fehler. */
+    private static final class Felder {
+
+        final String version;
+        final Map<String, Identifier> texturen = new HashMap<>();
+        boolean voll;
+
+        Felder(String version) {
+            this.version = version;
+        }
+    }
+
+    private final HttpClient client;
+    private final ExecutorService holer;
+    private final Executor renderThread;
+    private final BiFunction<URI, Kacheln.Bild, Identifier> ablage;
+    private final Consumer<Identifier> freigabe;
+    private final Map<String, Felder> ebenen = new HashMap<>();
+    /** Zählt bei jedem Leeren weiter; ein Auftrag aus einer älteren Runde fragt nicht mehr und legt nichts ab. */
+    private final AtomicInteger runde = new AtomicInteger();
     /** Die Wurzel der Kacheln am Server, aus der Liste, und die Verbindung zum Spielserver; null ohne Adresse. */
     private URI basis;
     private InetAddress spielserver;
-    /** Zählt bei jedem Leeren weiter; ein Bild aus einer älteren Runde verfällt. */
-    private int runde, zaehler;
 
-    /** Die Adresse aus der Liste {@code ebenen}: {@code url}, sonst {@code port} an der IP der Verbindung. */
+    Symbole(HttpClient client, ExecutorService holer, Executor renderThread, BiFunction<URI, Kacheln.Bild, Identifier> ablage,
+            Consumer<Identifier> freigabe) {
+        this.client = client;
+        this.holer = holer;
+        this.renderThread = renderThread;
+        this.ablage = ablage;
+        this.freigabe = freigabe;
+    }
+
+    /** Die Adresse aus einer gültigen Liste {@code ebenen}: {@code url}, sonst {@code port} an der IP der Verbindung. */
     void basis(JsonObject liste, InetAddress verbindung) {
         URI neu;
         try {
@@ -110,75 +143,89 @@ final class Symbole {
     }
 
     /**
-     * Die Textur des Symbols {@code feld} der Ebene in dieser {@code version}, oder null, solange es
-     * lädt, ohne Adresse und nach einem Fehler. Beim ersten Fragen holt es der eigene Thread; eine
-     * neue {@code version} holt es neu, denn ein Bild unter gleichem Namen kann neu sein.
+     * Die Textur des Symbols {@code feld} der Ebene in dieser {@code version} und Seite, oder null,
+     * solange es lädt, ohne Adresse, nach einem Fehler und über {@link #MAX_BILDER} je Ebene. Beim
+     * ersten Fragen holt es der eigene Thread. Eine neue {@code version} gibt alle Symbole der Ebene
+     * frei, denn unter gleichem Namen kann ein Bild neu sein.
      */
     Identifier symbol(String ebene, String version, String feld, int seite) {
         if (feld == null) {
             return null;
         }
-        String schluessel = ebene + "/" + feld;
-        Stand stand = staende.get(schluessel);
-        if (stand != null && stand.version().equals(version)) {
-            return stand.textur();
+        Felder f = ebenen.get(ebene);
+        if (f == null || !f.version.equals(version)) {
+            if (f != null) {
+                gibFrei(f);
+            }
+            f = new Felder(version);
+            ebenen.put(ebene, f);
         }
-        if (stand != null && stand.textur() != null) {
-            Minecraft.getInstance().getTextureManager().release(stand.textur());
+        String schluessel = feld + "@" + seite;
+        if (f.texturen.containsKey(schluessel)) {
+            return f.texturen.get(schluessel);
         }
-        staende.put(schluessel, new Stand(version, null));
+        if (f.texturen.size() >= MAX_BILDER) {
+            if (!f.voll) {
+                f.voll = true;
+                LOGGER.warn("Heroic Map: Ebene {} nennt mehr als {} Symbole, die übrigen fehlen", ebene, MAX_BILDER);
+            }
+            return null;
+        }
+        f.texturen.put(schluessel, null);
         URI uri = uri(basis, ebene, feld);
         if (uri == null) {
             return null;
         }
-        int r = runde;
+        int r = runde.get();
         InetAddress server = spielserver;
+        Felder ziel = f;
         holer.execute(() -> {
-            Kacheln.Bild bild = hole(client, uri, server, seite);
+            // Nach dem Trennen oder mit einer neuen Adresse fragt ein alter Auftrag nicht mehr.
+            if (r != runde.get()) {
+                return;
+            }
+            Kacheln.Bild bild = hole(client, uri, server, seite, FRIST);
             if (bild != null) {
-                Minecraft.getInstance().execute(() -> lege(r, schluessel, version, uri, bild));
+                renderThread.execute(() -> {
+                    if (r == runde.get() && ebenen.get(ebene) == ziel && ziel.texturen.containsKey(schluessel)) {
+                        ziel.texturen.put(schluessel, ablage.apply(uri, bild));
+                    }
+                });
             }
         });
         return null;
     }
 
-    /** Legt das geholte Bild als Textur ab, wenn seit dem Holen nichts geleert ist und dieselbe version gilt. */
-    private void lege(int r, String schluessel, String version, URI uri, Kacheln.Bild bild) {
-        Stand stand = staende.get(schluessel);
-        if (r != runde || stand == null || !stand.version().equals(version)) {
-            return;
-        }
+    /** Legt ein geholtes Bild als Textur ab. */
+    private static Identifier lege(URI uri, Kacheln.Bild bild) {
         NativeImage pixel = Kacheln.pixel(bild);
-        Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "ebenen/symbol_" + zaehler++);
+        Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "ebenen/symbol_" + ZAEHLER.getAndIncrement());
         Minecraft.getInstance().getTextureManager().register(id, new DynamicTexture(() -> "heroicmap " + uri, pixel));
-        staende.put(schluessel, new Stand(version, id));
+        return id;
     }
 
     /**
-     * Holt ein Symbol: prüft die Adresse, ohne Weiterleitung, höchstens {@link #MAX} Byte, PNG oder
-     * WebP genau {@code seite} × {@code seite}. Null bei jedem Fehler; das Log nennt ihn.
+     * Holt ein Symbol: prüft die Adresse, ohne Weiterleitung, höchstens {@link #MAX} Byte, alles in
+     * höchstens {@code frist} ({@link Laden#sende}); PNG oder einfache WebP mit nur {@code VP8L}, genau
+     * {@code seite} × {@code seite}. Null bei jedem Fehler; das Log nennt ihn.
      */
-    static Kacheln.Bild hole(HttpClient client, URI uri, InetAddress spielserver, int seite) {
+    static Kacheln.Bild hole(HttpClient client, URI uri, InetAddress spielserver, int seite, Duration frist) {
         try {
             Adresse.Urteil urteil = Adresse.pruefe(uri, spielserver);
             if (urteil != Adresse.Urteil.GUT) {
                 throw new IOException(urteil.name());
             }
-            HttpRequest anfrage = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10)).GET().build();
-            HttpResponse<InputStream> antwort = client.send(anfrage, HttpResponse.BodyHandlers.ofInputStream());
-            byte[] daten;
-            // ponytail: Die Frist gilt bis zu den Headern; ein Server, der den Körper zurückhält, hält nur diesen Thread auf.
-            try (InputStream rein = antwort.body()) {
-                if (antwort.statusCode() != 200) {
-                    throw new IOException("HTTP " + antwort.statusCode());
-                }
-                daten = rein.readNBytes(MAX + 1);
+            HttpRequest anfrage = HttpRequest.newBuilder(uri).timeout(frist).GET().build();
+            HttpResponse<byte[]> antwort = Laden.sende(client, anfrage, MAX, Laden.Grund.NETZ, frist, uri.getPath());
+            if (antwort.statusCode() != 200) {
+                throw new IOException("HTTP " + antwort.statusCode());
             }
-            if (daten.length > MAX) {
-                throw new IOException("grösser als " + MAX + " Byte");
+            Kacheln.Bild bild = uri.getPath().endsWith(".png") ? Kacheln.png(antwort.body(), seite) : Kacheln.vp8l(antwort.body(), seite);
+            if (bild == null) {
+                throw new IOException("keine einfache WebP mit nur VP8L");
             }
-            return uri.getPath().endsWith(".png") ? Kacheln.png(daten, seite) : Kacheln.dekodiere(daten, seite);
-        } catch (IOException | RuntimeException e) {
+            return bild;
+        } catch (IOException | Laden.Fehler | RuntimeException e) {
             LOGGER.warn("Heroic Map: Symbol {} nicht geladen: {}", uri, e.getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -186,11 +233,30 @@ final class Symbole {
         return null;
     }
 
-    /** Beim Trennen und mit einer neuen Adresse: alle Texturen frei, späte Bilder verfallen. */
+    /** Gibt die Symbole jeder Ebene frei, die die Liste nicht mehr nennt. */
+    void behalte(Collection<String> kennungen) {
+        ebenen.entrySet().removeIf(e -> {
+            boolean weg = !kennungen.contains(e.getKey());
+            if (weg) {
+                gibFrei(e.getValue());
+            }
+            return weg;
+        });
+    }
+
+    private void gibFrei(Felder f) {
+        f.texturen.values().stream().filter(Objects::nonNull).forEach(freigabe);
+    }
+
+    /** Beim Trennen und mit einer neuen Adresse: alle Texturen frei, alte Aufträge fragen nicht mehr. */
     void leeren() {
-        runde++;
-        staende.values().stream().map(Stand::textur).filter(Objects::nonNull)
-                .forEach(t -> Minecraft.getInstance().getTextureManager().release(t));
-        staende.clear();
+        runde.incrementAndGet();
+        ebenen.values().forEach(this::gibFrei);
+        ebenen.clear();
+    }
+
+    /** Für Tests: wartet, bis der eigene Thread alles Eingereihte abgearbeitet hat. */
+    void warte() throws InterruptedException, ExecutionException {
+        holer.submit(() -> { }).get();
     }
 }
