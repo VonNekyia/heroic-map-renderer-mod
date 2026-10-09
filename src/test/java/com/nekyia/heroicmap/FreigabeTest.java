@@ -91,6 +91,15 @@ class FreigabeTest {
     }
 
     @Test
+    void praefixDerEigenenKarteIstKeinBaum() {
+        // Siehe docs/selbst.md, „Wahl“: Ein Baum vom Server mischte sich sonst mit der eigenen Karte.
+        assertFalse(Freigabe.baum("selbst-minecraft_overworld"));
+        assertFalse(Freigabe.baum("selbst-x"));
+        assertTrue(Freigabe.baum("selbstgebaut"));
+        assertTrue(Freigabe.baum("survival"));
+    }
+
+    @Test
     void abgleichMisstAmGespeichertenStand() {
         assertEquals(Freigabe.Weg.STILL, freigabe("abgleich", 4, SATZ / 10).weg(GESPEICHERT, null, true));
         assertEquals(Freigabe.Weg.HOST, freigabe("abgleich", 4, SATZ / 10).weg(GESPEICHERT, null, false));

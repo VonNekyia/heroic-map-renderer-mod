@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.MemoryCacheImageInputStream;
 import net.minecraft.client.Minecraft;
@@ -74,6 +75,18 @@ final class Kacheln implements AutoCloseable {
         offen = this;
     }
 
+    /** Eine Kachel der selbst gezeichneten Karte in {@code ordner} ist neu geschrieben; ist sie offen, lädt die Kachel neu. */
+    static void geaendert(Path ordner, int z, int x, int y) {
+        if (offen != null && offen.ordner.equals(ordner)) {
+            String pfad = z + "/" + x + "/" + y;
+            offen.leer.remove(pfad);
+            if (offen.texturen.containsKey(pfad) || offen.laeuft.contains(pfad)) {
+                offen.generation.merge(pfad, 1, Integer::sum);
+                offen.veraltet.add(pfad);
+            }
+        }
+    }
+
     /** Nach einem vollständigen Download: Alle Kacheln laden neu. Auf dem Render-Thread. */
     static void satzGeladen() {
         if (offen != null) {
@@ -107,7 +120,8 @@ final class Kacheln implements AutoCloseable {
         laeuft.add(pfad);
         veraltet.remove(pfad);
         int gen = generation.getOrDefault(pfad, 0);
-        Path datei = ordner.resolve(String.valueOf(z)).resolve(String.valueOf(x)).resolve(y + ".webp");
+        Path spalte = ordner.resolve(String.valueOf(z)).resolve(String.valueOf(x));
+        Path datei = spalte.resolve(y + ".webp"), png = spalte.resolve(y + ".png");
         dekoder.execute(() -> {
             NativeImage pixel = null;
             try {
@@ -115,6 +129,9 @@ final class Kacheln implements AutoCloseable {
                 try {
                     if (Files.exists(datei)) {
                         argb = dekodiere(Files.readAllBytes(datei), seite).argb();
+                    } else if (Files.exists(png)) {
+                        // Die selbst gezeichnete Karte schreibt PNG. Siehe docs/selbst.md, „Kacheln“.
+                        argb = png(Files.readAllBytes(png), seite).argb();
                     }
                 } catch (IOException e) {
                     argb = null;
@@ -231,6 +248,19 @@ final class Kacheln implements AutoCloseable {
             new VP8LDecoder(rein, false).readVP8Lossless(bild.getRaster(), true, null, breite, hoehe);
         }
         return bild;
+    }
+
+    /** Dekodiert eine PNG-Kachel; die Grösse aus dem Kopf muss {@code seite} × {@code seite} sein, wie bei WebP. */
+    static Bild png(byte[] png, int seite) throws IOException {
+        ImageReader leser = ImageIO.getImageReadersByFormatName("png").next();
+        try (MemoryCacheImageInputStream rein = new MemoryCacheImageInputStream(new ByteArrayInputStream(png))) {
+            leser.setInput(rein);
+            pruefe(leser.getWidth(0), leser.getHeight(0), seite);
+            BufferedImage bild = leser.read(0);
+            return new Bild(seite, seite, bild.getRGB(0, 0, seite, seite, null, 0, seite));
+        } finally {
+            leser.dispose();
+        }
     }
 
     private static void pruefe(int breite, int hoehe, int seite) throws IOException {

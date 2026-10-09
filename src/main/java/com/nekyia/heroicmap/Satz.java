@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.stream.Stream;
 
 /**
@@ -23,22 +24,31 @@ record Satz(Path ordner, String name, String dimension, int massstab, int kachel
         };
     }
 
-    /** Der Satz für {@code dimension} unter dem Ordner einer Welt, oder null. */
-    static Satz fuer(Path server, String dimension) {
-        if (server == null || !Files.isDirectory(server)) {
+    /**
+     * Der Satz für {@code dimension} unter dem Ordner einer Welt, oder null. Ein selbst
+     * gezeichneter geht vor, siehe docs/selbst.md, „Wahl“.
+     */
+    static Satz fuer(Path welt, String dimension) {
+        if (welt == null || !Files.isDirectory(welt)) {
             return null;
         }
-        try (Stream<Path> baeume = Files.list(server)) {
-            for (Path baum : baeume.toList()) {
+        Satz erster = null;
+        // Nach dem Namen als Zeichenkette, nicht in der Folge des Dateisystems und nicht nach Path.compareTo,
+        // das unter Windows Gross und Klein gleich nimmt: So ist das Ergebnis überall gleich.
+        try (Stream<Path> baeume = Files.list(welt)) {
+            for (Path baum : baeume.sorted(Comparator.comparing((Path p) -> p.getFileName().toString())).toList()) {
                 Satz satz = lies(baum);
                 if (satz != null && dimension.equals(satz.dimension())) {
-                    return satz;
+                    if (Selbst.selbst(baum)) {
+                        return satz;
+                    }
+                    erster = erster == null ? satz : erster;
                 }
             }
         } catch (IOException e) {
             return null;
         }
-        return null;
+        return erster;
     }
 
     /**

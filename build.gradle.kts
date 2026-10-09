@@ -26,8 +26,11 @@ java {
     toolchain.languageVersion = JavaLanguageVersion.of(25)
 }
 
+// Die Messung von Kachelwerk.schreibe läuft nur mit -Pkachelwerk=<datei>, siehe docs/selbst.md, „Kosten“.
+val kachelwerk = providers.gradleProperty("kachelwerk").map { file(it).absolutePath }.orElse("")
 tasks.test {
     useJUnitPlatform()
+    systemProperty("heroicmap.kachelwerk", kachelwerk.get())
 }
 
 // Die Lizenzen gehen mit dem Jar, auch der Hinweis, den TwelveMonkeys verlangt.

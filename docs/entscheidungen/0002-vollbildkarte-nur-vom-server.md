@@ -12,6 +12,10 @@ code:
 
 # 0002: Die Vollbildkarte nur vom Server
 
+Teilweise abgelöst durch [0004](0004-karte-selbst-zeichnen.md): Neben der
+Karte des Servers gibt es die Wahl „Selbst“, eine eigene Karte; nicht mehr
+gilt, dass der Mod selbst nur die Minimap zeichnet.
+
 ## Anlass
 
 Die Live-Ebene zeichnete Änderungen in Chunks, die der Client geladen hatte,

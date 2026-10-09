@@ -43,7 +43,7 @@ final class Karte extends Screen {
     private Component hinweis;
     /** Wo die Knöpfe rechts oben beginnen und enden; Marken und Namen weichen ihnen aus. */
     private int knopfX, knopfUnten;
-    /** Der Knopf für den Abgleich, oder null ohne Satz; er ist aus, bis ein Abgleich wieder geht. */
+    /** Der Knopf für den Abgleich, oder null ohne Satz vom Server; er ist aus, bis ein Abgleich wieder geht. */
     private Button abgleich;
     private String baum;
     /** Das Menü nach Rechtsklick: der Block, oder null, seine Einträge und wo es steht. */
@@ -91,7 +91,8 @@ final class Karte extends Screen {
         int x = width - KNOPF - 4;
         Button unterster = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.laden"),
                 b -> minecraft.gui.setScreen(new Auswahl(this))).bounds(x, 4, KNOPF, 20).build());
-        if (satz != null) {
+        // Eine selbst gezeichnete Karte hat keinen Abgleich. Siehe docs/selbst.md, „Wahl“.
+        if (satz != null && !Selbst.selbst(satz.ordner().getParent())) {
             // Der Baum ist der Ordner über dem Massstab.
             baum = satz.ordner().getParent().getFileName().toString();
             abgleich = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.abgleich"),
@@ -133,10 +134,12 @@ final class Karte extends Screen {
             g.text(font, hinweis, 4, height - 24, TEXT);
         }
         // Höchstens ein Abgleich je Tag: Nach einer Ablehnung mit wieder ist der Knopf bis dahin aus.
-        long ab = Downloads.INSTANZ.abgleichAb(baum);
-        abgleich.active = ab == 0;
-        abgleich.setMessage(ab == 0 ? Component.translatable("heroicmap.karte.abgleich")
-                : Component.translatable("heroicmap.karte.abgleich_ab", Downloads.uhr(ab)));
+        if (abgleich != null) {
+            long ab = Downloads.INSTANZ.abgleichAb(baum);
+            abgleich.active = ab == 0;
+            abgleich.setMessage(ab == 0 ? Component.translatable("heroicmap.karte.abgleich")
+                    : Component.translatable("heroicmap.karte.abgleich_ab", Downloads.uhr(ab)));
+        }
         super.extractRenderState(g, mausX, mausY, delta);
         if (ziel != null) {
             int b = menueBreite();
@@ -237,6 +240,10 @@ final class Karte extends Screen {
 
     int[] ziel() {
         return ziel;
+    }
+
+    Satz satz() {
+        return satz;
     }
 
     List<Marke> marken() {

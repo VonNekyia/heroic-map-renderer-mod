@@ -340,7 +340,10 @@ Platte (`Kartenliste`), auch die anderer Server und Welten:
   Schlüssel des Baums in der Reihe, siehe „Reihe“; wartet oder läuft dort
   schon ein Download, löscht sie nichts. Gelöscht wird der Ordner des Baums
   samt Inhalt in einem eigenen Thread (`Laden.loesche`), danach gibt sie
-  den Schlüssel frei und zählt neu.
+  den Schlüssel frei und zählt neu. Eine selbst gezeichnete Karte löscht
+  der Worker, der in sie zeichnet, siehe [Selbst gezeichnete Karte](selbst.md), „Wahl“.
+  Scheitert das Löschen, nennt die Liste den Fehler; Einzelheiten stehen
+  im Log.
 - **Mausrad** blättert, wenn nicht alle Karten auf den Schirm passen.
 
 ## Was bleibt eine Näherung

@@ -14,11 +14,12 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
+import net.minecraft.client.gui.screens.ConfirmScreen;
 
 /**
  * Bilder der Minimap zum Ansehen, nicht zum Vergleichen: baut eine Szene in einer flachen
  * Welt und nimmt die Minimap bei 1, 2 und 4 Pixeln je Block auf, danach das Menü und die
- * Vollbildkarte mit zwei Wegpunkten. Mit -Pbilder=&lt;ordner&gt; landen die Bilder dort. Siehe docs/minimap.md, „Bilder“.
+ * Vollbildkarte mit zwei Wegpunkten, zuletzt die selbst gezeichnete Karte der Szene. Mit -Pbilder=&lt;ordner&gt; landen die Bilder dort. Siehe docs/minimap.md, „Bilder“.
  */
 public final class Bilder implements FabricClientGameTest {
 
@@ -94,6 +95,7 @@ public final class Bilder implements FabricClientGameTest {
             }
             menue(context);
             vollbildkarte(context);
+            selbst(context, server);
         }
     }
 
@@ -168,6 +170,74 @@ public final class Bilder implements FabricClientGameTest {
         context.runOnClient(mc -> {
             mc.gui.setScreen(null);
             Wegpunkte.INSTANZ.leeren();
+        });
+    }
+
+    /**
+     * Die selbst gezeichnete Karte der Szene, gewählt wie ein Spieler: Karte ohne Satz, „Karte
+     * laden …“, „Selbst“, Ja, Zurück; die Karte zeigt dann die eigene. Während die Minimap jeden
+     * Tick zu tun hat, wird um den Spieler trotzdem alles gezeichnet; dann schreiben und auf der
+     * feinsten Stufe aufnehmen. Siehe docs/selbst.md, „Bild“.
+     */
+    private static void selbst(ClientGameTestContext context, TestServerContext server) {
+        Path welt = FabricLoader.getInstance().getGameDir().resolve(HeroicMap.ID).resolve("test").resolve("selbst");
+        try {
+            Laden.loesche(welt);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        context.runOnClient(mc -> {
+            Selbst.INSTANZ.fuerTest(welt);
+            Karte ohne = new Karte(null);
+            mc.gui.setScreen(ohne);
+            mc.gui.setScreen(new Auswahl(ohne));
+        });
+        context.waitTicks(2);
+        context.clickScreenButton("heroicmap.selbst.knopf");
+        context.waitFor(mc -> mc.gui.screen() instanceof ConfirmScreen, 100);
+        context.clickScreenButton("gui.yes");
+        context.waitTicks(2);
+        context.clickScreenButton("gui.back");
+        context.waitTicks(2);
+        String baum = context.computeOnClient(mc -> mc.gui.screen() instanceof Karte k && k.satz() != null
+                ? k.satz().ordner().getParent().getFileName().toString() : null);
+        if (baum == null || !baum.startsWith(Selbst.PRAEFIX)) {
+            throw new AssertionError("Nach „Selbst“ zeigt die Karte " + baum);
+        }
+        context.runOnClient(mc -> mc.gui.screen().onClose());
+
+        // Ein Block im Bereich der Minimap, ausserhalb des geprüften Radius, wechselt jeden Tick.
+        boolean fertig = false;
+        int ruhig = 0, ticks = 0;
+        for (int i = 0; i < 1200 && !fertig; i++) {
+            server.runCommand("setblock 50 -60 0 " + (i % 2 == 0 ? "stone" : "air"));
+            context.waitTick();
+            ticks++;
+            ruhig += context.computeOnClient(mc -> Minimap.INSTANZ.beschaeftigt()) ? 0 : 1;
+            fertig = context.computeOnClient(mc -> Selbst.INSTANZ.fertig(mc.player.chunkPosition(), 2));
+        }
+        // Nur wenn die Minimap jeden Tick zu tun hatte, prüft der Test den Vorrang.
+        if (ruhig > 0) {
+            throw new AssertionError("Die Minimap war in " + ruhig + " von " + ticks + " Ticks nicht beschäftigt");
+        }
+        if (!fertig) {
+            throw new AssertionError("Die eigene Karte wurde neben der beschäftigten Minimap nicht fertig");
+        }
+        context.computeOnClient(mc -> Selbst.INSTANZ.schreibeJetzt()).join();
+        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(welt, "minecraft:overworld"))));
+        context.waitTicks(40);
+        Path bild = context.takeScreenshot(TestScreenshotOptions.of("selbst").disableCounterPrefix());
+        try {
+            if (!AUSGABE.isEmpty()) {
+                Files.copy(bild, Path.of(AUSGABE, "selbst.png"), StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        context.runOnClient(mc -> {
+            mc.gui.screen().onClose();
+            Selbst.INSTANZ.fuerTest(null);
+            Selbst.INSTANZ.leeren();
         });
     }
 

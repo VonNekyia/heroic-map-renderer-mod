@@ -94,7 +94,8 @@ record Freigabe(String baum, String art, int massstab, long bytes, URI url, Stri
 
     /** Taugt {@code name} als Ordner eines Baums? */
     static boolean baum(String name) {
-        return BAUM.matcher(name).matches() && !reserviert(name);
+        // Das Präfix gehört der selbst gezeichneten Karte; ein Baum vom Server mischte sich sonst mit ihr.
+        return BAUM.matcher(name).matches() && !reserviert(name) && !name.startsWith(Selbst.PRAEFIX);
     }
 
     /** Hält Windows {@code name} für ein Gerät? */

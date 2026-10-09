@@ -4,13 +4,16 @@ import java.util.List;
 import java.util.Map;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
 /**
  * Die Karten, die der Server anbietet, je Baum ein Knopf je Massstab mit seiner Grösse. Ein Knopf
  * fragt wie {@code /hmap laden} erst im Dialog nach; den Massstab, den der Spieler schon ganz hat,
- * gleicht er ab wie {@code /hmap abgleich}. Siehe docs/vollbildkarte.md, „Bedienung“.
+ * gleicht er ab wie {@code /hmap abgleich}. Darüber die Wahl „Selbst“ für die Dimension des
+ * Spielers. Siehe docs/vollbildkarte.md, „Bedienung“;
+ * „Selbst“: siehe docs/selbst.md, „Wahl“.
  */
 final class Auswahl extends Screen {
 
@@ -20,6 +23,11 @@ final class Auswahl extends Screen {
 
     private final Screen zurueck;
     private List<Downloads.Baum> baeume = List.of();
+    /** Geht „Selbst“, und ist es an? Dazu die Dimension des Spielers. */
+    private boolean selbst, selbstAn;
+    /** Wurde hier „Selbst“ gewählt? Dann zeigt die Karte beim Zurückgehen die eigene. */
+    private boolean gewaehlt;
+    private String dimension;
     /** Was beim letzten Knopf schiefging, oder null. */
     private Component hinweis;
 
@@ -31,7 +39,17 @@ final class Auswahl extends Screen {
     @Override
     protected void init() {
         baeume = Downloads.INSTANZ.baeume();
+        selbst = Selbst.INSTANZ.moeglich(minecraft);
+        selbstAn = Selbst.INSTANZ.an(minecraft);
+        dimension = minecraft.level == null ? "" : minecraft.level.dimension().identifier().toString();
         int y = 34;
+        if (selbst) {
+            Button knopf = Button.builder(Component.translatable(selbstAn ? "heroicmap.selbst.an" : "heroicmap.selbst.knopf"),
+                    b -> frageSelbst()).bounds(width / 2 - 45, y + 12, 90, 20).build();
+            knopf.active = !selbstAn;
+            addRenderableWidget(knopf);
+            y += ZEILE;
+        }
         for (Downloads.Baum baum : baeume) {
             // Die Knöpfe teilen sich die Breite des Schirms, höchstens 90 Einheiten je Knopf.
             int n = Math.max(1, baum.bytes().size());
@@ -70,6 +88,11 @@ final class Auswahl extends Screen {
             g.centeredText(font, Component.translatable("heroicmap.angebot.keins"), width / 2, height / 2, TEXT);
         }
         int y = 34;
+        if (selbst) {
+            g.centeredText(font, Component.translatable("heroicmap.selbst.zeile", dimension),
+                    width / 2, y, TEXT);
+            y += ZEILE;
+        }
         for (Downloads.Baum baum : baeume) {
             g.centeredText(font, baum.name() + "  (" + baum.dimension() + ")", width / 2, y, TEXT);
             y += ZEILE;
@@ -80,8 +103,28 @@ final class Auswahl extends Screen {
         super.extractRenderState(g, mausX, mausY, delta);
     }
 
+    /** „Selbst“ erst nach Rückfrage: Ab dann zeigt die Vollbildkarte nur noch die eigene Karte. */
+    private void frageSelbst() {
+        minecraft.gui.setScreen(new ConfirmScreen(ja -> {
+            if (ja) {
+                hinweis = Selbst.INSTANZ.waehle(minecraft);
+                if (hinweis == null) {
+                    gewaehlt = true;
+                    hinweis = Component.translatable("heroicmap.selbst.gewaehlt");
+                }
+            }
+            minecraft.gui.setScreen(this);
+        }, Component.translatable("heroicmap.selbst.titel"), Component.translatable("heroicmap.selbst.frage")));
+    }
+
+    /** Zurück; kam die Liste von der Karte und wurde „Selbst“ gewählt, öffnet die Karte neu mit der eigenen. */
     @Override
     public void onClose() {
+        if (gewaehlt && zurueck instanceof Karte karte && minecraft.level != null) {
+            karte.onClose();
+            minecraft.gui.setScreen(new Karte(Satz.fuer(Selbst.INSTANZ.weltOrdner(), dimension)));
+            return;
+        }
         minecraft.gui.setScreen(zurueck);
     }
 

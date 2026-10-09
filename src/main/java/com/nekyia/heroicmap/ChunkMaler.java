@@ -52,7 +52,7 @@ final class ChunkMaler {
     /** Spalte ohne Inhalt, etwa eine Wand unter einer Decke. */
     private static final int LEER = Integer.MIN_VALUE;
     /** sRGB-Wert nach linearem Licht. */
-    private static final float[] LINEAR = new float[256];
+    static final float[] LINEAR = new float[256];
 
     static {
         for (int i = 0; i < 256; i++) {
@@ -554,7 +554,7 @@ final class ChunkMaler {
         return null;
     }
 
-    private static float srgb(float linear) {
+    static float srgb(float linear) {
         return linear <= 0.0031308f ? linear * 12.92f : (float) (1.055 * Math.pow(linear, 1 / 2.4) - 0.055);
     }
 
