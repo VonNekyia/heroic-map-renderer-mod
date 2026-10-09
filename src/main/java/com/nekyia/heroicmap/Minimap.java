@@ -38,6 +38,7 @@ import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.data.AtlasIds;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
@@ -64,6 +65,7 @@ public final class Minimap {
     private static final int[] MARKEN = {1, 2, 3, 0};
     /** Farbe der Chunklinien: Schwarz, zu 30 % deckend, so bleibt die Karte darunter lesbar. */
     static final int LINIE = 0x4D000000;
+    private static final int TEXT = 0xFFFFFFFF;
     /** Chunks je Seite einer Region, einer Textur. */
     static final int CHUNKS_JE_REGION = 8;
     /** Zeit je Frame auf dem Render-Thread für Abzüge und fertige Bilder. */
@@ -104,6 +106,10 @@ public final class Minimap {
     private boolean show = true;
     /** Chunklinien auf Minimap und Vollbildkarte, eine Vorliebe aus dem Untermenü. Siehe docs/minimap.md, „Chunklinien“. */
     private boolean chunklinien;
+    /** Koordinaten unter der Minimap. Siehe docs/minimap.md, „Koordinaten“. */
+    enum Koordinaten { AUS, XZ, XYZ }
+
+    private Koordinaten koordinaten = Koordinaten.XZ;
     /** Dreht die Minimap mit der Blickrichtung, die oben liegt. Siehe docs/minimap.md, „Drehen“. */
     private boolean drehen = true;
     /** Hat der Spieler Drehen selbst gewählt? Nur dann steht es in der Datei, sonst gilt die Vorgabe. */
@@ -271,6 +277,14 @@ public final class Minimap {
         this.chunklinien = chunklinien;
     }
 
+    Koordinaten koordinaten() {
+        return koordinaten;
+    }
+
+    void setzeKoordinaten(Koordinaten koordinaten) {
+        this.koordinaten = koordinaten;
+    }
+
     String skin() {
         return skin;
     }
@@ -390,6 +404,11 @@ public final class Minimap {
         rund = "rund".equals(p.getProperty("form"));
         show = !"hidden".equals(p.getProperty("show"));
         chunklinien = "true".equals(p.getProperty("chunklinien"));
+        koordinaten = switch (String.valueOf(p.getProperty("koordinaten")).trim()) {
+            case "aus" -> Koordinaten.AUS;
+            case "xyz" -> Koordinaten.XYZ;
+            default -> Koordinaten.XZ;
+        };
         // Vorgabe an. Ein altes drehen=true war gewählt, denn die Vorgabe war aus; ein altes drehen=false nicht unterscheidbar.
         String wahl = p.getProperty("drehen_wahl");
         drehenGewaehlt = wahl != null || "true".equals(p.getProperty("drehen"));
@@ -413,6 +432,7 @@ public final class Minimap {
         p.setProperty("form", rund ? "rund" : "eckig");
         p.setProperty("show", show ? "simplevoicechat" : "hidden");
         p.setProperty("chunklinien", Boolean.toString(chunklinien));
+        p.setProperty("koordinaten", koordinaten.name().toLowerCase(Locale.ROOT));
         if (drehenGewaehlt) {
             p.setProperty("drehen_wahl", Boolean.toString(drehen));
         }
@@ -572,6 +592,32 @@ public final class Minimap {
         } else {
             avatar(g, spieler, (float) (lage.cx() / k), (float) (lage.cy() / k), a, kopf, true);
         }
+        Object[] werte = werte(koordinaten, spieler.getX(), spieler.getY(), spieler.getZ());
+        if (werte != null) {
+            Component text = Component.translatable(werte.length == 3 ? "heroicmap.koordinaten_xyz" : "heroicmap.koordinaten", werte);
+            int breite = mc.font.width(text);
+            // Unter dem Ring oder den Ornamenten des Rahmens, die halb über die Ecken ragen.
+            int[] wo = koordinatenLage(r, rahmen == null ? 1 : rahmen.einrueckung(), g.guiHeight(), breite, mc.font.lineHeight);
+            g.text(mc.font, text, wo[0], wo[1], TEXT, true);
+        }
+    }
+
+    /** Die Zahlen unter der Minimap, die Blockkoordinaten des Spielers: keine, x und z, oder x, y und z. */
+    static Object[] werte(Koordinaten k, double x, double y, double z) {
+        return switch (k) {
+            case AUS -> null;
+            case XZ -> new Object[] {Mth.floor(x), Mth.floor(z)};
+            case XYZ -> new Object[] {Mth.floor(x), Mth.floor(y), Mth.floor(z)};
+        };
+    }
+
+    /**
+     * Wo der Text der Koordinaten links oben beginnt: mittig unter der Minimap, {@code ueberstand}
+     * Einheiten unter ihrem Rand und 2 Abstand; passt er dort nicht mehr auf den Schirm, ebenso darüber.
+     */
+    static int[] koordinatenLage(Rahmen r, int ueberstand, int schirmHoehe, int textBreite, int zeile) {
+        int x = r.x() + (r.seite() - textBreite) / 2, unter = r.y() + r.seite() + ueberstand + 2;
+        return new int[] {x, unter + zeile <= schirmHoehe ? unter : r.y() - ueberstand - 2 - zeile};
     }
 
     /** Die Seite eines Kopfes auf der Minimap: {@link #KOPF} bei 128 Einheiten, mit der Seite wachsend, mindestens 4. */
