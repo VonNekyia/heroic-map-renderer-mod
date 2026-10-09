@@ -511,6 +511,7 @@ public final class Minimap {
         LocalPlayer spieler = mc.player;
         ClientLevel level = mc.level;
         if (!sichtbar || spieler == null || level == null) {
+            gibUmrissFrei();
             return;
         }
         arbeite(mc, level, spieler);

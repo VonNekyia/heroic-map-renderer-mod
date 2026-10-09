@@ -32,11 +32,11 @@ record Gitter(Matrix3x2fc pose, int x0, int y0, int dicke, int farbe, Linien lin
         void fill(int xa, int ya, int xb, int yb);
     }
 
-    /** Hängt die Linien ab (x0, y0) unter der aktuellen Pose an; die Fläche w × h begrenzt sie. */
-    static void zeichne(GuiGraphicsExtractor g, int x0, int y0, int w, int h, int dicke, int farbe, Linien linien) {
+    /** Hängt die Linien ab (x0, y0) unter der aktuellen Pose an; ihre Fläche begrenzt sie. */
+    static void zeichne(GuiGraphicsExtractor g, int x0, int y0, int dicke, int farbe, Linien linien) {
         Matrix3x2f pose = new Matrix3x2f(g.pose());
         g.guiRenderState.addGuiElement(new Gitter(pose, x0, y0, dicke, farbe, linien,
-                new ScreenRectangle(x0, y0, w, h).transformMaxBounds(pose), null, null));
+                new ScreenRectangle(x0, y0, linien.breite(), linien.hoehe()).transformMaxBounds(pose), null, null));
     }
 
     /**

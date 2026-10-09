@@ -16,7 +16,7 @@ import java.util.Map;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 
-/** Die Rahmen: Palette, Bänder, Ring und Maske, Ornamente und Griff. Siehe docs/rahmen.md. */
+/** Die Rahmen: Palette, Bänder, Ring, Ornamente und Griff. Siehe docs/rahmen.md. */
 class SkinTest {
 
     private static final String ORDNER = "/assets/heroicmap/textures/gui/sprites/rahmen/";

@@ -34,7 +34,7 @@ Die Messung zum Drehen zeigte rund gedreht billiger als ungedreht, siehe
   der Ring der Bänder; dafür braucht ein Skin mindestens zwei Bänder.
   Siehe [Minimap](../minimap.md), „Form“.
 - **Rund bleibt rund:** Ohne Rahmen ist der Rand Pixel für Pixel wie
-  vorher, gezeigt bei GUI-Massstab 1 und 3. Das war die Bedingung des
+  vorher, gezeigt bei GUI-Massstab 1 und 2. Das war die Bedingung des
   Reviewers.
 
 Entschieden vom Reviewer am 09.10.

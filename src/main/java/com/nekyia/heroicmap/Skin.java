@@ -74,7 +74,7 @@ final class Skin {
         }
         TextureAtlas atlas = gui();
         if (atlas.sprites != atlasStand) {
-            // F3+T oder ein Ressourcenpaket: Paletten, Ringe und Masken neu.
+            // F3+T oder ein Ressourcenpaket: Paletten und Ringe neu.
             GELADEN.values().forEach(s -> {
                 if (s != null) {
                     s.freigeben();

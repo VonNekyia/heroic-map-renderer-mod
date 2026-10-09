@@ -295,7 +295,10 @@ Der Mod zeichnet die Minimap in Pixeln des Schirms, nicht des GUI
   `subPixelPrecisionBits`, je mindestens 4). Der Test verlangt darum
   1/16 Pixel Abstand zur nächsten Kante, innen wie aussen
   (`DrehungTest.ohneRahmenDecktDerUmrissDenRand`); ohne den Zuschlag ist
-  er rot. Innen bleibt so mehr als 1/16 Pixel, weil jede freie Pixelmitte
+  er rot. Das deckt das Runden auf dieses Raster, das eine Kante um
+  höchstens √2/32 ≈ 0,044 Pixel verschiebt. Schnitte die Karte die Ecken
+  ab statt zu runden, wären es bis √2/16 ≈ 0,088 Pixel; feinere Raster
+  verschieben weniger. Innen bleibt so mehr als 1/16 Pixel, weil jede freie Pixelmitte
   näher als n/2 liegt. Aussen ist es bei GUI-Massstab 1 und 256 Einheiten
   am knappsten, mit 0,78 Pixeln bis zum Rand des Umrisses. Bei 256
   Einheiten und GUI-Massstab 4 ragen die Ecken 0,7 Pixel über n/2, unter
@@ -313,7 +316,7 @@ Der Mod zeichnet die Minimap in Pixeln des Schirms, nicht des GUI
 
 ![Der Rand der runden Minimap ohne Rahmen bei GUI-Massstab 1](bilder/rund-gs1.png)
 
-![Der Rand der runden Minimap ohne Rahmen bei GUI-Massstab 3](bilder/rund-gs3.png)
+![Der Rand der runden Minimap ohne Rahmen bei GUI-Massstab 2](bilder/rund-gs2.png)
 
 ![Minimap rund bei 4 Pixeln je Block](bilder/minimap-rund.png)
 
@@ -540,7 +543,8 @@ gemessen:
 - **Neu gebaut,** wenn sich Seite oder GUI-Massstab ändern, beim Ziehen am
   Griff also bei jedem Schritt. Geschrieben werden nur die Stücke des
   Rings, bei 256 Einheiten und GUI-Massstab 4 rund 13 000 Pixel.
-- **Freigegeben,** sobald die Minimap eckig ist oder einen Rahmen hat.
+- **Freigegeben,** sobald die Minimap eckig ist, einen Rahmen hat oder
+  nicht zu sehen ist, auch ohne Welt.
 
 Bei 8 und 16 px, gemessen am 07.10., siehe
 [Minimap, 8 und 16 px](messungen/2026-10-07-minimap-8-16px.md):
@@ -568,7 +572,7 @@ Der Gametest `Bilder` baut eine Szene in einer flachen Welt und nimmt die
 Minimap bei 1, 2 und 4 Pixeln je Block auf, mit dem Zoom gleich der
 Auflösung, dann rund bei 4 px, das Menü und das Untermenü
 „Einstellungen …“ (siehe „Bedienung“ und „Form“), den Rand rund ohne
-Rahmen bei GUI-Massstab 1 und 3 (siehe „Form“), zuletzt die
+Rahmen bei GUI-Massstab 1 und 2 (siehe „Form“), zuletzt die
 Chunklinien auf Vollbildkarte und Minimap (siehe „Chunklinien“):
 
 ```bash

@@ -122,8 +122,8 @@ class DrehungTest {
     }
 
     /**
-     * Wie weit die Grafikkarte eine Kante höchstens verschiebt, wenn sie die Ecken auf ein Raster
-     * unter dem Pixel einrastet. Siehe docs/minimap.md, „Form“.
+     * Wie viel Abstand der Test zwischen Pixelmitte und Kante verlangt, gegen das Einrasten der Ecken
+     * auf ein Raster unter dem Pixel. Siehe docs/minimap.md, „Form“.
      */
     private static final double EINRASTEN = 1.0 / 16;
 

@@ -62,8 +62,9 @@ nachher das Vieleck.
 | rund, Flug schräg | aus | 0,443 (0,439–0,444) | 0,266 (0,265–0,268) | 0,687 | 0,423 | 0,076 | 0,006 |
 | rund, Flug schräg | an | 0,324 (0,320–0,325) | 0,275 (0,271–0,276) | 0,512 | 0,446 | 0,035 | 0,007 |
 
-Ohne Minimap lag die Frametime im Stand vorher bei 0,294 bis 0,310 ms im
-p50, nachher bei 0,290 bis 0,297 ms, je Block der vier Formen.
+Ohne Minimap lag die Frametime im Stand im p50, je Block in der Reihenfolge
+eckig aus, eckig an, rund aus, rund an: vorher 0,310, 0,306, 0,302 und
+0,294 ms, nachher 0,290, 0,293, 0,297 und 0,291 ms.
 
 ## Schluss
 
@@ -81,7 +82,8 @@ p50, nachher bei 0,290 bis 0,297 ms, je Block der vier Formen.
 ## Grenzen
 
 - **Immer main zuerst:** Die Reihe lief main, dann den Branch, ohne
-  Wechsel. Ohne Minimap lag die Frametime danach 0,003 bis 0,020 ms tiefer.
+  Wechsel. Ohne Minimap lag die Frametime danach je Block 0,003 bis
+  0,020 ms tiefer, siehe „Ergebnis“.
   Was kleiner ist als diese Drift, etwa ob eckig gleich bleibt, zeigt die
   Messung nicht. Rund ungedreht ist der Unterschied mit 0,377 ms ein
   Vielfaches davon.
