@@ -96,6 +96,11 @@ public final class Minimap {
     private boolean show = true;
     /** Chunklinien auf Minimap und Vollbildkarte, eine Vorliebe aus dem Untermenü. Siehe docs/minimap.md, „Chunklinien“. */
     private boolean chunklinien;
+    /** Der Rahmen, ein Name aus {@link Skin#NAMEN}; „ohne“ ist der Umriss. Siehe docs/rahmen.md. */
+    private String skin = Skin.OHNE;
+    /** Solange das Menü offen ist: die Ecke des Griffs, 0 bis 3, sonst -1; und ob die Maus auf ihm liegt. */
+    private int griffEcke = -1;
+    private boolean griffAktiv;
     private int groesse = GROESSE;
     /** Wie die Ordner der Welten heissen, siehe docs/download.md, „Ablage“. */
     private Downloads.Ablage ablage = Downloads.Ablage.IP;
@@ -240,6 +245,20 @@ public final class Minimap {
         this.chunklinien = chunklinien;
     }
 
+    String skin() {
+        return skin;
+    }
+
+    void setzeSkin(String skin) {
+        this.skin = Skin.NAMEN.contains(skin) ? skin : Skin.OHNE;
+    }
+
+    /** Vom Menü je Frame: wo der Griff liegt, -1 ohne Menü. Mit Skin zeichnet die Minimap ihn statt der zier. */
+    void griff(int ecke, boolean aktiv) {
+        griffEcke = ecke;
+        griffAktiv = aktiv;
+    }
+
     void setzeShow(boolean show) {
         this.show = show;
     }
@@ -269,14 +288,20 @@ public final class Minimap {
     }
 
     Rahmen rahmen(int breite, int hoehe) {
-        return rahmen(breite, hoehe, groesse, lageX, lageY);
+        return rahmen(breite, hoehe, groesse, lageX, lageY, rand());
+    }
+
+    /** Der Abstand zum Rand des Schirms: {@link #RAND}, mit Rahmen mindestens dessen Einrückung, so bleibt die zier ganz auf dem Schirm. */
+    int rand() {
+        Skin rahmen = Skin.von(skin);
+        return rahmen == null ? RAND : Math.max(RAND, rahmen.einrueckung());
     }
 
     /** Die Seite höchstens so gross, wie der Schirm erlaubt; die Lage verteilt den freien Platz. */
-    static Rahmen rahmen(int breite, int hoehe, int groesse, float lageX, float lageY) {
-        int seite = Math.max(1, Math.min(groesse, Math.min(breite, hoehe) - 2 * RAND));
-        return new Rahmen(RAND + Math.round(lageX * (breite - seite - 2 * RAND)),
-                RAND + Math.round(lageY * (hoehe - seite - 2 * RAND)), seite);
+    static Rahmen rahmen(int breite, int hoehe, int groesse, float lageX, float lageY, int rand) {
+        int seite = Math.max(1, Math.min(groesse, Math.min(breite, hoehe) - 2 * rand));
+        return new Rahmen(rand + Math.round(lageX * (breite - seite - 2 * rand)),
+                rand + Math.round(lageY * (hoehe - seite - 2 * rand)), seite);
     }
 
     /** Gibt der Minimap die Seite und legt sie dann wie {@link #verschiebe}. */
@@ -292,9 +317,9 @@ public final class Minimap {
 
     /** Legt die Minimap mit der linken oberen Ecke auf (x, y), soweit sie auf den Schirm passt. */
     void verschiebe(int x, int y, int breite, int hoehe) {
-        int s = rahmen(breite, hoehe).seite();
-        lageX = anteil(x - RAND, breite - s - 2 * RAND);
-        lageY = anteil(y - RAND, hoehe - s - 2 * RAND);
+        int s = rahmen(breite, hoehe).seite(), rand = rand();
+        lageX = anteil(x - rand, breite - s - 2 * rand);
+        lageY = anteil(y - rand, hoehe - s - 2 * rand);
     }
 
     private static float anteil(int wert, int platz) {
@@ -320,6 +345,7 @@ public final class Minimap {
         rund = "rund".equals(p.getProperty("form"));
         show = !"hidden".equals(p.getProperty("show"));
         chunklinien = "true".equals(p.getProperty("chunklinien"));
+        setzeSkin(String.valueOf(p.getProperty("rahmen")).trim());
         ablage = switch (String.valueOf(p.getProperty("ablage")).trim()) {
             case "hash" -> Downloads.Ablage.HASH;
             case "ip_port" -> Downloads.Ablage.IP_PORT;
@@ -338,6 +364,7 @@ public final class Minimap {
         p.setProperty("form", rund ? "rund" : "eckig");
         p.setProperty("show", show ? "simplevoicechat" : "hidden");
         p.setProperty("chunklinien", Boolean.toString(chunklinien));
+        p.setProperty("rahmen", skin);
         p.setProperty("ablage", ablage.name().toLowerCase(Locale.ROOT));
         p.setProperty("groesse", Integer.toString(groesse));
         p.setProperty("lage_x", Float.toString(lageX));
@@ -445,11 +472,15 @@ public final class Minimap {
         int k = mc.getWindow().getGuiScale(), n = r.seite() * k;
         int links = ecke(spieler.xo, spieler.getX(), a, zoom, k, n);
         int oben = ecke(spieler.zo, spieler.getZ(), a, zoom, k, n);
-        // Die Form einmal je Frame, für Karte und Linien.
-        List<int[]> form = laeufe(n, rund);
-        male(g, r, links, oben, k, form);
+        // Die Form einmal je Frame, für Karte und Linien; rund mit Skin innerhalb seiner Bänder.
+        Skin rahmen = Skin.von(skin);
+        List<int[]> form = rahmen != null && rund ? Skin.maskeRund(r.seite(), rahmen.baender(), k) : laeufe(n, rund);
+        male(g, r, links, oben, k, form, rahmen == null);
         if (chunklinien) {
             linien(g, r, links, oben, k, form);
+        }
+        if (rahmen != null) {
+            zeichneRahmen(g, rahmen, r);
         }
         float kopf = kopf(r.seite());
         String dimension = level.dimension().identifier().toString();
@@ -553,15 +584,17 @@ public final class Minimap {
      * Zeichnet Rand und Regionen in Pixeln des Schirms, Lauf für Lauf der Form; eckig ist das ein
      * einziger Lauf. Siehe docs/minimap.md, „Form“.
      */
-    private void male(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k, List<int[]> form) {
+    private void male(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k, List<int[]> form, boolean umriss) {
         // Eine Region in Pixeln des Schirms nach dem Zoom; die Textur trifft sie über die Koordinaten 0 bis 1.
         int s = CHUNKS_JE_REGION * 16 * zoom * k;
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.scale(1f / k);
         int x0 = r.x() * k, y0 = r.y() * k, n = r.seite() * k;
-        for (int[] l : laeufe(n + 2 * k, rund)) {
-            g.fill(x0 - k + l[2], y0 - k + l[0], x0 - k + l[3], y0 - k + l[1], 0xFF000000);
+        if (umriss) {
+            for (int[] l : laeufe(n + 2 * k, rund)) {
+                g.fill(x0 - k + l[2], y0 - k + l[0], x0 - k + l[3], y0 - k + l[1], 0xFF000000);
+            }
         }
         for (int rz = Math.floorDiv(oben, s); rz <= Math.floorDiv(oben + n - 1, s); rz++) {
             for (int rx = Math.floorDiv(links, s); rx <= Math.floorDiv(links + n - 1, s); rx++) {
@@ -582,6 +615,24 @@ public final class Minimap {
             }
         }
         pose.popMatrix();
+    }
+
+    /**
+     * Der Rahmen eines Skins über Karte und Linien, in Einheiten des GUI: die Bänder, eckig als
+     * Rechtecke, rund als Ring; dann die zier an den Ecken, im Menü an der Ecke des Griffs der Griff.
+     * Siehe docs/rahmen.md.
+     */
+    private void zeichneRahmen(GuiGraphicsExtractor g, Skin skin, Rahmen r) {
+        if (rund) {
+            g.blit(skin.ring(r.seite()), r.x(), r.y(), r.x() + r.seite(), r.y() + r.seite(), 0, 1, 0, 1);
+        } else {
+            skin.baender(g, r.x(), r.y(), r.seite(), r.seite());
+        }
+        double[][] ecken = Skin.ecken(r.x(), r.y(), r.seite(), r.seite(), skin.baender(), rund);
+        for (int e = 0; e < ecken.length; e++) {
+            boolean griff = e == griffEcke;
+            skin.ornament(g, griff ? "griff" : "zier", griff ? griffAktiv : griffEcke >= 0, e, ecken[e][0], ecken[e][1]);
+        }
     }
 
     /** Die Chunklinien als ein Element des GUI, in Pixeln des Schirms. Siehe docs/minimap.md, „Chunklinien“. */

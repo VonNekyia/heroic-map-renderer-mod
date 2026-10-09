@@ -1,0 +1,6 @@
+// heroicmap Rahmen 'holz': Linie aussen -> innen, eine Zeile je 1-px-Band.
+// Zwei Werte = Licht (oben/links) Schatten (unten/rechts).
+#181616
+#53381A #3E2912
+#291A0C
+#FAD64A #DC9613
