@@ -211,6 +211,12 @@ Vollbildkarte bleibt genordet. So hat es der User gewünscht.
   ins Bild.
 - **Mit Rahmen** bleiben die Ornamente in den Ecken; N, O, S und W wandern
   am Rahmen, siehe [Rahmen](rahmen.md), „Marken“.
+- **Kosten** je Frame, gemessen am 09.10. bei 4 px und Zoom 4, siehe
+  [Minimap, Drehen](messungen/2026-10-09-minimap-drehen.md): eckig im Stand
+  0,017 ms mehr Frametime im p50, im Flug nichts über der Streuung. Rund
+  ist gedreht billiger als ungedreht, im Stand 0,410 statt 0,715 ms, im
+  HUD-Element 0,077 statt 0,335 ms: ein Vieleck je Region statt eines
+  Blits je Lauf.
 
 ## Mitspieler
 
