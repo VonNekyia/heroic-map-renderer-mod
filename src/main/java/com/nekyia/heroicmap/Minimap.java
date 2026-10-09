@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
@@ -92,6 +93,8 @@ public final class Minimap {
     /** Die Wahl {@code show}: Mitspieler über Simple Voice Chat zeigen und gezeigt werden, oder versteckt. */
     private boolean show = true;
     private int groesse = GROESSE;
+    /** Wie die Ordner der Welten heissen, siehe docs/download.md, „Ablage“. */
+    private Downloads.Ablage ablage = Downloads.Ablage.IP;
     /** Die Lage im freien Platz des Schirms: 0 links oder oben, 1 rechts oder unten. */
     private float lageX = 1, lageY = 0;
     final LongLinkedOpenHashSet offen = new LongLinkedOpenHashSet();
@@ -229,6 +232,14 @@ public final class Minimap {
         return rund;
     }
 
+    Downloads.Ablage ablage() {
+        return ablage;
+    }
+
+    void setzeAblage(Downloads.Ablage ablage) {
+        this.ablage = ablage;
+    }
+
     void setzeRund(boolean rund) {
         this.rund = rund;
     }
@@ -292,6 +303,11 @@ public final class Minimap {
         zoom = z == 1 || z == 4 || z == 8 ? z : 2;
         rund = "rund".equals(p.getProperty("form"));
         show = !"hidden".equals(p.getProperty("show"));
+        ablage = switch (String.valueOf(p.getProperty("ablage")).trim()) {
+            case "hash" -> Downloads.Ablage.HASH;
+            case "ip_port" -> Downloads.Ablage.IP_PORT;
+            default -> Downloads.Ablage.IP;
+        };
         groesse = Mth.clamp(zahl(p.getProperty("groesse"), GROESSE), KLEINSTE, GROESSTE);
         lageX = bruch(p.getProperty("lage_x"), 1);
         lageY = bruch(p.getProperty("lage_y"), 0);
@@ -304,6 +320,7 @@ public final class Minimap {
         p.setProperty("zoom", Integer.toString(zoom));
         p.setProperty("form", rund ? "rund" : "eckig");
         p.setProperty("show", show ? "simplevoicechat" : "hidden");
+        p.setProperty("ablage", ablage.name().toLowerCase(Locale.ROOT));
         p.setProperty("groesse", Integer.toString(groesse));
         p.setProperty("lage_x", Float.toString(lageX));
         p.setProperty("lage_y", Float.toString(lageY));

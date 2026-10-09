@@ -23,7 +23,7 @@ record Satz(Path ordner, String name, String dimension, int massstab, int kachel
         };
     }
 
-    /** Der Satz für {@code dimension} unter dem Ordner eines Servers, oder null. */
+    /** Der Satz für {@code dimension} unter dem Ordner einer Welt, oder null. */
     static Satz fuer(Path server, String dimension) {
         if (server == null || !Files.isDirectory(server)) {
             return null;

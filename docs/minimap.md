@@ -41,7 +41,10 @@ steht unter „Kosten“.
 | Zoom der Minimap | 2× | 1, 2, 4 oder 8 Einheiten des GUI je Block: wie viel Gegend die Minimap zeigt |
 | Auflösung der Minimap | 2 px je Block | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet |
 | Form | eckig | eckig oder rund, siehe „Form“ |
+| Mitspieler | Simple Voice Chat | siehe „Mitspieler“ |
+| Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
 | Knopf „Karte laden …“ | – | die Karten des Servers, wie in der [Vollbildkarte](vollbildkarte.md), „Bedienung“ |
+| Knopf „Kartenliste …“ | – | alle Karten auf der Platte mit Grösse und Summe in GB, mit Löschen, siehe [Download](download.md), „Kartenliste“ |
 
 - **Zoom und Auflösung** sind getrennt. Der Zoom legt fest, wie viel
   Gegend die Minimap zeigt: bei 128 Einheiten Seite 128 Blöcke bei 1×,
@@ -66,8 +69,10 @@ steht unter „Kosten“.
   Schirm Platz hat. Grösser zeigt mehr Gegend beim selben Zoom und
   zeichnet mehr Chunks, siehe „Neu zeichnen“, „Bereich“.
 - **Knöpfe** stehen im grösseren freien Platz neben der Minimap, 200
-  Einheiten breit oder schmaler, bis 120, wenn dort weniger Platz ist. So
-  passen sie auch bei grossem GUI-Massstab auf den Schirm.
+  Einheiten breit oder schmaler, bis 120, wenn dort weniger Platz ist.
+  „Minimap“ und „Form“ teilen sich eine Zeile, ebenso „Karte laden …“ und
+  „Kartenliste …“. So passen sie auch bei grossem GUI-Massstab auf den
+  Schirm, bis 240 Einheiten Höhe, etwa 1280 × 720 bei GUI-Massstab 3.
 - **Koordinaten:** Im Menü stehen über der Minimap `x` und `z` des Blocks
   unter der Maus fest unten links, wie auf der Karte im Browser, genau wie
   gezeichnet; nicht beim Ziehen. Zum Umschauen dient die
@@ -108,8 +113,9 @@ gibt es nicht; so hat es der User gewählt.
   `heroicmap.show` auf beiden Seiten, Vorgabe alle, mit Simple Voice Chat
   auf dem Server und wenn beide `simplevoicechat` gewählt haben. Er antwortet
   `{"typ":"show","erlaubt":true}`, oder mit `"erlaubt":false` und `grund`
-  `permission` oder `simplevoicechat`; das Menü nennt den Grund unter den
-  Knöpfen (`Mitspieler.antwort`), ein anderer Grund wird ein allgemeiner
+  `permission` oder `simplevoicechat`; das Menü nennt den Grund als
+  Tooltip am Knopf „Mitspieler“ und unter den Knöpfen, soweit der Schirm
+  reicht (`Mitspieler.antwort`), ein anderer Grund wird ein allgemeiner
   Text. Beim Verlassen des Servers fällt die Antwort weg.
 
 - **Nachricht:** `spieler` über den Kanal, etwa einmal je Sekunde:

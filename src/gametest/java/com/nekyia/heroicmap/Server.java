@@ -2,6 +2,7 @@ package com.nekyia.heroicmap;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Path;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
@@ -36,8 +37,10 @@ public final class Server implements FabricClientGameTest {
             return;
         }
         try {
-            // Ein Satz aus einem früheren Lauf liesse den Test vor dem Download enden.
-            Laden.loesche(FabricLoader.getInstance().getGameDir().resolve(HeroicMap.ID).resolve(Downloads.name(ADRESSE)));
+            // Ein Satz aus einem früheren Lauf liesse den Test vor dem Download enden, auch in der alten Ablage.
+            Path wurzel = FabricLoader.getInstance().getGameDir().resolve(HeroicMap.ID);
+            Laden.loesche(wurzel.resolve(Downloads.name(ADRESSE)));
+            Laden.loesche(wurzel.resolve(Downloads.name(ServerAddress.parseString(ADRESSE).getHost())));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -83,6 +86,6 @@ public final class Server implements FabricClientGameTest {
 
     /** Der vollständig geladene Satz des Baums, oder null, solange der Download läuft. */
     private static Satz satz(Downloads.Baum baum) {
-        return Satz.fuer(Downloads.serverOrdner(), baum.dimension());
+        return Satz.fuer(Downloads.weltOrdner(), baum.dimension());
     }
 }

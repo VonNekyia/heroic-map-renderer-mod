@@ -71,8 +71,9 @@ sagt sie das und zeigt nichts.
 - **Je Baum** schreibt der Mod nach einem vollständigen Download
   `satz.json` neben die Massstäbe: Name und Dimension aus dem `angebot`,
   dazu der Massstab. Ein gekappter Download schreibt sie nicht.
-- **Die Karte** nimmt unter dem Ordner des Servers den Baum, dessen
-  Dimension die des Spielers ist (`Satz.fuer`). Kachelgrösse, Stufen und
+- **Die Karte** nimmt unter dem Ordner der Welt den Baum, dessen
+  Dimension die des Spielers ist (`Satz.fuer`), siehe
+  [Download](download.md), „Ablage“. Kachelgrösse, Stufen und
   `scale` liest sie aus `map.json` des Satzes.
 - **`map.json` kommt vom Server** und hat deshalb Grenzen (`Satz.lies`):
 

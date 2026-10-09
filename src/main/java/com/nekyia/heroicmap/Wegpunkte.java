@@ -14,13 +14,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 
 /**
  * Die Wegpunkte des Spielers und was er auf der Minimap angeheftet hat, Wegpunkte wie Mitspieler.
- * Je Server in {@code wegpunkte.json} im Ordner des Servers; im Einzelspieler nur im Speicher.
+ * Je Welt in {@code wegpunkte.json} im Ordner der Welt; im Einzelspieler nur im Speicher.
  * Nur der Render-Thread liest und ändert sie. Siehe docs/wegpunkte.md.
  */
 final class Wegpunkte {
@@ -39,10 +40,21 @@ final class Wegpunkte {
     private final Set<UUID> spieler = new LinkedHashSet<>();
     /** Die Datei, oder null im Einzelspieler. */
     private Path datei;
+    /** Ist gelesen, seit dem letzten Leeren? */
+    private boolean geladen;
+
+    /** Beim Wechsel der Welt: liest die Wegpunkte aus {@code ordner}, wenn es ein anderer ist als bisher. Siehe docs/wegpunkte.md, „Ablage“. */
+    void wechsel(Path ordner) {
+        Path neu = ordner == null ? null : ordner.resolve("wegpunkte.json");
+        if (!geladen || !Objects.equals(neu, datei)) {
+            lies(ordner);
+        }
+    }
 
     /** Liest die Wegpunkte des Servers in {@code ordner}; null heisst nur im Speicher. Ein unlesbarer Eintrag fällt weg. */
     void lies(Path ordner) {
         leeren();
+        geladen = true;
         datei = ordner == null ? null : ordner.resolve("wegpunkte.json");
         if (datei == null || !Files.exists(datei)) {
             return;
@@ -111,6 +123,7 @@ final class Wegpunkte {
         punkte.clear();
         spieler.clear();
         datei = null;
+        geladen = false;
     }
 
     List<Punkt> punkte() {

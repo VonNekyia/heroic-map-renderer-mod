@@ -10,6 +10,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.TestInput;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 
@@ -30,6 +31,7 @@ public final class Bedienung implements FabricClientGameTest {
         // Mit Befehlen, sonst schickt der Server execute und tp nicht, und das Teleport-Menü fehlt.
         try (TestSingleplayerContext spiel = context.worldBuilder().adjustSettings(s -> s.setAllowCommands(true)).create()) {
             spiel.getConnection().waitForChunksRender();
+            kleinerSchirm(context);
             context.runOnClient(mc -> mc.gui.setScreen(new Einstellungen()));
             context.waitTicks(2);
             int k = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
@@ -275,6 +277,46 @@ public final class Bedienung implements FabricClientGameTest {
         return context.computeOnClient(mc -> ((Karte) mc.gui.screen()).marken().stream()
                 .filter(m -> m.punkt() != null && m.punkt().x() == punkt.x() && m.punkt().z() == punkt.z())
                 .findFirst().orElseThrow(() -> new AssertionError("Keine Marke für " + punkt)));
+    }
+
+    /**
+     * Bei 1280 × 720 und GUI-Massstab 3, 240 Einheiten hoch, liegt jeder Knopf des Menüs ganz auf
+     * dem Schirm. Siehe docs/minimap.md, „Bedienung“.
+     */
+    private static void kleinerSchirm(ClientGameTestContext context) {
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(),
+                mc.options.guiScale().get()});
+        // Die Wahl allein rechnet den Massstab nicht neu; das tut erst resizeGui, wie das Menü der Optionen.
+        context.getInput().resizeWindow(1280, 720);
+        context.runOnClient(mc -> {
+            mc.options.guiScale().set(3);
+            mc.resizeGui();
+        });
+        context.waitTicks(2);
+        context.runOnClient(mc -> mc.gui.setScreen(new Einstellungen()));
+        context.waitTicks(2);
+        String fehler = context.computeOnClient(mc -> {
+            int hoehe = mc.getWindow().getGuiScaledHeight();
+            if (hoehe != 240) {
+                return "Höhe " + hoehe + " statt 240";
+            }
+            for (Object kind : mc.gui.screen().children()) {
+                if (kind instanceof AbstractWidget w && w.getY() + w.getHeight() > hoehe) {
+                    return w.getMessage().getString() + " endet bei " + (w.getY() + w.getHeight()) + " von " + hoehe;
+                }
+            }
+            return null;
+        });
+        context.getInput().resizeWindow(vorher[0], vorher[1]);
+        context.runOnClient(mc -> {
+            mc.gui.setScreen(null);
+            mc.options.guiScale().set(vorher[2]);
+            mc.resizeGui();
+        });
+        context.waitTicks(2);
+        if (fehler != null) {
+            throw new AssertionError("Menü bei 1280 × 720, GUI-Massstab 3: " + fehler);
+        }
     }
 
     private static Minimap.Rahmen rahmen(ClientGameTestContext context) {
