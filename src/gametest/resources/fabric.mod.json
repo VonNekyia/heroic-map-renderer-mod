@@ -6,6 +6,7 @@
   "environment": "client",
   "entrypoints": {
     "fabric-client-gametest": [
+      "com.nekyia.heroicmap.Anmeldung",
       "com.nekyia.heroicmap.Bilder",
       "com.nekyia.heroicmap.Messung",
       "com.nekyia.heroicmap.Uebernahme",
