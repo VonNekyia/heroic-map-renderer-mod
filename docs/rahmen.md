@@ -109,8 +109,6 @@ Vorgabe.
   Kategorie rechnet sie nur neu, wenn sich das Biom ändert. Während der
   Überblendung zeichnet sie zwei Rahmen.
 
-![Der Rahmen „biom“ in der Szene des Gametests](bilder/rahmen-biom.png)
-
 ## Dateien
 
 Je Skin ein Ordner `assets/heroicmap/textures/gui/sprites/rahmen/<skin>/`,
