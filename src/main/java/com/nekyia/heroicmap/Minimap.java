@@ -108,6 +108,8 @@ public final class Minimap {
     private long uebernommen;
     /** Wann {@code arbeite} zuletzt lief, in ns; ohne HUD läuft es nicht. */
     private long gearbeitet;
+    /** Nur für den Gametest: gilt immer als beschäftigt. Siehe docs/selbst.md, „Bild“. */
+    private volatile boolean beschaeftigtFuerTest;
     private final Long2ObjectMap<Region> regionen = new Long2ObjectOpenHashMap<>();
     private final ArrayDeque<CompletableFuture<Bild>> laufend = new ArrayDeque<>();
     /** Zählt jedes Leeren mit; ein Bild aus einem älteren Stand fällt weg. */
@@ -382,7 +384,11 @@ public final class Minimap {
      * Arbeit gilt sie nicht mehr als beschäftigt.
      */
     boolean beschaeftigt() {
-        return sichtbar && !fertig() && System.nanoTime() - gearbeitet < 1_000_000_000L;
+        return beschaeftigtFuerTest || sichtbar && !fertig() && System.nanoTime() - gearbeitet < 1_000_000_000L;
+    }
+
+    void fuerTestBeschaeftigt(boolean an) {
+        beschaeftigtFuerTest = an;
     }
 
     /** Die Texel des Block-Atlas, nach einem Neuladen neu kopiert; auf dem Render-Thread. */
@@ -578,17 +584,26 @@ public final class Minimap {
         pose.popMatrix();
     }
 
-    /**
-     * Die Chunklinien in Pixeln des Schirms, auf dem Raster der Karte: Die Linie von Chunk c beginnt
-     * auf dem Pixel, auf dem die Karte Block 16·c zeichnet, und ist eine Einheit breit. Rund nur, wo
-     * sie ganz in der Form liegt. Keine Allokation je Linie. Siehe docs/minimap.md, „Chunklinien“.
-     */
+    /** Die Chunklinien als ein Element des GUI, in Pixeln des Schirms. Siehe docs/minimap.md, „Chunklinien“. */
     private void linien(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k, List<int[]> form) {
-        int n = r.seite() * k, schritt = 16 * zoom * k, x0 = r.x() * k, y0 = r.y() * k;
+        int n = r.seite() * k;
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.scale(1f / k);
-        for (int px = linie(Math.ceilDiv(links, schritt), zoom, k, links); px + k <= n; px += schritt) {
+        Gitter.zeichne(g, r.x() * k, r.y() * k, n, n, k, LINIE, linien(n, links, oben, 16 * zoom * k, k, form));
+        pose.popMatrix();
+    }
+
+    /**
+     * Die Chunklinien im Bild der Minimap mit der Seite n, auf dem Raster der Karte: Die Linie von
+     * Chunk c beginnt auf dem Pixel, auf dem die Karte Block 16·c zeichnet ({@link #pixel}), alle
+     * {@code schritt} Pixel, und ist k breit. Nur Linien ganz im Bild; rund nur, wo sie ganz in der
+     * Form liegen.
+     */
+    static Gitter.Linien linien(int n, int links, int oben, int schritt, int k, List<int[]> form) {
+        int m = n / schritt + 1, nx = 0, ny = 0;
+        int[] xs = new int[m], va = new int[m], vb = new int[m], ys = new int[m], ha = new int[m], hb = new int[m];
+        for (int px = Math.ceilDiv(links, schritt) * schritt - links; px + k <= n; px += schritt) {
             // Die Läufe, die die Linie ganz enthalten, folgen im Kreis aufeinander.
             int ya = -1, yb = -1;
             for (int[] l : form) {
@@ -598,10 +613,12 @@ public final class Minimap {
                 }
             }
             if (ya >= 0) {
-                g.fill(x0 + px, y0 + ya, x0 + px + k, y0 + yb, LINIE);
+                xs[nx] = px;
+                va[nx] = ya;
+                vb[nx++] = yb;
             }
         }
-        for (int pz = linie(Math.ceilDiv(oben, schritt), zoom, k, oben); pz + k <= n; pz += schritt) {
+        for (int pz = Math.ceilDiv(oben, schritt) * schritt - oben; pz + k <= n; pz += schritt) {
             int xa = 0, xb = n;
             boolean drin = false;
             for (int[] l : form) {
@@ -612,15 +629,12 @@ public final class Minimap {
                 }
             }
             if (drin && xa < xb) {
-                g.fill(x0 + xa, y0 + pz, x0 + xb, y0 + pz + k, LINIE);
+                ys[ny] = pz;
+                ha[ny] = xa;
+                hb[ny++] = xb;
             }
         }
-        pose.popMatrix();
-    }
-
-    /** Der Pixel im Bild der Minimap, ab dem die Linie von Chunk c liegt: wie {@link #pixel} für Block 16·c. */
-    static int linie(int chunk, int zoom, int k, int links) {
-        return 16 * chunk * zoom * k - links;
+        return new Gitter.Linien(xs, va, vb, nx, ys, ha, hb, ny);
     }
 
     /**

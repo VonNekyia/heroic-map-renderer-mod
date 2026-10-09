@@ -95,7 +95,7 @@ public final class Bilder implements FabricClientGameTest {
             }
             menue(context);
             vollbildkarte(context);
-            selbst(context, server);
+            selbst(context);
         }
     }
 
@@ -184,11 +184,11 @@ public final class Bilder implements FabricClientGameTest {
 
     /**
      * Die selbst gezeichnete Karte der Szene, gewählt wie ein Spieler: Karte ohne Satz, „Karte
-     * laden …“, „Selbst“, Ja, Zurück; die Karte zeigt dann die eigene. Während die Minimap jeden
-     * Tick zu tun hat, wird um den Spieler trotzdem alles gezeichnet; dann schreiben und auf der
-     * feinsten Stufe aufnehmen. Siehe docs/selbst.md, „Bild“.
+     * laden …“, „Selbst“, Ja, Zurück; die Karte zeigt dann die eigene. Auch wenn die Minimap als
+     * beschäftigt gilt, wird um den Spieler alles gezeichnet; dann schreiben und auf der feinsten
+     * Stufe aufnehmen. Siehe docs/selbst.md, „Bild“.
      */
-    private static void selbst(ClientGameTestContext context, TestServerContext server) {
+    private static void selbst(ClientGameTestContext context) {
         Path welt = FabricLoader.getInstance().getGameDir().resolve(HeroicMap.ID).resolve("test").resolve("selbst");
         try {
             Laden.loesche(welt);
@@ -197,6 +197,8 @@ public final class Bilder implements FabricClientGameTest {
         }
         context.runOnClient(mc -> {
             Selbst.INSTANZ.fuerTest(welt);
+            // Die Minimap gilt ab der Wahl als beschäftigt: Die eigene Karte bekommt höchstens einen Chunk je Tick.
+            Minimap.INSTANZ.fuerTestBeschaeftigt(true);
             Karte ohne = new Karte(null);
             mc.gui.setScreen(ohne);
             mc.gui.setScreen(new Auswahl(ohne));
@@ -215,33 +217,8 @@ public final class Bilder implements FabricClientGameTest {
         }
         context.runOnClient(mc -> mc.gui.screen().onClose());
 
-        // Bei Zoom 2 wechselt jeden Tick in jedem Chunk der Minimap ausserhalb des geprüften Radius, Abstand 3
-        // und 4, ein Block unter der Oberfläche: 56 Chunks, mehr, als ihr Worker in einem Tick zeichnet.
-        context.runOnClient(mc -> Minimap.INSTANZ.setzeZoom(2));
-        boolean fertig = false;
-        int ruhig = 0, ticks = 0;
-        for (int i = 0; i < 1200 && !fertig; i++) {
-            String block = i % 2 == 0 ? "stone" : "dirt";
-            for (int d : new int[] {3, 4}) {
-                // Je Seite des Rings eine Linie durch die Mitte seiner Chunks.
-                int a = -16 * d + 8, b = 16 * d + 8;
-                server.runCommand("fill " + a + " -63 " + a + " " + b + " -63 " + a + " " + block);
-                server.runCommand("fill " + a + " -63 " + b + " " + b + " -63 " + b + " " + block);
-                server.runCommand("fill " + a + " -63 " + a + " " + a + " -63 " + b + " " + block);
-                server.runCommand("fill " + b + " -63 " + a + " " + b + " -63 " + b + " " + block);
-            }
-            context.waitTick();
-            ticks++;
-            ruhig += context.computeOnClient(mc -> Minimap.INSTANZ.beschaeftigt()) ? 0 : 1;
-            fertig = context.computeOnClient(mc -> Selbst.INSTANZ.fertig(mc.player.chunkPosition(), 2));
-        }
-        // Nur wenn die Minimap jeden Tick zu tun hatte, prüft der Test den Vorrang.
-        if (ruhig > 0) {
-            throw new AssertionError("Die Minimap war in " + ruhig + " von " + ticks + " Ticks nicht beschäftigt");
-        }
-        if (!fertig) {
-            throw new AssertionError("Die eigene Karte wurde neben der beschäftigten Minimap nicht fertig");
-        }
+        context.waitFor(mc -> Selbst.INSTANZ.fertig(mc.player.chunkPosition(), 2), 1200);
+        context.runOnClient(mc -> Minimap.INSTANZ.fuerTestBeschaeftigt(false));
         context.computeOnClient(mc -> Selbst.INSTANZ.schreibeJetzt()).join();
         context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(welt, "minecraft:overworld"))));
         context.waitTicks(40);
@@ -250,7 +227,10 @@ public final class Bilder implements FabricClientGameTest {
         context.runOnClient(mc -> Minimap.INSTANZ.setzeChunklinien(true));
         context.waitTicks(2);
         Path linien = context.takeScreenshot(TestScreenshotOptions.of("chunklinien").disableCounterPrefix());
-        context.runOnClient(mc -> mc.gui.screen().onClose());
+        context.runOnClient(mc -> {
+            mc.gui.screen().onClose();
+            Minimap.INSTANZ.setzeZoom(2);
+        });
         context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
         context.waitTicks(2);
         Path minimapLinien = context.takeScreenshot(TestScreenshotOptions.of("minimap-chunklinien").disableCounterPrefix());

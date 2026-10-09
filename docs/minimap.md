@@ -1,6 +1,6 @@
 ---
 title: Minimap
-description: Bedienung über das Menü hinter /hmap, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
+description: Bedienung über das Menü hinter /hmap und das Untermenü „Einstellungen …“, Chunklinien, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
 code:
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/ChunkMaler.java
@@ -9,6 +9,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/Einstellungen.java
   - src/main/java/com/nekyia/heroicmap/Anzeige.java
   - src/main/java/com/nekyia/heroicmap/Kartenblick.java
+  - src/main/java/com/nekyia/heroicmap/Gitter.java
   - src/main/java/com/nekyia/heroicmap/Mitspieler.java
   - src/test/java/com/nekyia/heroicmap/MitspielerTest.java
   - src/main/java/com/nekyia/heroicmap/mixin/LevelExtractorMixin.java
@@ -123,25 +124,42 @@ Vorgabe aus. So hat es der User gewünscht.
   Chunks liegt auf seinem ersten Block, westlich und nördlich.
 - **Auf dem Raster der Karte,** sonst wackelten die Linien beim Ziehen und
   Laufen: auf der Minimap von der Kante des Bildes aus `Minimap.ecke`, wie
-  die Regionen (`Minimap.linie`, gleich `Minimap.pixel` für Block 16·c);
+  die Regionen (`Minimap.linien`, gleich `Minimap.pixel` für Block 16·c);
   auf der Vollbildkarte von der ganzzahligen Kante aus `Kartenblick`, wie
-  Kacheln und Marken (`Kartenblick.rasterX`).
+  Kacheln und Marken (`Kartenblick.linien`, `Kartenblick.rasterX`).
+- **Kreuzungen:** Die waagrechten Linien sparen die Spalten der
+  senkrechten aus (`Gitter.rechtecke`). So ist eine Kreuzung so dunkel wie
+  die Linie, nicht 51 % statt 30 %; so ist es im Review entschieden.
+- **Ein Element je Frame:** Alle Linien einer Karte sind ein Element des
+  GUI (`Gitter`); die Rechtecke entstehen erst beim Zeichnen. Dafür öffnet
+  der Access Widener `GuiGraphicsExtractor.guiRenderState`.
 - **Rund** zeichnet die Minimap eine Linie nur, wo sie ganz in der Form
   liegt, über dieselben Läufe wie die Karte.
-- **Zu dicht:** Liegen die Linien näher als 4 Einheiten
-  (`Kartenblick.LINIEN_MIN`), zeichnet die Vollbildkarte keine, etwa bei
-  `scale` 4 ab zwei Stufen unter der feinsten. Auf der Minimap liegen sie
+- **Zu dicht:** Ist der Abstand der Linien auf der Vollbildkarte kleiner
+  als 4 Einheiten (`Kartenblick.LINIEN_MIN`, `Kartenblick.chunklinien`),
+  zeichnet sie keine. Der Abstand ist `16 · scale / teiler · lupe`; auf
+  welcher Stufe das eintritt, hängt am Satz. Auf der Minimap liegen sie
   mindestens 16 Einheiten auseinander, bei Zoom 1×.
 - **Für jede Karte gleich,** die vom Server wie die
   [selbst gezeichnete](selbst.md): Die Vollbildkarte rechnet nur mit
   `scale` aus `map.json` und dem Raster der Kacheln.
-- **Kosten** je Frame, geschätzt, nicht gemessen: auf der Minimap
-  höchstens 17 Linien je Richtung, bei 256 Einheiten und Zoom 1×, rund
-  dazu je Linie ein Durchlauf über die Läufe, höchstens etwa 225; auf der
-  Vollbildkarte bei 427 × 240 Einheiten höchstens rund 170 Rechtecke. Nur
-  im sichtbaren Bereich, ohne Allokation je Linie; die Läufe der Form
-  rechnet die Minimap einmal je Frame für Karte und Linien. Zusammen
-  deutlich unter 0,1 ms.
+- **Kosten** je Frame, geschätzt, nicht gemessen. Mit V senkrechten und
+  H waagrechten Linien sind es V + H · (V + 1) Rechtecke zu je 4 Ecken, in
+  einem Element:
+  - **Minimap**, Seite s Einheiten, Zoom z, GUI-Massstab k: je Richtung
+    höchstens s / (16 · z) + 1 Linien, bei 256 Einheiten und Zoom 1× also
+    17 und höchstens 323 Rechtecke. Rund dazu je Linie ein Durchlauf über
+    die Läufe der Form, höchstens s · k, bei 256 Einheiten und k = 4 rund
+    35 000 Vergleiche je Frame. Die Läufe rechnet die Minimap einmal je
+    Frame für Karte und Linien.
+  - **Vollbildkarte**, b × h Einheiten, Abstand a ≥ 4: V ≈ b / a + 1,
+    H ≈ h / a + 1. Bei a = 4 sind es bei 427 × 240 Einheiten
+    (1280 × 720, GUI-Massstab 3) rund 6 600 Rechtecke, bei 960 × 540
+    (1920 × 1080, GUI-Massstab 2) rund 32 600. Der schlechteste Fall ist
+    GUI-Massstab 1 auf 3840 × 2160 mit rund 520 000; dort hülfe ein
+    grösserer Mindestabstand.
+  - **Speicher:** je Frame sechs kleine Felder von `int` und ein Element,
+    keine Allokation je Linie.
 - **Später mit der drehenden Minimap:** Die Linien liegen in denselben
   Koordinaten des Bildes wie die Regionen; dreht die Minimap, gehen sie
   durch dieselbe Drehung und denselben Schnitt mit der Form.
@@ -459,8 +477,9 @@ Den Gametest dazu startet:
 
 Der Gametest `Bilder` baut eine Szene in einer flachen Welt und nimmt die
 Minimap bei 1, 2 und 4 Pixeln je Block auf, mit dem Zoom gleich der
-Auflösung, dann rund bei 4 px und das
-Menü (siehe „Bedienung“ und „Form“):
+Auflösung, dann rund bei 4 px, das Menü und das Untermenü
+„Einstellungen …“ (siehe „Bedienung“ und „Form“), zuletzt die
+Chunklinien auf Vollbildkarte und Minimap (siehe „Chunklinien“):
 
 ```bash
 ./gradlew runClientGameTest -Pbilder=docs/bilder

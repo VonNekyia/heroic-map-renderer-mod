@@ -215,7 +215,8 @@ Einzelheiten stehen im Log.
 
 - **Ordner:** `heroicmap/<welt>/<baum>/<massstab>/` im Spielordner, darin
   `map.json`, `etags.txt`, `z/x/y.webp` und `tmp/`. `<welt>` richtet sich
-  nach der Wahl „Ablage der Karten“ im Menü (`Downloads.weltOrdner`),
+  nach der Wahl „Ablage der Karten“ im Untermenü „Einstellungen …“
+  (`Downloads.weltOrdner`),
   gespeichert als `ablage` in `heroicmap.properties`:
 
   | Wahl | `ablage` | `<welt>` |
@@ -231,7 +232,8 @@ Einzelheiten stehen im Log.
   Netz hinter einem Proxy hat für alle Server dieselbe Adresse; eine Welt,
   etwa ein Mining-Realm, behält ihre Karte, und eine neue Welt überschreibt
   sie nicht. Eine andere Wahl gilt sofort für Downloads und die
-  Vollbildkarte, für die Wegpunkte beim Schliessen des Menüs; sie zieht
+  Vollbildkarte, für die Wegpunkte beim Schliessen des Untermenüs
+  (`Anzeige.removed`); sie zieht
   nichts um, die Karten unter der alten Wahl stehen weiter in der
   Kartenliste. `<host>` ist klein, andere Zeichen als Buchstaben, Ziffern, Punkt
   und Strich werden `_`. Ein Baum heisst nur `[a-z0-9_-]`, höchstens 64

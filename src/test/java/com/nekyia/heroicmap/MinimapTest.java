@@ -231,16 +231,79 @@ class MinimapTest {
 
     @Test
     void chunklinienAufDemRasterDerKarte() {
-        // Zoom 2, GUI-Massstab 3: 6 Pixel je Block. Die Linie von Chunk c liegt, wo die Karte Block 16·c zeichnet,
-        // gleich wo der Spieler steht; die von Chunk 8 auf der Kante der Region 1.
-        int zoom = 2, k = 3, n = 128 * k, region = Minimap.CHUNKS_JE_REGION * 16 * zoom * k;
-        for (double frac : new double[] {0, 0.3, 0.99}) {
-            int links = Minimap.ecke(100 + frac, 100 + frac, 1f, zoom, k, n);
-            for (int c : new int[] {-3, 0, 5, 8}) {
-                assertEquals(Minimap.pixel(16.0 * c, zoom, k, links), Minimap.linie(c, zoom, k, links), "Chunk " + c);
+        // Zoom 2, GUI-Massstab 3: ein Chunk sind 96 Pixel des Bildes, eine Linie 3 breit.
+        int zoom = 2, k = 3, n = 128 * k, schritt = 16 * zoom * k;
+        List<int[]> eckig = Minimap.laeufe(n, false);
+        for (int links : new int[] {-1000, -50, -1, 0, 1, 3, 50, 94, 95, 96, 1000}) {
+            Gitter.Linien l = Minimap.linien(n, links, links, schritt, k, eckig);
+            // Die erste ganz im Bild, die davor nicht; die letzte ganz im Bild, die danach nicht. Bei links 3 endet die letzte genau am Rand.
+            assertTrue(l.xs()[0] >= 0 && l.xs()[0] - schritt < 0, "links " + links);
+            assertTrue(l.xs()[l.nx() - 1] + k <= n && l.xs()[l.nx() - 1] + schritt + k > n, "links " + links);
+            for (int i = 0; i < l.nx(); i++) {
+                // Jede Linie, wo die Karte den ersten Block ihres Chunks zeichnet.
+                int chunk = Math.floorDiv(l.xs()[i] + links, schritt);
+                assertEquals(Minimap.pixel(16.0 * chunk, zoom, k, links), l.xs()[i], "links " + links + ", Chunk " + chunk);
+                assertEquals(0, l.va()[i]);
+                assertEquals(n, l.vb()[i]);
             }
-            assertEquals(region - links, Minimap.linie(8, zoom, k, links));
+            assertArrayEquals(l.xs(), l.ys());
+            assertEquals(l.nx(), l.ny());
         }
+    }
+
+    @Test
+    void chunklinienRundNurInDerForm() {
+        // Zoom 1, GUI-Massstab 2: Linien alle 32 Pixel. Jedes Pixel einer Linie liegt in der Form, keins doppelt.
+        int k = 2, n = 128 * k;
+        List<int[]> rund = Minimap.laeufe(n, true);
+        boolean[][] form = new boolean[n][n];
+        for (int[] lauf : rund) {
+            for (int y = lauf[0]; y < lauf[1]; y++) {
+                for (int x = lauf[2]; x < lauf[3]; x++) {
+                    form[y][x] = true;
+                }
+            }
+        }
+        Gitter.Linien l = Minimap.linien(n, 7, -13, 16 * k, k, rund);
+        int[][] decke = decke(n, n, k, l);
+        int gedeckt = 0;
+        for (int y = 0; y < n; y++) {
+            for (int x = 0; x < n; x++) {
+                assertTrue(decke[y][x] <= 1, x + ", " + y);
+                assertTrue(decke[y][x] == 0 || form[y][x], x + ", " + y);
+                gedeckt += decke[y][x];
+            }
+        }
+        assertEquals(8, l.nx());
+        assertEquals(8, l.ny());
+        assertTrue(gedeckt > 0);
+    }
+
+    @Test
+    void kreuzungenDeckenEinfach() {
+        // Zwei senkrechte, eine waagrechte Linie, 2 breit, auf 50 × 40: Jedes Pixel einer Linie genau einmal.
+        Gitter.Linien l = new Gitter.Linien(new int[] {10, 30}, new int[] {0, 0}, new int[] {40, 40}, 2,
+                new int[] {20}, new int[] {0}, new int[] {50}, 1);
+        int[][] decke = decke(50, 40, 2, l);
+        for (int y = 0; y < 40; y++) {
+            for (int x = 0; x < 50; x++) {
+                boolean linie = x >= 10 && x < 12 || x >= 30 && x < 32 || y >= 20 && y < 22;
+                assertEquals(linie ? 1 : 0, decke[y][x], x + ", " + y);
+            }
+        }
+    }
+
+    /** Wie oft {@link Gitter#rechtecke} jedes Pixel deckt. */
+    private static int[][] decke(int breite, int hoehe, int dicke, Gitter.Linien l) {
+        int[][] decke = new int[hoehe][breite];
+        Gitter.rechtecke(dicke, l, (xa, ya, xb, yb) -> {
+            for (int y = ya; y < yb; y++) {
+                for (int x = xa; x < xb; x++) {
+                    decke[y][x]++;
+                }
+            }
+        });
+        return decke;
     }
 
     @Test

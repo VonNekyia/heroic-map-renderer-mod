@@ -154,26 +154,9 @@ final class Karte extends Screen {
         }
     }
 
-    /**
-     * Chunklinien je 16 Blöcke, eine Einheit breit, auf dem Raster der Kacheln; nur im sichtbaren
-     * Bereich und ohne Allokation je Linie. Siehe docs/minimap.md, „Chunklinien“.
-     */
+    /** Chunklinien je 16 Blöcke als ein Element des GUI. Siehe docs/minimap.md, „Chunklinien“. */
     private void linien(GuiGraphicsExtractor g) {
-        double chunk = 16.0 * satz.scale();
-        for (int c = blick.ersterChunkX(satz.scale(), width); ; c++) {
-            int x = Mth.floor(blick.rasterX(c * chunk, width));
-            if (x >= width) {
-                break;
-            }
-            g.fill(x, 0, x + 1, height, Minimap.LINIE);
-        }
-        for (int c = blick.ersterChunkZ(satz.scale(), height); ; c++) {
-            int y = Mth.floor(blick.rasterY(c * chunk, height));
-            if (y >= height) {
-                break;
-            }
-            g.fill(0, y, width, y + 1, Minimap.LINIE);
-        }
+        Gitter.zeichne(g, 0, 0, width, height, 1, Minimap.LINIE, blick.linien(satz.scale(), width, height));
     }
 
     /**
