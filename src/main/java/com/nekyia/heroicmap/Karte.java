@@ -155,10 +155,10 @@ final class Karte extends Screen {
     @Override
     protected void init() {
         LocalPlayer spieler = minecraft.player;
-        // Wie beim letzten Schliessen, je Dimension des Satzes; sonst der Spieler in der Mitte. Siehe docs/vollbildkarte.md, „Lage merken“.
+        // Wie beim letzten Schliessen, je Satz; sonst der Spieler in der Mitte. Siehe docs/vollbildkarte.md, „Lage merken“.
         if (blick != null && spieler != null && !gestellt) {
             gestellt = true;
-            Kartenlage.Lage l = Kartenlage.lies(Downloads.weltOrdner(), satz.dimension());
+            Kartenlage.Lage l = Kartenlage.lies(Downloads.weltOrdner(), satz);
             if (l != null) {
                 blick.stelle(Projektion.zuPixel(l.x(), satz.scale()), Projektion.zuPixel(l.z(), satz.scale()), l.zoom(), l.lupe());
             } else {
@@ -1180,7 +1180,7 @@ final class Karte extends Screen {
     @Override
     public void removed() {
         if (blick != null && gestellt) {
-            Kartenlage.schreibe(Downloads.weltOrdner(), satz.dimension(),
+            Kartenlage.schreibe(Downloads.weltOrdner(), satz,
                     new Kartenlage.Lage(blick.mx / satz.scale(), blick.mz / satz.scale(), blick.zoom, blick.lupe));
         }
         super.removed();
