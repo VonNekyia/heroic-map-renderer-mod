@@ -145,12 +145,12 @@ aus der Testwelt: 46 Kacheln, 2,2 MB, Code 0. Das Bild `server-karte`:
 
 ## Icon
 
-`src/main/resources/assets/heroicmap/icon.png`, 300 × 300 Pixel mit
+`src/main/resources/assets/heroicmap/icon.png`, 128 × 128 Pixel mit
 durchsichtigem Hintergrund, steht in `fabric.mod.json` unter `icon`;
-Launcher wie Prism und Mod-Listen zeigen es. Es ist die Insel aus dem Banner
-des Hauptrepositorys, die Ebene „Insel“ in `docs/bilder/quellen/banner.aseprite`
-von heroic-map-renderer, also eine Szene aus den Tests, ohne Verlauf und
-Schrift, mittig auf ein Quadrat gesetzt.
+Launcher wie Prism und Mod-Listen zeigen es. Es ist das Logo des Mods, eine
+Fichte auf einer Insel, dasselbe wie auf Modrinth; verkleinert aus
+600 × 600 Pixeln mit Lanczos, denn es ist eine gerenderte Szene, kein Raster
+aus Pixeln. Bis 0.2.14 war es die Insel aus dem Banner des Hauptrepositorys.
 
 ## CI
 
