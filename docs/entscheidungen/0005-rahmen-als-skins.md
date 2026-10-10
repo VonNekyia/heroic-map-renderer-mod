@@ -15,6 +15,9 @@ Teilweise abgelöst durch [0006](0006-ein-weg-fuer-die-minimap.md): Die
 runde Karte schneidet ein Vieleck, das unter den Ring reicht, keine Maske
 mit derselben Rechnung wie der Ring.
 
+Teilweise abgelöst durch [0008](0008-biom-rahmen-als-vorgabe.md): Die
+Vorgabe ist der Rahmen „biom“, nicht ohne Rahmen.
+
 ## Anlass
 
 Der User wünscht sich am 09.10. einen schlanken Rahmen um die Karte mit

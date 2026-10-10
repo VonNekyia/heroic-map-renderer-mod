@@ -90,6 +90,7 @@ class MinimapTest {
     @Test
     void verschiebenBleibtAufDemSchirm() {
         Minimap minimap = new Minimap();
+        minimap.setzeSkin(Skin.OHNE);
         minimap.verschiebe(100, 50, 640, 360);
         assertEquals(new Minimap.Rahmen(100, 50, 128), minimap.rahmen(640, 360));
         minimap.verschiebe(-500, 9999, 640, 360);
@@ -102,6 +103,7 @@ class MinimapTest {
     void einstellungenUeberstehenDenNeustart(@TempDir Path ordner) throws Exception {
         Path datei = ordner.resolve("config").resolve("heroicmap.properties");
         Minimap vorher = new Minimap();
+        vorher.setzeSkin(Skin.OHNE);
         vorher.setzeSichtbar(false);
         vorher.setzeScale(4);
         vorher.setzeZoom(1);
@@ -184,9 +186,36 @@ class MinimapTest {
         Minimap nachher = new Minimap();
         nachher.lies(datei);
         assertEquals("uhr", nachher.skin());
-        // Ein unbekannter Rahmen ist „ohne“.
+        // Ein unbekannter Rahmen ist die Vorgabe.
         nachher.setzeSkin("quatsch");
-        assertEquals(Skin.OHNE, nachher.skin());
+        assertEquals(Skin.BIOM, nachher.skin());
+    }
+
+    @Test
+    void rahmenNurGewaehltGespeichert(@TempDir Path ordner) throws Exception {
+        Path datei = ordner.resolve("heroicmap.properties");
+        Minimap m = new Minimap();
+        // Aus einer älteren Version: ein Rahmen ausser „ohne“ war gewählt; rahmen=ohne ist von der alten Vorgabe nicht zu unterscheiden.
+        Files.writeString(datei, "rahmen=uhr\n");
+        m.lies(datei);
+        assertEquals("uhr", m.skin());
+        m.schreibe(datei);
+        assertTrue(Files.readString(datei).contains("rahmen_wahl=uhr"));
+        Files.writeString(datei, "rahmen=ohne\n");
+        m.lies(datei);
+        assertEquals(Skin.BIOM, m.skin());
+        // Ohne Wahl schreibt der Mod nichts zum Rahmen; so gilt später eine andere Vorgabe.
+        m.schreibe(datei);
+        assertFalse(Files.readString(datei).contains("rahmen"));
+        // Gewählt bleibt gewählt, auch „ohne“; ein unbekannter gilt als nicht gewählt.
+        Files.writeString(datei, "rahmen_wahl=ohne\nrahmen=uhr\n");
+        m.lies(datei);
+        assertEquals(Skin.OHNE, m.skin());
+        Files.writeString(datei, "rahmen_wahl=quatsch\n");
+        m.lies(datei);
+        assertEquals(Skin.BIOM, m.skin());
+        m.schreibe(datei);
+        assertFalse(Files.readString(datei).contains("rahmen"));
     }
 
     @Test
@@ -199,6 +228,7 @@ class MinimapTest {
         assertTrue(minimap.sichtbar());
         assertEquals(2, minimap.aufloesung());
         assertFalse(minimap.rund());
+        minimap.setzeSkin(Skin.OHNE);
         assertEquals(new Minimap.Rahmen(640 - 128 - 4, 360 - 128 - 4, 128), minimap.rahmen(640, 360));
     }
 
@@ -346,7 +376,10 @@ class MinimapTest {
         assertEquals(Minimap.Koordinaten.XZ, minimap.koordinaten());
         // Drehen: Vorgabe an, der Wunsch des Users.
         assertTrue(minimap.drehen());
-        assertEquals(Skin.OHNE, minimap.skin());
+        // Rahmen: Vorgabe biom, der Wunsch des Users.
+        assertEquals(Skin.BIOM, minimap.skin());
+        // Rechts oben; den Abstand der Skins kennt erst das Spiel.
+        minimap.setzeSkin(Skin.OHNE);
         assertEquals(new Minimap.Rahmen(640 - 128 - 4, 4, 128), minimap.rahmen(640, 360));
     }
 }

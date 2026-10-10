@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Stream;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -18,6 +19,7 @@ import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.data.AtlasIds;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.ARGB;
 import org.slf4j.Logger;
 
 /**
@@ -28,8 +30,13 @@ import org.slf4j.Logger;
 final class Skin {
 
     /** Die Wahl im Untermenü, „ohne“ zuerst; ein neuer Skin ist ein Ordner und ein Eintrag hier. */
-    static final List<String> NAMEN = List.of("ohne", "grau", "holz", "papier", "kompass", "uhr", "kartograph");
+    static final List<String> NAMEN = List.of("ohne", "biom", "grau", "holz", "papier", "kompass", "uhr", "kartograph");
     static final String OHNE = "ohne";
+    /** Der Rahmen nach dem Biom unter dem Spieler, die Vorgabe; je Kategorie ein Ordner unter rahmen/biom/, siehe {@link Biom}. */
+    static final String BIOM = "biom";
+    /** Die Ordner unter rahmen/, die {@link #von} lädt: je fester Skin einer, für „biom“ einer je Kategorie. */
+    static final List<String> ORDNER = Stream.concat(NAMEN.stream().filter(n -> !OHNE.equals(n) && !BIOM.equals(n)),
+            Biom.KATEGORIEN.stream().map(k -> BIOM + "/" + k)).toList();
     /** Der Schatten eines Ornaments: Schwarz zu 50 %, um (+1, +1) versetzt. */
     static final int SCHATTEN = 0x80000000;
     /** Die Ornamente: zier, griff und die Marken beim Drehen, je mit {@code _aktiv} eins dahinter. */
@@ -67,9 +74,9 @@ final class Skin {
         }
     }
 
-    /** Der Skin mit diesem Namen, oder null für „ohne“, einen unbekannten oder unlesbaren. */
+    /** Der Skin aus diesem Ordner ({@link #ORDNER}), oder null für „ohne“, „biom“, einen unbekannten oder unlesbaren. */
     static Skin von(String name) {
-        if (OHNE.equals(name) || !NAMEN.contains(name)) {
+        if (!ORDNER.contains(name)) {
             return null;
         }
         TextureAtlas atlas = gui();
@@ -201,9 +208,9 @@ final class Skin {
         }
     }
 
-    /** Zeichnet die Bänder um das Rechteck (x, y, w, h), in Einheiten des GUI. */
-    void baender(GuiGraphicsExtractor g, int x, int y, int w, int h) {
-        baender(x, y, w, h, baender(), (xa, ya, xb, yb, i, l) -> g.fill(xa, ya, xb, yb, l ? licht[i] : schatten[i]));
+    /** Zeichnet die Bänder um das Rechteck (x, y, w, h), in Einheiten des GUI, zu {@code deckung} deckend. */
+    void baender(GuiGraphicsExtractor g, int x, int y, int w, int h, float deckung) {
+        baender(x, y, w, h, baender(), (xa, ya, xb, yb, i, l) -> g.fill(xa, ya, xb, yb, ARGB.multiplyAlpha(l ? licht[i] : schatten[i], deckung)));
     }
 
     /** Die Farbe des Rings im Quadrat mit der Seite s an (x, y), oder 0 ausserhalb der Bänder. */
@@ -283,18 +290,19 @@ final class Skin {
 
     /**
      * Zeichnet das Ornament {@code teil} ({@link #ZIER} oder {@link #GRIFF}, plus 1 für aktiv) der
-     * Ecke e mit der Mitte auf (px, py), mit Schatten, wenn der Skin ihn will. Gespiegelt über
+     * Ecke e mit der Mitte auf (px, py), zu {@code deckung} deckend, mit Schatten, wenn der Skin ihn will. Gespiegelt über
      * vertauschte UV: Die Ecken des Quads bleiben in derselben Reihenfolge, das GUI verwirft es nicht.
      */
-    void ornament(GuiGraphicsExtractor g, int teil, int e, double px, double py) {
+    void ornament(GuiGraphicsExtractor g, int teil, int e, double px, double py, float deckung) {
         TextureAtlasSprite s = gui().getSprite(sprites[teil]);
         int w = s.contents().width(), h = s.contents().height(), x = lage(px, w), y = lage(py, h);
         boolean griff = teil == GRIFF || teil == GRIFF + 1, sx = spiegeltX(e, griff), sy = spiegeltY(e, griff);
         float u0 = sx ? s.getU1() : s.getU0(), u1 = sx ? s.getU0() : s.getU1();
         float v0 = sy ? s.getV1() : s.getV0(), v1 = sy ? s.getV0() : s.getV1();
         if (mitSchatten) {
-            g.innerBlit(RenderPipelines.GUI_TEXTURED, s.atlasLocation(), x + 1, x + 1 + w, y + 1, y + 1 + h, u0, u1, v0, v1, SCHATTEN);
+            g.innerBlit(RenderPipelines.GUI_TEXTURED, s.atlasLocation(), x + 1, x + 1 + w, y + 1, y + 1 + h, u0, u1, v0, v1,
+                    ARGB.multiplyAlpha(SCHATTEN, deckung));
         }
-        g.innerBlit(RenderPipelines.GUI_TEXTURED, s.atlasLocation(), x, x + w, y, y + h, u0, u1, v0, v1, -1);
+        g.innerBlit(RenderPipelines.GUI_TEXTURED, s.atlasLocation(), x, x + w, y, y + h, u0, u1, v0, v1, ARGB.multiplyAlpha(-1, deckung));
     }
 }
