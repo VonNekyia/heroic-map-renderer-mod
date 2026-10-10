@@ -102,6 +102,7 @@
   "heroicmap.selbst.zeile": "Selbst zeichnen: %s",
   "heroicmap.selbst.knopf": "Selbst",
   "heroicmap.selbst.massstab": "Massstab",
+  "heroicmap.selbst.massstab.beschreibung": "Pixel je Block. Mehr Pixel zeigen feiner, brauchen aber mehr Platz: 1, 2 und 4 px etwa wie 1 : 4 : 16. Fest, bis die Karte in der Kartenliste gelöscht ist.",
   "heroicmap.selbst.an": "Selbst · an · %s px",
   "heroicmap.selbst.titel": "Karte selbst zeichnen?",
   "heroicmap.selbst.frage": "Ab jetzt zeichnet der Mod jeden Chunk, den du in dieser Dimension lädst, mit %s Pixeln je Block in eine eigene Karte dieser Welt. Die Vollbildkarte zeigt dann nur sie, nicht die Karte des Servers. Der Massstab bleibt, bis du die Karte in der Kartenliste löschst; dort endet sie auch.",

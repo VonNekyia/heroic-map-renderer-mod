@@ -5,6 +5,7 @@ import java.util.Map;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -56,6 +57,7 @@ final class Auswahl extends Screen {
             // Der Massstab steht fest, bis die Karte in der Kartenliste gelöscht ist. Siehe docs/selbst.md, „Massstab“.
             addRenderableWidget(CycleButton.builder((Integer px) -> Component.translatable("heroicmap.menue.px", px), massstab)
                     .withValues(Selbst.MASSSTAEBE)
+                    .withTooltip(px -> Tooltip.create(Component.translatable("heroicmap.selbst.massstab.beschreibung")))
                     .create(width / 2 - 94, y + 12, 90, 20, Component.translatable("heroicmap.selbst.massstab"), (b, px) -> massstab = px));
             addRenderableWidget(Button.builder(Component.translatable("heroicmap.selbst.knopf"), b -> frageSelbst())
                     .bounds(width / 2 + 4, y + 12, 90, 20).build());

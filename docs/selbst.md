@@ -76,6 +76,8 @@ hat es der User gewünscht, siehe
 - **Fest bis zum Löschen:** Der Massstab gilt für den Baum, bis der Spieler
   ihn in der Kartenliste löscht; einen anderen gibt es nur mit einer neuen
   Karte. Ist sie an, zeigt der Knopf den Massstab.
+- **Tooltip:** Der Umschalter nennt den Platz, 1, 2 und 4 px etwa wie
+  1 : 4 : 16, gerundet aus der Messung unter „Kosten“.
 - **Wie ein Download:** `satz.json` nennt den Massstab, `map.json` ist für
   jeden gleich, die feinste Stufe ist 8, 7 oder 6 (`Satz.stufe`), siehe
   [Vollbildkarte](vollbildkarte.md). Stufe 0 deckt immer 16 384 Blöcke.
