@@ -45,10 +45,15 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
-      # Ein Fenster ohne Bildschirm: Xvfb, OpenGL in Software über Mesa.
+      # Ein Fenster ohne Bildschirm: Xvfb, OpenGL in Software über Mesa. Ohne libglx-mesa0 findet das Spiel kein GLX-Visual.
       - name: Xvfb und Mesa
         timeout-minutes: 10
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri libglx-mesa0 mesa-utils
+
+      # Zeigt Renderer und Version von OpenGL im Fenster ohne Bildschirm, bevor das Spiel startet.
+      - name: OpenGL unter Xvfb
+        timeout-minutes: 5
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" glxinfo -B
 
       # 24 Bit Farbtiefe; mit der Vorgabe von xvfb-run, 8 Bit, gibt es kein OpenGL.
       - name: Gametests
