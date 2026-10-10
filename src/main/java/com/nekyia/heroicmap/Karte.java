@@ -493,7 +493,7 @@ final class Karte extends Screen {
             return null;
         }
         String dimension = minecraft.player.level().dimension().identifier().toString();
-        int scale = satz.scale(), k = minecraft.getWindow().getGuiScale();
+        int scale = satz.scale(), gs = minecraft.getWindow().getGuiScale();
         Tafeln.Ziel treffer = null;
         for (Ebenen.Eintrag e : Ebenen.INSTANZ.sichtbar()) {
             for (Ebenen.Ort o : Ebenen.INSTANZ.nadeln(e.id())) {
@@ -501,8 +501,8 @@ final class Karte extends Screen {
                     continue;
                 }
                 // Der Fuss wie gezeichnet; erst die Lage, dann der Kasten, denn der misst den Namen und holt das Bild.
-                float x = aufPixel(blick.rasterX(Projektion.zuPixel(o.x(), scale), width), k);
-                float y = aufPixel(blick.rasterY(Projektion.zuPixel(o.z(), scale), height), k);
+                float x = aufPixel(blick.rasterX(Projektion.zuPixel(o.x(), scale), width), gs);
+                float y = aufPixel(blick.rasterY(Projektion.zuPixel(o.z(), scale), height), gs);
                 if (my < y - Symbole.BANNER_HOEHE || my >= y + Math.round(Ebenen.NAME_ZEILE)) {
                     continue;
                 }
