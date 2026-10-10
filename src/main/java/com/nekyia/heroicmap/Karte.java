@@ -173,7 +173,9 @@ final class Karte extends Screen {
                 new double[] {blick.basisRasterX(0, width) / scale, blick.basisRasterZ(0, height) / scale,
                         blick.basisRasterX(width, width) / scale, blick.basisRasterZ(height, height) / scale},
                 pose, new ScreenRectangle(0, 0, width, height).transformMaxBounds(pose));
-        Formen.zeichne(g, a, dimension, Ebenen.INSTANZ.sichtbar().stream().map(e -> Ebenen.INSTANZ.formen(e.id())).toList(), formenSpeicher);
+        List<List<Ebenen.Form>> ebenen = Ebenen.INSTANZ.sichtbar().stream().map(e -> Ebenen.INSTANZ.formen(e.id())).toList();
+        Formen.zeichne(g, a, dimension, ebenen, formenSpeicher);
+        Formen.schriften(g, font, a, dimension, ebenen);
     }
 
     /** Chunklinien je 16 Blöcke als ein Element des GUI. Siehe docs/minimap.md, „Chunklinien“. */

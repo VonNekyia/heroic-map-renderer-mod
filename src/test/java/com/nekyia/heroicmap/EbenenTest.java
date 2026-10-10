@@ -481,6 +481,60 @@ class EbenenTest {
     }
 
     @Test
+    void kartenschriftMitVorgaben() {
+        JsonArray objekte = JsonParser.parseString("["
+                + "{\"type\":\"label\",\"text\":\"Westmeer\",\"path\":[[-400,120],[-250,60],[-90,80]],\"size\":24,\"spacing\":0.3,"
+                + "\"color\":\"#2B3A55\",\"outline\":{\"color\":\"#F2E8D0CC\",\"width\":3}},"
+                + "{\"type\":\"label\",\"text\":\"§cOrt\",\"path\":[[5,5]]},"
+                + "{\"type\":\"label\",\"text\":\"Kontur\",\"path\":[[0,0]],\"spacing\":9,\"outline\":{}}"
+                + "]").getAsJsonArray();
+        Ebenen.Gelesen g = Ebenen.formen(objekte);
+        assertEquals(0, g.verworfen());
+        Ebenen.Schrift w = (Ebenen.Schrift) g.formen().get(0);
+        assertEquals("Westmeer", w.text());
+        assertArrayEquals(new double[] {-400, 120, -250, 60, -90, 80}, w.pfad());
+        assertEquals(24, w.groesse());
+        assertEquals(0.3f, w.sperrung());
+        assertEquals(0xFF2B3A55, w.farbe());
+        assertEquals(0xCCF2E8D0, w.konturFarbe());
+        assertEquals(3, w.konturBreite());
+        // Vorgaben: 16 Blöcke, keine Sperrung, #2B2B2B, ohne Kontur; Codes mit § gestrichen.
+        Ebenen.Schrift o = (Ebenen.Schrift) g.formen().get(1);
+        assertEquals("Ort", o.text());
+        assertEquals(16, o.groesse());
+        assertEquals(0, o.sperrung());
+        assertEquals(Ebenen.SCHRIFTFARBE, o.farbe());
+        assertEquals(0, o.konturBreite());
+        // Kontur ohne Angaben: 2 breit in #F2E8D0; die Sperrung gekappt.
+        Ebenen.Schrift k = (Ebenen.Schrift) g.formen().get(2);
+        assertEquals(Ebenen.MAX_SPERRUNG, k.sperrung());
+        assertEquals(2, k.konturBreite());
+        assertEquals(Ebenen.KONTURFARBE, k.konturFarbe());
+        // Punkte: 3 + 1 + 1.
+        assertEquals(5, g.punkte());
+    }
+
+    @Test
+    void kartenschriftGrenzen() {
+        StringBuilder pfad = new StringBuilder();
+        for (int i = 0; i <= Ebenen.MAX_PFAD; i++) {
+            pfad.append(i == 0 ? "" : ",").append("[").append(i).append(",0]");
+        }
+        JsonArray objekte = JsonParser.parseString("["
+                + "{\"type\":\"label\",\"text\":\"zu lang\",\"path\":[" + pfad + "]},"
+                + "{\"type\":\"label\",\"text\":\"" + "x".repeat(Ebenen.MAX_TEXT + 1) + "\",\"path\":[[0,0]]},"
+                + "{\"type\":\"label\",\"path\":[[0,0]]},"
+                + "{\"type\":\"label\",\"text\":\"leer\",\"path\":[]},"
+                + "{\"type\":\"label\",\"text\":\"null\",\"path\":[[0,0]],\"size\":0},"
+                + "{\"type\":\"label\",\"text\":\"gut\",\"path\":[[0,0],[1,0]]}"
+                + "]").getAsJsonArray();
+        Ebenen.Gelesen g = Ebenen.formen(objekte);
+        assertEquals(1, g.formen().size());
+        assertEquals("gut", ((Ebenen.Schrift) g.formen().getFirst()).text());
+        assertEquals(5, g.verworfen());
+    }
+
+    @Test
     void farbeMitAlpha() {
         assertEquals(0x5540E53F, Ebenen.farbeMitAlpha("#40E53F55", 0));
         assertEquals(0xFF40E53F, Ebenen.farbeMitAlpha("#40e53f", 0));

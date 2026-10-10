@@ -176,6 +176,28 @@ class FormenTest {
     }
 
     @Test
+    void schriftMittigAufDemPfad() {
+        // Drei Zeichen zu 10, Lücke 2, auf einer Strecke von 0 bis 100: mittig ab 33, also Mitten bei 38, 50 und 62.
+        double[] l = Formen.anordnung(new double[] {0, 0, 100, 0}, new double[] {10, 10, 10}, 2);
+        assertArrayEquals(new double[] {38, 0, 0, 50, 0, 0, 62, 0, 0}, l, 1e-9);
+        // Nach links gezeichnet: umgekehrt, so steht die Schrift aufrecht, und dieselben Orte.
+        assertArrayEquals(l, Formen.anordnung(new double[] {100, 0, 0, 0}, new double[] {10, 10, 10}, 2), 1e-9);
+        // Um eine Ecke: das zweite Zeichen auf der zweiten Strecke, im Winkel nach unten (y nach unten).
+        double[] ecke = Formen.anordnung(new double[] {0, 0, 10, 0, 10, 10}, new double[] {4, 4}, 0);
+        assertArrayEquals(new double[] {8, 0, 0, 10, 2, Math.PI / 2}, ecke, 1e-9);
+    }
+
+    @Test
+    void schriftUeberDieEnden() {
+        // Kürzer als der Text: Die Schrift läuft in Richtung des ersten und letzten Stücks weiter.
+        double[] l = Formen.anordnung(new double[] {0, 0, 10, 0}, new double[] {10, 10, 10}, 0);
+        assertArrayEquals(new double[] {-5, 0, 0, 5, 0, 0, 15, 0, 0}, l, 1e-9);
+        // Ein Punkt heisst waagrecht dort; doppelte Punkte zählen als einer.
+        double[] p = Formen.anordnung(new double[] {7, 3, 7, 3}, new double[] {4, 6}, 1);
+        assertArrayEquals(new double[] {3.5, 3, 0, 9.5, 3, 0}, p, 1e-9);
+    }
+
+    @Test
     void gleicheAnsichtGleicherSchluessel() {
         // Der Speicher rechnet nur neu, wenn sich der Schlüssel ändert; gedreht und verschoben ändert er sich.
         Formen.Ansicht a = ansicht(Minimap.abbild(2, 2, 100, 200, Drehung.Lage.von(0.3, 64, 64, 10, 20)));

@@ -106,7 +106,7 @@ public final class Bilder implements FabricClientGameTest {
         }
     }
 
-    /** Eine Ebene mit Flächen, Kreis und Linie um den Spieler; der Teil wie vom Plugin. */
+    /** Eine Ebene mit Flächen, Kreis, Linie und Kartenschrift um den Spieler; der Teil wie vom Plugin. */
     private static final String FORMEN = """
             {"v":1,"typ":"ebene","id":"test:formen","version":"1","teil":1,"teile":1,"objects":[
               {"type":"region","fill":"#3060E080","polygons":[{"outer":[[-12,-12],[4,-12],[4,-4],[-4,-4],[-4,4],[-12,4]],
@@ -114,7 +114,9 @@ public final class Bilder implements FabricClientGameTest {
               {"type":"region","fill":"#E0403080","stroke":{"color":"#FFFFFF","width":1,"style":"dashed"},
                 "polygons":[{"outer":[[2,2],[14,2],[2,14]]}]},
               {"type":"circle","center":[9,-8],"radius":5,"fill":"#40C04060","stroke":{"style":"dashed"}},
-              {"type":"line","points":[[-15,10],[0,8],[15,14]],"stroke":{"color":"#FFD700","width":3,"style":"dashed","dash":[6,4]}}
+              {"type":"line","points":[[-15,10],[0,8],[15,14]],"stroke":{"color":"#FFD700","width":3,"style":"dashed","dash":[6,4]}},
+              {"type":"label","text":"Westmeer","path":[[-14,13],[0,9],[14,12]],"size":3,"spacing":0.2,"color":"#2B3A55",
+                "outline":{"color":"#F2E8D0CC","width":1}}
             ]}""";
 
     /**
@@ -127,7 +129,7 @@ public final class Bilder implements FabricClientGameTest {
                     {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:formen","name":{"de":"Formen","en":"Shapes"},
                       "visible":true,"order":1,"version":"1"}]}""").getAsJsonObject());
             Ebenen.Teil t = Ebenen.Teil.lies(FORMEN);
-            if (t == null || t.formen().size() != 4) {
+            if (t == null || t.formen().size() != 5) {
                 throw new AssertionError("Teil der Formen nicht lesbar");
             }
             Ebenen.INSTANZ.teil(t);

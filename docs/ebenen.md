@@ -1,12 +1,13 @@
 ---
 title: Ebenen
-description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Symbol und Namen auf Minimap und Vollbildkarte zeichnet, kleiner beim Hinauszoomen, die Symbole vom Server holt, Flächen, Kreise und Linien flach zeichnet, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
+description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Symbol und Namen auf Minimap und Vollbildkarte zeichnet, kleiner beim Hinauszoomen, die Symbole vom Server holt, Flächen, Kreise und Linien flach zeichnet, Kartenschrift entlang ihres Pfads, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Ebenen.java
   - src/main/java/com/nekyia/heroicmap/EbenenMenue.java
   - src/main/java/com/nekyia/heroicmap/Symbole.java
   - src/main/java/com/nekyia/heroicmap/Formen.java
   - src/main/java/com/nekyia/heroicmap/Trapeze.java
+  - src/main/resources/assets/heroicmap/font/karte.json
   - src/main/java/com/nekyia/heroicmap/Kartenblick.java
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
@@ -22,7 +23,7 @@ code:
 
 Ein Plugin auf dem Server legt Ebenen über die Karte, etwa die Städte einer
 Nation (#35). Der Mod empfängt sie über den Kanal und zeichnet ihre Nadeln,
-Flächen, Kreise und Linien auf Minimap und Vollbildkarte. Das Format beschreibt der
+Flächen, Kreise, Linien und Kartenschrift auf Minimap und Vollbildkarte. Das Format beschreibt der
 Renderer:
 [Ebenen](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/ebenen.md);
 die Nachrichten das Plugin:
@@ -212,6 +213,45 @@ Thread des Netzes wie die Nadeln.
   Ebene flackerte. Die Kosten der Formen begrenzen stattdessen die Grenzen
   unten, das sichtbare Stück und der Speicher der Ansicht.
 
+## Kartenschrift
+
+Ein Name entlang einer Linie (`label`), etwa ein Meer oder ein Gebirge,
+in der Schrift IM Fell English SC (`Formen.schriften`).
+
+- **Gelesen** wie die anderen Formen (`Ebenen.schrift`): `text` bis 64
+  Zeichen als schlichter Text, `path` 1 bis 64 Punkte. `size` ist die Höhe
+  der Grossbuchstaben in Blöcken, Vorgabe 16. `spacing` ist der Abstand
+  zwischen den Zeichen in Anteilen davon, Vorgabe 0, gekappt auf 0 bis 2.
+  `color` Vorgabe `#2B2B2B`, mit Alpha. `font` übergeht der Mod; es gibt
+  nur `map`.
+- **Kontur** (`outline`): ohne `outline` keine; `width` in Einheiten der
+  Oberfläche des Mods, Vorgabe 2, 0 heisst ohne, höchstens 64; `color`
+  Vorgabe `#F2E8D0`. Gezeichnet als acht versetzte Kopien je Zeichen in
+  der Farbe der Kontur, darüber das Zeichen.
+- **Schrift:** die TTF unverändert als Schrift des Spiels,
+  `assets/heroicmap/font/karte.json`, 16 Einheiten je Geviert, achtfach
+  abgetastet. Die Lizenz (SIL OFL 1.1) liegt daneben als `OFL.txt` und
+  steht in `NOTICE`.
+- **Grösse:** `size` Blöcke, auf dem Schirm also `size` mal die Länge
+  eines Blocks in Pixeln. Unter 8 Pixeln fehlt die Schrift, über 96 bleibt
+  sie 96 gross, wie im Format. Die Höhe der Grossbuchstaben ist 1417 von
+  2048 Einheiten je Geviert, aus der Schrift gelesen.
+- **Entlang des Pfads** (`Formen.anordnung`): jedes Zeichen aufrecht zur
+  Linie, seine Mitte auf ihr, die Mitte der Grossbuchstaben auf der Linie.
+  Die Grundlinie liegt bei jeder Schrift des Spiels 7 Einheiten unter dem
+  Anfang der Zeile (`GlyphBitmap.getTop`, per javap). Der Text steht
+  mittig auf dem Pfad. Ist der Pfad kürzer, läuft die Schrift in Richtung
+  des ersten und letzten Stücks weiter; ein einzelner Punkt heisst
+  waagrecht.
+- **Nie auf dem Kopf:** Läuft der Pfad im Bild nach links, etwa auf der
+  gedrehten Minimap, gilt er umgekehrt.
+- **Reihenfolge:** über allen Formen, unter den Nadeln. Auf der Minimap
+  bleibt sie im Quadrat, wie die Nadeln; rund also auch in den Ecken
+  ausserhalb des Kreises.
+- **Kosten:** je Frame neu, denn sie besteht aus Text des Spiels; je
+  Zeichen ein Text, mit Kontur neun. Eine Ebene mit vielen Namen kostet so
+  mehr als ihre Flächen; gemessen ist das noch nicht.
+
 ## Umschalten
 
 - **Untermenü „Ebenen …“** im Untermenü „Einstellungen …“, siehe
@@ -252,6 +292,9 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 | Punkte der Formen über alle Ebenen, je Ebene die grössere Sammlung | 500 000 | die Sammlung ist verworfen |
 | Trapeze einer Füllung | 3 je Punkt + 16, Arbeit 256 Kanten je Punkt | ohne Füllung, der Rand bleibt |
 | Breite eines Rands, Strich, Lücke | 64, 1000, 1000 Einheiten | gekappt |
+| Text einer Kartenschrift | 64 Zeichen, wie im Format | die Schrift fehlt |
+| Punkte im Pfad einer Kartenschrift | 64, wie im Format | die Schrift fehlt |
+| Sperrung, Kontur einer Kartenschrift | 2, 64 Einheiten | gekappt |
 
 - **Speicher:** Halbe Sammlungen gibt es höchstens eine je Ebene der
   Liste, also 64, mit je höchstens 1000 Nadeln. Symbole höchstens 200 je
@@ -271,5 +314,6 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 ## Was noch fehlt
 
 - **Infotafel** beim Zeigen und Anklicken.
-- **Kartenschrift** (`label`).
 - **Anheften** an Regionen (#36).
+- **Banner** (`banner`) und Nadeln in fester Grösse, nach
+  [0097](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entscheidungen/0097-banner-feste-groesse-tafel-beim-zeigen.md).
