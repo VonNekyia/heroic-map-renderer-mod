@@ -1,6 +1,6 @@
 ---
 title: Minimap
-description: Bedienung über das Menü hinter /hmap und das Untermenü „Einstellungen …“, Chunklinien, Drehen mit der Blickrichtung, Koordinaten unter der Minimap, der eigene Spieler in drei Darstellungen, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
+description: Bedienung über das Menü hinter /hmap und das Untermenü „Einstellungen …“, das Aussehen per Klick auf Spieler und Marken, Chunklinien, Drehen mit der Blickrichtung, Koordinaten unter der Minimap, der eigene Spieler in drei Darstellungen, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
 code:
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/ChunkMaler.java
@@ -8,6 +8,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/HeroicMap.java
   - src/main/java/com/nekyia/heroicmap/Einstellungen.java
   - src/main/java/com/nekyia/heroicmap/Anzeige.java
+  - src/main/java/com/nekyia/heroicmap/MinimapKlick.java
   - src/main/java/com/nekyia/heroicmap/Kartenblick.java
   - src/main/java/com/nekyia/heroicmap/Gitter.java
   - src/main/java/com/nekyia/heroicmap/Drehung.java
@@ -56,20 +57,21 @@ steht unter „Kosten“.
 Das Untermenü „Einstellungen …“ hält, was man selten ändert; das Hauptmenü
 bleibt so kurz. „Fertig“ führt zurück ins Menü:
 
-![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien und den Koordinaten darunter; „Chunklinien“ neben „Spieler“, unten „Koordinaten“ neben „Ebenen …“](bilder/anzeige.png)
+![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien, halben Marken auf dem Ring und den Koordinaten darunter; „Chunklinien“ neben „Drehen“, unten „Ebenen …“ neben „Fertig“](bilder/anzeige.png)
 
 | Einstellung | Vorgabe | tut |
 |---|---|---|
 | Form | eckig | eckig oder rund, siehe „Form“ |
 | Auflösung der Minimap | 2 px je Block | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet |
 | Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte, siehe „Chunklinien“ |
-| Spieler | Kopf | der eigene Spieler als Kopf mit Pfeil, nur Pfeil oder Kopf halb durchsichtig, siehe „Spieler“ |
 | Drehen | an | die Minimap dreht mit der Blickrichtung, siehe „Drehen“ |
 | Verzierungen | an | die Marken N, O, S, W des Rahmens, aus nur Bänder oder Ring, siehe [Rahmen](rahmen.md), „Verzierungen“ |
 | Koordinaten | xz | aus, `x z` oder `x y z` des Spielers unter der Minimap, siehe „Koordinaten“ |
-| Rahmen | biom | ein Skin um die Minimap, als Vorgabe nach dem Biom unter dem Spieler, siehe [Rahmen](rahmen.md) |
 | Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
 | Knopf „Ebenen …“ | – | je Ebene vom Server an oder aus, siehe [Ebenen](ebenen.md), „Umschalten“ |
+
+Den eigenen Spieler und den Rahmen stellt ein Klick auf die Minimap ein,
+nicht ein Knopf, siehe „Aussehen an der Minimap“.
 
 - **Zoom und Auflösung** sind getrennt. Der Zoom legt fest, wie viel
   Gegend die Minimap zeigt: bei 128 Einheiten Seite 128 Blöcke bei 1×,
@@ -86,7 +88,8 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
 - **Lage und Grösse:** Das Menü dunkelt nicht ab, die Minimap im HUD bleibt
   sichtbar und ist weiss umrandet, rund mit einem Ring. Ziehen mit der
   linken oder rechten Taste verschiebt die ganze Minimap, etwa von rechts
-  oben nach links oben. Der weisse Griff sitzt an der Ecke, die zur Mitte des
+  oben nach links oben, auch wenn es auf dem Spieler oder einer Marke
+  beginnt. Der weisse Griff sitzt an der Ecke, die zur Mitte des
   Schirms zeigt, rund auf dem Ring in der Diagonale dorthin; ihn ziehen
   macht die Minimap grösser oder kleiner, die Ecke gegenüber bleibt
   stehen, zwischen 64 und 256 Einheiten des GUI (`Minimap.KLEINSTE`,
@@ -110,7 +113,8 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
   (`Einstellungen.spalte`), im Untermenü ebenso. Im Hauptmenü teilen sich
   je zwei eine Zeile: „Minimap“ und „Zoom“, „Karte laden …“ und
   „Kartenliste …“, „Einstellungen …“ und „Fertig“; im Untermenü
-  „Drehen“ und „Verzierungen“, „Koordinaten“ und „Ebenen …“. So passen Menü und
+  „Chunklinien“ und „Drehen“, „Verzierungen“ und „Koordinaten“, „Ebenen …“
+  und „Fertig“. So passen Menü und
   Untermenü auch bei grossem GUI-Massstab auf den Schirm, bis 240
   Einheiten Höhe, etwa 1280 × 720 bei GUI-Massstab 3.
 - **Koordinaten:** Im Menü stehen über der Minimap `x` und `z` des Blocks
@@ -138,6 +142,40 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
   Karte nach unten; der Pfeil kreist deshalb um Gier + 180° gedreht um den
   Kopf. So hat es der User gewünscht.
 - **Wo ein Block liegt,** sagt die [Projektion](projektion.md).
+
+## Aussehen an der Minimap
+
+Im Menü von `/hmap` und im Untermenü „Einstellungen …“ stellt man das
+Aussehen an der Minimap selbst ein, nicht über Knöpfe (`MinimapKlick`). So
+hat es der User gewünscht (mod#105); das Menü wird kürzer.
+
+- **Spieler:** Ein Klick auf den eigenen Spieler in der Mitte schaltet die
+  Darstellung weiter, Kopf, Pfeil, Halb, dann wieder Kopf, siehe „Spieler“.
+  Er trifft ein Quadrat um die Mitte mit der halben Seite des Kopfes plus
+  2 Einheiten, bei 128 Einheiten Seite 11 × 11.
+- **Marken:** Ein Klick auf eine der Marken N, O, S, W schaltet den Rahmen
+  weiter, in der Reihenfolge von `Skin.NAMEN`: Ohne, Biom, Grau, Holz,
+  Papier, Kompass, Uhr, Kartograph, dann wieder Ohne. Eine Marke trifft man
+  dort, wo die Minimap sie in diesem Frame gezeichnet hat, auch gedreht,
+  mindestens 9 × 9 Einheiten um ihre Mitte (`Minimap.ziel`). Die Bänder
+  sind kein Ziel; dort greift man wie bisher die Minimap.
+- **Ohne Marken** stehen sie im Menü trotzdem, halb deckend: mit dem
+  Schalter „Verzierungen“ aus und bei „ohne“, dort die von „grau“ auf dem
+  Umriss. So lässt sich der Rahmen immer wechseln. Siehe
+  [Rahmen](rahmen.md), „Im Menü“.
+- **Klick oder Ziehen** entscheidet erst das Loslassen: höchstens 3
+  Einheiten vom Drücken (`MinimapKlick.WEG`) und über demselben Ziel, mit
+  der linken Taste. Wandert die Maus weiter, verschiebt sie die Minimap,
+  und die steht bis dahin still. Der Griff geht vor, der Zoom bleibt ein
+  Knopf.
+- **Woran man es sieht:** Über einem Ziel zeigt der Zeiger die Hand
+  (`CursorTypes.POINTING_HAND`, belegt per javap in 26.3), ein Tooltip sagt,
+  was ein Klick tut und was jetzt gilt, darunter die Beschreibung; die
+  Marke unter der Maus nimmt ihr helles Bild `_aktiv`. Der Hinweis über den
+  Knöpfen des Menüs nennt beides.
+- **Gespeichert** wird beim Schliessen des Menüs wie jede Wahl dort.
+- **Geprüft** im Gametest `Bedienung` mit Klicks wie von Hand, siehe
+  [Entwicklung](entwicklung.md), „Gametests“.
 
 ## Chunklinien
 
@@ -267,8 +305,10 @@ im Debug-Bildschirm des Spiels (`Mth.floor`). So hat es der User gewünscht.
 Der eigene Spieler auf Minimap und Vollbildkarte, in einer von drei
 Darstellungen. So hat es der User gewünscht (mod#101).
 
-- **Schalter** „Spieler“ im Untermenü, neben „Chunklinien“: `Kopf`,
-  `Pfeil` oder `Halb`, Vorgabe `Kopf` (`Minimap.Darstellung`). Gespeichert
+- **Umschalten** mit einem Klick auf den Spieler in der Minimap im Menü,
+  siehe „Aussehen an der Minimap“: `Kopf`,
+  `Pfeil` oder `Halb`, Vorgabe `Kopf` (`Minimap.Darstellung`). Bis 0.2.27
+  war es der Schalter „Spieler“ im Untermenü. Gespeichert
   als `spieler` in `heroicmap.properties`, `kopf`, `pfeil` oder
   `durchsichtig`; ein anderer Wert gilt als Vorgabe. Er gilt für Minimap
   und Vollbildkarte.
