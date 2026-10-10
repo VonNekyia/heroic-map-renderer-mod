@@ -4,6 +4,7 @@ description: Die Karte über den ganzen Schirm aus den geladenen Kacheln, mit Be
 code:
   - src/main/java/com/nekyia/heroicmap/Karte.java
   - src/main/java/com/nekyia/heroicmap/Kartenblick.java
+  - src/main/java/com/nekyia/heroicmap/Kartenlage.java
   - src/main/java/com/nekyia/heroicmap/Kacheln.java
   - src/main/java/com/nekyia/heroicmap/webp
   - src/main/java/com/nekyia/heroicmap/Satz.java
@@ -34,21 +35,45 @@ sagt sie das und zeigt nichts.
 | Ziehen mit links | verschiebt die Karte, der Inhalt folgt der Maus |
 | Mausrad | zoomt, siehe „Stufen und Lupe“; über einer Tafel, die höher ist als ihr Platz, scrollt es sie |
 | Zeigen auf eine Nadel, ein Banner, eine Fläche oder einen Kreis | öffnet nach 50 ms dessen Tafel, siehe [Ebenen](ebenen.md), „Infotafel“ |
-| Klick auf eine Nadel, ein Banner, eine Fläche oder einen Kreis | hält dessen Tafel offen, bis zum Knopf ×, `Esc` oder einem Klick daneben |
+| Doppelklick auf eine Nadel, ein Banner, eine Fläche oder einen Kreis | heftet es an die Minimap oder löst es, siehe [Wegpunkte](wegpunkte.md), „Anheften“; ein Klick hält keine Tafel, sie kommt nur beim Zeigen |
 | Rechtsklick | öffnet ein kleines Menü für den Block unter der Maus, wie die Anzeige unten links: „Hierher teleportieren (x, z)“, siehe unten, darunter „Wegpunkt setzen“, auf einem Wegpunkt „Wegpunkt löschen“, siehe [Wegpunkte](wegpunkte.md); erst ein Klick auf einen Eintrag tut etwas, mit der linken oder rechten Taste, jeder Klick daneben schliesst es, ein Rechtsklick öffnet es dort neu |
-| Klick, Doppelklick auf eine Marke | legt beim Loslassen einen Wegpunkt, Mitspieler oder den eigenen Spieler in die Mitte; ein Doppelklick heftet einen Wegpunkt oder Mitspieler an die Minimap, ebenso die Raute einer eigenen Region und eine Fläche oder einen Kreis vom Server; wer auf einer Marke zieht, zieht nur die Karte; siehe [Wegpunkte](wegpunkte.md) |
+| Klick, Doppelklick auf eine Marke | legt einen Wegpunkt, Mitspieler oder den eigenen Spieler in die Mitte, 250 ms nach dem Loslassen, wenn kein zweiter Klick kam; ein Doppelklick bewegt die Karte nicht und heftet einen Wegpunkt oder Mitspieler an die Minimap, ebenso die Raute einer eigenen Region und eine Fläche oder einen Kreis vom Server; wer auf einer Marke zieht, zieht nur die Karte; siehe [Wegpunkte](wegpunkte.md) |
 | Knopf „Karte laden …“ | zeigt die Karten des Servers, je Baum der Name und darunter ein Knopf je Massstab mit seiner Grösse (`Auswahl`), darüber die Wahl „Selbst“, siehe [Selbst gezeichnete Karte](selbst.md); die Knöpfe teilen sich die Breite des Schirms, höchstens 90 Einheiten je Knopf, so passen sie auch bei grossem GUI-Massstab; den Massstab, den der Spieler schon ganz hat (`Downloads.vollstaendig`: ein vollständiger Satz, und das Plugin misst den Abgleich an demselben Massstab), zeigt der Knopf als „Abgleich“ und gleicht ab wie der Knopf „Abgleich“, nach einer Ablehnung mit `wieder` bis dahin aus; ein Klick fragt wie `/hmap laden` erst im Dialog nach |
 | Knopf „Abgleich“ | fragt einen Abgleich des gezeigten Satzes an, wie `/hmap abgleich`; nur mit einem Satz vom Server, nicht auf der selbst gezeichneten Karte. Lehnt der Server mit `wieder` ab, ist der Knopf bis dahin aus und nennt die Uhrzeit |
-| `Esc` | schliesst zuerst eine offene Tafel, dann die Karte |
+| Knopf „Zum Spieler“ | legt den eigenen Spieler in die Mitte, für den Fall, dass man sich verirrt hat, wie auf der Webkarte; Stufe und Lupe bleiben (mod#75) |
+| Knopf „Optionen …“ unten rechts | öffnet das Menü von `/hmap`, siehe [Minimap](minimap.md), „Bedienung“; „Fertig“ und `Esc` führen von dort zurück auf die Karte, an dieselbe Stelle (mod#75) |
+| `Esc` | bricht zuerst eine Region ab, die der Spieler setzt, sonst schliesst es die Karte |
 
 - **Das Spiel läuft weiter,** die Karte hält es nicht an (`isPauseScreen`).
 - **Unten links** stehen der Name des Satzes und `x`, `z` des Blocks unter
   der Maus, so wie die Kacheln ihn zeichnen (`Kartenblick.basisRasterX`),
   fest wie auf der Karte im Browser; so will es der User.
-- **Beim Öffnen** liegt der Spieler in der Mitte.
+- **Beim Öffnen** steht die Karte wie beim letzten Schliessen, siehe „Lage
+  merken“; beim allerersten Mal liegt der Spieler in der Mitte.
 - **Geht ein Knopf nicht,** etwa weil der Server den Baum nicht anbietet oder
   schon ein Download läuft, steht der Grund über den Koordinaten.
 - **Ohne Satz** zeigt die Karte nur den Hinweis und den Knopf zum Laden.
+
+### Lage merken
+
+Beim Öffnen stehen Mitte, Stufe und Lupe wie beim letzten Schliessen, je
+Server, Welt und Dimension, so will es der User (mod#75); vorher begann die
+Karte jedes Mal beim Spieler, und man musste wieder herauszoomen.
+
+- **Gemerkt** beim Schliessen und vor jedem Untermenü (`Karte.removed`): die
+  Mitte in Blöcken, die Stufe und die Lupe (`Kartenlage`).
+- **Je Welt** in `karte.properties` im Ordner der Welt, neben
+  `wegpunkte.json`, siehe [Download](download.md), „Ablage“; die Schlüssel
+  beginnen mit der Dimension des Satzes, etwa `minecraft:overworld.zoom`.
+  Im Einzelspieler gibt es keinen Ordner, dann nur im Speicher, bis zum
+  Verlassen der Welt (`Kartenlage.leeren`).
+- **Gelesen** beim Öffnen, einmal, nicht bei jeder neuen Grösse des
+  Fensters (`Karte.gestellt`). Die Stufe kommt auf die Stufen des Satzes,
+  die Lupe auf 1, 2 oder 4 und nur auf der feinsten Stufe
+  (`Kartenblick.stelle`). Fehlt die Datei oder ist sie unlesbar, liegt der
+  Spieler in der Mitte.
+- **Getestet** im Gametest `Bedienung`: eine Stufe gröber, schliessen und
+  wieder öffnen, Mitte, Stufe und Lupe wie vorher; dazu `KartenblickTest`.
 
 ### Teleportieren
 

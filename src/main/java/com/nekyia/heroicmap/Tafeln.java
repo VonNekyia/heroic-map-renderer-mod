@@ -195,10 +195,9 @@ final class Tafeln {
     static final class Zeigen {
 
         static final long RUHE_MS = 50, NACHLAUF_MS = 300;
-        /** Das Ziel unter dem Zeiger, das offene und das unter dem Zeiger, als die Tafel von Hand zuging. */
+        /** Das Ziel unter dem Zeiger, das offene und das, dessen Tafel von selbst zuging. */
         private Ziel unter, offen, gesperrt;
         private long seit, weg = -1;
-        private boolean gehalten;
 
         /** Je Frame: das Ziel unter dem Zeiger, oder null, und ob der Zeiger über der offenen Tafel liegt. */
         void zeiger(Ziel z, boolean ueberTafel, long ms) {
@@ -207,7 +206,7 @@ final class Tafeln {
                 seit = ms;
                 gesperrt = null;
             }
-            if (offen != null && !gehalten) {
+            if (offen != null) {
                 if (ueberTafel || offen.equals(z)) {
                     weg = -1;
                 } else if (weg < 0) {
@@ -217,34 +216,13 @@ final class Tafeln {
                     weg = -1;
                 }
             }
-            if (z != null && !gehalten && !ueberTafel && !z.equals(offen) && !z.equals(gesperrt) && ms - seit >= RUHE_MS) {
+            if (z != null && !ueberTafel && !z.equals(offen) && !z.equals(gesperrt) && ms - seit >= RUHE_MS) {
                 offen = z;
                 weg = -1;
             }
         }
 
-        /** Ein Klick auf ein Ziel hält seine Tafel offen. */
-        void halte(Ziel z) {
-            offen = z;
-            gehalten = true;
-            weg = -1;
-        }
-
-        /**
-         * Schliesst die Tafel von Hand, mit Escape, × oder einem Klick; true, wenn eine offen war. So
-         * schliessen Escape und ein Klick daneben zuerst nur sie. Das Ziel unter dem Zeiger öffnet sie
-         * nicht gleich wieder.
-         */
-        boolean schliesse() {
-            boolean war = offen != null;
-            offen = null;
-            gesperrt = unter;
-            gehalten = false;
-            weg = -1;
-            return war;
-        }
-
-        /** Die Antwort zur offenen Tafel, null, solange sie aussteht: Gibt es keine, geht sie zu, auch gehalten. */
+        /** Die Antwort zur offenen Tafel, null, solange sie aussteht: Gibt es keine, geht sie zu. */
         void antwort(Optional<Tafel> t) {
             if (offen != null && t != null && t.isEmpty()) {
                 zu();
@@ -258,16 +236,11 @@ final class Tafeln {
         void zu() {
             gesperrt = offen;
             offen = null;
-            gehalten = false;
             weg = -1;
         }
 
         Ziel offen() {
             return offen;
-        }
-
-        boolean gehalten() {
-            return gehalten;
         }
     }
 }

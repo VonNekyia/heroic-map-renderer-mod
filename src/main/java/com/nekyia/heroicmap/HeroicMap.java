@@ -111,6 +111,7 @@ public final class HeroicMap implements ClientModInitializer {
             Tafeln.INSTANZ.leeren();
             Wegpunkte.INSTANZ.leeren();
             Selbst.INSTANZ.leeren();
+            Kartenlage.leeren();
         }));
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath(ID, "minimap"), Minimap.INSTANZ::zeichne);
         Kanal.anmelden();

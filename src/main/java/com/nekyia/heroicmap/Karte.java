@@ -8,6 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.MouseHandler;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
@@ -45,8 +46,6 @@ final class Karte extends Screen {
     private static final long BUNT_MS = 2000;
     /** Weiter gezogen, in Einheiten des GUI, ist es kein Klick auf eine Marke mehr. */
     private static final double ZUG = 3;
-    /** Die Spalte des Knopfs × rechts in der Tafel, in Einheiten des GUI; beim Zeigen blass, gehalten hell. */
-    private static final int SCHLIESSEN = 8, BLASS = 0x80D9D9D9;
     /** Die halbe Breite des Punkts unter einer angehefteten Nadel, in Einheiten des GUI. */
     private static final int PUNKT = 2;
     /** Die Vorschau einer Region, die der Spieler setzt. */
@@ -61,7 +60,7 @@ final class Karte extends Screen {
     private Tafeln.Ziel tafelOffen;
     private int tafelX, tafelY, tafelScroll;
     private long tafelSeit;
-    private int[] tafelKasten, tafelKnopf;
+    private int[] tafelKasten;
     /** Ist die Tafel höher als ihr Platz? Nur dann scrollt das Rad sie statt die Karte zu zoomen. */
     private boolean tafelZuHoch;
     /** Der Klick schloss oder traf die Tafel oder das Menü; sein Loslassen hält keine neue, sein Ziehen schiebt nicht. */
@@ -94,6 +93,14 @@ final class Karte extends Screen {
     private Marke gedrueckt;
     /** War das Drücken der zweite Klick eines Doppelklicks? */
     private boolean doppelklick;
+    /** So lange hält der Spieler die linke Taste still auf einem Wegpunkt, bis er an der Maus hängt, in ms. */
+    private static final long HALTEN_MS = 2000;
+    /** Seit wann die linke Taste gedrückt ist, und der Wegpunkt, der an der Maus hängt, oder null. */
+    private long gedruecktSeit;
+    private Wegpunkte.Punkt haengt;
+    /** Die Marke eines Klicks, die in die Mitte kommt, wenn kein zweiter Klick folgt, und seit wann sie wartet. */
+    private Marke wartend;
+    private long wartendSeit;
     /** Die Nadel, die Fläche oder der Kreis unter dem letzten Klick ohne Marke; ein Doppelklick darauf heftet an. */
     private Tafeln.Ziel letztesZiel;
     /** Wie weit seit dem Drücken gezogen ist, in Einheiten des GUI. */
@@ -111,6 +118,8 @@ final class Karte extends Screen {
     record Marke(float x, float y, float halb, double weltX, double weltZ, UUID spieler, Wegpunkte.Punkt punkt, Wegpunkte.Region region) {
     }
 
+    /** Ist die Lage beim Öffnen gestellt? {@code init} läuft bei jeder Grösse des Fensters und nach jedem Untermenü neu. */
+    private boolean gestellt;
     /** Die erste Ecke einer Region, die der Spieler gerade setzt, und ihre Dimension; sonst null. */
     private int[] regionVon;
     private String regionDimension;
@@ -126,9 +135,16 @@ final class Karte extends Screen {
     @Override
     protected void init() {
         LocalPlayer spieler = minecraft.player;
-        if (blick != null && spieler != null && blick.mx == 0 && blick.mz == 0) {
-            blick.mx = Projektion.zuPixel(spieler.getX(), satz.scale());
-            blick.mz = Projektion.zuPixel(spieler.getZ(), satz.scale());
+        // Wie beim letzten Schliessen, je Dimension des Satzes; sonst der Spieler in der Mitte. Siehe docs/vollbildkarte.md, „Lage merken“.
+        if (blick != null && spieler != null && !gestellt) {
+            gestellt = true;
+            Kartenlage.Lage l = Kartenlage.lies(Downloads.weltOrdner(), satz.dimension());
+            if (l != null) {
+                blick.stelle(Projektion.zuPixel(l.x(), satz.scale()), Projektion.zuPixel(l.z(), satz.scale()), l.zoom(), l.lupe());
+            } else {
+                blick.mx = Projektion.zuPixel(spieler.getX(), satz.scale());
+                blick.mz = Projektion.zuPixel(spieler.getZ(), satz.scale());
+            }
         }
         int x = width - KNOPF - 4;
         Button unterster = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.laden"),
@@ -141,8 +157,19 @@ final class Karte extends Screen {
                     b -> hinweis = Downloads.INSTANZ.frageAbgleich(baum)).bounds(x, 28, KNOPF, 20).build());
             unterster = abgleich;
         }
+        // Wer sich verirrt hat, kommt zum eigenen Spieler zurück; Stufe und Lupe bleiben. Siehe docs/vollbildkarte.md, „Bedienung“.
+        if (blick != null) {
+            unterster = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.zum_spieler"), b -> {
+                if (minecraft.player != null) {
+                    zentriere(minecraft.player.getX(), minecraft.player.getZ());
+                }
+            }).bounds(x, unterster.getY() + 24, KNOPF, 20).build());
+        }
         knopfX = x;
         knopfUnten = unterster.getY() + unterster.getHeight();
+        // Unten rechts das Menü von /hmap; „Fertig“ dort führt zurück auf die Karte. Siehe docs/vollbildkarte.md, „Bedienung“.
+        addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.optionen"),
+                b -> minecraft.gui.setScreen(new Einstellungen(this))).bounds(x, height - 24, KNOPF, 20).build());
     }
 
     @Override
@@ -152,6 +179,17 @@ final class Karte extends Screen {
             g.centeredText(font, Component.translatable("heroicmap.karte.keine"), width / 2, height / 2, TEXT);
             super.extractRenderState(g, mausX, mausY, delta);
             return;
+        }
+        // Still gehalten auf einem Wegpunkt hängt er nach HALTEN_MS an der Maus. Siehe docs/wegpunkte.md, „Bedienung“.
+        if (haengt == null && taste && gedrueckt != null && gedrueckt.punkt() != null && !doppelklick && gezogen <= ZUG
+                && Util.getMillis() - gedruecktSeit >= HALTEN_MS) {
+            haengt = gedrueckt.punkt();
+            wartend = null;
+        }
+        // Ein Klick auf eine Marke zentriert erst, wenn kein zweiter folgt; so bewegt ein Doppelklick die Karte nicht.
+        if (wartend != null && Util.getMillis() - wartendSeit >= MouseHandler.DOUBLE_CLICK_THRESHOLD_MS) {
+            zentriere(wartend.weltX(), wartend.weltZ());
+            wartend = null;
         }
         int[] k = blick.kacheln(width, height);
         int seite = satz.kachel() * blick.lupe;
@@ -191,6 +229,10 @@ final class Karte extends Screen {
                     : Component.translatable("heroicmap.karte.abgleich_ab", Downloads.uhr(ab)));
         }
         super.extractRenderState(g, mausX, mausY, delta);
+        if (haengt != null) {
+            // Der Wegpunkt, der an der Maus hängt, unter dem Zeiger.
+            Minimap.wegpunkt(g, mausX, mausY, Minimap.KOPF, Wegpunkte.FARBEN[haengt.farbe()], 0);
+        }
         tafel(g, mausX, mausY);
         if (ziel != null) {
             int b = menueBreite();
@@ -247,7 +289,7 @@ final class Karte extends Screen {
             }
         }
         for (Wegpunkte.Punkt p : Wegpunkte.INSTANZ.punkte()) {
-            if (p.dimension().equals(dimension)) {
+            if (p.dimension().equals(dimension) && !p.equals(haengt)) {
                 Marke m = marke(p.x() + 0.5, p.z() + 0.5, null, p);
                 Minimap.wegpunkt(g, m.x(), m.y(), Minimap.KOPF, Wegpunkte.FARBEN[p.farbe()], p.angeheftet() ? bunt : 0);
             }
@@ -357,6 +399,21 @@ final class Karte extends Screen {
         return b + 8;
     }
 
+    /** Für die Gametests: Stufe und Lupe, oder null ohne Satz. */
+    int[] stufe() {
+        return blick == null ? null : new int[] {blick.zoom, blick.lupe};
+    }
+
+    /** Für die Gametests: der Wegpunkt an der Maus, oder null. */
+    Wegpunkte.Punkt haengt() {
+        return haengt;
+    }
+
+    /** Für die Gametests: Steht eine Tafel auf dem Schirm? */
+    boolean tafelOffen() {
+        return tafelKasten != null;
+    }
+
     /** Für den Gametest Bedienung: die Mitte des Blicks in Pixeln der Basis, das offene Menü, oder null, und die Marken. */
     double[] blickMitte() {
         return blick == null ? null : new double[] {blick.mx, blick.mz};
@@ -452,8 +509,8 @@ final class Karte extends Screen {
     }
 
     /**
-     * Linksklick auf eine Marke, beim Loslassen ohne Zug, legt sie in die Mitte, ein Doppelklick
-     * heftet sie an die Minimap oder löst sie, ebenso auf eine Nadel, ein Banner, eine Fläche oder einen Kreis vom Server.
+     * Linksklick auf eine Marke, beim Loslassen ohne Zug, legt sie in die Mitte, sobald kein zweiter
+     * Klick mehr folgen kann; ein Doppelklick heftet sie an die Minimap oder löst sie, ohne die Karte zu bewegen, ebenso auf eine Nadel, ein Banner, eine Fläche oder einen Kreis vom Server.
      * Rechtsklick öffnet das Menü: „Hierher teleportieren“,
      * nur mit execute und tp im Befehlsbaum und nicht unter einer Decke, sonst landete man auf dem
      * Dach; darunter „Wegpunkt setzen“, auf einem Wegpunkt „Wegpunkt löschen“. Erst ein Klick auf
@@ -483,13 +540,8 @@ final class Karte extends Screen {
             klickVerbraucht = true;
             return true;
         }
-        // Ein Klick in die Tafel wirkt nicht auf die Karte und hält sie; der Knopf × schliesst sie.
+        // Ein Klick in die Tafel wirkt nicht auf die Karte.
         if (drin(tafelKasten, e.x(), e.y())) {
-            if (drin(tafelKnopf, e.x(), e.y())) {
-                zeigen.schliesse();
-            } else if (!zeigen.gehalten()) {
-                zeigen.halte(zeigen.offen());
-            }
             klickVerbraucht = true;
             return true;
         }
@@ -504,20 +556,6 @@ final class Karte extends Screen {
             klickVerbraucht = true;
             return true;
         }
-        // Solange der Spieler eine Region setzt, schliesst ein Klick keine Tafel, er setzt beim Loslassen die zweite Ecke.
-        if (zeigen.gehalten() && regionVon == null) {
-            // Ein Klick daneben schliesst zuerst nur die gehaltene Tafel; einer auf ein anderes Ziel hält beim Loslassen dessen.
-            // Nur eine sichtbare Tafel verbraucht den Klick; eine, die noch lädt oder keine ist, geht still zu.
-            Tafeln.Ziel alt = zeigen.offen(), anderes = tafelUnter(e.x(), e.y());
-            boolean sichtbar = tafelKasten != null;
-            zeigen.schliesse();
-            if (sichtbar && (anderes == null || anderes.equals(alt))) {
-                // Auch dieser Klick zählt für einen Doppelklick auf dasselbe Ziel.
-                letztesZiel = taste ? anderes : null;
-                klickVerbraucht = true;
-                return true;
-            }
-        }
         if (super.mouseClicked(e, doppelt)) {
             return true;
         }
@@ -526,9 +564,13 @@ final class Karte extends Screen {
         }
         Marke m = treffer(e.x(), e.y());
         if (e.button() == InputConstants.MOUSE_BUTTON_LEFT) {
-            // Der erste Klick hat die Marke schon in die Mitte gelegt; der zweite zählt für dieselbe.
+            // Der zweite zählt für die Marke des ersten, die noch nicht in die Mitte kam, und hebt das auf.
             doppelklick = doppelt && vorige != null;
             gedrueckt = doppelklick ? vorige : m;
+            gedruecktSeit = Util.getMillis();
+            if (doppelklick) {
+                wartend = null;
+            }
             // true, sonst zählt das Spiel den nächsten Klick nicht als doppelt, auch auf einer Fläche; ziehen geht trotzdem.
             return true;
         }
@@ -550,6 +592,13 @@ final class Karte extends Screen {
             klickVerbraucht = false;
             return true;
         }
+        // Der Wegpunkt an der Maus kommt auf den Block unter ihr, mit Farbe und Anheften.
+        if (haengt != null) {
+            int[] b = block(e.x(), e.y());
+            Wegpunkte.INSTANZ.verschiebe(haengt, b[0], b[1]);
+            haengt = null;
+            return true;
+        }
         // Solange die Vorschau läuft, setzt ein Linksklick ohne Zug die zweite Ecke, auch auf einer Marke; ziehen verschiebt weiter.
         if (regionVon != null && e.button() == InputConstants.MOUSE_BUTTON_LEFT && gezogen <= ZUG && blick != null
                 && !drin(tafelKasten, e.x(), e.y())) {
@@ -558,24 +607,17 @@ final class Karte extends Screen {
             regionVon = null;
             return true;
         }
-        // Ein Klick ohne Zug auf ein Ziel ohne Marke hält seine Tafel.
+        // Ein Klick ohne Zug auf ein Ziel ohne Marke merkt es für einen Doppelklick; eine Tafel hält er nicht.
         if (m == null && e.button() == InputConstants.MOUSE_BUTTON_LEFT && gezogen <= ZUG && ziel == null && blick != null
                 && !drin(tafelKasten, e.x(), e.y())) {
-            Tafeln.Ziel z = tafelUnter(e.x(), e.y());
-            // Ein Ziel mit id lässt sich anheften, auch wenn es keine Tafel hat.
-            letztesZiel = z;
-            // Halten nur, wenn eine Tafel da ist oder noch kommt; die Frage geht dabei schon hinaus.
-            Optional<Tafel> t = z == null ? Optional.empty() : Tafeln.INSTANZ.tafel(z, Util.getMillis());
-            if (t == null || t.isPresent()) {
-                zeigen.halte(z);
-                return true;
-            }
+            letztesZiel = tafelUnter(e.x(), e.y());
         }
         if (m == null || e.button() != InputConstants.MOUSE_BUTTON_LEFT) {
             return knopf;
         }
         if (!doppelklick) {
-            zentriere(m.weltX(), m.weltZ());
+            wartend = m;
+            wartendSeit = Util.getMillis();
             letzte = m;
         } else if (m.punkt() != null) {
             Wegpunkte.INSTANZ.umschalten(m.punkt());
@@ -602,7 +644,7 @@ final class Karte extends Screen {
     private void tafel(GuiGraphicsExtractor g, int mausX, int mausY) {
         long ms = Util.getMillis();
         boolean ueber = drin(tafelKasten, mausX, mausY);
-        zeigen.zeiger(ziel == null && !ueber && !(taste && gezogen > ZUG) ? zielUnter(mausX, mausY) : null, ueber, ms);
+        zeigen.zeiger(ziel == null && haengt == null && !ueber && !(taste && gezogen > ZUG) ? zielUnter(mausX, mausY) : null, ueber, ms);
         if (zeigen.offen() != null && !Tafeln.gilt(Ebenen.INSTANZ, zeigen.offen())) {
             zeigen.zu();
         }
@@ -617,13 +659,12 @@ final class Karte extends Screen {
             tafelSeit = ms;
         }
         tafelKasten = null;
-        tafelKnopf = null;
         tafelZuHoch = false;
         if (offen == null || t == null && ms - tafelSeit < Tafeln.LAEDT_MS) {
             return;
         }
         Tafel.Satz s = t == null ? laedt() : satz(t.get());
-        int w = s.breite() + 2 * Tafel.INNEN + SCHLIESSEN, voll = s.hoehe() + 2 * Tafel.INNEN, h = Math.min(voll, height - 8);
+        int w = s.breite() + 2 * Tafel.INNEN, voll = s.hoehe() + 2 * Tafel.INNEN, h = Math.min(voll, height - 8);
         // Rechts unter dem Zeiger; ist dort kein Platz, links von ihm oder über ihm, so rutscht sie nicht unter ihn.
         int x = tafelX + 12 + w > width - 4 ? tafelX - 12 - w : tafelX + 12;
         int y = tafelY + 12 + h > height - 4 ? tafelY - 12 - h : tafelY + 12;
@@ -632,7 +673,7 @@ final class Karte extends Screen {
         tafelZuHoch = voll > h;
         tafelScroll = Math.max(0, Math.min(tafelScroll, voll - h));
         g.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.fromNamespaceAndPath(HeroicMap.ID, "rahmen/" + tafelSkin() + "/tafel"), x, y, w, h);
-        g.enableScissor(x + Tafel.INNEN, y + Tafel.INNEN, x + w - Tafel.INNEN - SCHLIESSEN, y + h - Tafel.INNEN);
+        g.enableScissor(x + Tafel.INNEN, y + Tafel.INNEN, x + w - Tafel.INNEN, y + h - Tafel.INNEN);
         for (Tafel.Stueck stueck : s.stuecke()) {
             switch (stueck) {
                 case Tafel.Text text -> g.text(font, stil(text.text(), text.fett()), x + Tafel.INNEN + text.x(),
@@ -670,9 +711,6 @@ final class Karte extends Screen {
             }
         }
         g.disableScissor();
-        // Der Knopf × in seiner eigenen Spalte rechts, nie über dem Titel; beim Zeigen blass, gehalten hell.
-        tafelKnopf = new int[] {x + w - Tafel.INNEN - SCHLIESSEN, y, Tafel.INNEN + SCHLIESSEN, Tafel.INNEN + font.lineHeight};
-        g.text(font, "×", x + w - Tafel.INNEN - SCHLIESSEN + 2, y + Tafel.INNEN, zeigen.gehalten() ? Tafel.SCHRIFT : BLASS, false);
         tafelKasten = new int[] {x, y, w, h};
     }
 
@@ -866,8 +904,8 @@ final class Karte extends Screen {
 
     @Override
     public boolean mouseDragged(MouseButtonEvent ereignis, double dx, double dy) {
-        // Ein Zug, der in der Tafel beginnt oder mit dem Druck, der sie schloss, schiebt die Karte nicht.
-        if (klickVerbraucht) {
+        // Ein Zug, der in der Tafel beginnt, oder einer mit einem Wegpunkt an der Maus schiebt die Karte nicht.
+        if (klickVerbraucht || haengt != null) {
             return true;
         }
         // Die Tasten zählen wie in SDL, links ist 1. Siehe docs/entwicklung.md, „Maustasten“.
@@ -901,10 +939,13 @@ final class Karte extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent ereignis) {
-        // Escape schliesst zuerst nur die Tafel, dann bricht es eine Region ab, die der Spieler setzt.
-        if (ereignis.key() == InputConstants.KEY_ESCAPE && tafelKasten != null && zeigen.schliesse()) {
+        // Escape lässt zuerst einen Wegpunkt an der Maus, wo er war; das Loslassen danach tut nichts.
+        if (ereignis.key() == InputConstants.KEY_ESCAPE && haengt != null) {
+            haengt = null;
+            klickVerbraucht = true;
             return true;
         }
+        // Escape bricht dann eine Region ab, die der Spieler setzt.
         if (ereignis.key() == InputConstants.KEY_ESCAPE && regionVon != null) {
             regionVon = null;
             return true;
@@ -922,6 +963,16 @@ final class Karte extends Screen {
             kacheln.close();
         }
         super.onClose();
+    }
+
+    /** Beim Schliessen und vor jedem Untermenü: Mitte, Stufe und Lupe merken. */
+    @Override
+    public void removed() {
+        if (blick != null && gestellt) {
+            Kartenlage.schreibe(Downloads.weltOrdner(), satz.dimension(),
+                    new Kartenlage.Lage(blick.mx / satz.scale(), blick.mz / satz.scale(), blick.zoom, blick.lupe));
+        }
+        super.removed();
     }
 
     @Override

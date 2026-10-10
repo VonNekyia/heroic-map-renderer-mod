@@ -329,6 +329,21 @@ final class Wegpunkte {
         }
     }
 
+    /**
+     * Legt den Wegpunkt auf den Block (x, z) seiner Dimension, mit Farbe und Anheften; false, wenn es ihn
+     * nicht gibt oder dort schon einer liegt, dann bleibt alles.
+     */
+    boolean verschiebe(Punkt p, int x, int z) {
+        int i = finde(p.dimension(), p.x(), p.z());
+        if (i < 0 || finde(p.dimension(), x, z) >= 0) {
+            return false;
+        }
+        Punkt alt = punkte.get(i);
+        punkte.set(i, new Punkt(alt.dimension(), x, z, alt.farbe(), alt.angeheftet()));
+        schreibe();
+        return true;
+    }
+
     /** Heftet den Wegpunkt an die Minimap oder löst ihn. */
     void umschalten(Punkt p) {
         int i = finde(p.dimension(), p.x(), p.z());

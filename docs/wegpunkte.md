@@ -30,8 +30,9 @@ Fläche oder einen Kreis vom Server an, siehe „Anheften“ (mod#36).
 |---|---|
 | Rechtsklick, „Wegpunkt setzen“ | der Eintrag unter „Hierher teleportieren“; setzt einen Wegpunkt auf den Block unter der Maus, in der ersten der 8 Farben (`Wegpunkte.FARBEN`), die in der Dimension noch frei ist, sind alle vergeben, reihum. Steht dort schon einer, bleibt es einer. Den Eintrag gibt es auch ohne Recht zum Teleportieren und unter einer Decke |
 | Rechtsklick auf einen Wegpunkt | das Menü für seinen Block: „Hierher teleportieren“, wenn erlaubt, und „Wegpunkt löschen“ |
-| Klick auf eine Marke | legt sie beim Loslassen in die Mitte: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück. Wer auf einer Marke zu ziehen beginnt und weiter als 3 Einheiten zieht (`Karte.ZUG`), zieht nur die Karte |
-| Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder |
+| Klick auf eine Marke | legt sie in die Mitte, sobald kein zweiter Klick mehr folgen kann, 250 ms nach dem Loslassen: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück. Wer auf einer Marke zu ziehen beginnt und weiter als 3 Einheiten zieht (`Karte.ZUG`), zieht nur die Karte |
+| Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder; die Karte bewegt sich dabei nicht |
+| Linke Taste 2 s still auf einem Wegpunkt halten | er hängt an der Maus, die Karte zieht nicht mit; beim Loslassen liegt er auf dem Block darunter, mit Farbe und Anheften (`Wegpunkte.verschiebe`). Liegt dort schon einer, bleibt er, wo er war; `Esc` bricht ab. Still heisst: nicht weiter als 3 Einheiten gezogen (`Karte.ZUG`); unter 2 s ist es ein Klick oder ein Zug wie sonst (`Karte.HALTEN_MS`, mod#75). Nur Wegpunkte, nicht die Rauten eigener Regionen |
 | Doppelklick auf die Raute einer eigenen Region, auf eine Fläche, einen Kreis, eine Nadel oder ein Banner vom Server | heftet sie an die Minimap oder löst sie wieder, siehe „Anheften“ |
 | Rechtsklick, „Region von hier“, dann ein Linksklick oder „Region bis hier“ | setzt eine eigene Region, das Rechteck der Blöcke zwischen beiden Ecken samt ihnen, siehe „Regionen“; dazwischen zeigt eine gestrichelte Vorschau das Rechteck bis zur Maus und unten links der Hinweis „Linksklick setzt die zweite Ecke, Esc bricht ab“; ziehen verschiebt die Karte weiter, „Region abbrechen“ oder `Esc` brechen ab |
 | Rechtsklick in eine eigene Region oder auf ihre Raute | „Region löschen“ |
@@ -42,17 +43,18 @@ Fläche oder einen Kreis vom Server an, siehe „Anheften“ (mod#36).
   (`mouseClicked` gab `true`; `MouseHandler.onButton`, belegt per javap am
   Client 26.3). Die Karte nimmt jeden Linksklick an, auch einen auf
   freie Karte, sonst zählte ein Doppelklick auf eine Fläche nie. Der erste
-  Klick hat die Marke schon in die Mitte gelegt; der zweite zählt deshalb
-  für die Marke des ersten (`Karte.letzte`), nicht für die unter der Maus.
-  Jeder andere Klick vergisst sie; ein schneller Klick nach „Wegpunkt
-  setzen“ heftet so nichts an.
+  Klick auf eine Marke legt sie erst in die Mitte, wenn 250 ms lang kein
+  zweiter kam (`MouseHandler.DOUBLE_CLICK_THRESHOLD_MS`, `Karte.wartend`);
+  so bewegt ein Doppelklick die Karte nicht, wie der User es will (mod#75).
+  Der zweite zählt für die Marke des ersten (`Karte.letzte`), nicht für die
+  unter der Maus, und hebt das Zentrieren auf. Jeder andere Klick vergisst
+  sie; ein schneller Klick nach „Wegpunkt setzen“ heftet so nichts an.
 - **Doppelklick auf ein Objekt vom Server:** Der erste Klick merkt sich
   beim Loslassen ohne Zug das Ziel unter der Maus (`Karte.letztesZiel`),
   eine Nadel, ein Banner, eine Fläche oder einen Kreis mit `id`; eine Nadel
   geht vor, wie bei der Tafel. Der zweite heftet es an, wenn unter ihm
-  dasselbe Ziel liegt; ein Knopf geht vor. Schliesst der erste Klick die gehaltene Tafel desselben Ziels, zählt
-  er ebenso. Die Tafel bleibt, wie der erste Klick sie liess, siehe
-  [Ebenen](ebenen.md), „Infotafel“.
+  dasselbe Ziel liegt; ein Knopf geht vor. Eine Tafel hält dabei keiner
+  der Klicks, siehe [Ebenen](ebenen.md), „Infotafel“.
 - **Treffer:** eine halbe Kopfseite und eine Einheit um die Mitte der
   Marke. Ein Wegpunkt oder Mitspieler geht dem eigenen Kopf vor, sonst
   liesse sich ein Wegpunkt am eigenen Standort nicht greifen; sonst die
@@ -248,7 +250,9 @@ Welt kommen in eigenen PRs.
   zurück, und ein Rechtsklick bietet „Wegpunkt löschen“. Dazu ein Kreis
   vom Server: Ein Klick heftet nichts an, ein Doppelklick heftet an, ein
   zweiter löst; ein Doppelklick auf eine Nadel und einer auf die Raute
-  einer eigenen Region heften sie an. Eine Region wie ein Spieler:
+  einer eigenen Region heften sie an. Dazu „Zum Spieler“, „Optionen …“ und
+  zurück, und ein Wegpunkt, 2,5 s still gehalten, an der Maus verschoben,
+  ein zweites Mal mit Escape abgebrochen (mod#75). Eine Region wie ein Spieler:
   Rechtsklick, „Region von hier“, die Karte ziehen setzt keine Region, die
   Maus bewegen und ein Linksklick setzt die zweite Ecke.
 - `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
@@ -261,5 +265,5 @@ Welt kommen in eigenen PRs.
 
 ## Was fehlt
 
-- **Namen, Farbe wählen, verschieben:** Ein Wegpunkt hat nur Block und
-  Farbe; ändern heisst löschen und neu setzen.
+- **Namen, Farbe wählen:** Ein Wegpunkt hat nur Block und Farbe; die Farbe
+  ändern heisst löschen und neu setzen. Verschieben geht, siehe „Bedienung“.
