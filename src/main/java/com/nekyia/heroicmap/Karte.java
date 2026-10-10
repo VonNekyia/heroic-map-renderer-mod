@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -14,6 +15,7 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
+import org.joml.Matrix3x2f;
 
 /**
  * Die Vollbildkarte aus dem geladenen Satz: Ziehen verschiebt, das Mausrad zoomt über die
@@ -39,6 +41,7 @@ final class Karte extends Screen {
     private final Satz satz;
     private final Kacheln kacheln;
     private final Kartenblick blick;
+    private final Formen.Speicher formenSpeicher = new Formen.Speicher();
     /** Was beim letzten Knopf schiefging, oder null. */
     private Component hinweis;
     /** Wo die Knöpfe rechts oben beginnen und enden; Marken und Namen weichen ihnen aus. */
@@ -129,6 +132,7 @@ final class Karte extends Screen {
         if (Minimap.INSTANZ.chunklinien() && blick.chunklinien(satz.scale(), minecraft.getWindow().getGuiScale())) {
             linien(g);
         }
+        formen(g);
         marken(g);
         int[] block = block(mausX, mausY);
         g.text(font, Component.literal(satz.name() + "   ").append(Component.translatable("heroicmap.koordinaten", block[0], block[1])),
@@ -152,6 +156,24 @@ final class Karte extends Screen {
                 g.text(font, eintraege.get(i).text(), menueX + 4, menueY + i * ZEILE + 3, TEXT);
             }
         }
+    }
+
+    /**
+     * Die Flächen, Kreise und Linien der sichtbaren Ebenen in der Dimension des Spielers, auf dem
+     * Raster der Kacheln. Siehe docs/ebenen.md, „Flächen, Kreise und Linien“.
+     */
+    private void formen(GuiGraphicsExtractor g) {
+        if (minecraft.player == null) {
+            return;
+        }
+        String dimension = minecraft.player.level().dimension().identifier().toString();
+        int scale = satz.scale();
+        Matrix3x2f pose = new Matrix3x2f(g.pose());
+        Formen.Ansicht a = new Formen.Ansicht(blick.abbild(scale, width, height), blick.chunkAbstand(scale) / 16, 1, minecraft.getWindow().getGuiScale(), Drehung.rechteck(0, 0, width, height),
+                new double[] {blick.basisRasterX(0, width) / scale, blick.basisRasterZ(0, height) / scale,
+                        blick.basisRasterX(width, width) / scale, blick.basisRasterZ(height, height) / scale},
+                pose, new ScreenRectangle(0, 0, width, height).transformMaxBounds(pose));
+        Formen.zeichne(g, a, dimension, Ebenen.INSTANZ.sichtbar().stream().map(e -> Ebenen.INSTANZ.formen(e.id())).toList(), formenSpeicher);
     }
 
     /** Chunklinien je 16 Blöcke als ein Element des GUI. Siehe docs/minimap.md, „Chunklinien“. */

@@ -1,22 +1,29 @@
 ---
 title: Ebenen
-description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Symbol und Namen auf Minimap und Vollbildkarte zeichnet, kleiner beim Hinauszoomen, die Symbole vom Server holt, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
+description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Symbol und Namen auf Minimap und Vollbildkarte zeichnet, kleiner beim Hinauszoomen, die Symbole vom Server holt, Flächen, Kreise und Linien flach zeichnet, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Ebenen.java
   - src/main/java/com/nekyia/heroicmap/EbenenMenue.java
   - src/main/java/com/nekyia/heroicmap/Symbole.java
+  - src/main/java/com/nekyia/heroicmap/Formen.java
+  - src/main/java/com/nekyia/heroicmap/Trapeze.java
+  - src/main/java/com/nekyia/heroicmap/Kartenblick.java
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
   - src/main/java/com/nekyia/heroicmap/Kanal.java
   - src/test/java/com/nekyia/heroicmap/EbenenTest.java
   - src/test/java/com/nekyia/heroicmap/SymboleTest.java
+  - src/test/java/com/nekyia/heroicmap/FormenTest.java
+  - src/test/java/com/nekyia/heroicmap/TrapezeTest.java
+  - src/test/java/com/nekyia/heroicmap/DrehungTest.java
+  - src/gametest/java/com/nekyia/heroicmap/Bilder.java
 ---
 
 # Ebenen
 
 Ein Plugin auf dem Server legt Ebenen über die Karte, etwa die Städte einer
-Nation (#35). Der Mod empfängt sie über den Kanal und zeichnet vorerst nur
-ihre Nadeln, auf Minimap und Vollbildkarte. Das Format beschreibt der
+Nation (#35). Der Mod empfängt sie über den Kanal und zeichnet ihre Nadeln,
+Flächen, Kreise und Linien auf Minimap und Vollbildkarte. Das Format beschreibt der
 Renderer:
 [Ebenen](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/ebenen.md);
 die Nachrichten das Plugin:
@@ -27,26 +34,33 @@ die Nachrichten das Plugin:
 
 - **`ebenen`:** die Liste, je Ebene `id`, `name`, `visible`, `order` und
   `version` (`Ebenen.liste`). Was nicht mehr darin steht, ist weg, mit
-  seinen Nadeln und halben Teilen. Steht eine Kennung zweimal darin, gilt
+  seinen Nadeln, Formen und halben Teilen. Steht eine Kennung zweimal darin, gilt
   der erste Eintrag.
 - **`ebene`:** ein Teil einer Ebene, `teil` von `teile`, mit seiner
   `version` (`Ebenen.teil`).
   - Gelesen schon auf dem Thread des Netzes (`Kanal.lies`,
     `Ebenen.Teil.lies`): Bis 1 MiB JSON parst nicht der Render-Thread.
-    Er bekommt nur die Nadeln des Teils; kein JSON bleibt liegen.
+    Er bekommt nur Nadeln und Formen des Teils, die Füllungen schon
+    zerlegt; kein JSON bleibt liegen.
   - Ein Teil gilt nur mit der `version`, die die Liste für seine Ebene
     nennt; das Plugin schickt die Liste vor den Teilen. Welche von zwei
     `version` neuer ist, sagt ein Hash nicht, die Liste schon.
-  - Erst wenn alle Teile da sind, ersetzen ihre Nadeln die der Ebene, in
-    der Reihenfolge der Teile. Bis dahin bleibt die alte.
+  - Erst wenn alle Teile da sind, ersetzen ihre Nadeln und Formen die der
+    Ebene, in der Reihenfolge der Teile. Bis dahin bleibt die alte. Kommt
+    ein Teil zweimal, gilt der zweite, auch in den Zählern der Grenzen.
   - Nennt die Liste eine neue `version`, verwirft der Mod die halben
     Teile der alten. Weil die Liste je Kennung genau eine `version` nennt,
     entsteht so nie eine Ebene aus zwei Versionen.
+  - Eine Sammlung über einer Grenze ist verworfen; die übrigen Teile
+    ihrer `version` übergeht der Mod. So meldet das Log sie einmal, und
+    sie zählt nicht weiter in die Punkte über alle Ebenen.
 - **Vergessen** beim Trennen und bei jedem neuen Login; das Plugin schickt
   danach alles neu.
 - **Kaputt:** Eine Nachricht, die sich nicht lesen lässt, ändert nichts,
   auch nicht an einer halben Sammlung. Ein kaputtes Objekt fehlt, die
-  übrigen gelten.
+  übrigen gelten. Formen, die kaputt sind, eine Grenze verletzen oder
+  deren Füllung zu aufwendig ist, zählt der Mod und meldet sie einmal je
+  Ebene und `version` im Log, wenn die Sammlung fertig ist.
 - **Gross:** Ein Teil hat bis 64 KiB, ein Teil mit einem einzelnen grossen
   Objekt bis 1 MiB. So viel liest der Kanal, siehe [Download](download.md),
   „Kanal“; sonst würde eine Ebene mit einer grossen Region nie ganz.
@@ -129,6 +143,110 @@ die Nachrichten das Plugin:
   Login und mit einer neuen Adresse. Danach fragt ein Auftrag für sie, der
   noch wartet, nicht mehr.
 
+## Flächen, Kreise und Linien
+
+Regionen, Kreise und Linien zeichnet der Mod flach, wie das Format es für
+die Kameras von oben sagt: Seine Karten sind von oben gesehen, ein Kreis
+bleibt rund. Was er zeichnet, kommt aus `Ebenen.formen`, gelesen auf dem
+Thread des Netzes wie die Nadeln.
+
+![Fläche mit Loch, Kreis, Dreieck und Linie einer Ebene auf der Minimap, genordet und gedreht mit dem Rahmen „uhr“; Szene `formen` des Gametests](bilder/formen.png)
+
+![Dieselben Formen auf der Vollbildkarte](bilder/formen-karte.png)
+
+- **Füllung** (`fill`, mit Alpha; `#00000000` heisst ohne): bei einer
+  Region als Trapeze in der Welt (`Trapeze.von`).
+  - Bänder zwischen den z der Ecken; kreuzen sich zwei Kanten in einem
+    Band, wird es dort geteilt. Je Band die Spannen zwischen zwei Kanten
+    nach der Regel gerade/ungerade, über alle Ringe.
+  - Eine Spanne läuft über die Bänder weiter, solange sie dieselben zwei
+    Kanten hat; eine ehrliche Fläche braucht so rund zwei Trapeze je Ecke,
+    eine Treppe aus Chunks eins je Stufe.
+  - Genau: Die Kanten der Trapeze liegen auf den Kanten der Fläche, auch
+    schräg, ohne Treppe. Jedes Stück liegt einmal da, so doppelt sich das
+    Alpha nicht, auch nicht an Löchern. Jedes Trapez ist konvex.
+  - Gerechnet einmal je `version`, schon auf dem Thread des Netzes. Der
+    Speicher wächst mit den Punkten, nicht mit der Fläche.
+  - Zu aufwendig ist eine Füllung mit mehr als 3 Trapezen je Punkt oder
+    mehr als 256 Kanten je Punkt über alle Bänder, etwa ein Kamm aus
+    tausenden Zinken; dann bleibt nur der Rand.
+  - Gezeichnet: Erst schneidet der Mod jedes Trapez in Doubles mit dem
+    sichtbaren Rechteck der Welt (`Formen.kappe`), dann bildet er es ab.
+    Ein Trapez über die halbe Welt hätte als Float am Rand Fehler von
+    vielen Pixeln.
+  - Beim Kreis ein Vieleck, siehe unten.
+- **Rand** (`stroke`): Vorgabe 2 breit, `width` 0 heisst ohne. Die
+  Farbe ist ohne Angabe bei Region und Kreis die Füllung ohne Alpha, auch
+  bei `#00000000` also Schwarz; sonst `#2B2B2B`. Breite, Strich und Lücke
+  stehen in Einheiten der Oberfläche des Mods, wie die Nadeln; das Format
+  nennt Pixel des Bildschirms, im Mod sind es diese Einheiten.
+- **Ecken** (`Formen.Sammler.zug`): je Strecke ein Viereck, an den Ecken
+  mit Gehrung, sodass Nachbarn sich eine Kante teilen. Aussen fehlt
+  nichts, innen liegt nichts doppelt. Reicht die Spitze weiter als zwei
+  halbe Breiten (Ecken spitzer als 60°) oder ist eine Strecke zu kurz für
+  sie, enden beide Strecken gerade und ein Dreieck füllt aussen die Fase;
+  innen überlappen sie dann ein wenig. Die Enden einer Linie sind gerade.
+  Zwei Punkte näher als 10⁻⁶ Einheiten gelten als einer, und an den Enden
+  eines Stücks nimmt der Zug die genauen Punkte; sonst machte die Rundung
+  auf der gedrehten Minimap winzige Stücke, und die Gehrung fiele aus.
+- **Striche** (`Formen.streifen`): gestrichelt laufen die Striche über
+  die Ecken weiter, mit Gehrung wie der durchgezogene Zug. Strich und
+  Lücke sind mindestens 1 Einheit. Kämen auf ein sichtbares Stück einer
+  Strecke mehr als 1000 Striche, zeichnet der Mod es durchgezogen. Am
+  ersten Punkt eines gestrichelten Rings beginnt das Muster; dort stossen
+  zwei Striche ohne Gehrung aneinander.
+- **Kreis:** ein Vieleck mit so vielen Ecken, dass die Sehne höchstens
+  einen halben Pixel vom Kreis abweicht, mindestens 16, höchstens 4096
+  (`Formen.ecken`). Gerechnet nur, was im Kasten des Schnitts liegt
+  (`Formen.bogen`):
+  - Liegt der Kreis ganz neben dem Kasten, fehlt er.
+  - Liegt der ganze Kasten im Kreis, füllt der Mod nur den Kasten, ohne
+    Rand; so kosten 10 000 grosse Kreise um den Spieler je einen.
+  - Liegt die Mitte im Kasten, das ganze Vieleck.
+  - Sonst nur der Bogen über den Kasten, mit einer Ecke davor und
+    dahinter. Die Füllung ist der Ausschnitt von der Mitte über den Bogen,
+    erst in Doubles gekappt, denn die Mitte kann weit draussen liegen.
+  - Die Ecken sind stets die des ganzen Vielecks, und das Muster der
+    Striche beginnt mit der Länge bis zur ersten: So bleibt es beim
+    Verschieben stehen.
+- **Linie:** ein Rand ohne Fläche. Zu sehen sind Linien, sobald das
+  Plugin sie schickt; laut Format schickt es bisher nur Nadeln, Regionen
+  und Kreise.
+- **Minimap:** nach Karte und Chunklinien, vor den Nadeln, auch gedreht;
+  mit der Form der Minimap geschnitten wie die Karte (`Drehung.schneide`).
+- **Vollbildkarte:** auf dem Raster der Kacheln, nach den Chunklinien, vor
+  Nadeln und Wegpunkten.
+- **Reihenfolge:** Ebenen nach `order`; in einer Ebene erst alle Füllungen,
+  dann Ränder und Linien. Nadeln liegen über allen Formen.
+- **Nur, was zu sehen ist:**
+  - Formen ausserhalb des sichtbaren Teils der Welt zeichnet der Mod
+    nicht.
+  - Von jeder Strecke nimmt er nur das Stück im Kasten des Schnitts
+    (`Formen.imKasten`); davor und dahinter schiebt sich nur das Muster
+    der Striche weiter. Eine gestrichelte Weltgrenze von 60 Mio. Blöcken
+    kostet so viel wie ihr sichtbares Stück.
+  - Ein Stück, das ganz in der Form der Minimap liegt, schneidet er nicht.
+  - Jede Füllung und jeder Rand ist ein Element des GUI in einer Farbe.
+- **Neu gerechnet** nur, wenn sich die Ansicht, die Dimension oder eine
+  Ebene ändert (`Formen.Speicher`): Sonst hängt der Mod die fertigen
+  Elemente wieder an. Die Ansicht erkennt er an drei abgebildeten Punkten,
+  denn jedes Abbild ist affin, dazu Schnitt, Pose und Grenzen. Im Stand
+  kostet das je Frame fast nichts; im Flug und beim Drehen rechnet er neu.
+- **Budget an Ecken, nicht an Zeit:** Ein Neubau legt höchstens
+  1 000 000 Ecken (`Formen.MAX_ECKEN`); was darüber geht, fehlt, und
+  ist das Budget leer, rechnet der Mod auch nicht weiter.
+  - Welche fehlen: Die Ebenen kommen nach `order`, die oberste zuletzt,
+    also fallen die obersten zuerst weg. Die Ebene an der Grenze verliert
+    erst ihre Ränder und Linien, dann ihre Füllungen.
+  - Bei ruhender Ansicht fehlt immer dasselbe, also flackert nichts.
+    Beim Bewegen kann sich die Grenze von Neubau zu Neubau verschieben.
+  - Das Log warnt einmal je Ebene und `version`, deren Formen das Budget
+    leeren. Ein Budget
+  an Zeit wie beim Neuzeichnen der Karte, siehe [Minimap](minimap.md),
+  „Neu zeichnen“, taugt hier nicht: Dort kann ein Abzug auf den nächsten
+  Frame warten, eine halb gezeichnete Ebene aber flackerte. Warum so:
+  [0009](entscheidungen/0009-formen-als-trapeze.md).
+
 ## Umschalten
 
 - **Untermenü „Ebenen …“** im Untermenü „Einstellungen …“, siehe
@@ -145,8 +263,8 @@ die Nachrichten das Plugin:
 
 ## Grenzen
 
-Die ersten beiden wie im Format, die übrigen sind eigene Grenzen des Mods.
-So kann ein Server den Speicher des Mods nicht füllen:
+Was „wie im Format“ heisst, steht so im Format; die übrigen sind eigene
+Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 
 | Was | Höchstens | Darüber |
 |---|---|---|
@@ -159,16 +277,46 @@ So kann ein Server den Speicher des Mods nicht füllen:
 | Feld eines Symbols | 76 Zeichen | das Symbol fehlt |
 | Symbole je Ebene | 200 | die übrigen fehlen, das Log nennt es |
 | Bild eines Symbols | 256 KiB, 10 s | das Symbol fehlt |
+| Objekte je Ebene | 10 000, wie im Format | die Sammlung ist verworfen |
+| Punkte je Form, über alle Ringe | 10 000, wie im Format | die Form fehlt |
+| Löcher je Polygon | 100, wie im Format | die Form fehlt |
+| Radius eines Kreises | 100 000 Blöcke, wie im Format | der Kreis fehlt |
+| Koordinate | ±30 000 000 | die Form fehlt |
+| Punkte der Formen je Teil, ein Kreis zählt einen | 200 000, als JSON rund 3 MiB wie eine Datei im Format | der Teil gilt nicht |
+| Punkte der Formen je Ebene | 200 000 | die Sammlung ist verworfen |
+| Punkte der Formen über alle Ebenen, je Ebene die grössere Sammlung | 500 000 | die Sammlung ist verworfen |
+| Trapeze einer Füllung | 3 je Punkt + 16, Arbeit 256 Kanten je Punkt | ohne Füllung, der Rand bleibt |
+| Breite eines Rands, Strich, Lücke | 64, 1000, 1000 Einheiten | gekappt |
+| Strich, Lücke | mindestens 1 Einheit | gehoben |
+| Striche je sichtbarem Stück einer Strecke | 1000 | durchgezogen |
+| Ecken je Neubau der Formen | 1 000 000 | der Rest fehlt |
 
 - **Speicher:** Halbe Sammlungen gibt es höchstens eine je Ebene der
   Liste, also 64, mit je höchstens 1000 Nadeln. Symbole höchstens 200 je
   Ebene, also 12 800 Texturen, je 1 KiB im Speicher und auf der
   Grafikkarte, weil die `DynamicTexture` ihr Bild behält; zusammen rund
   25 MiB.
+- **Speicher der Formen:** je Punkt 16 Byte, je Trapez 48 Byte, mit
+  höchstens 3 Trapezen je Punkt und 16 je Fläche rund 200 Byte je Punkt.
+  Über alle Ebenen höchstens 500 000 Punkte, rund 100 MB; während eine
+  neue `version` kommt, liegen alte und neue Sammlung kurz nebeneinander,
+  rund 200 MB. Ein Plugin für Claims braucht ein Vielfaches weniger.
 - **Kosten:** Je Frame geht der Mod alle Nadeln der sichtbaren Ebenen
   durch, im schlimmsten Fall 64 000. Ein Raster nach Regionen kommt erst,
-  wenn eine Messung es verlangt.
+  wenn eine Messung es verlangt. Die Formen rechnet er nur bei einer
+  neuen Ansicht neu, siehe „Flächen, Kreise und Linien“. Der schlimmste
+  Neubau legt 1 000 000 Ecken, das Budget; geprüft geht er alle sichtbaren
+  Formen einmal durch, die Füllungen mit ihren Trapezen. Die Trapeze
+  rechnet er einmal je `version`, höchstens 256 Kanten je Punkt über alle
+  Bänder, das Sortieren mitgezählt. Die neuen Kanten eines Bands sortiert
+  er für sich und mischt sie unter die alten; so kostet es gleich viel, in
+  welcher Folge die Ecken kommen.
+- **Grafikkarte:** Das Budget zählt Ecken, nicht Pixel. 10 000
+  durchscheinende Kästen über die ganze Ansicht passen hinein, die
+  Grafikkarte zeichnet dann aber jeden Pixel 10 000-mal.
 
 ## Was noch fehlt
 
-- **Infotafel** beim Anklicken; Regionen und Kreise (#36).
+- **Infotafel** beim Zeigen und Anklicken.
+- **Kartenschrift** (`label`).
+- **Anheften** an Regionen (#36).
