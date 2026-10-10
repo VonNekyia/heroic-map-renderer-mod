@@ -1154,6 +1154,8 @@ public final class Minimap {
         }
         boolean nachgeladen = atlasStand != null;
         texel = ChunkMaler.Texel.vomAtlas(atlas);
+        // Die Deckel der Truhen kommen aus ihrem eigenen Atlas. Siehe docs/minimap.md, „Blockentities“.
+        texel.putAll(ChunkMaler.Texel.vomAtlas(mc.getAtlasManager().getAtlasOrThrow(AtlasIds.CHESTS)));
         atlasStand = atlas.sprites;
         if (nachgeladen) {
             leeren();

@@ -4,6 +4,11 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.14
+
+- **Doors, fences and torches on the minimap:** thin blocks now take at least one pixel, so doors, fence posts, panes, bars and torches show at low resolution too.
+- **Chests look like chests** on the minimap and the self-drawn map: the top of their lid instead of plain planks; ender chests no longer black.
+
 ## 0.2.13
 
 - **Pins and banners on the minimap only when pinned:** double-click a pin or banner on the full map to pin it; pinned ones show a small dot under them there. Up to 64 per world.

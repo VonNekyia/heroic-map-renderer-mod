@@ -68,6 +68,7 @@ Das baut das Jar nach `build/libs/` und lässt die Tests laufen.
 | `SelbstTest` | die selbst gezeichnete Karte: Chunk in seiner Kachel, Vorfahr aus vier Kindern, nur das geänderte Viertel, gröbere Stufen später, Schreiben scheitert, dauerhaft scheitert, Speicher bei 64, kaputte PNG, Baum je Dimension, Präfix und Marke, PNG mit falscher Grösse, siehe [Selbst gezeichnete Karte](selbst.md) |
 | `KachelwerkMessung` | nur mit `-Pkachelwerk=<datei>`: was `Kachelwerk.schreibe` kostet, siehe [Selbst gezeichnete Karte](selbst.md), „Kosten“ |
 | `PyramideTest` | Verkleinern wie die Pyramide des Renderers, siehe [Selbst gezeichnete Karte](selbst.md), „Pyramide“ |
+| `ChunkMalerTest` | dünne Flächen mindestens ein Pixel, der Deckel einer Truhe nach `facing` und Hälfte, siehe [Minimap](minimap.md), „Flächen und Pixel“ und „Blockentities“ |
 | `WegpunkteTest` | Wegpunkte setzen, löschen, anheften, Farben, kaputte Einträge und Dateien; Regionen, Kreise, Nadeln und Banner anheften, je höchstens 64, tote Einträge, Listen für Karte und Minimap; siehe [Wegpunkte](wegpunkte.md) |
 | `LichtTest` | die Lightmap gegen die Werte aus der Doku des Renderers, siehe [Minimap](minimap.md), „Licht“ |
 
