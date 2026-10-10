@@ -473,7 +473,8 @@ final class Ebenen {
      * Eine Kartenschrift: {@code text} bis {@link #MAX_TEXT} Zeichen, in NFC; {@code path} 1 bis
      * {@link #MAX_PFAD} Punkte; {@code size} Vorgabe 16 Blöcke, auch für 0 und Ungültiges; {@code spacing}
      * Vorgabe 0, gekappt auf 0 bis {@link #MAX_SPERRUNG}. {@code outline} nur als Objekt, ohne {@code width}
-     * ohne Kontur, ohne {@code color} in {@link #KONTURFARBE}. Wo das Format schweigt, wie die Webkarte.
+     * ohne Kontur, ohne {@code color} in {@link #KONTURFARBE}. Ein Feld mit falschem Typ nimmt die Vorgabe.
+     * Wo das Format schweigt, wie die Webkarte.
      */
     private static Schrift schrift(JsonObject o, String dimension) {
         String text = text(o, "text", MAX_TEXT);
@@ -485,22 +486,22 @@ final class Ebenen {
         if (pfad.length / 2 > MAX_PFAD) {
             throw new IllegalArgumentException("Pfad " + pfad.length / 2);
         }
-        float groesse = o.has("size") ? o.get("size").getAsFloat() : 16;
+        float groesse = zahl(o, "size", 16);
         if (!(groesse > 0)) {
             groesse = 16;
         }
         if (groesse > MAX_RADIUS) {
             throw new IllegalArgumentException("Grösse " + groesse);
         }
-        float sperrung = o.has("spacing") ? o.get("spacing").getAsFloat() : 0;
+        float sperrung = zahl(o, "spacing", 0);
         sperrung = Float.isFinite(sperrung) ? Math.max(0, Math.min(sperrung, MAX_SPERRUNG)) : 0;
-        int farbe = o.has("color") ? farbeMitAlpha(o.get("color").getAsString(), SCHRIFTFARBE) : SCHRIFTFARBE;
+        int farbe = farbeMitAlpha(o, "color", SCHRIFTFARBE);
         int konturFarbe = KONTURFARBE;
         float konturBreite = 0;
         if (o.has("outline") && o.get("outline").isJsonObject()) {
             JsonObject k = o.getAsJsonObject("outline");
-            konturFarbe = k.has("color") ? farbeMitAlpha(k.get("color").getAsString(), KONTURFARBE) : KONTURFARBE;
-            float b = k.has("width") ? k.get("width").getAsFloat() : 0;
+            konturFarbe = farbeMitAlpha(k, "color", KONTURFARBE);
+            float b = zahl(k, "width", 0);
             konturBreite = b > 0 ? Math.min(b, MAX_BREITE) : 0;
         }
         return new Schrift(dimension, text, pfad, groesse, sperrung, farbe, konturFarbe, konturBreite, box(List.of(pfad)));
@@ -570,6 +571,18 @@ final class Ebenen {
     }
 
     private static final Pattern FARBE_MIT_ALPHA = Pattern.compile("#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?");
+
+    /** Das Feld als Zahl, nur wenn es eine JSON-Zahl ist; sonst, auch für "12", {@code sonst}. */
+    static float zahl(JsonObject o, String feld, float sonst) {
+        JsonElement e = o.get(feld);
+        return e != null && e.isJsonPrimitive() && e.getAsJsonPrimitive().isNumber() ? e.getAsFloat() : sonst;
+    }
+
+    /** Das Feld als Farbe wie {@link #farbeMitAlpha(String, int)}, nur wenn es ein Text ist; sonst {@code sonst}. */
+    static int farbeMitAlpha(JsonObject o, String feld, int sonst) {
+        JsonElement e = o.get(feld);
+        return e != null && e.isJsonPrimitive() && e.getAsJsonPrimitive().isString() ? farbeMitAlpha(e.getAsString(), sonst) : sonst;
+    }
 
     /** {@code #RRGGBB} deckend oder {@code #RRGGBBAA} mit Alpha als ARGB; sonst {@code sonst}. */
     static int farbeMitAlpha(String text, int sonst) {

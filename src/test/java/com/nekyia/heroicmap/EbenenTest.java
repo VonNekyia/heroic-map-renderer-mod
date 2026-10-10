@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -559,6 +560,48 @@ class EbenenTest {
         assertEquals(2 * Ebenen.MAX_PFAD, ((Ebenen.Schrift) g.formen().get(3)).pfad().length);
         // In NFC: e mit Akut wird é.
         assertEquals("Caf\u00e9", ((Ebenen.Schrift) g.formen().get(4)).text());
+    }
+
+    @Test
+    void kartenschriftFelderMitFalschemTyp() {
+        // Ein Feld mit falschem Typ nimmt die Vorgabe, die Schrift bleibt; "12" als Text heisst 16, wie auf der Webkarte.
+        JsonArray objekte = JsonParser.parseString("["
+                + "{\"type\":\"label\",\"text\":\"a\",\"path\":[[0,0]],\"size\":\"abc\"},"
+                + "{\"type\":\"label\",\"text\":\"b\",\"path\":[[0,0]],\"size\":true},"
+                + "{\"type\":\"label\",\"text\":\"c\",\"path\":[[0,0]],\"size\":{}},"
+                + "{\"type\":\"label\",\"text\":\"d\",\"path\":[[0,0]],\"size\":\"12\"},"
+                + "{\"type\":\"label\",\"text\":\"e\",\"path\":[[0,0]],\"spacing\":\"x\"},"
+                + "{\"type\":\"label\",\"text\":\"f\",\"path\":[[0,0]],\"color\":{}},"
+                + "{\"type\":\"label\",\"text\":\"g\",\"path\":[[0,0]],\"outline\":{\"width\":\"2\"}},"
+                + "{\"type\":\"label\",\"text\":\"h\",\"path\":[[0,0]],\"outline\":{\"width\":2,\"color\":{}}}"
+                + "]").getAsJsonArray();
+        Ebenen.Gelesen g = Ebenen.formen(objekte);
+        assertEquals(0, g.verworfen());
+        assertEquals(8, g.formen().size());
+        for (int i = 0; i < 4; i++) {
+            assertEquals(16, ((Ebenen.Schrift) g.formen().get(i)).groesse());
+        }
+        assertEquals(0, ((Ebenen.Schrift) g.formen().get(4)).sperrung());
+        assertEquals(Ebenen.SCHRIFTFARBE, ((Ebenen.Schrift) g.formen().get(5)).farbe());
+        assertEquals(0, ((Ebenen.Schrift) g.formen().get(6)).konturBreite());
+        Ebenen.Schrift h = (Ebenen.Schrift) g.formen().get(7);
+        assertEquals(2, h.konturBreite());
+        assertEquals(Ebenen.KONTURFARBE, h.konturFarbe());
+    }
+
+    @Test
+    void zahlUndFarbeNurMitPassendemTyp() {
+        JsonObject o = JsonParser.parseString(
+                "{\"zahl\":2.5,\"text\":\"3\",\"wahr\":true,\"farbe\":\"#40E53F55\",\"keine\":5,\"objekt\":{}}").getAsJsonObject();
+        assertEquals(2.5f, Ebenen.zahl(o, "zahl", 7));
+        assertEquals(7, Ebenen.zahl(o, "text", 7));
+        assertEquals(7, Ebenen.zahl(o, "wahr", 7));
+        assertEquals(7, Ebenen.zahl(o, "objekt", 7));
+        assertEquals(7, Ebenen.zahl(o, "fehlt", 7));
+        assertEquals(0x5540E53F, Ebenen.farbeMitAlpha(o, "farbe", 7));
+        assertEquals(7, Ebenen.farbeMitAlpha(o, "keine", 7));
+        assertEquals(7, Ebenen.farbeMitAlpha(o, "objekt", 7));
+        assertEquals(7, Ebenen.farbeMitAlpha(o, "fehlt", 7));
     }
 
     @Test

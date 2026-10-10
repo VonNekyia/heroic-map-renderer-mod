@@ -287,13 +287,17 @@ in der Schrift IM Fell English SC (`Formen.glyphen`, `Formen.texte`).
 - **Wo das Format schweigt, wie die Webkarte,** so hat es der Reviewer
   entschieden: `size` 0 oder ungültig heisst 16; eine `outline`, die kein
   Objekt ist, fehlt, die Schrift bleibt; `outline: {}` ist ohne Kontur.
+  Ein Feld mit falschem Typ nimmt die Vorgabe, die Schrift bleibt: Zahlen
+  nur als Zahl, `size: "12"` heisst also 16; Farben nur als Text
+  (`Ebenen.zahl`, `Ebenen.farbeMitAlpha`).
 - **Kontur** (`outline`): ohne `width` keine; `width` in Einheiten der
   Oberfläche, 0 heisst ohne, höchstens 64 und höchstens 0,12 der Höhe der
   Grossbuchstaben, breiter zerfiele sie in Kopien; `color` Vorgabe
   `#F2E8D0`. Gezeichnet als acht versetzte Kopien je Zeichen, erst alle
   Kopien der ganzen Schrift, dann alle Zeichen; so deckt keine Kontur ein
   Zeichen davor. Mit Alpha liegen die Kopien übereinander, die Kontur wird
-  also deckender als ihre Farbe.
+  also deckender als ihre Farbe. Eine Farbe mit Alpha 0 zeichnet der Mod
+  nicht und zählt sie nicht.
 - **Schrift:** die TTF unverändert als Schrift des Spiels,
   `assets/heroicmap/font/karte.json`, 16 Einheiten je Geviert, achtfach
   abgetastet. Zeichen, die sie nicht hat, etwa Kyrillisch oder CJK, nimmt
@@ -323,10 +327,15 @@ in der Schrift IM Fell English SC (`Formen.glyphen`, `Formen.texte`).
   Form liegt; rund ragt die Schrift so nicht über den Ring.
 - **Gespeichert** wie die Formen (`Formen.Speicher`): Jede Glyphe ist ein
   fertiger Text des Spiels mit seiner Pose. Bleiben Ansicht und Ebenen
-  gleich, hängt der Mod sie nur wieder an.
+  gleich, hängt der Mod sie nur wieder an. Lädt das Spiel seine
+  Ressourcen neu (F3+T, andere Pakete), baut jede Ansicht neu
+  (`Formen.neuGeladen`, nach den Schriften des Spiels): Die Texte halten
+  Glyphen der alten Schrift.
 - **Budget:** Ein Neubau legt höchstens 20 000 Zeichen samt den Kopien
-  der Kontur (`Formen.MAX_ZEICHEN`); was darüber geht, fehlt, die
-  obersten Ebenen zuerst. Das Log warnt einmal je Ebene und `version`.
+  der Kontur (`Formen.MAX_ZEICHEN`). Eine Schrift geht ganz ab oder gar
+  nicht: Passt sie nicht mehr ganz, fehlt sie, und keine Kontur steht
+  ohne ihre Zeichen. Eine kleinere danach kann noch passen. Die obersten
+  Ebenen fehlen zuerst. Das Log warnt einmal je Ebene und `version`.
 
 ## Infotafel
 
@@ -429,7 +438,7 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 | Sperrung einer Kartenschrift | 2 | gekappt |
 | Breite der Kontur einer Kartenschrift | 64 Einheiten und 0,12 der Höhe der Grossbuchstaben | gekappt |
 | Grösse einer Kartenschrift | 100 000 Blöcke | die Schrift fehlt |
-| Zeichen der Kartenschrift je Neubau, samt Kontur | 20 000 | der Rest fehlt |
+| Zeichen der Kartenschrift je Neubau, samt Kontur | 20 000 | eine Schrift, die nicht mehr ganz passt, fehlt |
 | Strich, Lücke | mindestens 1 Einheit | gehoben |
 | Striche je sichtbarem Stück einer Strecke | 1000 | durchgezogen |
 | Ecken je Neubau der Formen | 1 000 000 | der Rest fehlt |

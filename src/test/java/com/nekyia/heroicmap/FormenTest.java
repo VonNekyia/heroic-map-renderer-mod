@@ -350,11 +350,53 @@ class FormenTest {
 
     @Test
     void budgetDerZeichen() {
+        // 8 Zeichen mit Kontur kosten 8 · 9 = 72 Glyphen. Reichen 5 nicht, fehlt die ganze Schrift und das Budget bleibt.
+        double[] breiten = {8, 8, 8, 8, 8, 8, 8, 8};
         int[] rest = {5};
-        List<Formen.Glyphe> g = Formen.glyphen(schrift("ABCDEFGH", 1), new double[] {0, 0, 100, 0}, new double[] {8, 8, 8, 8, 8, 8, 8, 8}, 16, 1,
-                Drehung.rechteck(-1000, -1000, 1000, 1000), rest);
-        assertEquals(5, g.size());
+        assertNull(Formen.glyphen(schrift("ABCDEFGH", 1), new double[] {0, 0, 100, 0}, breiten, 16, 1,
+                Drehung.rechteck(-1000, -1000, 1000, 1000), rest));
+        assertEquals(5, rest[0]);
+        // 71 reichen auch nicht, 72 genau.
+        rest[0] = 71;
+        assertNull(Formen.glyphen(schrift("ABCDEFGH", 1), new double[] {0, 0, 100, 0}, breiten, 16, 1,
+                Drehung.rechteck(-1000, -1000, 1000, 1000), rest));
+        rest[0] = 72;
+        assertEquals(72, Formen.glyphen(schrift("ABCDEFGH", 1), new double[] {0, 0, 100, 0}, breiten, 16, 1,
+                Drehung.rechteck(-1000, -1000, 1000, 1000), rest).size());
         assertEquals(0, rest[0]);
+    }
+
+    @Test
+    void unsichtbareFarbeWederGezeichnetNochGezaehlt() {
+        double[] p = {0, 0, 100, 0};
+        float[] kasten = Drehung.rechteck(-1000, -1000, 1000, 1000);
+        // Kontur mit Alpha 0: nur die zwei Füllungen, zwei Glyphen vom Budget.
+        int[] rest = {Formen.MAX_ZEICHEN};
+        List<Formen.Glyphe> ohneKontur = Formen.glyphen(new Ebenen.Schrift(Ebenen.UEBERWELT, "AB", p, 16, 0, 0xFF2B2B2B, 0x00F2E8D0, 1, p),
+                p, new double[] {8, 8}, 16, 1, kasten, rest);
+        assertEquals(2, ohneKontur.size());
+        assertEquals(0xFF2B2B2B, ohneKontur.getFirst().farbe());
+        assertEquals(Formen.MAX_ZEICHEN - 2, rest[0]);
+        // Füllung mit Alpha 0: nur die 2 · 8 Kopien der Kontur.
+        List<Formen.Glyphe> ohneFuellung = Formen.glyphen(new Ebenen.Schrift(Ebenen.UEBERWELT, "AB", p, 16, 0, 0x002B2B2B, 0xFFF2E8D0, 1, p),
+                p, new double[] {8, 8}, 16, 1, kasten, rest);
+        assertEquals(16, ohneFuellung.size());
+        assertTrue(ohneFuellung.stream().allMatch(gl -> gl.farbe() == 0xFFF2E8D0));
+        assertEquals(Formen.MAX_ZEICHEN - 18, rest[0]);
+    }
+
+    @Test
+    void neuladenVerwirftDenSpeicher() {
+        // Nach F3+T oder anderen Paketen halten gespeicherte Texte Glyphen der alten Schrift; der Speicher gilt nicht mehr.
+        Formen.Speicher sp = new Formen.Speicher();
+        double[] schluessel = {1, 2, 3};
+        List<List<Ebenen.Form>> ebenen = List.of(List.of());
+        sp.merke(schluessel, Ebenen.UEBERWELT, ebenen, List.of());
+        assertTrue(sp.gilt(schluessel, Ebenen.UEBERWELT, ebenen));
+        Formen.neuGeladen();
+        assertFalse(sp.gilt(schluessel, Ebenen.UEBERWELT, ebenen));
+        sp.merke(schluessel, Ebenen.UEBERWELT, ebenen, List.of());
+        assertTrue(sp.gilt(schluessel, Ebenen.UEBERWELT, ebenen));
     }
 
     @Test
