@@ -8,6 +8,7 @@ The release notes on GitHub and Modrinth come from here
 
 - **Banners and their names** no longer stay away when an image did not load at first: the mod asks again after one minute, after five, then every fifteen minutes.
 - **Names under pins and banners** look like the map labels now: dark letters with a light outline, no box.
+- **Minimap stays clear:** regions, circles and lines of server layers show on the full map only; pins, banners and labels stay on the minimap.
 
 ## 0.2.9
 

@@ -29,7 +29,8 @@ code:
 
 Ein Plugin auf dem Server legt Ebenen über die Karte, etwa die Städte einer
 Nation (#35). Der Mod empfängt sie über den Kanal und zeichnet ihre Nadeln,
-Banner, Flächen, Kreise, Linien und Kartenschrift auf Minimap und Vollbildkarte. Das Format beschreibt der
+Banner und Kartenschrift auf Minimap und Vollbildkarte, ihre Flächen,
+Kreise und Linien nur auf der Vollbildkarte. Das Format beschreibt der
 Renderer:
 [Ebenen](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/ebenen.md);
 die Nachrichten das Plugin:
@@ -210,9 +211,7 @@ die Kameras von oben sagt: Seine Karten sind von oben gesehen, ein Kreis
 bleibt rund. Was er zeichnet, kommt aus `Ebenen.formen`, gelesen auf dem
 Thread des Netzes wie die Nadeln.
 
-![Fläche mit Loch, Kreis, Dreieck, Linie und Kartenschrift einer Ebene auf der Minimap, genordet und gedreht mit dem Rahmen „uhr“; Szene `formen` des Gametests](bilder/formen.png)
-
-![Dieselben Formen auf der Vollbildkarte](bilder/formen-karte.png)
+![Fläche mit Loch, Kreis, Dreieck, Linie und Kartenschrift einer Ebene auf der Vollbildkarte; Szene `formen` des Gametests](bilder/formen-karte.png)
 
 - **Füllung** (`fill`, mit Alpha; `#00000000` heisst ohne): bei einer
   Region als Trapeze in der Welt (`Trapeze.von`).
@@ -272,8 +271,11 @@ Thread des Netzes wie die Nadeln.
 - **Linie:** ein Rand ohne Fläche. Zu sehen sind Linien, sobald das
   Plugin sie schickt; laut Format schickt es bisher nur Nadeln, Regionen
   und Kreise.
-- **Minimap:** nach Karte und Chunklinien, vor den Nadeln, auch gedreht;
-  mit der Form der Minimap geschnitten wie die Karte (`Drehung.schneide`).
+- **Minimap:** ohne Flächen, Kreise und Linien; die Karte bleibt frei,
+  so will es der User (mod#59). Angeheftet kommen sie mit mod#36. Die
+  Kartenschrift der Ebenen steht dort, nach Karte und Chunklinien, vor den
+  Nadeln, auch gedreht, mit der Form der Minimap geschnitten wie die Karte
+  (`Drehung.schneide`); `Formen.zeichne` ohne `flaechen`.
 - **Vollbildkarte:** auf dem Raster der Kacheln, nach den Chunklinien, vor
   Nadeln und Wegpunkten.
 - **Reihenfolge:** Ebenen nach `order`; in einer Ebene erst alle Füllungen,

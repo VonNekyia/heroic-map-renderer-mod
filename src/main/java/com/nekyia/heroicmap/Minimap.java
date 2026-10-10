@@ -694,7 +694,8 @@ public final class Minimap {
                 // Die Kartenschrift höchstens ein Zehntel der Seite hoch, sonst erschlüge sie die Karte.
                 r.seite() / 10.0);
         List<List<Ebenen.Form>> ebenen = Ebenen.INSTANZ.sichtbar().stream().map(e -> Ebenen.INSTANZ.formen(e.id())).toList();
-        Formen.zeichne(g, a, dimension, ebenen, formenSpeicher, Minecraft.getInstance().font);
+        // Flächen, Kreise und Linien nur auf der Vollbildkarte; auf die Minimap kommen sie erst angeheftet (mod#59, mod#36).
+        Formen.zeichne(g, a, dimension, ebenen, formenSpeicher, Minecraft.getInstance().font, false);
         pose.popMatrix();
     }
 

@@ -102,10 +102,12 @@ final class Formen {
 
     /**
      * Zeichnet die Formen der Ebenen in ihrer Reihenfolge, in dieser Dimension: je Ebene erst alle
-     * Füllungen, dann Ränder und Linien, dann die Schrift. Neu gerechnet nur, wenn sich Ansicht,
-     * Dimension oder eine Ebene ändert; sonst hängt sie die fertigen Elemente wieder an.
+     * Füllungen, dann Ränder und Linien, dann die Schrift; ohne {@code flaechen} nur die Schrift, wie
+     * auf der Minimap. Neu gerechnet nur, wenn sich Ansicht, Dimension oder eine Ebene ändert; sonst
+     * hängt sie die fertigen Elemente wieder an.
      */
-    static void zeichne(GuiGraphicsExtractor g, Ansicht a, String dimension, List<List<Ebenen.Form>> ebenen, Speicher sp, Font font) {
+    static void zeichne(GuiGraphicsExtractor g, Ansicht a, String dimension, List<List<Ebenen.Form>> ebenen, Speicher sp, Font font,
+            boolean flaechen) {
         double[] schluessel = schluessel(a);
         if (!sp.gilt(schluessel, dimension, ebenen)) {
             List<Object> neu = new ArrayList<>();
@@ -117,7 +119,9 @@ final class Formen {
             for (List<Ebenen.Form> formen : ebenen) {
                 boolean vorher = rest[0] > 0;
                 List<Vielecke> vielecke = new ArrayList<>();
-                baue(a, dimension, formen, vielecke, rest);
+                if (flaechen) {
+                    baue(a, dimension, formen, vielecke, rest);
+                }
                 neu.addAll(vielecke);
                 boolean schriftFehlt = texte(font, a, dimension, formen, neu, zeichen);
                 // Einmal je Ebene und version: Eine neue version ist eine neue Liste.
