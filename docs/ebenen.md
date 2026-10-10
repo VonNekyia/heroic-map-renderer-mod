@@ -100,10 +100,15 @@ die Nachrichten das Plugin:
   [0007](entscheidungen/0007-toenung-auf-der-grafikkarte.md).
 - **Name** immer, mittig unter dem Fuss, so wie die Kartenschrift
   aussieht, wie der User es will (`Ebenen.name`): in ihrer Schrift und
-  ihren Vorgaben, `#2B2B2B` mit einer Kontur `#F2E8D0` von 1 Einheit, ohne
-  Kasten. Die Grossbuchstaben sind 10 Einheiten hoch, ihre Oberkante liegt
-  2 unter dem Fuss; der Name reicht 18 Einheiten nach unten
-  (`Ebenen.NAME_UNTEN`). Die Webkarte zeichnet ihn gleich, mit 16 px. Das
+  ihren Vorgaben, `#2B2B2B` mit einer Kontur `#F2E8D0`, ohne Kasten. Die
+  Schrift ist 10 Einheiten je Geviert gross, wie 16 px auf der Webkarte im
+  Verhältnis 200 zu 320 (`Ebenen.NAME_GROESSE`); die Grossbuchstaben sind so
+  rund 6,8 hoch, ihre Oberkante liegt 2 unter dem Fuss. Die Kontur ist 1,25
+  Einheiten gewünscht, wie 2 px dort, gekappt wie bei der Kartenschrift auf
+  0,12 der Höhe der Grossbuchstaben, also rund 0,81 (`Formen.kontur`). Der
+  Name reicht 13 Einheiten nach unten (`Ebenen.NAME_UNTEN`). Höchstens 500
+  Namen je Ansicht und Frame, je neun Texte (`Ebenen.MAX_NAMEN`); die
+  übrigen fehlen, das Log sagt es einmal. Das
   Format sagt: unter dem Fuss, Kartenschrift, feste Grösse, siehe
   [Ebenen](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/ebenen.md)
   und
@@ -122,7 +127,7 @@ die Nachrichten das Plugin:
   sonst verschwände eine Stadt am Rand.
 - **Vollbildkarte:** der Fuss auf dem Raster der Kacheln wie die
   Wegpunkte. Gezeichnet wird, was den Schirm berühren kann: 16 Einheiten
-  zur Seite und 64 nach oben, so viel wie das grösste Banner, der Name 18
+  zur Seite und 64 nach oben, so viel wie das grösste Banner, der Name 13
   nach unten und halb so weit zur Seite, wie er samt Kontur breit ist.
 - **Reihenfolge:** über allen Formen und aller Kartenschrift jeder Ebene,
   unter Wegpunkten, Mitspielern und dem eigenen Kopf; die Ebenen nach
@@ -170,7 +175,8 @@ Ein Ort als Bild (`banner`), etwa eine Stadt mit dem Banner ihrer Nation
   `images/<Name>.png` oder `.webp`, ohne Unterordner und ohne Punkt vorn;
   anderes holt der Mod nicht.
 - **Geholt** erst, wenn eine Nadel es zeichnet, in einem eigenen Thread,
-  einmal je Ebene, Feld, Seite und `version`, höchstens 200 je Ebene wie
+  je Ebene, Feld, Seite und `version` einmal und, wenn es nicht kam, neu
+  (siehe „Neu geholt“), höchstens 200 je Ebene wie
   die Bilder im Format; die Bilder der Banner zählen mit. Über alle Ebenen
   höchstens 1000 (`Symbole.MAX_BILDER_GESAMT`), entschieden vom Reviewer,
   siehe „Grenzen“. Eine neue `version` gibt alle Symbole der Ebene
@@ -183,10 +189,13 @@ Ein Ort als Bild (`banner`), etwa eine Stadt mit dem Banner ihrer Nation
   Banner höchstens 32 × 64, geprüft am Kopf vor dem Dekodieren
   (`Symbole.hole`). Ein Fehler steht im Log, das Schild bleibt leer, das
   Banner fehlt samt Namen.
-- **Neu geholt** wird ein Bild, das nicht kam, nach 60 s, höchstens dreimal
-  je `version` (`Symbole.NEU_MS`, `Symbole.VERSUCHE`). So kommt ein Bild,
-  das der Server erst nach der Ebene schreibt oder das ein Proxy kurz
-  nicht durchreicht, ohne neues Login. Den Anlass gab mod#58: Ein Proxy
+- **Neu geholt** wird ein Bild, das nicht kam, nach 1, nach 5 und dann
+  alle 15 Minuten, je Schlüssel und `version`, ohne Deckel
+  (`Symbole.WARTEN_MS`), so hat es der Reviewer entschieden. Solange ein
+  Versuch läuft, geht kein zweiter hinaus. Der erste Fehlschlag steht als
+  WARN im Log, die neuen Versuche als DEBUG. So kommt ein Bild, das der
+  Server erst nach der Ebene schreibt oder das ein Proxy erst später
+  durchreicht, ohne neues Login. Den Anlass gab mod#58: Ein Proxy
   vor dem Server reichte `/tiles/` nicht durch, siehe
   [Ebenen](https://github.com/VonNekyia/heroic-map-renderer-plugin/blob/main/docs/ebenen.md)
   des Plugins, „Bilder im Mod“.
@@ -527,6 +536,8 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 | Breite der Kontur einer Kartenschrift | 64 Einheiten und 0,12 der Höhe der Grossbuchstaben | gekappt |
 | Grösse einer Kartenschrift | 100 000 Blöcke | die Schrift fehlt |
 | Zeichen der Kartenschrift je Neubau, samt Kontur | 20 000 | eine Schrift, die nicht mehr ganz passt, fehlt |
+| Namen unter Nadeln und Bannern je Ansicht und Frame | 500, je neun Texte | die übrigen fehlen, das Log nennt es einmal |
+| neues Holen eines Bilds, das nicht kam | nach 1, 5, dann alle 15 min, je Schlüssel und `version`, einer zur Zeit | – |
 | Strich, Lücke | mindestens 1 Einheit | gehoben |
 | Striche je sichtbarem Stück einer Strecke | 1000 | durchgezogen |
 | Ecken je Neubau der Formen | 1 000 000 | der Rest fehlt |
