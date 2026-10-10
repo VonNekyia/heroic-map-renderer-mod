@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.23
+
+- **Banner names follow an arc:** the name under a banner now curves below it, each letter upright to the arc, like on the web map; pin names stay straight.
+
 ## 0.2.22
 
 - **The full map remembers its view per map, not per dimension.** Switching to another map of the same dimension, such as your own, no longer opens it at the zoom of the last one, where your own map may still be empty. After the update the full map starts once at your position.

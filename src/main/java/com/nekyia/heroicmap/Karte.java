@@ -427,13 +427,13 @@ final class Karte extends Screen {
             for (Ebenen.Ort n : Ebenen.INSTANZ.nadeln(e.id())) {
                 double x = blick.rasterX(Projektion.zuPixel(n.x(), satz.scale()), width);
                 double y = blick.rasterY(Projektion.zuPixel(n.z(), satz.scale()), height);
-                // Erst die Höhe: Unter dem Fuss reicht der Name NAME_UNTEN Einheiten, über ihm höchstens ein Banner 64. Dann
-                // der Kasten ohne Holen; er misst den Namen, holt aber kein Bild.
-                if (!n.dimension().equals(dimension) || y <= -Ebenen.NAME_UNTEN || y >= height + 65) {
+                // Erst grob die Höhe: Unter dem Fuss reicht kein Name weiter als UNTEN_HOECHSTENS. Dann der Kasten ohne Holen,
+                // samt einem Namen im Bogen, der auch über den Fuss steigt; er misst den Namen, holt aber kein Bild.
+                if (!n.dimension().equals(dimension) || y <= -Ebenen.UNTEN_HOECHSTENS) {
                     continue;
                 }
                 float[] r = Ebenen.kastenOhneHolen(font, n);
-                if (x + r[2] > 0 && x + r[0] < width) {
+                if (x + r[2] > 0 && x + r[0] < width && y + r[3] > 0 && y + r[1] < height) {
                     float px = aufPixel(x, k), py = aufPixel(y, k);
                     Ebenen.zeichne(g, font, px, py, n, namen, k, 1);
                     if (Wegpunkte.INSTANZ.angeheftet(Ebenen.INSTANZ, n)) {
@@ -527,6 +527,13 @@ final class Karte extends Screen {
 
     int[] ziel() {
         return ziel;
+    }
+
+    /** Für den Gametest: der Fuss eines Orts auf dem Schirm, in Einheiten des GUI, wie gezeichnet. */
+    float[] fuss(Ebenen.Ort o) {
+        int k = minecraft.getWindow().getGuiScale();
+        return new float[] {aufPixel(blick.rasterX(Projektion.zuPixel(o.x(), satz.scale()), width), k),
+            aufPixel(blick.rasterY(Projektion.zuPixel(o.z(), satz.scale()), height), k)};
     }
 
     /** Für den Gametest: die ids der Form im Bau, oder null. */

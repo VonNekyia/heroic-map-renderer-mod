@@ -203,6 +203,7 @@ public final class Bilder implements FabricClientGameTest {
             context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
             context.waitTicks(40);
             Path karte = context.takeScreenshot(TestScreenshotOptions.of("orte-karte").disableCounterPrefix());
+            nameImBogen(context, karte);
             gleichGrossAufZweiStufen(context, karte);
             // Die Option tauscht die Schriften ohne Neuladen; die gespeicherte Kartenschrift baut neu.
             int vorher = context.computeOnClient(mc -> Formen.generation);
@@ -342,6 +343,52 @@ public final class Bilder implements FabricClientGameTest {
                 }
                 g.pose().popMatrix();
             }
+        }
+    }
+
+    /**
+     * Am Bildschirmfoto der Vollbildkarte: Der Name von „Westmark“ liegt im Bogen waagrecht mittig unter dem Fuss des
+     * Banners, sein tiefster Punkt unter dem Fuss, die Enden höher. Gezählt werden die Pixel in der Schriftfarbe in einem
+     * Band von 4 Einheiten über bis 18 unter dem Fuss und 36 zu beiden Seiten; „Nordland“ endet darüber, „Eichenfeld“
+     * liegt links daneben. Siehe docs/ebenen.md, „Banner“.
+     */
+    private static void nameImBogen(ClientGameTestContext context, Path bild) {
+        int gs = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+        float[] fuss = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).fuss(Ebenen.INSTANZ.nadeln("test:orte").stream()
+                .filter(o -> "westmark".equals(o.id())).findFirst().orElseThrow()));
+        BufferedImage b;
+        try {
+            b = ImageIO.read(bild.toFile());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        int fx = Math.round(fuss[0] * gs), fy = Math.round(fuss[1] * gs), n = 0;
+        int links = Integer.MAX_VALUE, rechts = Integer.MIN_VALUE, unten = Integer.MIN_VALUE, linksY = 0, rechtsY = 0;
+        for (int y = Math.max(0, fy - 4 * gs); y <= Math.min(b.getHeight() - 1, fy + 18 * gs); y++) {
+            for (int x = Math.max(0, fx - 36 * gs); x <= Math.min(b.getWidth() - 1, fx + 36 * gs); x++) {
+                int rgb = b.getRGB(x, y);
+                if (Math.abs((rgb >> 16 & 0xFF) - 0x2B) <= 10 && Math.abs((rgb >> 8 & 0xFF) - 0x2B) <= 10 && Math.abs((rgb & 0xFF) - 0x2B) <= 10) {
+                    n++;
+                    if (x < links) {
+                        links = x;
+                        linksY = y;
+                    }
+                    if (x > rechts) {
+                        rechts = x;
+                        rechtsY = y;
+                    }
+                    unten = Math.max(unten, y);
+                }
+            }
+        }
+        if (n < 50) {
+            throw new AssertionError("Unter dem Fuss von „Westmark“ kaum Schrift: " + n + " Pixel");
+        }
+        float mitte = (links + rechts) / 2f / gs - fuss[0], tief = unten / (float) gs - fuss[1];
+        boolean gewoelbt = linksY < unten - 3 * gs && rechtsY < unten - 3 * gs;
+        if (Math.abs(mitte) > 3 || tief < 5 || tief > 16 || !gewoelbt) {
+            throw new AssertionError("Name im Bogen nicht mittig unter dem Fuss: Mitte " + mitte + " Einheiten neben ihm, der tiefste Punkt "
+                    + tief + " darunter, die Enden bei y " + linksY / (float) gs + " und " + rechtsY / (float) gs + " gegen " + unten / (float) gs);
         }
     }
 

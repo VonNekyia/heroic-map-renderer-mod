@@ -666,10 +666,12 @@ class EbenenTest {
 
     @Test
     void kastenOhneHolenEnthaeltDenGenauen() {
-        // Zum Wegschneiden und als Vorprüfung beim Treffer: Jedes Banner bis 32 × 64 liegt bei jedem GUI-Massstab im groben Kasten.
-        Ebenen.Banner b = new Ebenen.Banner(0, 0, Ebenen.UEBERWELT, "x", "images/b.png", "b:e", "v", "id");
-        for (float name : new float[] {0, 10, 80}) {
-            float[] grob = Ebenen.grob(b, name);
+        // Zum Wegschneiden und als Vorprüfung beim Treffer: Jedes Banner bis 32 × 64 liegt bei jedem GUI-Massstab im groben
+        // Kasten, samt dem Namen im Bogen, kurz, mittel und so lang, dass er 120° öffnet.
+        double[][] namen = {{}, {6}, {6, 4, 6, 5, 6, 6, 5}, new double[40]};
+        java.util.Arrays.fill(namen[3], 6);
+        for (double[] name : namen) {
+            float[] grob = Ebenen.grob(name);
             for (int gs = 1; gs <= 6; gs++) {
                 for (int w = 1; w <= Symbole.BANNER_BREITE; w++) {
                     for (int h = 1; h <= Symbole.BANNER_HOEHE; h++) {
@@ -693,8 +695,8 @@ class EbenenTest {
         assertEquals(4, Ebenen.faktor(8, 16, 2));
         assertEquals(2, Ebenen.faktor(16, 8, 2));
         // Der Kasten wie gezeichnet: links ⌊21 / 2⌋ Pixel des Schirms, in Einheiten.
-        assertArrayEquals(new float[] {-5, -20, 5.5f, 0}, Ebenen.bannerKasten(21, 40, 2, 0));
-        assertArrayEquals(new float[] {-7, -80 / 3f, 7, 0}, Ebenen.bannerKasten(21, 40, 3, 0));
+        assertArrayEquals(new float[] {-5, -20, 5.5f, 0}, Ebenen.bannerKasten(21, 40, 2, new double[0]));
+        assertArrayEquals(new float[] {-7, -80 / 3f, 7, 0}, Ebenen.bannerKasten(21, 40, 3, new double[0]));
     }
 
     @Test
@@ -707,6 +709,40 @@ class EbenenTest {
         assertArrayEquals(new float[] {-26, -40, 26, Ebenen.NAME_UNTEN}, Ebenen.kasten(21, 40, 51));
         // Ein schmaler Name ändert die Seiten nicht.
         assertArrayEquals(new float[] {-10, -40, 11, Ebenen.NAME_UNTEN}, Ebenen.kasten(21, 40, 8));
+    }
+
+    @Test
+    void nameImBogenNachDemFormat() {
+        // Drei Zeichen je 6 breit, Sperrung 1,25: Länge 20,5. Unter einem Banner 20 hoch ist der Radius 2 · 20 = 40.
+        double[] name = {6, 6, 6};
+        assertEquals(20.5, Ebenen.laenge(name), 1e-9);
+        assertEquals(40, Ebenen.radius(name, 20), 1e-9);
+        double[] b = Ebenen.bogen(name, 40);
+        // Das mittlere Zeichen auf dem tiefsten Punkt, 0,75 · s = 7,5 unter dem Fuss, waagrecht.
+        assertEquals(0, b[3], 1e-9);
+        assertEquals(7.5, b[4], 1e-9);
+        assertEquals(0, b[5], 1e-9);
+        // Die äusseren symmetrisch und höher, links nach rechts unten geneigt, rechts nach rechts oben: nach unten gewölbt.
+        assertEquals(-b[6], b[0], 1e-9);
+        assertEquals(b[7], b[1], 1e-9);
+        assertTrue(b[1] < 7.5);
+        assertTrue(b[2] > 0 && b[8] < 0);
+        // Auf dem Kreis um (0, 7,5 − 40), im Abstand der Vorschübe samt Sperrung: 7,25 auf dem Bogen.
+        assertEquals(40, Math.hypot(b[0], b[1] - (7.5 - 40)), 1e-9);
+        assertEquals(7.25 / 40, b[2], 1e-9);
+        // Ein langer Name öffnet höchstens 120°: Der Radius wächst, sobald 2 · h nicht mehr reicht.
+        double[] lang = new double[40];
+        java.util.Arrays.fill(lang, 6);
+        double r = Ebenen.radius(lang, 20);
+        assertEquals(Ebenen.laenge(lang) / (2 * Math.PI / 3), r, 1e-9);
+        double[] l = Ebenen.bogen(lang, r);
+        double erstes = (-Ebenen.laenge(lang) / 2 + 3) / r;
+        assertEquals(-erstes, l[2], 1e-9);
+        assertTrue(Math.abs(l[2]) < Math.PI / 3);
+        // Der Kasten deckt alle Zeichen samt ihrer halben Höhe, unten weit unter UNTEN_HOECHSTENS.
+        float[] k = Ebenen.bogenKasten(name, 40);
+        assertTrue(k[3] <= Ebenen.UNTEN_HOECHSTENS && k[3] >= 7.5 + Ebenen.BOGEN_HALB);
+        assertTrue(k[0] <= b[0] - 3 && k[2] >= b[6] + 3);
     }
 
     @Test
