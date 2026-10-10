@@ -2,6 +2,9 @@ package com.nekyia.heroicmap;
 
 import com.google.gson.JsonObject;
 import com.mojang.blaze3d.platform.NativeImage;
+import java.awt.Graphics2D;
+import java.awt.Image;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -12,6 +15,8 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
@@ -43,6 +48,12 @@ final class Symbole {
     static final int MAX_BILDER = 200;
     /** So viele Bilder über alle Ebenen, je bis 8 KiB im Speicher und auf der Grafikkarte. Siehe docs/ebenen.md, „Grenzen“. */
     static final int MAX_BILDER_GESAMT = 1000;
+    /**
+     * Die Bilder der Tafeln haben ein eigenes Budget: höchstens so viele Byte an Pixeln und so viele
+     * Einträge; darüber gibt der Mod die am längsten nicht gezeigten frei. Siehe docs/ebenen.md, „Grenzen“.
+     */
+    static final long TAFELBILDER_BYTE = 16L << 20;
+    static final int MAX_TAFELBILDER = 1024;
     /** So lange darf ein Abruf dauern, Header und Körper zusammen. */
     static final Duration FRIST = Duration.ofSeconds(10);
     /** Das Bild eines Banners ist höchstens so gross, wie im Format. */
@@ -94,6 +105,15 @@ final class Symbole {
     private InetAddress spielserver;
     /** Gesetzt, sobald das Log einmal sagte, dass über alle Ebenen kein Bild mehr dazukommt; bis zum Leeren. */
     private boolean voll;
+    /** Zählt jedes angekommene Symbol und Banner; die Vollbildkarte sucht ihr Ziel danach neu. */
+    private int stand;
+    /** Ein Bild einer Tafel in der Grösse, in der die Tafel es zeigt. */
+    private record Tafelbild(String ebene, String version, String feld, int breite, int hoehe) {
+    }
+
+    /** Die Bilder der Tafeln, das zuletzt gezeigte hinten; null, solange es lädt oder wenn es fehlt. */
+    private final LinkedHashMap<Tafelbild, Textur> tafelbilder = new LinkedHashMap<>(16, 0.75f, true);
+    private long tafelbilderByte;
 
     Symbole(HttpClient client, ExecutorService holer, Executor renderThread, BiFunction<URI, Kacheln.Bild, Identifier> ablage,
             Consumer<Identifier> freigabe) {
@@ -166,6 +186,76 @@ final class Symbole {
     record Textur(Identifier id, int breite, int hoehe) {
     }
 
+    /**
+     * Ein Bild einer Tafel, höchstens {@link Tafel#MAX_BILD} im Quadrat, für {@code breite} × {@code hoehe}
+     * Pixel des Schirms, also die Grösse auf der Tafel mal GUI-Massstab: Ist es grösser, verkleinert der
+     * Mod es vorab geglättet auf genau diese Grösse.
+     * Eigenes Budget, unabhängig von Symbolen und Bannern; sonst wie {@link #symbol}.
+     */
+    Textur tafelBild(String ebene, String version, String feld, int breite, int hoehe) {
+        Tafelbild schluessel = new Tafelbild(ebene, version, feld, breite, hoehe);
+        if (tafelbilder.containsKey(schluessel)) {
+            return tafelbilder.get(schluessel);
+        }
+        URI uri = uri(basis, ebene, feld);
+        if (uri == null) {
+            return null;
+        }
+        tafelbilder.put(schluessel, null);
+        raeume();
+        int r = runde.get();
+        InetAddress server = spielserver;
+        holer.execute(() -> {
+            if (r != runde.get()) {
+                return;
+            }
+            Kacheln.Bild bild = hole(client, uri, server, Tafel.MAX_BILD, Tafel.MAX_BILD, true, FRIST);
+            if (bild == null) {
+                return;
+            }
+            Kacheln.Bild fertig = bild.breite() > breite || bild.hoehe() > hoehe ? verkleinert(bild, breite, hoehe) : bild;
+            renderThread.execute(() -> {
+                if (r == runde.get() && tafelbilder.containsKey(schluessel) && tafelbilder.get(schluessel) == null) {
+                    tafelbilder.put(schluessel, new Textur(ablage.apply(uri, fertig), fertig.breite(), fertig.hoehe()));
+                    tafelbilderByte += 4L * fertig.breite() * fertig.hoehe();
+                    raeume();
+                }
+            });
+        });
+        return null;
+    }
+
+    int stand() {
+        return stand;
+    }
+
+    /** Über dem Budget: die am längsten nicht gezeigten Bilder der Tafeln frei, das neueste bleibt. */
+    private void raeume() {
+        Iterator<Map.Entry<Tafelbild, Textur>> alt = tafelbilder.entrySet().iterator();
+        while ((tafelbilderByte > TAFELBILDER_BYTE || tafelbilder.size() > MAX_TAFELBILDER) && tafelbilder.size() > 1) {
+            gibBildFrei(alt.next().getValue());
+            alt.remove();
+        }
+    }
+
+    private void gibBildFrei(Textur t) {
+        if (t != null) {
+            tafelbilderByte -= 4L * t.breite() * t.hoehe();
+            freigabe.accept(t.id());
+        }
+    }
+
+    /** Verkleinert geglättet auf {@code breite} × {@code hoehe}: je Pixel der Mittelwert der Fläche, die es deckt. */
+    static Kacheln.Bild verkleinert(Kacheln.Bild b, int breite, int hoehe) {
+        BufferedImage quelle = new BufferedImage(b.breite(), b.hoehe(), BufferedImage.TYPE_INT_ARGB);
+        quelle.setRGB(0, 0, b.breite(), b.hoehe(), b.argb(), 0, b.breite());
+        BufferedImage ziel = new BufferedImage(breite, hoehe, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = ziel.createGraphics();
+        g.drawImage(quelle.getScaledInstance(breite, hoehe, Image.SCALE_AREA_AVERAGING), 0, 0, null);
+        g.dispose();
+        return new Kacheln.Bild(breite, hoehe, ziel.getRGB(0, 0, breite, hoehe, null, 0, breite));
+    }
+
     /** Das Bild eines Banners, höchstens {@link #BANNER_BREITE} × {@link #BANNER_HOEHE}; sonst wie {@link #symbol}. */
     Textur banner(String ebene, String version, String feld) {
         return textur(ebene, version, feld, feld + "@banner", BANNER_BREITE, BANNER_HOEHE, true);
@@ -218,6 +308,7 @@ final class Symbole {
                 renderThread.execute(() -> {
                     if (r == runde.get() && !ziel.frei && ebenen.get(ebene) == ziel && ziel.texturen.containsKey(schluessel)) {
                         ziel.texturen.put(schluessel, new Textur(ablage.apply(uri, bild), bild.breite(), bild.hoehe()));
+                        stand++;
                     }
                 });
             }
@@ -277,6 +368,13 @@ final class Symbole {
             }
             return weg;
         });
+        tafelbilder.entrySet().removeIf(e -> {
+            boolean weg = !kennungen.contains(e.getKey().ebene());
+            if (weg) {
+                gibBildFrei(e.getValue());
+            }
+            return weg;
+        });
     }
 
     private void gibFrei(Felder f) {
@@ -290,6 +388,8 @@ final class Symbole {
         voll = false;
         ebenen.values().forEach(this::gibFrei);
         ebenen.clear();
+        tafelbilder.values().forEach(this::gibBildFrei);
+        tafelbilder.clear();
     }
 
     /** Für Tests: wartet, bis der eigene Thread alles Eingereihte abgearbeitet hat. */

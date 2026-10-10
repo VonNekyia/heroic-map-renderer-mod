@@ -626,7 +626,9 @@ Kartenschrift (`formen.png`, `formen-karte.png`), dann Nadeln in drei
 Grössen, ein Banner und ihre Namen (`orte.png`, `orte-karte.png`), auf
 der Vollbildkarte noch einmal mit „Unicode-Schrift erzwingen“
 (`orte-unicode.png`). Die Bilder der Nadeln und des Banners holt der Mod
-von einem Server, den der Test auf 127.0.0.1 startet.
+von einem Server, den der Test auf 127.0.0.1 startet. Zuletzt die Tafel
+einer Nadel beim Zeigen und per Klick gehalten (`tafel-zeigen.png`,
+`tafel-gehalten.png`); die Antwort des Plugins legt der Test selbst ab.
 
 ## Was anders ist als top-north
 

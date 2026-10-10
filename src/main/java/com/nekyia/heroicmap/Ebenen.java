@@ -97,6 +97,12 @@ final class Ebenen {
         String dimension();
 
         String name();
+
+        /** Die Kennung in der Ebene, für die Tafel; null ohne. */
+        String id();
+
+        /** Die {@code version} der Daten, aus denen der Ort kommt. */
+        String version();
     }
 
     /**
@@ -104,11 +110,11 @@ final class Ebenen {
      * {@code small}. Dazu ihre Ebene und deren {@code version} und die Felder ihrer Symbole oder null.
      */
     record Nadel(double x, double z, String dimension, String name, int groesse, int farbe, String ebene, String version,
-            String symbolGross, String symbolMittel) implements Ort {
+            String symbolGross, String symbolMittel, String id) implements Ort {
     }
 
     /** Ein Banner: das Bild {@code bild} der Ebene, Pixel auf Pixel, der Fuss unten mittig auf dem Ort; darunter der Name. */
-    record Banner(double x, double z, String dimension, String name, String bild, String ebene, String version) implements Ort {
+    record Banner(double x, double z, String dimension, String name, String bild, String ebene, String version, String id) implements Ort {
     }
 
     /** Ein Rand in Einheiten des GUI: Farbe mit Alpha, Breite, gestrichelt Strich und Lücke, sonst beide 0. */
@@ -125,11 +131,11 @@ final class Ebenen {
      * Eine Region: die Füllung mit Alpha als Trapeze aus {@link Trapeze}, null ohne Füllung oder wenn sie
      * zu aufwendig ist; der Rand (null ohne) um alle Ringe {x0, z0, …}; {@code box} {x0, z0, x1, z1}.
      */
-    record Flaeche(String dimension, int fuellung, double[] trapeze, Rand rand, List<double[]> ringe, double[] box) implements Form {
+    record Flaeche(String dimension, int fuellung, double[] trapeze, Rand rand, List<double[]> ringe, double[] box, String id) implements Form {
     }
 
     /** Ein Kreis um (x, z) mit {@code radius} Blöcken, Füllung mit Alpha (Alpha 0 ohne) und Rand (null ohne). */
-    record Kreis(String dimension, double x, double z, double radius, int fuellung, Rand rand) implements Form {
+    record Kreis(String dimension, double x, double z, double radius, int fuellung, Rand rand, String id) implements Form {
     }
 
     /** Eine Linie durch {@code punkte} {x0, z0, …}; {@code box} {x0, z0, x1, z1}. */
@@ -201,6 +207,10 @@ final class Ebenen {
     }
 
     private List<Eintrag> liste = List.of();
+    /** Je Ebene die {@code version} der Daten, die gezeichnet werden; die Liste kann schon eine neuere nennen. */
+    private final Map<String, String> versionen = new HashMap<>();
+    /** Zählt jede Änderung an Liste, Daten oder Wahl; die Vollbildkarte sucht ihr Ziel nur danach neu. */
+    private int stand;
     private final Map<String, List<Ort>> nadeln = new HashMap<>();
     private final Map<String, List<Form>> formen = new HashMap<>();
     /** Die Punkte der fertigen Formen je Ebene. */
@@ -247,6 +257,8 @@ final class Ebenen {
         // Oben liegt, was später gezeichnet wird: aufsteigend nach order, bei Gleichstand nach id absteigend.
         neu.sort(Comparator.comparingInt(Eintrag::order).thenComparing(Eintrag::id, Comparator.reverseOrder()));
         liste = List.copyOf(neu);
+        stand++;
+        versionen.keySet().retainAll(liste.stream().map(Eintrag::id).toList());
         nadeln.keySet().retainAll(liste.stream().map(Eintrag::id).toList());
         formen.keySet().retainAll(liste.stream().map(Eintrag::id).toList());
         punkte.keySet().retainAll(liste.stream().map(Eintrag::id).toList());
@@ -290,6 +302,8 @@ final class Ebenen {
                 LOGGER.warn("Heroic Map: Ebene {} ({}): {} Banner oder Formen ungültig, oder Formen ohne Füllung, weil zu aufwendig",
                         t.id(), t.version(), s.verworfen);
             }
+            versionen.put(t.id(), t.version());
+            stand++;
             nadeln.put(t.id(), s.teile.stream().flatMap(x -> x.nadeln().stream()).toList());
             formen.put(t.id(), s.teile.stream().flatMap(x -> x.formen().stream()).toList());
             punkte.put(t.id(), s.punkte);
@@ -352,7 +366,7 @@ final class Ebenen {
         String dimension = o.has("dimension") ? text(o, "dimension", MAX_KENNUNG) : UEBERWELT;
         return dimension == null ? null : new Nadel(at.get(0).getAsDouble(), at.get(1).getAsDouble(), dimension,
                 text(o, "name", MAX_TEXT), groesse, o.has("color") ? farbe(o.get("color").getAsString()) : FARBE, ebene, version,
-                feld(symbol, "large"), feld(symbol, "medium"));
+                feld(symbol, "large"), feld(symbol, "medium"), text(o, "id", MAX_TEXT));
     }
 
     /** Ein Banner; null ohne Bild unter {@code images/}, mit einem Feld über {@link #MAX_FELD} oder einer zu langen Dimension. */
@@ -361,7 +375,8 @@ final class Ebenen {
         String dimension = o.has("dimension") ? text(o, "dimension", MAX_KENNUNG) : UEBERWELT;
         String bild = feld(o, "image");
         return dimension == null || bild == null || !Symbole.FELD.matcher(bild).matches() ? null
-                : new Banner(at.get(0).getAsDouble(), at.get(1).getAsDouble(), dimension, text(o, "name", MAX_TEXT), bild, ebene, version);
+                : new Banner(at.get(0).getAsDouble(), at.get(1).getAsDouble(), dimension, text(o, "name", MAX_TEXT), bild, ebene, version,
+                        text(o, "id", MAX_TEXT));
     }
 
     /** Das Feld eines Symbols wie es steht, oder null, wenn es fehlt oder länger als {@link #MAX_FELD} ist; prüfen tut {@link Symbole#uri}. */
@@ -444,7 +459,7 @@ final class Ebenen {
                 if (!(r > 0 && r <= MAX_RADIUS)) {
                     throw new IllegalArgumentException("Radius " + r);
                 }
-                return new Kreis(dimension, x, z, r, fuellung, rand);
+                return new Kreis(dimension, x, z, r, fuellung, rand, text(o, "id", MAX_TEXT));
             }
             case "line" -> {
                 double[] p = ring(o.getAsJsonArray("points"), 2);
@@ -476,7 +491,7 @@ final class Ebenen {
                     throw new IllegalArgumentException("Grenze");
                 }
                 double[] trapeze = sichtbar(fuellung) ? Trapeze.von(ringe) : null;
-                return new Flaeche(dimension, fuellung, trapeze, rand, List.copyOf(ringe), box(ringe));
+                return new Flaeche(dimension, fuellung, trapeze, rand, List.copyOf(ringe), box(ringe), text(o, "id", MAX_TEXT));
             }
         }
     }
@@ -617,7 +632,7 @@ final class Ebenen {
      * Ein Text vom Server als schlichter Text, Codes mit § gestrichen; null, wenn er fehlt oder länger
      * als {@code hoechstens} Zeichen ist.
      */
-    private static String text(JsonObject o, String feld, int hoechstens) {
+    static String text(JsonObject o, String feld, int hoechstens) {
         if (!o.has(feld)) {
             return null;
         }
@@ -628,6 +643,8 @@ final class Ebenen {
     /** Beim Trennen und bei einem neuen Login: Der Server schickt danach alles neu. */
     void leeren() {
         liste = List.of();
+        stand++;
+        versionen.clear();
         nadeln.clear();
         formen.clear();
         punkte.clear();
@@ -675,6 +692,7 @@ final class Ebenen {
     /** Schaltet eine Ebene an oder aus und schreibt die Wahl gleich. */
     void setze(String id, boolean an) {
         wahl.put(id, an);
+        stand++;
         if (datei == null) {
             return;
         }
@@ -688,6 +706,15 @@ final class Ebenen {
         } catch (IOException e) {
             LOGGER.warn("Heroic Map: {} nicht geschrieben", datei, e);
         }
+    }
+
+    /** Die {@code version} der Daten einer Ebene, die gezeichnet werden; null, solange keine ganz da ist. */
+    String version(String id) {
+        return versionen.get(id);
+    }
+
+    int stand() {
+        return stand;
     }
 
     /** Die Flächen, Kreise und Linien einer Ebene, die schon ganz da ist, sonst keine. */
@@ -727,6 +754,51 @@ final class Ebenen {
         pose.popMatrix();
     }
 
+    /**
+     * Der Kasten von Bild und Name relativ zum Fuss, {links, oben, rechts, unten} in Einheiten des GUI,
+     * so wie {@link #zeichne} ihn füllt; null bei einem Banner, dessen Bild noch fehlt. Misst den Namen
+     * und holt das Bild eines Banners, also erst die Lage prüfen.
+     */
+    static float[] kasten(Font font, Ort o) {
+        float name = o.name() == null ? 0 : nameBreite(font, o.name());
+        return switch (o) {
+            case Nadel n -> kasten(SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe(), name);
+            case Banner b -> {
+                Symbole.Textur t = Symbole.INSTANZ.banner(b.ebene(), b.version(), b.bild());
+                yield t == null ? null : kasten(t.breite(), t.hoehe(), name);
+            }
+        };
+    }
+
+    /**
+     * Wie {@link #kasten(Font, Ort)}, ohne das Bild eines Banners zu holen: mit der grössten Grösse eines
+     * Banners. Zum Wegschneiden und als Vorprüfung beim Treffer; der genaue Kasten liegt immer darin.
+     */
+    static float[] kastenOhneHolen(Font font, Ort o) {
+        return grob(o, o.name() == null ? 0 : nameBreite(font, o.name()));
+    }
+
+    /** Der grobe Kasten zu einem Namen, dessen Kasten {@code name} breit ist; siehe {@link #kastenOhneHolen}. */
+    static float[] grob(Ort o, float name) {
+        return switch (o) {
+            case Nadel n -> kasten(SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe(), name);
+            case Banner b -> kasten(Symbole.BANNER_BREITE, Symbole.BANNER_HOEHE, name);
+        };
+    }
+
+    /**
+     * Der Kasten eines Bilds von {@code breite} × {@code hoehe} über dem Fuss, links ⌊Breite / 2⌋ wie
+     * gezeichnet, und eines Namens mit dem Kasten {@code name} breit darunter; 0 heisst ohne Namen.
+     */
+    static float[] kasten(int breite, int hoehe, float name) {
+        float links = -(breite / 2), rechts = links + breite;
+        if (name <= 0) {
+            return new float[] {links, -hoehe, rechts, 0};
+        }
+        float halb = (float) Math.ceil(name / 2);
+        return new float[] {Math.min(links, -halb), -hoehe, Math.max(rechts, halb), Math.round(NAME_ZEILE)};
+    }
+
     /** Wie breit der Kasten um den Namen ist, in Einheiten des GUI. */
     static float nameBreite(Font font, String name) {
         return font.width(Component.literal(name).withStyle(Formen.STIL)) * NAME_GROESSE / 16 + 2 * NAME_RAND;
@@ -739,6 +811,7 @@ final class Ebenen {
     private static void name(GuiGraphicsExtractor g, Font font, String name) {
         Component c = Component.literal(name).withStyle(Formen.STIL);
         float m = NAME_GROESSE / 16, breite = font.width(c) * m;
+        // Wie kasten: halb so breit wie der Kasten um den Namen, aufgerundet.
         int halb = (int) Math.ceil(breite / 2 + NAME_RAND);
         g.fill(-halb, 0, halb, Math.round(NAME_ZEILE), NAME_GRUND);
         Matrix3x2fStack pose = g.pose();

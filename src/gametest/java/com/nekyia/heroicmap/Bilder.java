@@ -1,6 +1,7 @@
 package com.nekyia.heroicmap;
 
 import com.google.gson.JsonParser;
+import com.mojang.blaze3d.platform.InputConstants;
 import com.sun.net.httpserver.HttpServer;
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -185,6 +186,7 @@ public final class Bilder implements FabricClientGameTest {
             Path unicode = context.takeScreenshot(TestScreenshotOptions.of("orte-unicode").disableCounterPrefix());
             context.runOnClient(mc -> mc.options.forceUnicodeFont().set(false));
             context.waitTicks(10);
+            tafel(context);
             if (!AUSGABE.isEmpty()) {
                 try {
                     ImageIO.write(minimap, "png", Path.of(AUSGABE, "orte.png").toFile());
@@ -201,6 +203,71 @@ public final class Bilder implements FabricClientGameTest {
             });
         } finally {
             bilder.stop(0);
+        }
+    }
+
+    /** Die Antwort des Plugins auf die Frage nach der Tafel von „Nordhafen“. */
+    private static final String TAFEL = """
+            {"v":1,"typ":"tafel","ebene":"test:orte","version":"1","id":"nordhafen","panel":{"blocks":[
+              {"type":"title","text":"Nordhafen"},
+              {"type":"lines","lines":["Hafen am Nordufer","Gegründet im Frühling"]},
+              {"type":"rating","rows":[{"label":"Handel","value":4,"max":5},{"label":"Wehr","value":2,"max":5}]}
+            ]}}""";
+
+    /**
+     * Auf der offenen Vollbildkarte: die Tafel von „Nordhafen“ beim Zeigen, dann per Klick gehalten, während
+     * der Zeiger woanders steht; Escape schliesst erst die Tafel, die Karte bleibt. Mit dem Zeiger auf der
+     * Nadel schliesst der zweite Escape die Karte. Der Server im Test hört den Kanal nicht: Der Test lässt
+     * die Frage als gesendet gelten und legt die Antwort des Plugins selbst ab. Siehe docs/ebenen.md, „Infotafel“.
+     */
+    private static void tafel(ClientGameTestContext context) {
+        Tafeln.fragen = z -> true;
+        try {
+            tafelSchritte(context);
+        } finally {
+            Tafeln.fragen = Kanal::frageTafel;
+        }
+    }
+
+    private static void tafelSchritte(ClientGameTestContext context) {
+        int k = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+        // Der Fuss der grossen Nadel liegt beim Spieler in der Mitte; der Zeiger aufs Schild, über dem eigenen Kopf.
+        context.getInput().setCursorPos(breite / 2.0 * k, (hoehe / 2.0 - 24) * k);
+        context.waitTicks(6);
+        context.runOnClient(mc -> Tafeln.INSTANZ.antwort(Tafeln.Antwort.lies(TAFEL)));
+        context.waitTicks(10);
+        Path zeigen = context.takeScreenshot(TestScreenshotOptions.of("tafel-zeigen").disableCounterPrefix());
+        context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+        context.getInput().setCursorPos(10 * k, (hoehe - 10) * k);
+        context.waitTicks(20);
+        Path gehalten = context.takeScreenshot(TestScreenshotOptions.of("tafel-gehalten").disableCounterPrefix());
+        context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+        context.waitTicks(5);
+        if (!context.computeOnClient(mc -> mc.gui.screen() instanceof Karte)) {
+            throw new AssertionError("Escape schloss die Karte statt erst der Tafel");
+        }
+        // Zurück auf die Nadel: Die Tafel geht wieder auf, Escape schliesst sie, sie bleibt zu, der zweite Escape schliesst die Karte.
+        context.getInput().setCursorPos(breite / 2.0 * k, (hoehe / 2.0 - 24) * k);
+        context.waitTicks(10);
+        context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+        context.waitTicks(10);
+        if (!context.computeOnClient(mc -> mc.gui.screen() instanceof Karte)) {
+            throw new AssertionError("Escape auf der Nadel schloss die Karte statt erst der Tafel");
+        }
+        context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+        context.waitTicks(5);
+        if (context.computeOnClient(mc -> mc.gui.screen() instanceof Karte)) {
+            throw new AssertionError("Der zweite Escape auf der Nadel schloss die Karte nicht; die Tafel ging wieder auf");
+        }
+        if (!AUSGABE.isEmpty()) {
+            try {
+                Files.copy(zeigen, Path.of(AUSGABE, "tafel-zeigen.png"), StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(gehalten, Path.of(AUSGABE, "tafel-gehalten.png"), StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
     }
 

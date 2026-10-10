@@ -130,10 +130,10 @@ class EbenenTest {
                 + "]").getAsJsonArray();
         List<Ebenen.Ort> n = Ebenen.nadeln("b:staedte", "v1", objekte);
         assertEquals(3, n.size());
-        assertEquals(new Ebenen.Nadel(120.5, -340.5, Ebenen.UEBERWELT, null, 1, Ebenen.FARBE, "b:staedte", "v1", null, null), n.get(0));
+        assertEquals(new Ebenen.Nadel(120.5, -340.5, Ebenen.UEBERWELT, null, 1, Ebenen.FARBE, "b:staedte", "v1", null, null, "a"), n.get(0));
         // Das Alpha wirkt am Schild nicht; unbekannte Felder übergeht der Mod.
-        assertEquals(new Ebenen.Nadel(1, 2, "minecraft:the_nether", null, 0, 0xFF40E53F, "b:staedte", "v1", "images/burg_16.png", null), n.get(1));
-        assertEquals(new Ebenen.Nadel(3, 4, Ebenen.UEBERWELT, null, 2, Ebenen.FARBE, "b:staedte", "v1", null, null), n.get(2));
+        assertEquals(new Ebenen.Nadel(1, 2, "minecraft:the_nether", null, 0, 0xFF40E53F, "b:staedte", "v1", "images/burg_16.png", null, "c"), n.get(1));
+        assertEquals(new Ebenen.Nadel(3, 4, Ebenen.UEBERWELT, null, 2, Ebenen.FARBE, "b:staedte", "v1", null, null, "e"), n.get(2));
     }
 
     @Test
@@ -621,6 +621,75 @@ class EbenenTest {
     }
 
     @Test
+    void versionDerDatenBisDieNeueGanzDaIst() {
+        // Die Liste nennt v2, gezeichnet wird noch v1: Tafel und Bilder fragen mit v1, sonst wechselten sie je Frame.
+        Ebenen e = new Ebenen();
+        liste(e, eintrag("b:staedte", "v1"));
+        assertNull(e.version("b:staedte"));
+        teil(e, "b:staedte", "v1", 1, 1, nadel("alt", 1));
+        liste(e, eintrag("b:staedte", "v2"));
+        teil(e, "b:staedte", "v2", 1, 2, nadel("neu1", 1));
+        assertEquals("v1", e.version("b:staedte"));
+        assertEquals("v1", e.nadeln("b:staedte").getFirst().version());
+        teil(e, "b:staedte", "v2", 2, 2, nadel("neu2", 2));
+        assertEquals("v2", e.version("b:staedte"));
+        assertEquals("v2", e.nadeln("b:staedte").getFirst().version());
+        // Fällt die Ebene aus der Liste, ist auch ihre version weg.
+        liste(e, eintrag("b:andere", "v1"));
+        assertNull(e.version("b:staedte"));
+    }
+
+    @Test
+    void zielDerKarteMitDerVersionDerDaten() {
+        // Wie Karte.tafelUnter und Karte.tafel: Solange v2 nicht ganz da ist, trägt das Ziel v1 und gilt; sonst ginge
+        // die Tafel jeden Frame zu.
+        Ebenen e = new Ebenen();
+        liste(e, eintrag("b:staedte", "v1"));
+        teil(e, "b:staedte", "v1", 1, 1, nadel("alt", 1));
+        liste(e, eintrag("b:staedte", "v2"));
+        teil(e, "b:staedte", "v2", 1, 2, nadel("neu1", 1));
+        Tafeln.Ziel ort = Tafeln.ziel("b:staedte", e.nadeln("b:staedte").getFirst());
+        Tafeln.Ziel flaeche = Tafeln.ziel(e, "b:staedte", "f");
+        assertEquals(new Tafeln.Ziel("b:staedte", "v1", "alt"), ort);
+        assertEquals("v1", flaeche.version());
+        assertTrue(Tafeln.gilt(e, ort));
+        assertTrue(Tafeln.gilt(e, flaeche));
+        // Ist v2 ganz da, gilt das alte Ziel nicht mehr; ausgeschaltet gilt keins.
+        teil(e, "b:staedte", "v2", 2, 2, nadel("neu2", 2));
+        assertFalse(Tafeln.gilt(e, ort));
+        Tafeln.Ziel neu = Tafeln.ziel("b:staedte", e.nadeln("b:staedte").getFirst());
+        assertEquals("v2", neu.version());
+        assertTrue(Tafeln.gilt(e, neu));
+        e.setze("b:staedte", false);
+        assertFalse(Tafeln.gilt(e, neu));
+    }
+
+    @Test
+    void kastenOhneHolenEnthaeltDenGenauen() {
+        // Zum Wegschneiden und als Vorprüfung beim Treffer: Jedes Banner bis 32 × 64 liegt im groben Kasten.
+        Ebenen.Banner b = new Ebenen.Banner(0, 0, Ebenen.UEBERWELT, "x", "images/b.png", "b:e", "v", "id");
+        for (float name : new float[] {0, 10, 80}) {
+            float[] grob = Ebenen.grob(b, name);
+            for (int w = 1; w <= Symbole.BANNER_BREITE; w++) {
+                for (int h = 1; h <= Symbole.BANNER_HOEHE; h++) {
+                    float[] k = Ebenen.kasten(w, h, name);
+                    assertTrue(grob[0] <= k[0] && grob[1] <= k[1] && grob[2] >= k[2] && grob[3] >= k[3], w + " × " + h);
+                }
+            }
+        }
+    }
+
+    @Test
+    void kastenWieGezeichnet() {
+        // Ungerade Breite: links ⌊21 / 2⌋ wie beim Zeichnen, also -10 bis 11, nicht ±10,5.
+        assertArrayEquals(new float[] {-10, -40, 11, 0}, Ebenen.kasten(21, 40, 0));
+        // Ein Name breiter als das Bild: Er zählt zum Kasten, 17 Einheiten unter dem Fuss, halb so breit aufgerundet.
+        assertArrayEquals(new float[] {-26, -40, 26, 17}, Ebenen.kasten(21, 40, 51));
+        // Ein schmaler Name ändert die Seiten nicht.
+        assertArrayEquals(new float[] {-10, -40, 11, 17}, Ebenen.kasten(21, 40, 8));
+    }
+
+    @Test
     void kartenschriftGrenzen() {
         StringBuilder pfad = new StringBuilder();
         for (int i = 0; i <= Ebenen.MAX_PFAD; i++) {
@@ -658,8 +727,8 @@ class EbenenTest {
         List<Ebenen.Ort> n = Ebenen.nadeln("b:staedte", "v1", objekte);
         // Ohne gültiges Bild fällt ein Banner weg; Nadeln und Banner stehen in ihrer Reihenfolge.
         assertEquals(3, n.size());
-        assertEquals(new Ebenen.Banner(120.5, -340.5, Ebenen.UEBERWELT, "Hafenstadt", "images/banner-nord.png", "b:staedte", "v1"), n.get(0));
-        assertEquals(new Ebenen.Banner(3, 4, "minecraft:the_nether", null, "images/weiss.webp", "b:staedte", "v1"), n.get(1));
+        assertEquals(new Ebenen.Banner(120.5, -340.5, Ebenen.UEBERWELT, "Hafenstadt", "images/banner-nord.png", "b:staedte", "v1", "s"), n.get(0));
+        assertEquals(new Ebenen.Banner(3, 4, "minecraft:the_nether", null, "images/weiss.webp", "b:staedte", "v1", "w"), n.get(1));
         assertTrue(n.get(2) instanceof Ebenen.Nadel);
     }
 

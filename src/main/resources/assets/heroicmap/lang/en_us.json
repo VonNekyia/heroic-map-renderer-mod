@@ -38,6 +38,7 @@
   "heroicmap.download.grund.anderer": "An error in the mod; details in the log.",
   "key.heroicmap.karte": "Full-screen map",
   "heroicmap.karte.titel": "Map",
+  "heroicmap.tafel.laedt": "loading …",
   "heroicmap.karte.keine": "No map is downloaded for this dimension; /hmap angebot shows what the server offers.",
   "heroicmap.karte.laden": "Download map …",
   "heroicmap.karte.abgleich": "Sync",

@@ -42,12 +42,14 @@ der Mod mit den Kacheln zeigt, steht unter [Vollbildkarte](vollbildkarte.md).
 - **Empfangen:** `angebot` merkt sich der Mod, `freigabe` reiht einen
   Download ein, `abgelehnt` zeigt er dem Spieler, mit `wieder` als
   Uhrzeit. `spieler` nennt die Mitspieler, siehe [Minimap](minimap.md),
-  „Mitspieler“. `ebenen` und `ebene` bringen die Ebenen, siehe
-  [Ebenen](ebenen.md). Nachrichten mit einem anderen `v` als 1 oder über
-  1 MiB verwirft er; so gross wird nur ein Teil einer Ebene.
-- **Senden:** `anfrage` und `show` nur, wenn `ClientPlayNetworking.canSend`
-  wahr ist, also wenn das Plugin den Kanal angemeldet hat. Zu `show` siehe
-  [Minimap](minimap.md), „Mitspieler“.
+  „Mitspieler“. `ebenen` und `ebene` bringen die Ebenen, `tafel` die Tafel
+  eines Objekts, siehe [Ebenen](ebenen.md), „Infotafel“; `ebene` und
+  `tafel` liest schon der Thread des Netzes. Nachrichten mit einem anderen
+  `v` als 1 oder über 1 MiB verwirft er; so gross wird nur ein Teil einer
+  Ebene.
+- **Senden:** `anfrage`, `show` und `tafel` nur, wenn
+  `ClientPlayNetworking.canSend` wahr ist, also wenn das Plugin den Kanal
+  angemeldet hat. Zu `show` siehe [Minimap](minimap.md), „Mitspieler“.
 - **`neu: true`** steht in der `anfrage` eines vollen Downloads, wenn es
   für den Massstab keinen Stand zum Fortsetzen gibt, also kein `etags.txt`
   im Ordner des Massstabs (`Laden.hatStand`), etwa nachdem die Karte

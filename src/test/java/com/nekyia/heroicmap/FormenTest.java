@@ -214,7 +214,7 @@ class FormenTest {
         // Der Fall aus dem Review: 10 000 Kreise mit 100 000 Blöcken um den Spieler, bei Zoom 8 und GUI-Massstab 3.
         java.util.List<Ebenen.Form> kreise = new java.util.ArrayList<>();
         for (int i = 0; i < 10_000; i++) {
-            kreise.add(new Ebenen.Kreis(Ebenen.UEBERWELT, i % 100, i / 100, 100_000, 0x40FF0000, new Ebenen.Rand(0xFFFFFFFF, 2, 0, 0)));
+            kreise.add(new Ebenen.Kreis(Ebenen.UEBERWELT, i % 100, i / 100, 100_000, 0x40FF0000, new Ebenen.Rand(0xFFFFFFFF, 2, 0, 0), null));
         }
         Formen.Ansicht a = new Formen.Ansicht(Minimap.abbild(8, 3, 0, 0, Drehung.Lage.von(0.3, 192, 192, 0, 0)), 24, 3, 1,
                 Drehung.rechteck(0, 0, 384, 384), new double[] {-16, -16, 16, 16}, new Matrix3x2f(), new ScreenRectangle(0, 0, 384, 384),
@@ -240,7 +240,7 @@ class FormenTest {
     }
 
     private static Ebenen.Kreis kreis(double x, double z, double r) {
-        return new Ebenen.Kreis(Ebenen.UEBERWELT, x, z, r, 0x40FF0000, new Ebenen.Rand(0xFFFFFFFF, 2, 0, 0));
+        return new Ebenen.Kreis(Ebenen.UEBERWELT, x, z, r, 0x40FF0000, new Ebenen.Rand(0xFFFFFFFF, 2, 0, 0), null);
     }
 
     @Test

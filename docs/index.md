@@ -36,6 +36,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [0007](entscheidungen/0007-toenung-auf-der-grafikkarte.md): Die Nadeln auf der Grafikkarte tönen, je Kanal höchstens eine Stufe anders als die Webkarte.
 - [0008](entscheidungen/0008-biom-rahmen-als-vorgabe.md): Der Rahmen „biom“ als Vorgabe, Zuordnung über Tags und Namen in fester Rangfolge, Wechsel nach 2 s; löst 0005 in der Vorgabe ab.
 - [0009](entscheidungen/0009-formen-als-trapeze.md): Füllungen als Trapeze statt Blöcken, ein Budget an Ecken je Neubau statt an Zeit je Frame.
+- [0010](entscheidungen/0010-tafel-200-einheiten.md): Die Infotafel im Mod höchstens 200 Einheiten breit mit 6 Rand, nicht 320 wie auf der Webkarte.
 
 ## Messungen
 
