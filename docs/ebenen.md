@@ -272,41 +272,57 @@ Thread des Netzes wie die Nadeln.
 ## Kartenschrift
 
 Ein Name entlang einer Linie (`label`), etwa ein Meer oder ein Gebirge,
-in der Schrift IM Fell English SC (`Formen.schriften`).
+in der Schrift IM Fell English SC (`Formen.glyphen`, `Formen.texte`).
 
 - **Gelesen** wie die anderen Formen (`Ebenen.schrift`): `text` bis 64
-  Zeichen als schlichter Text, `path` 1 bis 64 Punkte. `size` ist die Höhe
-  der Grossbuchstaben in Blöcken, Vorgabe 16. `spacing` ist der Abstand
-  zwischen den Zeichen in Anteilen davon, Vorgabe 0, gekappt auf 0 bis 2.
-  `color` Vorgabe `#2B2B2B`, mit Alpha. `font` übergeht der Mod; es gibt
-  nur `map`.
-- **Kontur** (`outline`): ohne `outline` keine; `width` in Einheiten der
-  Oberfläche des Mods, Vorgabe 2, 0 heisst ohne, höchstens 64; `color`
-  Vorgabe `#F2E8D0`. Gezeichnet als acht versetzte Kopien je Zeichen in
-  der Farbe der Kontur, darüber das Zeichen.
+  Zeichen als schlichter Text in NFC, `path` 1 bis 64 Punkte. `size` ist
+  die Höhe der Grossbuchstaben in Blöcken, Vorgabe 16. `spacing` ist der
+  Abstand zwischen den Zeichen in Anteilen davon, Vorgabe 0, gekappt auf 0
+  bis 2. `color` Vorgabe `#2B2B2B`, mit Alpha. `font` übergeht der Mod; es
+  gibt nur `map`. `kern` kennt der Mod nicht.
+- **Wo das Format schweigt, wie die Webkarte,** so hat es der Reviewer
+  entschieden: `size` 0 oder ungültig heisst 16; eine `outline`, die kein
+  Objekt ist, fehlt, die Schrift bleibt; `outline: {}` ist ohne Kontur.
+- **Kontur** (`outline`): ohne `width` keine; `width` in Einheiten der
+  Oberfläche, 0 heisst ohne, höchstens 64 und höchstens 0,12 der Höhe der
+  Grossbuchstaben, breiter zerfiele sie in Kopien; `color` Vorgabe
+  `#F2E8D0`. Gezeichnet als acht versetzte Kopien je Zeichen, erst alle
+  Kopien der ganzen Schrift, dann alle Zeichen; so deckt keine Kontur ein
+  Zeichen davor. Mit Alpha liegen die Kopien übereinander, die Kontur wird
+  also deckender als ihre Farbe.
 - **Schrift:** die TTF unverändert als Schrift des Spiels,
   `assets/heroicmap/font/karte.json`, 16 Einheiten je Geviert, achtfach
-  abgetastet. Die Lizenz (SIL OFL 1.1) liegt daneben als `OFL.txt` und
-  steht in `NOTICE`.
-- **Grösse:** `size` Blöcke, auf dem Schirm also `size` mal die Länge
-  eines Blocks in Pixeln. Unter 8 Pixeln fehlt die Schrift, über 96 bleibt
-  sie 96 gross, wie im Format. Die Höhe der Grossbuchstaben ist 1417 von
-  2048 Einheiten je Geviert, aus der Schrift gelesen.
+  abgetastet. Zeichen, die sie nicht hat, etwa Kyrillisch oder CJK, nimmt
+  das Spiel aus seiner eigenen Schrift und dann aus Unifont; sie stehen
+  dann kleiner und schlichter. Die Lizenz (SIL OFL 1.1) liegt als
+  `OFL.txt` neben der TTF und steht in `NOTICE`.
+- **Grösse** (`Formen.kappe`): `size` Blöcke sind auf dem Schirm
+  `size` mal die Länge eines Blocks, in Einheiten des GUI wie die Nadeln
+  (0097). Unter 8 Einheiten fehlt die Schrift, über 96 bleibt sie 96 hoch,
+  wie im Format. Auf der Minimap ist sie höchstens ein Zehntel ihrer Seite
+  hoch, entschieden vom Reviewer: Grösser erschlüge sie die Karte, und die
+  Städte einer Nation sind der Hauptfall. Die Höhe der Grossbuchstaben ist
+  die Oberkante des H, 1384 von 2048 Einheiten je Geviert, wie bei der
+  Webkarte (0096 des Renderers).
 - **Entlang des Pfads** (`Formen.anordnung`): jedes Zeichen aufrecht zur
-  Linie, seine Mitte auf ihr, die Mitte der Grossbuchstaben auf der Linie.
-  Die Grundlinie liegt bei jeder Schrift des Spiels 7 Einheiten unter dem
-  Anfang der Zeile (`GlyphBitmap.getTop`, per javap). Der Text steht
-  mittig auf dem Pfad. Ist der Pfad kürzer, läuft die Schrift in Richtung
-  des ersten und letzten Stücks weiter; ein einzelner Punkt heisst
-  waagrecht.
+  Linie, seine Mitte auf ihr, die Mitte der Grossbuchstaben auf der Linie,
+  die Breiten als Kommazahl (`StringSplitter.stringWidth`). Die Grundlinie
+  liegt bei jeder Schrift des Spiels 7 Einheiten unter dem Anfang der
+  Zeile (`GlyphBitmap.getTop`, per javap). Der Text steht mittig auf dem
+  Pfad. Ist der Pfad kürzer, läuft die Schrift in Richtung des ersten und
+  letzten Stücks weiter; ein einzelner Punkt heisst waagrecht.
 - **Nie auf dem Kopf:** Läuft der Pfad im Bild nach links, etwa auf der
   gedrehten Minimap, gilt er umgekehrt.
-- **Reihenfolge:** über allen Formen, unter den Nadeln. Auf der Minimap
-  bleibt sie im Quadrat, wie die Nadeln; rund also auch in den Ecken
-  ausserhalb des Kreises.
-- **Kosten:** je Frame neu, denn sie besteht aus Text des Spiels; je
-  Zeichen ein Text, mit Kontur neun. Eine Ebene mit vielen Namen kostet so
-  mehr als ihre Flächen; gemessen ist das noch nicht.
+- **Reihenfolge:** je Ebene nach `order` erst die Füllungen, dann Ränder
+  und Linien, dann die Schrift, wie im Format; alle Nadeln darüber.
+- **Auf der Minimap** fehlt ein Zeichen, dessen Mitte ausserhalb ihrer
+  Form liegt; rund ragt die Schrift so nicht über den Ring.
+- **Gespeichert** wie die Formen (`Formen.Speicher`): Jede Glyphe ist ein
+  fertiger Text des Spiels mit seiner Pose. Bleiben Ansicht und Ebenen
+  gleich, hängt der Mod sie nur wieder an.
+- **Budget:** Ein Neubau legt höchstens 20 000 Zeichen samt den Kopien
+  der Kontur (`Formen.MAX_ZEICHEN`); was darüber geht, fehlt, die
+  obersten Ebenen zuerst. Das Log warnt einmal je Ebene und `version`.
 
 ## Umschalten
 
@@ -351,7 +367,10 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 | Breite eines Rands, Strich, Lücke | 64, 1000, 1000 Einheiten | gekappt |
 | Text einer Kartenschrift | 64 Zeichen, wie im Format | die Schrift fehlt |
 | Punkte im Pfad einer Kartenschrift | 64, wie im Format | die Schrift fehlt |
-| Sperrung, Kontur einer Kartenschrift | 2, 64 Einheiten | gekappt |
+| Sperrung einer Kartenschrift | 2 | gekappt |
+| Breite der Kontur einer Kartenschrift | 64 Einheiten und 0,12 der Höhe der Grossbuchstaben | gekappt |
+| Grösse einer Kartenschrift | 100 000 Blöcke | die Schrift fehlt |
+| Zeichen der Kartenschrift je Neubau, samt Kontur | 20 000 | der Rest fehlt |
 | Strich, Lücke | mindestens 1 Einheit | gehoben |
 | Striche je sichtbarem Stück einer Strecke | 1000 | durchgezogen |
 | Ecken je Neubau der Formen | 1 000 000 | der Rest fehlt |
@@ -365,7 +384,8 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
   höchstens 3 Trapezen je Punkt und 16 je Fläche rund 200 Byte je Punkt.
   Über alle Ebenen höchstens 500 000 Punkte, rund 100 MB; während eine
   neue `version` kommt, liegen alte und neue Sammlung kurz nebeneinander,
-  rund 200 MB. Ein Plugin für Claims braucht ein Vielfaches weniger.
+  rund 200 MB. Ein Plugin für Claims braucht ein Vielfaches weniger. Eine
+  Kartenschrift braucht mit Text und Pfad rund 250 bis 280 Byte.
 - **Kosten:** Je Frame geht der Mod alle Nadeln der sichtbaren Ebenen
   durch, im schlimmsten Fall 64 000. Ein Raster nach Regionen kommt erst,
   wenn eine Messung es verlangt. Die Formen rechnet er nur bei einer
