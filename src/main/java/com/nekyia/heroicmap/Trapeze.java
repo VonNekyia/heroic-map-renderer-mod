@@ -32,8 +32,9 @@ final class Trapeze {
         for (double[] r : ringe) {
             punkte += r.length / 2;
         }
-        // Kante i: x = b + s·z für z von z0 bis z1, z0 < z1; waagrechte fallen weg.
-        double[] z0 = new double[punkte], z1 = new double[punkte], b = new double[punkte], s = new double[punkte];
+        // Kante i: x = x0 + s·(z − z0) für z von z0 bis z1, z0 < z1; waagrechte fallen weg. Ab dem Anfangspunkt gerechnet,
+        // nicht über einen Achsenabschnitt: Der wäre bei grossen Koordinaten ungenau.
+        double[] z0 = new double[punkte], z1 = new double[punkte], x0 = new double[punkte], s = new double[punkte];
         double[] ecken = new double[punkte];
         int e = 0;
         for (double[] r : ringe) {
@@ -56,7 +57,7 @@ final class Trapeze {
                 z0[kanten] = za;
                 z1[kanten] = zb;
                 s[kanten] = (xb - xa) / (zb - za);
-                b[kanten] = xa - s[kanten] * za;
+                x0[kanten] = xa;
                 kanten++;
             }
         }
@@ -66,7 +67,7 @@ final class Trapeze {
         }
         Arrays.sort(folge, (p, q) -> Double.compare(z0[p], z0[q]));
         Arrays.sort(ecken);
-        Zerlegung z = new Zerlegung(b, s, JE_PUNKT * punkte + 16, (long) ARBEIT_JE_PUNKT * punkte + 4096);
+        Zerlegung z = new Zerlegung(x0, z0, s, JE_PUNKT * punkte + 16, (long) ARBEIT_JE_PUNKT * punkte + 4096);
         int[] aktiv = new int[kanten];
         int na = 0, naechste = 0;
         for (int k = 0; k < ecken.length; k++) {
@@ -104,7 +105,7 @@ final class Trapeze {
     /** Die Spannen von Band zu Band, offen je linker Kante, und die fertigen Trapeze. */
     private static final class Zerlegung {
 
-        private final double[] b, s;
+        private final double[] x0, z0, s;
         private final int deckel;
         private long arbeit;
         private Map<Integer, double[]> offen = new HashMap<>(), weiter = new HashMap<>();
@@ -112,15 +113,16 @@ final class Trapeze {
         private int n;
         private double zuletzt;
 
-        Zerlegung(double[] b, double[] s, int deckel, long arbeit) {
-            this.b = b;
+        Zerlegung(double[] x0, double[] z0, double[] s, int deckel, long arbeit) {
+            this.x0 = x0;
+            this.z0 = z0;
             this.s = s;
             this.deckel = deckel;
             this.arbeit = arbeit;
         }
 
         private double x(int kante, double z) {
-            return b[kante] + s[kante] * z;
+            return x0[kante] + s[kante] * (z - z0[kante]);
         }
 
         /** Das Band [za, zb] mit diesen Kanten, an Kreuzungen geteilt; false über einem Deckel. */
@@ -135,11 +137,14 @@ final class Trapeze {
                         return false;
                     }
                     sortiere(aktiv, na, (z + ende) / 2);
+                    if (arbeit < 0) {
+                        return false;
+                    }
                     double kreuz = ende;
                     for (int i = 0; i + 1 < na; i++) {
                         int l = aktiv[i], r = aktiv[i + 1];
                         if (s[l] != s[r] && (vertauscht(l, r, z) || vertauscht(l, r, ende))) {
-                            double zk = (b[r] - b[l]) / (s[l] - s[r]);
+                            double zk = (x0[r] - x0[l] + s[l] * z0[l] - s[r] * z0[r]) / (s[l] - s[r]);
                             double eps = 1e-9 * (1 + Math.abs(zk));
                             if (zk > z + eps && zk < kreuz - eps) {
                                 kreuz = zk;
@@ -165,15 +170,19 @@ final class Trapeze {
             return xl > xr + 1e-9 * (1 + Math.abs(xl));
         }
 
-        /** Nach x in der Mitte des Bands; Einfügen, denn von Band zu Band ändert sich die Reihenfolge kaum. */
+        /**
+         * Nach x in der Mitte des Bands; Einfügen, denn von Band zu Band ändert sich die Reihenfolge kaum.
+         * Jede Verschiebung zählt in die Arbeit, sonst kostete eine Säge, verkehrt herum gelistet, quadratisch viel.
+         */
         private void sortiere(int[] aktiv, int na, double zm) {
-            for (int i = 1; i < na; i++) {
+            for (int i = 1; i < na && arbeit >= 0; i++) {
                 int k = aktiv[i];
                 double xk = x(k, zm);
                 int j = i - 1;
                 while (j >= 0 && x(aktiv[j], zm) > xk) {
                     aktiv[j + 1] = aktiv[j];
                     j--;
+                    arbeit--;
                 }
                 aktiv[j + 1] = k;
             }

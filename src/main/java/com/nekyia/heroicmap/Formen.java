@@ -22,6 +22,12 @@ final class Formen {
 
     /** Die Spitze einer Gehrung reicht höchstens so viele halbe Breiten weit, also bis zu Ecken von 60°; spitzer wird es eine Fase. */
     static final double GEHRUNG = 2;
+    /** Höchstens so viele Striche je sichtbarer Strecke; mehr zeichnet der Mod durchgezogen. */
+    static final int MAX_STRICHE = 1000;
+    /** Näher liegen zwei Punkte eines Zugs nicht, ohne einer zu sein; die Rundung macht sonst winzige Stücke ohne Gehrung. */
+    static final double NAH = 1e-6;
+    /** So viele Ecken legt ein Neubau höchstens; was darüber geht, fehlt, bei gleicher Ansicht immer dasselbe, also ohne Flackern. */
+    static final int MAX_ECKEN = 1_000_000;
 
     private Formen() {
     }
@@ -57,8 +63,9 @@ final class Formen {
         double[] schluessel = schluessel(a);
         if (!Arrays.equals(schluessel, sp.schluessel) || !dimension.equals(sp.dimension) || !gleich(ebenen, sp.formen)) {
             List<Vielecke> neu = new ArrayList<>();
+            int[] rest = {MAX_ECKEN};
             for (List<Ebenen.Form> formen : ebenen) {
-                baue(a, dimension, formen, neu);
+                baue(a, dimension, formen, neu, rest);
             }
             sp.schluessel = schluessel;
             sp.dimension = dimension;
@@ -106,22 +113,88 @@ final class Formen {
 
     /** Die Elemente einer Ebene: erst alle Füllungen, dann Ränder und Linien; ein Kreis wird dafür einmal gerechnet. */
     static void baue(Ansicht a, String dimension, List<Ebenen.Form> formen, List<Vielecke> aus) {
-        float[][] kreise = new float[formen.size()][];
+        baue(a, dimension, formen, aus, new int[] {MAX_ECKEN});
+    }
+
+    /** Wie oben, mit {@code rest} Ecken übrig für diesen Neubau. */
+    static void baue(Ansicht a, String dimension, List<Ebenen.Form> formen, List<Vielecke> aus, int[] rest) {
+        Bogen[] boegen = new Bogen[formen.size()];
+        double[] kasten = kasten(a.schnitt(), GEHRUNG * Ebenen.MAX_BREITE * a.einheit() / 2 + 1);
         for (int i = 0; i < formen.size(); i++) {
             Ebenen.Form f = formen.get(i);
-            if (f.dimension().equals(dimension) && sichtbar(a, f)) {
+            if (f.dimension().equals(dimension) && sichtbar(a, f) && rest[0] > 0) {
                 if (f instanceof Ebenen.Kreis k) {
-                    kreise[i] = kreis(a, k);
+                    boegen[i] = bogen(a, k, kasten);
+                    if (boegen[i] == null) {
+                        continue;
+                    }
                 }
-                fuellung(a, f, kreise[i], aus);
+                fuellung(a, f, boegen[i], kasten, aus, rest);
             }
         }
         for (int i = 0; i < formen.size(); i++) {
             Ebenen.Form f = formen.get(i);
-            if (f.dimension().equals(dimension) && sichtbar(a, f)) {
-                rand(a, f, kreise[i], aus);
+            if (f.dimension().equals(dimension) && sichtbar(a, f) && (!(f instanceof Ebenen.Kreis) || boegen[i] != null)) {
+                rand(a, f, boegen[i], aus, rest);
             }
         }
+    }
+
+    /** Das umschliessende Rechteck des Schnitts {x0, y0, x1, y1}, um {@code rand} weiter. */
+    static double[] kasten(float[] schnitt, double rand) {
+        double[] k = {Double.MAX_VALUE, Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE};
+        for (int i = 0; i < schnitt.length; i += 2) {
+            k[0] = Math.min(k[0], schnitt[i]);
+            k[1] = Math.min(k[1], schnitt[i + 1]);
+            k[2] = Math.max(k[2], schnitt[i]);
+            k[3] = Math.max(k[3], schnitt[i + 1]);
+        }
+        return new double[] {k[0] - rand, k[1] - rand, k[2] + rand, k[3] + rand};
+    }
+
+    /**
+     * Was von einem Kreis im Kasten liegt, in Einheiten des Elements: {@code innen}, wenn der ganze Kasten
+     * im Kreis liegt; sonst Punkte auf dem Kreis, alle mit {@code ganz}, wenn die Mitte im Kasten liegt,
+     * sonst nur der Bogen über den Kasten, mit der Mitte (mx, my) für die Füllung. {@code phase} ist die
+     * Länge des Kreises bis zum ersten Punkt, für das Muster der Striche. Null, wenn nichts davon im Kasten liegt.
+     */
+    record Bogen(double[] punkte, boolean ganz, boolean innen, double phase, double mx, double my) {
+    }
+
+    /** Siehe {@link Bogen}; die Punkte sind die Ecken des ganzen Vielecks aus {@link #ecken}, so bleibt das Muster beim Verschieben stehen. */
+    static Bogen bogen(Ansicht a, Ebenen.Kreis k, double[] kasten) {
+        double[] m = new double[2];
+        a.abbild().ab(k.x(), k.z(), m);
+        double r = k.radius() * a.block();
+        double dx = Math.max(Math.max(kasten[0] - m[0], 0), m[0] - kasten[2]), dy = Math.max(Math.max(kasten[1] - m[1], 0), m[1] - kasten[3]);
+        if (Math.hypot(dx, dy) > r) {
+            return null;
+        }
+        double fern = 0, w0 = Math.atan2((kasten[1] + kasten[3]) / 2 - m[1], (kasten[0] + kasten[2]) / 2 - m[0]), lo = 0, hi = 0;
+        for (int e = 0; e < 4; e++) {
+            double ex = kasten[(e & 1) == 0 ? 0 : 2] - m[0], ey = kasten[(e & 2) == 0 ? 1 : 3] - m[1];
+            fern = Math.max(fern, Math.hypot(ex, ey));
+            double d = Math.IEEEremainder(Math.atan2(ey, ex) - w0, 2 * Math.PI);
+            lo = Math.min(lo, d);
+            hi = Math.max(hi, d);
+        }
+        if (fern <= r) {
+            return new Bogen(null, false, true, 0, m[0], m[1]);
+        }
+        int n = ecken(r * a.pixel()), von = 0, bis = n;
+        double schritt = 2 * Math.PI / n;
+        boolean ganz = m[0] >= kasten[0] && m[0] <= kasten[2] && m[1] >= kasten[1] && m[1] <= kasten[3];
+        if (!ganz) {
+            // Von aussen sieht die Mitte den Kasten unter weniger als 180°: nur die Ecken darüber, eine davor und dahinter.
+            von = (int) Math.floor((w0 + lo) / schritt) - 1;
+            bis = Math.min((int) Math.ceil((w0 + hi) / schritt) + 2, von + n);
+        }
+        double[] p = new double[2 * (bis - von)];
+        for (int i = von; i < bis; i++) {
+            p[2 * (i - von)] = m[0] + r * Math.cos(i * schritt);
+            p[2 * (i - von) + 1] = m[1] + r * Math.sin(i * schritt);
+        }
+        return new Bogen(p, ganz, false, Math.floorMod(von, n) * 2 * r * Math.sin(Math.PI / n), m[0], m[1]);
     }
 
     /** Liegt die Form, samt Rand, im sichtbaren Rechteck der Welt? */
@@ -135,9 +208,9 @@ final class Formen {
         return b[2] >= a.welt()[0] - rand && b[0] <= a.welt()[2] + rand && b[3] >= a.welt()[1] - rand && b[1] <= a.welt()[3] + rand;
     }
 
-    private static void fuellung(Ansicht a, Ebenen.Form f, float[] kreis, List<Vielecke> aus) {
+    private static void fuellung(Ansicht a, Ebenen.Form f, Bogen bogen, double[] kasten, List<Vielecke> aus, int[] rest) {
         if (f instanceof Ebenen.Flaeche fl && fl.trapeze() != null) {
-            Sammler s = new Sammler(a.schnitt());
+            Sammler s = new Sammler(a.schnitt(), rest);
             double[] t = fl.trapeze(), w = a.welt(), q = new double[8], k1 = new double[16], k2 = new double[16], p = new double[2];
             // Ein Block mehr: Das Rechteck der Welt ist schon das sichtbare, den Rest schneidet die Form.
             double[] welt = {w[0] - 1, w[1] - 1, w[2] + 1, w[3] + 1};
@@ -167,8 +240,30 @@ final class Formen {
             }
             s.element(aus, a, fl.fuellung());
         } else if (f instanceof Ebenen.Kreis k && Ebenen.sichtbar(k.fuellung())) {
-            Sammler s = new Sammler(a.schnitt());
-            s.vieleck(kreis, kreis.length / 2);
+            Sammler s = new Sammler(a.schnitt(), rest);
+            if (bogen.innen()) {
+                s.vieleck(Drehung.rechteck(kasten[0], kasten[1], kasten[2], kasten[3]), 4);
+            } else {
+                // Ganz das Vieleck des Kreises; sonst der Ausschnitt von der Mitte über den Bogen, erst in Doubles gekappt,
+                // denn die Mitte kann weit draussen liegen. Beides ist konvex.
+                double[] p = bogen.punkte();
+                int n = p.length / 2;
+                if (!bogen.ganz()) {
+                    double[] stueck = new double[p.length + 2], a1 = new double[p.length + 10], a2 = new double[p.length + 10];
+                    stueck[0] = bogen.mx();
+                    stueck[1] = bogen.my();
+                    System.arraycopy(p, 0, stueck, 2, p.length);
+                    n = kappe(stueck, n + 1, kasten, a1, a2);
+                    p = a1;
+                }
+                float[] e = new float[2 * n];
+                for (int i = 0; i < 2 * n; i++) {
+                    e[i] = (float) p[i];
+                }
+                if (n >= 3) {
+                    s.vieleck(e, n);
+                }
+            }
             s.element(aus, a, k.fuellung());
         }
     }
@@ -206,16 +301,16 @@ final class Formen {
         return n;
     }
 
-    private static void rand(Ansicht a, Ebenen.Form f, float[] kreis, List<Vielecke> aus) {
+    private static void rand(Ansicht a, Ebenen.Form f, Bogen bogen, List<Vielecke> aus, int[] rest) {
         Ebenen.Rand r = switch (f) {
             case Ebenen.Flaeche fl -> fl.rand();
             case Ebenen.Kreis k -> k.rand();
             case Ebenen.Linie l -> l.rand();
         };
-        if (r == null) {
+        if (r == null || rest[0] <= 0) {
             return;
         }
-        Sammler s = new Sammler(a.schnitt());
+        Sammler s = new Sammler(a.schnitt(), rest);
         double h = r.breite() * a.einheit() / 2, strich = r.strich() * a.einheit(), luecke = r.luecke() * a.einheit();
         switch (f) {
             case Ebenen.Flaeche fl -> {
@@ -224,11 +319,9 @@ final class Formen {
                 }
             }
             case Ebenen.Kreis k -> {
-                double[] p = new double[kreis.length];
-                for (int i = 0; i < kreis.length; i++) {
-                    p[i] = kreis[i];
+                if (!bogen.innen()) {
+                    streifen(s, bogen.punkte(), bogen.punkte().length / 2, bogen.ganz(), h, strich, luecke, bogen.phase());
                 }
-                streifen(s, p, p.length / 2, true, h, strich, luecke);
             }
             case Ebenen.Linie l -> streifen(s, abgebildet(a, l.punkte()), l.punkte().length / 2, false, h, strich, luecke);
         }
@@ -243,24 +336,6 @@ final class Formen {
             aus[i + 1] = p[1];
         }
         return aus;
-    }
-
-    /**
-     * Der Kreis als Vieleck in Einheiten des Elements: so viele Ecken, dass die Sehne höchstens einen
-     * halben Pixel vom Kreis abweicht, mindestens 16, höchstens 4096.
-     */
-    static float[] kreis(Ansicht a, Ebenen.Kreis k) {
-        double[] m = new double[2];
-        a.abbild().ab(k.x(), k.z(), m);
-        double r = k.radius() * a.block();
-        int n = ecken(r * a.pixel());
-        float[] p = new float[2 * n];
-        for (int i = 0; i < n; i++) {
-            double w = 2 * Math.PI * i / n;
-            p[2 * i] = (float) (m[0] + r * Math.cos(w));
-            p[2 * i + 1] = (float) (m[1] + r * Math.sin(w));
-        }
-        return p;
     }
 
     /** Wie viele Ecken ein Kreis mit {@code rPixel} Pixeln Radius braucht, damit die Sehne höchstens einen halben Pixel abweicht. */
@@ -279,19 +354,26 @@ final class Formen {
      * Kasten des Schnitts bekommt Striche; der Rest schiebt nur das Muster weiter.
      */
     static void streifen(Sammler s, double[] p, int n, boolean zu, double h, double strich, double luecke) {
+        streifen(s, p, n, zu, h, strich, luecke, 0);
+    }
+
+    /** Wie oben, das Muster der Striche schon um {@code phase} weiter. */
+    static void streifen(Sammler s, double[] p, int n, boolean zu, double h, double strich, double luecke, double phase) {
         int strecken = zu ? n : n - 1;
         if (strecken < 1) {
             return;
         }
-        double rand = GEHRUNG * h + 1, muster = strich + luecke, pos = 0;
+        double rand = GEHRUNG * h + 1, muster = strich + luecke, pos = strich > 0 ? phase % muster : 0;
         double[] kasten = {s.x0 - rand, s.y0 - rand, s.x1 + rand, s.y1 + rand}, t = new double[2];
         // Geschlossen und durchgezogen beginnt der Zug hinter einer Strecke, die nicht ganz im Kasten liegt; so bricht er nur dort ab.
         int start = 0;
         boolean ganz = true;
         if (zu && strich <= 0) {
             for (int i = 0; i < strecken && ganz; i++) {
-                if (!(imKasten(p, i, (i + 1) % n, kasten, t) && t[0] == 0 && t[1] == 1)) {
-                    start = (i + 1) % n;
+                boolean drin = imKasten(p, i, (i + 1) % n, kasten, t);
+                if (!(drin && t[0] == 0 && t[1] == 1)) {
+                    // Beginnt die Strecke draussen, beginnt der Zug mit ihr, sonst hinter ihr.
+                    start = drin && t[0] > 0 ? i : (i + 1) % n;
                     ganz = false;
                 }
             }
@@ -308,18 +390,20 @@ final class Formen {
                 pos = strich > 0 ? (pos + laenge) % muster : 0;
                 continue;
             }
-            if (strich <= 0) {
-                if (t[0] > 0) {
+            double a = t[0] * laenge, e = t[1] * laenge;
+            if (strich <= 0 || (e - a) / muster > MAX_STRICHE) {
+                if (t[0] > 0 || strich > 0) {
                     z.ende(false);
                 }
-                z.punkt(x0 + (x1 - x0) * t[0], y0 + (y1 - y0) * t[0]);
-                z.punkt(x0 + (x1 - x0) * t[1], y0 + (y1 - y0) * t[1]);
-                if (t[1] < 1) {
+                // An den Enden die genauen Punkte, sonst trennte die Rundung, was zusammengehört.
+                z.punkt(t[0] == 0 ? x0 : x0 + (x1 - x0) * t[0], t[0] == 0 ? y0 : y0 + (y1 - y0) * t[0]);
+                z.punkt(t[1] == 1 ? x1 : x0 + (x1 - x0) * t[1], t[1] == 1 ? y1 : y0 + (y1 - y0) * t[1]);
+                if (t[1] < 1 || strich > 0) {
                     z.ende(false);
                 }
+                pos = strich > 0 ? (pos + laenge) % muster : 0;
                 continue;
             }
-            double a = t[0] * laenge, e = t[1] * laenge;
             if (a > 0) {
                 z.ende(false);
                 pos = (pos + a) % muster;
@@ -379,7 +463,7 @@ final class Formen {
         }
 
         void punkt(double x, double y) {
-            if (n > 0 && p[2 * n - 2] == x && p[2 * n - 1] == y) {
+            if (n > 0 && Math.abs(p[2 * n - 2] - x) + Math.abs(p[2 * n - 1] - y) < NAH) {
                 return;
             }
             if (2 * n + 2 > p.length) {
@@ -391,7 +475,7 @@ final class Formen {
         }
 
         void ende(boolean zu) {
-            if (zu && n > 2 && p[0] == p[2 * n - 2] && p[1] == p[2 * n - 1]) {
+            if (zu && n > 2 && Math.abs(p[0] - p[2 * n - 2]) + Math.abs(p[1] - p[2 * n - 1]) < NAH) {
                 n--;
             }
             if (n >= 2) {
@@ -409,6 +493,8 @@ final class Formen {
     static final class Sammler {
 
         private final float[] schnitt, kasten;
+        /** Die Ecken, die der Neubau noch legen darf, geteilt mit den anderen Sammlern. */
+        private final int[] rest;
         final double x0, y0, x1, y1;
         float[] ecken = new float[256];
         int[] anzahl = new int[16];
@@ -416,7 +502,12 @@ final class Formen {
         private float[] a = new float[64], b = new float[64], quad = new float[8];
 
         Sammler(float[] schnitt) {
+            this(schnitt, new int[] {MAX_ECKEN});
+        }
+
+        Sammler(float[] schnitt, int[] rest) {
             this.schnitt = schnitt;
+            this.rest = rest;
             double ax = Double.MAX_VALUE, ay = Double.MAX_VALUE, bx = -Double.MAX_VALUE, by = -Double.MAX_VALUE;
             for (int i = 0; i < schnitt.length; i += 2) {
                 ax = Math.min(ax, schnitt[i]);
@@ -501,6 +592,11 @@ final class Formen {
         }
 
         void vieleck(float[] p, int k) {
+            if (rest[0] < k) {
+                rest[0] = 0;
+                return;
+            }
+            rest[0] -= k;
             int platz = 2 * (k + schnitt.length / 2 + 8);
             if (a.length < platz) {
                 a = new float[platz];

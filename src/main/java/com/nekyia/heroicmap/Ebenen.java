@@ -170,6 +170,8 @@ final class Ebenen {
     private final Map<String, List<Form>> formen = new HashMap<>();
     /** Die Punkte der fertigen Formen je Ebene. */
     private final Map<String, Integer> punkte = new HashMap<>();
+    /** Je Ebene die version einer verworfenen Sammlung; ihre übrigen Teile übergeht der Mod. */
+    private final Map<String, String> verworfen = new HashMap<>();
     private final Map<String, Sammlung> sammlungen = new HashMap<>();
     /** Die Wahl des Spielers je Kennung und wo sie liegt; null heisst nur im Speicher. */
     private final Map<String, Boolean> wahl = new HashMap<>();
@@ -213,6 +215,7 @@ final class Ebenen {
         nadeln.keySet().retainAll(liste.stream().map(Eintrag::id).toList());
         formen.keySet().retainAll(liste.stream().map(Eintrag::id).toList());
         punkte.keySet().retainAll(liste.stream().map(Eintrag::id).toList());
+        verworfen.entrySet().removeIf(v -> liste.stream().noneMatch(e -> e.id().equals(v.getKey()) && e.version().equals(v.getValue())));
         // Halbe Teile gelten nur, solange die Liste ihre version nennt.
         sammlungen.entrySet().removeIf(s -> liste.stream().noneMatch(e -> e.id().equals(s.getKey()) && e.version().equals(s.getValue().version)));
     }
@@ -226,7 +229,8 @@ final class Ebenen {
      */
     void teil(Teil t) {
         if (t.teile() < 1 || t.teile() > MAX_TEILE || t.teil() < 1 || t.teil() > t.teile()
-                || liste.stream().noneMatch(e -> e.id().equals(t.id()) && e.version().equals(t.version()))) {
+                || liste.stream().noneMatch(e -> e.id().equals(t.id()) && e.version().equals(t.version()))
+                || t.version().equals(verworfen.get(t.id()))) {
             return;
         }
         Sammlung s = sammlungen.get(t.id());
@@ -244,6 +248,7 @@ final class Ebenen {
             LOGGER.warn("Heroic Map: Ebene {} ist zu gross ({} Nadeln, {} Objekte, {} Punkte, über alle Ebenen {}), sie bleibt, wie sie war",
                     t.id(), s.nadeln, s.objekte, s.punkte, gesamt());
             sammlungen.remove(t.id());
+            verworfen.put(t.id(), t.version());
         } else if (s.da == s.teile.size()) {
             sammlungen.remove(t.id());
             if (s.verworfen > 0) {
@@ -470,8 +475,9 @@ final class Ebenen {
                 JsonArray d = s.getAsJsonArray("dash");
                 float a = d.get(0).getAsFloat(), b = d.get(1).getAsFloat();
                 if (a > 0 && b > 0) {
-                    strich = Math.min(a, MAX_STRICH);
-                    luecke = Math.min(b, MAX_STRICH);
+                    // Mindestens eine Einheit: Winzige Striche wären Millionen je Strecke.
+                    strich = Math.max(1, Math.min(a, MAX_STRICH));
+                    luecke = Math.max(1, Math.min(b, MAX_STRICH));
                 }
             }
         }
@@ -515,6 +521,7 @@ final class Ebenen {
         nadeln.clear();
         formen.clear();
         punkte.clear();
+        verworfen.clear();
         sammlungen.clear();
     }
 
