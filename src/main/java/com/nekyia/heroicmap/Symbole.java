@@ -41,6 +41,8 @@ final class Symbole {
     static final int MAX = 256 << 10;
     /** Höchstens so viele Bilder hat eine Ebene, siehe das Format; mehr Symbole holt der Mod nicht. */
     static final int MAX_BILDER = 200;
+    /** So viele Bilder über alle Ebenen, je bis 8 KiB im Speicher und auf der Grafikkarte. Siehe docs/ebenen.md, „Grenzen“. */
+    static final int MAX_BILDER_GESAMT = 1000;
     /** So lange darf ein Abruf dauern, Header und Körper zusammen. */
     static final Duration FRIST = Duration.ofSeconds(10);
     /** Das Bild eines Banners ist höchstens so gross, wie im Format. */
@@ -90,6 +92,8 @@ final class Symbole {
     /** Die Wurzel der Kacheln am Server, aus der Liste, und die Verbindung zum Spielserver; null ohne Adresse. */
     private URI basis;
     private InetAddress spielserver;
+    /** Gesetzt, sobald das Log einmal sagte, dass über alle Ebenen kein Bild mehr dazukommt; bis zum Leeren. */
+    private boolean voll;
 
     Symbole(HttpClient client, ExecutorService holer, Executor renderThread, BiFunction<URI, Kacheln.Bild, Identifier> ablage,
             Consumer<Identifier> freigabe) {
@@ -185,7 +189,14 @@ final class Symbole {
         if (f.texturen.size() >= MAX_BILDER) {
             if (!f.voll) {
                 f.voll = true;
-                LOGGER.warn("Heroic Map: Ebene {} nennt mehr als {} Symbole, die übrigen fehlen", ebene, MAX_BILDER);
+                LOGGER.warn("Heroic Map: Ebene {} nennt mehr als {} Bilder, die übrigen fehlen", ebene, MAX_BILDER);
+            }
+            return null;
+        }
+        if (ebenen.values().stream().mapToInt(e -> e.texturen.size()).sum() >= MAX_BILDER_GESAMT) {
+            if (!voll) {
+                voll = true;
+                LOGGER.warn("Heroic Map: mehr als {} Bilder über alle Ebenen, die übrigen fehlen", MAX_BILDER_GESAMT);
             }
             return null;
         }
@@ -250,7 +261,7 @@ final class Symbole {
             }
             return bild;
         } catch (IOException | Laden.Fehler | RuntimeException e) {
-            LOGGER.warn("Heroic Map: Symbol {} nicht geladen: {}", uri, e.getMessage());
+            LOGGER.warn("Heroic Map: Bild {} nicht geladen: {}", uri, e.getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -276,6 +287,7 @@ final class Symbole {
     /** Beim Trennen und mit einer neuen Adresse: alle Texturen frei, alte Aufträge fragen nicht mehr. */
     void leeren() {
         runde.incrementAndGet();
+        voll = false;
         ebenen.values().forEach(this::gibFrei);
         ebenen.clear();
     }

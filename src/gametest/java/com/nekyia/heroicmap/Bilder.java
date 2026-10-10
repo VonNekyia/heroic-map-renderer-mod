@@ -14,6 +14,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 import java.util.Map;
 import javax.imageio.ImageIO;
 import net.fabricmc.loader.api.FabricLoader;
@@ -148,7 +149,8 @@ public final class Bilder implements FabricClientGameTest {
      * und docs/ebenen.md, „Banner“.
      */
     private static void orte(ClientGameTestContext context, TestServerContext server) {
-        HttpServer bilder = bilderServer(Map.of("anker.png", bild(16, 16), "anker-m.png", bild(9, 9), "banner.png", bild(21, 40)));
+        HttpServer bilder = bilderServer(Map.of("anker.png", bild(16, 16, ANKER), "anker-m.png", bild(9, 9, ANKER), "banner.png",
+                bild(21, 40, BANNER)));
         try {
             context.runOnClient(mc -> {
                 Ebenen.INSTANZ.empfange(JsonParser.parseString("""
@@ -172,9 +174,14 @@ public final class Bilder implements FabricClientGameTest {
             context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
             context.waitTicks(40);
             Path karte = context.takeScreenshot(TestScreenshotOptions.of("orte-karte").disableCounterPrefix());
+            gleichGrossAufZweiStufen(context, karte);
             // Die Option tauscht die Schriften ohne Neuladen; die gespeicherte Kartenschrift baut neu.
+            int vorher = context.computeOnClient(mc -> Formen.generation);
             context.runOnClient(mc -> mc.options.forceUnicodeFont().set(true));
             context.waitTicks(10);
+            if (context.computeOnClient(mc -> Formen.generation) <= vorher) {
+                throw new AssertionError("„Unicode-Schrift erzwingen“ hob die Generation der Kartenschrift nicht");
+            }
             Path unicode = context.takeScreenshot(TestScreenshotOptions.of("orte-unicode").disableCounterPrefix());
             context.runOnClient(mc -> mc.options.forceUnicodeFont().set(false));
             context.waitTicks(10);
@@ -190,9 +197,54 @@ public final class Bilder implements FabricClientGameTest {
             context.runOnClient(mc -> {
                 mc.gui.setScreen(null);
                 Ebenen.INSTANZ.leeren();
+                Symbole.INSTANZ.leeren();
             });
         } finally {
             bilder.stop(0);
+        }
+    }
+
+    /** Die Farben der Bilder im Test; das Banner hat eine eigene, so findet es der Test im Bild. */
+    private static final int ANKER = 0x2E4A8C, BANNER = 0x8C2E4A;
+
+    /**
+     * Eine Stufe gröber steht das Banner woanders, aber gleich gross: feste Grösse nach 0097. Danach
+     * wieder die Stufe von vorher.
+     */
+    private static void gleichGrossAufZweiStufen(ClientGameTestContext context, Path vorher) {
+        int k = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+        context.getInput().setCursorPos(breite / 2.0 * k, hoehe / 2.0 * k);
+        context.getInput().scroll(-1);
+        context.waitTicks(20);
+        Path grob = context.takeScreenshot(TestScreenshotOptions.of("orte-karte-grob").disableCounterPrefix());
+        context.getInput().scroll(1);
+        context.waitTicks(20);
+        int[] a = kasten(vorher, BANNER), b = kasten(grob, BANNER);
+        if (a == null || b == null || a[2] - a[0] != b[2] - b[0] || a[3] - a[1] != b[3] - b[1] || a[0] == b[0] && a[1] == b[1]) {
+            throw new AssertionError("Banner nicht gleich gross auf zwei Stufen: " + Arrays.toString(a) + " " + Arrays.toString(b));
+        }
+    }
+
+    /** Der Kasten {x0, y0, x1, y1} aller Pixel genau in der Farbe {@code rgb}; null, wenn keins sie hat. */
+    private static int[] kasten(Path bild, int rgb) {
+        try {
+            BufferedImage b = ImageIO.read(bild.toFile());
+            int[] k = {Integer.MAX_VALUE, Integer.MAX_VALUE, -1, -1};
+            for (int y = 0; y < b.getHeight(); y++) {
+                for (int x = 0; x < b.getWidth(); x++) {
+                    if ((b.getRGB(x, y) & 0xFFFFFF) == rgb) {
+                        k[0] = Math.min(k[0], x);
+                        k[1] = Math.min(k[1], y);
+                        k[2] = Math.max(k[2], x + 1);
+                        k[3] = Math.max(k[3], y + 1);
+                    }
+                }
+            }
+            return k[2] < 0 ? null : k;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
@@ -219,11 +271,11 @@ public final class Bilder implements FabricClientGameTest {
         }
     }
 
-    /** Ein PNG: ein Feld in Blau mit gelbem Rand und Querstreifen, etwa ein Banner. */
-    private static byte[] bild(int breite, int hoehe) {
+    /** Ein PNG: ein Feld in der Farbe {@code rgb} mit gelbem Rand und Querstreifen, etwa ein Banner. */
+    private static byte[] bild(int breite, int hoehe, int rgb) {
         BufferedImage b = new BufferedImage(breite, hoehe, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = b.createGraphics();
-        g.setColor(new Color(0x2E4A8C));
+        g.setColor(new Color(rgb));
         g.fillRect(0, 0, breite, hoehe);
         g.setColor(new Color(0xE8C547));
         g.drawRect(0, 0, breite - 1, hoehe - 1);

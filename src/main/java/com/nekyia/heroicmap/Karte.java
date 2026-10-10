@@ -218,8 +218,8 @@ final class Karte extends Screen {
     }
 
     /**
-     * Die Nadeln der sichtbaren Ebenen in dieser Dimension, auf dem Raster der Kacheln; kleiner, je
-     * weniger Einheiten ein Block breit ist. Siehe docs/ebenen.md, „Nadeln“.
+     * Die Nadeln und Banner der sichtbaren Ebenen in dieser Dimension, auf dem Raster der Kacheln, in
+     * fester Grösse auf jeder Stufe. Siehe docs/ebenen.md, „Nadeln“.
      */
     private void nadeln(GuiGraphicsExtractor g, String dimension) {
         int k = minecraft.getWindow().getGuiScale();

@@ -530,7 +530,7 @@ class EbenenTest {
         assertEquals(0, o.konturBreite());
         // Eine Kontur ohne Angaben ist keine, wie auf der Webkarte; die Sperrung gekappt.
         Ebenen.Schrift k = (Ebenen.Schrift) g.formen().get(2);
-        assertEquals(Ebenen.MAX_SPERRUNG, k.sperrung());
+        assertEquals(1f, k.sperrung());
         assertEquals(0, k.konturBreite());
         assertEquals(Ebenen.KONTURFARBE, k.konturFarbe());
         // Punkte: 3 + 1 + 1.
@@ -602,6 +602,22 @@ class EbenenTest {
         assertEquals(7, Ebenen.farbeMitAlpha(o, "keine", 7));
         assertEquals(7, Ebenen.farbeMitAlpha(o, "objekt", 7));
         assertEquals(7, Ebenen.farbeMitAlpha(o, "fehlt", 7));
+    }
+
+    @Test
+    void bannerOhneGueltigesBildZaehltAlsVerworfen() {
+        // Ohne image, mit ../, als GIF und zu lang: vier verworfen, das Log nennt sie; Banner mit Bild und Nadel bleiben.
+        Ebenen.Teil t = Ebenen.Teil.lies("""
+                {"v":1,"typ":"ebene","id":"b:e","version":"1","teil":1,"teile":1,"objects":[
+                  {"type":"banner","at":[0,0]},
+                  {"type":"banner","at":[0,0],"image":"images/../x.png"},
+                  {"type":"banner","at":[0,0],"image":"images/x.gif"},
+                  {"type":"banner","at":[0,0],"image":"images/%s.png"},
+                  {"type":"banner","at":[0,0],"image":"images/gut.png"},
+                  {"type":"pin","at":[0,0]}
+                ]}""".formatted("x".repeat(Ebenen.MAX_FELD)));
+        assertEquals(2, t.nadeln().size());
+        assertEquals(4, t.verworfen());
     }
 
     @Test

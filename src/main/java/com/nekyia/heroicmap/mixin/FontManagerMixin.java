@@ -1,6 +1,6 @@
 package com.nekyia.heroicmap.mixin;
 
-import com.nekyia.heroicmap.Formen;
+import com.nekyia.heroicmap.HeroicMap;
 import net.minecraft.client.Options;
 import net.minecraft.client.gui.font.FontManager;
 import org.spongepowered.asm.mixin.Mixin;
@@ -18,6 +18,6 @@ abstract class FontManagerMixin {
 
     @Inject(method = "updateOptions", at = @At("TAIL"))
     private void heroicmap$neuGeladen(Options options, CallbackInfo info) {
-        Formen.neuGeladen();
+        HeroicMap.schriftenGewechselt();
     }
 }
