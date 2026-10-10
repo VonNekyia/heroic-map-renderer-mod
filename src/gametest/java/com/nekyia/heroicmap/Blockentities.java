@@ -1,13 +1,18 @@
 package com.nekyia.heroicmap;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.logging.LogUtils;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import javax.imageio.ImageIO;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerConnection;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
@@ -15,6 +20,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
+import org.slf4j.Logger;
 
 /**
  * Blöcke mit Blockentity, gesetzt und abgebaut wie ein Spieler: Truhe, Tür, Schild und Kopf. Die
@@ -31,12 +37,33 @@ public final class Blockentities implements FabricClientGameTest {
     private static final int ZOOM = 8;
     /** Ab so vielen Kanälen Unterschied gilt ein Pixel als anders. */
     private static final int SCHWELLE = 24;
+    /** Mit {@code -Peula=<datei>}: eine angenommene eula.txt für den Server-Fall. Siehe docs/entwicklung.md, „Gametests“. */
+    private static final String EULA = System.getProperty("heroicmap.eula", "");
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     @Override
     public void runTest(ClientGameTestContext context) {
         try (TestSingleplayerContext spiel = context.worldBuilder().adjustSettings(s -> s.setAllowCommands(true)).create()) {
             spiel.getConnection().waitForChunksRender();
             alle(context, spiel.getServer(), "einzelspieler");
+        }
+        // Auf einem Server, mit dem der Client übers Netz spricht wie mit dem des Users: nur mit einer
+        // eula.txt, die ein Mensch angenommen hat (-Peula); der Test kopiert sie unverändert, er schreibt nie eine.
+        Path eula = EULA.isEmpty() ? null : Path.of(EULA);
+        if (eula == null || !Files.isRegularFile(eula)) {
+            LOGGER.info("Blockentities: ohne -Peula kein Server-Fall");
+            return;
+        }
+        try {
+            // Dort liest der Server des Tests sie, im Arbeitsordner des Spiels.
+            Files.copy(eula, Path.of("eula.txt"), StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        try (TestDedicatedServerContext server = context.worldBuilder().createServer();
+                TestDedicatedServerConnection verbindung = server.connect()) {
+            verbindung.waitForChunksRender();
+            alle(context, server, "server");
         }
     }
 
