@@ -225,6 +225,20 @@ final class Formen {
         return gui < KLEINSTE_SCHRIFT ? 0 : Math.min(Math.min(gui, GROESSTE_SCHRIFT), hoechstens) * einheit;
     }
 
+    /** Die Breite der Kontur: gewünscht, höchstens {@link #KONTUR_HOECHSTENS} der Höhe der Grossbuchstaben; breiter zerfiele sie. */
+    static double kontur(double gewuenscht, double kappe) {
+        return Math.min(gewuenscht, KONTUR_HOECHSTENS * kappe);
+    }
+
+    /** Der Versatz der {@code k}-ten der acht Kopien der Kontur rundum, im Abstand {@code r}. */
+    static double versatzX(int k, double r) {
+        return r * Math.cos(k * Math.PI / 4);
+    }
+
+    static double versatzY(int k, double r) {
+        return r * Math.sin(k * Math.PI / 4);
+    }
+
     /** Ein Zeichen der Kartenschrift: welches, seine Mitte, Winkel und Massstab, der Versatz der Kontur in Einheiten der Schrift, die Farbe. */
     record Glyphe(int zeichen, double x, double y, double winkel, double massstab, double dx, double dy, int farbe) {
     }
@@ -247,7 +261,7 @@ final class Formen {
         for (int i = 0; i < b.length; i++) {
             drin[i] = innen(schnitt, lage[3 * i], lage[3 * i + 1]);
         }
-        double r = Math.min(s.konturBreite() * einheit, KONTUR_HOECHSTENS * kappe) / massstab;
+        double r = kontur(s.konturBreite() * einheit, kappe) / massstab;
         boolean mitKontur = r > 0 && Ebenen.sichtbar(s.konturFarbe()), mitFuellung = Ebenen.sichtbar(s.farbe());
         int n = 0;
         for (boolean d : drin) {
@@ -264,8 +278,8 @@ final class Formen {
             boolean kontur = k < 8;
             for (int i = 0; i < b.length; i++) {
                 if (drin[i]) {
-                    aus.add(new Glyphe(i, lage[3 * i], lage[3 * i + 1], lage[3 * i + 2], massstab, kontur ? r * Math.cos(k * Math.PI / 4) : 0,
-                            kontur ? r * Math.sin(k * Math.PI / 4) : 0, kontur ? s.konturFarbe() : s.farbe()));
+                    aus.add(new Glyphe(i, lage[3 * i], lage[3 * i + 1], lage[3 * i + 2], massstab, kontur ? versatzX(k, r) : 0,
+                            kontur ? versatzY(k, r) : 0, kontur ? s.konturFarbe() : s.farbe()));
                 }
             }
         }
