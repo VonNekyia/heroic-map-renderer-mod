@@ -529,6 +529,13 @@ final class Karte extends Screen {
         return ziel;
     }
 
+    /** Für den Gametest: der Fuss eines Orts auf dem Schirm, in Einheiten des GUI, wie gezeichnet. */
+    float[] fuss(Ebenen.Ort o) {
+        int k = minecraft.getWindow().getGuiScale();
+        return new float[] {aufPixel(blick.rasterX(Projektion.zuPixel(o.x(), satz.scale()), width), k),
+            aufPixel(blick.rasterY(Projektion.zuPixel(o.z(), satz.scale()), height), k)};
+    }
+
     /** Für den Gametest: die ids der Form im Bau, oder null. */
     List<Integer> zug() {
         return zug == null ? null : List.copyOf(zug);
