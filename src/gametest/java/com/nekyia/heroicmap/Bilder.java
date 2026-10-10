@@ -120,6 +120,7 @@ public final class Bilder implements FabricClientGameTest {
             formen(context, server);
             orte(context, server);
             selbst(context);
+            tueren(context, server);
         }
     }
 
@@ -758,6 +759,70 @@ public final class Bilder implements FabricClientGameTest {
      * scale 4, Stufen 0 bis 2, und nimmt sie auf der feinsten Stufe auf; dazu ein angehefteter
      * Wegpunkt auf der Karte und einer am Rand. Siehe docs/wegpunkte.md.
      */
+    /** Türen in vier Richtungen, offen, aus Eisen; Truhen einzeln und doppelt, Ender- und Fallentruhe, ein Fass als Gegenprobe. */
+    private static final String[] TUEREN = {
+        "setblock -40 -60 0 oak_door[facing=north,half=lower]", "setblock -40 -59 0 oak_door[facing=north,half=upper]",
+        "setblock -38 -60 0 oak_door[facing=east,half=lower]", "setblock -38 -59 0 oak_door[facing=east,half=upper]",
+        "setblock -36 -60 0 oak_door[facing=south,half=lower]", "setblock -36 -59 0 oak_door[facing=south,half=upper]",
+        "setblock -34 -60 0 oak_door[facing=west,half=lower]", "setblock -34 -59 0 oak_door[facing=west,half=upper]",
+        "setblock -32 -60 0 iron_door[facing=north,half=lower]", "setblock -32 -59 0 iron_door[facing=north,half=upper]",
+        "setblock -30 -60 0 spruce_door[facing=north,half=lower,open=true]", "setblock -30 -59 0 spruce_door[facing=north,half=upper,open=true]",
+        "setblock -40 -60 4 chest[facing=south]",
+        "setblock -38 -60 4 chest[facing=south,type=right]", "setblock -37 -60 4 chest[facing=south,type=left]",
+        "setblock -35 -60 4 ender_chest[facing=south]",
+        "setblock -33 -60 4 trapped_chest[facing=south]",
+        "setblock -31 -60 4 barrel[facing=up]",
+        // Ein Stück Dorf: Zaun mit Tor, Fackeln, Laterne auf dem Zaun, Scheiben, Gitter, Mauer, Falltüren offen und zu.
+        "fill -40 -60 8 -31 -60 8 oak_fence", "setblock -35 -60 8 oak_fence_gate[facing=south]", "setblock -38 -59 8 lantern",
+        "setblock -40 -60 10 torch", "setblock -37 -60 10 torch", "setblock -34 -60 10 torch", "setblock -31 -60 10 torch",
+        "fill -40 -60 12 -37 -60 12 glass_pane", "fill -35 -60 12 -32 -60 12 iron_bars", "fill -40 -60 14 -37 -60 14 cobblestone_wall",
+        "setblock -35 -60 14 oak_trapdoor[facing=north,half=bottom,open=false]",
+        "setblock -33 -60 14 oak_trapdoor[facing=north,half=bottom,open=true]",
+    };
+
+    /**
+     * Türen, Truhen und ein Stück Dorf westlich der Szene auf der Minimap bei 1, 2 und 4 px, je Zoom 4,
+     * genordet und eckig (mod#80). Siehe docs/minimap.md, „Flächen und Pixel“,
+     * und docs/minimap.md, „Blockentities“.
+     */
+    private static void tueren(ClientGameTestContext context, TestServerContext server) {
+        for (String befehl : TUEREN) {
+            server.runCommand(befehl);
+        }
+        int[] scales = {1, 2, 4};
+        BufferedImage[] teile = new BufferedImage[scales.length];
+        for (int i = 0; i < scales.length; i++) {
+            int scale = scales[i];
+            context.runOnClient(mc -> {
+                Minimap.INSTANZ.setzeScale(scale);
+                Minimap.INSTANZ.setzeZoom(4);
+            });
+            teile[i] = minimapBei(context, server, -34.5, 7.5, "tueren-" + scale + "px");
+        }
+        // Bei 2 px trafen die Türen keine Mitte eines Pixels und fehlten ganz (mod#80). Ihre Reihe z = 0 liegt 7,5 Blöcke
+        // nördlich der Mitte, bei Zoom 4 und GS 2 also 60 Pixel darüber; dort muss etwas anderes als Gras stehen.
+        int gs = context.computeOnClient(mc -> mc.getWindow().getGuiScale()), nichtGras = 0;
+        BufferedImage zwei = teile[1];
+        int my = zwei.getHeight() / 2 - Math.round(7.5f * 4 * gs), mx = zwei.getWidth() / 2;
+        for (int y = my - 2 * gs; y <= my + 2 * gs; y++) {
+            for (int x = mx - 6 * 4 * gs; x <= mx + 5 * 4 * gs; x++) {
+                int rgb = zwei.getRGB(x, y), r = rgb >> 16 & 0xFF, g = rgb >> 8 & 0xFF, b = rgb & 0xFF;
+                nichtGras += g > r + 8 && g > b + 8 ? 0 : 1;
+            }
+        }
+        if (nichtGras < 4 * gs * gs) {
+            throw new AssertionError("Türen bei 2 px nicht zu sehen: " + nichtGras + " Pixel ausser Gras");
+        }
+        if (!AUSGABE.isEmpty()) {
+            try {
+                ImageIO.write(nebeneinander(0, teile), "png", Path.of(AUSGABE, "tueren.png").toFile());
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        server.runCommand("tp @a 0.5 -30 0.5 0 90");
+    }
+
     private static void vollbildkarte(ClientGameTestContext context) {
         Path baum = testsatz();
         context.runOnClient(mc -> {
