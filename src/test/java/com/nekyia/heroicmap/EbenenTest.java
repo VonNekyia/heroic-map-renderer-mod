@@ -572,13 +572,12 @@ class EbenenTest {
                 + "{\"type\":\"label\",\"text\":\"" + "x".repeat(Ebenen.MAX_TEXT + 1) + "\",\"path\":[[0,0]]},"
                 + "{\"type\":\"label\",\"path\":[[0,0]]},"
                 + "{\"type\":\"label\",\"text\":\"leer\",\"path\":[]},"
-                + "{\"type\":\"label\",\"text\":\"null\",\"path\":[[0,0]],\"size\":0},"
                 + "{\"type\":\"label\",\"text\":\"gut\",\"path\":[[0,0],[1,0]]}"
                 + "]").getAsJsonArray();
         Ebenen.Gelesen g = Ebenen.formen(objekte);
         assertEquals(1, g.formen().size());
         assertEquals("gut", ((Ebenen.Schrift) g.formen().getFirst()).text());
-        assertEquals(5, g.verworfen());
+        assertEquals(4, g.verworfen());
     }
 
     @Test

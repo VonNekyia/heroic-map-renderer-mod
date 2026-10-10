@@ -335,7 +335,7 @@ class FormenTest {
         // Die Kontur reicht höchstens 0,12 der Höhe: 64 Einheiten breit gewünscht, bei 16 hoch also 1,92, in Einheiten der Schrift.
         List<Formen.Glyphe> breit = Formen.glyphen(schrift("A", 64), new double[] {0, 0, 100, 0}, new double[] {8}, 16, 1,
                 Drehung.rechteck(-1000, -1000, 1000, 1000), new int[] {Formen.MAX_ZEICHEN});
-        double massstab = 16 / Formen.KAPPE;
+        double massstab = 16.0 / Formen.KAPPE;
         assertEquals(0.12 * 16 / massstab, breit.getFirst().dx(), 1e-9);
     }
 
