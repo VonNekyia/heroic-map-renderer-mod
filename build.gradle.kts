@@ -64,6 +64,8 @@ tasks.matching { it.name == "runClientGameTest" }.configureEach {
     systemProperty("heroicmap.uebernahme", uebernahme.get())
     systemProperty("heroicmap.server", server.get())
     providers.gradleProperty("zusatzmods").orNull?.let { systemProperty("fabric.addMods", file(it).absolutePath) }
+    // Der Server-Fall von Blockentities nur mit einer eula.txt, die ein Mensch angenommen hat; der Test kopiert sie unverändert.
+    systemProperty("heroicmap.eula", providers.gradleProperty("eula").map { file(it).absolutePath }.orElse("").get())
 }
 
 tasks.processResources {
