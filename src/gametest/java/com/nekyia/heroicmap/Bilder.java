@@ -774,11 +774,6 @@ public final class Bilder implements FabricClientGameTest {
         return baum;
     }
 
-    /**
-     * Öffnet die Vollbildkarte mit einem kleinen Satz gemalter Testkacheln um den Ursprung,
-     * scale 4, Stufen 0 bis 2, und nimmt sie auf der feinsten Stufe auf; dazu ein angehefteter
-     * Wegpunkt auf der Karte und einer am Rand. Siehe docs/wegpunkte.md.
-     */
     /** Türen in vier Richtungen, offen, aus Eisen; Truhen einzeln und doppelt, Ender- und Fallentruhe, ein Fass als Gegenprobe. */
     private static final String[] TUEREN = {
         "setblock -40 -60 0 oak_door[facing=north,half=lower]", "setblock -40 -59 0 oak_door[facing=north,half=upper]",
@@ -875,6 +870,11 @@ public final class Bilder implements FabricClientGameTest {
         server.runCommand("tp @a 0.5 -30 0.5 0 90");
     }
 
+    /**
+     * Öffnet die Vollbildkarte mit einem kleinen Satz gemalter Testkacheln um den Ursprung,
+     * scale 4, Stufen 0 bis 2, und nimmt sie auf der feinsten Stufe auf; dazu ein angehefteter
+     * Wegpunkt auf der Karte und einer am Rand. Siehe docs/wegpunkte.md.
+     */
     private static void vollbildkarte(ClientGameTestContext context) {
         Path baum = testsatz();
         context.runOnClient(mc -> {
