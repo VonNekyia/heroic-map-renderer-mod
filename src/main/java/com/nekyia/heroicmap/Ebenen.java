@@ -81,9 +81,21 @@ final class Ebenen {
     static final float NAME_GROESSE = 10, NAME_OBEN = 2;
     /** Massstab von der Schrift (16 je Geviert) aufs GUI und die Breite der Kontur in Einheiten des GUI. */
     private static final double NAME_MASSSTAB = NAME_GROESSE / 16.0, NAME_KONTUR = Formen.kontur(1.25, Formen.KAPPE * NAME_MASSSTAB);
-    /** So weit reicht der Name unter den Fuss: Oberkante, ein Geviert der Schrift, die Kontur. */
+    /**
+     * Der Name eines Banners im Bogen, in Einheiten des GUI: Sperrung 0,125 · s, der tiefste Punkt 0,75 · s unter dem
+     * Fuss, höchstens 120° offen; ein Zeichen reicht über und unter seiner Mitte je 0,55 · s, die Grossbuchstaben samt
+     * Akzenten und Unterlängen. Siehe docs/ebenen.md, „Banner“.
+     */
+    static final double BOGEN_SPERRUNG = 0.125 * NAME_GROESSE, BOGEN_TIEF = 0.75 * NAME_GROESSE, BOGEN_OEFFNUNG = 2 * Math.PI / 3,
+            BOGEN_HALB = 0.55 * NAME_GROESSE;
+    /** So weit reicht der gerade Name unter den Fuss: Oberkante, ein Geviert der Schrift, die Kontur. */
     static final int NAME_UNTEN = (int) Math.ceil(NAME_OBEN + NAME_GROESSE + NAME_KONTUR);
-    /** So viele Namen zeichnet eine Ansicht je Frame, je neun Texte; die übrigen fehlen, das Log sagt es einmal. */
+    /** So weit reicht kein Name unter den Fuss, auch keiner im Bogen; zum Vorfiltern vor dem Kasten. */
+    static final int UNTEN_HOECHSTENS = 32;
+    /**
+     * So viele Namen zeichnet eine Ansicht je Frame, je neun Texte; ein Name im Bogen zählt je Zeichen einen, denn er
+     * zeichnet je Zeichen neun. Die übrigen fehlen, das Log sagt es einmal.
+     */
     static final int MAX_NAMEN = 500;
     /**
      * So hoch steht ein Banner höchstens, in Einheiten des GUI, und halb so breit, wie bisher 32 × 64:
@@ -93,6 +105,13 @@ final class Ebenen {
     static final int BANNER_HOEHE = 32;
     private static boolean namenGewarnt;
     private static final Logger LOGGER = LoggerFactory.getLogger(HeroicMap.ID);
+    /** Die Zeichen der Namen im Bogen, gemessen mit der Schrift von {@link #zeichenGeneration}; nur der Render-Thread. */
+    private static final Map<String, Zeichen> ZEICHEN = new HashMap<>();
+    private static int zeichenGeneration = -1;
+
+    /** Die Zeichen eines Namens einzeln in der Kartenschrift und ihre Vorschübe in Einheiten des GUI. */
+    record Zeichen(Component[] zeichen, double[] breiten) {
+    }
 
     /** Ein Eintrag der Liste; {@code order} höher liegt oben. */
     record Eintrag(String id, String nameDe, String nameEn, boolean sichtbar, int order, String version) {
@@ -765,6 +784,7 @@ final class Ebenen {
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.translate(x, y);
+        double hoehe = 0;
         switch (o) {
             case Nadel n -> nadel(g, n);
             case Banner b -> {
@@ -774,10 +794,19 @@ final class Ebenen {
                     return;
                 }
                 banner(g, t, gs, BANNER_HOEHE, deckung);
+                hoehe = t.hoehe() * faktor(t.breite(), t.hoehe(), gs) / (double) gs;
             }
         }
-        if (o.name() != null && namen[0]-- > 0) {
-            name(g, font, o.name());
+        // Eine Nadel trägt ihren Namen gerade, ein Banner im Bogen, so wählte es der User (0102 des Renderers).
+        Zeichen z = o instanceof Banner && o.name() != null ? zeichen(font, o.name()) : null;
+        int kosten = z == null ? 1 : Math.max(1, z.zeichen().length);
+        if (o.name() != null && namen[0] >= kosten) {
+            namen[0] -= kosten;
+            if (z == null) {
+                name(g, font, o.name());
+            } else {
+                bogenName(g, font, z, hoehe);
+            }
         } else if (o.name() != null && !namenGewarnt) {
             namenGewarnt = true;
             LOGGER.warn("Heroic Map: mehr als {} Namen auf einmal; die übrigen fehlen", MAX_NAMEN);
@@ -791,12 +820,11 @@ final class Ebenen {
      * noch fehlt. Misst den Namen und holt das Bild eines Banners, also erst die Lage prüfen.
      */
     static float[] kasten(Font font, Ort o, int gs) {
-        float name = o.name() == null ? 0 : nameBreite(font, o.name());
         return switch (o) {
-            case Nadel n -> kasten(SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe(), name);
+            case Nadel n -> kasten(SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe(), o.name() == null ? 0 : nameBreite(font, o.name()));
             case Banner b -> {
                 Symbole.Textur t = Symbole.INSTANZ.banner(b.ebene(), b.version(), b.bild());
-                yield t == null ? null : bannerKasten(t.breite(), t.hoehe(), gs, name);
+                yield t == null ? null : bannerKasten(t.breite(), t.hoehe(), gs, breiten(font, o));
             }
         };
     }
@@ -829,10 +857,14 @@ final class Ebenen {
         return Math.max(1, Math.min(hoechstens / 2 * gs / breite, hoechstens * gs / hoehe));
     }
 
-    /** Der Kasten eines Banners wie gezeichnet, in Einheiten des GUI: links ⌊Breite / 2⌋ Pixel des Schirms. */
-    static float[] bannerKasten(int breite, int hoehe, int gs, float name) {
+    /**
+     * Der Kasten eines Banners wie gezeichnet, in Einheiten des GUI: links ⌊Breite / 2⌋ Pixel des Schirms; dazu der
+     * Name im Bogen mit den Vorschüben {@code name}, leer heisst ohne Namen.
+     */
+    static float[] bannerKasten(int breite, int hoehe, int gs, double[] name) {
         int f = faktor(breite, hoehe, gs), w = breite * f;
-        return kasten(-(w / 2) / (float) gs, w / (float) gs, hoehe * f / (float) gs, name);
+        float[] bild = kasten(-(w / 2) / (float) gs, w / (float) gs, hoehe * f / (float) gs, 0);
+        return name.length == 0 ? bild : vereint(bild, bogenKasten(name, radius(name, hoehe * f / (double) gs)));
     }
 
     /**
@@ -841,15 +873,108 @@ final class Ebenen {
      * bei jedem GUI-Massstab darin.
      */
     static float[] kastenOhneHolen(Font font, Ort o) {
-        return grob(o, o.name() == null ? 0 : nameBreite(font, o.name()));
+        return switch (o) {
+            case Nadel n -> kasten(SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe(), o.name() == null ? 0 : nameBreite(font, o.name()));
+            case Banner b -> grob(breiten(font, o));
+        };
     }
 
-    /** Der grobe Kasten zu einem Namen, dessen Kasten {@code name} breit ist; siehe {@link #kastenOhneHolen}. */
-    static float[] grob(Ort o, float name) {
-        return switch (o) {
-            case Nadel n -> kasten(SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe(), name);
-            case Banner b -> kasten(Symbole.BANNER_BREITE, Symbole.BANNER_HOEHE, name);
-        };
+    /**
+     * Der grobe Kasten eines Banners mit dem Namen im Bogen aus den Vorschüben {@code name}; siehe {@link #kastenOhneHolen}.
+     * Für jeden Radius: Die Mitte eines Zeichens liegt auf dem Bogen höchstens L / 2 vom tiefsten Punkt, also waagrecht
+     * höchstens so weit, und höchstens so hoch über ihm wie das Ende des engsten Bogens, der 120° öffnet, r / 2. Jede
+     * Ecke liegt höchstens die halbe Diagonale ihres Zeichens von seiner Mitte.
+     */
+    static float[] grob(double[] name) {
+        float[] bild = kasten(Symbole.BANNER_BREITE, Symbole.BANNER_HOEHE, 0);
+        if (name.length == 0) {
+            return bild;
+        }
+        double laenge = laenge(name), rho = 0;
+        for (double b : name) {
+            rho = Math.max(rho, Math.hypot(b / 2 + NAME_KONTUR, BOGEN_HALB + NAME_KONTUR));
+        }
+        double steigt = laenge / BOGEN_OEFFNUNG / 2;
+        return vereint(bild, new float[] {(float) Math.floor(-laenge / 2 - rho), (float) Math.floor(BOGEN_TIEF - steigt - rho),
+            (float) Math.ceil(laenge / 2 + rho), (float) Math.ceil(BOGEN_TIEF + rho)});
+    }
+
+    private static float[] vereint(float[] a, float[] b) {
+        return new float[] {Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])};
+    }
+
+    /** Die Vorschübe der Zeichen im Namen eines Orts, leer ohne Namen. */
+    private static double[] breiten(Font font, Ort o) {
+        return o.name() == null ? new double[0] : zeichen(font, o.name()).breiten();
+    }
+
+    /** Die Zeichen eines Namens, einmal gemessen je Name und Schrift; nach einem Wechsel der Schrift neu (Formen.generation). */
+    static Zeichen zeichen(Font font, String name) {
+        if (zeichenGeneration != Formen.generation || ZEICHEN.size() > 4 * MAX_NAMEN) {
+            ZEICHEN.clear();
+            zeichenGeneration = Formen.generation;
+        }
+        return ZEICHEN.computeIfAbsent(name, n -> {
+            int[] codes = n.codePoints().toArray();
+            Component[] zeichen = new Component[codes.length];
+            double[] breiten = new double[codes.length];
+            for (int i = 0; i < codes.length; i++) {
+                zeichen[i] = Component.literal(Character.toString(codes[i])).withStyle(Formen.STIL);
+                breiten[i] = font.getSplitter().stringWidth(zeichen[i]) * NAME_MASSSTAB;
+            }
+            return new Zeichen(zeichen, breiten);
+        });
+    }
+
+    /** Die Länge eines Namens auf dem Bogen: die Vorschübe aller Zeichen und die Sperrung dazwischen. */
+    static double laenge(double[] breiten) {
+        double l = Math.max(0, breiten.length - 1) * BOGEN_SPERRUNG;
+        for (double b : breiten) {
+            l += b;
+        }
+        return l;
+    }
+
+    /** Der Radius des Bogens unter einem Banner {@code h} Einheiten hoch: 2 · h, für lange Namen mehr, so öffnet er höchstens 120°. */
+    static double radius(double[] breiten, double h) {
+        return Math.max(2 * h, laenge(breiten) / BOGEN_OEFFNUNG);
+    }
+
+    /**
+     * Je Zeichen {x, y, winkel} auf dem Bogen mit Radius {@code r} unter dem Fuss im Ursprung, y nach unten: nach unten
+     * gewölbt, der Mittelpunkt (0, 0,75 · s − r), die Mitte des Namens auf dem tiefsten Punkt, jedes Zeichen aufrecht zum
+     * Bogen. {@code breiten} sind die Vorschübe in Einheiten des GUI.
+     */
+    static double[] bogen(double[] breiten, double r) {
+        double[] aus = new double[3 * breiten.length];
+        double s = -laenge(breiten) / 2, mitte = BOGEN_TIEF - r;
+        for (int i = 0; i < breiten.length; i++) {
+            double phi = (s + breiten[i] / 2) / r;
+            aus[3 * i] = r * Math.sin(phi);
+            aus[3 * i + 1] = mitte + r * Math.cos(phi);
+            aus[3 * i + 2] = -phi;
+            s += breiten[i] + BOGEN_SPERRUNG;
+        }
+        return aus;
+    }
+
+    /** Der Kasten des Namens im Bogen mit Radius {@code r}, {links, oben, rechts, unten}: je Zeichen sein Rechteck samt Kontur, gedreht. */
+    static float[] bogenKasten(double[] breiten, double r) {
+        double[] lage = bogen(breiten, r);
+        double[] k = {Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY};
+        double hy = BOGEN_HALB + NAME_KONTUR;
+        for (int i = 0; i < breiten.length; i++) {
+            double hx = breiten[i] / 2 + NAME_KONTUR, c = Math.cos(lage[3 * i + 2]), sn = Math.sin(lage[3 * i + 2]);
+            for (int ecke = 0; ecke < 4; ecke++) {
+                double u = (ecke & 1) == 0 ? -hx : hx, v = (ecke & 2) == 0 ? -hy : hy;
+                double x = lage[3 * i] + u * c - v * sn, y = lage[3 * i + 1] + u * sn + v * c;
+                k[0] = Math.min(k[0], x);
+                k[1] = Math.min(k[1], y);
+                k[2] = Math.max(k[2], x);
+                k[3] = Math.max(k[3], y);
+            }
+        }
+        return new float[] {(float) Math.floor(k[0]), (float) Math.floor(k[1]), (float) Math.ceil(k[2]), (float) Math.ceil(k[3])};
     }
 
     /**
@@ -895,6 +1020,32 @@ final class Ebenen {
         }
         g.text(font, c, 0, 0, SCHRIFTFARBE, false);
         pose.popMatrix();
+    }
+
+    /**
+     * Der Name eines Banners im Bogen unter einem Banner {@code h} Einheiten hoch, Zeichen für Zeichen gedreht wie die
+     * Kartenschrift: erst die Kontur aller Zeichen als acht versetzte Kopien, dann die Zeichen, so deckt keine Kontur ein
+     * Zeichen. Siehe docs/ebenen.md, „Banner“.
+     */
+    private static void bogenName(GuiGraphicsExtractor g, Font font, Zeichen z, double h) {
+        double[] lage = bogen(z.breiten(), radius(z.breiten(), h));
+        float m = (float) NAME_MASSSTAB;
+        double r = NAME_KONTUR / m;
+        Matrix3x2fStack pose = g.pose();
+        for (int k = 0; k <= 8; k++) {
+            // k 0 bis 7: die Kopien der Kontur rundum; 8: die Zeichen.
+            float dx = k < 8 ? (float) Formen.versatzX(k, r) : 0, dy = k < 8 ? (float) Formen.versatzY(k, r) : 0;
+            for (int i = 0; i < z.zeichen().length; i++) {
+                pose.pushMatrix();
+                pose.translate((float) lage[3 * i], (float) lage[3 * i + 1]);
+                pose.rotate((float) lage[3 * i + 2]);
+                pose.scale(m);
+                // Die Mitte des Zeichens auf dem Punkt, die Mitte der Grossbuchstaben auf dem Bogen.
+                pose.translate((float) (dx - z.breiten()[i] / m / 2), dy + Formen.KAPPE / 2 - Formen.GRUNDLINIE);
+                g.text(font, z.zeichen()[i], 0, 0, k < 8 ? KONTURFARBE : SCHRIFTFARBE, false);
+                pose.popMatrix();
+            }
+        }
     }
 
     /** Feld, Symbol und Rahmen der Nadel in ihrer Grösse, der Fuss im Ursprung. */
