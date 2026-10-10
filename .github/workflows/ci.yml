@@ -21,10 +21,49 @@ jobs:
       # Prüft auch, dass gradle-wrapper.jar ein Wrapper von Gradle ist.
       - uses: gradle/actions/setup-gradle@v6
 
-      # Die Gametests nur kompiliert: Laufen brauchen sie ein Fenster; so fällt ein Fehler im Code der Szenen schon hier auf.
+      # Die Gametests hier nur kompiliert, so fällt ein Fehler im Code der Szenen schon hier auf; laufen tun sie im Job Gametests.
       - name: Bauen und testen
         timeout-minutes: 20
         run: ./gradlew build compileGametestJava
+
+  # Die Gametests im Spiel, ohne und mit Sodium wie im Modpack. Siehe docs/entscheidungen/0017-gametests-in-der-ci-auch-mit-sodium.md.
+  gametests:
+    name: Gametests (${{ matrix.mods }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        mods: [ohne, sodium]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # Ein Fenster ohne Bildschirm: Xvfb, OpenGL in Software über Mesa.
+      - name: Xvfb und Mesa
+        timeout-minutes: 10
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri
+
+      # 24 Bit Farbtiefe; mit der Vorgabe von xvfb-run, 8 Bit, gibt es kein OpenGL.
+      - name: Gametests
+        timeout-minutes: 60
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" ./gradlew runClientGameTest ${{ matrix.mods == 'sodium' && '-Psodium' || '' }}
+
+      - name: Log und Bildschirmfotos
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gametests-${{ matrix.mods }}
+          path: |
+            build/run/clientGameTest/logs/
+            build/run/clientGameTest/screenshots/
+          if-no-files-found: ignore
 
   doku:
     name: Doku

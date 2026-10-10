@@ -612,7 +612,7 @@ Barrieren, zeichnen nichts.
 - **Geprüft** im Gametest `Blockentities`: Truhe, Tür, Schild und Kopf,
   gesetzt und abgebaut wie ein Spieler; die Minimap zeigt sie ohne
   weiteres Zutun, verglichen am Bild auf dem Schirm. Mit
-  `-Pzusatzmods=<ordner>` und Sodium darin auch mit Sodium, mit
+  `-Psodium` auch mit Sodium, so auch in der CI, mit
   `-Peula=<datei>` auch auf einem Server, mit dem der Client übers Netz
   spricht, siehe [Bauen und testen](entwicklung.md); ohne
   `ClientLevelMixin` ist er mit Sodium rot, im Einzelspieler wie auf dem
