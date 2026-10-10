@@ -12,6 +12,7 @@ import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -145,7 +146,10 @@ public final class Bilder implements FabricClientGameTest {
     /** Die Wegpunkte der eigenen Region in der Szene der Formen, rechts vom Spieler zwischen Kreis und Dreieck der Ebene. */
     private static final int[][] DREIECK = {{6, -2}, {12, -3}, {8, 1}};
 
-    /** Nadeln in drei Grössen, ein Banner und eine Kartenschrift; die Bilder holt der Mod von einem Server im Test. */
+    /**
+     * Nadeln in drei Grössen, ein Banner mit Bild, eins mit Entwurf und Krone ohne Bild, und eine Kartenschrift; Bilder
+     * und Sprites holt der Mod von einem Server im Test.
+     */
     private static final String ORTE = """
             {"v":1,"typ":"ebene","id":"test:orte","version":"1","teil":1,"teile":1,"objects":[
               {"type":"pin","id":"nordhafen","at":[0.5,0.5],"size":"large","name":"Nordhafen","color":"#3A6EA5",
@@ -153,6 +157,7 @@ public final class Bilder implements FabricClientGameTest {
               {"type":"pin","at":[-9,-7],"name":"Eichenfeld","symbol":{"medium":"images/anker-m.png"}},
               {"type":"pin","at":[9,9],"size":"small","name":"Furt"},
               {"type":"banner","id":"westmark","at":[10,-9],"name":"Westmark","image":"images/banner.png"},
+              {"type":"banner","id":"suedburg","at":[-20,12],"name":"Südburg","design":"suedreich","capital":true},
               {"type":"label","text":"Nordland","path":[[-14,-12],[14,-14]],"size":3,"outline":{"width":1}}
             ]}""";
 
@@ -166,7 +171,9 @@ public final class Bilder implements FabricClientGameTest {
      */
     private static void orte(ClientGameTestContext context, TestServerContext server) {
         HttpServer bilder = bilderServer(Map.of("anker.png", bild(16, 16, ANKER), "anker-m.png", bild(9, 9, ANKER), "banner.png",
-                bild(21, 40, BANNER)));
+                bild(21, 40, BANNER)), Map.of("orte/oben/satz.json", SATZ.getBytes(StandardCharsets.UTF_8),
+                "orte/oben/suedreich.png", bild(SPRITE_BREITE, SPRITE_HOEHE, OHNE_KRONE),
+                "orte/oben/krone/suedreich.png", bild(SPRITE_BREITE, SPRITE_HOEHE, MIT_KRONE)));
         try {
             context.runOnClient(mc -> {
                 Ebenen.INSTANZ.empfange(JsonParser.parseString("""
@@ -175,7 +182,7 @@ public final class Bilder implements FabricClientGameTest {
                 Symbole.INSTANZ.basis(JsonParser.parseString("{\"url\":\"http://127.0.0.1:" + bilder.getAddress().getPort() + "/tiles\"}")
                         .getAsJsonObject(), InetAddress.getLoopbackAddress());
                 Ebenen.Teil t = Ebenen.Teil.lies(ORTE);
-                if (t == null || t.nadeln().size() != 4) {
+                if (t == null || t.nadeln().size() != 5) {
                     throw new AssertionError("Teil der Orte nicht lesbar");
                 }
                 Ebenen.INSTANZ.teil(t);
@@ -204,6 +211,7 @@ public final class Bilder implements FabricClientGameTest {
             context.waitTicks(40);
             Path karte = context.takeScreenshot(TestScreenshotOptions.of("orte-karte").disableCounterPrefix());
             nameImBogen(context, karte);
+            spriteUmDenFuss(context, karte);
             gleichGrossAufZweiStufen(context, karte);
             // Die Option tauscht die Schriften ohne Neuladen; die gespeicherte Kartenschrift baut neu.
             int vorher = context.computeOnClient(mc -> Formen.generation);
@@ -392,6 +400,52 @@ public final class Bilder implements FabricClientGameTest {
         }
     }
 
+    /** Das Sprite von „Südburg“, 20 × 46 wie der Satz oben, mit dem Fuss nicht unten mittig; ohne Krone eine andere Farbe. */
+    private static final int SPRITE_BREITE = 20, SPRITE_HOEHE = 46, FUSS_X = 6, FUSS_Y = 40, OHNE_KRONE = 0xC03AC0, MIT_KRONE = 0x1FA88C;
+    private static final String SATZ = "{\"foot\":[" + FUSS_X + "," + FUSS_Y + "],\"angle\":0}";
+
+    /**
+     * Am Bildschirmfoto der Vollbildkarte: Das Sprite von „Südburg“ steht mit Krone, und seine linke obere Ecke liegt
+     * {@code foot} aus {@code satz.json} links über dem Ort, mal so viele Pixel des Schirms je Pixel, wie der Mod nimmt.
+     * Gesucht werden die Pixel in der Farbe des Sprites mit Krone um den Fuss. Siehe docs/ebenen.md, „Banner“.
+     */
+    private static void spriteUmDenFuss(ClientGameTestContext context, Path bild) {
+        int gs = context.computeOnClient(mc -> mc.getWindow().getGuiScale()), f = Ebenen.faktor(SPRITE_BREITE, SPRITE_HOEHE, gs);
+        float[] fuss = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).fuss(Ebenen.INSTANZ.nadeln("test:orte").stream()
+                .filter(o -> "suedburg".equals(o.id())).findFirst().orElseThrow()));
+        BufferedImage b;
+        try {
+            b = ImageIO.read(bild.toFile());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        int fx = Math.round(fuss[0] * gs), fy = Math.round(fuss[1] * gs), ohne = 0;
+        int links = Integer.MAX_VALUE, oben = Integer.MAX_VALUE, rechts = Integer.MIN_VALUE, unten = Integer.MIN_VALUE;
+        for (int y = Math.max(0, fy - 70 * gs); y <= Math.min(b.getHeight() - 1, fy + 40 * gs); y++) {
+            for (int x = Math.max(0, fx - 40 * gs); x <= Math.min(b.getWidth() - 1, fx + 40 * gs); x++) {
+                int rgb = b.getRGB(x, y) & 0xFFFFFF;
+                if (rgb == MIT_KRONE) {
+                    links = Math.min(links, x);
+                    oben = Math.min(oben, y);
+                    rechts = Math.max(rechts, x);
+                    unten = Math.max(unten, y);
+                } else if (rgb == OHNE_KRONE) {
+                    ohne++;
+                }
+            }
+        }
+        if (ohne > 0 || links == Integer.MAX_VALUE) {
+            throw new AssertionError("„Südburg“ steht nicht mit dem Sprite mit Krone: " + ohne + " Pixel ohne Krone, mit Krone "
+                    + (links == Integer.MAX_VALUE ? "keins" : "da"));
+        }
+        // Der gelbe Rand des Bilds deckt die äusserste Reihe; die Fläche beginnt einen Pixel des Sprites weiter innen.
+        int sollLinks = fx - FUSS_X * f + f, sollOben = fy - FUSS_Y * f + f;
+        if (Math.abs(links - sollLinks) > 1 || Math.abs(oben - sollOben) > 1) {
+            throw new AssertionError("Sprite nicht um seinen Fuss: links oben bei " + links + "," + oben + " statt " + sollLinks + "," + sollOben
+                    + " (Fuss " + fx + "," + fy + ", " + f + " Pixel je Pixel)");
+        }
+    }
+
     /** Die Antwort des Plugins auf die Frage nach der Tafel von „Nordhafen“. */
     private static final String TAFEL = """
             {"v":1,"typ":"tafel","ebene":"test:orte","version":"1","id":"nordhafen","panel":{"blocks":[
@@ -500,8 +554,23 @@ public final class Bilder implements FabricClientGameTest {
 
     /** Ein Server auf 127.0.0.1, der die Bilder unter /tiles/layers/test/images/ ausliefert. */
     private static HttpServer bilderServer(Map<String, byte[]> dateien) {
+        return bilderServer(dateien, Map.of());
+    }
+
+    /** Wie oben, dazu die Sprites der Banner und ihr {@code satz.json} unter {@code layers/test/banner/}, je Pfad dahinter. */
+    private static HttpServer bilderServer(Map<String, byte[]> dateien, Map<String, byte[]> banner) {
         try {
             HttpServer s = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+            s.createContext("/tiles/layers/test/banner/", austausch -> {
+                byte[] inhalt = banner.get(austausch.getRequestURI().getPath().substring("/tiles/layers/test/banner/".length()));
+                if (inhalt == null) {
+                    austausch.sendResponseHeaders(404, -1);
+                } else {
+                    austausch.sendResponseHeaders(200, inhalt.length);
+                    austausch.getResponseBody().write(inhalt);
+                }
+                austausch.close();
+            });
             s.createContext("/tiles/layers/test/images/", austausch -> {
                 String pfad = austausch.getRequestURI().getPath();
                 byte[] inhalt = dateien.get(pfad.substring(pfad.lastIndexOf('/') + 1));
