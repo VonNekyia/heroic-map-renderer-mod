@@ -461,6 +461,8 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   Knopf ×, Escape oder einem Klick daneben. Ein Klick in die Tafel und ein
   Zug, der in ihr beginnt, wirken nie auf die Karte. Escape schliesst die
   Karte, auch wenn eine Tafel steht.
+- **Keine Tafel,** solange der Spieler eine Form aus Wegpunkten baut, siehe
+  [Wegpunkte](wegpunkte.md), „Formen aus Wegpunkten“.
 - **Zu** geht sie auch von selbst, wenn ihr Objekt keine Tafel hat, und
   wenn ihre Ebene nicht mehr gezeichnet wird oder neue
   Daten hat. Dann öffnet dieses Objekt erst wieder, wenn der Zeiger ein
