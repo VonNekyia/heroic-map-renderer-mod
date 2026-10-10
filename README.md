@@ -19,12 +19,12 @@ bis 1,5 statt 3,0 bis 6,4 GiB RAM, dafür mit mehr Platz. Bei gleicher
 Fläche sind squaremap und Pl3xMap schneller, denn sie zeichnen ein Pixel
 je Block statt sechzehn.[^benchmark]
 
-![Zeit, RAM, Platz und Sekunden je Million Pixel von squaremap, Pl3xMap, Dynmap und Heroic auf Welten mit 3 000, 5 000 und 15 000 Blöcken Seitenlänge](https://raw.githubusercontent.com/VonNekyia/heroic-map-renderer/master/docs/bilder/benchmark.svg)
+![Zeit, RAM, Platz und Sekunden je Million Pixel von squaremap, Pl3xMap, Dynmap und Heroic auf Welten mit 3 000, 5 000 und 15 000 Blöcken Seitenlänge](https://raw.githubusercontent.com/VonNekyia/heroic-map-renderer/75411b668a0aea8ac5188de2b39cfcf9c366bf6b/docs/bilder/benchmark.svg)
 
 [^benchmark]: Gemessen am 10.10.2026 mit Heroic v0.3.0 als CLI und als
     Plugin 0.1.0, spätere Fassungen nicht. Aufbau, Messrechner und alle
     Zahlen in
-    [Benchmark gegen andere Karten](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/messungen/2026-10-10-benchmark-karten.md).
+    [Benchmark gegen andere Karten](https://github.com/VonNekyia/heroic-map-renderer/blob/75411b668a0aea8ac5188de2b39cfcf9c366bf6b/docs/messungen/2026-10-10-benchmark-karten.md).
 
 ## Stand
 
