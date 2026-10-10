@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.11
+
+- **Your own regions:** right-click on the full map, "Region from here", then "Region to here" marks a rectangle in a waypoint colour, saved per world like waypoints; right-click inside it to delete it.
+
 ## 0.2.10
 
 - **Banners and their names** no longer stay away when an image did not load at first: the mod asks again after a minute, up to three times per layer version.

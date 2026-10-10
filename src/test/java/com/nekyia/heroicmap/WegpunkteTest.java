@@ -52,6 +52,52 @@ class WegpunkteTest {
     }
 
     @Test
+    void regionenSetzenLoeschenBehalten(@TempDir Path ordner) {
+        Wegpunkte w = new Wegpunkte();
+        w.lies(ordner);
+        // Die Ecken in beliebiger Folge: ein Rechteck der Blöcke samt beiden Ecken.
+        w.setze(WELT, 10, -5, 2, 3);
+        assertEquals(List.of(new Wegpunkte.Region(WELT, 2, -5, 10, 3, 0, false)), w.regionen());
+        // Dieselbe Region noch einmal bleibt eine; ein Wegpunkt daneben bekommt die nächste Farbe.
+        w.setze(WELT, 2, 3, 10, -5);
+        w.setze(WELT, 0, 0);
+        assertEquals(1, w.regionen().size());
+        assertEquals(1, w.punkte().getFirst().farbe());
+        // Der Block in der Ecke gehört dazu, der daneben nicht; eine andere Dimension nie.
+        assertEquals(w.regionen().getFirst(), w.region(WELT, 10, 3));
+        assertEquals(null, w.region(WELT, 11, 3));
+        assertEquals(null, w.region("minecraft:the_nether", 5, 0));
+        // Überlappen zwei, gilt die zuletzt gesetzte.
+        w.setze(WELT, 4, 0, 6, 1);
+        assertEquals(new Wegpunkte.Region(WELT, 4, 0, 6, 1, 2, false), w.region(WELT, 5, 0));
+
+        Wegpunkte nachher = new Wegpunkte();
+        nachher.lies(ordner);
+        assertEquals(w.regionen(), nachher.regionen());
+        nachher.loesche(nachher.regionen().getFirst());
+        assertEquals(List.of(new Wegpunkte.Region(WELT, 4, 0, 6, 1, 2, false)), nachher.regionen());
+    }
+
+    @Test
+    void hoechstens256Regionen() {
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        for (int i = 0; i < Wegpunkte.MAX_REGIONEN + 5; i++) {
+            w.setze(WELT, i, 0, i, 0);
+        }
+        assertEquals(Wegpunkte.MAX_REGIONEN, w.regionen().size());
+        // Auch aus der Datei nicht mehr; kaputte Einträge fallen weg.
+        StringBuilder viele = new StringBuilder("{\"regionen\":[{\"dimension\":5},");
+        for (int i = 0; i < Wegpunkte.MAX_REGIONEN + 5; i++) {
+            viele.append(i == 0 ? "" : ",").append("{\"dimension\":\"").append(WELT).append("\",\"x0\":").append(i)
+                    .append(",\"z0\":0,\"x1\":").append(i).append(",\"z1\":0,\"farbe\":3,\"minimap\":false}");
+        }
+        Wegpunkte gelesen = new Wegpunkte();
+        gelesen.lies(JsonParser.parseString(viele.append("]}").toString()).getAsJsonObject());
+        assertEquals(Wegpunkte.MAX_REGIONEN, gelesen.regionen().size());
+    }
+
+    @Test
     void ohneOrdnerNurImSpeicher() {
         Wegpunkte w = new Wegpunkte();
         w.lies((Path) null);

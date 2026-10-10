@@ -20,9 +20,9 @@ import java.util.UUID;
 import org.slf4j.Logger;
 
 /**
- * Die Wegpunkte des Spielers und was er auf der Minimap angeheftet hat, Wegpunkte wie Mitspieler.
- * Je Welt in {@code wegpunkte.json} im Ordner der Welt; im Einzelspieler nur im Speicher.
- * Nur der Render-Thread liest und ändert sie. Siehe docs/wegpunkte.md.
+ * Die Wegpunkte und eigenen Regionen des Spielers und was er auf der Minimap angeheftet hat,
+ * Wegpunkte wie Mitspieler. Je Welt in {@code wegpunkte.json} im Ordner der Welt; im Einzelspieler
+ * nur im Speicher. Nur der Render-Thread liest und ändert sie. Siehe docs/wegpunkte.md.
  */
 final class Wegpunkte {
 
@@ -35,7 +35,22 @@ final class Wegpunkte {
     record Punkt(String dimension, int x, int z, int farbe, boolean angeheftet) {
     }
 
+    /**
+     * Eine eigene Region, das Rechteck der Blöcke von (x0, z0) bis (x1, z1) samt beiden, x0 ≤ x1 und
+     * z0 ≤ z1; {@code farbe} ist ein Index in {@link #FARBEN}. Siehe docs/wegpunkte.md, „Regionen“.
+     */
+    record Region(String dimension, int x0, int z0, int x1, int z1, int farbe, boolean angeheftet) {
+
+        boolean enthaelt(String d, int x, int z) {
+            return x >= x0 && x <= x1 && z >= z0 && z <= z1 && dimension.equals(d);
+        }
+    }
+
+    /** So viele eigene Regionen je Welt; darüber setzt der Mod keine neue. */
+    static final int MAX_REGIONEN = 256;
+
     private final List<Punkt> punkte = new ArrayList<>();
+    private final List<Region> regionen = new ArrayList<>();
     /** Die Mitspieler, die auf der Minimap angeheftet sind. */
     private final Set<UUID> spieler = new LinkedHashSet<>();
     /** Die Datei, oder null im Einzelspieler. */
@@ -87,6 +102,18 @@ final class Wegpunkte {
                 // Nur dieser Eintrag fällt weg.
             }
         }
+        for (JsonElement element : liste(json, "regionen")) {
+            try {
+                JsonObject o = element.getAsJsonObject();
+                Region r = region(o.get("dimension").getAsString(), o.get("x0").getAsInt(), o.get("z0").getAsInt(), o.get("x1").getAsInt(),
+                        o.get("z1").getAsInt(), Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length), o.get("minimap").getAsBoolean());
+                if (regionen.size() < MAX_REGIONEN && finde(r) < 0) {
+                    regionen.add(r);
+                }
+            } catch (RuntimeException kaputt) {
+                // Nur dieser Eintrag fällt weg.
+            }
+        }
         for (JsonElement element : liste(json, "spieler")) {
             try {
                 spieler.add(UUID.fromString(element.getAsString()));
@@ -111,16 +138,30 @@ final class Wegpunkte {
             o.addProperty("minimap", p.angeheftet());
             liste.add(o);
         }
+        JsonArray rechtecke = new JsonArray();
+        for (Region r : regionen) {
+            JsonObject o = new JsonObject();
+            o.addProperty("dimension", r.dimension());
+            o.addProperty("x0", r.x0());
+            o.addProperty("z0", r.z0());
+            o.addProperty("x1", r.x1());
+            o.addProperty("z1", r.z1());
+            o.addProperty("farbe", r.farbe());
+            o.addProperty("minimap", r.angeheftet());
+            rechtecke.add(o);
+        }
         JsonArray uuids = new JsonArray();
         spieler.forEach(u -> uuids.add(u.toString()));
         JsonObject json = new JsonObject();
         json.add("wegpunkte", liste);
+        json.add("regionen", rechtecke);
         json.add("spieler", uuids);
         return json;
     }
 
     void leeren() {
         punkte.clear();
+        regionen.clear();
         spieler.clear();
         datei = null;
         geladen = false;
@@ -138,13 +179,68 @@ final class Wegpunkte {
         }
     }
 
-    /** Die erste Farbe, die in der Dimension noch frei ist; sind alle vergeben, reihum. */
+    List<Region> regionen() {
+        return Collections.unmodifiableList(regionen);
+    }
+
+    /** Die oberste eigene Region, die den Block enthält, die zuletzt gesetzte; sonst null. */
+    Region region(String dimension, int x, int z) {
+        for (int i = regionen.size() - 1; i >= 0; i--) {
+            if (regionen.get(i).enthaelt(dimension, x, z)) {
+                return regionen.get(i);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Setzt eine Region über die Blöcke von (ax, az) bis (bx, bz) samt beiden, gleich in welcher Folge
+     * die Ecken kamen; gibt es sie schon oder schon {@link #MAX_REGIONEN}, bleibt es, wie es ist.
+     */
+    void setze(String dimension, int ax, int az, int bx, int bz) {
+        Region r = region(dimension, ax, az, bx, bz, farbe(dimension), false);
+        if (regionen.size() < MAX_REGIONEN && finde(r) < 0) {
+            regionen.add(r);
+            schreibe();
+        }
+    }
+
+    void loesche(Region r) {
+        int i = finde(r);
+        if (i >= 0) {
+            regionen.remove(i);
+            schreibe();
+        }
+    }
+
+    private static Region region(String dimension, int ax, int az, int bx, int bz, int farbe, boolean angeheftet) {
+        return new Region(dimension, Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), farbe, angeheftet);
+    }
+
+    /** Dieselbe Region heisst: dieselbe Dimension und dieselben Ecken; Farbe und Anheften zählen nicht. */
+    private int finde(Region r) {
+        for (int i = 0; i < regionen.size(); i++) {
+            Region q = regionen.get(i);
+            if (q.x0() == r.x0() && q.z0() == r.z0() && q.x1() == r.x1() && q.z1() == r.z1() && q.dimension().equals(r.dimension())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** Die erste Farbe, die in der Dimension unter Wegpunkten und Regionen noch frei ist; sind alle vergeben, reihum. */
     private int farbe(String dimension) {
         boolean[] belegt = new boolean[FARBEN.length];
         int anzahl = 0;
         for (Punkt p : punkte) {
             if (p.dimension().equals(dimension)) {
                 belegt[p.farbe()] = true;
+                anzahl++;
+            }
+        }
+        for (Region r : regionen) {
+            if (r.dimension().equals(dimension)) {
+                belegt[r.farbe()] = true;
                 anzahl++;
             }
         }
