@@ -362,9 +362,14 @@ final class Karte extends Screen {
             klickVerbraucht = true;
             return true;
         }
-        if (zeigen.gehalten() && zeigen.schliesse()) {
-            klickVerbraucht = true;
-            return true;
+        if (zeigen.gehalten()) {
+            // Nur eine sichtbare Tafel verbraucht den Klick; eine, die noch lädt oder keine ist, geht still zu.
+            boolean sichtbar = tafelKasten != null;
+            zeigen.schliesse();
+            if (sichtbar) {
+                klickVerbraucht = true;
+                return true;
+            }
         }
         if (super.mouseClicked(e, doppelt)) {
             return true;
@@ -402,7 +407,9 @@ final class Karte extends Screen {
         if (m == null && e.button() == InputConstants.MOUSE_BUTTON_LEFT && gezogen <= ZUG && ziel == null && blick != null
                 && !drin(tafelKasten, e.x(), e.y())) {
             Tafeln.Ziel z = tafelUnter(e.x(), e.y());
-            if (z != null) {
+            // Halten nur, wenn eine Tafel da ist oder noch kommt; die Frage geht dabei schon hinaus.
+            Optional<Tafel> t = z == null ? Optional.empty() : Tafeln.INSTANZ.tafel(z);
+            if (t == null || t.isPresent()) {
                 zeigen.halte(z);
                 return true;
             }
@@ -627,7 +634,7 @@ final class Karte extends Screen {
     @Override
     public boolean keyPressed(KeyEvent ereignis) {
         // Escape schliesst zuerst nur die Tafel.
-        if (ereignis.key() == InputConstants.KEY_ESCAPE && zeigen.schliesse()) {
+        if (ereignis.key() == InputConstants.KEY_ESCAPE && tafelKasten != null && zeigen.schliesse()) {
             return true;
         }
         if (HeroicMap.karte != null && HeroicMap.karte.matches(ereignis)) {
