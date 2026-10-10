@@ -4,6 +4,11 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.26
+
+- **The arrow sits centred above your head** on the minimap and the full map; before, it stood about half a head pixel to the right.
+- **Choose how you show:** under "Settings …" a switch "Player" picks head with arrow, the arrow alone, or the head half see-through with arrow.
+
 ## 0.2.25
 
 - **Banners of secret layers:** layers only some players may see now show their banners too; the mod asks the server for each banner it draws, and only players allowed to see the layer get them.
