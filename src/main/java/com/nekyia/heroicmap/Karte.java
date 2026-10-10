@@ -120,9 +120,11 @@ final class Karte extends Screen {
 
     /** Ist die Lage beim Öffnen gestellt? {@code init} läuft bei jeder Grösse des Fensters und nach jedem Untermenü neu. */
     private boolean gestellt;
-    /** Die erste Ecke einer Region, die der Spieler gerade setzt, und ihre Dimension; sonst null. */
-    private int[] regionVon;
-    private String regionDimension;
+    /** Die Wegpunkte einer Form, die der Spieler gerade baut, als ids in Reihenfolge, und ihre Dimension; sonst null. */
+    private List<Integer> zug;
+    private String zugDimension;
+    /** Die eigene Form unter dem letzten Klick ohne Marke; ein Doppelklick darauf heftet sie an. */
+    private Wegpunkte.EigeneForm letzteEigene;
 
     /** {@code satz} ist null, wenn für diese Dimension nichts geladen ist. */
     Karte(Satz satz) {
@@ -218,8 +220,8 @@ final class Karte extends Screen {
         if (hinweis != null) {
             g.text(font, hinweis, 4, height - 24, TEXT);
         }
-        if (regionVon != null) {
-            g.text(font, Component.translatable("heroicmap.karte.region_hinweis"), 4, height - (hinweis != null ? 36 : 24), TEXT);
+        if (zug != null) {
+            g.text(font, Component.translatable("heroicmap.karte.form_hinweis"), 4, height - (hinweis != null ? 36 : 24), TEXT);
         }
         // Höchstens ein Abgleich je Tag: Nach einer Ablehnung mit wieder ist der Knopf bis dahin aus.
         if (abgleich != null) {
@@ -281,7 +283,7 @@ final class Karte extends Screen {
         String dimension = spieler.level().dimension().identifier().toString();
         int bunt = Mth.hsvToArgb((System.currentTimeMillis() % BUNT_MS) / (float) BUNT_MS, 1f, 1f, 255);
         nadeln(g, dimension, bunt);
-        // Eine eigene Region steht wie ein Wegpunkt als Raute in ihrer Mitte. Siehe docs/wegpunkte.md, „Regionen“.
+        // Ein altes Rechteck steht wie ein Wegpunkt als Raute in seiner Mitte. Siehe docs/wegpunkte.md, „Regionen“.
         for (Wegpunkte.Region r : Wegpunkte.INSTANZ.regionen()) {
             if (r.dimension().equals(dimension)) {
                 Marke m = marke((r.x0() + r.x1() + 1) / 2.0, (r.z0() + r.z1() + 1) / 2.0, null, null, r);
@@ -423,9 +425,9 @@ final class Karte extends Screen {
         return ziel;
     }
 
-    /** Die erste Ecke der Region, die der Spieler gerade setzt, oder null. */
-    int[] regionVon() {
-        return regionVon;
+    /** Für den Gametest: die ids der Form im Bau, oder null. */
+    List<Integer> zug() {
+        return zug == null ? null : List.copyOf(zug);
     }
 
     Satz satz() {
@@ -441,18 +443,19 @@ final class Karte extends Screen {
     }
 
     /**
-     * Die eigenen Regionen dieser Dimension: die Fläche in ihrer Farbe zu 25 %, 1 Einheit Rand deckend,
-     * angeheftet {@link Wegpunkte#BREITER} breiter, auf ganzen Pixeln wie die Kacheln; dazu die Vorschau,
-     * solange der Spieler eine setzt, gestrichelt von der ersten Ecke bis zum Block unter der Maus.
-     * Siehe docs/wegpunkte.md, „Regionen“.
+     * Die eigenen Rechtecke dieser Dimension: die Fläche in ihrer Farbe zu 25 %, 1 Einheit Rand deckend,
+     * angeheftet {@link Wegpunkte#BREITER} breiter, auf ganzen Pixeln wie die Kacheln; dazu die Vorschau
+     * einer Form, die der Spieler baut, gepunktet von Wegpunkt zu Wegpunkt und vom letzten zur Maus.
+     * Siehe docs/wegpunkte.md, „Regionen“,
+     * und docs/wegpunkte.md, „Formen aus Wegpunkten“.
      */
     private void regionen(GuiGraphicsExtractor g, int mausX, int mausY) {
         if (minecraft.player == null) {
             return;
         }
         String dimension = minecraft.player.level().dimension().identifier().toString();
-        if (regionVon != null && !dimension.equals(regionDimension)) {
-            regionVon = null;
+        if (zug != null && !dimension.equals(zugDimension)) {
+            zug = null;
         }
         int gs = minecraft.getWindow().getGuiScale();
         g.pose().pushMatrix();
@@ -468,23 +471,90 @@ final class Karte extends Screen {
                 g.fill(k[2] - b, k[1], k[2], k[3], farbe);
             }
         }
-        if (regionVon != null) {
-            int[] b = block(mausX, mausY);
-            int[] k = kasten(Math.min(regionVon[0], b[0]), Math.min(regionVon[1], b[1]), Math.max(regionVon[0], b[0]),
-                    Math.max(regionVon[1], b[1]), gs);
-            if (k != null) {
-                // Striche von 4 Einheiten mit 2 Lücke, in Weiss, das auf jeder Karte zu sehen ist.
-                for (int x = k[0]; x < k[2]; x += 6 * gs) {
-                    g.fill(x, k[1], Math.min(x + 4 * gs, k[2]), k[1] + gs, VORSCHAU);
-                    g.fill(x, k[3] - gs, Math.min(x + 4 * gs, k[2]), k[3], VORSCHAU);
+        g.pose().popMatrix();
+        if (zug != null) {
+            // Punkte alle 3 Einheiten, in Weiss, das auf jeder Karte zu sehen ist; zuletzt bis zur Maus.
+            float[] vorher = null;
+            for (int id : zug) {
+                Wegpunkte.Punkt p = Wegpunkte.INSTANZ.punkt(id);
+                float[] jetzt = p == null ? null : schirm(p.x() + 0.5, p.z() + 0.5);
+                if (vorher != null && jetzt != null) {
+                    gepunktet(g, vorher, jetzt);
                 }
-                for (int y = k[1]; y < k[3]; y += 6 * gs) {
-                    g.fill(k[0], y, k[0] + gs, Math.min(y + 4 * gs, k[3]), VORSCHAU);
-                    g.fill(k[2] - gs, y, k[2], Math.min(y + 4 * gs, k[3]), VORSCHAU);
-                }
+                vorher = jetzt != null ? jetzt : vorher;
+            }
+            if (vorher != null) {
+                gepunktet(g, vorher, new float[] {mausX, mausY});
             }
         }
-        g.pose().popMatrix();
+    }
+
+    /** Der Ort (x, z) der Welt auf dem Schirm, in Einheiten des GUI. */
+    private float[] schirm(double x, double z) {
+        return new float[] {(float) blick.rasterX(Projektion.zuPixel(x, satz.scale()), width),
+            (float) blick.rasterY(Projektion.zuPixel(z, satz.scale()), height)};
+    }
+
+    /** Eine gepunktete Linie von a nach b, ein Punkt von einer Einheit alle 3 Einheiten. */
+    private static void gepunktet(GuiGraphicsExtractor g, float[] a, float[] b) {
+        double laenge = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        for (double t = 0; t <= laenge; t += 3) {
+            int x = Math.round(a[0] + (float) ((b[0] - a[0]) * t / Math.max(laenge, 1e-9)));
+            int y = Math.round(a[1] + (float) ((b[1] - a[1]) * t / Math.max(laenge, 1e-9)));
+            g.fill(x, y, x + 1, y + 1, VORSCHAU);
+        }
+    }
+
+    /**
+     * Fügt den Wegpunkt der Form im Bau an, die damit beginnt, wenn keine im Bau ist. Der erste Punkt
+     * schliesst bei drei und mehr zur Region; ein Punkt einer anderen Dimension, einer, der schon dabei
+     * ist, oder einer über {@link Wegpunkte#MAX_PUNKTE_FORM} kommt nicht dazu.
+     */
+    private void hinzu(Wegpunkte.Punkt p) {
+        if (zug == null) {
+            zug = new ArrayList<>();
+            zugDimension = p.dimension();
+        }
+        if (!p.dimension().equals(zugDimension)) {
+            return;
+        }
+        if (zug.size() >= 3 && zug.getFirst() == p.id()) {
+            fertig();
+        } else if (!zug.contains(p.id()) && zug.size() < Wegpunkte.MAX_PUNKTE_FORM) {
+            zug.add(p.id());
+        }
+    }
+
+    /** Speichert die Form im Bau: zwei Punkte eine Linie, drei und mehr eine Region; sagt es, wenn keine mehr passt. */
+    private void fertig() {
+        if (zug != null && zug.size() >= 2 && !Wegpunkte.INSTANZ.setzeForm(zug)) {
+            hinweis = Component.translatable("heroicmap.karte.formen_voll", Wegpunkte.MAX_EIGENE_FORMEN);
+        }
+        zug = null;
+    }
+
+    /** Die oberste eigene Form dieser Dimension unter (mx, my): in einer Region, oder höchstens 3 Einheiten neben einer Linie. */
+    private Wegpunkte.EigeneForm eigeneUnter(double mx, double my) {
+        if (minecraft.player == null || satz == null || blick == null) {
+            return null;
+        }
+        String dimension = minecraft.player.level().dimension().identifier().toString();
+        int scale = satz.scale();
+        double wx = blick.basisRasterX(mx, width) / scale, wz = blick.basisRasterZ(my, height) / scale;
+        // So viele Blöcke sind 3 Einheiten des GUI auf dieser Stufe.
+        double nah = 3 / (blick.rasterX(Projektion.zuPixel(1, scale), width) - blick.rasterX(0, width));
+        List<Wegpunkte.EigeneForm> alle = Wegpunkte.INSTANZ.eigeneFormen();
+        for (int i = alle.size() - 1; i >= 0; i--) {
+            Wegpunkte.EigeneForm f = alle.get(i);
+            Ebenen.Form form = Wegpunkte.INSTANZ.form(f);
+            if (form == null || !dimension.equals(form.dimension())) {
+                continue;
+            }
+            if (form instanceof Ebenen.Linie l ? Tafeln.abstand(l.punkte(), wx, wz) <= nah : Tafeln.trifft(form, wx, wz)) {
+                return f;
+            }
+        }
+        return null;
     }
 
     /**
@@ -514,7 +584,7 @@ final class Karte extends Screen {
      * Rechtsklick öffnet das Menü: „Hierher teleportieren“,
      * nur mit execute und tp im Befehlsbaum und nicht unter einer Decke, sonst landete man auf dem
      * Dach; darunter „Wegpunkt setzen“, auf einem Wegpunkt „Wegpunkt löschen“. Erst ein Klick auf
-     * einen Eintrag tut etwas. Nach „Region von hier“ setzt ein Linksklick ohne Zug die zweite Ecke. Siehe docs/vollbildkarte.md, „Bedienung“;
+     * einen Eintrag tut etwas. Solange eine Form im Bau ist, fügt ein Linksklick ohne Zug auf einen Wegpunkt ihn an. Siehe docs/vollbildkarte.md, „Bedienung“;
      * Marken: siehe docs/wegpunkte.md, „Bedienung“.
      */
     @Override
@@ -522,8 +592,10 @@ final class Karte extends Screen {
         // Jeder Klick, der true gibt, zählt für den nächsten Doppelklick; gemerkt bleibt nur ein Klick auf eine Marke oder ein Ziel mit id.
         Marke vorige = letzte;
         Tafeln.Ziel voriges = letztesZiel;
+        Wegpunkte.EigeneForm vorigeEigene = letzteEigene;
         letzte = null;
         letztesZiel = null;
+        letzteEigene = null;
         gedrueckt = null;
         taste = e.button() == InputConstants.MOUSE_BUTTON_LEFT;
         gezogen = 0;
@@ -553,6 +625,12 @@ final class Karte extends Screen {
             } else {
                 anheften(Wegpunkte.INSTANZ.umschalten(voriges.ebene(), voriges.id()), "heroicmap.karte.angeheftet_voll", Wegpunkte.MAX_ANGEHEFTET);
             }
+            klickVerbraucht = true;
+            return true;
+        }
+        // Ebenso auf eine eigene Form aus Wegpunkten. Siehe docs/wegpunkte.md, „Formen aus Wegpunkten“.
+        if (doppelt && vorigeEigene != null && taste && getChildAt(e.x(), e.y()).isEmpty() && vorigeEigene.equals(eigeneUnter(e.x(), e.y()))) {
+            anheften(Wegpunkte.INSTANZ.umschalten(vorigeEigene), "heroicmap.karte.angeheftet_voll", Wegpunkte.MAX_ANGEHEFTET);
             klickVerbraucht = true;
             return true;
         }
@@ -599,18 +677,16 @@ final class Karte extends Screen {
             haengt = null;
             return true;
         }
-        // Solange die Vorschau läuft, setzt ein Linksklick ohne Zug die zweite Ecke, auch auf einer Marke; ziehen verschiebt weiter.
-        if (regionVon != null && e.button() == InputConstants.MOUSE_BUTTON_LEFT && gezogen <= ZUG && blick != null
-                && !drin(tafelKasten, e.x(), e.y())) {
-            int[] b = block(e.x(), e.y());
-            Wegpunkte.INSTANZ.setze(regionDimension, regionVon[0], regionVon[1], b[0], b[1]);
-            regionVon = null;
+        // Solange eine Form im Bau ist, fügt ein Linksklick ohne Zug auf einen Wegpunkt ihn an, statt ihn zu zentrieren.
+        if (zug != null && m != null && m.punkt() != null && e.button() == InputConstants.MOUSE_BUTTON_LEFT && gezogen <= ZUG && !doppelklick) {
+            hinzu(m.punkt());
             return true;
         }
         // Ein Klick ohne Zug auf ein Ziel ohne Marke merkt es für einen Doppelklick; eine Tafel hält er nicht.
         if (m == null && e.button() == InputConstants.MOUSE_BUTTON_LEFT && gezogen <= ZUG && ziel == null && blick != null
                 && !drin(tafelKasten, e.x(), e.y())) {
             letztesZiel = tafelUnter(e.x(), e.y());
+            letzteEigene = letztesZiel == null ? eigeneUnter(e.x(), e.y()) : null;
         }
         if (m == null || e.button() != InputConstants.MOUSE_BUTTON_LEFT) {
             return knopf;
@@ -856,25 +932,25 @@ final class Karte extends Screen {
                 onClose();
             }));
         }
-        if (regionVon != null) {
-            // Die zweite Ecke: Erst ein Klick auf den Eintrag setzt die Region, Escape bricht ab.
-            int[] von = regionVon;
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_bis"), () -> {
-                Wegpunkte.INSTANZ.setze(dimension, von[0], von[1], z[0], z[1]);
-                regionVon = null;
-            }));
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_abbrechen"), () -> regionVon = null));
-        } else {
-            neu.add(punkt != null
-                    ? new Eintrag(Component.translatable("heroicmap.karte.wegpunkt_loeschen"), () -> Wegpunkte.INSTANZ.loesche(punkt))
-                    : new Eintrag(Component.translatable("heroicmap.karte.wegpunkt"), () -> Wegpunkte.INSTANZ.setze(dimension, z[0], z[1])));
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_von"), () -> {
-                regionVon = z;
-                regionDimension = dimension;
-            }));
-            if (region != null) {
-                neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_loeschen"), () -> Wegpunkte.INSTANZ.loesche(region)));
+        neu.add(punkt != null
+                ? new Eintrag(Component.translatable("heroicmap.karte.wegpunkt_loeschen"), () -> Wegpunkte.INSTANZ.loesche(punkt))
+                : new Eintrag(Component.translatable("heroicmap.karte.wegpunkt"), () -> Wegpunkte.INSTANZ.setze(dimension, z[0], z[1])));
+        // Formen aus Wegpunkten: „Punkt hinzufügen“ auf einem Wegpunkt; solange eine im Bau ist, „Form fertig“ und „Form abbrechen“.
+        if (punkt != null) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.punkt_hinzu"), () -> hinzu(punkt)));
+        }
+        if (zug != null) {
+            if (zug.size() >= 2) {
+                neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_fertig"), this::fertig));
             }
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_abbrechen"), () -> zug = null));
+        }
+        Wegpunkte.EigeneForm eigen = punkt == null ? eigeneUnter(x, y) : null;
+        if (eigen != null) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_loeschen"), () -> Wegpunkte.INSTANZ.loesche(eigen)));
+        }
+        if (region != null) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_loeschen"), () -> Wegpunkte.INSTANZ.loesche(region)));
         }
         ziel = z;
         eintraege = neu;
@@ -946,8 +1022,8 @@ final class Karte extends Screen {
             return true;
         }
         // Escape bricht dann eine Region ab, die der Spieler setzt.
-        if (ereignis.key() == InputConstants.KEY_ESCAPE && regionVon != null) {
-            regionVon = null;
+        if (ereignis.key() == InputConstants.KEY_ESCAPE && zug != null) {
+            zug = null;
             return true;
         }
         if (HeroicMap.karte != null && HeroicMap.karte.matches(ereignis)) {

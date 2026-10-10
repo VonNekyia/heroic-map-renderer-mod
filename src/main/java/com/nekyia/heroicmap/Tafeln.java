@@ -151,6 +151,17 @@ final class Tafeln {
      * Liegt der Punkt (x, z) der Welt in der Fläche, nach gerade/ungerade über alle Ringe, oder im
      * Kreis? Linien und Schrift haben keine Tafel.
      */
+    /** Der kleinste Abstand von (x, z) zu einem Stück des Zugs {x0, z0, …}, in Blöcken. */
+    static double abstand(double[] p, double x, double z) {
+        double best = Double.POSITIVE_INFINITY;
+        for (int i = 0; i + 3 < p.length; i += 2) {
+            double ax = p[i], az = p[i + 1], dx = p[i + 2] - ax, dz = p[i + 3] - az, l = dx * dx + dz * dz;
+            double t = l == 0 ? 0 : Math.clamp(((x - ax) * dx + (z - az) * dz) / l, 0, 1);
+            best = Math.min(best, Math.hypot(x - ax - t * dx, z - az - t * dz));
+        }
+        return best;
+    }
+
     static boolean trifft(Ebenen.Form f, double x, double z) {
         return switch (f) {
             case Ebenen.Kreis k -> Math.hypot(x - k.x(), z - k.z()) <= k.radius();
