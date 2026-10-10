@@ -270,31 +270,38 @@ class DrehungTest {
     }
 
     @Test
-    void verzierungenDrehenStarrMit() {
+    void markenInBeidenModiOhneZier() {
         Minimap.Rahmen r = new Minimap.Rahmen(10, 20, 128);
-        double[][] diagonalen = {{-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
-        // Ungedreht treffen die Diagonalen die Ecken wie Skin.ecken, eckig wie rund.
-        Drehung.Lage ungedreht = Drehung.Lage.von(0, 0, 0, 0, 0);
+        // Ungedreht: vier Marken fest rechts, unten, links und oben auf der Mitte der Bänder, N zuletzt; sonst nichts, keine zier.
         for (boolean rund : new boolean[] {false, true}) {
-            double[][] ecken = Skin.ecken(10, 20, 128, 128, 2, rund);
-            for (int e = 0; e < 4; e++) {
-                double[] p = Minimap.verzierung(r, 2, rund, ungedreht, diagonalen[e], 2);
-                assertEquals(ecken[e][0], p[0], 0.25, "x " + e);
-                assertEquals(ecken[e][1], p[1], 0.25, "y " + e);
-            }
+            assertEquals(List.of(new Minimap.Ornament(Skin.MARKE_QUER, 0, 137, 84, 0), new Minimap.Ornament(Skin.MARKE, 0, 74, 147, 0),
+                    new Minimap.Ornament(Skin.MARKE_QUER, 0, 11, 84, 0), new Minimap.Ornament(Skin.NORDEN, 0, 74, 21, 0)),
+                    Minimap.ornamente(r, 2, rund, null, 2, true, -1, false), "rund " + rund);
         }
-        // Um 30° gedreht: rund auf dem Kreis durch die Mitte der Bänder, bei 45° + 30°; das Bild dreht um denselben Winkel.
+        // Um 30° gedreht: dieselben vier, starr mit der Karte, das Bild um denselben Winkel, die Mitte auf ganzen Pixeln.
         Drehung.Lage lage = Drehung.Lage.von(Math.toRadians(30), 0, 0, 0, 0);
         assertEquals(Math.toRadians(30), lage.winkel(), 1e-12);
-        double[] p = Minimap.verzierung(r, 2, true, lage, diagonalen[3], 3);
-        assertEquals(63, Math.hypot(p[0] - 74, p[1] - 84), 0.5);
-        assertEquals(Math.toRadians(75), Math.atan2(p[1] - 84, p[0] - 74), 0.01);
-        // Die Mitte auf ganzen Pixeln, hier bei GUI-Massstab 3.
-        assertEquals(Math.round(p[0] * 3), p[0] * 3, 1e-9);
-        assertEquals(Math.round(p[1] * 3), p[1] * 3, 1e-9);
+        List<Minimap.Ornament> rund = Minimap.ornamente(r, 2, true, lage, 3, true, -1, false);
+        assertEquals(4, rund.size());
+        Minimap.Ornament n = rund.get(3);
+        assertEquals(Skin.NORDEN, n.teil());
+        assertEquals(Math.toRadians(30), n.winkel(), 1e-12);
+        assertEquals(63, Math.hypot(n.x() - 74, n.y() - 84), 0.5);
+        assertEquals(Math.toRadians(-90 + 30), Math.atan2(n.y() - 84, n.x() - 74), 0.01);
+        assertEquals(Math.round(n.x() * 3), n.x() * 3, 1e-9);
+        assertEquals(Math.round(n.y() * 3), n.y() * 3, 1e-9);
         // Eckig auf dem Quadrat durch die Mitte der Bänder.
-        double[] q = Minimap.verzierung(r, 2, false, lage, diagonalen[3], 1);
-        assertEquals(63, Math.max(Math.abs(q[0] - 74), Math.abs(q[1] - 84)), 0.5);
+        for (Minimap.Ornament o : Minimap.ornamente(r, 2, false, lage, 1, true, -1, false)) {
+            assertEquals(63, Math.max(Math.abs(o.x() - 74), Math.abs(o.y() - 84)), 0.5);
+        }
+        // Aus: nichts. Im Menü steht der Griff zuletzt an seiner Ecke, aktiv, nie gedreht; die Marken als _aktiv.
+        assertEquals(List.of(), Minimap.ornamente(r, 2, false, null, 2, false, -1, false));
+        double[] ecke = Skin.ecken(10, 20, 128, 128, 2, false)[3];
+        assertEquals(List.of(new Minimap.Ornament(Skin.GRIFF + 1, 3, ecke[0], ecke[1], 0)), Minimap.ornamente(r, 2, false, lage, 2, false, 3, true));
+        List<Minimap.Ornament> menue = Minimap.ornamente(r, 2, false, null, 2, true, 3, false);
+        assertEquals(5, menue.size());
+        assertEquals(Skin.NORDEN + 1, menue.get(3).teil());
+        assertEquals(new Minimap.Ornament(Skin.GRIFF, 3, ecke[0], ecke[1], 0), menue.get(4));
     }
 
     @Test

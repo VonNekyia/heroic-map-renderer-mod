@@ -48,19 +48,21 @@ class SkinTest {
         assertEquals(baender.keySet(), Set.copyOf(Skin.ORDNER));
         int biomRand = 0;
         for (String name : Skin.ORDNER) {
-            // Wie Skin.laden: die längste Seite der Verzierungen, zier und Marken.
+            // Wie Skin.laden: die längste Seite der Marken.
             int groesste = 0;
-            for (String teil : List.of("zier", "norden", "marke", "marke_quer")) {
+            for (String teil : List.of("norden", "marke", "marke_quer")) {
                 BufferedImage b = bild(name, teil);
                 groesste = Math.max(groesste, Math.max(b.getWidth(), b.getHeight()));
             }
             Skin s = Skin.lies(name, text(name, "palette.txt"), text(name, "info.txt"), groesste);
             assertEquals(baender.get(name), s.baender(), name);
-            for (String teil : List.of("zier", "zier_aktiv", "griff", "griff_aktiv", "norden", "norden_aktiv", "marke", "marke_aktiv",
-                    "marke_quer", "marke_quer_aktiv")) {
+            for (String teil : List.of("griff", "griff_aktiv", "norden", "norden_aktiv", "marke", "marke_aktiv", "marke_quer",
+                    "marke_quer_aktiv")) {
                 assertNotNull(bild(name, teil), name + "/" + teil);
             }
-            // Mit Rahmen hält die Minimap so viel Abstand, dass jede Verzierung in jeder Drehung ganz auf dem
+            // Die zier gibt es nicht mehr, auch nicht im Jar.
+            assertNull(bild(name, "zier"), name);
+            // Mit Rahmen hält die Minimap so viel Abstand, dass jede Marke in jeder Drehung ganz auf dem
             // Schirm bleibt, auch ihr Schatten um (+1, +1): Ihre Mitte liegt auf der Mitte der Bänder.
             int rand = Minimap.rand(s);
             biomRand = name.startsWith(Skin.BIOM + "/") ? Math.max(biomRand, rand) : biomRand;
@@ -172,14 +174,14 @@ class SkinTest {
 
     @Test
     void spiegelnJeEcke() {
-        // zier ist für oben links gezeichnet, griff für unten rechts; Ecken 0 oben links bis 3 unten rechts.
-        boolean[][] zier = {{false, false}, {true, false}, {false, true}, {true, true}};
+        // griff ist für unten rechts gezeichnet; Ecken 0 oben links bis 3 unten rechts. Die Marken, Ecke 0, nie.
+        boolean[][] griff = {{true, true}, {false, true}, {true, false}, {false, false}};
         for (int e = 0; e < 4; e++) {
-            assertEquals(zier[e][0], Skin.spiegeltX(e, false), "zier " + e);
-            assertEquals(zier[e][1], Skin.spiegeltY(e, false), "zier " + e);
-            assertEquals(!zier[e][0], Skin.spiegeltX(e, true), "griff " + e);
-            assertEquals(!zier[e][1], Skin.spiegeltY(e, true), "griff " + e);
+            assertEquals(griff[e][0], Skin.spiegeltX(e, true), "griff " + e);
+            assertEquals(griff[e][1], Skin.spiegeltY(e, true), "griff " + e);
         }
+        assertFalse(Skin.spiegeltX(0, false));
+        assertFalse(Skin.spiegeltY(0, false));
     }
 
     @Test

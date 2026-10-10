@@ -639,7 +639,7 @@ public final class Bilder implements FabricClientGameTest {
                 }
             }
         }
-        // Das Menü mit „uhr“: an der Ecke zur Mitte der Griff statt der zier, ohne den weissen Umriss.
+        // Das Menü mit „uhr“: an der Ecke zur Mitte der Griff, ohne den weissen Umriss.
         context.runOnClient(mc -> {
             Minimap.INSTANZ.setzeSkin("uhr");
             Minimap.INSTANZ.setzeRund(false);
@@ -695,7 +695,7 @@ public final class Bilder implements FabricClientGameTest {
 
     /**
      * Die drehende Minimap bei Gier 30, mit Chunklinien: eckig ohne Rahmen, rund mit „uhr“, eckig mit
-     * „kompass“, die Verzierungen gedreht, zuletzt „kompass“ ohne Verzierungen, nebeneinander. Siehe
+     * „kompass“, die Marken gedreht, zuletzt „kompass“ ohne Marken, nebeneinander. Siehe
      * docs/minimap.md, „Drehen“.
      */
     private static void drehen(ClientGameTestContext context, TestServerContext server) {

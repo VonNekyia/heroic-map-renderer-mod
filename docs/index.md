@@ -18,7 +18,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [Ebenen](ebenen.md): Ebenen vom Plugin empfangen, in Teilen je `version`, ihre Nadeln als Wappenschild mit Symbol und Namen, ihre Banner und ihre Flächen, Kreise, Linien und Kartenschrift auf Minimap und Vollbildkarte zeichnen, Grenzen und Kosten, und je Ebene im Menü umschalten.
 - [Wegpunkte](wegpunkte.md): Wegpunkte setzen und löschen, eigene Linien und Regionen aus Wegpunkten, Marken am Rand der Vollbildkarte, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen und Kreise vom Server, Grösse der Köpfe und Ablage in `wegpunkte.json`.
 - [Selbst gezeichnete Karte](selbst.md): die Wahl „Selbst“, wie der Mod die geladenen Chunks in eine eigene Karte zeichnet, Wahl und Beenden, wann gezeichnet wird, Kacheln als PNG und Pyramide.
-- [Rahmen](rahmen.md): die Rahmen der Minimap als umschaltbare Skins, die Vorgabe „biom“ nach dem Biom unter dem Spieler, Dateien und Quellen, Bänder eckig und rund, Ornamente und Griff im Menü, Verzierungen, die beim Drehen mitdrehen, und ihr Schalter, Abstand zum Rand.
+- [Rahmen](rahmen.md): die Rahmen der Minimap als umschaltbare Skins, die Vorgabe „biom“ nach dem Biom unter dem Spieler, Dateien und Quellen, Bänder eckig und rund, die Marken N, O, S, W, genordet fest und gedreht mitdrehend, ihr Schalter, der Griff im Menü, Abstand zum Rand.
 - [Minimap](minimap.md): Bedienung mit Untermenü „Einstellungen …“, Chunklinien, Drehen mit der Blickrichtung, Bewegung zwischen zwei Ticks, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, Neu zeichnen im Worker, Kosten, Bilder und was anders ist als `top-north`.
 
 ## Entwicklung
@@ -38,7 +38,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [0009](entscheidungen/0009-formen-als-trapeze.md): Füllungen als Trapeze statt Blöcken, ein Budget an Ecken je Neubau statt an Zeit je Frame.
 - [0010](entscheidungen/0010-tafel-200-einheiten.md): Die Infotafel im Mod höchstens 200 Einheiten breit mit 6 Rand, nicht 320 wie auf der Webkarte.
 - [0011](entscheidungen/0011-modrinth-mit-curl.md): Releases per Workflow mit curl auf Modrinth, ohne fremde Action mit dem Token.
-- [0012](entscheidungen/0012-verzierungen-drehen-mit.md): zier und Marken des Rahmens drehen mit der Minimap starr mit, ein Schalter stellt sie ab, der Abstand zum Rand mit der halben Diagonale; löst 0005 in den Marken ab.
+- [0012](entscheidungen/0012-marken-statt-verzierungen.md): Der Rahmen zeigt nur die Marken N, O, S, W, genordet fest, gedreht starr mitdrehend, ohne zier; ein Schalter stellt sie ab, der Abstand zum Rand mit der halben Diagonale; löst 0005 in Ornamenten und Marken ab.
 - [0013](entscheidungen/0013-groesse-als-anteil-des-schirms.md): Die Seite der Minimap als Anteil der kürzeren Seite des Schirms, sie folgt dem Fenster; alte Einstellungen ohne Sprung.
 
 ## Messungen

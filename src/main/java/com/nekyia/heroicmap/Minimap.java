@@ -14,6 +14,7 @@ import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -66,8 +67,6 @@ public final class Minimap {
     /** Norden, Osten, Süden, Westen als Richtung im Bild, x nach Osten, y nach Süden; gezeichnet in der Reihenfolge MARKEN, N zuletzt. */
     private static final double[][] RICHTUNGEN = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
     private static final int[] MARKEN = {1, 2, 3, 0};
-    /** Die Diagonalen im Bild zu den Ecken 0 oben links bis 3 unten rechts, wie {@link Skin#ecken}. */
-    private static final double[][] DIAGONALEN = {{-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
     /** Farbe der Chunklinien: Schwarz, zu 30 % deckend, so bleibt die Karte darunter lesbar. */
     static final int LINIE = 0x4D000000;
     private static final int TEXT = 0xFFFFFFFF;
@@ -126,7 +125,7 @@ public final class Minimap {
     /** Der Rahmen, ein Name aus {@link Skin#NAMEN}; „ohne“ ist der Umriss. Siehe docs/rahmen.md. */
     private String skin = Skin.BIOM;
     private boolean skinGewaehlt;
-    /** zier und Marken des Rahmens; aus nur Bänder oder Ring. Siehe docs/rahmen.md, „Verzierungen“. */
+    /** Die Marken N, O, S, W des Rahmens; aus nur Bänder oder Ring. Siehe docs/rahmen.md, „Verzierungen“. */
     private boolean verzierungen = true;
     private Biom biom = new Biom();
     /** Solange das Menü offen ist: die Ecke des Griffs, 0 bis 3, sonst -1; und ob die Maus auf ihm liegt. */
@@ -325,7 +324,7 @@ public final class Minimap {
         return Skin.von(Skin.BIOM.equals(skin) ? Biom.ORDNER.get(biom.gezeigt()) : skin);
     }
 
-    /** Vom Menü je Frame: wo der Griff liegt, -1 ohne Menü. Mit Skin zeichnet die Minimap ihn statt der zier. */
+    /** Vom Menü je Frame: wo der Griff liegt, -1 ohne Menü. Mit Skin zeichnet die Minimap ihn über den Bändern. */
     void griff(int ecke, boolean aktiv) {
         griffEcke = ecke;
         griffAktiv = aktiv;
@@ -394,7 +393,7 @@ public final class Minimap {
         return r;
     }
 
-    /** Der Abstand zum Rand des Schirms: {@link #RAND}, mit Rahmen mindestens dessen Einrückung, so bleibt die zier ganz auf dem Schirm. */
+    /** Der Abstand zum Rand des Schirms: {@link #RAND}, mit Rahmen mindestens dessen Einrückung, so bleiben die Marken ganz auf dem Schirm. */
     int rand() {
         if (!Skin.BIOM.equals(skin)) {
             return rand(Skin.von(skin));
@@ -1022,10 +1021,8 @@ public final class Minimap {
 
     /**
      * Der Rahmen eines Skins über Karte und Linien, in Einheiten des GUI: die Bänder, eckig als
-     * Rechtecke, rund als Ring; mit Verzierungen die zier an den Ecken und gedreht die Marken N, O,
-     * S, W, N zuoberst; im Menü zuletzt der Griff an seiner Ecke. Gedreht drehen zier und Marken
-     * starr mit der Karte, der Griff nicht. Die Bänder zu {@code baender}, die Ornamente zu
-     * {@code deckung} deckend. Siehe docs/rahmen.md.
+     * Rechtecke, rund als Ring; darüber die Ornamente aus {@link #ornamente}. Die Bänder zu
+     * {@code baender}, die Ornamente zu {@code deckung} deckend. Siehe docs/rahmen.md.
      */
     private void zeichneRahmen(GuiGraphicsExtractor g, Skin skin, Rahmen r, Drehung.Lage lage, int k, float baender, float deckung) {
         if (rund) {
@@ -1034,32 +1031,42 @@ public final class Minimap {
         } else {
             skin.baender(g, r.x(), r.y(), r.seite(), r.seite(), baender);
         }
-        double[][] ecken = ecken(skin, r);
-        int aktiv = griffEcke >= 0 ? 1 : 0;
-        if (verzierungen && lage == null) {
-            for (int e = 0; e < ecken.length; e++) {
-                if (e != griffEcke) {
-                    skin.ornament(g, Skin.ZIER + aktiv, e, ecken[e][0], ecken[e][1], deckung, 0);
-                }
-            }
-        } else if (verzierungen) {
-            double winkel = lage.winkel();
-            for (int e = 0; e < DIAGONALEN.length; e++) {
-                double[] p = verzierung(r, skin.baender(), rund, lage, DIAGONALEN[e], k);
-                skin.ornament(g, Skin.ZIER + aktiv, e, p[0], p[1], deckung, winkel);
-            }
-            for (int i : MARKEN) {
-                double[] p = verzierung(r, skin.baender(), rund, lage, RICHTUNGEN[i], k);
-                skin.ornament(g, Skin.MARKE_JE_RICHTUNG[i] + aktiv, 0, p[0], p[1], deckung, winkel);
-            }
-        }
-        if (griffEcke >= 0) {
-            skin.ornament(g, Skin.GRIFF + (griffAktiv ? 1 : 0), griffEcke, ecken[griffEcke][0], ecken[griffEcke][1], deckung, 0);
+        for (Ornament o : ornamente(r, skin.baender(), rund, lage, k, verzierungen, griffEcke, griffAktiv)) {
+            skin.ornament(g, o.teil(), o.ecke(), o.x(), o.y(), deckung, o.winkel());
         }
     }
 
+    /** Ein Bild über den Bändern: Teil aus {@link Skin}, Ecke zum Spiegeln, Mitte in Einheiten des GUI, Winkel. */
+    record Ornament(int teil, int ecke, double x, double y, double winkel) {
+    }
+
     /**
-     * Wo eine Verzierung in {@code richtung} des Kartenbilds gedreht sitzt, auf der Mitte der Bänder
+     * Was der Rahmen über den Bändern zeichnet, in dieser Reihenfolge: mit {@code marken} die Marken
+     * O, S, W, N auf der Mitte der Bänder, ungedreht fest rechts, unten, links und oben, gedreht starr
+     * mit der Karte; im Menü zuletzt der Griff an seiner Ecke, nie gedreht. In den Ecken sonst nichts.
+     * Siehe docs/rahmen.md, „Marken“.
+     */
+    static List<Ornament> ornamente(Rahmen r, int baender, boolean rund, Drehung.Lage lage, int k, boolean marken,
+            int griffEcke, boolean griffAktiv) {
+        List<Ornament> aus = new ArrayList<>(5);
+        if (marken) {
+            int aktiv = griffEcke >= 0 ? 1 : 0;
+            double winkel = lage == null ? 0 : lage.winkel();
+            for (int i : MARKEN) {
+                double[] p = lage == null ? Skin.marke(r.x(), r.y(), r.seite(), baender, rund, RICHTUNGEN[i][0], RICHTUNGEN[i][1])
+                        : verzierung(r, baender, rund, lage, RICHTUNGEN[i], k);
+                aus.add(new Ornament(Skin.MARKE_JE_RICHTUNG[i] + aktiv, 0, p[0], p[1], winkel));
+            }
+        }
+        if (griffEcke >= 0) {
+            double[] p = Skin.ecken(r.x(), r.y(), r.seite(), r.seite(), baender, rund)[griffEcke];
+            aus.add(new Ornament(Skin.GRIFF + (griffAktiv ? 1 : 0), griffEcke, p[0], p[1], 0));
+        }
+        return aus;
+    }
+
+    /**
+     * Wo eine Marke in {@code richtung} des Kartenbilds gedreht sitzt, auf der Mitte der Bänder
      * ({@link Skin#marke}), die Mitte auf ganzen Pixeln des Schirms, sonst zitterte sie beim Laufen.
      * Siehe docs/rahmen.md, „Drehen“.
      */
@@ -1069,7 +1076,7 @@ public final class Minimap {
         return new double[] {Math.round(p[0] * k) / (double) k, Math.round(p[1] * k) / (double) k};
     }
 
-    /** Wo die Ornamente des Rahmens sitzen ({@link Skin#ecken}), neu gerechnet nur, wenn sich Skin, Lage oder Form ändern. */
+    /** Wo der Griff an den Ecken sitzen kann ({@link Skin#ecken}), für das Menü; neu gerechnet nur, wenn sich Skin, Lage oder Form ändern. */
     double[][] ecken(Skin skin, Rahmen r) {
         if (skin != eckenSkin || !r.equals(eckenRahmen) || rund != eckenRund) {
             ecken = Skin.ecken(r.x(), r.y(), r.seite(), r.seite(), skin.baender(), rund);

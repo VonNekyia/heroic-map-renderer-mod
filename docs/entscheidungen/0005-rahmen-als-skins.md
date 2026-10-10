@@ -18,9 +18,9 @@ mit derselben Rechnung wie der Ring.
 Teilweise abgelöst durch [0008](0008-biom-rahmen-als-vorgabe.md): Die
 Vorgabe ist der Rahmen „biom“, nicht ohne Rahmen.
 
-Teilweise abgelöst durch [0012](0012-verzierungen-drehen-mit.md): Gedreht
-drehen zier und Marken starr mit, die Marken mit festem Bild je Richtung;
-ein Schalter stellt sie ab.
+Teilweise abgelöst durch [0012](0012-marken-statt-verzierungen.md): Es gibt
+keine zier mehr; die Marken N, O, S, W stehen genordet fest und drehen
+gedreht starr mit, ein Schalter stellt sie ab.
 
 ## Anlass
 
@@ -59,7 +59,7 @@ Entschieden vom User und vom Reviewer am 09.10.
 - **`nine_slice` aus dem Atlas des GUI:** Kanten würden gekachelt, rund
   ginge es nicht; die Bänder aus Code sind in jeder Grösse genau.
 - **Ornamente gespiegelt über die Pose:** Das GUI verwirft Rückseiten,
-  siehe [Rahmen](../rahmen.md), „Ornamente“.
+  siehe [Rahmen](../rahmen.md), „Griff“.
 - **Eigene, schon gespiegelte Texturen je Ecke:** 16 Texturen je Skin und
   ein eigener Lader, und F3+T lüde sie nicht neu; über die Koordinaten im
   Atlas geht es ohne.

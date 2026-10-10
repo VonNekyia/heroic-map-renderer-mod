@@ -61,7 +61,7 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
 | Auflösung der Minimap | 2 px je Block | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet |
 | Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte, siehe „Chunklinien“ |
 | Drehen | an | die Minimap dreht mit der Blickrichtung, siehe „Drehen“ |
-| Verzierungen | an | zier und Marken des Rahmens, aus nur Bänder oder Ring, siehe [Rahmen](rahmen.md), „Verzierungen“ |
+| Verzierungen | an | die Marken N, O, S, W des Rahmens, aus nur Bänder oder Ring, siehe [Rahmen](rahmen.md), „Verzierungen“ |
 | Koordinaten | xz | aus, `x z` oder `x y z` des Spielers unter der Minimap, siehe „Koordinaten“ |
 | Rahmen | biom | ein Skin um die Minimap, als Vorgabe nach dem Biom unter dem Spieler, siehe [Rahmen](rahmen.md) |
 | Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
@@ -208,7 +208,7 @@ seit dem 10.10. als Vorgabe.
 - **Die Gametests** `Bilder` und `Messung` schalten Drehen aus, denn ihre
   Bilder und Messreihen zeigen die Minimap genordet.
 
-![Die drehende Minimap bei Gier 30 mit Chunklinien: eckig ohne Rahmen, rund mit „uhr“, eckig mit „kompass“, die Verzierungen gedreht, und „kompass“ ohne Verzierungen](bilder/drehen.png)
+![Die drehende Minimap bei Gier 30 mit Chunklinien: eckig ohne Rahmen, rund mit „uhr“, eckig mit „kompass“, die Marken gedreht, und „kompass“ ohne Marken](bilder/drehen.png)
 
 - **Winkel:** 180° − Gier (`Drehung.winkel`), zwischen zwei Ticks wie die
   Kamera (`LocalPlayer.getViewYRot`). Bei Blick nach Norden dreht nichts.
@@ -229,9 +229,9 @@ seit dem 10.10. als Vorgabe.
   wie ungedreht; sein Pfeil zeigt nach oben.
 - **Im Menü** rechnet die Zeile mit den Koordinaten unter der Maus zurück
   ins Bild.
-- **Mit Rahmen** drehen die Verzierungen starr mit, die zier und die
-  Marken N, O, S, W, Lage und Bild; der Schalter „Verzierungen“ stellt sie
-  ab. Siehe [Rahmen](rahmen.md), „Drehen“.
+- **Mit Rahmen** drehen die Marken N, O, S, W starr mit, Lage und Bild;
+  der Schalter „Verzierungen“ stellt sie ab. Siehe [Rahmen](rahmen.md),
+  „Drehen“.
 - **Kosten** je Frame, gemessen am 09.10. bei 4 px und Zoom 4, siehe
   [Minimap, Vieleck auch ungedreht](messungen/2026-10-09-minimap-vieleck.md):
   Drehen kostet im p50 eckig 0,011 ms und rund 0,009 ms Frametime im
