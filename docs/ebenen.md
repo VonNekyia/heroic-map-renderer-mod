@@ -17,6 +17,7 @@ code:
   - src/test/java/com/nekyia/heroicmap/FormenTest.java
   - src/test/java/com/nekyia/heroicmap/TrapezeTest.java
   - src/test/java/com/nekyia/heroicmap/DrehungTest.java
+  - src/gametest/java/com/nekyia/heroicmap/Bilder.java
 ---
 
 # Ebenen
@@ -149,6 +150,10 @@ Regionen, Kreise und Linien zeichnet der Mod flach, wie das Format es für
 die Kameras von oben sagt: Seine Karten sind von oben gesehen, ein Kreis
 bleibt rund. Was er zeichnet, kommt aus `Ebenen.formen`, gelesen auf dem
 Thread des Netzes wie die Nadeln.
+
+![Fläche mit Loch, Kreis, Dreieck und Linie einer Ebene auf der Minimap, genordet und gedreht mit dem Rahmen „uhr“; Szene `formen` des Gametests](bilder/formen.png)
+
+![Dieselben Formen auf der Vollbildkarte](bilder/formen-karte.png)
 
 - **Füllung** (`fill`, mit Alpha; `#00000000` heisst ohne): bei einer
   Region als Trapeze in der Welt (`Trapeze.von`).
