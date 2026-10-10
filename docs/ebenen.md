@@ -205,6 +205,12 @@ Ein Ort als Bild (`banner`), etwa eine Stadt mit dem Banner ihrer Nation
     Mod einmal je Name und Schrift (`Ebenen.zeichen`).
   - **Schräger Satz:** Der Mod zeichnet Banner nur aus `image`, der Winkel
     ist also 0, wie das Format es dafür sagt.
+
+  ![Der Name im Bogen auf der Webkarte von oben, „Hafenstadt“, und im Mod auf der Vollbildkarte, „Westmark“, je mittig unter dem Fuss](bilder/name-bogen-vergleich.png)
+  - **Getestet** am Bild im Gametest `Bilder` (`Bilder.nameImBogen`): Die
+    Pixel in der Schriftfarbe um den Fuss von „Westmark“ liegen waagrecht
+    mittig, der tiefste darunter, die Enden höher; dazu
+    `EbenenTest.nameImBogenNachDemFormat`.
   - **Kasten** für Treffer und Wegschneiden: je Zeichen sein Rechteck samt
     Kontur, gedreht, 0,55 · s über und unter der Mitte (`Ebenen.bogenKasten`).
     Der grobe Kasten ohne Bild gilt für jeden Radius: Die Mitte eines
