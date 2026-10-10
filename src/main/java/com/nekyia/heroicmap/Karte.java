@@ -180,6 +180,9 @@ final class Karte extends Screen {
         if (hinweis != null) {
             g.text(font, hinweis, 4, height - 24, TEXT);
         }
+        if (regionVon != null) {
+            g.text(font, Component.translatable("heroicmap.karte.region_hinweis"), 4, height - (hinweis != null ? 36 : 24), TEXT);
+        }
         // Höchstens ein Abgleich je Tag: Nach einer Ablehnung mit wieder ist der Knopf bis dahin aus.
         if (abgleich != null) {
             long ab = Downloads.INSTANZ.abgleichAb(baum);
@@ -363,6 +366,11 @@ final class Karte extends Screen {
         return ziel;
     }
 
+    /** Die erste Ecke der Region, die der Spieler gerade setzt, oder null. */
+    int[] regionVon() {
+        return regionVon;
+    }
+
     Satz satz() {
         return satz;
     }
@@ -449,7 +457,7 @@ final class Karte extends Screen {
      * Rechtsklick öffnet das Menü: „Hierher teleportieren“,
      * nur mit execute und tp im Befehlsbaum und nicht unter einer Decke, sonst landete man auf dem
      * Dach; darunter „Wegpunkt setzen“, auf einem Wegpunkt „Wegpunkt löschen“. Erst ein Klick auf
-     * einen Eintrag tut etwas. Siehe docs/vollbildkarte.md, „Bedienung“;
+     * einen Eintrag tut etwas. Nach „Region von hier“ setzt ein Linksklick ohne Zug die zweite Ecke. Siehe docs/vollbildkarte.md, „Bedienung“;
      * Marken: siehe docs/wegpunkte.md, „Bedienung“.
      */
     @Override
@@ -496,7 +504,8 @@ final class Karte extends Screen {
             klickVerbraucht = true;
             return true;
         }
-        if (zeigen.gehalten()) {
+        // Solange der Spieler eine Region setzt, schliesst ein Klick keine Tafel, er setzt beim Loslassen die zweite Ecke.
+        if (zeigen.gehalten() && regionVon == null) {
             // Ein Klick daneben schliesst zuerst nur die gehaltene Tafel; einer auf ein anderes Ziel hält beim Loslassen dessen.
             // Nur eine sichtbare Tafel verbraucht den Klick; eine, die noch lädt oder keine ist, geht still zu.
             Tafeln.Ziel alt = zeigen.offen(), anderes = tafelUnter(e.x(), e.y());
@@ -539,6 +548,14 @@ final class Karte extends Screen {
         taste = false;
         if (klickVerbraucht) {
             klickVerbraucht = false;
+            return true;
+        }
+        // Solange die Vorschau läuft, setzt ein Linksklick ohne Zug die zweite Ecke, auch auf einer Marke; ziehen verschiebt weiter.
+        if (regionVon != null && e.button() == InputConstants.MOUSE_BUTTON_LEFT && gezogen <= ZUG && blick != null
+                && !drin(tafelKasten, e.x(), e.y())) {
+            int[] b = block(e.x(), e.y());
+            Wegpunkte.INSTANZ.setze(regionDimension, regionVon[0], regionVon[1], b[0], b[1]);
+            regionVon = null;
             return true;
         }
         // Ein Klick ohne Zug auf ein Ziel ohne Marke hält seine Tafel.

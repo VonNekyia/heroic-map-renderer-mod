@@ -48,6 +48,7 @@
   "heroicmap.karte.region_von": "Region from here",
   "heroicmap.karte.region_bis": "Region to here",
   "heroicmap.karte.region_abbrechen": "Cancel region",
+  "heroicmap.karte.region_hinweis": "Left-click sets the second corner, Esc cancels",
   "heroicmap.karte.region_loeschen": "Delete region",
   "heroicmap.karte.angeheftet_voll": "At most %s regions pinned; unpin one first",
   "heroicmap.karte.nadeln_voll": "At most %s pins and banners pinned; unpin one first",

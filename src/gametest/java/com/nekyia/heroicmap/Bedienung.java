@@ -106,6 +106,7 @@ public final class Bedienung implements FabricClientGameTest {
 
         wegpunkt(context, maus, k, x, y);
         anheften(context, maus, k);
+        region(context, maus, k);
         maus.setCursorPos(x * k, y * k);
         context.waitTick();
 
@@ -330,6 +331,69 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("Doppelklick auf die Raute heftet die Region nicht an");
         }
         context.runOnClient(mc -> Ebenen.INSTANZ.leeren());
+        warte250();
+    }
+
+    /**
+     * Eine Region wie ein Spieler: Rechtsklick, „Region von hier“, die Karte ziehen setzt keine Region,
+     * dann die Maus bewegen und ein Linksklick setzt die zweite Ecke. Siehe docs/wegpunkte.md, „Regionen“.
+     */
+    private static void region(ClientGameTestContext context, TestInput maus, int k) {
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+        double x = breite / 3.0, y = hoehe / 3.0;
+        int vorher = context.computeOnClient(mc -> Wegpunkte.INSTANZ.regionen().size());
+        warte250();
+        maus.setCursorPos(x * k, y * k);
+        context.waitTick();
+        maus.pressMouse(RECHTS);
+        context.waitTicks(2);
+        int[] ecke = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).ziel());
+        String von = context.computeOnClient(mc -> Component.translatable("heroicmap.karte.region_von").getString());
+        int zeile = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eintraege().stream().map(Component::getString).toList().indexOf(von));
+        if (ecke == null || zeile < 0) {
+            throw new AssertionError("Kein Menü mit „Region von hier“");
+        }
+        // Die Einträge stehen 14 Einheiten untereinander, ab der Maus.
+        maus.moveCursor(6 * k, (zeile * 14 + 6) * k);
+        context.waitTick();
+        maus.pressMouse(LINKS);
+        context.waitTicks(2);
+        if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).regionVon()) == null) {
+            throw new AssertionError("„Region von hier“ startet keine Vorschau");
+        }
+
+        // Ziehen verschiebt die Karte und setzt keine Region; die Vorschau bleibt.
+        warte250();
+        double[] vorZug = mitte(context);
+        maus.setCursorPos(breite / 2.0 * k, hoehe / 2.0 * k);
+        context.waitTick();
+        maus.holdMouse(LINKS);
+        context.waitTick();
+        for (int i = 0; i < 5; i++) {
+            maus.moveCursor(6 * k, 0);
+            context.waitTick();
+        }
+        maus.releaseMouse(LINKS);
+        context.waitTicks(2);
+        if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.regionen().size()) != vorher || mitte(context)[0] == vorZug[0]
+                || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).regionVon()) == null) {
+            throw new AssertionError("Ziehen während der Vorschau setzte eine Region oder verschob die Karte nicht");
+        }
+
+        // Die Maus bewegen, dann ein Linksklick ohne Zug: die zweite Ecke. Die erste steht nach dem Zug 30 Einheiten
+        // weiter rechts; 4 Einheiten sind ein Block, so wird das Rechteck rund 8 × 10 Blöcke gross.
+        warte250();
+        maus.setCursorPos((x + 60) * k, (y + 40) * k);
+        context.waitTick();
+        maus.pressMouse(LINKS);
+        context.waitTicks(2);
+        Wegpunkte.Region neu = context.computeOnClient(mc -> Wegpunkte.INSTANZ.regionen().size() == vorher + 1
+                ? Wegpunkte.INSTANZ.regionen().getLast() : null);
+        if (neu == null || !neu.enthaelt(neu.dimension(), ecke[0], ecke[1]) || neu.x1() - neu.x0() < 5 || neu.z1() - neu.z0() < 5
+                || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).regionVon()) != null) {
+            throw new AssertionError("Linksklick setzt die zweite Ecke nicht: " + neu);
+        }
         warte250();
     }
 

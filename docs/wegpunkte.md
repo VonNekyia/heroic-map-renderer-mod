@@ -33,7 +33,7 @@ Fläche oder einen Kreis vom Server an, siehe „Anheften“ (mod#36).
 | Klick auf eine Marke | legt sie beim Loslassen in die Mitte: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück. Wer auf einer Marke zu ziehen beginnt und weiter als 3 Einheiten zieht (`Karte.ZUG`), zieht nur die Karte |
 | Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder |
 | Doppelklick auf die Raute einer eigenen Region, auf eine Fläche, einen Kreis, eine Nadel oder ein Banner vom Server | heftet sie an die Minimap oder löst sie wieder, siehe „Anheften“ |
-| Rechtsklick, „Region von hier“, dann „Region bis hier“ | setzt eine eigene Region, das Rechteck der Blöcke zwischen beiden Ecken samt ihnen, siehe „Regionen“; dazwischen zeigt eine gestrichelte Vorschau das Rechteck bis zur Maus, „Region abbrechen“ oder `Esc` brechen ab |
+| Rechtsklick, „Region von hier“, dann ein Linksklick oder „Region bis hier“ | setzt eine eigene Region, das Rechteck der Blöcke zwischen beiden Ecken samt ihnen, siehe „Regionen“; dazwischen zeigt eine gestrichelte Vorschau das Rechteck bis zur Maus und unten links der Hinweis „Linksklick setzt die zweite Ecke, Esc bricht ab“; ziehen verschiebt die Karte weiter, „Region abbrechen“ oder `Esc` brechen ab |
 | Rechtsklick in eine eigene Region oder auf ihre Raute | „Region löschen“ |
 
 - **Doppelklick:** Das Spiel meldet einen Klick als doppelt, wenn derselbe
@@ -119,8 +119,12 @@ Eigene Regionen des Spielers, „Region-Wegpunkte“, so wünscht es der User
 Vieleck kommt nur, wenn der User es will.
 
 - **Setzen** über das Menü der rechten Taste, wo auch „Wegpunkt setzen“
-  steht: „Region von hier“ merkt die erste Ecke, „Region bis hier“ setzt das
-  Rechteck (`Wegpunkte.setze` mit vier Zahlen). Die Ecken dürfen in jeder
+  steht: „Region von hier“ merkt die erste Ecke. Danach setzt ein Linksklick
+  ohne Zug die zweite Ecke auf den Block unter der Maus, auch auf einer
+  Marke; wer zieht, verschiebt die Karte, die Vorschau bleibt. Ebenso setzt
+  „Region bis hier“ im Menü der rechten Taste das Rechteck
+  (`Wegpunkte.setze` mit vier Zahlen). Ohne den Linksklick nahm die Karte
+  den Klick als Verschieben, und es entstand keine Region (mod#73). Die Ecken dürfen in jeder
   Folge kommen. Dieselbe Region noch einmal bleibt eine. Höchstens 256 je
   Welt (`Wegpunkte.MAX_REGIONEN`); darüber setzt der Mod keine.
 - **Farbe** wie ein Wegpunkt: die erste der 8 Farben, die in der Dimension
@@ -244,7 +248,9 @@ Welt kommen in eigenen PRs.
   zurück, und ein Rechtsklick bietet „Wegpunkt löschen“. Dazu ein Kreis
   vom Server: Ein Klick heftet nichts an, ein Doppelklick heftet an, ein
   zweiter löst; ein Doppelklick auf eine Nadel und einer auf die Raute
-  einer eigenen Region heften sie an.
+  einer eigenen Region heften sie an. Eine Region wie ein Spieler:
+  Rechtsklick, „Region von hier“, die Karte ziehen setzt keine Region, die
+  Maus bewegen und ein Linksklick setzt die zweite Ecke.
 - `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
   [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und

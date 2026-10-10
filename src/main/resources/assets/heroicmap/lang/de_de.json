@@ -48,6 +48,7 @@
   "heroicmap.karte.region_von": "Region von hier",
   "heroicmap.karte.region_bis": "Region bis hier",
   "heroicmap.karte.region_abbrechen": "Region abbrechen",
+  "heroicmap.karte.region_hinweis": "Linksklick setzt die zweite Ecke, Esc bricht ab",
   "heroicmap.karte.region_loeschen": "Region löschen",
   "heroicmap.karte.angeheftet_voll": "Höchstens %s Regionen angeheftet; erst eine lösen",
   "heroicmap.karte.nadeln_voll": "Höchstens %s Nadeln und Banner angeheftet; erst eins lösen",

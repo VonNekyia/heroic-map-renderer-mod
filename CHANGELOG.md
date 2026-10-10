@@ -9,6 +9,7 @@ The release notes on GitHub and Modrinth come from here
 - **Pins and banners on the minimap only when pinned:** double-click a pin or banner on the full map to pin it; pinned ones show a small dot under them there. Up to 64 per world.
 - **Smaller banners,** drawn on whole screen pixels.
 - **Banners fade near you:** a pinned banner on the minimap turns see-through as you come closer than 24 blocks, down to 35 % at 8.
+- **Regions with a left-click:** after "Region from here", a left-click on the full map sets the second corner; dragging still moves the map.
 
 ## 0.2.12
 
