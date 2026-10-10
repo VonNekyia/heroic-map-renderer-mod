@@ -202,7 +202,6 @@ final class Kartenblick {
         }
     }
 
-    /** Verschiebt den Inhalt um (dx, dy) Einheiten des GUI. */
     /**
      * Stellt Mitte, Stufe und Lupe, etwa wie die Karte zuletzt stand: die Stufe zwischen der gröbsten
      * und {@code stufe}, die Lupe 1, 2 oder 4 und nur auf der feinsten Stufe. Siehe docs/vollbildkarte.md, „Lage merken“.
@@ -214,6 +213,7 @@ final class Kartenblick {
         this.lupe = this.zoom < stufe ? 1 : lupe >= 4 ? 4 : lupe >= 2 ? 2 : 1;
     }
 
+    /** Verschiebt den Inhalt um (dx, dy) Einheiten des GUI. */
     void schiebe(double dx, double dy) {
         mx -= dx / lupe * teiler();
         mz -= dy / lupe * teiler();
