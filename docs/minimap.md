@@ -15,6 +15,8 @@ code:
   - src/main/java/com/nekyia/heroicmap/Mitspieler.java
   - src/test/java/com/nekyia/heroicmap/MitspielerTest.java
   - src/main/java/com/nekyia/heroicmap/mixin/LevelExtractorMixin.java
+  - src/main/java/com/nekyia/heroicmap/mixin/ClientLevelMixin.java
+  - src/gametest/java/com/nekyia/heroicmap/Blockentities.java
   - src/main/resources/heroicmap.accesswidener
   - src/test/java/com/nekyia/heroicmap/LichtTest.java
   - src/test/java/com/nekyia/heroicmap/MinimapTest.java
@@ -553,6 +555,25 @@ Barrieren, zeichnen nichts.
   `enableChunkLight`. Dort hängt der Mixin des Mods
   (`LevelExtractorMixin`) und markiert die Spalte, für die Minimap und die
   [selbst gezeichnete Karte](selbst.md).
+- **Auch mit Sodium:** Sodium 0.9.2 für 26.3 ersetzt in `LevelExtractor`
+  `setBlockDirty`, `setSectionDirty`, `setSectionDirtyWithNeighbors` und
+  `setBlocksDirty` per `@Overwrite`, belegt per javap an
+  `sodium-fabric-0.9.2+mc26.3`. Eine gesetzte Truhe kam damit nicht beim
+  Mixin an, erst ein weiterer Block löste das Neuzeichnen aus (mod#84).
+  Darum hängt ein zweiter Mixin an der Welt (`ClientLevelMixin`): an
+  `sendBlockUpdated`, `setBlocksDirty`, `setSectionDirtyWithNeighbors` und
+  `setSectionRangeDirty` von `ClientLevel`. Über sie laufen alle Wege in
+  den Renderer ausser `handleChunksBiomes`, das der erste Mixin fängt,
+  belegt per javap am Client 26.3. Er markiert wie der Renderer: einen
+  Block mit seinen Nachbarn, einen Abschnitt mit seinen Nachbarn, einen
+  Bereich ganz. Doppelt markiert schadet nicht, ein Chunk ist nur einmal
+  offen.
+- **Geprüft** im Gametest `Blockentities`: Truhe, Tür, Schild und Kopf,
+  gesetzt und abgebaut wie ein Spieler; die Minimap zeigt sie ohne
+  weiteres Zutun, verglichen am Bild auf dem Schirm. Mit
+  `-Pzusatzmods=<ordner>` und Sodium darin auch mit Sodium, siehe
+  [Bauen und testen](entwicklung.md); ohne `ClientLevelMixin` ist er dort
+  rot.
 - **Ausnahme:** `LevelExtractor.allChanged` legt alles neu an, ohne
   `setSectionDirty`, etwa wenn der Biomübergang sich ändert. Der Mod
   vergleicht deshalb je Frame `Options.biomeBlendRadius` und den Block-Atlas
