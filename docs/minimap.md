@@ -232,7 +232,8 @@ im Debug-Bildschirm des Spiels (`Mth.floor`). So hat es der User gewünscht.
   Vorgabe.
 - **Lage:** mittig unter der Minimap, in der Schrift des Spiels, weiss mit
   Schatten. 2 Einheiten Abstand unter dem Ring, mit Rahmen unter den
-  Ornamenten, die halb über die Ecken ragen (`Skin.einrueckung`). Sie folgt
+  Ornamenten, die halb über die Ecken ragen, so weit wie der Abstand zum
+  Rand (`Minimap.rand`). Sie folgt
   Grösse und Lage der Minimap. Ist unten kein Platz mehr, steht die Zeile
   ebenso über der Minimap (`Minimap.koordinatenLage`).
 - **Nicht gedreht:** Die Zeile bleibt waagrecht, auch wenn die Minimap

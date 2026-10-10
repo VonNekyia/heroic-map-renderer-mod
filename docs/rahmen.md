@@ -73,41 +73,53 @@ Vorgabe.
   | `feuchtgebiete` | `c:is_swamp` | `swamp`, `mangrove_swamp` |
   | `tropen` | `minecraft:is_jungle` | |
   | `wueste` | `c:is_desert`, `minecraft:is_badlands` | `desert` |
-  | `gewaesser` | `minecraft:is_ocean`, `minecraft:is_river`, `minecraft:is_beach`, `c:is_mushroom` | `mushroom_fields` |
+  | `gewaesser` | `minecraft:is_ocean`, `minecraft:is_river`, `minecraft:is_beach` | `mushroom_fields`, `stony_shore` |
   | `waelder` | `minecraft:is_forest`, `minecraft:is_taiga` | `cherry_grove` |
   | `grasland` | `c:is_plains`, `minecraft:is_savanna` | `plains`, `sunflower_plains`, `meadow` |
-  | `gebirge` | `minecraft:is_mountain`, `minecraft:is_hill` | `stony_shore` |
+  | `gebirge` | `minecraft:is_mountain`, `minecraft:is_hill` | |
 
+  Vor allen Zeilen: Nether und End nehmen Grasland, Höhlen behalten die
+  letzte Kategorie, siehe unten.
 - **Warum Namen neben Tags:** Der Server schickt dem Client die Tags der
   Biome, denn `Registries.BIOME` steht in
-  `RegistryDataLoader.SYNCHRONIZED_REGISTRIES` (26.3, per javap). Die
-  Tags `c:` kommen aber aus Fabric API; ein Server ohne sie, etwa Paper,
-  schickt nur die des Spiels. Für Schnee, Sumpf, Wüste, Ebene und Pilze hat
-  das Spiel keinen Tag, darum stehen diese Biome mit Namen da.
+  `RegistryDataLoader.SYNCHRONIZED_REGISTRIES` (26.3, per javap): die des
+  Spiels und die seiner Datapacks. `c:` gibt es nur mit Fabric API oder
+  mit einem Datapack, der sie mitbringt. Für Schnee, Sumpf, Wüste, Ebene
+  und Pilze hat das Spiel keinen Tag, darum stehen seine Biome mit Namen
+  da.
 - **Rangfolge:** Schnee vor Wald, so ist die verschneite Taiga Schnee,
   obwohl sie in `minecraft:is_taiga` liegt. Grasland vor Gebirge, denn
   `minecraft:is_mountain` enthält `meadow` und `cherry_grove`; Wiese ist
   Grasland, der Kirschhain Wald, so schlägt es der Designer vor.
 - **Rückfall über den Namen:** Passt keine Zeile, etwa bei Biomen aus
   Datapacks, entscheidet ein Wort im Namen, in derselben Rangfolge: etwa
-  `snowy` oder `frozen` Schnee, `forest` oder `taiga` Wald, `peaks` oder
-  `hills` Gebirge (`Biom.WOERTER`). Ein Wort ist ein ganzes Stück zwischen
-  `_` oder `/`. Sonst Grasland.
+  `snowy`, `frozen` oder `winter` Schnee, `shrubland` oder `canyon` Wüste,
+  `forest` oder `taiga` Wald, `peak` oder `hills` Gebirge (`Biom.WOERTER`).
+  Ein Wort ist ein ganzes Stück zwischen `_` oder `/`. Sonst Grasland.
 - **Nether und End** (`minecraft:is_nether`, `minecraft:is_end`) nehmen
-  Grasland, auch der Wald im Nether. Höhlen wie `lush_caves` und
-  `deep_dark` passen auf nichts und nehmen ebenso Grasland.
+  Grasland, auch der Wald im Nether.
+- **Höhlen** (`c:is_cave`, dazu `dripstone_caves`, `lush_caves`,
+  `deep_dark` und `sulfur_caves` mit Namen, `Biom.HOEHLEN`): Der Rahmen
+  bleibt bei der letzten Kategorie. „Biom unter dem Spieler“ heisst die
+  Landschaft, nicht die Höhle; so hat es der Reviewer entschieden.
+- **Noch nicht geladen:** Steht der Spieler in einem Chunk, den der Client
+  noch nicht hat, fragt die Minimap nicht (`hasChunkAt`); sonst läse sich
+  das Biom als Ebene, und nach einem weiten Teleport spränge der Rahmen
+  hin und zurück.
 - **Wechsel:** erst, wenn der Spieler 2 s in der neuen Kategorie ist
   (`Biom.WARTEN_MS`); jeder Schritt zurück setzt die Zeit neu, so flackert
-  der Rahmen an Grenzen nicht. Die erste Kategorie nach dem Start gilt
-  sofort. Dann blendet der alte Rahmen in 0,3 s aus und der neue ein
-  (`Biom.BLENDE_MS`): beide gezeichnet, der alte zu 1 − t deckend, der neue
-  zu t.
+  der Rahmen an Grenzen nicht. Die erste Kategorie nach dem Start und nach
+  einem Wechsel der Welt oder Dimension gilt sofort (`Minimap.leeren`).
+  Dann blendet der Rahmen in 0,3 s über (`Biom.BLENDE_MS`): Die Bänder sind
+  in allen acht gleich gebaut, darum liegen die alten zu 1 und die neuen zu
+  t darüber; nur die alten Ornamente blenden zu 1 − t aus. So sinkt die
+  Deckung der Bänder nie.
 - **Abstand zum Rand:** der grösste aller acht, 6 Einheiten, denn die zier
   ist 9 bis 12 Pixel gross (`Minimap.rand`). So springt die Minimap beim
   Wechsel nicht; ebenso die Koordinaten darunter.
 - **Kosten:** Das Biom unter dem Spieler liest die Minimap je Frame; die
   Kategorie rechnet sie nur neu, wenn sich das Biom ändert. Während der
-  Überblendung zeichnet sie zwei Rahmen.
+  Überblendung zeichnet sie zwei Rahmen, siehe „Kosten“.
 
 ## Dateien
 
@@ -206,10 +218,15 @@ Geschätzt, nicht gemessen:
 - **Rund** je Frame ein Bild für den Ring. Den Ring rechnet der Mod nur,
   wenn sich die Seite ändert, und behält je Skin nur den letzten
   (`Skin.ring`); bei 256 Einheiten sind das 256 × 256 Texel, 256 KiB, und
-  eine Wurzel je Texel einmal.
+  eine Wurzel je Texel einmal. Mit `biom` hat jede Kategorie, die schon
+  gezeigt wurde, ihren Ring, höchstens 8, also bis 2 MiB.
 - **Ornamente:** Wo sie sitzen, rechnet die Minimap nur neu, wenn sich
   Skin, Lage oder Form ändern (`Minimap.ecken`); die Namen der Sprites
-  stehen je Skin fest.
+  stehen je Skin fest. Während der Überblendung wechseln zwei Skins je
+  Frame, dann rechnet sie die vier Punkte jedes Mal neu.
+- **Überblendung:** 0,3 s lang zwei Rahmen je Frame.
+- **Abstand zum Rand bei `biom`:** je Frame das Grösste über die acht
+  Kategorien; ihre Namen stehen fest (`Biom.ORDNER`).
 
 ## Bilder
 

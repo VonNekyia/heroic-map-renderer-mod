@@ -1,6 +1,6 @@
 ---
 title: "0008: Der Rahmen „biom“ als Vorgabe"
-description: Warum die Minimap als Vorgabe einen Rahmen nach dem Biom unter dem Spieler trägt, wie Tags und Namen in fester Rangfolge die Kategorie wählen, warum der Rahmen erst nach 2 s wechselt und wer seine Wahl behält; löst 0005 in der Vorgabe ab.
+description: Warum die Minimap als Vorgabe einen Rahmen nach dem Biom unter dem Spieler trägt, wie Tags und Namen in fester Rangfolge die Kategorie wählen, warum der Rahmen erst nach 2 s wechselt, dass Höhlen die letzte Kategorie behalten und wer seine Wahl behält; löst 0005 in der Vorgabe ab.
 status: gilt
 date: 2026-10-10
 issues: []
@@ -30,13 +30,17 @@ vom Reviewer am 10.10.
   Tabelle steht in [Rahmen](../rahmen.md), „Biom“.
 - **Wechsel nach 2 s** in der neuen Kategorie, dann 0,3 s Überblendung.
 - **Nether und End** nehmen den Rückfall Grasland.
+- **Höhlen** behalten die letzte Kategorie: „Biom unter dem Spieler“ heisst
+  die Landschaft, nicht die Höhle. `stony_shore` zählt wie die Strände.
+  Entschieden vom Reviewer am 10.10., in der Nachtschicht.
 
 ## Verworfen
 
-- **Nur Tags:** Die Tags `c:` stammen aus Fabric API. Ein Server ohne sie,
-  etwa Paper, schickt nur die Tags des Spiels, und die haben nichts für
-  Schnee, Sumpf, Wüste oder Ebene. Die verschneite Taiga wäre dort Wald.
-  Darum stehen diese Biome des Spiels mit Namen in den Regeln.
+- **Nur Tags:** Der Server schickt die Tags des Spiels und die seiner
+  Datapacks; `c:` gibt es nur mit Fabric API oder einem Datapack, der sie
+  mitbringt. Die Tags des Spiels haben nichts für Schnee, Sumpf, Wüste
+  oder Ebene; ohne `c:` wäre die verschneite Taiga Wald. Darum stehen
+  diese Biome des Spiels mit Namen in den Regeln.
 - **Nur Namen:** Biome aus Datapacks oder Mods mit Tags würden falsch
   eingeordnet, wenn ihr Name nichts sagt. Tags gehen darum vor.
 - **Sofort wechseln:** An einer Grenze flackerte der Rahmen bei jedem

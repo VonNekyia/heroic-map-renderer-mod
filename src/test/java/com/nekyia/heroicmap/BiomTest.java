@@ -26,7 +26,7 @@ class BiomTest {
             Map.entry("mushroom_fields", "gewaesser"), Map.entry("deep_frozen_ocean", "schnee"), Map.entry("frozen_ocean", "schnee"),
             Map.entry("deep_cold_ocean", "gewaesser"), Map.entry("cold_ocean", "gewaesser"), Map.entry("deep_ocean", "gewaesser"),
             Map.entry("ocean", "gewaesser"), Map.entry("deep_lukewarm_ocean", "gewaesser"), Map.entry("lukewarm_ocean", "gewaesser"),
-            Map.entry("warm_ocean", "gewaesser"), Map.entry("stony_shore", "gebirge"), Map.entry("swamp", "feuchtgebiete"),
+            Map.entry("warm_ocean", "gewaesser"), Map.entry("stony_shore", "gewaesser"), Map.entry("swamp", "feuchtgebiete"),
             Map.entry("mangrove_swamp", "feuchtgebiete"), Map.entry("snowy_slopes", "schnee"), Map.entry("snowy_plains", "schnee"),
             Map.entry("snowy_beach", "schnee"), Map.entry("windswept_gravelly_hills", "gebirge"), Map.entry("grove", "schnee"),
             Map.entry("windswept_hills", "gebirge"), Map.entry("snowy_taiga", "schnee"), Map.entry("windswept_forest", "gebirge"),
@@ -40,8 +40,10 @@ class BiomTest {
             Map.entry("dappled_forest", "waelder"), Map.entry("old_growth_pine_taiga", "waelder"), Map.entry("sunflower_plains", "grasland"),
             Map.entry("old_growth_birch_forest", "waelder"), Map.entry("sparse_jungle", "tropen"), Map.entry("bamboo_jungle", "tropen"),
             Map.entry("eroded_badlands", "wueste"), Map.entry("windswept_savanna", "grasland"), Map.entry("cherry_grove", "waelder"),
-            Map.entry("frozen_peaks", "schnee"), Map.entry("dripstone_caves", "grasland"), Map.entry("lush_caves", "grasland"),
-            Map.entry("sulfur_caves", "grasland"), Map.entry("deep_dark", "grasland"));
+            Map.entry("frozen_peaks", "schnee"), Map.entry("dripstone_caves", BLEIBT), Map.entry("lush_caves", BLEIBT),
+            Map.entry("sulfur_caves", BLEIBT), Map.entry("deep_dark", BLEIBT));
+    /** In einer Höhle bleibt die letzte Kategorie; {@link Biom#kategorie} gibt dann null. */
+    private static final String BLEIBT = "bleibt";
 
     @Test
     void jedesBiomDesSpiels() {
@@ -52,8 +54,8 @@ class BiomTest {
         Tags paper = new Tags(false), fabric = new Tags(true);
         for (String id : oberwelt) {
             // Auf einem Paper-Server kommen nur die Tags des Spiels an, mit Fabric API auf dem Server auch die c:.
-            assertEquals(OBERWELT.get(id.substring(10)), Biom.kategorie(id, paper.von(id)), id + " ohne c:");
-            assertEquals(OBERWELT.get(id.substring(10)), Biom.kategorie(id, fabric.von(id)), id + " mit c:");
+            assertEquals(OBERWELT.get(id.substring(10)), kategorie(id, paper.von(id)), id + " ohne c:");
+            assertEquals(OBERWELT.get(id.substring(10)), kategorie(id, fabric.von(id)), id + " mit c:");
         }
         // Nether und End nehmen den Rückfall, auch der Wald im Nether.
         Set<String> andere = new HashSet<>(Tags.inhalt("minecraft:is_nether"));
@@ -62,6 +64,37 @@ class BiomTest {
         for (String id : andere) {
             assertEquals(Biom.GRASLAND, Biom.kategorie(id, fabric.von(id)), id);
         }
+    }
+
+    @Test
+    void biomeEinesDatapacks() {
+        // Echte Namen eines Datapacks mit eigenen Biomen, im Namensraum „beispiel“: einmal nur über den Namen,
+        // einmal mit den Tags, die der Datapack ihnen gibt.
+        Map<String, Set<String>> tags = Map.of(
+                "fungal_caves", Set.of("c:is_mushroom", "c:is_cave"),
+                "gravel_desert", Set.of("c:is_snowy", "c:is_desert"),
+                "alpha_islands_winter", Set.of(),
+                "skylands_winter", Set.of(),
+                "hot_shrubland", Set.of());
+        Map<String, String> nurName = Map.of("fungal_caves", Biom.GRASLAND, "gravel_desert", "wueste", "alpha_islands_winter", "schnee",
+                "skylands_winter", "schnee", "hot_shrubland", "wueste");
+        Map<String, String> mitTags = Map.of("fungal_caves", BLEIBT, "gravel_desert", "schnee", "alpha_islands_winter", "schnee",
+                "skylands_winter", "schnee", "hot_shrubland", "wueste");
+        for (String name : tags.keySet()) {
+            assertEquals(nurName.get(name), kategorie("beispiel:" + name, t -> false), name + " nur über den Namen");
+            assertEquals(mitTags.get(name), kategorie("beispiel:" + name, tags.get(name)::contains), name + " mit Tags");
+        }
+    }
+
+    @Test
+    void jedeKategorieHatEinenOrdner() {
+        for (String[] zeile : Biom.REGELN) {
+            assertTrue(Biom.KATEGORIEN.contains(zeile[0]), zeile[0]);
+        }
+        for (String[] zeile : Biom.WOERTER) {
+            assertTrue(Biom.KATEGORIEN.contains(zeile[0]), zeile[0]);
+        }
+        assertEquals(Set.copyOf(Biom.KATEGORIEN), Biom.ORDNER.keySet());
     }
 
     @Test
@@ -78,6 +111,11 @@ class BiomTest {
         assertEquals(Biom.GRASLAND, Biom.kategorie("beispiel:spicy_fields", ohne));
         // Ein Tag geht dem Namen vor.
         assertEquals("tropen", Biom.kategorie("beispiel:snowy_jungle", "minecraft:is_jungle"::equals));
+    }
+
+    private static String kategorie(String id, Predicate<String> tag) {
+        String k = Biom.kategorie(id, tag);
+        return k == null ? BLEIBT : k;
     }
 
     @Test

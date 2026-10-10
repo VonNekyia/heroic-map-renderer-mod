@@ -46,6 +46,7 @@ class SkinTest {
         Biom.KATEGORIEN.forEach(k -> baender.put(Skin.BIOM + "/" + k, 2));
         assertEquals(Skin.OHNE, Skin.NAMEN.getFirst());
         assertEquals(baender.keySet(), Set.copyOf(Skin.ORDNER));
+        int biomRand = 0;
         for (String name : Skin.ORDNER) {
             BufferedImage zier = bild(name, "zier");
             Skin s = Skin.lies(name, text(name, "palette.txt"), text(name, "info.txt"), Math.max(zier.getWidth(), zier.getHeight()));
@@ -55,10 +56,13 @@ class SkinTest {
             }
             // Mit Rahmen hält die Minimap so viel Abstand, dass die zier in der Ecke ganz auf dem Schirm bleibt.
             int rand = Minimap.rand(s);
+            biomRand = name.startsWith(Skin.BIOM + "/") ? Math.max(biomRand, rand) : biomRand;
             double[][] ecken = Skin.ecken(rand, rand, 128, 128, s.baender(), false);
             assertTrue(Skin.lage(ecken[0][0], zier.getWidth()) >= 0, name);
             assertTrue(Skin.lage(ecken[0][1], zier.getHeight()) >= 0, name);
         }
+        // „biom“ hält den grössten Abstand seiner Kategorien, so springt die Minimap beim Wechsel nicht.
+        assertEquals(6, biomRand);
     }
 
     @Test

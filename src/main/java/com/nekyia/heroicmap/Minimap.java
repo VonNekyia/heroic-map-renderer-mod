@@ -120,7 +120,7 @@ public final class Minimap {
     /** Der Rahmen, ein Name aus {@link Skin#NAMEN}; „ohne“ ist der Umriss. Siehe docs/rahmen.md. */
     private String skin = Skin.BIOM;
     private boolean skinGewaehlt;
-    private final Biom biom = new Biom();
+    private Biom biom = new Biom();
     /** Solange das Menü offen ist: die Ecke des Griffs, 0 bis 3, sonst -1; und ob die Maus auf ihm liegt. */
     private int griffEcke = -1;
     private boolean griffAktiv;
@@ -301,7 +301,7 @@ public final class Minimap {
 
     /** Der Skin, den die Minimap gerade zeichnet, bei „biom“ der der gezeigten Kategorie; null ohne Rahmen. */
     Skin skinJetzt() {
-        return Skin.von(Skin.BIOM.equals(skin) ? Skin.BIOM + "/" + biom.gezeigt() : skin);
+        return Skin.von(Skin.BIOM.equals(skin) ? Biom.ORDNER.get(biom.gezeigt()) : skin);
     }
 
     /** Vom Menü je Frame: wo der Griff liegt, -1 ohne Menü. Mit Skin zeichnet die Minimap ihn statt der zier. */
@@ -365,8 +365,8 @@ public final class Minimap {
         }
         // Der grösste Abstand aller Kategorien: So springt die Minimap beim Wechsel nicht.
         int rand = RAND;
-        for (String k : Biom.KATEGORIEN) {
-            rand = Math.max(rand, rand(Skin.von(Skin.BIOM + "/" + k)));
+        for (String ordner : Biom.ORDNER.values()) {
+            rand = Math.max(rand, rand(Skin.von(ordner)));
         }
         return rand;
     }
@@ -552,6 +552,8 @@ public final class Minimap {
         mitte = null;
         licht = null;
         stand++;
+        // Nach einem Wechsel der Welt oder Dimension gilt die erste Kategorie wieder sofort.
+        biom = new Biom();
     }
 
     /** Zeichnet den Bereich neu, ohne die Texturen zu leeren. */
@@ -576,8 +578,12 @@ public final class Minimap {
         int links = ecke(spieler.xo, spieler.getX(), a, zoom, k, n);
         int oben = ecke(spieler.zo, spieler.getZ(), a, zoom, k, n);
         long ms = Util.getMillis();
-        if (Skin.BIOM.equals(skin)) {
-            biom.sieh(biom.kategorie(level.getBiome(spieler.blockPosition())), ms);
+        // Ein Chunk, den der Client noch nicht hat, läse sich als Ebene; in einer Höhle bleibt die letzte Kategorie.
+        if (Skin.BIOM.equals(skin) && level.hasChunkAt(spieler.blockPosition())) {
+            String kategorie = biom.kategorie(level.getBiome(spieler.blockPosition()));
+            if (kategorie != null) {
+                biom.sieh(kategorie, ms);
+            }
         }
         Skin rahmen = skinJetzt();
         Drehung.Lage lage = drehen ? lage(r, Mth.lerp(a, spieler.xo, spieler.getX()), Mth.lerp(a, spieler.zo, spieler.getZ()),
@@ -606,14 +612,15 @@ public final class Minimap {
             gibUmrissFrei();
         }
         if (rahmen != null) {
-            // Beim Wechsel des Bioms blendet der alte Rahmen aus und der neue ein.
+            // Beim Wechsel des Bioms: Die Bänder sind in allen Kategorien gleich gebaut, die neuen decken die alten zu t;
+            // nur die alten Ornamente blenden aus. So sinkt die Deckung der Bänder nie.
             String vorher = Skin.BIOM.equals(skin) ? biom.vorher(ms) : null;
-            Skin alt = vorher == null ? null : Skin.von(Skin.BIOM + "/" + vorher);
+            Skin alt = vorher == null ? null : Skin.von(Biom.ORDNER.get(vorher));
             float t = alt == null ? 1 : biom.anteil(ms);
             if (alt != null) {
-                zeichneRahmen(g, alt, r, lage, 1 - t);
+                zeichneRahmen(g, alt, r, lage, 1, 1 - t);
             }
-            zeichneRahmen(g, rahmen, r, lage, t);
+            zeichneRahmen(g, rahmen, r, lage, t, t);
         }
         float kopf = kopf(r.seite());
         wegpunkte(g, r, dimension, links, oben, k, kopf, lage);
@@ -941,14 +948,14 @@ public final class Minimap {
     /**
      * Der Rahmen eines Skins über Karte und Linien, in Einheiten des GUI: die Bänder, eckig als
      * Rechtecke, rund als Ring; dann die zier an den Ecken, im Menü an der Ecke des Griffs der Griff;
-     * gedreht die Marken. Zu {@code deckung} deckend. Siehe docs/rahmen.md.
+     * gedreht die Marken. Die Bänder zu {@code baender}, die Ornamente zu {@code deckung} deckend. Siehe docs/rahmen.md.
      */
-    private void zeichneRahmen(GuiGraphicsExtractor g, Skin skin, Rahmen r, Drehung.Lage lage, float deckung) {
+    private void zeichneRahmen(GuiGraphicsExtractor g, Skin skin, Rahmen r, Drehung.Lage lage, float baender, float deckung) {
         if (rund) {
             g.innerBlit(RenderPipelines.GUI_TEXTURED, skin.ring(r.seite()), r.x(), r.x() + r.seite(), r.y(), r.y() + r.seite(),
-                    0, 1, 0, 1, ARGB.multiplyAlpha(-1, deckung));
+                    0, 1, 0, 1, ARGB.multiplyAlpha(-1, baender));
         } else {
-            skin.baender(g, r.x(), r.y(), r.seite(), r.seite(), deckung);
+            skin.baender(g, r.x(), r.y(), r.seite(), r.seite(), baender);
         }
         double[][] ecken = ecken(skin, r);
         for (int e = 0; e < ecken.length; e++) {
