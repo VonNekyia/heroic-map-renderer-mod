@@ -106,5 +106,7 @@ class SchleierTest {
         assertEquals(0xFF112233, Schleier.farbe(new Ebenen.Flaeche(WELT, 0x80445566, null, rand, List.of(ring), new double[] {0, 0, 1, 1}, "a")));
         assertEquals(0xFF445566, Schleier.farbe(new Ebenen.Kreis(WELT, 0, 0, 1, 0x80445566, null, "b")));
         assertEquals(0, Schleier.farbe(new Ebenen.Kreis(WELT, 0, 0, 1, 0, null, "c")));
+        // Eine Linie, auch eine eigene aus Wegpunkten, bekommt keinen Schleier.
+        assertEquals(0, Schleier.farbe(new Ebenen.Linie(WELT, new double[] {0, 0, 4, 4}, rand, new double[] {0, 0, 4, 4})));
     }
 }

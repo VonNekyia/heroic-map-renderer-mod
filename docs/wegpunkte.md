@@ -156,8 +156,10 @@ nach oben immer durchsichtiger.
 ![Der Schleier einer angehefteten Region am Hang und der Strahl eines angehefteten Wegpunkts; Szene `schleier` des Gametests](bilder/schleier.png)
 
 - **Welche:** dieselben Formen wie auf der Minimap, siehe „Anheften“:
-  angeheftete Flächen und Kreise der sichtbaren Ebenen und angeheftete
-  eigene Regionen, in der Dimension des Spielers (`Wegpunkte.minimap`).
+  angeheftete Flächen und Kreise der sichtbaren Ebenen, angeheftete eigene
+  Regionen aus Wegpunkten und alte Rechtecke, in der Dimension des Spielers
+  (`Wegpunkte.minimap`). Linien bekommen keinen Schleier, auch eigene
+  nicht, entschieden vom Reviewer (mod#79).
 - **Farbe:** der Rand der Form, ohne sichtbaren Rand ihre Füllung ohne
   Alpha; eine eigene Region in ihrer Farbe (`Schleier.farbe`).
 - **Form:** je Stück der Kante ein senkrechtes Viereck. Die Kanten teilt
