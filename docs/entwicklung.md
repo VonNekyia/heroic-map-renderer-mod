@@ -191,6 +191,10 @@ Ein Release geht auf GitHub und Modrinth, siehe
    versions; Read versions braucht die Prüfung, ob es die Version schon
    gibt, solange das Projekt in Prüfung ist. Fehlt das Secret, warnt der
    Lauf nur.
+5. **Nur das Jar des Releases** geht weiter, an jeden Ort, an dem der Mod
+   liegt: Modrinth, Modpacks, die eigene Instanz. Ein eigener Build trägt
+   dieselbe Versionsnummer, aber andere Bytes; so gibt es je Version genau
+   eine Fassung, und ihre SHA-256 steht in `SHA256SUMS` des Releases.
 
 ## Doku prüfen
 
