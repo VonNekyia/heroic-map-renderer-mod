@@ -42,6 +42,7 @@
   "heroicmap.karte.keine": "No map is downloaded for this dimension; /hmap angebot shows what the server offers.",
   "heroicmap.karte.laden": "Download map …",
   "heroicmap.karte.abgleich": "Sync",
+  "heroicmap.karte.zum_spieler": "To player",
   "heroicmap.karte.teleport": "Teleport here (%s, %s)",
   "heroicmap.karte.wegpunkt": "Add waypoint",
   "heroicmap.karte.wegpunkt_loeschen": "Delete waypoint",

@@ -42,6 +42,7 @@
   "heroicmap.karte.keine": "Für diese Dimension ist keine Karte geladen; /hmap angebot zeigt, was der Server anbietet.",
   "heroicmap.karte.laden": "Karte laden …",
   "heroicmap.karte.abgleich": "Abgleich",
+  "heroicmap.karte.zum_spieler": "Zum Spieler",
   "heroicmap.karte.teleport": "Hierher teleportieren (%s, %s)",
   "heroicmap.karte.wegpunkt": "Wegpunkt setzen",
   "heroicmap.karte.wegpunkt_loeschen": "Wegpunkt löschen",

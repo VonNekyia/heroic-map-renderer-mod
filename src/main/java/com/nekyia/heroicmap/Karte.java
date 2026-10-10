@@ -152,6 +152,14 @@ final class Karte extends Screen {
                     b -> hinweis = Downloads.INSTANZ.frageAbgleich(baum)).bounds(x, 28, KNOPF, 20).build());
             unterster = abgleich;
         }
+        // Wer sich verirrt hat, kommt zum eigenen Spieler zurück; Stufe und Lupe bleiben. Siehe docs/vollbildkarte.md, „Bedienung“.
+        if (blick != null) {
+            unterster = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.zum_spieler"), b -> {
+                if (minecraft.player != null) {
+                    zentriere(minecraft.player.getX(), minecraft.player.getZ());
+                }
+            }).bounds(x, unterster.getY() + 24, KNOPF, 20).build());
+        }
         knopfX = x;
         knopfUnten = unterster.getY() + unterster.getHeight();
     }

@@ -108,6 +108,7 @@ public final class Bedienung implements FabricClientGameTest {
         wegpunkt(context, maus, k, x, y);
         anheften(context, maus, k);
         region(context, maus, k);
+        zumSpieler(context, maus, k);
         maus.setCursorPos(x * k, y * k);
         context.waitTick();
 
@@ -416,6 +417,49 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("Linksklick setzt die zweite Ecke nicht: " + neu);
         }
         warte250();
+    }
+
+    /** Die Mitte des Knopfs mit dieser Aufschrift auf dem offenen Schirm, in Einheiten des GUI. */
+    private static double[] knopf(ClientGameTestContext context, String schluessel) {
+        return context.computeOnClient(mc -> {
+            String text = Component.translatable(schluessel).getString();
+            for (Object kind : mc.gui.screen().children()) {
+                if (kind instanceof AbstractWidget w && w.getMessage().getString().equals(text)) {
+                    return new double[] {w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0};
+                }
+            }
+            throw new AssertionError("Kein Knopf „" + text + "“");
+        });
+    }
+
+    /** Die Karte weit wegziehen, dann „Zum Spieler“: Der Spieler liegt in der Mitte. Siehe docs/vollbildkarte.md, „Bedienung“. */
+    private static void zumSpieler(ClientGameTestContext context, TestInput maus, int k) {
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+        warte250();
+        maus.setCursorPos(breite / 2.0 * k, hoehe / 2.0 * k);
+        context.waitTick();
+        maus.holdMouse(LINKS);
+        context.waitTick();
+        for (int i = 0; i < 5; i++) {
+            maus.moveCursor(-15 * k, 10 * k);
+            context.waitTick();
+        }
+        maus.releaseMouse(LINKS);
+        warte250();
+        double[] k2 = knopf(context, "heroicmap.karte.zum_spieler");
+        maus.setCursorPos(k2[0] * k, k2[1] * k);
+        context.waitTick();
+        maus.pressMouse(LINKS);
+        context.waitTicks(2);
+        double[] mitte = mitte(context);
+        double[] soll = context.computeOnClient(mc -> {
+            int scale = ((Karte) mc.gui.screen()).satz().scale();
+            return new double[] {mc.player.getX() * scale, mc.player.getZ() * scale};
+        });
+        if (Math.abs(mitte[0] - soll[0]) > 1e-6 || Math.abs(mitte[1] - soll[1]) > 1e-6) {
+            throw new AssertionError("„Zum Spieler“: Mitte " + mitte[0] + "," + mitte[1] + " statt " + soll[0] + "," + soll[1]);
+        }
     }
 
     private static boolean kreisAngeheftet(ClientGameTestContext context) {
