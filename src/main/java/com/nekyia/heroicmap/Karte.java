@@ -45,8 +45,6 @@ final class Karte extends Screen {
     private static final long BUNT_MS = 2000;
     /** Weiter gezogen, in Einheiten des GUI, ist es kein Klick auf eine Marke mehr. */
     private static final double ZUG = 3;
-    /** Die Spalte des Knopfs × rechts in der Tafel, in Einheiten des GUI; beim Zeigen blass, gehalten hell. */
-    private static final int SCHLIESSEN = 8, BLASS = 0x80D9D9D9;
     /** Die halbe Breite des Punkts unter einer angehefteten Nadel, in Einheiten des GUI. */
     private static final int PUNKT = 2;
     /** Die Vorschau einer Region, die der Spieler setzt. */
@@ -61,7 +59,7 @@ final class Karte extends Screen {
     private Tafeln.Ziel tafelOffen;
     private int tafelX, tafelY, tafelScroll;
     private long tafelSeit;
-    private int[] tafelKasten, tafelKnopf;
+    private int[] tafelKasten;
     /** Ist die Tafel höher als ihr Platz? Nur dann scrollt das Rad sie statt die Karte zu zoomen. */
     private boolean tafelZuHoch;
     /** Der Klick schloss oder traf die Tafel oder das Menü; sein Loslassen hält keine neue, sein Ziehen schiebt nicht. */
@@ -357,6 +355,11 @@ final class Karte extends Screen {
         return b + 8;
     }
 
+    /** Für die Gametests: Steht eine Tafel auf dem Schirm? */
+    boolean tafelOffen() {
+        return tafelKasten != null;
+    }
+
     /** Für den Gametest Bedienung: die Mitte des Blicks in Pixeln der Basis, das offene Menü, oder null, und die Marken. */
     double[] blickMitte() {
         return blick == null ? null : new double[] {blick.mx, blick.mz};
@@ -483,13 +486,8 @@ final class Karte extends Screen {
             klickVerbraucht = true;
             return true;
         }
-        // Ein Klick in die Tafel wirkt nicht auf die Karte und hält sie; der Knopf × schliesst sie.
+        // Ein Klick in die Tafel wirkt nicht auf die Karte.
         if (drin(tafelKasten, e.x(), e.y())) {
-            if (drin(tafelKnopf, e.x(), e.y())) {
-                zeigen.schliesse();
-            } else if (!zeigen.gehalten()) {
-                zeigen.halte(zeigen.offen());
-            }
             klickVerbraucht = true;
             return true;
         }
@@ -503,20 +501,6 @@ final class Karte extends Screen {
             }
             klickVerbraucht = true;
             return true;
-        }
-        // Solange der Spieler eine Region setzt, schliesst ein Klick keine Tafel, er setzt beim Loslassen die zweite Ecke.
-        if (zeigen.gehalten() && regionVon == null) {
-            // Ein Klick daneben schliesst zuerst nur die gehaltene Tafel; einer auf ein anderes Ziel hält beim Loslassen dessen.
-            // Nur eine sichtbare Tafel verbraucht den Klick; eine, die noch lädt oder keine ist, geht still zu.
-            Tafeln.Ziel alt = zeigen.offen(), anderes = tafelUnter(e.x(), e.y());
-            boolean sichtbar = tafelKasten != null;
-            zeigen.schliesse();
-            if (sichtbar && (anderes == null || anderes.equals(alt))) {
-                // Auch dieser Klick zählt für einen Doppelklick auf dasselbe Ziel.
-                letztesZiel = taste ? anderes : null;
-                klickVerbraucht = true;
-                return true;
-            }
         }
         if (super.mouseClicked(e, doppelt)) {
             return true;
@@ -558,18 +542,10 @@ final class Karte extends Screen {
             regionVon = null;
             return true;
         }
-        // Ein Klick ohne Zug auf ein Ziel ohne Marke hält seine Tafel.
+        // Ein Klick ohne Zug auf ein Ziel ohne Marke merkt es für einen Doppelklick; eine Tafel hält er nicht.
         if (m == null && e.button() == InputConstants.MOUSE_BUTTON_LEFT && gezogen <= ZUG && ziel == null && blick != null
                 && !drin(tafelKasten, e.x(), e.y())) {
-            Tafeln.Ziel z = tafelUnter(e.x(), e.y());
-            // Ein Ziel mit id lässt sich anheften, auch wenn es keine Tafel hat.
-            letztesZiel = z;
-            // Halten nur, wenn eine Tafel da ist oder noch kommt; die Frage geht dabei schon hinaus.
-            Optional<Tafel> t = z == null ? Optional.empty() : Tafeln.INSTANZ.tafel(z, Util.getMillis());
-            if (t == null || t.isPresent()) {
-                zeigen.halte(z);
-                return true;
-            }
+            letztesZiel = tafelUnter(e.x(), e.y());
         }
         if (m == null || e.button() != InputConstants.MOUSE_BUTTON_LEFT) {
             return knopf;
@@ -617,13 +593,12 @@ final class Karte extends Screen {
             tafelSeit = ms;
         }
         tafelKasten = null;
-        tafelKnopf = null;
         tafelZuHoch = false;
         if (offen == null || t == null && ms - tafelSeit < Tafeln.LAEDT_MS) {
             return;
         }
         Tafel.Satz s = t == null ? laedt() : satz(t.get());
-        int w = s.breite() + 2 * Tafel.INNEN + SCHLIESSEN, voll = s.hoehe() + 2 * Tafel.INNEN, h = Math.min(voll, height - 8);
+        int w = s.breite() + 2 * Tafel.INNEN, voll = s.hoehe() + 2 * Tafel.INNEN, h = Math.min(voll, height - 8);
         // Rechts unter dem Zeiger; ist dort kein Platz, links von ihm oder über ihm, so rutscht sie nicht unter ihn.
         int x = tafelX + 12 + w > width - 4 ? tafelX - 12 - w : tafelX + 12;
         int y = tafelY + 12 + h > height - 4 ? tafelY - 12 - h : tafelY + 12;
@@ -632,7 +607,7 @@ final class Karte extends Screen {
         tafelZuHoch = voll > h;
         tafelScroll = Math.max(0, Math.min(tafelScroll, voll - h));
         g.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.fromNamespaceAndPath(HeroicMap.ID, "rahmen/" + tafelSkin() + "/tafel"), x, y, w, h);
-        g.enableScissor(x + Tafel.INNEN, y + Tafel.INNEN, x + w - Tafel.INNEN - SCHLIESSEN, y + h - Tafel.INNEN);
+        g.enableScissor(x + Tafel.INNEN, y + Tafel.INNEN, x + w - Tafel.INNEN, y + h - Tafel.INNEN);
         for (Tafel.Stueck stueck : s.stuecke()) {
             switch (stueck) {
                 case Tafel.Text text -> g.text(font, stil(text.text(), text.fett()), x + Tafel.INNEN + text.x(),
@@ -670,9 +645,6 @@ final class Karte extends Screen {
             }
         }
         g.disableScissor();
-        // Der Knopf × in seiner eigenen Spalte rechts, nie über dem Titel; beim Zeigen blass, gehalten hell.
-        tafelKnopf = new int[] {x + w - Tafel.INNEN - SCHLIESSEN, y, Tafel.INNEN + SCHLIESSEN, Tafel.INNEN + font.lineHeight};
-        g.text(font, "×", x + w - Tafel.INNEN - SCHLIESSEN + 2, y + Tafel.INNEN, zeigen.gehalten() ? Tafel.SCHRIFT : BLASS, false);
         tafelKasten = new int[] {x, y, w, h};
     }
 
@@ -901,10 +873,7 @@ final class Karte extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent ereignis) {
-        // Escape schliesst zuerst nur die Tafel, dann bricht es eine Region ab, die der Spieler setzt.
-        if (ereignis.key() == InputConstants.KEY_ESCAPE && tafelKasten != null && zeigen.schliesse()) {
-            return true;
-        }
+        // Escape bricht zuerst eine Region ab, die der Spieler setzt.
         if (ereignis.key() == InputConstants.KEY_ESCAPE && regionVon != null) {
             regionVon = null;
             return true;

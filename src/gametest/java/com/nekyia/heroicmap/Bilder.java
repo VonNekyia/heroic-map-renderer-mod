@@ -370,32 +370,24 @@ public final class Bilder implements FabricClientGameTest {
         context.runOnClient(mc -> Tafeln.INSTANZ.antwort(Tafeln.Antwort.lies(TAFEL)));
         context.waitTicks(10);
         Path zeigen = context.takeScreenshot(TestScreenshotOptions.of("tafel-zeigen").disableCounterPrefix());
+        // Ein Klick hält die Tafel nicht (mod#75): Geht der Zeiger weg, ist sie nach dem Nachlauf zu.
         context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
         context.getInput().setCursorPos(10 * k, (hoehe - 10) * k);
         context.waitTicks(20);
-        Path gehalten = context.takeScreenshot(TestScreenshotOptions.of("tafel-gehalten").disableCounterPrefix());
-        context.getInput().pressKey(InputConstants.KEY_ESCAPE);
-        context.waitTicks(5);
-        if (!context.computeOnClient(mc -> mc.gui.screen() instanceof Karte)) {
-            throw new AssertionError("Escape schloss die Karte statt erst der Tafel");
+        if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelOffen())) {
+            throw new AssertionError("Ein Klick hielt die Tafel offen");
         }
-        // Zurück auf die Nadel: Die Tafel geht wieder auf, Escape schliesst sie, sie bleibt zu, der zweite Escape schliesst die Karte.
+        // Zurück auf die Nadel: Die Tafel geht wieder auf, und Escape schliesst gleich die Karte.
         context.getInput().setCursorPos(breite / 2.0 * k, (hoehe / 2.0 - 24) * k);
         context.waitTicks(10);
         context.getInput().pressKey(InputConstants.KEY_ESCAPE);
-        context.waitTicks(10);
-        if (!context.computeOnClient(mc -> mc.gui.screen() instanceof Karte)) {
-            throw new AssertionError("Escape auf der Nadel schloss die Karte statt erst der Tafel");
-        }
-        context.getInput().pressKey(InputConstants.KEY_ESCAPE);
         context.waitTicks(5);
         if (context.computeOnClient(mc -> mc.gui.screen() instanceof Karte)) {
-            throw new AssertionError("Der zweite Escape auf der Nadel schloss die Karte nicht; die Tafel ging wieder auf");
+            throw new AssertionError("Escape auf der Nadel schloss die Karte nicht");
         }
         if (!AUSGABE.isEmpty()) {
             try {
                 Files.copy(zeigen, Path.of(AUSGABE, "tafel-zeigen.png"), StandardCopyOption.REPLACE_EXISTING);
-                Files.copy(gehalten, Path.of(AUSGABE, "tafel-gehalten.png"), StandardCopyOption.REPLACE_EXISTING);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }

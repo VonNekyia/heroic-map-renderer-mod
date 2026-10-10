@@ -455,17 +455,14 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
 - **Lage:** wie die Tooltips des Spiels rechts unter der Stelle, an der
   sie aufging; ist dort kein Platz, links von ihr oder über ihr, so
   rutscht sie nicht unter den Zeiger. Ganz auf dem Schirm.
-- **Halten:** Ein Klick ohne Zug auf das Ziel oder in die Tafel hält sie
-  offen, bis zum Knopf ×, Escape oder einem Klick daneben. Ein Klick auf
-  ein anderes Ziel schliesst sie und hält dessen Tafel. Escape und ein
-  Klick daneben schliessen zuerst nur die Tafel; erst der nächste wirkt
-  auf die Karte. Von Hand geschlossen, öffnet sie erst wieder, wenn der
-  Zeiger ein anderes Ziel berührt hat; so schliesst der zweite Escape die
-  Karte, auch mit dem Zeiger auf dem Ziel. Ein Klick in die Tafel und ein
-  Zug, der in ihr beginnt, wirken nie auf die Karte, ebenso der Druck,
-  der eine gehaltene Tafel schliesst.
-- **Zu** geht sie auch von selbst, wenn ihr Objekt keine Tafel hat, auch
-  gehalten, und wenn ihre Ebene nicht mehr gezeichnet wird oder neue
+- **Kein Halten:** Ein Klick hält die Tafel nicht; sie kommt nur beim
+  Zeigen. Das will der User (mod#75): Das Halten war unnötig und störte den
+  Doppelklick zum Anheften. Bis 0.2.14 hielt ein Klick sie offen, bis zum
+  Knopf ×, Escape oder einem Klick daneben. Ein Klick in die Tafel und ein
+  Zug, der in ihr beginnt, wirken nie auf die Karte. Escape schliesst die
+  Karte, auch wenn eine Tafel steht.
+- **Zu** geht sie auch von selbst, wenn ihr Objekt keine Tafel hat, und
+  wenn ihre Ebene nicht mehr gezeichnet wird oder neue
   Daten hat. Dann öffnet dieses Objekt erst wieder, wenn der Zeiger ein
   anderes berührt hat; ein anderes Ziel unter dem Zeiger öffnet wie sonst
   (`Tafeln.Zeigen.zu`).
@@ -479,8 +476,7 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   des Spiels in ihrer Grösse: Der Inhalt ist so breit wie sein breitester
   Baustein, höchstens 200 Einheiten, und nicht 320 wie auf der Webkarte;
   6 Innenabstand, 4 zwischen Bausteinen, 6 vor einem Abschnitt, siehe
-  [0010](entscheidungen/0010-tafel-200-einheiten.md). Rechts eine eigene
-  Spalte von 8 Einheiten für den Knopf ×. Titel fett, Zeilen umbrochen.
+  [0010](entscheidungen/0010-tafel-200-einheiten.md). Titel fett, Zeilen umbrochen.
   Ein Titel mit eigener `color` unter 3:1 Kontrast gegen den Grund
   `#101014` (WCAG) steht im selben Farbton heller: Der Mod mischt in
   Schritten von 10 % Weiss bei, bis 3:1 erreicht ist, das Alpha bleibt
@@ -501,9 +497,9 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   Taste. Der Grund ist der 9-Slice des Rahmens der Minimap,
   `rahmen/<skin>/tafel.png`, 16 × 16 mit 5 Rand; „ohne“ und „biom“ nehmen
   den schlichten unter `rahmen/ohne/`. Die Schrift ist hell, `#D9D9D9`,
-  denn die Fläche ist überall dunkel. Der Knopf × steht beim Zeigen blass,
-  gehalten hell. Höher als der Schirm, scrollt das Mausrad über der Tafel
-  sie; passt sie, zoomt es die Karte.
+  denn die Fläche ist überall dunkel. Höher als der Schirm, scrollt das
+  Mausrad über der Tafel sie; passt sie, zoomt es die Karte. Solange der
+  Zeiger über ihr liegt, bleibt sie offen.
 - **Bilder** holt der Mod wie die Symbole, siehe „Symbole“, höchstens
   512 × 512 (`Symbole.tafelBild`), mit eigenem Budget: höchstens 16 MiB
   an Pixeln und 1024 Einträge, darüber gibt er die am längsten nicht
@@ -516,8 +512,6 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   so bleibt es in seinem Kasten (`Tafel.faktor`).
 
 ![Die Tafel der Nadel „Nordhafen“ beim Zeigen; Szene `orte` des Gametests](bilder/tafel-zeigen.png)
-
-![Dieselbe Tafel per Klick gehalten, der Zeiger steht woanders](bilder/tafel-gehalten.png)
 
 ## Umschalten
 

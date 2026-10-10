@@ -50,9 +50,8 @@ Fläche oder einen Kreis vom Server an, siehe „Anheften“ (mod#36).
   beim Loslassen ohne Zug das Ziel unter der Maus (`Karte.letztesZiel`),
   eine Nadel, ein Banner, eine Fläche oder einen Kreis mit `id`; eine Nadel
   geht vor, wie bei der Tafel. Der zweite heftet es an, wenn unter ihm
-  dasselbe Ziel liegt; ein Knopf geht vor. Schliesst der erste Klick die gehaltene Tafel desselben Ziels, zählt
-  er ebenso. Die Tafel bleibt, wie der erste Klick sie liess, siehe
-  [Ebenen](ebenen.md), „Infotafel“.
+  dasselbe Ziel liegt; ein Knopf geht vor. Eine Tafel hält dabei keiner
+  der Klicks, siehe [Ebenen](ebenen.md), „Infotafel“.
 - **Treffer:** eine halbe Kopfseite und eine Einheit um die Mitte der
   Marke. Ein Wegpunkt oder Mitspieler geht dem eigenen Kopf vor, sonst
   liesse sich ein Wegpunkt am eigenen Standort nicht greifen; sonst die

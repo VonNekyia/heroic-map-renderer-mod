@@ -34,12 +34,12 @@ sagt sie das und zeigt nichts.
 | Ziehen mit links | verschiebt die Karte, der Inhalt folgt der Maus |
 | Mausrad | zoomt, siehe „Stufen und Lupe“; über einer Tafel, die höher ist als ihr Platz, scrollt es sie |
 | Zeigen auf eine Nadel, ein Banner, eine Fläche oder einen Kreis | öffnet nach 50 ms dessen Tafel, siehe [Ebenen](ebenen.md), „Infotafel“ |
-| Klick auf eine Nadel, ein Banner, eine Fläche oder einen Kreis | hält dessen Tafel offen, bis zum Knopf ×, `Esc` oder einem Klick daneben |
+| Doppelklick auf eine Nadel, ein Banner, eine Fläche oder einen Kreis | heftet es an die Minimap oder löst es, siehe [Wegpunkte](wegpunkte.md), „Anheften“; ein Klick hält keine Tafel, sie kommt nur beim Zeigen |
 | Rechtsklick | öffnet ein kleines Menü für den Block unter der Maus, wie die Anzeige unten links: „Hierher teleportieren (x, z)“, siehe unten, darunter „Wegpunkt setzen“, auf einem Wegpunkt „Wegpunkt löschen“, siehe [Wegpunkte](wegpunkte.md); erst ein Klick auf einen Eintrag tut etwas, mit der linken oder rechten Taste, jeder Klick daneben schliesst es, ein Rechtsklick öffnet es dort neu |
 | Klick, Doppelklick auf eine Marke | legt beim Loslassen einen Wegpunkt, Mitspieler oder den eigenen Spieler in die Mitte; ein Doppelklick heftet einen Wegpunkt oder Mitspieler an die Minimap, ebenso die Raute einer eigenen Region und eine Fläche oder einen Kreis vom Server; wer auf einer Marke zieht, zieht nur die Karte; siehe [Wegpunkte](wegpunkte.md) |
 | Knopf „Karte laden …“ | zeigt die Karten des Servers, je Baum der Name und darunter ein Knopf je Massstab mit seiner Grösse (`Auswahl`), darüber die Wahl „Selbst“, siehe [Selbst gezeichnete Karte](selbst.md); die Knöpfe teilen sich die Breite des Schirms, höchstens 90 Einheiten je Knopf, so passen sie auch bei grossem GUI-Massstab; den Massstab, den der Spieler schon ganz hat (`Downloads.vollstaendig`: ein vollständiger Satz, und das Plugin misst den Abgleich an demselben Massstab), zeigt der Knopf als „Abgleich“ und gleicht ab wie der Knopf „Abgleich“, nach einer Ablehnung mit `wieder` bis dahin aus; ein Klick fragt wie `/hmap laden` erst im Dialog nach |
 | Knopf „Abgleich“ | fragt einen Abgleich des gezeigten Satzes an, wie `/hmap abgleich`; nur mit einem Satz vom Server, nicht auf der selbst gezeichneten Karte. Lehnt der Server mit `wieder` ab, ist der Knopf bis dahin aus und nennt die Uhrzeit |
-| `Esc` | schliesst zuerst eine offene Tafel, dann die Karte |
+| `Esc` | bricht zuerst eine Region ab, die der Spieler setzt, sonst schliesst es die Karte |
 
 - **Das Spiel läuft weiter,** die Karte hält es nicht an (`isPauseScreen`).
 - **Unten links** stehen der Name des Satzes und `x`, `z` des Blocks unter
