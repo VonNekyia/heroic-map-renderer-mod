@@ -571,9 +571,11 @@ Barrieren, zeichnen nichts.
 - **Geprüft** im Gametest `Blockentities`: Truhe, Tür, Schild und Kopf,
   gesetzt und abgebaut wie ein Spieler; die Minimap zeigt sie ohne
   weiteres Zutun, verglichen am Bild auf dem Schirm. Mit
-  `-Pzusatzmods=<ordner>` und Sodium darin auch mit Sodium, siehe
-  [Bauen und testen](entwicklung.md); ohne `ClientLevelMixin` ist er dort
-  rot.
+  `-Pzusatzmods=<ordner>` und Sodium darin auch mit Sodium, mit
+  `-Peula=<datei>` auch auf einem Server, mit dem der Client übers Netz
+  spricht, siehe [Bauen und testen](entwicklung.md); ohne
+  `ClientLevelMixin` ist er mit Sodium rot, im Einzelspieler wie auf dem
+  Server.
 - **Ausnahme:** `LevelExtractor.allChanged` legt alles neu an, ohne
   `setSectionDirty`, etwa wenn der Biomübergang sich ändert. Der Mod
   vergleicht deshalb je Frame `Options.biomeBlendRadius` und den Block-Atlas
