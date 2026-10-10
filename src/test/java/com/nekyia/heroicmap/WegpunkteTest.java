@@ -98,6 +98,24 @@ class WegpunkteTest {
     }
 
     @Test
+    void verschiebenBehaeltFarbeUndAnheften(@TempDir Path ordner) {
+        Wegpunkte w = new Wegpunkte();
+        w.lies(ordner);
+        w.setze(WELT, 1, 1);
+        w.setze(WELT, 5, 5);
+        w.umschalten(w.punkte().getFirst());
+        Wegpunkte.Punkt erster = w.punkte().getFirst();
+        assertTrue(w.verschiebe(erster, 10, -3));
+        assertEquals(new Wegpunkte.Punkt(WELT, 10, -3, erster.farbe(), true), w.punkte().getFirst());
+        // Auf einen besetzten Block nicht, und einen, den es nicht mehr gibt, auch nicht.
+        assertFalse(w.verschiebe(w.punkte().getFirst(), 5, 5));
+        assertFalse(w.verschiebe(erster, 20, 20));
+        Wegpunkte nachher = new Wegpunkte();
+        nachher.lies(ordner);
+        assertEquals(10, nachher.punkte().getFirst().x());
+    }
+
+    @Test
     void ohneOrdnerNurImSpeicher() {
         Wegpunkte w = new Wegpunkte();
         w.lies((Path) null);

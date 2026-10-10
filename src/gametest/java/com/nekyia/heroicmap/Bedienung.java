@@ -110,6 +110,7 @@ public final class Bedienung implements FabricClientGameTest {
         region(context, maus, k);
         zumSpieler(context, maus, k);
         optionen(context, maus, k);
+        verschieben(context, maus, k);
         maus.setCursorPos(x * k, y * k);
         context.waitTick();
 
@@ -491,6 +492,59 @@ public final class Bedienung implements FabricClientGameTest {
         if (!context.computeOnClient(mc -> mc.gui.screen() instanceof Karte) || !Arrays.equals(mitte(context), vorher)) {
             throw new AssertionError("„Fertig“ führte nicht an dieselbe Stelle der Karte zurück");
         }
+    }
+
+    /**
+     * Linke Taste 2 s still auf einem Wegpunkt: Er hängt an der Maus und liegt nach dem Loslassen auf dem
+     * Block darunter; ein zweites Mal mit Escape bleibt er, wo er war. Siehe docs/wegpunkte.md, „Bedienung“.
+     */
+    private static void verschieben(ClientGameTestContext context, TestInput maus, int k) {
+        // Ein Wegpunkt links über der Mitte, wo nichts anderes liegt: 40 und 32 Einheiten, bei scale 4 also 10 und 8 Blöcke.
+        Wegpunkte.Punkt punkt = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            int x = (int) Math.floor(m[0] / 4) - 10, z = (int) Math.floor(m[1] / 4) - 8;
+            Wegpunkte.INSTANZ.setze(mc.level.dimension().identifier().toString(), x, z);
+            return Wegpunkte.INSTANZ.punkte().getLast();
+        });
+        context.waitTick();
+        warte250();
+        Karte.Marke m = marke(context, punkt);
+        maus.setCursorPos(m.x() * k, m.y() * k);
+        context.waitTick();
+        maus.holdMouse(LINKS);
+        context.waitTicks(50);
+        if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).haengt()) == null) {
+            maus.releaseMouse(LINKS);
+            throw new AssertionError("Nach 2,5 s still gehalten hängt der Wegpunkt nicht an der Maus");
+        }
+        for (int i = 0; i < 4; i++) {
+            maus.moveCursor(10 * k, 0);
+            context.waitTick();
+        }
+        maus.releaseMouse(LINKS);
+        context.waitTicks(2);
+        Wegpunkte.Punkt neu = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().getLast());
+        if (Math.abs(neu.x() - (punkt.x() + 10)) > 1 || Math.abs(neu.z() - punkt.z()) > 1 || neu.farbe() != punkt.farbe()) {
+            throw new AssertionError("Verschoben: " + neu + " statt rund 10 Blöcke östlich von " + punkt);
+        }
+        // Noch einmal, aber mit Escape: Er bleibt, und das Loslassen danach tut nichts.
+        warte250();
+        Karte.Marke n = marke(context, neu);
+        maus.setCursorPos(n.x() * k, n.y() * k);
+        context.waitTick();
+        maus.holdMouse(LINKS);
+        context.waitTicks(50);
+        maus.moveCursor(0, 30 * k);
+        context.waitTick();
+        maus.pressKey(InputConstants.KEY_ESCAPE);
+        context.waitTick();
+        maus.releaseMouse(LINKS);
+        context.waitTicks(2);
+        if (!context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().getLast()).equals(neu)
+                || !context.computeOnClient(mc -> mc.gui.screen() instanceof Karte)) {
+            throw new AssertionError("Escape beim Verschieben liess den Wegpunkt nicht, wo er war, oder schloss die Karte");
+        }
+        warte250();
     }
 
     private static boolean kreisAngeheftet(ClientGameTestContext context) {

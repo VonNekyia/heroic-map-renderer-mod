@@ -93,6 +93,11 @@ final class Karte extends Screen {
     private Marke gedrueckt;
     /** War das Drücken der zweite Klick eines Doppelklicks? */
     private boolean doppelklick;
+    /** So lange hält der Spieler die linke Taste still auf einem Wegpunkt, bis er an der Maus hängt, in ms. */
+    private static final long HALTEN_MS = 2000;
+    /** Seit wann die linke Taste gedrückt ist, und der Wegpunkt, der an der Maus hängt, oder null. */
+    private long gedruecktSeit;
+    private Wegpunkte.Punkt haengt;
     /** Die Marke eines Klicks, die in die Mitte kommt, wenn kein zweiter Klick folgt, und seit wann sie wartet. */
     private Marke wartend;
     private long wartendSeit;
@@ -175,6 +180,12 @@ final class Karte extends Screen {
             super.extractRenderState(g, mausX, mausY, delta);
             return;
         }
+        // Still gehalten auf einem Wegpunkt hängt er nach HALTEN_MS an der Maus. Siehe docs/wegpunkte.md, „Bedienung“.
+        if (haengt == null && taste && gedrueckt != null && gedrueckt.punkt() != null && !doppelklick && gezogen <= ZUG
+                && Util.getMillis() - gedruecktSeit >= HALTEN_MS) {
+            haengt = gedrueckt.punkt();
+            wartend = null;
+        }
         // Ein Klick auf eine Marke zentriert erst, wenn kein zweiter folgt; so bewegt ein Doppelklick die Karte nicht.
         if (wartend != null && Util.getMillis() - wartendSeit >= MouseHandler.DOUBLE_CLICK_THRESHOLD_MS) {
             zentriere(wartend.weltX(), wartend.weltZ());
@@ -218,6 +229,10 @@ final class Karte extends Screen {
                     : Component.translatable("heroicmap.karte.abgleich_ab", Downloads.uhr(ab)));
         }
         super.extractRenderState(g, mausX, mausY, delta);
+        if (haengt != null) {
+            // Der Wegpunkt, der an der Maus hängt, unter dem Zeiger.
+            Minimap.wegpunkt(g, mausX, mausY, Minimap.KOPF, Wegpunkte.FARBEN[haengt.farbe()], 0);
+        }
         tafel(g, mausX, mausY);
         if (ziel != null) {
             int b = menueBreite();
@@ -274,7 +289,7 @@ final class Karte extends Screen {
             }
         }
         for (Wegpunkte.Punkt p : Wegpunkte.INSTANZ.punkte()) {
-            if (p.dimension().equals(dimension)) {
+            if (p.dimension().equals(dimension) && !p.equals(haengt)) {
                 Marke m = marke(p.x() + 0.5, p.z() + 0.5, null, p);
                 Minimap.wegpunkt(g, m.x(), m.y(), Minimap.KOPF, Wegpunkte.FARBEN[p.farbe()], p.angeheftet() ? bunt : 0);
             }
@@ -382,6 +397,11 @@ final class Karte extends Screen {
             b = Math.max(b, font.width(e.text()));
         }
         return b + 8;
+    }
+
+    /** Für die Gametests: der Wegpunkt an der Maus, oder null. */
+    Wegpunkte.Punkt haengt() {
+        return haengt;
     }
 
     /** Für die Gametests: Steht eine Tafel auf dem Schirm? */
@@ -542,6 +562,7 @@ final class Karte extends Screen {
             // Der zweite zählt für die Marke des ersten, die noch nicht in die Mitte kam, und hebt das auf.
             doppelklick = doppelt && vorige != null;
             gedrueckt = doppelklick ? vorige : m;
+            gedruecktSeit = Util.getMillis();
             if (doppelklick) {
                 wartend = null;
             }
@@ -564,6 +585,13 @@ final class Karte extends Screen {
         taste = false;
         if (klickVerbraucht) {
             klickVerbraucht = false;
+            return true;
+        }
+        // Der Wegpunkt an der Maus kommt auf den Block unter ihr, mit Farbe und Anheften.
+        if (haengt != null) {
+            int[] b = block(e.x(), e.y());
+            Wegpunkte.INSTANZ.verschiebe(haengt, b[0], b[1]);
+            haengt = null;
             return true;
         }
         // Solange die Vorschau läuft, setzt ein Linksklick ohne Zug die zweite Ecke, auch auf einer Marke; ziehen verschiebt weiter.
@@ -611,7 +639,7 @@ final class Karte extends Screen {
     private void tafel(GuiGraphicsExtractor g, int mausX, int mausY) {
         long ms = Util.getMillis();
         boolean ueber = drin(tafelKasten, mausX, mausY);
-        zeigen.zeiger(ziel == null && !ueber && !(taste && gezogen > ZUG) ? zielUnter(mausX, mausY) : null, ueber, ms);
+        zeigen.zeiger(ziel == null && haengt == null && !ueber && !(taste && gezogen > ZUG) ? zielUnter(mausX, mausY) : null, ueber, ms);
         if (zeigen.offen() != null && !Tafeln.gilt(Ebenen.INSTANZ, zeigen.offen())) {
             zeigen.zu();
         }
@@ -871,8 +899,8 @@ final class Karte extends Screen {
 
     @Override
     public boolean mouseDragged(MouseButtonEvent ereignis, double dx, double dy) {
-        // Ein Zug, der in der Tafel beginnt oder mit dem Druck, der sie schloss, schiebt die Karte nicht.
-        if (klickVerbraucht) {
+        // Ein Zug, der in der Tafel beginnt, oder einer mit einem Wegpunkt an der Maus schiebt die Karte nicht.
+        if (klickVerbraucht || haengt != null) {
             return true;
         }
         // Die Tasten zählen wie in SDL, links ist 1. Siehe docs/entwicklung.md, „Maustasten“.
@@ -906,7 +934,13 @@ final class Karte extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent ereignis) {
-        // Escape bricht zuerst eine Region ab, die der Spieler setzt.
+        // Escape lässt zuerst einen Wegpunkt an der Maus, wo er war; das Loslassen danach tut nichts.
+        if (ereignis.key() == InputConstants.KEY_ESCAPE && haengt != null) {
+            haengt = null;
+            klickVerbraucht = true;
+            return true;
+        }
+        // Escape bricht dann eine Region ab, die der Spieler setzt.
         if (ereignis.key() == InputConstants.KEY_ESCAPE && regionVon != null) {
             regionVon = null;
             return true;
