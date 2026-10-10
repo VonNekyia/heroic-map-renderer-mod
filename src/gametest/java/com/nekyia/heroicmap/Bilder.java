@@ -24,7 +24,11 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.ConfirmScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.network.chat.Component;
 
 /**
  * Bilder der Minimap zum Ansehen, nicht zum Vergleichen: baut eine Szene in einer flachen
@@ -145,7 +149,9 @@ public final class Bilder implements FabricClientGameTest {
 
     /**
      * Nadeln und Banner mit ihren Namen in der Kartenschrift unter dem Fuss, in fester Grösse: die Minimap
-     * bei 4 px und Zoom 4, dann die Vollbildkarte; dort einmal mit „Unicode-Schrift erzwingen“.
+     * bei 4 px und Zoom 2 ohne Angeheftetes, mit angehefteter Nadel und angeheftetem Banner, und nah am
+     * Banner; dann die Vollbildkarte, dort einmal mit „Unicode-Schrift erzwingen“; zuletzt die Grössen
+     * des Banners nebeneinander.
      * Siehe docs/ebenen.md, „Nadeln“,
      * und docs/ebenen.md, „Banner“.
      */
@@ -167,12 +173,23 @@ public final class Bilder implements FabricClientGameTest {
                 // Eine eigene Region links unten, wie der Spieler sie über das Menü setzt (docs/wegpunkte.md, „Regionen“).
                 Wegpunkte.INSTANZ.setze(Ebenen.UEBERWELT, -14, 2, -5, 8);
                 Minimap.INSTANZ.setzeScale(4);
-                Minimap.INSTANZ.setzeZoom(4);
+                Minimap.INSTANZ.setzeZoom(2);
             });
             context.waitFor(mc -> Symbole.INSTANZ.banner("test:orte", "1", "images/banner.png") != null
                     && Symbole.INSTANZ.symbol("test:orte", "1", "images/anker.png", 16) != null && Minimap.INSTANZ.fertig(), 600);
-            context.waitTicks(2);
-            BufferedImage minimap = mitRand(context, context.takeScreenshot(TestScreenshotOptions.of("orte").disableCounterPrefix()));
+            // Ohne Angeheftetes, dann mit, beide 24,7 Blöcke vom Banner bei (10, -9), so steht es noch ganz auf der Minimap;
+            // zuletzt nah an ihm. Siehe docs/ebenen.md, „Banner“.
+            BufferedImage[] teile = new BufferedImage[3];
+            teile[0] = minimapBei(context, server, -7.5, 8.5, "orte-ohne");
+            context.runOnClient(mc -> {
+                Wegpunkte.INSTANZ.umschaltenNadel("test:orte", "nordhafen");
+                Wegpunkte.INSTANZ.umschaltenNadel("test:orte", "westmark");
+            });
+            teile[1] = minimapBei(context, server, -7.5, 8.5, "orte-angeheftet");
+            teile[2] = minimapBei(context, server, 7.5, -6.5, "orte-nah");
+            BufferedImage minimap = nebeneinander(0, teile);
+            server.runCommand("tp @a 0.5 -30 0.5 0 90");
+            context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - 0.5) < 0.1 && Minimap.INSTANZ.fertig(), 600);
             Path baum = testsatz();
             context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
             context.waitTicks(40);
@@ -189,9 +206,11 @@ public final class Bilder implements FabricClientGameTest {
             context.runOnClient(mc -> mc.options.forceUnicodeFont().set(false));
             context.waitTicks(10);
             tafel(context);
+            BufferedImage groessen = groessen(context);
             if (!AUSGABE.isEmpty()) {
                 try {
                     ImageIO.write(minimap, "png", Path.of(AUSGABE, "orte.png").toFile());
+                    ImageIO.write(groessen, "png", Path.of(AUSGABE, "banner-groessen.png").toFile());
                     Files.copy(karte, Path.of(AUSGABE, "orte-karte.png"), StandardCopyOption.REPLACE_EXISTING);
                     Files.copy(unicode, Path.of(AUSGABE, "orte-unicode.png"), StandardCopyOption.REPLACE_EXISTING);
                 } catch (IOException e) {
@@ -203,9 +222,117 @@ public final class Bilder implements FabricClientGameTest {
                 Ebenen.INSTANZ.leeren();
                 Symbole.INSTANZ.leeren();
                 Wegpunkte.INSTANZ.loesche(Wegpunkte.INSTANZ.region(Ebenen.UEBERWELT, -10, 5));
+                Wegpunkte.INSTANZ.umschaltenNadel("test:orte", "nordhafen");
+                Wegpunkte.INSTANZ.umschaltenNadel("test:orte", "westmark");
+                Minimap.INSTANZ.setzeZoom(4);
             });
         } finally {
             bilder.stop(0);
+        }
+    }
+
+    /** Die Minimap mit dem Spieler bei (x, z), sobald sie fertig ist. */
+    private static BufferedImage minimapBei(ClientGameTestContext context, TestServerContext server, double x, double z, String name) {
+        server.runCommand("tp @a " + x + " -30 " + z + " 0 90");
+        context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - x) < 0.1 && Math.abs(mc.player.getZ() - z) < 0.1
+                && Minimap.INSTANZ.fertig(), 600);
+        context.waitTicks(2);
+        return mitRand(context, context.takeScreenshot(TestScreenshotOptions.of(name).disableCounterPrefix()));
+    }
+
+    /** Die Bilder oben bündig nebeneinander; was ein niedrigeres frei lässt, in der Farbe {@code grund}. */
+    private static BufferedImage nebeneinander(int grund, BufferedImage... teile) {
+        int breite = 0, hoehe = 0;
+        for (BufferedImage t : teile) {
+            breite += t.getWidth();
+            hoehe = Math.max(hoehe, t.getHeight());
+        }
+        BufferedImage alle = new BufferedImage(breite, hoehe, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = alle.createGraphics();
+        g.setColor(new Color(grund));
+        g.fillRect(0, 0, breite, hoehe);
+        g.dispose();
+        int x = 0;
+        for (BufferedImage t : teile) {
+            alle.getGraphics().drawImage(t, x, 0, null);
+            x += t.getWidth();
+        }
+        return alle;
+    }
+
+    /**
+     * Das Banner des Tests wie bis 0.2.12 und höchstens 32 und 24 Einheiten hoch nebeneinander, bei
+     * GUI-Massstab 2 im Fenster des Tests und bei 3 in 1280 × 720. Siehe docs/ebenen.md, „Banner“.
+     */
+    private static BufferedImage groessen(ClientGameTestContext context) {
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        BufferedImage[] teile = new BufferedImage[2];
+        for (int i = 0; i < 2; i++) {
+            int gs = i + 2;
+            if (gs == 3) {
+                context.getInput().resizeWindow(1280, 720);
+            }
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(gs);
+                mc.resizeGui();
+                mc.gui.setScreen(new Groessen(Symbole.INSTANZ.banner("test:orte", "1", "images/banner.png")));
+            });
+            context.waitTicks(5);
+            int echt = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+            if (echt != gs) {
+                throw new AssertionError("GUI-Massstab " + echt + " statt " + gs);
+            }
+            Path bild = context.takeScreenshot(TestScreenshotOptions.of("banner-groessen-" + gs).disableCounterPrefix());
+            try {
+                teile[i] = ImageIO.read(bild.toFile()).getSubimage(0, 0, Groessen.BREITE * gs, Groessen.HOEHE * gs);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        context.getInput().resizeWindow(vorher[0], vorher[1]);
+        context.runOnClient(mc -> {
+            mc.gui.setScreen(null);
+            mc.options.guiScale().set(vorher[2]);
+            mc.resizeGui();
+        });
+        context.waitTicks(2);
+        return nebeneinander(Groessen.GRUND, teile);
+    }
+
+    /** Ein Schirm nur für das Bild der Grössen: alt, 32, 24, je mit dem Fuss auf derselben Linie. */
+    private static final class Groessen extends Screen {
+
+        static final int BREITE = 160, HOEHE = 100, GRUND = 0x6D8F4A;
+        private final Symbole.Textur bild;
+
+        Groessen(Symbole.Textur bild) {
+            super(Component.literal("Grössen"));
+            this.bild = bild;
+        }
+
+        @Override
+        public void extractBackground(GuiGraphicsExtractor g, int mausX, int mausY, float delta) {
+        }
+
+        @Override
+        public void extractRenderState(GuiGraphicsExtractor g, int mausX, int mausY, float delta) {
+            int gs = minecraft.getWindow().getGuiScale();
+            g.fill(0, 0, BREITE, HOEHE, 0xFF000000 | GRUND);
+            String[] namen = {"alt", "32", "24"};
+            for (int i = 0; i < namen.length; i++) {
+                int x = 30 + 50 * i;
+                g.centeredText(font, Component.literal(namen[i]), x, 8, 0xFFFFFFFF);
+                g.pose().pushMatrix();
+                g.pose().translate(x, 90);
+                if (i == 0) {
+                    // Wie bis 0.2.12: ein Pixel des Bilds je Einheit des GUI.
+                    g.blit(RenderPipelines.GUI_TEXTURED, bild.id(), -bild.breite() / 2, -bild.hoehe(), 0, 0, bild.breite(), bild.hoehe(),
+                            bild.breite(), bild.hoehe(), bild.breite(), bild.hoehe());
+                } else {
+                    Ebenen.banner(g, bild, gs, i == 1 ? 32 : 24, 1);
+                }
+                g.pose().popMatrix();
+            }
         }
     }
 
@@ -294,6 +421,11 @@ public final class Bilder implements FabricClientGameTest {
         int[] a = kasten(vorher, BANNER), b = kasten(grob, BANNER);
         if (a == null || b == null || a[2] - a[0] != b[2] - b[0] || a[3] - a[1] != b[3] - b[1] || a[0] == b[0] && a[1] == b[1]) {
             throw new AssertionError("Banner nicht gleich gross auf zwei Stufen: " + Arrays.toString(a) + " " + Arrays.toString(b));
+        }
+        // Das Feld des Banners ohne den gelben Rand, 19 × 38 Pixel des Bilds, je Pixel ganze Pixel des Schirms.
+        int f = Ebenen.faktor(21, 40, k);
+        if (a[2] - a[0] != 19 * f || a[3] - a[1] != 38 * f) {
+            throw new AssertionError("Banner nicht " + f + " Pixel je Pixel des Bilds: " + Arrays.toString(a));
         }
     }
 

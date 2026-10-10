@@ -306,6 +306,78 @@ class WegpunkteTest {
         assertEquals(List.of(), w.karte(e));
     }
 
+    private static final String NADEL = "{\"type\":\"pin\",\"id\":\"hafen\",\"at\":[1,2],\"name\":\"Hafen\"}";
+    private static final String BANNER = "{\"type\":\"banner\",\"id\":\"mark\",\"at\":[3,4],\"name\":\"Mark\",\"image\":\"images/b.png\"}";
+    private static final String NADEL_OHNE_ID = "{\"type\":\"pin\",\"at\":[5,6],\"name\":\"Furt\"}";
+
+    @Test
+    void nadelnAnheftenUndBehalten(@TempDir Path ordner) throws Exception {
+        Wegpunkte vorher = new Wegpunkte();
+        vorher.lies(ordner);
+        assertTrue(vorher.umschaltenNadel("b:orte", "mark"));
+        Wegpunkte nachher = new Wegpunkte();
+        nachher.lies(ordner);
+        assertTrue(nachher.nadelAngeheftet("b:orte", "mark"));
+        // Eine Nadel ist keine Fläche: dieselbe Kennung als Fläche ist nicht angeheftet.
+        assertFalse(nachher.angeheftet("b:orte", "mark"));
+        nachher.umschaltenNadel("b:orte", "mark");
+        assertFalse(nachher.nadelAngeheftet("b:orte", "mark"));
+        // Eine Datei von vor mod#71 ohne „nadeln“ liest der Mod ohne Fehler.
+        Files.writeString(ordner.resolve("wegpunkte.json"), "{\"formen\":[{\"ebene\":\"b:wald\",\"id\":\"wald\"}]}");
+        Wegpunkte alt = new Wegpunkte();
+        alt.lies(ordner);
+        assertTrue(alt.angeheftet("b:wald", "wald"));
+        assertFalse(Files.exists(ordner.resolve("wegpunkte.json.kaputt")));
+    }
+
+    @Test
+    void hoechstens64NadelnEigeneGrenze() {
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        for (int i = 0; i < Wegpunkte.MAX_ANGEHEFTET; i++) {
+            assertTrue(w.umschalten("b:viele", "r" + i));
+        }
+        // Die 64 Regionen nehmen den Nadeln keinen Platz: eine eigene Grenze.
+        for (int i = 0; i < Wegpunkte.MAX_NADELN_ANGEHEFTET; i++) {
+            assertTrue(w.umschaltenNadel("b:viele", "n" + i));
+        }
+        assertFalse(w.umschaltenNadel("b:viele", "zuviel"));
+        assertTrue(w.umschaltenNadel("b:viele", "n0"));
+        assertTrue(w.umschaltenNadel("b:viele", "zuviel"));
+        // Auch aus der Datei nicht mehr.
+        StringBuilder viele = new StringBuilder("{\"nadeln\":[");
+        for (int i = 0; i < Wegpunkte.MAX_NADELN_ANGEHEFTET + 5; i++) {
+            viele.append(i == 0 ? "" : ",").append("{\"ebene\":\"b:viele\",\"id\":\"n").append(i).append("\"}");
+        }
+        Wegpunkte gelesen = new Wegpunkte();
+        gelesen.lies(JsonParser.parseString(viele.append("]}").toString()).getAsJsonObject());
+        assertTrue(gelesen.nadelAngeheftet("b:viele", "n63"));
+        assertFalse(gelesen.nadelAngeheftet("b:viele", "n64"));
+    }
+
+    @Test
+    void nadelnAufDerMinimapNurAngeheftet() {
+        Ebenen e = ebene("b:orte", "v1", NADEL + "," + BANNER + "," + NADEL_OHNE_ID);
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        assertEquals(List.of(), w.nadeln(e));
+        w.umschaltenNadel("b:orte", "mark");
+        w.umschaltenNadel("b:orte", "weg");
+        List<Ebenen.Ort> orte = e.nadeln("b:orte");
+        assertEquals(List.of(orte.get(1)), w.nadeln(e));
+        assertTrue(w.nadeln(e) == w.nadeln(e));
+        // Für den Punkt auf der Vollbildkarte: nach Identität, ohne Allokation.
+        assertTrue(w.angeheftet(e, orte.get(1)));
+        assertFalse(w.angeheftet(e, orte.get(0)));
+        // Tote Einträge fallen weg, wenn die Ebene ganz ankommt.
+        w.pruefe(e, "b:orte");
+        assertTrue(w.nadelAngeheftet("b:orte", "mark"));
+        assertFalse(w.nadelAngeheftet("b:orte", "weg"));
+        // Ausgeblendet fehlt sie auch angeheftet.
+        e.setze("b:orte", false);
+        assertEquals(List.of(), w.nadeln(e));
+    }
+
     @Test
     void breiterOhneRandNimmtDieFuellung() {
         Ebenen.Kreis k = new Ebenen.Kreis(WELT, 0, 0, 3, 0x8040C040, null, "k");
