@@ -4,13 +4,18 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
-## 0.2.21
+## 0.2.22
 
 - **Veils along pinned regions:** the edge of each pinned region and circle shows a soft veil in its colour, standing on the ground and fading out over four blocks. "World effects" in the settings switches it off together with the beams.
 
-## 0.2.19
+## 0.2.20
 
 - **Beams above pinned waypoints:** each pinned waypoint in view distance shows a beacon beam in its colour in the world. Switch it off with "World effects" in the settings.
+
+## 0.2.18
+
+- **Adding waypoints to a shape works on servers with layers:** after "Add point", the info panel of a region under the waypoints no longer opens where the menu was and swallows the next clicks; no panels open while a shape is being built.
+- **Double-click your own region inside a region from the server** pins your region, not the one from the server.
 
 ## 0.2.17
 
