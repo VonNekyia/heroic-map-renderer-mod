@@ -446,6 +446,28 @@ class EbenenTest {
     }
 
     @Test
+    void winzigesMuster() {
+        JsonArray objekte = JsonParser.parseString("[{\"type\":\"line\",\"points\":[[0,0],[1,1]],"
+                + "\"stroke\":{\"style\":\"dashed\",\"dash\":[1e-20,1e-20]}}]").getAsJsonArray();
+        assertEquals(new Ebenen.Rand(Ebenen.RANDFARBE, 2, 1, 1), ((Ebenen.Linie) Ebenen.formen(objekte).formen().getFirst()).rand());
+    }
+
+    @Test
+    void verworfeneEbeneUebergehtIhreTeile() {
+        // C ist fertig mit 190 000 Punkten. A wird mit zu vielen Nadeln verworfen; ihr zweiter Teil mit 190 000 Punkten
+        // zählt danach nicht mehr. Sonst käme B mit 190 000 über 500 000 und bliebe aus.
+        Ebenen e = new Ebenen();
+        liste(e, eintrag("b:a", "v1") + "," + eintrag("b:b", "v1") + "," + eintrag("b:c", "v1"));
+        String linien = mal(linie(Ebenen.MAX_PUNKTE), 19);
+        teil(e, "b:c", "v1", 1, 1, linien);
+        teil(e, "b:a", "v1", 1, 3, viele("n", Ebenen.MAX_NADELN + 1));
+        teil(e, "b:a", "v1", 2, 3, linien);
+        teil(e, "b:b", "v1", 1, 1, linien);
+        assertEquals(19, e.formen("b:b").size());
+        assertEquals(List.of(), e.formen("b:a"));
+    }
+
+    @Test
     void randGekappt() {
         JsonArray objekte = JsonParser.parseString("[{\"type\":\"line\",\"points\":[[0,0],[1,1]],"
                 + "\"stroke\":{\"width\":100,\"style\":\"dashed\",\"dash\":[5000,4000]}}]").getAsJsonArray();

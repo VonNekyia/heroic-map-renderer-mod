@@ -94,6 +94,25 @@ class TrapezeTest {
     }
 
     @Test
+    void saegeVerkehrtHerum() {
+        // Der Fall aus dem Review: alle Zähne in einem Band, von rechts nach links gelistet. Das Einfügen zählt in die Arbeit.
+        int zaehne = 2500;
+        double[] r = new double[2 * (2 * zaehne + 3)];
+        int n = 0;
+        double[] anfang = {0, -1, 2 * zaehne, -1};
+        System.arraycopy(anfang, 0, r, 0, 4);
+        n = 4;
+        for (int i = 2 * zaehne; i >= 0; i--) {
+            r[n++] = i;
+            r[n++] = i % 2 == 0 ? 0 : 1;
+        }
+        long start = System.nanoTime();
+        double[] t = Trapeze.von(List.<double[]>of(java.util.Arrays.copyOf(r, n)));
+        assertTrue(System.nanoTime() - start < 2_000_000_000L, "der Deckel greift auch beim Einfügen");
+        assertNull(t);
+    }
+
+    @Test
     void zuAufwendigOhneFuellung() {
         // Ein Kamm aus 2000 Zinken mit verschiedenen Enden: viele Kanten in jedem Band, über dem Deckel der Arbeit.
         int zinken = 2000;
