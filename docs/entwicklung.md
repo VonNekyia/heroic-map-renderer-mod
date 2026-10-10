@@ -178,11 +178,30 @@ aus Pixeln. Bis 0.2.14 war es die Insel aus dem Banner des Hauptrepositorys.
   Java 25. Die Gametests kompiliert er nur, laufen tun sie im nächsten Job.
 - **Gametests:** `./gradlew runClientGameTest` unter `xvfb-run`, ein
   Fenster ohne Bildschirm mit 24 Bit Farbtiefe und OpenGL in Software über
-  Mesa. Als Matrix zweimal nebeneinander: `ohne` und `sodium` mit
+  Mesa (llvmpipe). Als Matrix zweimal nebeneinander: `ohne` und `sodium` mit
   `-Psodium`, siehe „Gametests“ und
   [0017](entscheidungen/0017-gametests-in-der-ci-auch-mit-sodium.md).
-  Scheitert ein Lauf, lädt er Log und Bildschirmfotos als Artefakt hoch.
-  Noch kein Pflicht-Check für den Merge.
+  - **EGL statt GLX** (`SDL_VIDEO_FORCE_EGL=1`): Über GLX fand SDL3 unter
+    Xvfb kein Visual für das Fenster des Spiels, obwohl `glxinfo` OpenGL
+    4.5 meldete. Das Spiel verlangt einen Core-Kontext 3.3 mit
+    sRGB-fähigem Framebuffer (`GlBackend.createWindow`, per javap in
+    26.3); woran GLX scheiterte, ist nicht belegt. Über EGL nimmt das
+    Spiel sein OpenGL-Backend, 4.5 Core auf llvmpipe, mit und ohne Sodium.
+  - **Ohne Backend** zeigt das Spiel einen Dialog mit dem Fehler
+    (`MessageBox.error` in `Minecraft`, per javap) und wartet auf einen
+    Klick, der unter Xvfb nie kommt. Steht `Failed to create backend`
+    zweimal im Log, für OpenGL und Vulkan, beendet der Schritt das Spiel
+    und wird rot, statt bis zum Limit zu hängen.
+  - **Dauer,** Stand 11.10., Lauf von `e6c0706`: der Schritt 3 min 35 s
+    ohne, 3 min 20 s mit Sodium; lokal sind es gut 2 min. Davon rund 55 s
+    bis zur ersten Welt, `Bilder` rund 52 s, `Bedienung` rund 60 s, die
+    übrigen Gametests je 5 bis 15 s. Zugeordnet nach den Welten im Log in
+    der Reihenfolge der Einträge in `fabric.mod.json`. Das Limit am Schritt
+    sind 10 min.
+  - **In Software** riss keine Prüfung am Bildschirmfoto; keine Schwelle
+    ist dafür gelockert.
+  - Scheitert ein Lauf, lädt er Log und Bildschirmfotos als Artefakt hoch.
+    Noch kein Pflicht-Check für den Merge.
   `gradle/actions/setup-gradle` prüft dabei auch, dass `gradle-wrapper.jar`
   ein Wrapper von Gradle ist.
 - **Doku:** `pruefe-doku.sh` vom Branch `master` des Hauptrepositorys,

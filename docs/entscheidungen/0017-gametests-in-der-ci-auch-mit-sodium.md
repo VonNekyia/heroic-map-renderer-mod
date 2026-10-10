@@ -25,7 +25,8 @@ Sodium.
 
 - **Die Gametests laufen in der CI,** im Job „Gametests“ unter Ubuntu, in
   einem Fenster ohne Bildschirm: Xvfb mit 24 Bit Farbtiefe, OpenGL in
-  Software über Mesa. Das Spiel nimmt dort wie lokal sein OpenGL-Backend.
+  Software über Mesa, den Kontext über EGL (`SDL_VIDEO_FORCE_EGL=1`). Das
+  Spiel nimmt dort wie lokal sein OpenGL-Backend.
 - **Zweimal:** einmal ohne andere Mods, einmal mit Sodium (`-Psodium`),
   als Matrix nebeneinander.
 - **Sodium nur für die Gametests:** eine eigene Configuration `sodium`,
@@ -64,9 +65,12 @@ Hauptrepositorys.
   Jar nur zum Testen wäre das zu viel.
 - **Weitere Mods aus dem Modpack, etwa Lithium oder Iris:** erst, wenn ein
   Fehler auf sie zeigt; sie kämen genauso dazu.
+- **GLX unter Xvfb:** In zwei Läufen fand SDL3 kein Visual für das Fenster
+  des Spiels, auch mit `libglx-mesa0`. Siehe
+  [Bauen und testen](../entwicklung.md), „CI“.
 
 ## Folgen
 
-- **CI-Zeit:** zwei Jobs mehr, nebeneinander. Die Dauer steht nach dem
-  ersten Lauf in [Bauen und testen](../entwicklung.md), „CI“.
+- **CI-Zeit:** zwei Jobs mehr, nebeneinander, je gut 3 min für die
+  Gametests; Einzelheiten in [Bauen und testen](../entwicklung.md), „CI“.
 - **Netz:** Mit `-Psodium` braucht der Build den Maven von Modrinth.

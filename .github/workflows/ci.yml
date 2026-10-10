@@ -45,26 +45,17 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
-      # Ein Fenster ohne Bildschirm: Xvfb, OpenGL in Software über Mesa, den Kontext über EGL (siehe Gametests).
+      # Ein Fenster ohne Bildschirm: Xvfb, OpenGL in Software über Mesa (llvmpipe), der Kontext über EGL.
       - name: Xvfb und Mesa
         timeout-minutes: 10
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri libglx-mesa0 libegl-mesa0 libegl1 mesa-utils
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri libglx-mesa0 libegl-mesa0 libegl1
 
-      # Zeigt Renderer und Version von OpenGL im Fenster ohne Bildschirm, bevor das Spiel startet.
-      - name: OpenGL unter Xvfb
-        timeout-minutes: 5
-        run: |
-          xvfb-run -a -s "-screen 0 1920x1080x24" glxinfo -B
-          echo "GLX-Konfigurationen mit sRGB: $(xvfb-run -a -s '-screen 0 1920x1080x24' glxinfo -v | grep -c 'sRGB=Y')"
-          xvfb-run -a -s "-screen 0 1920x1080x24" glxinfo -v | grep -i -m5 srgb || true
-          xvfb-run -a -s "-screen 0 1920x1080x24" eglinfo -B || true
-
-      # 24 Bit Farbtiefe; mit der Vorgabe von xvfb-run, 8 Bit, gibt es kein OpenGL. Das Spiel verlangt über SDL3 einen
-      # sRGB-fähigen Framebuffer, den es über GLX unter Xvfb nicht fand; SDL_VIDEO_FORCE_EGL nimmt EGL statt GLX.
-      # Ohne Backend zeigt das Spiel einen Dialog und wartet auf einen Klick, der hier nie kommt: Dann bricht der
-      # Schritt gleich ab, statt bis zum Limit zu hängen.
+      # 24 Bit Farbtiefe; mit der Vorgabe von xvfb-run, 8 Bit, gibt es kein OpenGL. Über GLX fand SDL3 unter Xvfb kein
+      # Visual für das Fenster des Spiels, SDL_VIDEO_FORCE_EGL nimmt EGL. Ohne Backend zeigt das Spiel einen Dialog und
+      # wartet auf einen Klick, der hier nie kommt: Dann bricht der Schritt gleich ab, statt bis zum Limit zu hängen.
+      # Ein Lauf dauert gut 3 min, das Limit lässt Raum für einen langsamen Runner. Siehe docs/entwicklung.md, „CI“.
       - name: Gametests
-        timeout-minutes: 60
+        timeout-minutes: 10
         env:
           SDL_VIDEO_FORCE_EGL: "1"
         run: |
