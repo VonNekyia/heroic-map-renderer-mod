@@ -211,7 +211,7 @@ die Kameras von oben sagt: Seine Karten sind von oben gesehen, ein Kreis
 bleibt rund. Was er zeichnet, kommt aus `Ebenen.formen`, gelesen auf dem
 Thread des Netzes wie die Nadeln.
 
-![Fläche mit Loch, Kreis, Dreieck, Linie und Kartenschrift einer Ebene auf der Vollbildkarte; Szene `formen` des Gametests](bilder/formen-karte.png)
+![Fläche mit Loch, Kreis, Dreieck, Linie und Kartenschrift einer Ebene auf der Vollbildkarte, der Kreis und eine eigene Region angeheftet mit breiterem Rand; Szene `formen` des Gametests](bilder/formen-karte.png)
 
 - **Füllung** (`fill`, mit Alpha; `#00000000` heisst ohne): bei einer
   Region als Trapeze in der Welt (`Trapeze.von`).
@@ -272,10 +272,12 @@ Thread des Netzes wie die Nadeln.
   Plugin sie schickt; laut Format schickt es bisher nur Nadeln, Regionen
   und Kreise.
 - **Minimap:** ohne Flächen, Kreise und Linien; die Karte bleibt frei,
-  so will es der User (mod#59). Angeheftet kommen sie mit mod#36. Die
-  Kartenschrift der Ebenen steht dort, nach Karte und Chunklinien, vor den
-  Nadeln, auch gedreht, mit der Form der Minimap geschnitten wie die Karte
-  (`Drehung.schneide`); `Formen.zeichne` ohne `flaechen`.
+  so will es der User (mod#59). Nur angeheftete Flächen und Kreise stehen
+  dort, siehe [Wegpunkte](wegpunkte.md), „Anheften“. Darüber die
+  Kartenschrift der Ebenen, nach Karte und Chunklinien, vor den Nadeln,
+  auch gedreht, mit der Form der Minimap geschnitten wie die Karte
+  (`Drehung.schneide`); `Formen.zeichne` ohne `flaechen`. Jede der beiden
+  Lagen hat ihren eigenen `Formen.Speicher`.
 - **Vollbildkarte:** auf dem Raster der Kacheln, nach den Chunklinien, vor
   Nadeln und Wegpunkten.
 - **Reihenfolge:** Ebenen nach `order`; in einer Ebene erst alle Füllungen,
@@ -582,4 +584,4 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 
 ## Was noch fehlt
 
-- **Anheften** an Regionen (#36).
+- **Strahl und Schleier** für Angeheftetes in der Welt (#36, PR 2 und 3).

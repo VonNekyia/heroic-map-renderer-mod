@@ -622,7 +622,8 @@ Haus mit einem Schild an der Wand, Bambus, ein Kopf, drei Bäume, ein Weg, Glas,
 ein Feld. Gras, Blumen und Weizen stehen senkrecht und fehlen von oben.
 
 Danach die Ebenen (siehe [ebenen.md](ebenen.md)): Flächen, Kreis, Linie und
-Kartenschrift (`formen.png`, `formen-karte.png`), dann Nadeln in drei
+Kartenschrift, der Kreis und eine eigene Region angeheftet (`formen.png`,
+`formen-karte.png`), dann Nadeln in drei
 Grössen, ein Banner und ihre Namen, dazu eine eigene Region (`orte.png`,
 `orte-karte.png`), auf
 der Vollbildkarte noch einmal mit „Unicode-Schrift erzwingen“

@@ -1,5 +1,6 @@
 package com.nekyia.heroicmap;
 
+import com.google.gson.JsonParser;
 import com.mojang.blaze3d.platform.InputConstants;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -18,8 +19,8 @@ import net.minecraft.util.Mth;
  * Das Menü und die Vollbildkarte mit echten Eingaben der Maus: Ziehen mit der linken wie der
  * rechten Taste verschiebt die ganze Minimap; auf der Karte verschiebt links ziehen den Inhalt,
  * rechts klicken öffnet das Menü mit Teleport und Wegpunkt; auf einer Marke am Rand ziehen zieht
- * die Karte, ein Klick zentriert sie, ein Doppelklick heftet sie an.
- * Siehe docs/minimap.md, „Bedienung“, und docs/wegpunkte.md.
+ * die Karte, ein Klick zentriert sie, ein Doppelklick heftet sie an, ebenso einen Kreis vom Server und
+ * eine eigene Region. Siehe docs/minimap.md, „Bedienung“, und docs/wegpunkte.md.
  */
 public final class Bedienung implements FabricClientGameTest {
 
@@ -104,6 +105,7 @@ public final class Bedienung implements FabricClientGameTest {
         }
 
         wegpunkt(context, maus, k, x, y);
+        anheften(context, maus, k);
         maus.setCursorPos(x * k, y * k);
         context.waitTick();
 
@@ -251,6 +253,73 @@ public final class Bedienung implements FabricClientGameTest {
         context.waitTick();
         maus.pressMouse(LINKS);
         context.waitTicks(2);
+    }
+
+    /**
+     * Ein Kreis vom Server und eine eigene Region: Ein Klick auf den Kreis heftet nichts an, ein
+     * Doppelklick heftet ihn an, ein zweiter löst ihn; ein Doppelklick auf die Raute der Region heftet
+     * sie an. Siehe docs/wegpunkte.md, „Anheften“.
+     */
+    private static void anheften(ClientGameTestContext context, TestInput maus, int k) {
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+        double[] mitte = mitte(context);
+        // Rechts und links unter der Mitte, fern von den Knöpfen. Stufe 2 von 2, Lupe 1, scale 4: ein Block sind 4 Einheiten.
+        double kx = breite / 2.0 + 60, ky = hoehe / 2.0 + 30;
+        long cx = Math.round((mitte[0] + 60) / 4), cz = Math.round((mitte[1] + 30) / 4);
+        int rx = (int) Math.round((mitte[0] - 70) / 4), rz = (int) Math.round((mitte[1] + 30) / 4);
+        boolean frei = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).marken().stream()
+                .noneMatch(m -> Math.abs(m.x() - kx) < 12 && Math.abs(m.y() - ky) < 12));
+        if (!frei) {
+            throw new AssertionError("Eine Marke liegt auf dem Kreis; der Test braucht dort freie Karte");
+        }
+        context.runOnClient(mc -> {
+            Ebenen.INSTANZ.empfange(JsonParser.parseString("""
+                    {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:anheften","visible":true,"version":"1"}]}""").getAsJsonObject());
+            Ebenen.INSTANZ.teil(Ebenen.Teil.lies("""
+                    {"v":1,"typ":"ebene","jetzt":1,"id":"test:anheften","version":"1","teil":1,"teile":1,"objects":[
+                      {"type":"circle","id":"see","center":[%d,%d],"radius":6,"fill":"#40C04060"}]}""".formatted(cx, cz)));
+            Wegpunkte.INSTANZ.setze(mc.level.dimension().identifier().toString(), rx, rz, rx + 2, rz + 2);
+        });
+        context.waitTick();
+
+        warte250();
+        maus.setCursorPos(kx * k, ky * k);
+        context.waitTick();
+        maus.pressMouse(LINKS);
+        context.waitTicks(2);
+        if (kreisAngeheftet(context)) {
+            throw new AssertionError("Ein Klick heftete den Kreis an");
+        }
+        for (boolean an : new boolean[] {true, false}) {
+            warte250();
+            maus.pressMouse(LINKS);
+            context.waitTick();
+            maus.pressMouse(LINKS);
+            context.waitTicks(2);
+            if (kreisAngeheftet(context) != an) {
+                throw new AssertionError("Doppelklick auf den Kreis: angeheftet " + !an + " statt " + an);
+            }
+        }
+
+        warte250();
+        Karte.Marke raute = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).marken().stream()
+                .filter(m -> m.region() != null).findFirst().orElseThrow(() -> new AssertionError("Keine Raute der Region")));
+        maus.setCursorPos(raute.x() * k, raute.y() * k);
+        context.waitTick();
+        maus.pressMouse(LINKS);
+        context.waitTick();
+        maus.pressMouse(LINKS);
+        context.waitTicks(2);
+        if (!context.computeOnClient(mc -> Wegpunkte.INSTANZ.regionen().getFirst().angeheftet())) {
+            throw new AssertionError("Doppelklick auf die Raute heftet die Region nicht an");
+        }
+        context.runOnClient(mc -> Ebenen.INSTANZ.leeren());
+        warte250();
+    }
+
+    private static boolean kreisAngeheftet(ClientGameTestContext context) {
+        return context.computeOnClient(mc -> Wegpunkte.INSTANZ.angeheftet("test:anheften", "see"));
     }
 
     private static double[] mitte(ClientGameTestContext context) {

@@ -1,11 +1,12 @@
 ---
 title: Wegpunkte
-description: Wegpunkte und eigene Regionen auf der Vollbildkarte setzen und löschen, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
+description: Wegpunkte und eigene Regionen auf der Vollbildkarte setzen und löschen, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen und Kreise vom Server, höchstens 64 angeheftete Regionen, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Wegpunkte.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/Mitspieler.java
+  - src/main/java/com/nekyia/heroicmap/Kanal.java
   - src/test/java/com/nekyia/heroicmap/WegpunkteTest.java
   - src/test/java/com/nekyia/heroicmap/MinimapTest.java
   - src/main/java/com/nekyia/heroicmap/Kartenblick.java
@@ -20,7 +21,8 @@ stehen sie als Raute in ihrer Farbe, wie Mitspieler und der eigene Spieler;
 was ausserhalb des Schirms liegt, steht am Rand in seiner Richtung. Ein
 Klick legt eine Marke in die Mitte, ein Doppelklick heftet einen Wegpunkt
 oder Mitspieler an die [Minimap](minimap.md). So hat es der User am 08.10.
-gewünscht.
+gewünscht. Ebenso heftet ein Doppelklick eine eigene Region oder eine
+Fläche oder einen Kreis vom Server an, siehe „Anheften“ (mod#36).
 
 ## Bedienung
 
@@ -30,6 +32,7 @@ gewünscht.
 | Rechtsklick auf einen Wegpunkt | das Menü für seinen Block: „Hierher teleportieren“, wenn erlaubt, und „Wegpunkt löschen“ |
 | Klick auf eine Marke | legt sie beim Loslassen in die Mitte: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück. Wer auf einer Marke zu ziehen beginnt und weiter als 3 Einheiten zieht (`Karte.ZUG`), zieht nur die Karte |
 | Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder |
+| Doppelklick auf die Raute einer eigenen Region, auf eine Fläche oder einen Kreis vom Server | heftet sie an die Minimap oder löst sie wieder, siehe „Anheften“ |
 | Rechtsklick, „Region von hier“, dann „Region bis hier“ | setzt eine eigene Region, das Rechteck der Blöcke zwischen beiden Ecken samt ihnen, siehe „Regionen“; dazwischen zeigt eine gestrichelte Vorschau das Rechteck bis zur Maus, „Region abbrechen“ oder `Esc` brechen ab |
 | Rechtsklick in eine eigene Region oder auf ihre Raute | „Region löschen“ |
 
@@ -37,12 +40,19 @@ gewünscht.
   Knopf im selben Schirm weniger als 250 ms nach dem letzten kommt, gleich
   wo, und nur, wenn der Schirm den letzten Klick angenommen hat
   (`mouseClicked` gab `true`; `MouseHandler.onButton`, belegt per javap am
-  Client 26.3). Die Karte nimmt einen Klick auf eine Marke, einen Knopf
-  oder einen Eintrag des Menüs an. Der erste Klick hat die Marke schon in
-  die Mitte gelegt; der zweite zählt deshalb für die Marke des ersten
-  (`Karte.letzte`), nicht für die unter der Maus. Jeder andere Klick
-  vergisst sie; ein schneller Klick nach „Wegpunkt setzen“ heftet so nichts
-  an.
+  Client 26.3). Die Karte nimmt jeden Linksklick an, auch einen auf
+  freie Karte, sonst zählte ein Doppelklick auf eine Fläche nie. Der erste
+  Klick hat die Marke schon in die Mitte gelegt; der zweite zählt deshalb
+  für die Marke des ersten (`Karte.letzte`), nicht für die unter der Maus.
+  Jeder andere Klick vergisst sie; ein schneller Klick nach „Wegpunkt
+  setzen“ heftet so nichts an.
+- **Doppelklick auf eine Fläche oder einen Kreis:** Der erste Klick merkt
+  sich beim Loslassen ohne Zug das Ziel unter der Maus (`Karte.letztesZiel`),
+  nur eine Fläche oder einen Kreis mit `id`, keine Nadel darüber. Der
+  zweite heftet es an, wenn unter ihm dasselbe Ziel liegt; ein Knopf geht
+  vor. Schliesst der erste Klick die gehaltene Tafel desselben Ziels, zählt
+  er ebenso. Die Tafel bleibt, wie der erste Klick sie liess, siehe
+  [Ebenen](ebenen.md), „Infotafel“.
 - **Treffer:** eine halbe Kopfseite und eine Einheit um die Mitte der
   Marke. Ein Wegpunkt oder Mitspieler geht dem eigenen Kopf vor, sonst
   liesse sich ein Wegpunkt am eigenen Standort nicht greifen; sonst die
@@ -122,7 +132,50 @@ Vieleck kommt nur, wenn der User es will.
   sie in die Mitte, ausserhalb des Schirms steht sie am Rand.
 - **Löschen:** Rechtsklick in die Region oder auf ihre Raute, „Region
   löschen“; überlappen zwei, die zuletzt gesetzte.
-- **Minimap:** keine; angeheftet kommen Regionen mit mod#36 dorthin.
+- **Minimap:** nur angeheftet, siehe „Anheften“.
+
+## Anheften
+
+Regionen und Kreise lassen sich anheften wie Wegpunkte, so wünscht es der
+Maintainer (mod#36): eigene Regionen und Flächen und Kreise der Ebenen vom
+Server. Linien nicht, entschieden vom Reviewer. Strahl und Schleier in der
+Welt kommen in eigenen PRs.
+
+![Minimap genordet und gedreht: nur der angeheftete Kreis und die angeheftete eigene Region, die übrigen Formen fehlen; Szene `formen` des Gametests](bilder/formen.png)
+
+- **Doppelklick** auf der Vollbildkarte auf die Raute einer eigenen Region
+  oder auf eine Fläche oder einen Kreis vom Server, siehe „Bedienung“.
+  Anheften lässt sich nur, was eine `id` hat; ohne `id` gibt es auch keine
+  Tafel.
+- **Höchstens 64** Regionen und Kreise je Welt, eigene und vom Server
+  zusammen (`Wegpunkte.MAX_ANGEHEFTET`). Darüber heftet der Doppelklick
+  nichts an, und unten links steht „Höchstens 64 Regionen angeheftet; erst
+  eine lösen“. Lösen geht immer. Auch aus der Datei liest der Mod nicht
+  mehr.
+- **Vom Server** merkt sich der Mod die Kennungen `{ebene, id}`
+  (`Wegpunkte.Anheftung`), nicht die `version`: So bleibt angeheftet, was
+  eine neue `version` der Ebene noch hat.
+- **Tote Einträge:** Kommt eine Ebene ganz an, vergisst der Mod, was von ihr
+  angeheftet ist und sie nicht mehr hat (`Wegpunkte.pruefe`, aus
+  `Kanal.anmelden`); sonst füllten tote Einträge die 64. Einträge anderer
+  Ebenen bleiben, auch wenn deren Daten gerade da sind: Nach dem Wechsel
+  über einen Proxy können sie noch vom vorigen Server sein.
+- **Minimap:** die angehefteten Flächen und Kreise der sichtbaren Ebenen,
+  wie die Vollbildkarte sie zeichnet, darüber die angehefteten eigenen
+  Regionen als Fläche in ihrer Farbe zu 25 % mit 1 Einheit Rand
+  (`Wegpunkte.flaeche`). Alle liegen unter der Kartenschrift und den
+  Nadeln; eine ausgeblendete Ebene fehlt auch angeheftet.
+- **Vollbildkarte:** Der Rand angehefteter Flächen, Kreise und eigener
+  Regionen ist 2 Einheiten breiter (`Wegpunkte.BREITER`), höchstens 64 wie
+  jeder Rand. Hat eine Form keinen Rand, bekommt sie einen von 2 Einheiten
+  in der Füllung ohne Alpha, wie die Vorgabe des Formats. Die Raute einer
+  angehefteten Region hat den bunten Ring wie ein Wegpunkt.
+- **Kosten:** Die Listen für Karte und Minimap baut der Mod nur neu, wenn
+  sich Ebenen (`Ebenen.stand`) oder Wegpunkte (`Wegpunkte.stand`) ändern
+  (`Wegpunkte.karte`, `Wegpunkte.minimap`). Sonst sind es dieselben
+  Listen, und der Speicher der Formen bleibt gültig, siehe
+  [Ebenen](ebenen.md), „Flächen, Kreise und Linien“, „Neu gerechnet“. Eine
+  Ebene ohne Angeheftetes gibt ihre eigene Liste weiter.
 
 ## Ablage
 
@@ -139,12 +192,15 @@ Vieleck kommt nur, wenn der User es will.
   ```json
   {"wegpunkte":[{"dimension":"minecraft:overworld","x":12,"z":-40,"farbe":0,"minimap":true}],
    "regionen":[{"dimension":"minecraft:overworld","x0":2,"z0":-5,"x1":10,"z1":3,"farbe":1,"minimap":false}],
-   "spieler":["00000000-0000-0000-0000-000000000001"]}
+   "spieler":["00000000-0000-0000-0000-000000000001"],
+   "formen":[{"ebene":"b:staedte","id":"westmark"}]}
   ```
 
   `farbe` ist ein Index in `Wegpunkte.FARBEN`, `minimap` heisst angeheftet,
-  `spieler` sind die angehefteten Mitspieler. Eine Region nennt die Blöcke
-  ihrer Ecken, `x0` ≤ `x1` und `z0` ≤ `z1`, beide samt.
+  `spieler` sind die angehefteten Mitspieler, `formen` die angehefteten
+  Flächen und Kreise vom Server. Eine Region nennt die Blöcke ihrer Ecken,
+  `x0` ≤ `x1` und `z0` ≤ `z1`, beide samt. Eine Datei von vor mod#36 ohne
+  `formen` liest der Mod ohne Fehler.
 - **Schreiben** nach jeder Änderung, über `wegpunkte.json.tmp`, dann
   verschieben; nie liegt eine halbe Datei da.
 - **Lesen:** Ein unlesbarer Eintrag fällt weg, die übrigen bleiben. Ist die
@@ -156,7 +212,12 @@ Vieleck kommt nur, wenn der User es will.
 
 - `WegpunkteTest`: setzen, löschen, anheften, über den Neustart behalten,
   kaputte Einträge, eine kaputte Datei bleibt gesichert, Farben bleiben
-  nach dem Löschen verschieden, nur im Speicher.
+  nach dem Löschen verschieden, nur im Speicher. Zum Anheften:
+  `alteDateiOhneListeLaedt`, `anheftenUeberstehtDenNeustart`,
+  `hoechstens64Angeheftet`, `toteEintraegeFallenWeg`,
+  `listenFuerKarteUndMinimap` (dieselben Listen ohne Änderung, nur
+  Angeheftetes auf der Minimap, breiterer Rand auf der Karte) und
+  `breiterOhneRandNimmtDieFuellung`.
 - `MinimapTest`: `kopfWaechstMitDerSeite`, `amRandInSeinerRichtung` und
   `markeAufDemPixelDerKarte`.
 - `KartenblickTest`: `markenAufDemRasterDerKacheln`,
@@ -169,11 +230,17 @@ Vieleck kommt nur, wenn der User es will.
   der Marke ziehen zieht nur die Karte; ein Klick legt sie in die Mitte;
   ein schneller Klick nach „Wegpunkt setzen“ heftet nichts an; ein
   Doppelklick heftet an; am eigenen Standort holt ein Klick den Spieler
-  zurück, und ein Rechtsklick bietet „Wegpunkt löschen“.
+  zurück, und ein Rechtsklick bietet „Wegpunkt löschen“. Dazu ein Kreis
+  vom Server: Ein Klick heftet nichts an, ein Doppelklick heftet an, ein
+  zweiter löst; ein Doppelklick auf die Raute einer eigenen Region heftet
+  sie an.
 - `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
   [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und
-  einem am Rand, siehe [Vollbildkarte](vollbildkarte.md), „Bild“.
+  einem am Rand, siehe [Vollbildkarte](vollbildkarte.md), „Bild“; in der
+  Szene `formen` ein angehefteter Kreis und eine angeheftete eigene Region
+  auf Minimap und Vollbildkarte, siehe [Ebenen](ebenen.md), „Flächen,
+  Kreise und Linien“.
 
 ## Was fehlt
 

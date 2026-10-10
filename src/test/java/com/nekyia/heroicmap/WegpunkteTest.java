@@ -12,7 +12,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Wegpunkte setzen, anheften, löschen und über den Neustart behalten. Siehe docs/wegpunkte.md. */
+/** Wegpunkte setzen, anheften, löschen und über den Neustart behalten; Regionen und Kreise anheften. Siehe docs/wegpunkte.md. */
 class WegpunkteTest {
 
     private static final String WELT = "minecraft:overworld";
@@ -171,5 +171,148 @@ class WegpunkteTest {
         assertEquals(java.util.Set.of(0, 1, 2), w.punkte().stream().filter(p -> p.dimension().equals(WELT))
                 .map(Wegpunkte.Punkt::farbe).collect(java.util.stream.Collectors.toSet()));
         assertEquals(0, w.punkte().getLast().farbe());
+    }
+
+    /** Eine Ebene vom Server mit den Flächen und Kreisen {@code objekte}, ganz angekommen. */
+    private static Ebenen ebene(String id, String version, String objekte) {
+        Ebenen e = new Ebenen();
+        e.empfange(JsonParser.parseString("{\"v\":1,\"typ\":\"ebenen\",\"jetzt\":1,\"ebenen\":[{\"id\":\"" + id
+                + "\",\"visible\":true,\"version\":\"" + version + "\"}]}").getAsJsonObject());
+        assertTrue(e.teil(Ebenen.Teil.lies("{\"v\":1,\"typ\":\"ebene\",\"jetzt\":1,\"id\":\"" + id + "\",\"version\":\"" + version
+                + "\",\"teil\":1,\"teile\":1,\"objects\":[" + objekte + "]}")));
+        return e;
+    }
+
+    private static final String FLAECHE = "{\"type\":\"region\",\"id\":\"wald\",\"fill\":\"#3060E080\",\"polygons\":[{\"outer\":[[0,0],[8,0],[8,8]]}]}";
+    private static final String KREIS = "{\"type\":\"circle\",\"id\":\"see\",\"center\":[20,20],\"radius\":4,\"fill\":\"#40C04060\","
+            + "\"stroke\":{\"width\":1}}";
+    private static final String OHNE_ID = "{\"type\":\"circle\",\"center\":[-20,0],\"radius\":4}";
+    private static final String LINIE = "{\"type\":\"line\",\"points\":[[0,0],[5,5]]}";
+
+    @Test
+    void alteDateiOhneListeLaedt(@TempDir Path ordner) throws Exception {
+        // Eine wegpunkte.json von vor mod#36: ohne „formen“, gelesen ohne Fehler und ohne Verlust.
+        Files.writeString(ordner.resolve("wegpunkte.json"), """
+                {"wegpunkte":[{"dimension":"minecraft:overworld","x":1,"z":2,"farbe":0,"minimap":true}],
+                 "regionen":[{"dimension":"minecraft:overworld","x0":0,"z0":0,"x1":3,"z1":3,"farbe":1,"minimap":false}],
+                 "spieler":[]}""");
+        Wegpunkte w = new Wegpunkte();
+        w.lies(ordner);
+        assertEquals(1, w.punkte().size());
+        assertEquals(1, w.regionen().size());
+        assertEquals(0, w.angeheftet());
+        assertFalse(Files.exists(ordner.resolve("wegpunkte.json.kaputt")));
+    }
+
+    @Test
+    void anheftenUeberstehtDenNeustart(@TempDir Path ordner) {
+        Wegpunkte vorher = new Wegpunkte();
+        vorher.lies(ordner);
+        vorher.setze(WELT, 0, 0, 3, 3);
+        assertTrue(vorher.umschalten(vorher.regionen().getFirst()));
+        assertTrue(vorher.umschalten("b:wald", "wald"));
+        assertEquals(2, vorher.angeheftet());
+
+        Wegpunkte nachher = new Wegpunkte();
+        nachher.lies(ordner);
+        assertTrue(nachher.regionen().getFirst().angeheftet());
+        assertTrue(nachher.angeheftet("b:wald", "wald"));
+        // Noch einmal löst; das hält ebenso.
+        nachher.umschalten("b:wald", "wald");
+        nachher.umschalten(nachher.regionen().getFirst());
+        Wegpunkte zuletzt = new Wegpunkte();
+        zuletzt.lies(ordner);
+        assertEquals(0, zuletzt.angeheftet());
+    }
+
+    @Test
+    void hoechstens64Angeheftet() {
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        w.setze(WELT, 0, 0, 1, 1);
+        w.setze(WELT, 5, 5, 6, 6);
+        assertTrue(w.umschalten(w.regionen().getFirst()));
+        for (int i = 1; i < Wegpunkte.MAX_ANGEHEFTET; i++) {
+            assertTrue(w.umschalten("b:viele", "r" + i));
+        }
+        // Eigene und vom Server zählen zusammen: Die 65. geht nicht, weder vom Server noch eigen.
+        assertFalse(w.umschalten("b:viele", "zuviel"));
+        assertFalse(w.umschalten(w.regionen().getLast()));
+        assertFalse(w.angeheftet("b:viele", "zuviel"));
+        assertEquals(Wegpunkte.MAX_ANGEHEFTET, w.angeheftet());
+        // Lösen geht immer, danach ist wieder Platz.
+        assertTrue(w.umschalten("b:viele", "r1"));
+        assertTrue(w.umschalten("b:viele", "zuviel"));
+
+        // Aus der Datei auch nicht mehr; kaputte Einträge fallen weg.
+        StringBuilder viele = new StringBuilder("{\"formen\":[{\"ebene\":5},");
+        for (int i = 0; i < Wegpunkte.MAX_ANGEHEFTET + 5; i++) {
+            viele.append(i == 0 ? "" : ",").append("{\"ebene\":\"b:viele\",\"id\":\"r").append(i).append("\"}");
+        }
+        Wegpunkte gelesen = new Wegpunkte();
+        gelesen.lies(JsonParser.parseString(viele.append("]}").toString()).getAsJsonObject());
+        assertEquals(Wegpunkte.MAX_ANGEHEFTET, gelesen.angeheftet());
+    }
+
+    @Test
+    void toteEintraegeFallenWeg() {
+        Ebenen e = ebene("b:wald", "v1", FLAECHE + "," + KREIS);
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        w.umschalten("b:wald", "wald");
+        w.umschalten("b:wald", "gerodet");
+        w.umschalten("b:anderswo", "gerodet");
+        // Nur die Ebene, die eben ganz ankam; eine andere kann noch vom vorigen Server sein.
+        w.pruefe(e, "b:wald");
+        assertTrue(w.angeheftet("b:wald", "wald"));
+        assertFalse(w.angeheftet("b:wald", "gerodet"));
+        assertTrue(w.angeheftet("b:anderswo", "gerodet"));
+    }
+
+    @Test
+    void listenFuerKarteUndMinimap() {
+        Ebenen e = ebene("b:wald", "v1", FLAECHE + "," + KREIS + "," + OHNE_ID + "," + LINIE);
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        List<Ebenen.Form> alle = e.formen("b:wald");
+        // Nichts angeheftet: die Liste der Ebene selbst, die Minimap leer.
+        assertTrue(w.karte(e).getFirst() == alle);
+        assertEquals(List.of(), w.minimap(e));
+
+        w.umschalten("b:wald", "see");
+        w.setze(WELT, 0, 0, 3, 3);
+        w.setze(WELT, 9, 9, 9, 9);
+        w.umschalten(w.regionen().getFirst());
+        List<List<Ebenen.Form>> karte = w.karte(e), minimap = w.minimap(e);
+        // Dieselben Listen, solange sich nichts ändert; so bleibt der Speicher der Formen gültig.
+        assertTrue(karte == w.karte(e) && minimap == w.minimap(e));
+        assertTrue(karte.getFirst().get(0) == alle.get(0));
+        Ebenen.Kreis breit = (Ebenen.Kreis) karte.getFirst().get(1);
+        assertEquals(1 + Wegpunkte.BREITER, breit.rand().breite());
+        assertTrue(karte.getFirst().get(2) == alle.get(2) && karte.getFirst().get(3) == alle.get(3));
+        // Auf der Minimap nur der angeheftete Kreis, wie er ist, und die angeheftete eigene Region als Fläche.
+        assertEquals(2, minimap.size());
+        assertEquals(List.of(alle.get(1)), minimap.get(0));
+        Ebenen.Flaeche eigen = (Ebenen.Flaeche) minimap.get(1).getFirst();
+        assertEquals(1, minimap.get(1).size());
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new double[] {0, 0, 4, 4}, eigen.box());
+        assertEquals(Wegpunkte.FARBEN[0] & 0x00FFFFFF | 0x40000000, eigen.fuellung());
+
+        // Eine Änderung baut neu; eine ausgeblendete Ebene fehlt auf beiden.
+        w.umschalten("b:wald", "see");
+        assertTrue(w.karte(e).getFirst() == alle);
+        assertEquals(1, w.minimap(e).size());
+        e.setze("b:wald", false);
+        assertEquals(List.of(), w.karte(e));
+    }
+
+    @Test
+    void breiterOhneRandNimmtDieFuellung() {
+        Ebenen.Kreis k = new Ebenen.Kreis(WELT, 0, 0, 3, 0x8040C040, null, "k");
+        Ebenen.Rand r = ((Ebenen.Kreis) Wegpunkte.breiter(k)).rand();
+        assertEquals(new Ebenen.Rand(0xFF40C040, Wegpunkte.BREITER, 0, 0), r);
+        // Breiter als das Format erlaubt wird es nicht.
+        Ebenen.Kreis dick = new Ebenen.Kreis(WELT, 0, 0, 3, 0, new Ebenen.Rand(0xFF000000, Ebenen.MAX_BREITE, 0, 0), "d");
+        assertEquals(Ebenen.MAX_BREITE, ((Ebenen.Kreis) Wegpunkte.breiter(dick)).rand().breite());
     }
 }
