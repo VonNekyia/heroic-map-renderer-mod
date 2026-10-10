@@ -151,6 +151,17 @@ final class Tafeln {
      * Liegt der Punkt (x, z) der Welt in der Fläche, nach gerade/ungerade über alle Ringe, oder im
      * Kreis? Linien und Schrift haben keine Tafel.
      */
+    /** Der kleinste Abstand von (x, z) zu einem Stück des Zugs {x0, z0, …}, in Blöcken. */
+    static double abstand(double[] p, double x, double z) {
+        double best = Double.POSITIVE_INFINITY;
+        for (int i = 0; i + 3 < p.length; i += 2) {
+            double ax = p[i], az = p[i + 1], dx = p[i + 2] - ax, dz = p[i + 3] - az, l = dx * dx + dz * dz;
+            double t = l == 0 ? 0 : Math.clamp(((x - ax) * dx + (z - az) * dz) / l, 0, 1);
+            best = Math.min(best, Math.hypot(x - ax - t * dx, z - az - t * dz));
+        }
+        return best;
+    }
+
     static boolean trifft(Ebenen.Form f, double x, double z) {
         return switch (f) {
             case Ebenen.Kreis k -> Math.hypot(x - k.x(), z - k.z()) <= k.radius();
@@ -195,10 +206,9 @@ final class Tafeln {
     static final class Zeigen {
 
         static final long RUHE_MS = 50, NACHLAUF_MS = 300;
-        /** Das Ziel unter dem Zeiger, das offene und das unter dem Zeiger, als die Tafel von Hand zuging. */
+        /** Das Ziel unter dem Zeiger, das offene und das, dessen Tafel von selbst zuging. */
         private Ziel unter, offen, gesperrt;
         private long seit, weg = -1;
-        private boolean gehalten;
 
         /** Je Frame: das Ziel unter dem Zeiger, oder null, und ob der Zeiger über der offenen Tafel liegt. */
         void zeiger(Ziel z, boolean ueberTafel, long ms) {
@@ -207,7 +217,7 @@ final class Tafeln {
                 seit = ms;
                 gesperrt = null;
             }
-            if (offen != null && !gehalten) {
+            if (offen != null) {
                 if (ueberTafel || offen.equals(z)) {
                     weg = -1;
                 } else if (weg < 0) {
@@ -217,34 +227,13 @@ final class Tafeln {
                     weg = -1;
                 }
             }
-            if (z != null && !gehalten && !ueberTafel && !z.equals(offen) && !z.equals(gesperrt) && ms - seit >= RUHE_MS) {
+            if (z != null && !ueberTafel && !z.equals(offen) && !z.equals(gesperrt) && ms - seit >= RUHE_MS) {
                 offen = z;
                 weg = -1;
             }
         }
 
-        /** Ein Klick auf ein Ziel hält seine Tafel offen. */
-        void halte(Ziel z) {
-            offen = z;
-            gehalten = true;
-            weg = -1;
-        }
-
-        /**
-         * Schliesst die Tafel von Hand, mit Escape, × oder einem Klick; true, wenn eine offen war. So
-         * schliessen Escape und ein Klick daneben zuerst nur sie. Das Ziel unter dem Zeiger öffnet sie
-         * nicht gleich wieder.
-         */
-        boolean schliesse() {
-            boolean war = offen != null;
-            offen = null;
-            gesperrt = unter;
-            gehalten = false;
-            weg = -1;
-            return war;
-        }
-
-        /** Die Antwort zur offenen Tafel, null, solange sie aussteht: Gibt es keine, geht sie zu, auch gehalten. */
+        /** Die Antwort zur offenen Tafel, null, solange sie aussteht: Gibt es keine, geht sie zu. */
         void antwort(Optional<Tafel> t) {
             if (offen != null && t != null && t.isEmpty()) {
                 zu();
@@ -258,16 +247,11 @@ final class Tafeln {
         void zu() {
             gesperrt = offen;
             offen = null;
-            gehalten = false;
             weg = -1;
         }
 
         Ziel offen() {
             return offen;
-        }
-
-        boolean gehalten() {
-            return gehalten;
         }
     }
 }

@@ -8,8 +8,11 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.MouseHandler;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
@@ -45,8 +48,6 @@ final class Karte extends Screen {
     private static final long BUNT_MS = 2000;
     /** Weiter gezogen, in Einheiten des GUI, ist es kein Klick auf eine Marke mehr. */
     private static final double ZUG = 3;
-    /** Die Spalte des Knopfs × rechts in der Tafel, in Einheiten des GUI; beim Zeigen blass, gehalten hell. */
-    private static final int SCHLIESSEN = 8, BLASS = 0x80D9D9D9;
     /** Die halbe Breite des Punkts unter einer angehefteten Nadel, in Einheiten des GUI. */
     private static final int PUNKT = 2;
     /** Die Vorschau einer Region, die der Spieler setzt. */
@@ -61,7 +62,7 @@ final class Karte extends Screen {
     private Tafeln.Ziel tafelOffen;
     private int tafelX, tafelY, tafelScroll;
     private long tafelSeit;
-    private int[] tafelKasten, tafelKnopf;
+    private int[] tafelKasten;
     /** Ist die Tafel höher als ihr Platz? Nur dann scrollt das Rad sie statt die Karte zu zoomen. */
     private boolean tafelZuHoch;
     /** Der Klick schloss oder traf die Tafel oder das Menü; sein Loslassen hält keine neue, sein Ziehen schiebt nicht. */
@@ -94,6 +95,14 @@ final class Karte extends Screen {
     private Marke gedrueckt;
     /** War das Drücken der zweite Klick eines Doppelklicks? */
     private boolean doppelklick;
+    /** So lange hält der Spieler die linke Taste still auf einem Wegpunkt, bis er an der Maus hängt, in ms. */
+    private static final long HALTEN_MS = 2000;
+    /** Seit wann die linke Taste gedrückt ist, und der Wegpunkt, der an der Maus hängt, oder null. */
+    private long gedruecktSeit;
+    private Wegpunkte.Punkt haengt;
+    /** Die Marke eines Klicks, die in die Mitte kommt, wenn kein zweiter Klick folgt, und seit wann sie wartet. */
+    private Marke wartend;
+    private long wartendSeit;
     /** Die Nadel, die Fläche oder der Kreis unter dem letzten Klick ohne Marke; ein Doppelklick darauf heftet an. */
     private Tafeln.Ziel letztesZiel;
     /** Wie weit seit dem Drücken gezogen ist, in Einheiten des GUI. */
@@ -111,9 +120,28 @@ final class Karte extends Screen {
     record Marke(float x, float y, float halb, double weltX, double weltZ, UUID spieler, Wegpunkte.Punkt punkt, Wegpunkte.Region region) {
     }
 
-    /** Die erste Ecke einer Region, die der Spieler gerade setzt, und ihre Dimension; sonst null. */
-    private int[] regionVon;
-    private String regionDimension;
+    /** Ist die Lage beim Öffnen gestellt? {@code init} läuft bei jeder Grösse des Fensters und nach jedem Untermenü neu. */
+    private boolean gestellt;
+    /** Die Wegpunkte einer Form, die der Spieler gerade baut, als ids in Reihenfolge, und ihre Dimension; sonst null. */
+    private List<Integer> zug;
+    private String zugDimension;
+    /** Die eigene Form unter dem letzten Klick ohne Marke; ein Doppelklick darauf heftet sie an. */
+    private Wegpunkte.EigeneForm letzteEigene;
+    /** Ist die Liste der Ebenen unter dem Knopf „Ebenen“ offen? Siehe docs/vollbildkarte.md, „Ebenen“. */
+    private boolean ebenenOffen;
+    /** Die Schalter der Liste, die Ebenen, für die sie gebaut ist, und der Stand der Ebenen dabei. */
+    private final List<Schalter> schalter = new ArrayList<>();
+    private List<String> gebauteEbenen = List.of();
+    private int ebenenStand;
+    /** Für welche Schalter alles angeheftet ist, gerechnet bei diesem Stand der Ebenen und der Wegpunkte. */
+    private boolean[] ganz = new boolean[0];
+    private int ganzEbenen = -1, ganzWegpunkte = -1;
+    /** Der Schalter unter dem letzten Klick; ein Doppelklick darauf heftet die ganze Ebene an. */
+    private Schalter letzterSchalter;
+
+    /** Ein Schalter der Liste und die Kennung seiner Ebene. */
+    private record Schalter(CycleButton<Boolean> knopf, String ebene) {
+    }
 
     /** {@code satz} ist null, wenn für diese Dimension nichts geladen ist. */
     Karte(Satz satz) {
@@ -121,17 +149,25 @@ final class Karte extends Screen {
         this.satz = satz;
         this.kacheln = satz == null ? null : new Kacheln(satz);
         this.blick = satz == null ? null : new Kartenblick(satz.kachel(), satz.minZoom(), satz.maxZoom(), satz.stufe());
+        this.ebenenOffen = Kartenlage.ebenenOffen(Downloads.weltOrdner());
     }
 
     @Override
     protected void init() {
         LocalPlayer spieler = minecraft.player;
-        if (blick != null && spieler != null && blick.mx == 0 && blick.mz == 0) {
-            blick.mx = Projektion.zuPixel(spieler.getX(), satz.scale());
-            blick.mz = Projektion.zuPixel(spieler.getZ(), satz.scale());
+        // Wie beim letzten Schliessen, je Dimension des Satzes; sonst der Spieler in der Mitte. Siehe docs/vollbildkarte.md, „Lage merken“.
+        if (blick != null && spieler != null && !gestellt) {
+            gestellt = true;
+            Kartenlage.Lage l = Kartenlage.lies(Downloads.weltOrdner(), satz.dimension());
+            if (l != null) {
+                blick.stelle(Projektion.zuPixel(l.x(), satz.scale()), Projektion.zuPixel(l.z(), satz.scale()), l.zoom(), l.lupe());
+            } else {
+                blick.mx = Projektion.zuPixel(spieler.getX(), satz.scale());
+                blick.mz = Projektion.zuPixel(spieler.getZ(), satz.scale());
+            }
         }
         int x = width - KNOPF - 4;
-        Button unterster = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.laden"),
+        AbstractWidget unterster = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.laden"),
                 b -> minecraft.gui.setScreen(new Auswahl(this))).bounds(x, 4, KNOPF, 20).build());
         // Eine selbst gezeichnete Karte hat keinen Abgleich. Siehe docs/selbst.md, „Wahl“.
         if (satz != null && !Selbst.selbst(satz.ordner().getParent())) {
@@ -141,8 +177,104 @@ final class Karte extends Screen {
                     b -> hinweis = Downloads.INSTANZ.frageAbgleich(baum)).bounds(x, 28, KNOPF, 20).build());
             unterster = abgleich;
         }
+        // Wer sich verirrt hat, kommt zum eigenen Spieler zurück; Stufe und Lupe bleiben. Siehe docs/vollbildkarte.md, „Bedienung“.
+        if (blick != null) {
+            unterster = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.zum_spieler"), b -> {
+                if (minecraft.player != null) {
+                    zentriere(minecraft.player.getX(), minecraft.player.getZ());
+                }
+            }).bounds(x, unterster.getY() + 24, KNOPF, 20).build());
+        }
+        unterster = ebenen(x, unterster);
         knopfX = x;
         knopfUnten = unterster.getY() + unterster.getHeight();
+        // Unten rechts das Menü von /hmap; „Fertig“ dort führt zurück auf die Karte. Siehe docs/vollbildkarte.md, „Bedienung“.
+        addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.optionen"),
+                b -> minecraft.gui.setScreen(new Einstellungen(this))).bounds(x, height - 24, KNOPF, 20).build());
+    }
+
+    /**
+     * Der Knopf „Ebenen“ unter {@code ueber}, ist die Liste offen, darunter je Ebene ein Schalter, die
+     * oberste zuerst, bis über „Optionen …“; passen nicht alle, führt der letzte zu „Ebenen …“. Ohne
+     * Ebenen kein Knopf. Gibt den untersten Knopf zurück. Siehe docs/vollbildkarte.md, „Ebenen“.
+     */
+    private AbstractWidget ebenen(int x, AbstractWidget ueber) {
+        schalter.clear();
+        gebauteEbenen = Ebenen.INSTANZ.kennungen();
+        ebenenStand = Ebenen.INSTANZ.stand();
+        ganzEbenen = -1;
+        if (blick == null || gebauteEbenen.isEmpty()) {
+            return ueber;
+        }
+        AbstractWidget unterster = addRenderableWidget(Button.builder(Component.translatable(ebenenOffen ? "heroicmap.karte.ebenen_zu" : "heroicmap.karte.ebenen"),
+                b -> {
+                    ebenenOffen = !ebenenOffen;
+                    Kartenlage.ebenenOffen(Downloads.weltOrdner(), ebenenOffen);
+                    rebuildWidgets();
+                }).bounds(x, ueber.getY() + 24, KNOPF, 20).build());
+        if (!ebenenOffen) {
+            return unterster;
+        }
+        boolean deutsch = minecraft.getLanguageManager().getSelected().startsWith("de");
+        List<Ebenen.Eintrag> alle = Ebenen.INSTANZ.alle();
+        // Platz bis über „Optionen …“ unten rechts, je Schalter 22 Einheiten.
+        int platz = Math.max(1, (height - 28 - (unterster.getY() + unterster.getHeight())) / 22);
+        int n = alle.size() <= platz ? alle.size() : platz - 1;
+        for (int i = 0; i < n; i++) {
+            Ebenen.Eintrag e = alle.get(i);
+            CycleButton<Boolean> k = addRenderableWidget(CycleButton.onOffBuilder(Ebenen.INSTANZ.an(e)).create(x, unterster.getY() + 22, KNOPF, 20,
+                    Component.literal(e.name(deutsch)), (b, an) -> Ebenen.INSTANZ.setze(e.id(), an)));
+            schalter.add(new Schalter(k, e.id()));
+            unterster = k;
+        }
+        if (n < alle.size()) {
+            unterster = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.ebenen_mehr"),
+                    b -> minecraft.gui.setScreen(new EbenenMenue(this))).bounds(x, unterster.getY() + 22, KNOPF, 20).build());
+        }
+        return unterster;
+    }
+
+    /** Kommen andere Ebenen vom Server, während die Karte offen ist, baut sie die Liste neu. */
+    @Override
+    public void tick() {
+        if (Ebenen.INSTANZ.stand() != ebenenStand) {
+            ebenenStand = Ebenen.INSTANZ.stand();
+            if (!Ebenen.INSTANZ.kennungen().equals(gebauteEbenen)) {
+                rebuildWidgets();
+            }
+        }
+    }
+
+    /** Ein bunter Punkt links an jedem Schalter, dessen Ebene ganz angeheftet ist; neu gerechnet, wenn sich Ebenen oder Wegpunkte ändern. */
+    private void ganzAngeheftet(GuiGraphicsExtractor g) {
+        if (schalter.isEmpty()) {
+            return;
+        }
+        if (ganzEbenen != Ebenen.INSTANZ.stand() || ganzWegpunkte != Wegpunkte.INSTANZ.stand()) {
+            ganzEbenen = Ebenen.INSTANZ.stand();
+            ganzWegpunkte = Wegpunkte.INSTANZ.stand();
+            ganz = new boolean[schalter.size()];
+            for (int i = 0; i < ganz.length; i++) {
+                ganz[i] = Wegpunkte.INSTANZ.ganzAngeheftet(Ebenen.INSTANZ, schalter.get(i).ebene());
+            }
+        }
+        int bunt = Mth.hsvToArgb((System.currentTimeMillis() % BUNT_MS) / (float) BUNT_MS, 1f, 1f, 255);
+        for (int i = 0; i < ganz.length; i++) {
+            if (ganz[i]) {
+                CycleButton<Boolean> k = schalter.get(i).knopf();
+                g.fill(k.getX() - 6, k.getY() + 8, k.getX() - 2, k.getY() + 12, bunt);
+            }
+        }
+    }
+
+    /** Der Schalter der Liste unter (x, y), oder null. */
+    private Schalter schalterUnter(double x, double y) {
+        for (Schalter s : schalter) {
+            if (s.knopf().isMouseOver(x, y)) {
+                return s;
+            }
+        }
+        return null;
     }
 
     @Override
@@ -152,6 +284,17 @@ final class Karte extends Screen {
             g.centeredText(font, Component.translatable("heroicmap.karte.keine"), width / 2, height / 2, TEXT);
             super.extractRenderState(g, mausX, mausY, delta);
             return;
+        }
+        // Still gehalten auf einem Wegpunkt hängt er nach HALTEN_MS an der Maus. Siehe docs/wegpunkte.md, „Bedienung“.
+        if (haengt == null && taste && gedrueckt != null && gedrueckt.punkt() != null && !doppelklick && gezogen <= ZUG
+                && Util.getMillis() - gedruecktSeit >= HALTEN_MS) {
+            haengt = gedrueckt.punkt();
+            wartend = null;
+        }
+        // Ein Klick auf eine Marke zentriert erst, wenn kein zweiter folgt; so bewegt ein Doppelklick die Karte nicht.
+        if (wartend != null && Util.getMillis() - wartendSeit >= MouseHandler.DOUBLE_CLICK_THRESHOLD_MS) {
+            zentriere(wartend.weltX(), wartend.weltZ());
+            wartend = null;
         }
         int[] k = blick.kacheln(width, height);
         int seite = satz.kachel() * blick.lupe;
@@ -180,8 +323,8 @@ final class Karte extends Screen {
         if (hinweis != null) {
             g.text(font, hinweis, 4, height - 24, TEXT);
         }
-        if (regionVon != null) {
-            g.text(font, Component.translatable("heroicmap.karte.region_hinweis"), 4, height - (hinweis != null ? 36 : 24), TEXT);
+        if (zug != null) {
+            g.text(font, Component.translatable("heroicmap.karte.form_hinweis"), 4, height - (hinweis != null ? 36 : 24), TEXT);
         }
         // Höchstens ein Abgleich je Tag: Nach einer Ablehnung mit wieder ist der Knopf bis dahin aus.
         if (abgleich != null) {
@@ -191,6 +334,11 @@ final class Karte extends Screen {
                     : Component.translatable("heroicmap.karte.abgleich_ab", Downloads.uhr(ab)));
         }
         super.extractRenderState(g, mausX, mausY, delta);
+        ganzAngeheftet(g);
+        if (haengt != null) {
+            // Der Wegpunkt, der an der Maus hängt, unter dem Zeiger.
+            Minimap.wegpunkt(g, mausX, mausY, Minimap.KOPF, Wegpunkte.FARBEN[haengt.farbe()], 0);
+        }
         tafel(g, mausX, mausY);
         if (ziel != null) {
             int b = menueBreite();
@@ -239,7 +387,7 @@ final class Karte extends Screen {
         String dimension = spieler.level().dimension().identifier().toString();
         int bunt = Mth.hsvToArgb((System.currentTimeMillis() % BUNT_MS) / (float) BUNT_MS, 1f, 1f, 255);
         nadeln(g, dimension, bunt);
-        // Eine eigene Region steht wie ein Wegpunkt als Raute in ihrer Mitte. Siehe docs/wegpunkte.md, „Regionen“.
+        // Ein altes Rechteck steht wie ein Wegpunkt als Raute in seiner Mitte. Siehe docs/wegpunkte.md, „Regionen“.
         for (Wegpunkte.Region r : Wegpunkte.INSTANZ.regionen()) {
             if (r.dimension().equals(dimension)) {
                 Marke m = marke((r.x0() + r.x1() + 1) / 2.0, (r.z0() + r.z1() + 1) / 2.0, null, null, r);
@@ -247,7 +395,7 @@ final class Karte extends Screen {
             }
         }
         for (Wegpunkte.Punkt p : Wegpunkte.INSTANZ.punkte()) {
-            if (p.dimension().equals(dimension)) {
+            if (p.dimension().equals(dimension) && !p.equals(haengt)) {
                 Marke m = marke(p.x() + 0.5, p.z() + 0.5, null, p);
                 Minimap.wegpunkt(g, m.x(), m.y(), Minimap.KOPF, Wegpunkte.FARBEN[p.farbe()], p.angeheftet() ? bunt : 0);
             }
@@ -357,6 +505,21 @@ final class Karte extends Screen {
         return b + 8;
     }
 
+    /** Für die Gametests: Stufe und Lupe, oder null ohne Satz. */
+    int[] stufe() {
+        return blick == null ? null : new int[] {blick.zoom, blick.lupe};
+    }
+
+    /** Für die Gametests: der Wegpunkt an der Maus, oder null. */
+    Wegpunkte.Punkt haengt() {
+        return haengt;
+    }
+
+    /** Für die Gametests: Steht eine Tafel auf dem Schirm? */
+    boolean tafelOffen() {
+        return tafelKasten != null;
+    }
+
     /** Für den Gametest Bedienung: die Mitte des Blicks in Pixeln der Basis, das offene Menü, oder null, und die Marken. */
     double[] blickMitte() {
         return blick == null ? null : new double[] {blick.mx, blick.mz};
@@ -366,9 +529,9 @@ final class Karte extends Screen {
         return ziel;
     }
 
-    /** Die erste Ecke der Region, die der Spieler gerade setzt, oder null. */
-    int[] regionVon() {
-        return regionVon;
+    /** Für den Gametest: die ids der Form im Bau, oder null. */
+    List<Integer> zug() {
+        return zug == null ? null : List.copyOf(zug);
     }
 
     Satz satz() {
@@ -384,18 +547,19 @@ final class Karte extends Screen {
     }
 
     /**
-     * Die eigenen Regionen dieser Dimension: die Fläche in ihrer Farbe zu 25 %, 1 Einheit Rand deckend,
-     * angeheftet {@link Wegpunkte#BREITER} breiter, auf ganzen Pixeln wie die Kacheln; dazu die Vorschau,
-     * solange der Spieler eine setzt, gestrichelt von der ersten Ecke bis zum Block unter der Maus.
-     * Siehe docs/wegpunkte.md, „Regionen“.
+     * Die eigenen Rechtecke dieser Dimension: die Fläche in ihrer Farbe zu 25 %, 1 Einheit Rand deckend,
+     * angeheftet {@link Wegpunkte#BREITER} breiter, auf ganzen Pixeln wie die Kacheln; dazu die Vorschau
+     * einer Form, die der Spieler baut, gepunktet von Wegpunkt zu Wegpunkt und vom letzten zur Maus.
+     * Siehe docs/wegpunkte.md, „Regionen“,
+     * und docs/wegpunkte.md, „Formen aus Wegpunkten“.
      */
     private void regionen(GuiGraphicsExtractor g, int mausX, int mausY) {
         if (minecraft.player == null) {
             return;
         }
         String dimension = minecraft.player.level().dimension().identifier().toString();
-        if (regionVon != null && !dimension.equals(regionDimension)) {
-            regionVon = null;
+        if (zug != null && !dimension.equals(zugDimension)) {
+            zug = null;
         }
         int gs = minecraft.getWindow().getGuiScale();
         g.pose().pushMatrix();
@@ -411,23 +575,90 @@ final class Karte extends Screen {
                 g.fill(k[2] - b, k[1], k[2], k[3], farbe);
             }
         }
-        if (regionVon != null) {
-            int[] b = block(mausX, mausY);
-            int[] k = kasten(Math.min(regionVon[0], b[0]), Math.min(regionVon[1], b[1]), Math.max(regionVon[0], b[0]),
-                    Math.max(regionVon[1], b[1]), gs);
-            if (k != null) {
-                // Striche von 4 Einheiten mit 2 Lücke, in Weiss, das auf jeder Karte zu sehen ist.
-                for (int x = k[0]; x < k[2]; x += 6 * gs) {
-                    g.fill(x, k[1], Math.min(x + 4 * gs, k[2]), k[1] + gs, VORSCHAU);
-                    g.fill(x, k[3] - gs, Math.min(x + 4 * gs, k[2]), k[3], VORSCHAU);
+        g.pose().popMatrix();
+        if (zug != null) {
+            // Punkte alle 3 Einheiten, in Weiss, das auf jeder Karte zu sehen ist; zuletzt bis zur Maus.
+            float[] vorher = null;
+            for (int id : zug) {
+                Wegpunkte.Punkt p = Wegpunkte.INSTANZ.punkt(id);
+                float[] jetzt = p == null ? null : schirm(p.x() + 0.5, p.z() + 0.5);
+                if (vorher != null && jetzt != null) {
+                    gepunktet(g, vorher, jetzt);
                 }
-                for (int y = k[1]; y < k[3]; y += 6 * gs) {
-                    g.fill(k[0], y, k[0] + gs, Math.min(y + 4 * gs, k[3]), VORSCHAU);
-                    g.fill(k[2] - gs, y, k[2], Math.min(y + 4 * gs, k[3]), VORSCHAU);
-                }
+                vorher = jetzt != null ? jetzt : vorher;
+            }
+            if (vorher != null) {
+                gepunktet(g, vorher, new float[] {mausX, mausY});
             }
         }
-        g.pose().popMatrix();
+    }
+
+    /** Der Ort (x, z) der Welt auf dem Schirm, in Einheiten des GUI. */
+    private float[] schirm(double x, double z) {
+        return new float[] {(float) blick.rasterX(Projektion.zuPixel(x, satz.scale()), width),
+            (float) blick.rasterY(Projektion.zuPixel(z, satz.scale()), height)};
+    }
+
+    /** Eine gepunktete Linie von a nach b, ein Punkt von einer Einheit alle 3 Einheiten. */
+    private static void gepunktet(GuiGraphicsExtractor g, float[] a, float[] b) {
+        double laenge = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        for (double t = 0; t <= laenge; t += 3) {
+            int x = Math.round(a[0] + (float) ((b[0] - a[0]) * t / Math.max(laenge, 1e-9)));
+            int y = Math.round(a[1] + (float) ((b[1] - a[1]) * t / Math.max(laenge, 1e-9)));
+            g.fill(x, y, x + 1, y + 1, VORSCHAU);
+        }
+    }
+
+    /**
+     * Fügt den Wegpunkt der Form im Bau an, die damit beginnt, wenn keine im Bau ist. Der erste Punkt
+     * schliesst bei drei und mehr zur Region; ein Punkt einer anderen Dimension, einer, der schon dabei
+     * ist, oder einer über {@link Wegpunkte#MAX_PUNKTE_FORM} kommt nicht dazu.
+     */
+    private void hinzu(Wegpunkte.Punkt p) {
+        if (zug == null) {
+            zug = new ArrayList<>();
+            zugDimension = p.dimension();
+        }
+        if (!p.dimension().equals(zugDimension)) {
+            return;
+        }
+        if (zug.size() >= 3 && zug.getFirst() == p.id()) {
+            fertig();
+        } else if (!zug.contains(p.id()) && zug.size() < Wegpunkte.MAX_PUNKTE_FORM) {
+            zug.add(p.id());
+        }
+    }
+
+    /** Speichert die Form im Bau: zwei Punkte eine Linie, drei und mehr eine Region; sagt es, wenn keine mehr passt. */
+    private void fertig() {
+        if (zug != null && zug.size() >= 2 && !Wegpunkte.INSTANZ.setzeForm(zug)) {
+            hinweis = Component.translatable("heroicmap.karte.formen_voll", Wegpunkte.MAX_EIGENE_FORMEN);
+        }
+        zug = null;
+    }
+
+    /** Die oberste eigene Form dieser Dimension unter (mx, my): in einer Region, oder höchstens 3 Einheiten neben einer Linie. */
+    private Wegpunkte.EigeneForm eigeneUnter(double mx, double my) {
+        if (minecraft.player == null || satz == null || blick == null) {
+            return null;
+        }
+        String dimension = minecraft.player.level().dimension().identifier().toString();
+        int scale = satz.scale();
+        double wx = blick.basisRasterX(mx, width) / scale, wz = blick.basisRasterZ(my, height) / scale;
+        // So viele Blöcke sind 3 Einheiten des GUI auf dieser Stufe.
+        double nah = 3 / (blick.rasterX(Projektion.zuPixel(1, scale), width) - blick.rasterX(0, width));
+        List<Wegpunkte.EigeneForm> alle = Wegpunkte.INSTANZ.eigeneFormen();
+        for (int i = alle.size() - 1; i >= 0; i--) {
+            Wegpunkte.EigeneForm f = alle.get(i);
+            Ebenen.Form form = Wegpunkte.INSTANZ.form(f);
+            if (form == null || !dimension.equals(form.dimension())) {
+                continue;
+            }
+            if (form instanceof Ebenen.Linie l ? Tafeln.abstand(l.punkte(), wx, wz) <= nah : Tafeln.trifft(form, wx, wz)) {
+                return f;
+            }
+        }
+        return null;
     }
 
     /**
@@ -452,12 +683,12 @@ final class Karte extends Screen {
     }
 
     /**
-     * Linksklick auf eine Marke, beim Loslassen ohne Zug, legt sie in die Mitte, ein Doppelklick
-     * heftet sie an die Minimap oder löst sie, ebenso auf eine Nadel, ein Banner, eine Fläche oder einen Kreis vom Server.
+     * Linksklick auf eine Marke, beim Loslassen ohne Zug, legt sie in die Mitte, sobald kein zweiter
+     * Klick mehr folgen kann; ein Doppelklick heftet sie an die Minimap oder löst sie, ohne die Karte zu bewegen, ebenso auf eine Nadel, ein Banner, eine Fläche oder einen Kreis vom Server.
      * Rechtsklick öffnet das Menü: „Hierher teleportieren“,
      * nur mit execute und tp im Befehlsbaum und nicht unter einer Decke, sonst landete man auf dem
      * Dach; darunter „Wegpunkt setzen“, auf einem Wegpunkt „Wegpunkt löschen“. Erst ein Klick auf
-     * einen Eintrag tut etwas. Nach „Region von hier“ setzt ein Linksklick ohne Zug die zweite Ecke. Siehe docs/vollbildkarte.md, „Bedienung“;
+     * einen Eintrag tut etwas. Solange eine Form im Bau ist, fügt ein Linksklick ohne Zug auf einen Wegpunkt ihn an. Siehe docs/vollbildkarte.md, „Bedienung“;
      * Marken: siehe docs/wegpunkte.md, „Bedienung“.
      */
     @Override
@@ -465,8 +696,12 @@ final class Karte extends Screen {
         // Jeder Klick, der true gibt, zählt für den nächsten Doppelklick; gemerkt bleibt nur ein Klick auf eine Marke oder ein Ziel mit id.
         Marke vorige = letzte;
         Tafeln.Ziel voriges = letztesZiel;
+        Wegpunkte.EigeneForm vorigeEigene = letzteEigene;
+        Schalter vorigerSchalter = letzterSchalter;
         letzte = null;
         letztesZiel = null;
+        letzteEigene = null;
+        letzterSchalter = null;
         gedrueckt = null;
         taste = e.button() == InputConstants.MOUSE_BUTTON_LEFT;
         gezogen = 0;
@@ -483,13 +718,8 @@ final class Karte extends Screen {
             klickVerbraucht = true;
             return true;
         }
-        // Ein Klick in die Tafel wirkt nicht auf die Karte und hält sie; der Knopf × schliesst sie.
+        // Ein Klick in die Tafel wirkt nicht auf die Karte.
         if (drin(tafelKasten, e.x(), e.y())) {
-            if (drin(tafelKnopf, e.x(), e.y())) {
-                zeigen.schliesse();
-            } else if (!zeigen.gehalten()) {
-                zeigen.halte(zeigen.offen());
-            }
             klickVerbraucht = true;
             return true;
         }
@@ -504,20 +734,26 @@ final class Karte extends Screen {
             klickVerbraucht = true;
             return true;
         }
-        // Solange der Spieler eine Region setzt, schliesst ein Klick keine Tafel, er setzt beim Loslassen die zweite Ecke.
-        if (zeigen.gehalten() && regionVon == null) {
-            // Ein Klick daneben schliesst zuerst nur die gehaltene Tafel; einer auf ein anderes Ziel hält beim Loslassen dessen.
-            // Nur eine sichtbare Tafel verbraucht den Klick; eine, die noch lädt oder keine ist, geht still zu.
-            Tafeln.Ziel alt = zeigen.offen(), anderes = tafelUnter(e.x(), e.y());
-            boolean sichtbar = tafelKasten != null;
-            zeigen.schliesse();
-            if (sichtbar && (anderes == null || anderes.equals(alt))) {
-                // Auch dieser Klick zählt für einen Doppelklick auf dasselbe Ziel.
-                letztesZiel = taste ? anderes : null;
-                klickVerbraucht = true;
-                return true;
-            }
+        // Ebenso auf eine eigene Form aus Wegpunkten. Siehe docs/wegpunkte.md, „Formen aus Wegpunkten“.
+        if (doppelt && vorigeEigene != null && taste && getChildAt(e.x(), e.y()).isEmpty() && vorigeEigene.equals(eigeneUnter(e.x(), e.y()))) {
+            anheften(Wegpunkte.INSTANZ.umschalten(vorigeEigene), "heroicmap.karte.angeheftet_voll", Wegpunkte.MAX_ANGEHEFTET);
+            klickVerbraucht = true;
+            return true;
         }
+        // Der erste Klick eines Doppelklicks auf einen Schalter schaltete die Ebene um; der zweite schaltet
+        // zurück und heftet alles von ihr an oder löst es. Siehe docs/vollbildkarte.md, „Ebenen“.
+        Schalter s = taste ? schalterUnter(e.x(), e.y()) : null;
+        if (s != null && doppelt && s.equals(vorigerSchalter)) {
+            s.knopf().setValue(!s.knopf().getValue());
+            Ebenen.INSTANZ.setze(s.ebene(), s.knopf().getValue());
+            int uebrig = Wegpunkte.INSTANZ.alleUmschalten(Ebenen.INSTANZ, s.ebene());
+            if (uebrig > 0) {
+                hinweis = Component.translatable("heroicmap.karte.ebene_voll", uebrig, Wegpunkte.MAX_ANGEHEFTET, Wegpunkte.MAX_NADELN_ANGEHEFTET);
+            }
+            klickVerbraucht = true;
+            return true;
+        }
+        letzterSchalter = s;
         if (super.mouseClicked(e, doppelt)) {
             return true;
         }
@@ -526,9 +762,13 @@ final class Karte extends Screen {
         }
         Marke m = treffer(e.x(), e.y());
         if (e.button() == InputConstants.MOUSE_BUTTON_LEFT) {
-            // Der erste Klick hat die Marke schon in die Mitte gelegt; der zweite zählt für dieselbe.
+            // Der zweite zählt für die Marke des ersten, die noch nicht in die Mitte kam, und hebt das auf.
             doppelklick = doppelt && vorige != null;
             gedrueckt = doppelklick ? vorige : m;
+            gedruecktSeit = Util.getMillis();
+            if (doppelklick) {
+                wartend = null;
+            }
             // true, sonst zählt das Spiel den nächsten Klick nicht als doppelt, auch auf einer Fläche; ziehen geht trotzdem.
             return true;
         }
@@ -550,32 +790,30 @@ final class Karte extends Screen {
             klickVerbraucht = false;
             return true;
         }
-        // Solange die Vorschau läuft, setzt ein Linksklick ohne Zug die zweite Ecke, auch auf einer Marke; ziehen verschiebt weiter.
-        if (regionVon != null && e.button() == InputConstants.MOUSE_BUTTON_LEFT && gezogen <= ZUG && blick != null
-                && !drin(tafelKasten, e.x(), e.y())) {
+        // Der Wegpunkt an der Maus kommt auf den Block unter ihr, mit Farbe und Anheften.
+        if (haengt != null) {
             int[] b = block(e.x(), e.y());
-            Wegpunkte.INSTANZ.setze(regionDimension, regionVon[0], regionVon[1], b[0], b[1]);
-            regionVon = null;
+            Wegpunkte.INSTANZ.verschiebe(haengt, b[0], b[1]);
+            haengt = null;
             return true;
         }
-        // Ein Klick ohne Zug auf ein Ziel ohne Marke hält seine Tafel.
+        // Solange eine Form im Bau ist, fügt ein Linksklick ohne Zug auf einen Wegpunkt ihn an, statt ihn zu zentrieren.
+        if (zug != null && m != null && m.punkt() != null && e.button() == InputConstants.MOUSE_BUTTON_LEFT && gezogen <= ZUG && !doppelklick) {
+            hinzu(m.punkt());
+            return true;
+        }
+        // Ein Klick ohne Zug auf ein Ziel ohne Marke merkt es für einen Doppelklick; eine Tafel hält er nicht.
         if (m == null && e.button() == InputConstants.MOUSE_BUTTON_LEFT && gezogen <= ZUG && ziel == null && blick != null
                 && !drin(tafelKasten, e.x(), e.y())) {
-            Tafeln.Ziel z = tafelUnter(e.x(), e.y());
-            // Ein Ziel mit id lässt sich anheften, auch wenn es keine Tafel hat.
-            letztesZiel = z;
-            // Halten nur, wenn eine Tafel da ist oder noch kommt; die Frage geht dabei schon hinaus.
-            Optional<Tafel> t = z == null ? Optional.empty() : Tafeln.INSTANZ.tafel(z, Util.getMillis());
-            if (t == null || t.isPresent()) {
-                zeigen.halte(z);
-                return true;
-            }
+            letztesZiel = tafelUnter(e.x(), e.y());
+            letzteEigene = letztesZiel == null ? eigeneUnter(e.x(), e.y()) : null;
         }
         if (m == null || e.button() != InputConstants.MOUSE_BUTTON_LEFT) {
             return knopf;
         }
         if (!doppelklick) {
-            zentriere(m.weltX(), m.weltZ());
+            wartend = m;
+            wartendSeit = Util.getMillis();
             letzte = m;
         } else if (m.punkt() != null) {
             Wegpunkte.INSTANZ.umschalten(m.punkt());
@@ -602,7 +840,8 @@ final class Karte extends Screen {
     private void tafel(GuiGraphicsExtractor g, int mausX, int mausY) {
         long ms = Util.getMillis();
         boolean ueber = drin(tafelKasten, mausX, mausY);
-        zeigen.zeiger(ziel == null && !ueber && !(taste && gezogen > ZUG) ? zielUnter(mausX, mausY) : null, ueber, ms);
+        boolean frei = ziel == null && haengt == null && !ueber && !(taste && gezogen > ZUG) && getChildAt(mausX, mausY).isEmpty();
+        zeigen.zeiger(frei ? zielUnter(mausX, mausY) : null, ueber, ms);
         if (zeigen.offen() != null && !Tafeln.gilt(Ebenen.INSTANZ, zeigen.offen())) {
             zeigen.zu();
         }
@@ -617,13 +856,12 @@ final class Karte extends Screen {
             tafelSeit = ms;
         }
         tafelKasten = null;
-        tafelKnopf = null;
         tafelZuHoch = false;
         if (offen == null || t == null && ms - tafelSeit < Tafeln.LAEDT_MS) {
             return;
         }
         Tafel.Satz s = t == null ? laedt() : satz(t.get());
-        int w = s.breite() + 2 * Tafel.INNEN + SCHLIESSEN, voll = s.hoehe() + 2 * Tafel.INNEN, h = Math.min(voll, height - 8);
+        int w = s.breite() + 2 * Tafel.INNEN, voll = s.hoehe() + 2 * Tafel.INNEN, h = Math.min(voll, height - 8);
         // Rechts unter dem Zeiger; ist dort kein Platz, links von ihm oder über ihm, so rutscht sie nicht unter ihn.
         int x = tafelX + 12 + w > width - 4 ? tafelX - 12 - w : tafelX + 12;
         int y = tafelY + 12 + h > height - 4 ? tafelY - 12 - h : tafelY + 12;
@@ -632,7 +870,7 @@ final class Karte extends Screen {
         tafelZuHoch = voll > h;
         tafelScroll = Math.max(0, Math.min(tafelScroll, voll - h));
         g.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.fromNamespaceAndPath(HeroicMap.ID, "rahmen/" + tafelSkin() + "/tafel"), x, y, w, h);
-        g.enableScissor(x + Tafel.INNEN, y + Tafel.INNEN, x + w - Tafel.INNEN - SCHLIESSEN, y + h - Tafel.INNEN);
+        g.enableScissor(x + Tafel.INNEN, y + Tafel.INNEN, x + w - Tafel.INNEN, y + h - Tafel.INNEN);
         for (Tafel.Stueck stueck : s.stuecke()) {
             switch (stueck) {
                 case Tafel.Text text -> g.text(font, stil(text.text(), text.fett()), x + Tafel.INNEN + text.x(),
@@ -670,9 +908,6 @@ final class Karte extends Screen {
             }
         }
         g.disableScissor();
-        // Der Knopf × in seiner eigenen Spalte rechts, nie über dem Titel; beim Zeigen blass, gehalten hell.
-        tafelKnopf = new int[] {x + w - Tafel.INNEN - SCHLIESSEN, y, Tafel.INNEN + SCHLIESSEN, Tafel.INNEN + font.lineHeight};
-        g.text(font, "×", x + w - Tafel.INNEN - SCHLIESSEN + 2, y + Tafel.INNEN, zeigen.gehalten() ? Tafel.SCHRIFT : BLASS, false);
         tafelKasten = new int[] {x, y, w, h};
     }
 
@@ -818,25 +1053,25 @@ final class Karte extends Screen {
                 onClose();
             }));
         }
-        if (regionVon != null) {
-            // Die zweite Ecke: Erst ein Klick auf den Eintrag setzt die Region, Escape bricht ab.
-            int[] von = regionVon;
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_bis"), () -> {
-                Wegpunkte.INSTANZ.setze(dimension, von[0], von[1], z[0], z[1]);
-                regionVon = null;
-            }));
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_abbrechen"), () -> regionVon = null));
-        } else {
-            neu.add(punkt != null
-                    ? new Eintrag(Component.translatable("heroicmap.karte.wegpunkt_loeschen"), () -> Wegpunkte.INSTANZ.loesche(punkt))
-                    : new Eintrag(Component.translatable("heroicmap.karte.wegpunkt"), () -> Wegpunkte.INSTANZ.setze(dimension, z[0], z[1])));
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_von"), () -> {
-                regionVon = z;
-                regionDimension = dimension;
-            }));
-            if (region != null) {
-                neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_loeschen"), () -> Wegpunkte.INSTANZ.loesche(region)));
+        neu.add(punkt != null
+                ? new Eintrag(Component.translatable("heroicmap.karte.wegpunkt_loeschen"), () -> Wegpunkte.INSTANZ.loesche(punkt))
+                : new Eintrag(Component.translatable("heroicmap.karte.wegpunkt"), () -> Wegpunkte.INSTANZ.setze(dimension, z[0], z[1])));
+        // Formen aus Wegpunkten: „Punkt hinzufügen“ auf einem Wegpunkt; solange eine im Bau ist, „Form fertig“ und „Form abbrechen“.
+        if (punkt != null) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.punkt_hinzu"), () -> hinzu(punkt)));
+        }
+        if (zug != null) {
+            if (zug.size() >= 2) {
+                neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_fertig"), this::fertig));
             }
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_abbrechen"), () -> zug = null));
+        }
+        Wegpunkte.EigeneForm eigen = punkt == null ? eigeneUnter(x, y) : null;
+        if (eigen != null) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_loeschen"), () -> Wegpunkte.INSTANZ.loesche(eigen)));
+        }
+        if (region != null) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_loeschen"), () -> Wegpunkte.INSTANZ.loesche(region)));
         }
         ziel = z;
         eintraege = neu;
@@ -866,8 +1101,8 @@ final class Karte extends Screen {
 
     @Override
     public boolean mouseDragged(MouseButtonEvent ereignis, double dx, double dy) {
-        // Ein Zug, der in der Tafel beginnt oder mit dem Druck, der sie schloss, schiebt die Karte nicht.
-        if (klickVerbraucht) {
+        // Ein Zug, der in der Tafel beginnt, oder einer mit einem Wegpunkt an der Maus schiebt die Karte nicht.
+        if (klickVerbraucht || haengt != null) {
             return true;
         }
         // Die Tasten zählen wie in SDL, links ist 1. Siehe docs/entwicklung.md, „Maustasten“.
@@ -901,12 +1136,15 @@ final class Karte extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent ereignis) {
-        // Escape schliesst zuerst nur die Tafel, dann bricht es eine Region ab, die der Spieler setzt.
-        if (ereignis.key() == InputConstants.KEY_ESCAPE && tafelKasten != null && zeigen.schliesse()) {
+        // Escape lässt zuerst einen Wegpunkt an der Maus, wo er war; das Loslassen danach tut nichts.
+        if (ereignis.key() == InputConstants.KEY_ESCAPE && haengt != null) {
+            haengt = null;
+            klickVerbraucht = true;
             return true;
         }
-        if (ereignis.key() == InputConstants.KEY_ESCAPE && regionVon != null) {
-            regionVon = null;
+        // Escape bricht dann eine Region ab, die der Spieler setzt.
+        if (ereignis.key() == InputConstants.KEY_ESCAPE && zug != null) {
+            zug = null;
             return true;
         }
         if (HeroicMap.karte != null && HeroicMap.karte.matches(ereignis)) {
@@ -922,6 +1160,16 @@ final class Karte extends Screen {
             kacheln.close();
         }
         super.onClose();
+    }
+
+    /** Beim Schliessen und vor jedem Untermenü: Mitte, Stufe und Lupe merken. */
+    @Override
+    public void removed() {
+        if (blick != null && gestellt) {
+            Kartenlage.schreibe(Downloads.weltOrdner(), satz.dimension(),
+                    new Kartenlage.Lage(blick.mx / satz.scale(), blick.mz / satz.scale(), blick.zoom, blick.lupe));
+        }
+        super.removed();
     }
 
     @Override
