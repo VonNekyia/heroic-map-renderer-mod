@@ -470,6 +470,51 @@ class WegpunkteTest {
     }
 
     @Test
+    void ganzeEbeneAnheftenUndLoesen() {
+        Ebenen e = ebene("b:alles", "v1", FLAECHE + "," + KREIS + "," + OHNE_ID + "," + LINIE + "," + NADEL + "," + BANNER + "," + NADEL_OHNE_ID);
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        assertFalse(w.ganzAngeheftet(e, "b:alles"));
+        // Eins schon angeheftet: Der Doppelklick heftet den Rest an, ohne es zu lösen.
+        assertTrue(w.umschalten("b:alles", "see"));
+        assertEquals(0, w.alleUmschalten(e, "b:alles"));
+        assertTrue(w.angeheftet("b:alles", "wald") && w.angeheftet("b:alles", "see"));
+        assertTrue(w.nadelAngeheftet("b:alles", "hafen") && w.nadelAngeheftet("b:alles", "mark"));
+        assertEquals(2, w.angeheftet());
+        assertTrue(w.ganzAngeheftet(e, "b:alles"));
+        // Ganz angeheftet: Der nächste löst alles.
+        assertEquals(0, w.alleUmschalten(e, "b:alles"));
+        assertEquals(0, w.angeheftet());
+        assertFalse(w.nadelAngeheftet("b:alles", "hafen"));
+        // Eine Ebene ohne etwas mit id ist nie ganz angeheftet.
+        assertFalse(w.ganzAngeheftet(ebene("b:leer", "v1", OHNE_ID + "," + LINIE), "b:leer"));
+    }
+
+    @Test
+    void ganzeEbeneHaeltDieGrenzen() {
+        Ebenen e = ebene("b:alles", "v1", FLAECHE + "," + KREIS + "," + NADEL + "," + BANNER);
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        for (int i = 1; i < Wegpunkte.MAX_ANGEHEFTET; i++) {
+            assertTrue(w.umschalten("b:viele", "r" + i));
+        }
+        for (int i = 1; i < Wegpunkte.MAX_NADELN_ANGEHEFTET; i++) {
+            assertTrue(w.umschaltenNadel("b:viele", "n" + i));
+        }
+        // Je Grenze ist noch eins frei: Eine Fläche und eine Nadel passen, ein Kreis und ein Banner nicht.
+        assertEquals(2, w.alleUmschalten(e, "b:alles"));
+        assertEquals(Wegpunkte.MAX_ANGEHEFTET, w.angeheftet());
+        assertTrue(w.angeheftet("b:alles", "wald"));
+        assertFalse(w.angeheftet("b:alles", "see"));
+        assertTrue(w.nadelAngeheftet("b:alles", "hafen"));
+        assertFalse(w.nadelAngeheftet("b:alles", "mark"));
+        // Nicht ganz angeheftet: Der nächste löst nicht, sondern versucht wieder anzuheften.
+        assertFalse(w.ganzAngeheftet(e, "b:alles"));
+        assertEquals(2, w.alleUmschalten(e, "b:alles"));
+        assertTrue(w.angeheftet("b:alles", "wald"));
+    }
+
+    @Test
     void breiterOhneRandNimmtDieFuellung() {
         Ebenen.Kreis k = new Ebenen.Kreis(WELT, 0, 0, 3, 0x8040C040, null, "k");
         Ebenen.Rand r = ((Ebenen.Kreis) Wegpunkte.breiter(k)).rand();

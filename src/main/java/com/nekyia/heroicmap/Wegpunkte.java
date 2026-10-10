@@ -576,8 +576,78 @@ final class Wegpunkte {
         return true;
     }
 
+    /** Zählt jede Änderung; wer etwas aus den Wegpunkten rechnet, rechnet neu, wenn er sich ändert. */
+    int stand() {
+        return stand;
+    }
+
     boolean nadelAngeheftet(String ebene, String id) {
         return nadeln.contains(new Anheftung(ebene, id));
+    }
+
+    /**
+     * Ist alles, was sich von der Ebene {@code ebene} anheften lässt, angeheftet: Flächen, Kreise, Nadeln
+     * und Banner mit {@code id}; false, wenn sie nichts davon hat. Siehe docs/vollbildkarte.md, „Ebenen“.
+     */
+    boolean ganzAngeheftet(Ebenen e, String ebene) {
+        boolean etwas = false;
+        for (Ebenen.Form f : e.formen(ebene)) {
+            String id = Ebenen.id(f);
+            if (id != null) {
+                if (!formen.contains(new Anheftung(ebene, id))) {
+                    return false;
+                }
+                etwas = true;
+            }
+        }
+        for (Ebenen.Ort o : e.nadeln(ebene)) {
+            if (o.id() != null) {
+                if (!nadeln.contains(new Anheftung(ebene, o.id()))) {
+                    return false;
+                }
+                etwas = true;
+            }
+        }
+        return etwas;
+    }
+
+    /**
+     * Ist alles Anheftbare der Ebene angeheftet, löst es alles; sonst heftet es an, was noch fehlt, so weit
+     * {@link #MAX_ANGEHEFTET} und {@link #MAX_NADELN_ANGEHEFTET} reichen. Gibt zurück, wie viele nicht mehr passten.
+     */
+    int alleUmschalten(Ebenen e, String ebene) {
+        boolean loesen = ganzAngeheftet(e, ebene);
+        int frei = MAX_ANGEHEFTET - angeheftet(), uebrig = 0;
+        for (Ebenen.Form f : e.formen(ebene)) {
+            String id = Ebenen.id(f);
+            if (id == null) {
+                continue;
+            }
+            Anheftung a = new Anheftung(ebene, id);
+            if (loesen) {
+                formen.remove(a);
+            } else if (!formen.contains(a) && frei > 0) {
+                formen.add(a);
+                frei--;
+            } else if (!formen.contains(a)) {
+                uebrig++;
+            }
+        }
+        for (Ebenen.Ort o : e.nadeln(ebene)) {
+            if (o.id() == null) {
+                continue;
+            }
+            Anheftung a = new Anheftung(ebene, o.id());
+            if (loesen) {
+                nadeln.remove(a);
+            } else if (!nadeln.contains(a) && nadeln.size() < MAX_NADELN_ANGEHEFTET) {
+                nadeln.add(a);
+            } else if (!nadeln.contains(a)) {
+                uebrig++;
+            }
+        }
+        schreibe();
+        return uebrig;
     }
 
     /** Wie viele Regionen und Kreise angeheftet sind, eigene und vom Server. */
