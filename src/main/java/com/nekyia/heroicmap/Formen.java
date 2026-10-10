@@ -4,7 +4,10 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
@@ -17,6 +20,8 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.resources.Identifier;
 import org.joml.Matrix3x2fStack;
 import org.joml.Matrix3x2fc;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Flächen, Kreise und Linien der Ebenen, flach wie die Karten des Mods: Füllungen als Trapeze aus
@@ -34,6 +39,7 @@ final class Formen {
     static final double NAH = 1e-6;
     /** So viele Ecken legt ein Neubau höchstens; was darüber geht, fehlt, bei gleicher Ansicht immer dasselbe, also ohne Flackern. */
     static final int MAX_ECKEN = 1_000_000;
+    private static final Logger LOGGER = LoggerFactory.getLogger(HeroicMap.ID);
 
     private Formen() {
     }
@@ -59,6 +65,8 @@ final class Formen {
         private String dimension;
         private List<List<Ebenen.Form>> formen = List.of();
         private List<Vielecke> elemente = List.of();
+        /** Die Ebenen, deren Formen das Budget schon einmal leerten. */
+        private final Set<List<Ebenen.Form>> gewarnt = Collections.newSetFromMap(new IdentityHashMap<>());
     }
 
     /**
@@ -70,8 +78,16 @@ final class Formen {
         if (!Arrays.equals(schluessel, sp.schluessel) || !dimension.equals(sp.dimension) || !gleich(ebenen, sp.formen)) {
             List<Vielecke> neu = new ArrayList<>();
             int[] rest = {MAX_ECKEN};
+            Set<List<Ebenen.Form>> jetzt = Collections.newSetFromMap(new IdentityHashMap<>());
+            jetzt.addAll(ebenen);
+            sp.gewarnt.removeIf(l -> !jetzt.contains(l));
             for (List<Ebenen.Form> formen : ebenen) {
+                boolean vorher = rest[0] > 0;
                 baue(a, dimension, formen, neu, rest);
+                // Einmal je Ebene und version: Eine neue version ist eine neue Liste.
+                if (vorher && rest[0] <= 0 && sp.gewarnt.add(formen)) {
+                    LOGGER.warn("Heroic Map: Formen über {} Ecken; was in dieser und den Ebenen darüber noch käme, fehlt", MAX_ECKEN);
+                }
             }
             sp.schluessel = schluessel;
             sp.dimension = dimension;
@@ -341,7 +357,7 @@ final class Formen {
             // Ein Block mehr: Das Rechteck der Welt ist schon das sichtbare, den Rest schneidet die Form.
             double[] welt = {w[0] - 1, w[1] - 1, w[2] + 1, w[3] + 1};
             float[] e = new float[16];
-            for (int i = 0; i < t.length; i += 6) {
+            for (int i = 0; i < t.length && rest[0] > 0; i += 6) {
                 if (t[i + 3] < welt[1] || t[i] > welt[3] || Math.max(t[i + 2], t[i + 5]) < welt[0] || Math.min(t[i + 1], t[i + 4]) > welt[2]) {
                     continue;
                 }
@@ -508,7 +524,8 @@ final class Formen {
             }
         }
         Zug z = new Zug(s, h);
-        for (int q = 0; q < strecken; q++) {
+        // Ist das Budget leer, rechnet der Zug nicht weiter.
+        for (int q = 0; q < strecken && s.rest[0] > 0; q++) {
             int i = (start + q) % n, j = (i + 1) % n;
             double x0 = p[2 * i], y0 = p[2 * i + 1], x1 = p[2 * j], y1 = p[2 * j + 1], laenge = Math.hypot(x1 - x0, y1 - y0);
             if (laenge == 0) {
@@ -537,7 +554,7 @@ final class Formen {
                 z.ende(false);
                 pos = (pos + a) % muster;
             }
-            for (double l = a; l < e; ) {
+            for (double l = a; l < e && s.rest[0] > 0; ) {
                 boolean an = pos < strich;
                 double schritt = Math.min(an ? strich - pos : muster - pos, e - l);
                 if (an) {
@@ -623,7 +640,7 @@ final class Formen {
 
         private final float[] schnitt, kasten;
         /** Die Ecken, die der Neubau noch legen darf, geteilt mit den anderen Sammlern. */
-        private final int[] rest;
+        final int[] rest;
         final double x0, y0, x1, y1;
         float[] ecken = new float[256];
         int[] anzahl = new int[16];

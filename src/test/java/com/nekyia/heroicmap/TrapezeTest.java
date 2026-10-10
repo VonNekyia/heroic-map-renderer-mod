@@ -94,8 +94,9 @@ class TrapezeTest {
     }
 
     @Test
-    void saegeVerkehrtHerum() {
-        // Der Fall aus dem Review: alle Zähne in einem Band, von rechts nach links gelistet. Das Einfügen zählt in die Arbeit.
+    void saegeInBeidenRichtungen() {
+        // Der Fall aus dem Review: alle Zähne in einem Band. Ob die Ecken von rechts nach links oder umgekehrt kommen,
+        // die Füllung ist dieselbe: der Balken 2 · 2500 und 2500 Zähne zu je 1.
         int zaehne = 2500;
         double[] r = new double[2 * (2 * zaehne + 3)];
         int n = 0;
@@ -106,10 +107,15 @@ class TrapezeTest {
             r[n++] = i;
             r[n++] = i % 2 == 0 ? 0 : 1;
         }
+        double[] hin = java.util.Arrays.copyOf(r, n), zurueck = new double[n];
+        for (int i = 0; i < n / 2; i++) {
+            zurueck[2 * i] = hin[n - 2 - 2 * i];
+            zurueck[2 * i + 1] = hin[n - 1 - 2 * i];
+        }
         long start = System.nanoTime();
-        double[] t = Trapeze.von(List.<double[]>of(java.util.Arrays.copyOf(r, n)));
-        assertTrue(System.nanoTime() - start < 2_000_000_000L, "der Deckel greift auch beim Einfügen");
-        assertNull(t);
+        assertEquals(3 * zaehne, flaeche(Trapeze.von(List.<double[]>of(hin))), 1e-6);
+        assertEquals(3 * zaehne, flaeche(Trapeze.von(List.<double[]>of(zurueck))), 1e-6);
+        assertTrue(System.nanoTime() - start < 2_000_000_000L);
     }
 
     @Test

@@ -82,6 +82,7 @@ final class Trapeze {
                 }
             }
             na = m;
+            int alt = na;
             while (naechste < kanten && z0[folge[naechste]] <= za) {
                 aktiv[na++] = folge[naechste++];
             }
@@ -95,6 +96,7 @@ final class Trapeze {
             if (Double.isNaN(zb)) {
                 break;
             }
+            z.mische(aktiv, alt, na, (za + zb) / 2);
             if (!z.band(aktiv, na, za, zb)) {
                 return null;
             }
@@ -144,8 +146,9 @@ final class Trapeze {
                     for (int i = 0; i + 1 < na; i++) {
                         int l = aktiv[i], r = aktiv[i + 1];
                         if (s[l] != s[r] && (vertauscht(l, r, z) || vertauscht(l, r, ende))) {
-                            double zk = (x0[r] - x0[l] + s[l] * z0[l] - s[r] * z0[r]) / (s[l] - s[r]);
-                            double eps = 1e-9 * (1 + Math.abs(zk));
+                            // Ab dem Anfang des Bands gerechnet, mit einer Toleranz relativ zum Band.
+                            double zk = z + (x(r, z) - x(l, z)) / (s[l] - s[r]);
+                            double eps = 1e-9 * (ende - z);
                             if (zk > z + eps && zk < kreuz - eps) {
                                 kreuz = zk;
                             }
@@ -168,6 +171,28 @@ final class Trapeze {
         private boolean vertauscht(int l, int r, double z) {
             double xl = x(l, z), xr = x(r, z);
             return xl > xr + 1e-9 * (1 + Math.abs(xl));
+        }
+
+        /**
+         * Mischt die neuen Kanten {@code aktiv[alt..na)} nach x bei {@code zm} sortiert unter die alten. So kostet
+         * es gleich viel, in welcher Folge die Ecken kommen: n · log n für die neuen, n für das Mischen.
+         */
+        void mische(int[] aktiv, int alt, int na, double zm) {
+            int k = na - alt;
+            if (k == 0) {
+                return;
+            }
+            Integer[] neu = new Integer[k];
+            for (int i = 0; i < k; i++) {
+                neu[i] = aktiv[alt + i];
+            }
+            Arrays.sort(neu, (p, q) -> Double.compare(x(p, zm), x(q, zm)));
+            arbeit -= na + (long) k * (64 - Long.numberOfLeadingZeros(k));
+            int[] alte = Arrays.copyOf(aktiv, alt);
+            int i = 0, j = 0;
+            for (int o = 0; o < na; o++) {
+                aktiv[o] = j >= k || i < alt && x(alte[i], zm) <= x(neu[j], zm) ? alte[i++] : neu[j++];
+            }
         }
 
         /**
