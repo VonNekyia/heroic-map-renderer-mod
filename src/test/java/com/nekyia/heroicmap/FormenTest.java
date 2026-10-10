@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
+import java.util.List;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import org.joml.Matrix3x2f;
 import org.junit.jupiter.api.Test;
@@ -185,7 +186,8 @@ class FormenTest {
         Formen.Ansicht a = new Formen.Ansicht((wx, wz, aus) -> {
             aus[0] = wx;
             aus[1] = wz;
-        }, 1, 1, 1, Drehung.rechteck(0, 0, 384, 384), new double[] {0, 0, 384, 384}, new Matrix3x2f(), new ScreenRectangle(0, 0, 384, 384));
+        }, 1, 1, 1, Drehung.rechteck(0, 0, 384, 384), new double[] {0, 0, 384, 384}, new Matrix3x2f(), new ScreenRectangle(0, 0, 384, 384),
+                Double.POSITIVE_INFINITY);
         // Weit draussen: nichts. Der Kasten ganz innen: nur er.
         assertNull(Formen.bogen(a, kreis(1000, 1000, 100), kasten));
         assertTrue(Formen.bogen(a, kreis(192, 192, 100_000), kasten).innen());
@@ -215,7 +217,8 @@ class FormenTest {
             kreise.add(new Ebenen.Kreis(Ebenen.UEBERWELT, i % 100, i / 100, 100_000, 0x40FF0000, new Ebenen.Rand(0xFFFFFFFF, 2, 0, 0)));
         }
         Formen.Ansicht a = new Formen.Ansicht(Minimap.abbild(8, 3, 0, 0, Drehung.Lage.von(0.3, 192, 192, 0, 0)), 24, 3, 1,
-                Drehung.rechteck(0, 0, 384, 384), new double[] {-16, -16, 16, 16}, new Matrix3x2f(), new ScreenRectangle(0, 0, 384, 384));
+                Drehung.rechteck(0, 0, 384, 384), new double[] {-16, -16, 16, 16}, new Matrix3x2f(), new ScreenRectangle(0, 0, 384, 384),
+                Double.POSITIVE_INFINITY);
         java.util.List<Formen.Vielecke> aus = new java.util.ArrayList<>();
         long start = System.nanoTime();
         Formen.baue(a, Ebenen.UEBERWELT, kreise, aus);
@@ -279,6 +282,136 @@ class FormenTest {
     }
 
     @Test
+    void schriftMittigAufDemPfad() {
+        // Drei Zeichen zu 10, Lücke 2, auf einer Strecke von 0 bis 100: mittig ab 33, also Mitten bei 38, 50 und 62.
+        double[] l = Formen.anordnung(new double[] {0, 0, 100, 0}, new double[] {10, 10, 10}, 2);
+        assertArrayEquals(new double[] {38, 0, 0, 50, 0, 0, 62, 0, 0}, l, 1e-9);
+        // Nach links gezeichnet: umgekehrt, so steht die Schrift aufrecht, und dieselben Orte.
+        assertArrayEquals(l, Formen.anordnung(new double[] {100, 0, 0, 0}, new double[] {10, 10, 10}, 2), 1e-9);
+        // Um eine Ecke: das zweite Zeichen auf der zweiten Strecke, im Winkel nach unten (y nach unten).
+        double[] ecke = Formen.anordnung(new double[] {0, 0, 10, 0, 10, 10}, new double[] {4, 4}, 0);
+        assertArrayEquals(new double[] {8, 0, 0, 10, 2, Math.PI / 2}, ecke, 1e-9);
+    }
+
+    @Test
+    void schriftUeberDieEnden() {
+        // Kürzer als der Text: Die Schrift läuft in Richtung des ersten und letzten Stücks weiter.
+        double[] l = Formen.anordnung(new double[] {0, 0, 10, 0}, new double[] {10, 10, 10}, 0);
+        assertArrayEquals(new double[] {-5, 0, 0, 5, 0, 0, 15, 0, 0}, l, 1e-9);
+        // Ein Punkt heisst waagrecht dort; doppelte Punkte zählen als einer.
+        double[] p = Formen.anordnung(new double[] {7, 3, 7, 3}, new double[] {4, 6}, 1);
+        assertArrayEquals(new double[] {3.5, 3, 0, 9.5, 3, 0}, p, 1e-9);
+    }
+
+    @Test
+    void kappeNachEinheitenDesGui() {
+        // 16 Blöcke zu 1 Einheit: 16 hoch. Unter 8 Einheiten fehlt die Schrift, über 96 bleibt sie 96.
+        assertEquals(16, Formen.kappe(16, 1, 1, Double.POSITIVE_INFINITY), 1e-9);
+        assertEquals(0, Formen.kappe(7.9, 1, 1, Double.POSITIVE_INFINITY), 1e-9);
+        assertEquals(96, Formen.kappe(200, 1, 1, Double.POSITIVE_INFINITY), 1e-9);
+        // In Einheiten des GUI, nicht in Pixeln: bei GUI-Massstab 4 (einheit 4) gleich hoch, nur in mehr Pixeln.
+        assertEquals(16 * 4, Formen.kappe(16, 4, 4, Double.POSITIVE_INFINITY), 1e-9);
+        // Minimap mit 128 Einheiten: höchstens 12,8 Einheiten hoch.
+        assertEquals(12.8 * 2, Formen.kappe(16, 4, 2, 12.8), 1e-9);
+    }
+
+    private static Ebenen.Schrift schrift(String text, float kontur) {
+        return new Ebenen.Schrift(Ebenen.UEBERWELT, text, new double[] {0, 0, 100, 0}, 16, 0, 0xFF2B2B2B, 0xFFF2E8D0, kontur,
+                new double[] {0, 0, 100, 0});
+    }
+
+    @Test
+    void erstDieKonturDannDieFuellung() {
+        // Zwei Zeichen mit Kontur: erst 2 · 8 Kopien der Kontur, dann die 2 Füllungen; so deckt keine Kontur ein Zeichen davor.
+        List<Formen.Glyphe> g = Formen.glyphen(schrift("AB", 1), new double[] {0, 0, 100, 0}, new double[] {8, 8}, 16, 1,
+                Drehung.rechteck(-1000, -1000, 1000, 1000), new int[] {Formen.MAX_ZEICHEN});
+        assertEquals(18, g.size());
+        for (int i = 0; i < 16; i++) {
+            assertEquals(0xFFF2E8D0, g.get(i).farbe());
+            assertTrue(g.get(i).dx() != 0 || g.get(i).dy() != 0);
+        }
+        assertEquals(List.of(0, 1), List.of(g.get(16).zeichen(), g.get(17).zeichen()));
+        assertEquals(0xFF2B2B2B, g.get(17).farbe());
+        // Die Kontur reicht höchstens 0,12 der Höhe: 64 Einheiten breit gewünscht, bei 16 hoch also 1,92, in Einheiten der Schrift.
+        List<Formen.Glyphe> breit = Formen.glyphen(schrift("A", 64), new double[] {0, 0, 100, 0}, new double[] {8}, 16, 1,
+                Drehung.rechteck(-1000, -1000, 1000, 1000), new int[] {Formen.MAX_ZEICHEN});
+        double massstab = 16.0 / Formen.KAPPE;
+        assertEquals(0.12 * 16 / massstab, breit.getFirst().dx(), 1e-9);
+    }
+
+    @Test
+    void zeichenAusserhalbDerFormFehlen() {
+        // Der Text liegt mittig um x 50; im Schnitt von 0 bis 50 liegt nur das linke Zeichen.
+        List<Formen.Glyphe> g = Formen.glyphen(schrift("AB", 0), new double[] {0, 0, 100, 0}, new double[] {20, 20}, 16, 1,
+                Drehung.rechteck(0, -10, 50, 10), new int[] {Formen.MAX_ZEICHEN});
+        assertEquals(1, g.size());
+        assertEquals(0, g.getFirst().zeichen());
+    }
+
+    @Test
+    void budgetDerZeichen() {
+        // 8 Zeichen mit Kontur kosten 8 · 9 = 72 Glyphen. Reichen 5 nicht, fehlt die ganze Schrift und das Budget bleibt.
+        double[] breiten = {8, 8, 8, 8, 8, 8, 8, 8};
+        int[] rest = {5};
+        assertNull(Formen.glyphen(schrift("ABCDEFGH", 1), new double[] {0, 0, 100, 0}, breiten, 16, 1,
+                Drehung.rechteck(-1000, -1000, 1000, 1000), rest));
+        assertEquals(5, rest[0]);
+        // 71 reichen auch nicht, 72 genau.
+        rest[0] = 71;
+        assertNull(Formen.glyphen(schrift("ABCDEFGH", 1), new double[] {0, 0, 100, 0}, breiten, 16, 1,
+                Drehung.rechteck(-1000, -1000, 1000, 1000), rest));
+        rest[0] = 72;
+        assertEquals(72, Formen.glyphen(schrift("ABCDEFGH", 1), new double[] {0, 0, 100, 0}, breiten, 16, 1,
+                Drehung.rechteck(-1000, -1000, 1000, 1000), rest).size());
+        assertEquals(0, rest[0]);
+    }
+
+    @Test
+    void unsichtbareFarbeWederGezeichnetNochGezaehlt() {
+        double[] p = {0, 0, 100, 0};
+        float[] kasten = Drehung.rechteck(-1000, -1000, 1000, 1000);
+        // Kontur mit Alpha 0: nur die zwei Füllungen, zwei Glyphen vom Budget.
+        int[] rest = {Formen.MAX_ZEICHEN};
+        List<Formen.Glyphe> ohneKontur = Formen.glyphen(new Ebenen.Schrift(Ebenen.UEBERWELT, "AB", p, 16, 0, 0xFF2B2B2B, 0x00F2E8D0, 1, p),
+                p, new double[] {8, 8}, 16, 1, kasten, rest);
+        assertEquals(2, ohneKontur.size());
+        assertEquals(0xFF2B2B2B, ohneKontur.getFirst().farbe());
+        assertEquals(Formen.MAX_ZEICHEN - 2, rest[0]);
+        // Füllung mit Alpha 0: nur die 2 · 8 Kopien der Kontur.
+        List<Formen.Glyphe> ohneFuellung = Formen.glyphen(new Ebenen.Schrift(Ebenen.UEBERWELT, "AB", p, 16, 0, 0x002B2B2B, 0xFFF2E8D0, 1, p),
+                p, new double[] {8, 8}, 16, 1, kasten, rest);
+        assertEquals(16, ohneFuellung.size());
+        assertTrue(ohneFuellung.stream().allMatch(gl -> gl.farbe() == 0xFFF2E8D0));
+        assertEquals(Formen.MAX_ZEICHEN - 18, rest[0]);
+    }
+
+    @Test
+    void neuladenVerwirftDenSpeicher() {
+        // Nach F3+T oder anderen Paketen halten gespeicherte Texte Glyphen der alten Schrift; der Speicher gilt nicht mehr.
+        Formen.Speicher sp = new Formen.Speicher();
+        double[] schluessel = {1, 2, 3};
+        List<List<Ebenen.Form>> ebenen = List.of(List.of());
+        sp.merke(schluessel, Ebenen.UEBERWELT, ebenen, List.of());
+        assertTrue(sp.gilt(schluessel, Ebenen.UEBERWELT, ebenen));
+        Formen.neuGeladen();
+        assertFalse(sp.gilt(schluessel, Ebenen.UEBERWELT, ebenen));
+        sp.merke(schluessel, Ebenen.UEBERWELT, ebenen, List.of());
+        assertTrue(sp.gilt(schluessel, Ebenen.UEBERWELT, ebenen));
+    }
+
+    @Test
+    void schriftSichtbarDurchIhrenText() {
+        // Der Pfad liegt links neben der Welt, der lange Text reicht hinein; ein kurzer nicht.
+        Formen.Ansicht a = ansicht(Minimap.abbild(1, 1, 0, 0, Drehung.Lage.von(0, 0, 0, 0, 0)));
+        Ebenen.Schrift lang = new Ebenen.Schrift(Ebenen.UEBERWELT, "x".repeat(64), new double[] {-200, 30}, 16, 0, 0, 0, 0,
+                new double[] {-200, 30, -200, 30});
+        Ebenen.Schrift kurz = new Ebenen.Schrift(Ebenen.UEBERWELT, "x", new double[] {-200, 30}, 16, 0, 0, 0, 0,
+                new double[] {-200, 30, -200, 30});
+        assertTrue(Formen.sichtbar(a, lang));
+        assertFalse(Formen.sichtbar(a, kurz));
+    }
+
+    @Test
     void gleicheAnsichtGleicherSchluessel() {
         // Der Speicher rechnet nur neu, wenn sich der Schlüssel ändert; gedreht und verschoben ändert er sich.
         Formen.Ansicht a = ansicht(Minimap.abbild(2, 2, 100, 200, Drehung.Lage.von(0.3, 64, 64, 10, 20)));
@@ -292,6 +425,6 @@ class FormenTest {
 
     private static Formen.Ansicht ansicht(Formen.Abbild abbild) {
         return new Formen.Ansicht(abbild, 4, 2, 1, Drehung.rechteck(0, 0, 256, 256), new double[] {0, 0, 64, 64}, new Matrix3x2f(),
-                new ScreenRectangle(0, 0, 256, 256));
+                new ScreenRectangle(0, 0, 256, 256), Double.POSITIVE_INFINITY);
     }
 }

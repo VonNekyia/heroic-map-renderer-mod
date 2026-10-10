@@ -10,6 +10,7 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -63,6 +64,9 @@ final class Ebenen {
     static final double MAX_KOORDINATE = 30_000_000;
     /** Die Farbe eines Rands ohne Farbe und ohne Füllung. */
     static final int RANDFARBE = 0xFF2B2B2B;
+    /** Kartenschrift: höchstens so viele Punkte im Pfad, wie im Format; Farbe und Kontur ohne Angabe; Sperrung gekappt. */
+    static final int MAX_PFAD = 64, SCHRIFTFARBE = 0xFF2B2B2B, KONTURFARBE = 0xFFF2E8D0;
+    static final float MAX_SPERRUNG = 2;
     static final String UEBERWELT = "minecraft:overworld";
     /** Die Farbe des Schilds ohne {@code color}. */
     static final int FARBE = 0xFFD9443A;
@@ -92,7 +96,7 @@ final class Ebenen {
     }
 
     /** Eine Fläche, ein Kreis oder eine Linie einer Ebene, flach gezeichnet. */
-    sealed interface Form permits Flaeche, Kreis, Linie {
+    sealed interface Form permits Flaeche, Kreis, Linie, Schrift {
 
         String dimension();
     }
@@ -110,6 +114,15 @@ final class Ebenen {
 
     /** Eine Linie durch {@code punkte} {x0, z0, …}; {@code box} {x0, z0, x1, z1}. */
     record Linie(String dimension, double[] punkte, Rand rand, double[] box) implements Form {
+    }
+
+    /**
+     * Eine Kartenschrift: {@code text} entlang des Pfads {x0, z0, …}; {@code groesse} die Höhe der
+     * Grossbuchstaben in Blöcken, {@code sperrung} der Abstand zwischen den Zeichen in Anteilen davon;
+     * Farbe mit Alpha; Kontur in Einheiten des GUI, Breite 0 ohne. {@code box} {x0, z0, x1, z1} des Pfads.
+     */
+    record Schrift(String dimension, String text, double[] pfad, float groesse, float sperrung, int farbe, int konturFarbe, float konturBreite,
+            double[] box) implements Form {
     }
 
     /** Schild und Nadel einer Grösse: Feld zum Tönen und Rahmen mit Nadel, gleich gross, der Fuss unten in der Mitte. */
@@ -353,6 +366,7 @@ final class Ebenen {
             case Flaeche fl -> fl.ringe().stream().mapToInt(r -> r.length / 2).sum();
             case Linie l -> l.punkte().length / 2;
             case Kreis k -> 1;
+            case Schrift s -> s.pfad().length / 2;
         };
     }
 
@@ -364,12 +378,15 @@ final class Ebenen {
     /** Eine Form; null, wenn das Objekt keine sein will. Verletzt es eine Grenze, wirft sie. */
     private static Form form(JsonObject o) {
         String typ = o.has("type") ? o.get("type").getAsString() : "";
-        if (!typ.equals("region") && !typ.equals("circle") && !typ.equals("line")) {
+        if (!typ.equals("region") && !typ.equals("circle") && !typ.equals("line") && !typ.equals("label")) {
             return null;
         }
         String dimension = o.has("dimension") ? text(o, "dimension", MAX_KENNUNG) : UEBERWELT;
         if (dimension == null) {
             throw new IllegalArgumentException("Grenze");
+        }
+        if (typ.equals("label")) {
+            return schrift(o, dimension);
         }
         String fill = o.has("fill") ? o.get("fill").getAsString() : null;
         boolean gefuellt = fill != null && FARBE_MIT_ALPHA.matcher(fill).matches() && !typ.equals("line");
@@ -419,6 +436,44 @@ final class Ebenen {
                 return new Flaeche(dimension, fuellung, trapeze, rand, List.copyOf(ringe), box(ringe));
             }
         }
+    }
+
+    /**
+     * Eine Kartenschrift: {@code text} bis {@link #MAX_TEXT} Zeichen, in NFC; {@code path} 1 bis
+     * {@link #MAX_PFAD} Punkte; {@code size} Vorgabe 16 Blöcke, auch für 0 und Ungültiges; {@code spacing}
+     * Vorgabe 0, gekappt auf 0 bis {@link #MAX_SPERRUNG}. {@code outline} nur als Objekt, ohne {@code width}
+     * ohne Kontur, ohne {@code color} in {@link #KONTURFARBE}. Ein Feld mit falschem Typ nimmt die Vorgabe.
+     * Wo das Format schweigt, wie die Webkarte.
+     */
+    private static Schrift schrift(JsonObject o, String dimension) {
+        String text = text(o, "text", MAX_TEXT);
+        if (text == null || text.isBlank()) {
+            throw new IllegalArgumentException("Text");
+        }
+        text = Normalizer.normalize(text, Normalizer.Form.NFC);
+        double[] pfad = ring(o.getAsJsonArray("path"), 1);
+        if (pfad.length / 2 > MAX_PFAD) {
+            throw new IllegalArgumentException("Pfad " + pfad.length / 2);
+        }
+        float groesse = zahl(o, "size", 16);
+        if (!(groesse > 0)) {
+            groesse = 16;
+        }
+        if (groesse > MAX_RADIUS) {
+            throw new IllegalArgumentException("Grösse " + groesse);
+        }
+        float sperrung = zahl(o, "spacing", 0);
+        sperrung = Float.isFinite(sperrung) ? Math.max(0, Math.min(sperrung, MAX_SPERRUNG)) : 0;
+        int farbe = farbeMitAlpha(o, "color", SCHRIFTFARBE);
+        int konturFarbe = KONTURFARBE;
+        float konturBreite = 0;
+        if (o.has("outline") && o.get("outline").isJsonObject()) {
+            JsonObject k = o.getAsJsonObject("outline");
+            konturFarbe = farbeMitAlpha(k, "color", KONTURFARBE);
+            float b = zahl(k, "width", 0);
+            konturBreite = b > 0 ? Math.min(b, MAX_BREITE) : 0;
+        }
+        return new Schrift(dimension, text, pfad, groesse, sperrung, farbe, konturFarbe, konturBreite, box(List.of(pfad)));
     }
 
     /** Die Punkte [[x, z], …] als {x0, z0, …}; mit weniger als {@code mindestens} oder mehr als {@link #MAX_PUNKTE} wirft sie. */
@@ -485,6 +540,18 @@ final class Ebenen {
     }
 
     private static final Pattern FARBE_MIT_ALPHA = Pattern.compile("#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?");
+
+    /** Das Feld als Zahl, nur wenn es eine JSON-Zahl ist; sonst, auch für "12", {@code sonst}. */
+    static float zahl(JsonObject o, String feld, float sonst) {
+        JsonElement e = o.get(feld);
+        return e != null && e.isJsonPrimitive() && e.getAsJsonPrimitive().isNumber() ? e.getAsFloat() : sonst;
+    }
+
+    /** Das Feld als Farbe wie {@link #farbeMitAlpha(String, int)}, nur wenn es ein Text ist; sonst {@code sonst}. */
+    static int farbeMitAlpha(JsonObject o, String feld, int sonst) {
+        JsonElement e = o.get(feld);
+        return e != null && e.isJsonPrimitive() && e.getAsJsonPrimitive().isString() ? farbeMitAlpha(e.getAsString(), sonst) : sonst;
+    }
 
     /** {@code #RRGGBB} deckend oder {@code #RRGGBBAA} mit Alpha als ARGB; sonst {@code sonst}. */
     static int farbeMitAlpha(String text, int sonst) {

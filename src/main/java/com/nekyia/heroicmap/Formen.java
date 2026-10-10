@@ -8,11 +8,19 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
+import net.minecraft.client.renderer.state.gui.GuiTextRenderState;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FontDescription;
+import net.minecraft.network.chat.Style;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.FormattedCharSequence;
+import org.joml.Matrix3x2f;
 import org.joml.Matrix3x2fc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,50 +54,85 @@ final class Formen {
     /**
      * Was eine Ansicht gibt: das Abbild; wie lang ein Block und eine Einheit des GUI in Einheiten des
      * Elements sind, und wie viele Pixel des Schirms eine Einheit des Elements; das konvexe Vieleck,
-     * an dem geschnitten wird; das sichtbare Rechteck der Welt {x0, z0, x1, z1}; Pose und Grenzen.
+     * an dem geschnitten wird; das sichtbare Rechteck der Welt {x0, z0, x1, z1}; Pose und Grenzen; wie
+     * hoch die Grossbuchstaben der Kartenschrift höchstens stehen, in Einheiten des GUI.
      */
     record Ansicht(Abbild abbild, double block, double einheit, double pixel, float[] schnitt, double[] welt, Matrix3x2fc pose,
-            ScreenRectangle bounds) {
+            ScreenRectangle bounds, double schrift) {
+    }
+
+    /** Zählt jedes Neuladen der Ressourcen: Die gespeicherten Texte halten Glyphen der Schrift, die dabei verfällt. */
+    private static int generation;
+
+    /** Ruft der Reload-Listener nach den Schriften des Spiels; danach baut jede Ansicht neu. */
+    static void neuGeladen() {
+        generation++;
     }
 
     /** Was eine Ansicht zuletzt gezeichnet hat: Bleiben Ansicht und Formen gleich, hängt sie nur die fertigen Elemente wieder an. */
     static final class Speicher {
 
         private double[] schluessel = new double[0];
+        private int generation;
         private String dimension;
         private List<List<Ebenen.Form>> formen = List.of();
-        private List<Vielecke> elemente = List.of();
-        /** Die Ebenen, deren Formen das Budget schon einmal leerten. */
+        /** Die fertigen Elemente in ihrer Reihenfolge: Vielecke und Text des Spiels. */
+        private List<Object> elemente = List.of();
+        /** Die Ebenen, deren Formen oder Schrift das Budget schon einmal leerten. */
         private final Set<List<Ebenen.Form>> gewarnt = Collections.newSetFromMap(new IdentityHashMap<>());
+        private final Set<List<Ebenen.Form>> gewarntSchrift = Collections.newSetFromMap(new IdentityHashMap<>());
+
+        /** Gilt, was gespeichert ist, noch für diese Ansicht, Dimension und Ebenen, mit der Schrift von jetzt? */
+        boolean gilt(double[] schluessel, String dimension, List<List<Ebenen.Form>> ebenen) {
+            return Arrays.equals(schluessel, this.schluessel) && this.generation == Formen.generation
+                    && dimension.equals(this.dimension) && gleich(ebenen, formen);
+        }
+
+        void merke(double[] schluessel, String dimension, List<List<Ebenen.Form>> ebenen, List<Object> elemente) {
+            this.schluessel = schluessel;
+            this.generation = Formen.generation;
+            this.dimension = dimension;
+            this.formen = ebenen;
+            this.elemente = elemente;
+        }
     }
 
     /**
      * Zeichnet die Formen der Ebenen in ihrer Reihenfolge, in dieser Dimension: je Ebene erst alle
-     * Füllungen, dann Ränder und Linien. Neu gerechnet nur, wenn sich Ansicht, Dimension oder eine Ebene ändert.
+     * Füllungen, dann Ränder und Linien, dann die Schrift. Neu gerechnet nur, wenn sich Ansicht,
+     * Dimension oder eine Ebene ändert; sonst hängt sie die fertigen Elemente wieder an.
      */
-    static void zeichne(GuiGraphicsExtractor g, Ansicht a, String dimension, List<List<Ebenen.Form>> ebenen, Speicher sp) {
+    static void zeichne(GuiGraphicsExtractor g, Ansicht a, String dimension, List<List<Ebenen.Form>> ebenen, Speicher sp, Font font) {
         double[] schluessel = schluessel(a);
-        if (!Arrays.equals(schluessel, sp.schluessel) || !dimension.equals(sp.dimension) || !gleich(ebenen, sp.formen)) {
-            List<Vielecke> neu = new ArrayList<>();
-            int[] rest = {MAX_ECKEN};
+        if (!sp.gilt(schluessel, dimension, ebenen)) {
+            List<Object> neu = new ArrayList<>();
+            int[] rest = {MAX_ECKEN}, zeichen = {MAX_ZEICHEN};
             Set<List<Ebenen.Form>> jetzt = Collections.newSetFromMap(new IdentityHashMap<>());
             jetzt.addAll(ebenen);
             sp.gewarnt.removeIf(l -> !jetzt.contains(l));
+            sp.gewarntSchrift.removeIf(l -> !jetzt.contains(l));
             for (List<Ebenen.Form> formen : ebenen) {
                 boolean vorher = rest[0] > 0;
-                baue(a, dimension, formen, neu, rest);
+                List<Vielecke> vielecke = new ArrayList<>();
+                baue(a, dimension, formen, vielecke, rest);
+                neu.addAll(vielecke);
+                boolean schriftFehlt = texte(font, a, dimension, formen, neu, zeichen);
                 // Einmal je Ebene und version: Eine neue version ist eine neue Liste.
                 if (vorher && rest[0] <= 0 && sp.gewarnt.add(formen)) {
                     LOGGER.warn("Heroic Map: Formen über {} Ecken; was in dieser und den Ebenen darüber noch käme, fehlt", MAX_ECKEN);
                 }
+                if (schriftFehlt && sp.gewarntSchrift.add(formen)) {
+                    LOGGER.warn("Heroic Map: Kartenschrift über {} Zeichen; eine Schrift, die nicht mehr ganz passt, fehlt", MAX_ZEICHEN);
+                }
             }
-            sp.schluessel = schluessel;
-            sp.dimension = dimension;
-            sp.formen = ebenen;
-            sp.elemente = neu;
+            sp.merke(schluessel, dimension, ebenen, neu);
         }
-        for (Vielecke v : sp.elemente) {
-            g.guiRenderState.addGuiElement(v);
+        for (Object o : sp.elemente) {
+            if (o instanceof Vielecke v) {
+                g.guiRenderState.addGuiElement(v);
+            } else {
+                g.guiRenderState.addText((GuiTextRenderState) o);
+            }
         }
     }
 
@@ -98,7 +141,7 @@ final class Formen {
         double[] p = new double[2];
         float[] s = a.schnitt();
         Matrix3x2fc m = a.pose();
-        double[] k = new double[24 + s.length];
+        double[] k = new double[25 + s.length];
         for (int i = 0; i < 3; i++) {
             a.abbild().ab(i == 1 ? 1 : 0, i == 2 ? 1 : 0, p);
             k[2 * i] = p[0];
@@ -106,10 +149,10 @@ final class Formen {
         }
         double[] rest = {a.block(), a.einheit(), a.pixel(), a.welt()[0], a.welt()[1], a.welt()[2], a.welt()[3],
             m.m00(), m.m01(), m.m10(), m.m11(), m.m20(), m.m21(), a.bounds().left(), a.bounds().top(), a.bounds().width(),
-            a.bounds().height(), s.length};
+            a.bounds().height(), a.schrift(), s.length};
         System.arraycopy(rest, 0, k, 6, rest.length);
         for (int i = 0; i < s.length; i++) {
-            k[24 + i] = s[i];
+            k[25 + i] = s[i];
         }
         return k;
     }
@@ -154,6 +197,189 @@ final class Formen {
                 rand(a, f, boegen[i], aus, rest);
             }
         }
+    }
+
+    /** Die Kartenschrift: Schrift „karte“ aus assets/heroicmap/font/karte.json, IM Fell English SC in 16 Einheiten je Geviert. */
+    static final Style STIL = Style.EMPTY.withFont(new FontDescription.Resource(Identifier.fromNamespaceAndPath(HeroicMap.ID, "karte")));
+    /** Höhe der Grossbuchstaben in Einheiten der Schrift: 16 · 1384 / 2048, die Oberkante des H, wie die Webkarte (0096 des Renderers). */
+    static final float KAPPE = 16f * 1384 / 2048;
+    /** Die Grundlinie liegt 7 Einheiten unter dem y des Texts, wie bei jeder Schrift des Spiels (GlyphBitmap.getTop). */
+    static final float GRUNDLINIE = 7;
+    /** Unter so vielen Einheiten des GUI Höhe fehlt die Schrift, über so vielen bleibt sie so gross, wie im Format. */
+    static final double KLEINSTE_SCHRIFT = 8, GROESSTE_SCHRIFT = 96;
+    /** So viele Zeichen legt ein Neubau höchstens, die Kopien der Kontur mitgezählt; was darüber geht, fehlt. */
+    static final int MAX_ZEICHEN = 20_000;
+    /** So weit reicht die Kontur höchstens, in Anteilen der Höhe der Grossbuchstaben; breiter zerfiele sie in Kopien. */
+    static final double KONTUR_HOECHSTENS = 0.12;
+
+    /**
+     * Die Höhe der Grossbuchstaben in Einheiten des Elements: {@code groesse} Blöcke sind
+     * groesse · block / einheit Einheiten des GUI. Unter {@link #KLEINSTE_SCHRIFT} fehlt die Schrift (0),
+     * darüber steht sie höchstens {@link #GROESSTE_SCHRIFT} und {@code hoechstens} Einheiten hoch.
+     */
+    static double kappe(double groesse, double block, double einheit, double hoechstens) {
+        double gui = groesse * block / einheit;
+        return gui < KLEINSTE_SCHRIFT ? 0 : Math.min(Math.min(gui, GROESSTE_SCHRIFT), hoechstens) * einheit;
+    }
+
+    /** Ein Zeichen der Kartenschrift: welches, seine Mitte, Winkel und Massstab, der Versatz der Kontur in Einheiten der Schrift, die Farbe. */
+    record Glyphe(int zeichen, double x, double y, double winkel, double massstab, double dx, double dy, int farbe) {
+    }
+
+    /**
+     * Die Glyphen einer Kartenschrift auf dem Pfad p in Einheiten des Elements: erst alle Kopien der
+     * Kontur der ganzen Schrift, dann alle Füllungen, so deckt keine Kontur ein Zeichen davor. Ein Zeichen,
+     * dessen Mitte ausserhalb des Schnitts liegt, fehlt, ein Durchgang in unsichtbarer Farbe auch.
+     * {@code breiten} in Einheiten der Schrift. Die Glyphen gehen ganz von {@code rest[0]} ab; passen sie
+     * nicht ganz, null und {@code rest} bleibt, so steht keine Kontur ohne ihre Zeichen.
+     */
+    static List<Glyphe> glyphen(Ebenen.Schrift s, double[] p, double[] breiten, double kappe, double einheit, float[] schnitt, int[] rest) {
+        double massstab = kappe / KAPPE;
+        double[] b = new double[breiten.length];
+        for (int i = 0; i < b.length; i++) {
+            b[i] = breiten[i] * massstab;
+        }
+        double[] lage = anordnung(p, b, s.sperrung() * kappe);
+        boolean[] drin = new boolean[b.length];
+        for (int i = 0; i < b.length; i++) {
+            drin[i] = innen(schnitt, lage[3 * i], lage[3 * i + 1]);
+        }
+        double r = Math.min(s.konturBreite() * einheit, KONTUR_HOECHSTENS * kappe) / massstab;
+        boolean mitKontur = r > 0 && Ebenen.sichtbar(s.konturFarbe()), mitFuellung = Ebenen.sichtbar(s.farbe());
+        int n = 0;
+        for (boolean d : drin) {
+            n += d ? 1 : 0;
+        }
+        int kosten = n * ((mitKontur ? 8 : 0) + (mitFuellung ? 1 : 0));
+        if (kosten > rest[0]) {
+            return null;
+        }
+        rest[0] -= kosten;
+        List<Glyphe> aus = new ArrayList<>(kosten);
+        for (int k = mitKontur ? 0 : 8; k <= (mitFuellung ? 8 : 7); k++) {
+            // k 0 bis 7: die Kopien der Kontur rundum; 8: die Füllung.
+            boolean kontur = k < 8;
+            for (int i = 0; i < b.length; i++) {
+                if (drin[i]) {
+                    aus.add(new Glyphe(i, lage[3 * i], lage[3 * i + 1], lage[3 * i + 2], massstab, kontur ? r * Math.cos(k * Math.PI / 4) : 0,
+                            kontur ? r * Math.sin(k * Math.PI / 4) : 0, kontur ? s.konturFarbe() : s.farbe()));
+                }
+            }
+        }
+        return aus;
+    }
+
+    /**
+     * Die Kartenschrift einer Ebene als fertiger Text des Spiels, je Glyphe ein Element mit seiner Pose,
+     * im Ausschnitt der Ansicht; true, wenn eine Schrift nicht mehr ins Budget passte.
+     * Siehe docs/ebenen.md, „Kartenschrift“.
+     */
+    private static boolean texte(Font font, Ansicht a, String dimension, List<Ebenen.Form> formen, List<Object> aus, int[] rest) {
+        boolean fehlt = false;
+        for (Ebenen.Form f : formen) {
+            if (!(f instanceof Ebenen.Schrift s) || !s.dimension().equals(dimension) || !sichtbar(a, s)) {
+                continue;
+            }
+            double kappe = kappe(s.groesse(), a.block(), a.einheit(), a.schrift());
+            if (kappe <= 0) {
+                continue;
+            }
+            int[] codes = s.text().codePoints().toArray();
+            FormattedCharSequence[] zeichen = new FormattedCharSequence[codes.length];
+            double[] breiten = new double[codes.length];
+            for (int i = 0; i < codes.length; i++) {
+                Component c = Component.literal(Character.toString(codes[i])).withStyle(STIL);
+                zeichen[i] = c.getVisualOrderText();
+                breiten[i] = font.getSplitter().stringWidth(c);
+            }
+            List<Glyphe> glyphen = glyphen(s, abgebildet(a, s.pfad()), breiten, kappe, a.einheit(), a.schnitt(), rest);
+            if (glyphen == null) {
+                fehlt = true;
+                continue;
+            }
+            for (Glyphe gl : glyphen) {
+                // Die Mitte des Zeichens auf dem Punkt, die Mitte der Grossbuchstaben auf der Linie.
+                Matrix3x2f pose = new Matrix3x2f(a.pose()).translate((float) gl.x(), (float) gl.y()).rotate((float) gl.winkel())
+                        .scale((float) gl.massstab()).translate((float) (gl.dx() - breiten[gl.zeichen()] / 2), (float) (gl.dy() + KAPPE / 2 - GRUNDLINIE));
+                aus.add(new GuiTextRenderState(font, zeichen[gl.zeichen()], pose, 0, 0, gl.farbe(), 0, false, false, a.bounds()));
+            }
+        }
+        return fehlt;
+    }
+
+    /** Liegt der Punkt im konvexen Vieleck {@code schnitt}? */
+    static boolean innen(float[] schnitt, double x, double y) {
+        int c = schnitt.length / 2;
+        double vorzeichen = 0;
+        for (int e = 0; e < c; e++) {
+            int f = (e + 1) % c;
+            double kreuz = (schnitt[2 * f] - schnitt[2 * e]) * (y - schnitt[2 * e + 1]) - (schnitt[2 * f + 1] - schnitt[2 * e + 1]) * (x - schnitt[2 * e]);
+            if (kreuz != 0) {
+                if (vorzeichen == 0) {
+                    vorzeichen = Math.signum(kreuz);
+                } else if (Math.signum(kreuz) != vorzeichen) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Wo die Zeichen einer Kartenschrift liegen: je Zeichen Mitte und Winkel {x, y, w, …} auf dem Pfad p
+     * in Einheiten des Elements, mittig, mit {@code luecke} zwischen Zeichen der Breiten {@code breiten}.
+     * Läuft der Pfad im Bild nach links, gilt er umgekehrt, so steht die Schrift nie auf dem Kopf. Ist er
+     * kürzer als der Text, läuft die Schrift an den Enden in Richtung des ersten und letzten Stücks weiter;
+     * ein einzelner Punkt heisst waagrecht.
+     */
+    static double[] anordnung(double[] p, double[] breiten, double luecke) {
+        // Doppelte Punkte fallen weg, sie hätten keine Richtung.
+        double[] q = new double[p.length];
+        int n = 0;
+        for (int i = 0; i < p.length; i += 2) {
+            if (n == 0 || p[i] != q[2 * n - 2] || p[i + 1] != q[2 * n - 1]) {
+                q[2 * n] = p[i];
+                q[2 * n + 1] = p[i + 1];
+                n++;
+            }
+        }
+        if (n > 1 && q[2 * n - 2] < q[0]) {
+            for (int i = 0; i < n / 2; i++) {
+                for (int k = 0; k < 2; k++) {
+                    double t = q[2 * i + k];
+                    q[2 * i + k] = q[2 * (n - 1 - i) + k];
+                    q[2 * (n - 1 - i) + k] = t;
+                }
+            }
+        }
+        double[] l = new double[n];
+        for (int i = 1; i < n; i++) {
+            l[i] = l[i - 1] + Math.hypot(q[2 * i] - q[2 * i - 2], q[2 * i + 1] - q[2 * i - 1]);
+        }
+        double text = luecke * (breiten.length - 1);
+        for (double b : breiten) {
+            text += b;
+        }
+        double d = (l[n - 1] - text) / 2;
+        double[] aus = new double[3 * breiten.length];
+        for (int c = 0; c < breiten.length; c++) {
+            double mitte = d + breiten[c] / 2;
+            if (n == 1) {
+                aus[3 * c] = q[0] + mitte;
+                aus[3 * c + 1] = q[1];
+            } else {
+                int i = 0;
+                while (i < n - 2 && l[i + 1] < mitte) {
+                    i++;
+                }
+                double t = (mitte - l[i]) / (l[i + 1] - l[i]), dx = q[2 * i + 2] - q[2 * i], dy = q[2 * i + 3] - q[2 * i + 1];
+                aus[3 * c] = q[2 * i] + t * dx;
+                aus[3 * c + 1] = q[2 * i + 1] + t * dy;
+                aus[3 * c + 2] = Math.atan2(dy, dx);
+            }
+            d += breiten[c] + luecke;
+        }
+        return aus;
     }
 
     /** Das umschliessende Rechteck des Schnitts {x0, y0, x1, y1}, um {@code rand} weiter. */
@@ -219,6 +445,12 @@ final class Formen {
             case Ebenen.Flaeche fl -> fl.box();
             case Ebenen.Linie l -> l.box();
             case Ebenen.Kreis k -> new double[] {k.x() - k.radius(), k.z() - k.radius(), k.x() + k.radius(), k.z() + k.radius()};
+            // Die Schrift reicht über ihren Pfad hinaus, so weit, wie ihre Zeichen in der gekappten Grösse breit sein können.
+            case Ebenen.Schrift s -> {
+                double h = kappe(s.groesse(), a.block(), a.einheit(), a.schrift()) / a.block();
+                double w = h * 1.5 * (1 + s.sperrung()) * (s.text().length() + 1);
+                yield new double[] {s.box()[0] - w, s.box()[1] - w, s.box()[2] + w, s.box()[3] + w};
+            }
         };
         double rand = 1 + GEHRUNG * Ebenen.MAX_BREITE * a.einheit() / a.block();
         return b[2] >= a.welt()[0] - rand && b[0] <= a.welt()[2] + rand && b[3] >= a.welt()[1] - rand && b[1] <= a.welt()[3] + rand;
@@ -322,6 +554,7 @@ final class Formen {
             case Ebenen.Flaeche fl -> fl.rand();
             case Ebenen.Kreis k -> k.rand();
             case Ebenen.Linie l -> l.rand();
+            case Ebenen.Schrift s -> null;
         };
         if (r == null || rest[0] <= 0) {
             return;
@@ -340,6 +573,8 @@ final class Formen {
                 }
             }
             case Ebenen.Linie l -> streifen(s, abgebildet(a, l.punkte()), l.punkte().length / 2, false, h, strich, luecke);
+            case Ebenen.Schrift t -> {
+            }
         }
         s.element(aus, a, r.farbe());
     }

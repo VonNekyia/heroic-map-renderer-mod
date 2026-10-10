@@ -16,11 +16,15 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.fabricmc.fabric.api.resource.v1.ResourceLoader;
+import net.fabricmc.fabric.api.resource.v1.reloader.ResourceReloaderKeys;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import org.slf4j.Logger;
 
 /** Meldet Minimap, Download, Tasten, Befehle, Menü und Ereignisse an. Siehe docs/minimap.md, docs/download.md. */
@@ -42,6 +46,11 @@ public final class HeroicMap implements ClientModInitializer {
         karte = KeyMappingHelper.registerKeyMapping(
                 new KeyMapping("key.heroicmap.karte", InputConstants.KEY_PERIOD, kategorie));
         Minimap.INSTANZ.lies(einstellungen());
+        // Nach den Schriften: Die gespeicherte Kartenschrift hält Glyphen, die ein Neuladen verwirft.
+        Identifier formen = Identifier.fromNamespaceAndPath(ID, "formen");
+        ResourceLoader ressourcen = ResourceLoader.get(PackType.CLIENT_RESOURCES);
+        ressourcen.registerReloadListener(formen, (ResourceManagerReloadListener) manager -> Formen.neuGeladen());
+        ressourcen.addListenerOrdering(ResourceReloaderKeys.Client.FONTS, formen);
         // Die Live-Ebene gibt es nicht mehr; ihre alten Ordner gehen beim Start weg. Siehe docs/download.md, „Ablage“.
         Thread.ofPlatform().daemon().name("Heroic Map Aufräumen").start(() -> {
             try {
