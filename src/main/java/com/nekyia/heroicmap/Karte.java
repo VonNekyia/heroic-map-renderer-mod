@@ -253,6 +253,7 @@ final class Karte extends Screen {
      */
     private void nadeln(GuiGraphicsExtractor g, String dimension) {
         int k = minecraft.getWindow().getGuiScale();
+        int[] namen = {Ebenen.MAX_NAMEN};
         for (Ebenen.Eintrag e : Ebenen.INSTANZ.sichtbar()) {
             for (Ebenen.Ort n : Ebenen.INSTANZ.nadeln(e.id())) {
                 double x = blick.rasterX(Projektion.zuPixel(n.x(), satz.scale()), width);
@@ -264,7 +265,7 @@ final class Karte extends Screen {
                 }
                 float[] r = Ebenen.kastenOhneHolen(font, n);
                 if (x + r[2] > 0 && x + r[0] < width) {
-                    Ebenen.zeichne(g, font, aufPixel(x, k), aufPixel(y, k), n);
+                    Ebenen.zeichne(g, font, aufPixel(x, k), aufPixel(y, k), n, namen);
                 }
             }
         }
