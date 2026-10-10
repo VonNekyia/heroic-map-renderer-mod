@@ -143,5 +143,10 @@
   "heroicmap.menue.drehen": "Drehen",
   "heroicmap.menue.verzierungen": "Verzierungen",
   "heroicmap.menue.verzierungen.beschreibung": "Die Marken N, O, S, W am Rahmen: genordet fest, beim Drehen drehen sie mit. Aus: nur Bänder oder Ring.",
-  "heroicmap.menue.chunklinien": "Chunklinien"
+  "heroicmap.menue.chunklinien": "Chunklinien",
+  "heroicmap.menue.spieler": "Spieler",
+  "heroicmap.menue.spieler.kopf": "Kopf",
+  "heroicmap.menue.spieler.pfeil": "Pfeil",
+  "heroicmap.menue.spieler.durchsichtig": "Halb",
+  "heroicmap.menue.spieler.beschreibung": "Wie du auf Minimap und Vollbildkarte aussiehst: Kopf mit Pfeil, nur der Pfeil oder der Kopf halb durchsichtig mit Pfeil."
 }

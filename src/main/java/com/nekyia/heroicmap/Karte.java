@@ -412,7 +412,7 @@ final class Karte extends Screen {
             g.text(font, e.name(), name[0], name[1], TEXT);
         }
         Marke ich = marke(spieler.getX(), spieler.getZ(), null, null);
-        Minimap.avatar(g, spieler, ich.x(), ich.y(), 1f, Minimap.KOPF, false);
+        Minimap.avatar(g, spieler, ich.x(), ich.y(), 1f, Minimap.KOPF, false, Minimap.INSTANZ.darstellung());
     }
 
     /**

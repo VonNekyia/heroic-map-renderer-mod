@@ -143,5 +143,10 @@
   "heroicmap.menue.drehen": "Rotate",
   "heroicmap.menue.verzierungen": "Ornaments",
   "heroicmap.menue.verzierungen.beschreibung": "The N, E, S, W marks on the frame: fixed when north is up, turning with the map when it rotates. Off: bands or ring only.",
-  "heroicmap.menue.chunklinien": "Chunk lines"
+  "heroicmap.menue.chunklinien": "Chunk lines",
+  "heroicmap.menue.spieler": "Player",
+  "heroicmap.menue.spieler.kopf": "Head",
+  "heroicmap.menue.spieler.pfeil": "Arrow",
+  "heroicmap.menue.spieler.durchsichtig": "Faded",
+  "heroicmap.menue.spieler.beschreibung": "How you show on the minimap and the full map: head with arrow, the arrow alone, or the head half see-through with arrow."
 }

@@ -1,6 +1,6 @@
 ---
 title: Minimap
-description: Bedienung über das Menü hinter /hmap und das Untermenü „Einstellungen …“, Chunklinien, Drehen mit der Blickrichtung, Koordinaten unter der Minimap, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
+description: Bedienung über das Menü hinter /hmap und das Untermenü „Einstellungen …“, Chunklinien, Drehen mit der Blickrichtung, Koordinaten unter der Minimap, der eigene Spieler in drei Darstellungen, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
 code:
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/ChunkMaler.java
@@ -17,6 +17,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/mixin/LevelExtractorMixin.java
   - src/main/java/com/nekyia/heroicmap/mixin/ClientLevelMixin.java
   - src/gametest/java/com/nekyia/heroicmap/Blockentities.java
+  - src/gametest/java/com/nekyia/heroicmap/Spieler.java
   - src/main/resources/heroicmap.accesswidener
   - src/test/java/com/nekyia/heroicmap/LichtTest.java
   - src/test/java/com/nekyia/heroicmap/MinimapTest.java
@@ -55,13 +56,14 @@ steht unter „Kosten“.
 Das Untermenü „Einstellungen …“ hält, was man selten ändert; das Hauptmenü
 bleibt so kurz. „Fertig“ führt zurück ins Menü:
 
-![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien und den Koordinaten darunter; unten „Koordinaten“ neben „Ebenen …“](bilder/anzeige.png)
+![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien und den Koordinaten darunter; „Chunklinien“ neben „Spieler“, unten „Koordinaten“ neben „Ebenen …“](bilder/anzeige.png)
 
 | Einstellung | Vorgabe | tut |
 |---|---|---|
 | Form | eckig | eckig oder rund, siehe „Form“ |
 | Auflösung der Minimap | 2 px je Block | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet |
 | Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte, siehe „Chunklinien“ |
+| Spieler | Kopf | der eigene Spieler als Kopf mit Pfeil, nur Pfeil oder Kopf halb durchsichtig, siehe „Spieler“ |
 | Drehen | an | die Minimap dreht mit der Blickrichtung, siehe „Drehen“ |
 | Verzierungen | an | die Marken N, O, S, W des Rahmens, aus nur Bänder oder Ring, siehe [Rahmen](rahmen.md), „Verzierungen“ |
 | Koordinaten | xz | aus, `x z` oder `x y z` des Spielers unter der Minimap, siehe „Koordinaten“ |
@@ -129,7 +131,8 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
   „Zoom der Minimap“ gibt es auch als Tasten, ohne Belegung, unter
   Steuerung, Gruppe „Heroic Map“; was sie ändern, speichert der Mod gleich.
 - **Der eigene Spieler** ist sein Kopf aus dem Skin mit schwarzem Rand,
-  daneben ein kleiner Pfeil in Blickrichtung (`Minimap.avatar`). Er ist
+  darüber ein kleiner Pfeil in Blickrichtung (`Minimap.avatar`), oder eine
+  der anderen Darstellungen, siehe „Spieler“. Er ist
   6 Einheiten gross bei 128 Einheiten Seite und wächst mit der Seite, siehe
   [Wegpunkte](wegpunkte.md), „Grösse“. Bei Gier 0 blickt der Spieler nach Süden, auf der
   Karte nach unten; der Pfeil kreist deshalb um Gier + 180° gedreht um den
@@ -258,6 +261,44 @@ im Debug-Bildschirm des Spiels (`Mth.floor`). So hat es der User gewünscht.
   ebenso über der Minimap (`Minimap.koordinatenLage`).
 - **Nicht gedreht:** Die Zeile bleibt waagrecht, auch wenn die Minimap
   dreht.
+
+## Spieler
+
+Der eigene Spieler auf Minimap und Vollbildkarte, in einer von drei
+Darstellungen. So hat es der User gewünscht (mod#101).
+
+- **Schalter** „Spieler“ im Untermenü, neben „Chunklinien“: `Kopf`,
+  `Pfeil` oder `Halb`, Vorgabe `Kopf` (`Minimap.Darstellung`). Gespeichert
+  als `spieler` in `heroicmap.properties`, `kopf`, `pfeil` oder
+  `durchsichtig`; ein anderer Wert gilt als Vorgabe. Er gilt für Minimap
+  und Vollbildkarte.
+- **Kopf:** der Kopf mit schwarzem Rand, deckend, der Pfeil darüber.
+- **Pfeil:** nur der Pfeil, doppelt so gross, seine Mitte auf dem Spieler;
+  er dreht um sie.
+- **Halb:** Kopf und Rand mit Alpha 50 % (`Minimap.HALB_SCHWARZ`), unter
+  dem Gesicht kein Schwarz, so scheint die Karte durch; der Pfeil deckend.
+- **Mittig:** Der Pfeil liegt waagrecht mittig auf dem Spieler. Gezeichnet
+  wird in Achteln des Kopfes; die Zeilen des Pfeils sind 3, 5 und 7 Achtel
+  breit, ab `-i - 1`, ihre Mitte läge ein halbes Achtel rechts. Darum
+  rückt der Pfeil ein halbes Achtel nach links. Bis 0.2.25 fehlte das; bei
+  einem Kopf von 30 px, 3 px je Achtel, stand der Pfeil 1,5 px rechts.
+- **Auf ganze Pixel** rastet nichts ein: Ein Achtel ist fast nie ein ganzer
+  Pixel, etwa 0,75 px bei GUI-Massstab 1 und 128 Einheiten Seite. Der
+  Rasterer rundet Kopf und Pfeil, die Achse des Pfeils liegt so höchstens
+  0,5 px neben der Mitte. Einrasten änderte die Grösse des Kopfes bei
+  GUI-Massstab 1 um bis zu ein Drittel.
+- **Geprüft** im Gametest `Spieler` am Bildschirmfoto: je Darstellung bei
+  GUI-Massstab 1, 2 und 3, gedreht und ungedreht, Blick nach Norden. Je
+  Zeile des Pfeils die Mitte seiner schwarzen und weissen Pixel gegen die
+  Mitte, die die Minimap rechnet, höchstens 0,5 px daneben; halb
+  durchsichtig ist mindestens die Hälfte des Gesichts anders als deckend.
+
+![Kopf mit Pfeil](bilder/spieler-kopf.png)
+![Nur der Pfeil](bilder/spieler-pfeil.png)
+![Kopf halb durchsichtig mit Pfeil](bilder/spieler-durchsichtig.png)
+
+Die drei Darstellungen bei GUI-Massstab 2, ungedreht, viermal vergrössert
+ohne Glätten; der Gametest `Spieler` nimmt sie mit `-Pbilder=<ordner>` auf.
 
 ## Mitspieler
 

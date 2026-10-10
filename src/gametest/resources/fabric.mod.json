@@ -12,7 +12,8 @@
       "com.nekyia.heroicmap.Uebernahme",
       "com.nekyia.heroicmap.Server",
       "com.nekyia.heroicmap.Bedienung",
-      "com.nekyia.heroicmap.Blockentities"
+      "com.nekyia.heroicmap.Blockentities",
+      "com.nekyia.heroicmap.Spieler"
     ]
   },
   "depends": {
