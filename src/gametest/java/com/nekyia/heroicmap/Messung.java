@@ -77,6 +77,8 @@ public final class Messung implements FabricClientGameTest {
                     }
                 });
         context.runOnClient(mc -> {
+            // Wie die Messreihen davor: ohne Rahmen.
+            Minimap.INSTANZ.setzeSkin(Skin.OHNE);
             mc.options.renderDistance().set(SICHTWEITE);
             mc.options.framerateLimit().set(260);
             mc.options.enableVsync().set(false);

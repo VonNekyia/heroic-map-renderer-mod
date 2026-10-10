@@ -1,0 +1,4 @@
+// heroicmap Rahmen 'feuchtgebiete': Linie aussen -> innen, eine Zeile je 1-px-Band.
+// Zwei Werte = Licht (oben/links) Schatten (unten/rechts).
+#1E1B18
+#B5C97A

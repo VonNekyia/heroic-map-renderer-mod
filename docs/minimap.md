@@ -61,7 +61,7 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
 | Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte, siehe „Chunklinien“ |
 | Drehen | an | die Minimap dreht mit der Blickrichtung, siehe „Drehen“ |
 | Koordinaten | xz | aus, `x z` oder `x y z` des Spielers unter der Minimap, siehe „Koordinaten“ |
-| Rahmen | ohne | ein Skin um die Minimap, siehe [Rahmen](rahmen.md) |
+| Rahmen | biom | ein Skin um die Minimap, als Vorgabe nach dem Biom unter dem Spieler, siehe [Rahmen](rahmen.md) |
 | Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
 | Knopf „Ebenen …“ | – | je Ebene vom Server an oder aus, siehe [Ebenen](ebenen.md), „Umschalten“ |
 
@@ -232,7 +232,8 @@ im Debug-Bildschirm des Spiels (`Mth.floor`). So hat es der User gewünscht.
   Vorgabe.
 - **Lage:** mittig unter der Minimap, in der Schrift des Spiels, weiss mit
   Schatten. 2 Einheiten Abstand unter dem Ring, mit Rahmen unter den
-  Ornamenten, die halb über die Ecken ragen (`Skin.einrueckung`). Sie folgt
+  Ornamenten, die halb über die Ecken ragen, so weit wie der Abstand zum
+  Rand (`Minimap.rand`). Sie folgt
   Grösse und Lage der Minimap. Ist unten kein Platz mehr, steht die Zeile
   ebenso über der Minimap (`Minimap.koordinatenLage`).
 - **Nicht gedreht:** Die Zeile bleibt waagrecht, auch wenn die Minimap
