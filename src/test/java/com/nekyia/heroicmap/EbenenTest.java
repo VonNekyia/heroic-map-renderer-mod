@@ -185,7 +185,7 @@ class EbenenTest {
         String feld = "images/" + "s".repeat(Ebenen.MAX_FELD - 12) + ".webp", lang = "images/" + "s".repeat(Ebenen.MAX_FELD - 11) + ".webp";
         JsonArray symbole = JsonParser.parseString("[{\"id\":\"a\",\"type\":\"pin\",\"at\":[0,0],\"symbol\":{\"large\":\"" + feld
                 + "\",\"medium\":\"" + lang + "\"}}]").getAsJsonArray();
-        Ebenen.Nadel mitSymbol = Ebenen.nadeln("b:e", "v", symbole).getFirst();
+        Ebenen.Nadel mitSymbol = (Ebenen.Nadel) Ebenen.nadeln("b:e", "v", symbole).getFirst();
         assertEquals(feld, mitSymbol.symbolGross());
         assertNull(mitSymbol.symbolMittel());
         assertNull(Ebenen.Teil.lies("{\"v\":1,\"typ\":\"ebene\",\"id\":\"" + "i".repeat(Ebenen.MAX_KENNUNG + 1)
