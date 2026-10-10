@@ -10,7 +10,9 @@ import java.util.UUID;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.MouseHandler;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
@@ -125,6 +127,21 @@ final class Karte extends Screen {
     private String zugDimension;
     /** Die eigene Form unter dem letzten Klick ohne Marke; ein Doppelklick darauf heftet sie an. */
     private Wegpunkte.EigeneForm letzteEigene;
+    /** Ist die Liste der Ebenen unter dem Knopf „Ebenen“ offen? Siehe docs/vollbildkarte.md, „Ebenen“. */
+    private boolean ebenenOffen;
+    /** Die Schalter der Liste, die Ebenen, für die sie gebaut ist, und der Stand der Ebenen dabei. */
+    private final List<Schalter> schalter = new ArrayList<>();
+    private List<String> gebauteEbenen = List.of();
+    private int ebenenStand;
+    /** Für welche Schalter alles angeheftet ist, gerechnet bei diesem Stand der Ebenen und der Wegpunkte. */
+    private boolean[] ganz = new boolean[0];
+    private int ganzEbenen = -1, ganzWegpunkte = -1;
+    /** Der Schalter unter dem letzten Klick; ein Doppelklick darauf heftet die ganze Ebene an. */
+    private Schalter letzterSchalter;
+
+    /** Ein Schalter der Liste und die Kennung seiner Ebene. */
+    private record Schalter(CycleButton<Boolean> knopf, String ebene) {
+    }
 
     /** {@code satz} ist null, wenn für diese Dimension nichts geladen ist. */
     Karte(Satz satz) {
@@ -132,6 +149,7 @@ final class Karte extends Screen {
         this.satz = satz;
         this.kacheln = satz == null ? null : new Kacheln(satz);
         this.blick = satz == null ? null : new Kartenblick(satz.kachel(), satz.minZoom(), satz.maxZoom(), satz.stufe());
+        this.ebenenOffen = Kartenlage.ebenenOffen(Downloads.weltOrdner());
     }
 
     @Override
@@ -149,7 +167,7 @@ final class Karte extends Screen {
             }
         }
         int x = width - KNOPF - 4;
-        Button unterster = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.laden"),
+        AbstractWidget unterster = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.laden"),
                 b -> minecraft.gui.setScreen(new Auswahl(this))).bounds(x, 4, KNOPF, 20).build());
         // Eine selbst gezeichnete Karte hat keinen Abgleich. Siehe docs/selbst.md, „Wahl“.
         if (satz != null && !Selbst.selbst(satz.ordner().getParent())) {
@@ -167,11 +185,96 @@ final class Karte extends Screen {
                 }
             }).bounds(x, unterster.getY() + 24, KNOPF, 20).build());
         }
+        unterster = ebenen(x, unterster);
         knopfX = x;
         knopfUnten = unterster.getY() + unterster.getHeight();
         // Unten rechts das Menü von /hmap; „Fertig“ dort führt zurück auf die Karte. Siehe docs/vollbildkarte.md, „Bedienung“.
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.optionen"),
                 b -> minecraft.gui.setScreen(new Einstellungen(this))).bounds(x, height - 24, KNOPF, 20).build());
+    }
+
+    /**
+     * Der Knopf „Ebenen“ unter {@code ueber}, ist die Liste offen, darunter je Ebene ein Schalter, die
+     * oberste zuerst, bis über „Optionen …“; passen nicht alle, führt der letzte zu „Ebenen …“. Ohne
+     * Ebenen kein Knopf. Gibt den untersten Knopf zurück. Siehe docs/vollbildkarte.md, „Ebenen“.
+     */
+    private AbstractWidget ebenen(int x, AbstractWidget ueber) {
+        schalter.clear();
+        gebauteEbenen = Ebenen.INSTANZ.kennungen();
+        ebenenStand = Ebenen.INSTANZ.stand();
+        ganzEbenen = -1;
+        if (blick == null || gebauteEbenen.isEmpty()) {
+            return ueber;
+        }
+        AbstractWidget unterster = addRenderableWidget(Button.builder(Component.translatable(ebenenOffen ? "heroicmap.karte.ebenen_zu" : "heroicmap.karte.ebenen"),
+                b -> {
+                    ebenenOffen = !ebenenOffen;
+                    Kartenlage.ebenenOffen(Downloads.weltOrdner(), ebenenOffen);
+                    rebuildWidgets();
+                }).bounds(x, ueber.getY() + 24, KNOPF, 20).build());
+        if (!ebenenOffen) {
+            return unterster;
+        }
+        boolean deutsch = minecraft.getLanguageManager().getSelected().startsWith("de");
+        List<Ebenen.Eintrag> alle = Ebenen.INSTANZ.alle();
+        // Platz bis über „Optionen …“ unten rechts, je Schalter 22 Einheiten.
+        int platz = Math.max(1, (height - 28 - (unterster.getY() + unterster.getHeight())) / 22);
+        int n = alle.size() <= platz ? alle.size() : platz - 1;
+        for (int i = 0; i < n; i++) {
+            Ebenen.Eintrag e = alle.get(i);
+            CycleButton<Boolean> k = addRenderableWidget(CycleButton.onOffBuilder(Ebenen.INSTANZ.an(e)).create(x, unterster.getY() + 22, KNOPF, 20,
+                    Component.literal(e.name(deutsch)), (b, an) -> Ebenen.INSTANZ.setze(e.id(), an)));
+            schalter.add(new Schalter(k, e.id()));
+            unterster = k;
+        }
+        if (n < alle.size()) {
+            unterster = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.ebenen_mehr"),
+                    b -> minecraft.gui.setScreen(new EbenenMenue(this))).bounds(x, unterster.getY() + 22, KNOPF, 20).build());
+        }
+        return unterster;
+    }
+
+    /** Kommen andere Ebenen vom Server, während die Karte offen ist, baut sie die Liste neu. */
+    @Override
+    public void tick() {
+        if (Ebenen.INSTANZ.stand() != ebenenStand) {
+            ebenenStand = Ebenen.INSTANZ.stand();
+            if (!Ebenen.INSTANZ.kennungen().equals(gebauteEbenen)) {
+                rebuildWidgets();
+            }
+        }
+    }
+
+    /** Ein bunter Punkt links an jedem Schalter, dessen Ebene ganz angeheftet ist; neu gerechnet, wenn sich Ebenen oder Wegpunkte ändern. */
+    private void ganzAngeheftet(GuiGraphicsExtractor g) {
+        if (schalter.isEmpty()) {
+            return;
+        }
+        if (ganzEbenen != Ebenen.INSTANZ.stand() || ganzWegpunkte != Wegpunkte.INSTANZ.stand()) {
+            ganzEbenen = Ebenen.INSTANZ.stand();
+            ganzWegpunkte = Wegpunkte.INSTANZ.stand();
+            ganz = new boolean[schalter.size()];
+            for (int i = 0; i < ganz.length; i++) {
+                ganz[i] = Wegpunkte.INSTANZ.ganzAngeheftet(Ebenen.INSTANZ, schalter.get(i).ebene());
+            }
+        }
+        int bunt = Mth.hsvToArgb((System.currentTimeMillis() % BUNT_MS) / (float) BUNT_MS, 1f, 1f, 255);
+        for (int i = 0; i < ganz.length; i++) {
+            if (ganz[i]) {
+                CycleButton<Boolean> k = schalter.get(i).knopf();
+                g.fill(k.getX() - 6, k.getY() + 8, k.getX() - 2, k.getY() + 12, bunt);
+            }
+        }
+    }
+
+    /** Der Schalter der Liste unter (x, y), oder null. */
+    private Schalter schalterUnter(double x, double y) {
+        for (Schalter s : schalter) {
+            if (s.knopf().isMouseOver(x, y)) {
+                return s;
+            }
+        }
+        return null;
     }
 
     @Override
@@ -231,6 +334,7 @@ final class Karte extends Screen {
                     : Component.translatable("heroicmap.karte.abgleich_ab", Downloads.uhr(ab)));
         }
         super.extractRenderState(g, mausX, mausY, delta);
+        ganzAngeheftet(g);
         if (haengt != null) {
             // Der Wegpunkt, der an der Maus hängt, unter dem Zeiger.
             Minimap.wegpunkt(g, mausX, mausY, Minimap.KOPF, Wegpunkte.FARBEN[haengt.farbe()], 0);
@@ -593,9 +697,11 @@ final class Karte extends Screen {
         Marke vorige = letzte;
         Tafeln.Ziel voriges = letztesZiel;
         Wegpunkte.EigeneForm vorigeEigene = letzteEigene;
+        Schalter vorigerSchalter = letzterSchalter;
         letzte = null;
         letztesZiel = null;
         letzteEigene = null;
+        letzterSchalter = null;
         gedrueckt = null;
         taste = e.button() == InputConstants.MOUSE_BUTTON_LEFT;
         gezogen = 0;
@@ -634,6 +740,20 @@ final class Karte extends Screen {
             klickVerbraucht = true;
             return true;
         }
+        // Der erste Klick eines Doppelklicks auf einen Schalter schaltete die Ebene um; der zweite schaltet
+        // zurück und heftet alles von ihr an oder löst es. Siehe docs/vollbildkarte.md, „Ebenen“.
+        Schalter s = taste ? schalterUnter(e.x(), e.y()) : null;
+        if (s != null && doppelt && s.equals(vorigerSchalter)) {
+            s.knopf().setValue(!s.knopf().getValue());
+            Ebenen.INSTANZ.setze(s.ebene(), s.knopf().getValue());
+            int uebrig = Wegpunkte.INSTANZ.alleUmschalten(Ebenen.INSTANZ, s.ebene());
+            if (uebrig > 0) {
+                hinweis = Component.translatable("heroicmap.karte.ebene_voll", uebrig, Wegpunkte.MAX_ANGEHEFTET, Wegpunkte.MAX_NADELN_ANGEHEFTET);
+            }
+            klickVerbraucht = true;
+            return true;
+        }
+        letzterSchalter = s;
         if (super.mouseClicked(e, doppelt)) {
             return true;
         }
@@ -720,7 +840,8 @@ final class Karte extends Screen {
     private void tafel(GuiGraphicsExtractor g, int mausX, int mausY) {
         long ms = Util.getMillis();
         boolean ueber = drin(tafelKasten, mausX, mausY);
-        zeigen.zeiger(ziel == null && haengt == null && !ueber && !(taste && gezogen > ZUG) ? zielUnter(mausX, mausY) : null, ueber, ms);
+        boolean frei = ziel == null && haengt == null && !ueber && !(taste && gezogen > ZUG) && getChildAt(mausX, mausY).isEmpty();
+        zeigen.zeiger(frei ? zielUnter(mausX, mausY) : null, ueber, ms);
         if (zeigen.offen() != null && !Tafeln.gilt(Ebenen.INSTANZ, zeigen.offen())) {
             zeigen.zu();
         }

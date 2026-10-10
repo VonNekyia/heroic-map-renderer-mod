@@ -247,4 +247,21 @@ class KartenblickTest {
         Files.writeString(ordner.resolve("karte.properties"), "minecraft\\:overworld.x=eins\n");
         assertNull(Kartenlage.lies(ordner, "minecraft:overworld"));
     }
+
+    @Test
+    void listeDerEbenenBleibtOffen(@TempDir Path ordner) {
+        // Beim ersten Öffnen zu; offen gemerkt neben der Lage, die bleibt.
+        assertFalse(Kartenlage.ebenenOffen(ordner));
+        Kartenlage.schreibe(ordner, "minecraft:overworld", new Kartenlage.Lage(1, 2, 3, 1));
+        Kartenlage.ebenenOffen(ordner, true);
+        assertTrue(Kartenlage.ebenenOffen(ordner));
+        assertEquals(new Kartenlage.Lage(1, 2, 3, 1), Kartenlage.lies(ordner, "minecraft:overworld"));
+        Kartenlage.schreibe(ordner, "minecraft:overworld", new Kartenlage.Lage(4, 5, 3, 1));
+        assertTrue(Kartenlage.ebenenOffen(ordner));
+        // Ohne Ordner nur im Speicher, bis zum Verlassen der Welt.
+        Kartenlage.ebenenOffen(null, true);
+        assertTrue(Kartenlage.ebenenOffen(null));
+        Kartenlage.leeren();
+        assertFalse(Kartenlage.ebenenOffen(null));
+    }
 }
