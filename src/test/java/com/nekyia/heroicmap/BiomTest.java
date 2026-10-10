@@ -21,6 +21,8 @@ import org.junit.jupiter.api.Test;
 
 class BiomTest {
 
+    /** In einer Höhle bleibt die letzte Kategorie; {@link Biom#kategorie} gibt dann null. */
+    private static final String BLEIBT = "bleibt";
     /** Jedes Biom der Oberwelt in 26.3 (Tag minecraft:is_overworld) und seine Kategorie. */
     private static final Map<String, String> OBERWELT = Map.ofEntries(
             Map.entry("mushroom_fields", "gewaesser"), Map.entry("deep_frozen_ocean", "schnee"), Map.entry("frozen_ocean", "schnee"),
@@ -42,8 +44,6 @@ class BiomTest {
             Map.entry("eroded_badlands", "wueste"), Map.entry("windswept_savanna", "grasland"), Map.entry("cherry_grove", "waelder"),
             Map.entry("frozen_peaks", "schnee"), Map.entry("dripstone_caves", BLEIBT), Map.entry("lush_caves", BLEIBT),
             Map.entry("sulfur_caves", BLEIBT), Map.entry("deep_dark", BLEIBT));
-    /** In einer Höhle bleibt die letzte Kategorie; {@link Biom#kategorie} gibt dann null. */
-    private static final String BLEIBT = "bleibt";
 
     @Test
     void jedesBiomDesSpiels() {
