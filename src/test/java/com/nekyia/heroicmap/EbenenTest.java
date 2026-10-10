@@ -790,6 +790,20 @@ class EbenenTest {
     }
 
     @Test
+    void geheimAusDerListe() {
+        Ebenen e = new Ebenen();
+        e.empfange(JsonParser.parseString("{\"v\":1,\"typ\":\"ebenen\",\"jetzt\":1,\"ebenen\":["
+                + "{\"id\":\"b:geheim\",\"version\":\"v1\",\"secret\":true},{\"id\":\"b:offen\",\"version\":\"v1\"},"
+                + "{\"id\":\"b:nein\",\"version\":\"v1\",\"secret\":false}]}").getAsJsonObject());
+        // Nur mit "secret": true; ohne das Feld ist eine Ebene öffentlich. Beim Leeren vergisst der Mod es.
+        assertTrue(e.geheim("b:geheim"));
+        assertFalse(e.geheim("b:offen"));
+        assertFalse(e.geheim("b:nein"));
+        e.leeren();
+        assertFalse(e.geheim("b:geheim"));
+    }
+
+    @Test
     void bannerMitEntwurf() {
         JsonArray objekte = JsonParser.parseString("["
                 // Mit Entwurf und Krone, das Bild als Ersatz.

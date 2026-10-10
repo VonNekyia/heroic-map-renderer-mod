@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.25
+
+- **Banners of secret layers:** layers only some players may see now show their banners too; the mod asks the server for each banner it draws, and only players allowed to see the layer get them.
+
 ## 0.2.24
 
 - **Banners drawn by the server:** when a layer gives a banner a design, the mod shows the banner the server renders for it, with a crown for capitals; until it arrives, the layer's image stands in.

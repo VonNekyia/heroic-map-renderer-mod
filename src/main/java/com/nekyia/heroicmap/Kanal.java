@@ -12,10 +12,11 @@ import net.minecraft.resources.Identifier;
 
 /**
  * Der Kanal {@code heroicmap:karte} zum Plugin: UTF-8-JSON ohne Längenpräfix, in beide
- * Richtungen. Einen Teil {@code ebene} und eine Antwort {@code tafel} liest schon der Thread des
- * Netzes ({@code teil}, {@code tafel}), alles andere geht als Text weiter. Siehe docs/download.md, „Kanal“.
+ * Richtungen. Einen Teil {@code ebene} und die Antworten {@code tafel} und {@code banner} liest schon
+ * der Thread des Netzes ({@code teil}, {@code tafel}, {@code banner}), alles andere geht als Text
+ * weiter. Siehe docs/download.md, „Kanal“.
  */
-record Kanal(String json, Ebenen.Teil teil, Tafeln.Antwort tafel) implements CustomPacketPayload {
+record Kanal(String json, Ebenen.Teil teil, Tafeln.Antwort tafel, Geheimbanner.Antwort banner) implements CustomPacketPayload {
 
     static final Type<Kanal> TYPE = new Type<>(Identifier.fromNamespaceAndPath(HeroicMap.ID, "karte"));
     /** Ein Teil einer Ebene hat bis 1 MiB, wenn ein Objekt allein so gross ist; mehr liest der Mod nicht. */
@@ -23,7 +24,7 @@ record Kanal(String json, Ebenen.Teil teil, Tafeln.Antwort tafel) implements Cus
     static final StreamCodec<FriendlyByteBuf, Kanal> CODEC = CustomPacketPayload.codec(Kanal::schreibe, Kanal::lies);
 
     Kanal(String json) {
-        this(json, null, null);
+        this(json, null, null, null);
     }
 
     private void schreibe(FriendlyByteBuf puffer) {
@@ -39,13 +40,17 @@ record Kanal(String json, Ebenen.Teil teil, Tafeln.Antwort tafel) implements Cus
         byte[] daten = new byte[n];
         puffer.readBytes(daten);
         String text = new String(daten, StandardCharsets.UTF_8);
-        // Bis 1 MiB JSON nicht auf dem Render-Thread; dorthin gehen nur Nadeln, Formen und Tafeln.
+        // Bis 1 MiB JSON nicht auf dem Render-Thread; dorthin gehen nur Nadeln, Formen, Tafeln und Sprites, schon gelesen.
         Ebenen.Teil teil = Ebenen.Teil.lies(text);
         if (teil != null) {
-            return new Kanal("", teil, null);
+            return new Kanal("", teil, null, null);
         }
         Tafeln.Antwort tafel = Tafeln.Antwort.lies(text);
-        return tafel != null ? new Kanal("", null, tafel) : new Kanal(text);
+        if (tafel != null) {
+            return new Kanal("", null, tafel, null);
+        }
+        Geheimbanner.Antwort banner = Geheimbanner.Antwort.lies(text);
+        return banner != null ? new Kanal("", null, null, banner) : new Kanal(text);
     }
 
     @Override
@@ -64,6 +69,8 @@ record Kanal(String json, Ebenen.Teil teil, Tafeln.Antwort tafel) implements Cus
                 }
             } else if (nachricht.tafel() != null) {
                 Tafeln.INSTANZ.antwort(nachricht.tafel());
+            } else if (nachricht.banner() != null) {
+                Geheimbanner.INSTANZ.antwort(nachricht.banner());
             } else {
                 Downloads.INSTANZ.empfange(nachricht.json());
             }
@@ -109,6 +116,27 @@ record Kanal(String json, Ebenen.Teil teil, Tafeln.Antwort tafel) implements Cus
         json.addProperty("ebene", z.ebene());
         json.addProperty("version", z.version());
         json.addProperty("id", z.id());
+        return json.toString();
+    }
+
+    /** Fragt das Sprite eines geheimen Banners, wenn der Server den Kanal hört; true, wenn die Frage hinausging. Siehe docs/ebenen.md, „Geheime Banner“. */
+    static boolean frageBanner(Geheimbanner.Schluessel k) {
+        if (!offen()) {
+            return false;
+        }
+        ClientPlayNetworking.send(new Kanal(banner(k)));
+        return true;
+    }
+
+    /** Die Frage {@code banner}: Ebene, version, Entwurf und Krone. */
+    static String banner(Geheimbanner.Schluessel k) {
+        JsonObject json = new JsonObject();
+        json.addProperty("v", 1);
+        json.addProperty("typ", "banner");
+        json.addProperty("ebene", k.ebene());
+        json.addProperty("version", k.version());
+        json.addProperty("entwurf", k.entwurf());
+        json.addProperty("krone", k.krone());
         return json.toString();
     }
 

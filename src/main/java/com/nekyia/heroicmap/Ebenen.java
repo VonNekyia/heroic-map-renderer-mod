@@ -15,9 +15,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.regex.Pattern;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.Font;
@@ -268,6 +270,8 @@ final class Ebenen {
     /** Je Ebene die version einer verworfenen Sammlung; ihre übrigen Teile übergeht der Mod. */
     private final Map<String, String> verworfen = new HashMap<>();
     private final Map<String, Sammlung> sammlungen = new HashMap<>();
+    /** Die Kennungen der Ebenen mit {@code "secret": true} in der Liste; ihre Banner kommen über den Kanal. */
+    private Set<String> geheim = Set.of();
     /** Die Wahl des Spielers je Kennung und wo sie liegt; null heisst nur im Speicher. */
     private final Map<String, Boolean> wahl = new HashMap<>();
     private Path datei;
@@ -286,6 +290,7 @@ final class Ebenen {
     /** Die Liste {@code ebenen}: Was fehlt, ist weg, samt seinen Nadeln und halben Teilen. */
     void liste(JsonObject json) {
         List<Eintrag> neu = new ArrayList<>();
+        Set<String> geheimNeu = new HashSet<>();
         for (JsonElement e : json.getAsJsonArray("ebenen")) {
             if (neu.size() == MAX_EBENEN) {
                 LOGGER.warn("Heroic Map: mehr als {} Ebenen, die übrigen fehlen", MAX_EBENEN);
@@ -303,7 +308,11 @@ final class Ebenen {
             }
             neu.add(new Eintrag(id, text(name, "de", MAX_TEXT), text(name, "en", MAX_TEXT),
                     !o.has("visible") || o.get("visible").getAsBoolean(), o.has("order") ? o.get("order").getAsInt() : 0, version));
+            if (o.has("secret") && o.get("secret").getAsBoolean()) {
+                geheimNeu.add(id);
+            }
         }
+        geheim = Set.copyOf(geheimNeu);
         // Oben liegt, was später gezeichnet wird: aufsteigend nach order, bei Gleichstand nach id absteigend.
         neu.sort(Comparator.comparingInt(Eintrag::order).thenComparing(Eintrag::id, Comparator.reverseOrder()));
         liste = List.copyOf(neu);
@@ -703,6 +712,7 @@ final class Ebenen {
     /** Beim Trennen und bei einem neuen Login: Der Server schickt danach alles neu. */
     void leeren() {
         liste = List.of();
+        geheim = Set.of();
         stand++;
         versionen.clear();
         nadeln.clear();
@@ -715,6 +725,28 @@ final class Ebenen {
     /** Die Ebenen, die gezeichnet werden, unten zuerst. */
     List<Eintrag> sichtbar() {
         return liste.stream().filter(this::an).toList();
+    }
+
+    /** Ist die Ebene geheim, mit {@code "secret": true} in der Liste? Ihre Banner holt der Mod über den Kanal, siehe docs/ebenen.md, „Geheime Banner“. */
+    boolean geheim(String id) {
+        return geheim.contains(id);
+    }
+
+    /**
+     * Das Sprite eines Banners mit Entwurf: in einer geheimen Ebene über den Kanal, sonst per HTTP; null ohne Entwurf
+     * oder solange es fehlt.
+     */
+    static Symbole.Sprite sprite(Banner b) {
+        if (b.design() == null) {
+            return null;
+        }
+        return INSTANZ.geheim(b.ebene()) ? Geheimbanner.INSTANZ.sprite(b.ebene(), b.version(), b.design(), b.krone())
+                : Symbole.INSTANZ.sprite(b.ebene(), b.version(), b.design(), b.krone());
+    }
+
+    /** Das Bild eines Banners; eine geheime Ebene hat keine Bilder auf dem Server, dort null. */
+    static Symbole.Textur bild(Banner b) {
+        return INSTANZ.geheim(b.ebene()) ? null : Symbole.INSTANZ.banner(b.ebene(), b.version(), b.bild());
     }
 
     /** Die Kennungen der Liste. */
@@ -802,8 +834,8 @@ final class Ebenen {
             case Nadel n -> nadel(g, n);
             case Banner b -> {
                 // Mit Entwurf das Sprite um seinen Fuss; solange es fehlt, das Bild, wie das Format sagt.
-                Symbole.Sprite sp = b.design() == null ? null : Symbole.INSTANZ.sprite(b.ebene(), b.version(), b.design(), b.krone());
-                Symbole.Textur t = sp != null ? sp.textur() : Symbole.INSTANZ.banner(b.ebene(), b.version(), b.bild());
+                Symbole.Sprite sp = sprite(b);
+                Symbole.Textur t = sp != null ? sp.textur() : bild(b);
                 if (t == null) {
                     pose.popMatrix();
                     return;
@@ -839,11 +871,11 @@ final class Ebenen {
         return switch (o) {
             case Nadel n -> kasten(SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe(), o.name() == null ? 0 : nameBreite(font, o.name()));
             case Banner b -> {
-                Symbole.Sprite sp = b.design() == null ? null : Symbole.INSTANZ.sprite(b.ebene(), b.version(), b.design(), b.krone());
+                Symbole.Sprite sp = sprite(b);
                 if (sp != null) {
                     yield spriteKasten(sp.textur().breite(), sp.textur().hoehe(), sp.fussX(), sp.fussY(), gs, breiten(font, o));
                 }
-                Symbole.Textur t = Symbole.INSTANZ.banner(b.ebene(), b.version(), b.bild());
+                Symbole.Textur t = bild(b);
                 yield t == null ? null : bannerKasten(t.breite(), t.hoehe(), gs, breiten(font, o));
             }
         };

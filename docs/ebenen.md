@@ -254,8 +254,8 @@ und der Mod holt das Sprite, siehe „Sprites aus Entwürfen“.
   - **Getestet** im Gametest `Bilder`: „Südburg“ mit Entwurf und Krone,
     ohne Bild; das Sprite mit Krone liegt am Bildschirmfoto mit seiner
     linken oberen Ecke `foot` links über dem Ort (`Bilder.spriteUmDenFuss`).
-  - **Geheime Ebenen** haben keine Sprites unter `layers/`; ihr Weg über
-    den Kanal kommt in einem eigenen PR.
+  - **Geheime Ebenen** haben keine Sprites unter `layers/`; ihre kommen
+    über den Kanal, siehe „Geheime Banner“.
 - **Nah durchsichtig** auf der Minimap: Ein angeheftetes Banner ist ab 24
   Blöcken waagrechtem Abstand vom Spieler deckend und wird darunter linear
   durchsichtiger, bis 35 % bei 8 Blöcken und näher (`Minimap.NAH_AB`,
@@ -269,6 +269,41 @@ und der Mod holt das Sprite, siehe „Sprites aus Entwürfen“.
 ![Die Minimap bei Zoom 2: ohne Angeheftetes, mit angehefteter Nadel und angeheftetem Banner, und nah am Banner, das dort durchsichtig wird; Szene `orte` des Gametests](bilder/orte.png)
 
 ![Alle Orte auf der Vollbildkarte, die angehefteten mit dem Punkt unter dem Fuss](bilder/orte-karte.png)
+
+## Geheime Banner
+
+Banner einer Ebene mit `permission` sieht nur, wer die Ebene sehen darf;
+ihre Sprites liegen nicht unter `layers/`, sondern kommen über den Kanal,
+Schritt 2b zu 0100 des Renderers, Format mit dem Backend abgestimmt, siehe
+[Plugin](https://github.com/VonNekyia/heroic-map-renderer-plugin/blob/main/docs/ebenen.md),
+„Banner im Mod“ (`Geheimbanner`).
+
+- **Geheim** ist eine Ebene mit `"secret": true` in ihrem Eintrag der Liste
+  `ebenen` (`Ebenen.geheim`); ohne das Feld ist sie öffentlich.
+- **Frage** `{"v":1,"typ":"banner","ebene","version","entwurf","krone"}`,
+  `entwurf` aus `design`, `krone` aus `capital` (`Kanal.banner`). Erst wenn
+  das Banner gezeichnet oder getroffen wird, je Schlüssel aus Ebene,
+  `version`, Entwurf und Krone einmal je Verbindung. Höchstens 8 offen und
+  20 je Sekunde (`Geheimbanner.MAX_OFFEN`, `Geheimbanner.MAX_JE_SEKUNDE`),
+  so viele, wie das Plugin nimmt; darüber fragt es beim nächsten Zeichnen.
+- **Antwort** mit denselben Feldern, `satz` wie `satz.json` und `png` als
+  Base64, gelesen auf dem Thread des Netzes (`Geheimbanner.Antwort.lies`):
+  höchstens 342 KiB Base64, ein PNG bis 32 × 64. Gezeichnet wie ein
+  öffentliches Sprite, siehe „Banner“, „Sprites aus Entwürfen“.
+- **Nicht wieder gefragt** wird für diese `version`, wenn die Antwort ohne
+  `png` kommt, das PNG nicht taugt, der Fuss nicht auf dem Sprite liegt
+  oder in 10 s keine kommt (`Geheimbanner.FRIST_MS`); ohne Rechte schweigt
+  das Plugin. Eine neue `version` der Ebene gibt ihre Sprites frei und
+  fragt neu, ebenso eine neue Verbindung.
+- **Bis die Antwort da ist,** zeigt der Mod nichts; ein Bild gibt es bei
+  geheimen Bannern nicht.
+- **Nur Antworten auf offene Fragen** nimmt der Mod; eine andere verwirft
+  er.
+- **Getestet:** `GeheimbannerTest` (einmal fragen, 8 offen, 20 je Sekunde,
+  ohne Antwort oder `png` nicht wieder, neue `version`, Lesen) und
+  `KanalTest.bannerDurchDenCodec`; im Gametest `Bilder` ein Banner „Wacht“
+  einer geheimen Ebene, das fragt; der Test legt die Antwort ab, und am
+  Bildschirmfoto steht das Sprite um seinen Fuss (`Bilder.geheimUmDenFuss`).
 
 ## Symbole
 
