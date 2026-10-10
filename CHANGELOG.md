@@ -7,7 +7,6 @@ The release notes on GitHub and Modrinth come from here
 ## 0.2.14
 
 - **Beams above pinned waypoints:** each pinned waypoint in view distance shows a beacon beam in its colour in the world. Switch it off with "World effects" in the settings.
-- **New icon:** the mod's logo, a spruce on an island, as on Modrinth.
 
 ## 0.2.13
 
