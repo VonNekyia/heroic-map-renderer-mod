@@ -196,7 +196,10 @@ Ein Release geht auf GitHub und Modrinth, siehe
    Version in `fabric.mod.json` und trägt `META-INF/LICENSE` und
    `META-INF/NOTICE`, und jede Datei unter `assets/` liegt Byte für Byte im
    Jar. Dann legt er einen Entwurf an, mit Jar, `SHA256SUMS`
-   und den Notizen aus `.github/notizen.sh`. Eine PR, die diese Dateien
+   und den Notizen aus `.github/notizen.sh`: die Stichpunkte der Version und
+   jeder Version seit dem letzten veröffentlichten Release, dem höchsten Tag
+   `v…` darunter auf `origin`. So stehen Versionen, die kein eigenes Release
+   bekamen, mit drin, etwa 0.2.19 in 0.2.20. Eine PR, die diese Dateien
    ändert, baut zur Probe ohne Entwurf.
 3. **Veröffentlichen** von Hand auf GitHub. Das veröffentlichte Release
    lädt `modrinth.yml` als Version auf
