@@ -13,15 +13,17 @@ import java.util.Properties;
 import org.slf4j.Logger;
 
 /**
- * Wo die Vollbildkarte zuletzt stand, je Dimension: die Mitte in Blöcken, die Stufe und die Lupe. Je
- * Welt in {@code karte.properties} im Ordner der Welt, im Einzelspieler nur im Speicher. Nur der
- * Render-Thread. Siehe docs/vollbildkarte.md, „Lage merken“.
+ * Wo die Vollbildkarte zuletzt stand, je Dimension: die Mitte in Blöcken, die Stufe und die Lupe; dazu,
+ * ob die Liste der Ebenen offen ist. Je Welt in {@code karte.properties} im Ordner der Welt, im
+ * Einzelspieler nur im Speicher. Nur der Render-Thread. Siehe docs/vollbildkarte.md, „Lage merken“.
  */
 final class Kartenlage {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     /** Ohne Ordner, im Einzelspieler: je Dimension nur im Speicher. */
     private static final Map<String, Lage> SPEICHER = new HashMap<>();
+    /** Ohne Ordner: ob die Liste der Ebenen offen ist. */
+    private static boolean ebenenImSpeicher;
 
     /** Die Mitte in Blöcken, die Stufe und die Lupe. */
     record Lage(double x, double z, int zoom, int lupe) {
@@ -55,6 +57,26 @@ final class Kartenlage {
         p.setProperty(dimension + ".z", Double.toString(l.z()));
         p.setProperty(dimension + ".zoom", Integer.toString(l.zoom()));
         p.setProperty(dimension + ".lupe", Integer.toString(l.lupe()));
+        speichere(ordner, p);
+    }
+
+    /** Ist die Liste der Ebenen offen? Ohne Eintrag zu, wie beim ersten Öffnen. */
+    static boolean ebenenOffen(Path ordner) {
+        return ordner == null ? ebenenImSpeicher : Boolean.parseBoolean(datei(ordner).getProperty("ebenen"));
+    }
+
+    /** Merkt, ob die Liste der Ebenen offen ist; die Lagen bleiben. */
+    static void ebenenOffen(Path ordner, boolean offen) {
+        if (ordner == null) {
+            ebenenImSpeicher = offen;
+            return;
+        }
+        Properties p = datei(ordner);
+        p.setProperty("ebenen", Boolean.toString(offen));
+        speichere(ordner, p);
+    }
+
+    private static void speichere(Path ordner, Properties p) {
         try {
             Files.createDirectories(ordner);
             try (Writer raus = Files.newBufferedWriter(ordner.resolve("karte.properties"), StandardCharsets.UTF_8)) {
@@ -68,6 +90,7 @@ final class Kartenlage {
     /** Beim Trennen: Was nur im Speicher lag, gilt für die nächste Welt nicht. */
     static void leeren() {
         SPEICHER.clear();
+        ebenenImSpeicher = false;
     }
 
     private static Properties datei(Path ordner) {

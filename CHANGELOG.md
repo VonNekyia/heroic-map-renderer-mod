@@ -4,9 +4,14 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
-## 0.2.18
+## 0.2.19
 
 - **Beams above pinned waypoints:** each pinned waypoint in view distance shows a beacon beam in its colour in the world. Switch it off with "World effects" in the settings.
+
+## 0.2.17
+
+- **Layers on the full map:** a "Layers" button opens a list with a switch per layer from the server; the list stays open or closed as you left it.
+- **Double-click a layer** to pin everything in it to the minimap, or unpin it all; a colourful dot marks fully pinned layers. The limits of 64 still apply, and the map says what did not fit.
 
 ## 0.2.16
 

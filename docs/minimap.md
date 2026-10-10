@@ -661,7 +661,8 @@ ein Feld. Gras, Blumen und Weizen stehen senkrecht und fehlen von oben.
 
 Danach die Ebenen (siehe [ebenen.md](ebenen.md)): Flächen, Kreis, Linie und
 Kartenschrift, der Kreis und eine eigene Region aus drei Wegpunkten angeheftet (`formen.png`,
-`formen-karte.png`), dann Nadeln in drei
+`formen-karte.png`), dieselbe Karte mit offener Liste der Ebenen
+(`ebenen-liste.png`), dann Nadeln in drei
 Grössen, ein Banner und ihre Namen, dazu ein altes Rechteck; die Minimap
 ohne Angeheftetes, mit angehefteter Nadel und angeheftetem Banner und nah am
 Banner (`orte.png`), die Vollbildkarte (`orte-karte.png`), auf

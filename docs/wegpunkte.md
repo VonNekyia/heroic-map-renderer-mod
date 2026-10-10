@@ -238,6 +238,9 @@ eigenen PR.
   anheften, was eine `id` hat; ohne `id` gibt es auch keine Tafel. Der
   erste Klick merkt sich die eigene Form unter der Maus
   (`Karte.letzteEigene`), wenn dort nichts vom Server liegt.
+- **Ganze Ebene:** Ein Doppelklick auf ihren Schalter in der Liste der
+  Vollbildkarte heftet alles von ihr an oder löst es, siehe
+  [Vollbildkarte](vollbildkarte.md), „Ebenen“ (mod#76).
 - **Höchstens 64** Formen, Rechtecke und Kreise je Welt, eigene und vom
   Server zusammen (`Wegpunkte.MAX_ANGEHEFTET`). Darüber heftet der Doppelklick
   nichts an, und unten links steht „Höchstens 64 Regionen angeheftet; erst
@@ -323,7 +326,8 @@ eigenen PR.
   Angeheftetes auf der Minimap, breiterer Rand auf der Karte) und
   `breiterOhneRandNimmtDieFuellung`. Zu Nadeln: `nadelnAnheftenUndBehalten`,
   `hoechstens64NadelnEigeneGrenze` und `nadelnAufDerMinimapNurAngeheftet`.
-  Zu Formen aus Wegpunkten: `festeIdsAuchAusAltenDateien`,
+  Zur ganzen Ebene: `ganzeEbeneAnheftenUndLoesen` und
+  `ganzeEbeneHaeltDieGrenzen`. Zu Formen aus Wegpunkten: `festeIdsAuchAusAltenDateien`,
   `formenAusWegpunktenGehenMitUndBleiben` und `formenGrenzenUndAlteDatei`.
 - `StrahlenTest`: nur angeheftete Wegpunkte dieser Dimension in Sichtweite,
   genau an der Grenze, höchstens 64, die ersten der Reihe nach; breiter in
