@@ -8,6 +8,7 @@ code:
   - gradle/libs.versions.toml
   - gradle/wrapper/gradle-wrapper.properties
   - .github/workflows/ci.yml
+  - .github/workflows/basis.yml
   - .github/workflows/release.yml
   - .github/workflows/modrinth.yml
   - .github/notizen.sh
@@ -164,6 +165,13 @@ Schrift, mittig auf ein Quadrat gesetzt.
   `pipefail`: Scheitert der Download, wird der Job rot.
   Danach sucht er Konfliktmarken eines Merges (`<<<<<<<`, `>>>>>>>` am
   Anfang einer Zeile) in allen Dateien; eine heisst rot.
+
+`.github/workflows/basis.yml` prüft jede PR mit dem Job „Basis aktuell“:
+Ihre Basis muss `main` sein, und sie muss den neuesten Stand von `main`
+enthalten, sonst ist sie rot. So landet keine gestapelte PR in einem
+fremden Zweig, und nichts wird über einen alten Stand gemergt. Eine PR,
+die auf einer anderen aufbaut, bleibt darum Entwurf, bis der Vorgänger
+gemergt ist; dann geht sie auf `main`.
 
 ## Release
 
