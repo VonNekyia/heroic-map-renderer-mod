@@ -23,7 +23,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 
 ## Entwicklung
 
-- [Bauen und testen](entwicklung.md): Versionen, Gradle, Tests, Gametests, Maustasten, CI und die Prüfung der Doku.
+- [Bauen und testen](entwicklung.md): Versionen, Gradle, Tests, Gametests, Maustasten, CI, Release auf GitHub und Modrinth und die Prüfung der Doku.
 
 ## Entscheidungen
 
@@ -37,6 +37,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [0008](entscheidungen/0008-biom-rahmen-als-vorgabe.md): Der Rahmen „biom“ als Vorgabe, Zuordnung über Tags und Namen in fester Rangfolge, Wechsel nach 2 s; löst 0005 in der Vorgabe ab.
 - [0009](entscheidungen/0009-formen-als-trapeze.md): Füllungen als Trapeze statt Blöcken, ein Budget an Ecken je Neubau statt an Zeit je Frame.
 - [0010](entscheidungen/0010-tafel-200-einheiten.md): Die Infotafel im Mod höchstens 200 Einheiten breit mit 6 Rand, nicht 320 wie auf der Webkarte.
+- [0011](entscheidungen/0011-modrinth-mit-curl.md): Releases per Workflow mit curl auf Modrinth, ohne fremde Action mit dem Token.
 
 ## Messungen
 

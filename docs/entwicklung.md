@@ -1,6 +1,6 @@
 ---
 title: Bauen und testen
-description: Versionen, Gradle, Tests, Gametests, Maustasten, CI und die Prüfung der Doku.
+description: Versionen, Gradle, Tests, Gametests, Maustasten, CI, Release auf GitHub und Modrinth und die Prüfung der Doku.
 code:
   - build.gradle.kts
   - src/gametest/resources/fabric.mod.json
@@ -8,6 +8,10 @@ code:
   - gradle/libs.versions.toml
   - gradle/wrapper/gradle-wrapper.properties
   - .github/workflows/ci.yml
+  - .github/workflows/release.yml
+  - .github/workflows/modrinth.yml
+  - .github/notizen.sh
+  - CHANGELOG.md
   - src/main/resources/fabric.mod.json
   - src/main/resources/assets/heroicmap/icon.png
 ---
@@ -160,6 +164,32 @@ Schrift, mittig auf ein Quadrat gesetzt.
   `pipefail`: Scheitert der Download, wird der Job rot.
   Danach sucht er Konfliktmarken eines Merges (`<<<<<<<`, `>>>>>>>` am
   Anfang einer Zeile) in allen Dateien; eine heisst rot.
+
+## Release
+
+Ein Release geht auf GitHub und Modrinth, siehe
+[0011](entscheidungen/0011-modrinth-mit-curl.md).
+
+1. **Version** in `gradle.properties` heben und in `CHANGELOG.md` einen
+   Abschnitt `## X.Y.Z` mit englischen Stichpunkten schreiben; beides in
+   der PR der Änderung.
+2. **Tag** `vX.Y.Z` auf `main` nach dem Merge. `release.yml` baut das
+   Jar und prüft: Der Tag passt zu `gradle.properties`, das Jar nennt die
+   Version in `fabric.mod.json` und trägt `META-INF/LICENSE` und
+   `META-INF/NOTICE`. Dann legt er einen Entwurf an, mit Jar, `SHA256SUMS`
+   und den Notizen aus `.github/notizen.sh`. Eine PR, die diese Dateien
+   ändert, baut zur Probe ohne Entwurf.
+3. **Veröffentlichen** von Hand auf GitHub. Das veröffentlichte Release
+   lädt `modrinth.yml` als Version auf
+   [Modrinth](https://modrinth.com/mod/heroic-map): Minecraft 26.3, Fabric,
+   Beta solange 0.x, Fabric API als Abhängigkeit, die Notizen als
+   Changelog. Gibt es die Version dort schon, lädt er nichts; ältere als
+   0.2.9 lädt er nicht. Von Hand: „Run workflow“ mit dem Tag.
+4. **Token:** das Secret `MODRINTH_TOKEN`, ein Token des Kontos auf
+   modrinth.com mit den Rechten Create versions, Read projects und Read
+   versions; Read versions braucht die Prüfung, ob es die Version schon
+   gibt, solange das Projekt in Prüfung ist. Fehlt das Secret, warnt der
+   Lauf nur.
 
 ## Doku prüfen
 
