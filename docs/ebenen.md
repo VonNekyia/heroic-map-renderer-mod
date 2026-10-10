@@ -251,6 +251,9 @@ und der Mod holt das Sprite, siehe „Sprites aus Entwürfen“.
   - **Ersatz:** Solange das Sprite oder `satz.json` lädt, fehlt oder nicht
     taugt, zeichnet der Mod `image`, wie das Format sagt; ohne `image`
     nichts.
+  - **Getestet** im Gametest `Bilder`: „Südburg“ mit Entwurf und Krone,
+    ohne Bild; das Sprite mit Krone liegt am Bildschirmfoto mit seiner
+    linken oberen Ecke `foot` links über dem Ort (`Bilder.spriteUmDenFuss`).
   - **Geheime Ebenen** haben keine Sprites unter `layers/`; ihr Weg über
     den Kanal kommt in einem eigenen PR.
 - **Nah durchsichtig** auf der Minimap: Ein angeheftetes Banner ist ab 24
