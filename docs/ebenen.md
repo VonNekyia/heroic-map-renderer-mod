@@ -42,7 +42,9 @@ die Nachrichten das Plugin:
 - **`ebenen`:** die Liste, je Ebene `id`, `name`, `visible`, `order` und
   `version` (`Ebenen.liste`). Was nicht mehr darin steht, ist weg, mit
   seinen Nadeln, Formen und halben Teilen. Steht eine Kennung zweimal darin, gilt
-  der erste Eintrag.
+  der erste Eintrag. Die Ebenen von Client-Mods kommen dazu und bleiben,
+  bei gleicher Kennung gilt die vom Server, siehe
+  [API für Client-Mods](api.md) (`Ebenen.mische`).
 - **`ebene`:** ein Teil einer Ebene, `teil` von `teile`, mit seiner
   `version` (`Ebenen.teil`).
   - Gelesen schon auf dem Thread des Netzes (`Kanal.lies`,

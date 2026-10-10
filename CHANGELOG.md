@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.29
+
+- **An API for other client mods:** a Fabric mod can add its own layers with pins, map text, areas, circles and lines, in the same JSON as server layers; they show on the minimap and the full map with their own switch. See docs/api.md.
+
 ## 0.2.28
 
 - **Change the look right on the minimap.** In the `/hmap` menu and under "Settings …", click yourself on the minimap to switch between head, arrow and half see-through, and click one of the marks N, E, S, W to switch the frame. The buttons "Player" and "Frame" are gone. With ornaments off or without a frame, the menu shows the marks half see-through so you can still click them. Dragging still moves the minimap.
