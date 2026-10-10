@@ -1,13 +1,20 @@
 package com.nekyia.heroicmap;
 
 import com.google.gson.JsonParser;
+import com.sun.net.httpserver.HttpServer;
+import java.awt.Color;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Map;
 import javax.imageio.ImageIO;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -105,6 +112,7 @@ public final class Bilder implements FabricClientGameTest {
             drehen(context, server);
             vollbildkarte(context);
             formen(context, server);
+            orte(context, server);
             selbst(context);
         }
     }
@@ -121,6 +129,113 @@ public final class Bilder implements FabricClientGameTest {
               {"type":"label","text":"Westmeer","path":[[-14,13],[0,9],[14,12]],"size":3,"spacing":0.2,"color":"#2B3A55",
                 "outline":{"color":"#F2E8D0CC","width":1}}
             ]}""";
+
+    /** Nadeln in drei Grössen, ein Banner und eine Kartenschrift; die Bilder holt der Mod von einem Server im Test. */
+    private static final String ORTE = """
+            {"v":1,"typ":"ebene","id":"test:orte","version":"1","teil":1,"teile":1,"objects":[
+              {"type":"pin","id":"nordhafen","at":[0.5,0.5],"size":"large","name":"Nordhafen","color":"#3A6EA5",
+                "symbol":{"large":"images/anker.png","medium":"images/anker-m.png"}},
+              {"type":"pin","at":[-9,-7],"name":"Eichenfeld","symbol":{"medium":"images/anker-m.png"}},
+              {"type":"pin","at":[9,9],"size":"small","name":"Furt"},
+              {"type":"banner","id":"westmark","at":[10,-9],"name":"Westmark","image":"images/banner.png"},
+              {"type":"label","text":"Nordland","path":[[-14,-12],[14,-14]],"size":3,"outline":{"width":1}}
+            ]}""";
+
+    /**
+     * Nadeln und Banner mit ihren Namen in der Kartenschrift unter dem Fuss, in fester Grösse: die Minimap
+     * bei 4 px und Zoom 4, dann die Vollbildkarte; dort einmal mit „Unicode-Schrift erzwingen“.
+     * Siehe docs/ebenen.md, „Nadeln“, und docs/ebenen.md, „Banner“.
+     */
+    private static void orte(ClientGameTestContext context, TestServerContext server) {
+        HttpServer bilder = bilderServer(Map.of("anker.png", bild(16, 16), "anker-m.png", bild(9, 9), "banner.png", bild(21, 40)));
+        try {
+            context.runOnClient(mc -> {
+                Ebenen.INSTANZ.empfange(JsonParser.parseString("""
+                        {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:orte","name":{"de":"Orte","en":"Places"},
+                          "visible":true,"order":1,"version":"1"}]}""").getAsJsonObject());
+                Symbole.INSTANZ.basis(JsonParser.parseString("{\"url\":\"http://127.0.0.1:" + bilder.getAddress().getPort() + "/tiles\"}")
+                        .getAsJsonObject(), InetAddress.getLoopbackAddress());
+                Ebenen.Teil t = Ebenen.Teil.lies(ORTE);
+                if (t == null || t.nadeln().size() != 4) {
+                    throw new AssertionError("Teil der Orte nicht lesbar");
+                }
+                Ebenen.INSTANZ.teil(t);
+                Minimap.INSTANZ.setzeScale(4);
+                Minimap.INSTANZ.setzeZoom(4);
+            });
+            context.waitFor(mc -> Symbole.INSTANZ.banner("test:orte", "1", "images/banner.png") != null
+                    && Symbole.INSTANZ.symbol("test:orte", "1", "images/anker.png", 16) != null && Minimap.INSTANZ.fertig(), 600);
+            context.waitTicks(2);
+            BufferedImage minimap = mitRand(context, context.takeScreenshot(TestScreenshotOptions.of("orte").disableCounterPrefix()));
+            Path baum = testsatz();
+            context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
+            context.waitTicks(40);
+            Path karte = context.takeScreenshot(TestScreenshotOptions.of("orte-karte").disableCounterPrefix());
+            // Die Option tauscht die Schriften ohne Neuladen; die gespeicherte Kartenschrift baut neu.
+            context.runOnClient(mc -> mc.options.forceUnicodeFont().set(true));
+            context.waitTicks(10);
+            Path unicode = context.takeScreenshot(TestScreenshotOptions.of("orte-unicode").disableCounterPrefix());
+            context.runOnClient(mc -> mc.options.forceUnicodeFont().set(false));
+            context.waitTicks(10);
+            if (!AUSGABE.isEmpty()) {
+                try {
+                    ImageIO.write(minimap, "png", Path.of(AUSGABE, "orte.png").toFile());
+                    Files.copy(karte, Path.of(AUSGABE, "orte-karte.png"), StandardCopyOption.REPLACE_EXISTING);
+                    Files.copy(unicode, Path.of(AUSGABE, "orte-unicode.png"), StandardCopyOption.REPLACE_EXISTING);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+            context.runOnClient(mc -> {
+                mc.gui.setScreen(null);
+                Ebenen.INSTANZ.leeren();
+            });
+        } finally {
+            bilder.stop(0);
+        }
+    }
+
+    /** Ein Server auf 127.0.0.1, der die Bilder unter /tiles/layers/test/images/ ausliefert. */
+    private static HttpServer bilderServer(Map<String, byte[]> dateien) {
+        try {
+            HttpServer s = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+            s.createContext("/tiles/layers/test/images/", austausch -> {
+                String pfad = austausch.getRequestURI().getPath();
+                byte[] inhalt = dateien.get(pfad.substring(pfad.lastIndexOf('/') + 1));
+                if (inhalt == null) {
+                    austausch.sendResponseHeaders(404, -1);
+                } else {
+                    austausch.getResponseHeaders().set("Content-Type", "image/png");
+                    austausch.sendResponseHeaders(200, inhalt.length);
+                    austausch.getResponseBody().write(inhalt);
+                }
+                austausch.close();
+            });
+            s.start();
+            return s;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** Ein PNG: ein Feld in Blau mit gelbem Rand und Querstreifen, etwa ein Banner. */
+    private static byte[] bild(int breite, int hoehe) {
+        BufferedImage b = new BufferedImage(breite, hoehe, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = b.createGraphics();
+        g.setColor(new Color(0x2E4A8C));
+        g.fillRect(0, 0, breite, hoehe);
+        g.setColor(new Color(0xE8C547));
+        g.drawRect(0, 0, breite - 1, hoehe - 1);
+        g.fillRect(0, hoehe / 3, breite, Math.max(1, hoehe / 8));
+        g.dispose();
+        ByteArrayOutputStream aus = new ByteArrayOutputStream();
+        try {
+            ImageIO.write(b, "png", aus);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return aus.toByteArray();
+    }
 
     /**
      * Flächen, Kreis und Linie einer Ebene: die Minimap genordet und gedreht mit „uhr“ bei 4 px und Zoom 4,
