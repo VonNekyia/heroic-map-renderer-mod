@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.28
+
+- **Change the look right on the minimap.** In the `/hmap` menu and under "Settings …", click yourself on the minimap to switch between head, arrow and half see-through, and click one of the marks N, E, S, W to switch the frame. The buttons "Player" and "Frame" are gone. With ornaments off or without a frame, the menu shows the marks half see-through so you can still click them. Dragging still moves the minimap.
+
 ## 0.2.27
 
 - **Layers on the full map: the name is a heading, the button only switches.** Each layer shows its name with an "On"/"Off" button next to it. A click on the button turns the layer on or off and does nothing else; a double click on the name pins everything of the layer to the minimap, another one unpins it. Before, the double click went on the switch and made it flicker.
