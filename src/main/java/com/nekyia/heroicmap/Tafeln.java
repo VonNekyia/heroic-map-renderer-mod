@@ -229,13 +229,6 @@ final class Tafeln {
             }
         }
 
-        /** Die Antwort zur offenen Tafel, null, solange sie aussteht: Gibt es keine, geht sie zu, auch gehalten. */
-        void antwort(Optional<Tafel> t) {
-            if (offen != null && t != null && t.isEmpty()) {
-                schliesse();
-            }
-        }
-
         Ziel offen() {
             return offen;
         }
