@@ -144,7 +144,8 @@ public final class Bilder implements FabricClientGameTest {
     /**
      * Nadeln und Banner mit ihren Namen in der Kartenschrift unter dem Fuss, in fester Grösse: die Minimap
      * bei 4 px und Zoom 4, dann die Vollbildkarte; dort einmal mit „Unicode-Schrift erzwingen“.
-     * Siehe docs/ebenen.md, „Nadeln“, und docs/ebenen.md, „Banner“.
+     * Siehe docs/ebenen.md, „Nadeln“,
+     * und docs/ebenen.md, „Banner“.
      */
     private static void orte(ClientGameTestContext context, TestServerContext server) {
         HttpServer bilder = bilderServer(Map.of("anker.png", bild(16, 16), "anker-m.png", bild(9, 9), "banner.png", bild(21, 40)));
