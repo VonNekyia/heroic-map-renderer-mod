@@ -65,6 +65,12 @@ class SymboleTest {
                     // Header mit 200, dann kein Körper.
                     t.sendResponseHeaders(200, 1000);
                     frei.await(30, TimeUnit.SECONDS);
+                } else if (pfad.endsWith("zweimal.png")) {
+                    // Die erste Anfrage scheitert gleich, jede weitere erst, wenn der Test sie freigibt.
+                    if (anfragen.stream().filter(pfad::equals).count() > 1) {
+                        frei.await(30, TimeUnit.SECONDS);
+                    }
+                    t.sendResponseHeaders(404, -1);
                 } else if (pfad.endsWith("warte.png")) {
                     frei.await(30, TimeUnit.SECONDS);
                     t.sendResponseHeaders(404, -1);
@@ -324,35 +330,64 @@ class SymboleTest {
     }
 
     @Test
-    void fehlendesBildNachEinerMinuteNeuHoechstensDreimal() throws Exception {
+    void fehlendesBildNach1Und5DannAlle15Minuten() throws Exception {
         // Wie mod#58: Das Banner fehlt erst (404), etwa weil der Server es nach der Ebene schreibt oder ein Proxy es nicht
-        // durchreicht. Nach 60 s holt der Mod es neu und zeigt es, ohne neue version und ohne neues Login.
+        // durchreicht. Nach 1 min holt der Mod es neu und zeigt es, ohne neue version und ohne neues Login.
         long[] jetzt = {0};
         Aufbau a = aufbau(() -> jetzt[0]);
         Symbole s = a.symbole();
         assertNull(s.banner("beispiel:staedte", "v1", "images/spaet.png"));
         s.warte();
         dateien.put(PFAD + "spaet.png", png(22, 40));
-        jetzt[0] = Symbole.NEU_MS - 1;
+        jetzt[0] = 60_000 - 1;
         assertNull(s.banner("beispiel:staedte", "v1", "images/spaet.png"));
         s.warte();
         assertEquals(1, anfragen.size());
-        jetzt[0] = Symbole.NEU_MS;
+        jetzt[0] = 60_000;
         assertNull(s.banner("beispiel:staedte", "v1", "images/spaet.png"));
         s.warte();
         assertEquals(2, anfragen.size());
         assertEquals(22, s.banner("beispiel:staedte", "v1", "images/spaet.png").breite());
-        // Ein Bild, das nie kommt: drei Versuche je version, dann keiner mehr.
-        for (int i = 0; i < 6; i++) {
-            jetzt[0] += Symbole.NEU_MS;
+        // Ein Bild, das nie kommt: nach 1, nach 5, dann alle 15 min, ohne Deckel; je eine Minute früher nichts.
+        long t = 10_000_000;
+        jetzt[0] = t;
+        s.banner("beispiel:staedte", "v1", "images/nie.png");
+        s.warte();
+        int vorher = anfragen.size();
+        for (long abstand : new long[] {60_000, 300_000, 900_000, 900_000, 900_000}) {
+            jetzt[0] = t + abstand - 1;
             s.banner("beispiel:staedte", "v1", "images/nie.png");
             s.warte();
+            assertEquals(vorher, anfragen.size(), "zu früh nach " + abstand);
+            t += abstand;
+            jetzt[0] = t;
+            s.banner("beispiel:staedte", "v1", "images/nie.png");
+            s.warte();
+            assertEquals(++vorher, anfragen.size(), "nicht neu nach " + abstand);
         }
-        assertEquals(2 + Symbole.VERSUCHE, anfragen.size());
         // Eine neue version fängt von vorn an.
         s.banner("beispiel:staedte", "v2", "images/nie.png");
         s.warte();
-        assertEquals(3 + Symbole.VERSUCHE, anfragen.size());
+        assertEquals(vorher + 1, anfragen.size());
+    }
+
+    @Test
+    void keinZweiterVersuchNebenEinemLaufenden() throws Exception {
+        // Der erste scheitert gleich; der neue Versuch nach 1 min hängt am Server. Solange er läuft, geht keiner neben ihm hinaus.
+        long[] jetzt = {0};
+        Symbole s = aufbau(() -> jetzt[0]).symbole();
+        s.banner("beispiel:staedte", "v1", "images/zweimal.png");
+        s.warte();
+        jetzt[0] = 60_000;
+        s.banner("beispiel:staedte", "v1", "images/zweimal.png");
+        for (int i = 0; i < 100 && anfragen.size() < 2; i++) {
+            Thread.sleep(20);
+        }
+        jetzt[0] = 60_000 + 3_600_000;
+        assertNull(s.banner("beispiel:staedte", "v1", "images/zweimal.png"));
+        frei.countDown();
+        s.warte();
+        assertEquals(2, anfragen.size());
     }
 
     @Test
