@@ -200,7 +200,9 @@ hat es der User gewünscht, siehe
 Der Gametest `Bilder` wählt in der Szene „Selbst“ wie ein Spieler, in einer
 Einzelspielerwelt mit ihrem Ordner, ohne Haken für den Test: Karte ohne
 Satz, „Karte laden …“, mit der Maus den Massstab auf 2 px, „Selbst“, Ja,
-Zurück; die Karte zeigt dann die eigene mit 2 px auf Stufe 7. Zu Beginn
+Zurück; die Karte zeigt dann die eigene mit 2 px und öffnet auf Stufe 7,
+nicht auf der Stufe des Testsatzes davor, siehe
+[Vollbildkarte](vollbildkarte.md), „Lage merken“. Zu Beginn
 leert er den Ordner der Welt (`Bilder.leereWelt`), sonst brächte ein
 früherer Lauf Wegpunkte und Karte mit. Schon vor der Wahl gilt die Minimap als beschäftigt, über einen
 Haken nur für den Test (`Minimap.fuerTestBeschaeftigt`): Die eigene Karte

@@ -931,8 +931,6 @@ public final class Bilder implements FabricClientGameTest {
         }
         try {
             Laden.loesche(welt.resolve(Selbst.baum("minecraft:overworld")));
-            // Die Lage merkt sich die Karte je Dimension, nicht je Satz; die Stufe des Testsatzes passte nicht zur eigenen Karte.
-            Files.deleteIfExists(welt.resolve("karte.properties"));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -960,9 +958,11 @@ public final class Bilder implements FabricClientGameTest {
         context.waitTicks(2);
         context.clickScreenButton("gui.back");
         context.waitTicks(2);
+        // Die Karte öffnet auf ihrer feinsten Stufe, nicht auf der des Testsatzes davor. Siehe docs/vollbildkarte.md, „Lage merken“.
         String baum = context.computeOnClient(mc -> mc.gui.screen() instanceof Karte k && k.satz() != null
-                ? k.satz().ordner().getParent().getFileName().toString() + " " + k.satz().massstab() + " " + k.satz().stufe() : null);
-        if (baum == null || !baum.startsWith(Selbst.PRAEFIX) || !baum.endsWith(" 2 7")) {
+                ? k.satz().ordner().getParent().getFileName().toString() + " " + k.satz().massstab() + " " + k.satz().stufe()
+                        + " " + k.stufe()[0] : null);
+        if (baum == null || !baum.startsWith(Selbst.PRAEFIX) || !baum.endsWith(" 2 7 7")) {
             throw new AssertionError("Nach „Selbst“ mit 2 px zeigt die Karte " + baum);
         }
         context.runOnClient(mc -> mc.gui.screen().onClose());
