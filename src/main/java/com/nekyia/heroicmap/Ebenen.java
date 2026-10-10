@@ -23,6 +23,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import org.joml.Matrix3x2fStack;
 import org.slf4j.Logger;
@@ -66,11 +67,14 @@ final class Ebenen {
     static final int RANDFARBE = 0xFF2B2B2B;
     /** Kartenschrift: höchstens so viele Punkte im Pfad, wie im Format; Farbe und Kontur ohne Angabe; Sperrung gekappt. */
     static final int MAX_PFAD = 64, SCHRIFTFARBE = 0xFF2B2B2B, KONTURFARBE = 0xFFF2E8D0;
-    static final float MAX_SPERRUNG = 2;
+    static final float MAX_SPERRUNG = 1;
     static final String UEBERWELT = "minecraft:overworld";
     /** Die Farbe des Schilds ohne {@code color}. */
     static final int FARBE = 0xFFD9443A;
-    private static final int TEXT = 0xFFFFFFFF;
+    /** Der Name unter dem Fuss: Kartenschrift mit 12 Einheiten je Geviert, Zeilenhöhe 1,4, 3 Einheiten Rand zur Seite. */
+    static final float NAME_GROESSE = 12, NAME_ZEILE = 1.4f * NAME_GROESSE, NAME_RAND = 3;
+    /** Die Farben der UI wie auf der Webkarte: Grund weiss mit Alpha 0,8, Schrift schwarz, ohne Kontur. */
+    private static final int NAME_GRUND = 0xCCFFFFFF, NAME_SCHRIFT = 0xFF000000;
     private static final Logger LOGGER = LoggerFactory.getLogger(HeroicMap.ID);
 
     /** Ein Eintrag der Liste; {@code order} höher liegt oben. */
@@ -83,12 +87,28 @@ final class Ebenen {
         }
     }
 
+    /** Ein Ort der Karte mit Fuss bei (x, z): eine Nadel oder ein Banner; zusammen höchstens {@link #MAX_NADELN} je Ebene. */
+    sealed interface Ort permits Nadel, Banner {
+
+        double x();
+
+        double z();
+
+        String dimension();
+
+        String name();
+    }
+
     /**
      * Eine Nadel mit dem Fuss bei (x, z); {@code groesse} 0 ist {@code large}, 1 {@code medium}, 2
      * {@code small}. Dazu ihre Ebene und deren {@code version} und die Felder ihrer Symbole oder null.
      */
     record Nadel(double x, double z, String dimension, String name, int groesse, int farbe, String ebene, String version,
-            String symbolGross, String symbolMittel) {
+            String symbolGross, String symbolMittel) implements Ort {
+    }
+
+    /** Ein Banner: das Bild {@code bild} der Ebene, Pixel auf Pixel, der Fuss unten mittig auf dem Ort; darunter der Name. */
+    record Banner(double x, double z, String dimension, String name, String bild, String ebene, String version) implements Ort {
     }
 
     /** Ein Rand in Einheiten des GUI: Farbe mit Alpha, Breite, gestrichelt Strich und Lücke, sonst beide 0. */
@@ -141,7 +161,7 @@ final class Ebenen {
      * Formen mit ihren Punkten und wie viele verworfen sind, damit der Render-Thread kein JSON bekommt
      * und keins liegen bleibt.
      */
-    record Teil(String id, String version, int teil, int teile, List<Nadel> nadeln, List<Form> formen, int punkte, int verworfen) {
+    record Teil(String id, String version, int teil, int teile, List<Ort> nadeln, List<Form> formen, int punkte, int verworfen) {
 
         /** Liest eine Nachricht auf dem Thread des Netzes; null, wenn sie keine {@code ebene} ist oder nicht taugt. */
         static Teil lies(String text) {
@@ -152,16 +172,18 @@ final class Ebenen {
                 }
                 String id = text(json, "id", MAX_KENNUNG), version = text(json, "version", MAX_KENNUNG);
                 Gelesen f = id == null || version == null ? null : Ebenen.formen(json.getAsJsonArray("objects"));
+                int[] banner = {0};
+                List<Ort> nadeln = f == null ? null : Ebenen.nadeln(id, version, json.getAsJsonArray("objects"), banner);
                 return f == null ? null
-                        : new Teil(id, version, json.get("teil").getAsInt(), json.get("teile").getAsInt(),
-                                Ebenen.nadeln(id, version, json.getAsJsonArray("objects")), f.formen(), f.punkte(), f.verworfen());
+                        : new Teil(id, version, json.get("teil").getAsInt(), json.get("teile").getAsInt(), nadeln, f.formen(), f.punkte(),
+                                f.verworfen() + banner[0]);
             } catch (RuntimeException e) {
                 return null;
             }
         }
     }
 
-    /** Die Formen eines Teils, ihre Punkte und wie viele Objekte als Form verworfen sind. */
+    /** Die Formen eines Teils, ihre Punkte und wie viele Objekte als Form verworfen sind; die Banner zählt {@link #nadeln}. */
     record Gelesen(List<Form> formen, int punkte, int verworfen) {
     }
 
@@ -179,7 +201,7 @@ final class Ebenen {
     }
 
     private List<Eintrag> liste = List.of();
-    private final Map<String, List<Nadel>> nadeln = new HashMap<>();
+    private final Map<String, List<Ort>> nadeln = new HashMap<>();
     private final Map<String, List<Form>> formen = new HashMap<>();
     /** Die Punkte der fertigen Formen je Ebene. */
     private final Map<String, Integer> punkte = new HashMap<>();
@@ -237,8 +259,8 @@ final class Ebenen {
      * Ein Teil {@code ebene}. Er gilt nur mit der {@code version}, die die Liste nennt; das Plugin
      * schickt die Liste vor den Teilen. Sind alle Teile da, ersetzen ihre Nadeln die der Ebene, bis
      * dahin bleibt die alte. Kommt eine Sammlung über {@link #MAX_NADELN} Nadeln, {@link #MAX_OBJEKTE}
-     * Objekte oder {@link #MAX_PUNKTE_EBENE} Punkte, ist sie verworfen. Verworfene Formen meldet das Log
-     * einmal je Ebene und {@code version}, wenn sie fertig ist.
+     * Objekte oder {@link #MAX_PUNKTE_EBENE} Punkte, ist sie verworfen. Verworfene Formen und Banner meldet
+     * das Log einmal je Ebene und {@code version}, wenn sie fertig ist.
      */
     void teil(Teil t) {
         if (t.teile() < 1 || t.teile() > MAX_TEILE || t.teil() < 1 || t.teil() > t.teile()
@@ -265,8 +287,8 @@ final class Ebenen {
         } else if (s.da == s.teile.size()) {
             sammlungen.remove(t.id());
             if (s.verworfen > 0) {
-                LOGGER.warn("Heroic Map: Ebene {} ({}): {} Formen ungültig oder ohne Füllung, weil sie zu aufwendig war", t.id(), t.version(),
-                        s.verworfen);
+                LOGGER.warn("Heroic Map: Ebene {} ({}): {} Banner oder Formen ungültig, oder Formen ohne Füllung, weil zu aufwendig",
+                        t.id(), t.version(), s.verworfen);
             }
             nadeln.put(t.id(), s.teile.stream().flatMap(x -> x.nadeln().stream()).toList());
             formen.put(t.id(), s.teile.stream().flatMap(x -> x.formen().stream()).toList());
@@ -281,23 +303,35 @@ final class Ebenen {
         return je.values().stream().mapToInt(Integer::intValue).sum();
     }
 
-    /** Die Nadeln aus den Objekten eines Teils, in ihrer Reihenfolge, höchstens {@link #MAX_NADELN} + 1; anderes und Kaputtes fällt weg. */
-    static List<Nadel> nadeln(String ebene, String version, JsonArray objekte) {
-        List<Nadel> aus = new ArrayList<>();
+    /** Wie {@link #nadeln(String, String, JsonArray, int[])}, ohne die verworfenen Banner zu zählen. */
+    static List<Ort> nadeln(String ebene, String version, JsonArray objekte) {
+        return nadeln(ebene, version, objekte, new int[1]);
+    }
+
+    /**
+     * Die Nadeln und Banner aus den Objekten eines Teils, in ihrer Reihenfolge, zusammen höchstens
+     * {@link #MAX_NADELN} + 1; anderes und Kaputtes fällt weg. Ein Banner ohne gültiges Bild oder
+     * kaputt zählt in {@code verworfen[0]}, damit das Log es nennt, wie das Format verlangt.
+     */
+    static List<Ort> nadeln(String ebene, String version, JsonArray objekte, int[] verworfen) {
+        List<Ort> aus = new ArrayList<>();
         for (JsonElement e : objekte) {
             if (aus.size() > MAX_NADELN) {
                 break;
             }
+            String typ = "";
             try {
                 JsonObject o = e.getAsJsonObject();
-                if ("pin".equals(o.has("type") ? o.get("type").getAsString() : null)) {
-                    Nadel n = nadel(o, ebene, version);
-                    if (n != null) {
-                        aus.add(n);
-                    }
+                typ = o.has("type") ? o.get("type").getAsString() : "";
+                Ort n = typ.equals("pin") ? nadel(o, ebene, version) : typ.equals("banner") ? banner(o, ebene, version) : null;
+                if (n != null) {
+                    aus.add(n);
+                } else if (typ.equals("banner")) {
+                    verworfen[0]++;
                 }
             } catch (RuntimeException fehler) {
                 // Ein kaputtes Objekt fehlt, die übrigen gelten.
+                verworfen[0] += typ.equals("banner") ? 1 : 0;
             }
         }
         return List.copyOf(aus);
@@ -319,6 +353,15 @@ final class Ebenen {
         return dimension == null ? null : new Nadel(at.get(0).getAsDouble(), at.get(1).getAsDouble(), dimension,
                 text(o, "name", MAX_TEXT), groesse, o.has("color") ? farbe(o.get("color").getAsString()) : FARBE, ebene, version,
                 feld(symbol, "large"), feld(symbol, "medium"));
+    }
+
+    /** Ein Banner; null ohne Bild unter {@code images/}, mit einem Feld über {@link #MAX_FELD} oder einer zu langen Dimension. */
+    private static Banner banner(JsonObject o, String ebene, String version) {
+        JsonArray at = o.getAsJsonArray("at");
+        String dimension = o.has("dimension") ? text(o, "dimension", MAX_KENNUNG) : UEBERWELT;
+        String bild = feld(o, "image");
+        return dimension == null || bild == null || !Symbole.FELD.matcher(bild).matches() ? null
+                : new Banner(at.get(0).getAsDouble(), at.get(1).getAsDouble(), dimension, text(o, "name", MAX_TEXT), bild, ebene, version);
     }
 
     /** Das Feld eines Symbols wie es steht, oder null, wenn es fehlt oder länger als {@link #MAX_FELD} ist; prüfen tut {@link Symbole#uri}. */
@@ -653,32 +696,64 @@ final class Ebenen {
     }
 
     /** Die Nadeln einer Ebene, die schon ganz da ist, sonst keine. */
-    List<Nadel> nadeln(String id) {
+    List<Ort> nadeln(String id) {
         return nadeln.getOrDefault(id, List.of());
     }
 
     /**
-     * Um wie viele Grössen eine Nadel kleiner wird, wenn ein Block {@code p} Einheiten breit ist; ab 3
-     * fällt jede weg. Siehe docs/ebenen.md, „Nadeln“.
+     * Zeichnet den Ort mit dem Fuss bei (x, y), in Einheiten des GUI auf ganzen Pixeln, in fester
+     * Grösse, darunter den Namen. Siehe docs/ebenen.md, „Nadeln“,
+     * und docs/ebenen.md, „Banner“.
      */
-    static int stufen(double p) {
-        return p >= 1 / 2.0 ? 0 : p >= 1 / 8.0 ? 1 : p >= 1 / 32.0 ? 2 : 3;
-    }
-
-    /**
-     * Zeichnet die Nadel mit dem Fuss bei (x, y), in Einheiten des GUI auf ganzen Pixeln, um
-     * {@code stufen} Grössen kleiner: Feld, Symbol der gezeichneten Grösse, Rahmen; den Namen nur in
-     * ihrer Grundgrösse. Siehe docs/ebenen.md, „Nadeln“.
-     */
-    static void zeichne(GuiGraphicsExtractor g, Font font, float x, float y, Nadel n, int stufen) {
-        int groesse = n.groesse() + stufen;
-        if (groesse >= SCHILDE.length) {
-            return;
-        }
-        Schild s = SCHILDE[groesse];
+    static void zeichne(GuiGraphicsExtractor g, Font font, float x, float y, Ort o) {
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.translate(x, y);
+        switch (o) {
+            case Nadel n -> nadel(g, n);
+            case Banner b -> {
+                Symbole.Textur t = Symbole.INSTANZ.banner(b.ebene(), b.version(), b.bild());
+                if (t == null) {
+                    pose.popMatrix();
+                    return;
+                }
+                // Pixel auf Pixel; der Fuss ⌊Breite / 2⌋ rechts der linken Kante, wie bei der Nadel.
+                g.blit(RenderPipelines.GUI_TEXTURED, t.id(), -t.breite() / 2, -t.hoehe(), 0, 0, t.breite(), t.hoehe(), t.breite(), t.hoehe());
+            }
+        }
+        if (o.name() != null) {
+            name(g, font, o.name());
+        }
+        pose.popMatrix();
+    }
+
+    /** Wie breit der Kasten um den Namen ist, in Einheiten des GUI. */
+    static float nameBreite(Font font, String name) {
+        return font.width(Component.literal(name).withStyle(Formen.STIL)) * NAME_GROESSE / 16 + 2 * NAME_RAND;
+    }
+
+    /**
+     * Der Name im Kasten direkt unter dem Fuss, mittig, die Grossbuchstaben mittig im Kasten.
+     * Siehe docs/ebenen.md, „Nadeln“.
+     */
+    private static void name(GuiGraphicsExtractor g, Font font, String name) {
+        Component c = Component.literal(name).withStyle(Formen.STIL);
+        float m = NAME_GROESSE / 16, breite = font.width(c) * m;
+        int halb = (int) Math.ceil(breite / 2 + NAME_RAND);
+        g.fill(-halb, 0, halb, Math.round(NAME_ZEILE), NAME_GRUND);
+        Matrix3x2fStack pose = g.pose();
+        pose.pushMatrix();
+        // Die Oberkante der Grossbuchstaben liegt KAPPE − GRUNDLINIE Einheiten der Schrift über dem y des Texts.
+        pose.translate(-breite / 2, (Math.round(NAME_ZEILE) - Formen.KAPPE * m) / 2 + (Formen.KAPPE - Formen.GRUNDLINIE) * m);
+        pose.scale(m);
+        g.text(font, c, 0, 0, NAME_SCHRIFT, false);
+        pose.popMatrix();
+    }
+
+    /** Feld, Symbol und Rahmen der Nadel in ihrer Grösse, der Fuss im Ursprung. */
+    private static void nadel(GuiGraphicsExtractor g, Nadel n) {
+        int groesse = n.groesse();
+        Schild s = SCHILDE[groesse];
         // Das Feld steht in Graustufen; die Grafikkarte multipliziert es mit der Farbe.
         g.blitSprite(RenderPipelines.GUI_TEXTURED, s.feld(), -s.breite() / 2, -s.hoehe(), s.breite(), s.hoehe(), n.farbe());
         int seite = groesse == 0 ? 16 : 9;
@@ -688,9 +763,5 @@ final class Ebenen {
             g.blit(RenderPipelines.GUI_TEXTURED, symbol, -s.breite() / 2 + (s.breite() - seite) / 2, -s.hoehe() + 3, 0, 0, seite, seite, seite, seite);
         }
         g.blitSprite(RenderPipelines.GUI_TEXTURED, s.rahmen(), -s.breite() / 2, -s.hoehe(), s.breite(), s.hoehe());
-        if (stufen == 0 && n.name() != null) {
-            g.centeredText(font, n.name(), 0, 2, TEXT);
-        }
-        pose.popMatrix();
     }
 }

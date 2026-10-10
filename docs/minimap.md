@@ -621,6 +621,13 @@ Westen ragen Mangrovenwurzeln und obere Stufen aus dem Wasser. Dazu ein
 Haus mit einem Schild an der Wand, Bambus, ein Kopf, drei Bäume, ein Weg, Glas, Eis, Schnee, Lava, eine Truhe, Teppich und
 ein Feld. Gras, Blumen und Weizen stehen senkrecht und fehlen von oben.
 
+Danach die Ebenen (siehe [ebenen.md](ebenen.md)): Flächen, Kreis, Linie und
+Kartenschrift (`formen.png`, `formen-karte.png`), dann Nadeln in drei
+Grössen, ein Banner und ihre Namen (`orte.png`, `orte-karte.png`), auf
+der Vollbildkarte noch einmal mit „Unicode-Schrift erzwingen“
+(`orte-unicode.png`). Die Bilder der Nadeln und des Banners holt der Mod
+von einem Server, den der Test auf 127.0.0.1 startet.
+
 ## Was anders ist als top-north
 
 - **Texturen** aus den Packs des Spielers, nicht aus den Vanilla-Assets.

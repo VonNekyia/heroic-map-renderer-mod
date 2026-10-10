@@ -35,6 +35,11 @@ public final class HeroicMap implements ClientModInitializer {
     /** Die Taste der Vollbildkarte; die Karte schliesst sich mit ihr. */
     static KeyMapping karte;
 
+    /** Für {@code FontManagerMixin}: Die Optionen der Schrift wechselten ohne Neuladen der Ressourcen. */
+    public static void schriftenGewechselt() {
+        Formen.neuGeladen();
+    }
+
     @Override
     public void onInitializeClient() {
         KeyMapping.Category kategorie = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(ID, "karte"));

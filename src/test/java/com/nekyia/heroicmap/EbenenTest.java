@@ -56,7 +56,7 @@ class EbenenTest {
         assertEquals(List.of(), e.nadeln("b:staedte"));
         teil(e, "b:staedte", "v1", 1, 2, nadel("eins", 1));
         // In der Reihenfolge der Teile, nicht der Ankunft.
-        assertEquals(List.of("eins", "zwei"), e.nadeln("b:staedte").stream().map(Ebenen.Nadel::name).toList());
+        assertEquals(List.of("eins", "zwei"), e.nadeln("b:staedte").stream().map(Ebenen.Ort::name).toList());
     }
 
     @Test
@@ -73,7 +73,7 @@ class EbenenTest {
         teil(e, "b:staedte", "v2", 2, 2, nadel("neu2", 2));
         assertEquals("alt", e.nadeln("b:staedte").getFirst().name());
         teil(e, "b:staedte", "v3", 2, 2, nadel("drei2", 2));
-        assertEquals(List.of("drei1", "drei2"), e.nadeln("b:staedte").stream().map(Ebenen.Nadel::name).toList());
+        assertEquals(List.of("drei1", "drei2"), e.nadeln("b:staedte").stream().map(Ebenen.Ort::name).toList());
         // Ein Teil vor seiner Liste gilt nicht.
         teil(e, "b:staedte", "v4", 1, 1, nadel("vier", 1));
         assertEquals("drei1", e.nadeln("b:staedte").getFirst().name());
@@ -89,7 +89,7 @@ class EbenenTest {
         teil(e, "b:staedte", "v3", 2, 2, nadel("drei2", 2));
         assertEquals(List.of(), e.nadeln("b:staedte"));
         teil(e, "b:staedte", "v3", 1, 2, nadel("drei1", 1));
-        assertEquals(List.of("drei1", "drei2"), e.nadeln("b:staedte").stream().map(Ebenen.Nadel::name).toList());
+        assertEquals(List.of("drei1", "drei2"), e.nadeln("b:staedte").stream().map(Ebenen.Ort::name).toList());
         // Nennt die Liste eine Kennung zweimal, gilt der erste Eintrag; ein Teil der zweiten version gilt nicht.
         Ebenen f = new Ebenen();
         liste(f, eintrag("b:staedte", "v2") + "," + eintrag("b:staedte", "v3"));
@@ -128,7 +128,7 @@ class EbenenTest {
                 + "{\"id\":\"d\",\"type\":\"pin\",\"at\":\"kaputt\"},"
                 + "{\"id\":\"e\",\"type\":\"pin\",\"at\":[3,4],\"size\":\"small\",\"color\":\"rot\"}"
                 + "]").getAsJsonArray();
-        List<Ebenen.Nadel> n = Ebenen.nadeln("b:staedte", "v1", objekte);
+        List<Ebenen.Ort> n = Ebenen.nadeln("b:staedte", "v1", objekte);
         assertEquals(3, n.size());
         assertEquals(new Ebenen.Nadel(120.5, -340.5, Ebenen.UEBERWELT, null, 1, Ebenen.FARBE, "b:staedte", "v1", null, null), n.get(0));
         // Das Alpha wirkt am Schild nicht; unbekannte Felder übergeht der Mod.
@@ -159,7 +159,7 @@ class EbenenTest {
         teil(e, "b:staedte", "v2", 2, 3, viele("b", 600));
         teil(e, "b:staedte", "v2", 3, 3, nadel("c", 1));
         // Über 1000 in der Sammlung: verworfen, die alte bleibt.
-        assertEquals(List.of("alt"), e.nadeln("b:staedte").stream().map(Ebenen.Nadel::name).toList());
+        assertEquals(List.of("alt"), e.nadeln("b:staedte").stream().map(Ebenen.Ort::name).toList());
         // Genau 1000 gehen.
         liste(e, eintrag("b:staedte", "v3"));
         teil(e, "b:staedte", "v3", 1, 2, viele("a", 600));
@@ -177,7 +177,7 @@ class EbenenTest {
         JsonArray objekte = JsonParser.parseString("[{\"id\":\"a\",\"type\":\"pin\",\"at\":[0,0],\"name\":\"" + name64 + "\"},"
                 + "{\"id\":\"b\",\"type\":\"pin\",\"at\":[0,0],\"name\":\"" + name65 + "\"},"
                 + "{\"id\":\"c\",\"type\":\"pin\",\"at\":[0,0],\"dimension\":\"" + "d".repeat(Ebenen.MAX_KENNUNG + 1) + "\"}]").getAsJsonArray();
-        List<Ebenen.Nadel> n = Ebenen.nadeln("b:e", "v", objekte);
+        List<Ebenen.Ort> n = Ebenen.nadeln("b:e", "v", objekte);
         // Ein zu langer Name fehlt, die Nadel bleibt; eine zu lange Dimension nimmt die Nadel mit.
         assertEquals(2, n.size());
         assertEquals(name64, n.get(0).name());
@@ -186,7 +186,7 @@ class EbenenTest {
         String feld = "images/" + "s".repeat(Ebenen.MAX_FELD - 12) + ".webp", lang = "images/" + "s".repeat(Ebenen.MAX_FELD - 11) + ".webp";
         JsonArray symbole = JsonParser.parseString("[{\"id\":\"a\",\"type\":\"pin\",\"at\":[0,0],\"symbol\":{\"large\":\"" + feld
                 + "\",\"medium\":\"" + lang + "\"}}]").getAsJsonArray();
-        Ebenen.Nadel mitSymbol = Ebenen.nadeln("b:e", "v", symbole).getFirst();
+        Ebenen.Nadel mitSymbol = (Ebenen.Nadel) Ebenen.nadeln("b:e", "v", symbole).getFirst();
         assertEquals(feld, mitSymbol.symbolGross());
         assertNull(mitSymbol.symbolMittel());
         assertNull(Ebenen.Teil.lies("{\"v\":1,\"typ\":\"ebene\",\"id\":\"" + "i".repeat(Ebenen.MAX_KENNUNG + 1)
@@ -208,7 +208,7 @@ class EbenenTest {
         assertNull(Ebenen.Teil.lies("{\"v\":1,\"typ\":\"ebene\",\"id\":\"b:staedte\",\"version\":\"v1\",\"teil\":2,\"teile\":2,\"objects\":\"x\"}"));
         teil(e, "b:staedte", "v1", 2, 3, nadel("b", 2));
         teil(e, "b:staedte", "v1", 3, 3, nadel("c", 3));
-        assertEquals(List.of("a", "b", "c"), e.nadeln("b:staedte").stream().map(Ebenen.Nadel::name).toList());
+        assertEquals(List.of("a", "b", "c"), e.nadeln("b:staedte").stream().map(Ebenen.Ort::name).toList());
         // Andere Nachrichten sind kein Teil.
         assertNull(Ebenen.Teil.lies("{\"v\":1,\"typ\":\"spieler\"}"));
         assertNull(Ebenen.Teil.lies("{\"v\":2,\"typ\":\"ebene\",\"id\":\"b:staedte\",\"version\":\"v1\",\"teil\":1,\"teile\":1,\"objects\":[]}"));
@@ -530,7 +530,7 @@ class EbenenTest {
         assertEquals(0, o.konturBreite());
         // Eine Kontur ohne Angaben ist keine, wie auf der Webkarte; die Sperrung gekappt.
         Ebenen.Schrift k = (Ebenen.Schrift) g.formen().get(2);
-        assertEquals(Ebenen.MAX_SPERRUNG, k.sperrung());
+        assertEquals(1f, k.sperrung());
         assertEquals(0, k.konturBreite());
         assertEquals(Ebenen.KONTURFARBE, k.konturFarbe());
         // Punkte: 3 + 1 + 1.
@@ -605,6 +605,22 @@ class EbenenTest {
     }
 
     @Test
+    void bannerOhneGueltigesBildZaehltAlsVerworfen() {
+        // Ohne image, mit ../, als GIF und zu lang: vier verworfen, das Log nennt sie; Banner mit Bild und Nadel bleiben.
+        Ebenen.Teil t = Ebenen.Teil.lies("""
+                {"v":1,"typ":"ebene","id":"b:e","version":"1","teil":1,"teile":1,"objects":[
+                  {"type":"banner","at":[0,0]},
+                  {"type":"banner","at":[0,0],"image":"images/../x.png"},
+                  {"type":"banner","at":[0,0],"image":"images/x.gif"},
+                  {"type":"banner","at":[0,0],"image":"images/%s.png"},
+                  {"type":"banner","at":[0,0],"image":"images/gut.png"},
+                  {"type":"pin","at":[0,0]}
+                ]}""".formatted("x".repeat(Ebenen.MAX_FELD)));
+        assertEquals(2, t.nadeln().size());
+        assertEquals(4, t.verworfen());
+    }
+
+    @Test
     void kartenschriftGrenzen() {
         StringBuilder pfad = new StringBuilder();
         for (int i = 0; i <= Ebenen.MAX_PFAD; i++) {
@@ -631,15 +647,35 @@ class EbenenTest {
     }
 
     @Test
-    void stufenNachBlockbreite() {
-        // Ab 1/2 Einheit je Block die Grundgrösse, ab 1/8 eine kleiner, ab 1/32 zwei, darunter keine.
-        assertEquals(0, Ebenen.stufen(4));
-        assertEquals(0, Ebenen.stufen(0.5));
-        assertEquals(1, Ebenen.stufen(0.4999));
-        assertEquals(1, Ebenen.stufen(1 / 8.0));
-        assertEquals(2, Ebenen.stufen(0.1249));
-        assertEquals(2, Ebenen.stufen(1 / 32.0));
-        assertEquals(3, Ebenen.stufen(0.031));
+    void bannerMitBild() {
+        JsonArray objekte = JsonParser.parseString("["
+                + "{\"id\":\"s\",\"type\":\"banner\",\"at\":[120.5,-340.5],\"image\":\"images/banner-nord.png\",\"name\":\"Hafenstadt\"},"
+                + "{\"id\":\"o\",\"type\":\"banner\",\"at\":[1,2],\"name\":\"ohne Bild\"},"
+                + "{\"id\":\"f\",\"type\":\"banner\",\"at\":[1,2],\"image\":\"../banner.png\"},"
+                + "{\"id\":\"w\",\"type\":\"banner\",\"at\":[3,4],\"image\":\"images/weiss.webp\",\"dimension\":\"minecraft:the_nether\"},"
+                + "{\"id\":\"p\",\"type\":\"pin\",\"at\":[5,6]}"
+                + "]").getAsJsonArray();
+        List<Ebenen.Ort> n = Ebenen.nadeln("b:staedte", "v1", objekte);
+        // Ohne gültiges Bild fällt ein Banner weg; Nadeln und Banner stehen in ihrer Reihenfolge.
+        assertEquals(3, n.size());
+        assertEquals(new Ebenen.Banner(120.5, -340.5, Ebenen.UEBERWELT, "Hafenstadt", "images/banner-nord.png", "b:staedte", "v1"), n.get(0));
+        assertEquals(new Ebenen.Banner(3, 4, "minecraft:the_nether", null, "images/weiss.webp", "b:staedte", "v1"), n.get(1));
+        assertTrue(n.get(2) instanceof Ebenen.Nadel);
+    }
+
+    @Test
+    void nadelnUndBannerZusammen() {
+        // 1000 Nadeln und Banner zusammen, wie im Format: 600 Nadeln und 401 Banner sind eins zu viel.
+        Ebenen e = new Ebenen();
+        liste(e, eintrag("b:staedte", "v1"));
+        String banner = "{\"type\":\"banner\",\"at\":[0,0],\"image\":\"images/b.png\"}";
+        teil(e, "b:staedte", "v1", 1, 2, viele("n", 600));
+        teil(e, "b:staedte", "v1", 2, 2, mal(banner, 401));
+        assertEquals(List.of(), e.nadeln("b:staedte"));
+        liste(e, eintrag("b:staedte", "v2"));
+        teil(e, "b:staedte", "v2", 1, 2, viele("n", 600));
+        teil(e, "b:staedte", "v2", 2, 2, mal(banner, 400));
+        assertEquals(Ebenen.MAX_NADELN, e.nadeln("b:staedte").size());
     }
 
     @Test

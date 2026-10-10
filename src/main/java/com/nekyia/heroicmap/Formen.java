@@ -62,9 +62,12 @@ final class Formen {
     }
 
     /** Zählt jedes Neuladen der Ressourcen: Die gespeicherten Texte halten Glyphen der Schrift, die dabei verfällt. */
-    private static int generation;
+    static int generation;
 
-    /** Ruft der Reload-Listener nach den Schriften des Spiels; danach baut jede Ansicht neu. */
+    /**
+     * Ruft der Reload-Listener nach den Schriften des Spiels, ebenso {@link HeroicMap#schriftenGewechselt},
+     * wenn die Optionen der Schrift wechseln; danach baut jede Ansicht neu.
+     */
     static void neuGeladen() {
         generation++;
     }

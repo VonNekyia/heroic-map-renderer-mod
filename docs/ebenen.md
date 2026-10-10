@@ -1,12 +1,13 @@
 ---
 title: Ebenen
-description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Symbol und Namen auf Minimap und Vollbildkarte zeichnet, kleiner beim Hinauszoomen, die Symbole vom Server holt, Flächen, Kreise und Linien flach zeichnet, Kartenschrift entlang ihres Pfads, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
+description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Symbol und Namen und ihre Banner auf Minimap und Vollbildkarte zeichnet, in fester Grösse, Symbole und Bilder vom Server holt, Flächen, Kreise und Linien flach zeichnet, Kartenschrift entlang ihres Pfads, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Ebenen.java
   - src/main/java/com/nekyia/heroicmap/EbenenMenue.java
   - src/main/java/com/nekyia/heroicmap/Symbole.java
   - src/main/java/com/nekyia/heroicmap/Formen.java
   - src/main/java/com/nekyia/heroicmap/Trapeze.java
+  - src/main/java/com/nekyia/heroicmap/mixin/FontManagerMixin.java
   - src/main/resources/assets/heroicmap/font/karte.json
   - src/main/java/com/nekyia/heroicmap/Kartenblick.java
   - src/main/java/com/nekyia/heroicmap/Minimap.java
@@ -24,7 +25,7 @@ code:
 
 Ein Plugin auf dem Server legt Ebenen über die Karte, etwa die Städte einer
 Nation (#35). Der Mod empfängt sie über den Kanal und zeichnet ihre Nadeln,
-Flächen, Kreise, Linien und Kartenschrift auf Minimap und Vollbildkarte. Das Format beschreibt der
+Banner, Flächen, Kreise, Linien und Kartenschrift auf Minimap und Vollbildkarte. Das Format beschreibt der
 Renderer:
 [Ebenen](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/ebenen.md);
 die Nachrichten das Plugin:
@@ -68,8 +69,8 @@ die Nachrichten das Plugin:
 
 ## Nadeln
 
-- **Nur `pin`:** Andere Objekte und unbekannte Felder übergeht der Mod.
-  `y` braucht er nicht, denn seine Karten sind von oben gesehen. Ohne
+- **Gelesen:** Unbekannte Felder übergeht der Mod. `y` braucht er nicht,
+  denn seine Karten sind von oben gesehen. Ohne
   `dimension` gilt `minecraft:overworld`; der Mod zeigt nur die Nadeln der
   Dimension des Spielers.
 - **Schild und Nadel** dieselben Bilder wie auf der Webkarte, in drei
@@ -86,38 +87,71 @@ die Nachrichten das Plugin:
 - **Symbol** über dem gefärbten Feld und unter dem Rahmen, Pixel auf
   Pixel, die linke obere Ecke bei (⌊(Breite − Seite) / 2⌋, 3) im Bild des
   Schilds: `symbol.large` 16 × 16 in `large`, `symbol.medium` 9 × 9 in
-  `medium`, `small` ohne. Steht die Nadel eine Grösse kleiner, gilt das
-  Symbol dieser Grösse; fehlt es, bleibt das Schild leer. Siehe „Symbole“.
+  `medium`, `small` ohne. Fehlt es, bleibt das Schild leer. Siehe „Symbole“.
 - **Farbe:** Die Grafikkarte multipliziert das Feld mit `color`, ohne
   `color` `#D9443A`; das Alpha wirkt nicht. Sie rundet dabei, statt
   abzuschneiden wie die Webkarte; ein Kanal weicht so um höchstens eine
   Stufe ab, siehe
   [0007](entscheidungen/0007-toenung-auf-der-grafikkarte.md).
-- **Name** in der Schrift des Spiels, mittig 2 Einheiten unter dem Fuss,
-  nur in der Grundgrösse.
-- **Grösse** (`Ebenen.stufen`): massgebend ist p, wie viele Einheiten ein
-  Block breit ist. Ab p = 1/2 steht die Nadel in ihrer Grundgrösse, ab
-  1/8 eine kleiner, ab 1/32 zwei kleiner, darunter gar nicht. Kleiner als
-  `small` fällt sie weg.
-- **Minimap:** p ist der Zoom, also mindestens 1; die Nadeln stehen
-  immer in ihrer Grundgrösse. Gezeichnet wird eine Nadel, deren Fuss auf
+- **Name** immer, in der Kartenschrift mit 12 Einheiten je Geviert, also
+  Grossbuchstaben rund 8 hoch, wie die Webkarte (`Ebenen.name`). Das
+  Format sagt: unter dem Fuss, Kartenschrift, feste Grösse, siehe
+  [Ebenen](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/ebenen.md)
+  und
+  [0097](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entscheidungen/0097-banner-feste-groesse-tafel-beim-zeigen.md). Er steht mittig in einem Kasten direkt unter
+  dem Fuss, 17 Einheiten hoch (Zeilenhöhe 1,4), mit 3 Einheiten Rand zur
+  Seite. Die Grossbuchstaben stehen mittig im Kasten. Farben der UI wie auf
+  der Webkarte: Grund weiss mit Alpha 0,8, Schrift schwarz, ohne Kontur.
+- **Grösse:** fest, auf jeder Stufe gleich, die Nadel in ihrer `size`, in
+  Einheiten der Oberfläche des Mods wie die Wegpunkte, siehe
+  [0097](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entscheidungen/0097-banner-feste-groesse-tafel-beim-zeigen.md).
+  Bis zur Version 0.2.7 wurde sie beim Hinauszoomen kleiner und fiel
+  zuletzt weg.
+- **Minimap:** Gezeichnet wird eine Nadel, deren Fuss auf
   der sichtbaren Karte liegt, mit Rahmen innerhalb seiner Bänder, auch
   gedreht (`Minimap.marke`). Die Nadeln kommen nach Karte und Linien und
   vor Ring und Rahmen: Was am Rand über sie ragt, decken diese. Schild und
   Name bleiben im Quadrat der Minimap. Rund steht ein Schild am Rand so
   auch in den Ecken des Quadrats ausserhalb des Kreises; so ist es gewollt,
   sonst verschwände eine Stadt am Rand.
-- **Vollbildkarte:** p ist der Abstand der Chunklinien durch 16
-  (`Kartenblick.chunkAbstand`), der Fuss auf dem Raster der Kacheln wie
-  die Wegpunkte. Gezeichnet wird, was den Schirm berührt: das Schild 12
-  Einheiten zur Seite und 33 nach oben, der Name 11 nach unten und halb so
-  weit zur Seite, wie er breit ist.
-- **Reihenfolge:** unter Wegpunkten, Mitspielern und dem eigenen Kopf; die
-  Ebenen nach `order`, die höhere oben, bei Gleichstand die kleinere `id`
-  oben; in einer Ebene in der Reihenfolge der Objekte.
+- **Vollbildkarte:** der Fuss auf dem Raster der Kacheln wie die
+  Wegpunkte. Gezeichnet wird, was den Schirm berühren kann: 16 Einheiten
+  zur Seite und 64 nach oben, so viel wie das grösste Banner, der Name 17
+  nach unten und halb so weit zur Seite, wie sein Kasten breit ist.
+- **Reihenfolge:** über allen Formen und aller Kartenschrift jeder Ebene,
+  unter Wegpunkten, Mitspielern und dem eigenen Kopf; die Ebenen nach
+  `order`, die höhere oben, bei Gleichstand die kleinere `id` oben; in
+  einer Ebene in der Reihenfolge der Objekte.
 - **An oder aus:** siehe „Umschalten“.
-- **Text:** Namen von Ebenen und Nadeln setzt der Mod als schlichten Text;
+- **Text:** Namen von Ebenen, Nadeln und Bannern setzt der Mod als schlichten Text;
   Codes mit `§` streicht er.
+
+## Banner
+
+Ein Ort als Bild (`banner`), etwa eine Stadt mit dem Banner ihrer Nation
+(`Ebenen.Banner`).
+
+- **Gelesen** wie eine Nadel: `at`, `dimension`, `name` bis 64 Zeichen.
+  `image` ist ein Feld wie bei den Symbolen, `images/<Name>.png` oder
+  `.webp`. Ohne gültiges Feld fällt das Banner weg, und das Log nennt es,
+  wie das Format verlangt: einmal je Ebene und `version`, zusammen mit
+  den verworfenen Formen. `y` braucht der Mod
+  nicht.
+- **Nadeln und Banner** zählen zusammen, höchstens 1000 je Ebene, wie im
+  Format; sie stehen in einer Liste in der Reihenfolge der Objekte
+  (`Ebenen.Ort`).
+- **Bild** vom Server wie ein Symbol, siehe „Symbole“, aber höchstens
+  32 × 64 Pixel statt genau einer Seite (`Symbole.banner`).
+- **Gezeichnet** Pixel auf Pixel in der Grösse des Bilds, in Einheiten der
+  Oberfläche, nie skaliert, auf jeder Stufe gleich. Der Fuss liegt in der
+  Mitte der Unterkante, ⌊Breite / 2⌋ rechts der linken Kante, wie bei der
+  Nadel. Darunter der Name wie bei der Nadel. Solange das Bild lädt oder
+  wenn es fehlt, fehlt das Banner samt Namen.
+- **Minimap, Vollbildkarte, Reihenfolge:** wie die Nadeln, siehe dort.
+
+![Nadeln in drei Grössen und ein Banner mit ihren Namen in der Kartenschrift auf der Minimap; Szene `orte` des Gametests](bilder/orte.png)
+
+![Dieselben Orte auf der Vollbildkarte, in derselben Grösse](bilder/orte-karte.png)
 
 ## Symbole
 
@@ -131,14 +165,18 @@ die Nachrichten das Plugin:
   anderes holt der Mod nicht.
 - **Geholt** erst, wenn eine Nadel es zeichnet, in einem eigenen Thread,
   einmal je Ebene, Feld, Seite und `version`, höchstens 200 je Ebene wie
-  die Bilder im Format. Eine neue `version` gibt alle Symbole der Ebene
+  die Bilder im Format; die Bilder der Banner zählen mit. Über alle Ebenen
+  höchstens 1000 (`Symbole.MAX_BILDER_GESAMT`), entschieden vom Reviewer,
+  siehe „Grenzen“. Eine neue `version` gibt alle Symbole der Ebene
   frei und holt neu, denn unter gleichem Namen kann ein Bild neu sein.
 - **Geprüft** wie der Download der Karte, siehe [Download](download.md),
   „Sicherheit“: die Adresse gegen das Heimnetz, keine Weiterleitung, kein
   Proxy, ohne Token. Höchstens 256 KiB, Header und Körper zusammen in
   höchstens 10 s, über denselben Weg wie die Kacheln (`Laden.sende`).
-  PNG oder WebP nur als einfaches `VP8L`, genau in seiner Grösse
-  (`Symbole.hole`). Ein Fehler steht im Log, das Schild bleibt leer.
+  PNG oder WebP nur als einfaches `VP8L`, genau in seiner Grösse, ein
+  Banner höchstens 32 × 64, geprüft am Kopf vor dem Dekodieren
+  (`Symbole.hole`). Ein Fehler steht im Log, das Schild bleibt leer, das
+  Banner fehlt.
 - **Freigegeben** wird ein Symbol, wenn seine Ebene eine neue `version`
   bekommt oder aus der Liste fällt, und alle beim Trennen, bei einem neuen
   Login und mit einer neuen Adresse. Danach fragt ein Auftrag für sie, der
@@ -257,7 +295,7 @@ in der Schrift IM Fell English SC (`Formen.glyphen`, `Formen.texte`).
   Zeichen als schlichter Text in NFC, `path` 1 bis 64 Punkte. `size` ist
   die Höhe der Grossbuchstaben in Blöcken, Vorgabe 16. `spacing` ist der
   Abstand zwischen den Zeichen in Anteilen davon, Vorgabe 0, gekappt auf 0
-  bis 2. `color` Vorgabe `#2B2B2B`, mit Alpha. `font` übergeht der Mod; es
+  bis 1 wie im Format. `color` Vorgabe `#2B2B2B`, mit Alpha. `font` übergeht der Mod; es
   gibt nur `map`. `kern` kennt der Mod nicht.
 - **Wo das Format schweigt, wie die Webkarte,** so hat es der Reviewer
   entschieden: `size` 0 oder ungültig heisst 16; eine `outline`, die kein
@@ -305,7 +343,10 @@ in der Schrift IM Fell English SC (`Formen.glyphen`, `Formen.texte`).
   gleich, hängt der Mod sie nur wieder an. Lädt das Spiel seine
   Ressourcen neu (F3+T, andere Pakete), baut jede Ansicht neu
   (`Formen.neuGeladen`, nach den Schriften des Spiels): Die Texte halten
-  Glyphen der alten Schrift.
+  Glyphen der alten Schrift. Ebenso, wenn „Unicode-Schrift erzwingen“ oder
+  die japanischen Glyphen wechseln: Das Spiel tauscht dann die Schriften in
+  `FontManager.updateOptions`, ohne neu zu laden (per javap;
+  `FontManagerMixin`).
 - **Budget:** Ein Neubau legt höchstens 20 000 Zeichen samt den Kopien
   der Kontur (`Formen.MAX_ZEICHEN`). Eine Schrift geht ganz ab oder gar
   nicht: Passt sie nicht mehr ganz, fehlt sie, und keine Kontur steht
@@ -334,14 +375,16 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 | Was | Höchstens | Darüber |
 |---|---|---|
 | Ebenen | 64 | die übrigen fehlen, das Log nennt es |
-| Nadeln je Ebene | 1000 | die Sammlung ist verworfen, die alte Ebene bleibt |
+| Nadeln und Banner je Ebene | 1000, wie im Format | die Sammlung ist verworfen, die alte Ebene bleibt |
 | Teile je Ebene | 256; für 4 MiB braucht ein Plugin rund 130 | der Teil gilt nicht |
 | Nachricht | 1 MiB | verworfen, siehe [Download](download.md), „Kanal“ |
-| Name einer Nadel oder Ebene | 64 Zeichen | der Name fehlt |
+| Name einer Nadel, eines Banners oder einer Ebene | 64 Zeichen | der Name fehlt |
 | Kennung, `version`, Dimension | 129 Zeichen | Nachricht oder Nadel gilt nicht |
 | Feld eines Symbols | 76 Zeichen | das Symbol fehlt |
-| Symbole je Ebene | 200 | die übrigen fehlen, das Log nennt es |
+| Bilder je Ebene (Symbole und Banner) | 200, wie im Format | die übrigen fehlen, das Log nennt es |
+| Bilder über alle Ebenen | 1000 | die übrigen fehlen, das Log nennt es |
 | Bild eines Symbols | 256 KiB, 10 s | das Symbol fehlt |
+| Bild eines Banners | 32 × 64 Pixel, 256 KiB, 10 s | das Banner fehlt |
 | Objekte je Ebene | 10 000, wie im Format | die Sammlung ist verworfen |
 | Punkte je Form, über alle Ringe | 10 000, wie im Format | die Form fehlt |
 | Löcher je Polygon | 100, wie im Format | die Form fehlt |
@@ -354,7 +397,7 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 | Breite eines Rands, Strich, Lücke | 64, 1000, 1000 Einheiten | gekappt |
 | Text einer Kartenschrift | 64 Zeichen, wie im Format | die Schrift fehlt |
 | Punkte im Pfad einer Kartenschrift | 64, wie im Format | die Schrift fehlt |
-| Sperrung einer Kartenschrift | 2 | gekappt |
+| Sperrung einer Kartenschrift | 1, wie im Format | gekappt |
 | Breite der Kontur einer Kartenschrift | 64 Einheiten und 0,12 der Höhe der Grossbuchstaben | gekappt |
 | Grösse einer Kartenschrift | 100 000 Blöcke | die Schrift fehlt |
 | Zeichen der Kartenschrift je Neubau, samt Kontur | 20 000 | eine Schrift, die nicht mehr ganz passt, fehlt |
@@ -363,18 +406,21 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 | Ecken je Neubau der Formen | 1 000 000 | der Rest fehlt |
 
 - **Speicher:** Halbe Sammlungen gibt es höchstens eine je Ebene der
-  Liste, also 64, mit je höchstens 1000 Nadeln. Symbole höchstens 200 je
-  Ebene, also 12 800 Texturen, je 1 KiB im Speicher und auf der
-  Grafikkarte, weil die `DynamicTexture` ihr Bild behält; zusammen rund
-  25 MiB.
+  Liste, also 64, mit je höchstens 1000 Nadeln. Ein Bild hat im Speicher
+  4 Byte je Pixel, ein Symbol bis 1 KiB, ein Banner bis 8 KiB, einmal im
+  Speicher und einmal auf der Grafikkarte, weil die `DynamicTexture` ihr
+  Bild behält. 200 je Ebene über 64 Ebenen wären bis 12 800 Banner, rund
+  100 MiB und noch einmal so viel auf der Grafikkarte; darum höchstens
+  1000 Bilder über alle Ebenen, also bis rund 8 MiB und 8 MiB.
 - **Speicher der Formen:** je Punkt 16 Byte, je Trapez 48 Byte, mit
   höchstens 3 Trapezen je Punkt und 16 je Fläche rund 200 Byte je Punkt.
   Über alle Ebenen höchstens 500 000 Punkte, rund 100 MB; während eine
   neue `version` kommt, liegen alte und neue Sammlung kurz nebeneinander,
   rund 200 MB. Ein Plugin für Claims braucht ein Vielfaches weniger. Eine
   Kartenschrift braucht mit Text und Pfad rund 250 bis 280 Byte.
-- **Kosten:** Je Frame geht der Mod alle Nadeln der sichtbaren Ebenen
-  durch, im schlimmsten Fall 64 000. Ein Raster nach Regionen kommt erst,
+- **Kosten:** Je Frame geht der Mod alle Nadeln und Banner der sichtbaren
+  Ebenen durch, im schlimmsten Fall 64 000, und zeichnet die Namen der
+  sichtbaren auf jeder Stufe, je einen Text und einen Kasten. Ein Raster nach Regionen kommt erst,
   wenn eine Messung es verlangt. Die Formen rechnet er nur bei einer
   neuen Ansicht neu, siehe „Flächen, Kreise und Linien“. Der schlimmste
   Neubau legt 1 000 000 Ecken, das Budget; geprüft geht er alle sichtbaren
@@ -391,5 +437,3 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 
 - **Infotafel** beim Zeigen und Anklicken.
 - **Anheften** an Regionen (#36).
-- **Banner** (`banner`) und Nadeln in fester Grösse, nach
-  [0097](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entscheidungen/0097-banner-feste-groesse-tafel-beim-zeigen.md).
