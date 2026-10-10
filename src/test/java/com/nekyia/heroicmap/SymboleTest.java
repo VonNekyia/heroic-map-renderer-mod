@@ -92,7 +92,11 @@ class SymboleTest {
     }
 
     private static byte[] png(int seite) throws IOException {
-        BufferedImage bild = new BufferedImage(seite, seite, BufferedImage.TYPE_INT_ARGB);
+        return png(seite, seite);
+    }
+
+    private static byte[] png(int breite, int hoehe) throws IOException {
+        BufferedImage bild = new BufferedImage(breite, hoehe, BufferedImage.TYPE_INT_ARGB);
         bild.setRGB(0, 0, 0xFF123456);
         ByteArrayOutputStream aus = new ByteArrayOutputStream();
         ImageIO.write(bild, "png", aus);
@@ -139,6 +143,27 @@ class SymboleTest {
         assertNull(Symbole.uri(b, "Beispiel:staedte", "images/burg.png"));
         assertNull(Symbole.uri(b, "staedte", "images/burg.png"));
         assertNull(Symbole.uri(null, "beispiel:staedte", "images/burg.png"));
+    }
+
+    @Test
+    void bannerBisZurGrenze() throws IOException {
+        dateien.put(PFAD + "banner.png", png(22, 40));
+        dateien.put(PFAD + "voll.png", png(Symbole.BANNER_BREITE, Symbole.BANNER_HOEHE));
+        dateien.put(PFAD + "zu_breit.png", png(Symbole.BANNER_BREITE + 1, Symbole.BANNER_HOEHE));
+        InetAddress hier = InetAddress.getLoopbackAddress();
+        Kacheln.Bild b = holeBanner("banner.png", hier);
+        assertEquals(22, b.breite());
+        assertEquals(40, b.hoehe());
+        assertEquals(22 * 40, b.argb().length);
+        assertEquals(Symbole.BANNER_HOEHE, holeBanner("voll.png", hier).hoehe());
+        assertNull(holeBanner("zu_breit.png", hier));
+        // Ein Symbol bleibt genau so gross: 22 × 40 ist keins.
+        assertNull(hole("banner.png", hier, Symbole.FRIST));
+    }
+
+    private Kacheln.Bild holeBanner(String name, InetAddress spielserver) {
+        return Symbole.hole(Symbole.CLIENT, Symbole.uri(basis, "beispiel:staedte", "images/" + name), spielserver,
+                Symbole.BANNER_BREITE, Symbole.BANNER_HOEHE, true, Symbole.FRIST);
     }
 
     private Kacheln.Bild hole(String name, InetAddress spielserver, Duration frist) {

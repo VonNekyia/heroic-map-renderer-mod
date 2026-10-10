@@ -667,7 +667,8 @@ final class Ebenen {
 
     /**
      * Zeichnet den Ort mit dem Fuss bei (x, y), in Einheiten des GUI auf ganzen Pixeln, in fester
-     * Grösse, darunter den Namen. Siehe docs/ebenen.md, „Nadeln“ und „Banner“.
+     * Grösse, darunter den Namen. Siehe docs/ebenen.md, „Nadeln“,
+     * und docs/ebenen.md, „Banner“.
      */
     static void zeichne(GuiGraphicsExtractor g, Font font, float x, float y, Ort o) {
         Matrix3x2fStack pose = g.pose();

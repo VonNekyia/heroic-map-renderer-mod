@@ -673,10 +673,10 @@ public final class Minimap {
     }
 
     /**
-     * Die Nadeln der sichtbaren Ebenen in dieser Dimension, deren Fuss auf der sichtbaren Karte liegt,
-     * innerhalb der {@code baender} eines Rahmens; Schild und Name bleiben im Quadrat der Minimap.
-     * Ein Block ist hier {@code zoom} Einheiten breit, die Nadel also in ihrer Grundgrösse. Siehe
-     * docs/ebenen.md, „Nadeln“.
+     * Die Nadeln und Banner der sichtbaren Ebenen in dieser Dimension, deren Fuss auf der sichtbaren
+     * Karte liegt, innerhalb der {@code baender} eines Rahmens; Schild, Banner und Name bleiben im
+     * Quadrat der Minimap. Siehe docs/ebenen.md, „Nadeln“,
+     * und docs/ebenen.md, „Banner“.
      */
     private void nadeln(GuiGraphicsExtractor g, Font font, Rahmen r, String dimension, int links, int oben, int k, Drehung.Lage lage,
             int baender) {

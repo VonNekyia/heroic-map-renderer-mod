@@ -1,6 +1,6 @@
 ---
 title: Ebenen
-description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Symbol und Namen auf Minimap und Vollbildkarte zeichnet, kleiner beim Hinauszoomen, die Symbole vom Server holt, Flächen, Kreise und Linien flach zeichnet, Kartenschrift entlang ihres Pfads, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
+description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Symbol und Namen und ihre Banner auf Minimap und Vollbildkarte zeichnet, in fester Grösse, Symbole und Bilder vom Server holt, Flächen, Kreise und Linien flach zeichnet, Kartenschrift entlang ihres Pfads, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Ebenen.java
   - src/main/java/com/nekyia/heroicmap/EbenenMenue.java
@@ -85,38 +85,57 @@ die Nachrichten das Plugin:
 - **Symbol** über dem gefärbten Feld und unter dem Rahmen, Pixel auf
   Pixel, die linke obere Ecke bei (⌊(Breite − Seite) / 2⌋, 3) im Bild des
   Schilds: `symbol.large` 16 × 16 in `large`, `symbol.medium` 9 × 9 in
-  `medium`, `small` ohne. Steht die Nadel eine Grösse kleiner, gilt das
-  Symbol dieser Grösse; fehlt es, bleibt das Schild leer. Siehe „Symbole“.
+  `medium`, `small` ohne. Fehlt es, bleibt das Schild leer. Siehe „Symbole“.
 - **Farbe:** Die Grafikkarte multipliziert das Feld mit `color`, ohne
   `color` `#D9443A`; das Alpha wirkt nicht. Sie rundet dabei, statt
   abzuschneiden wie die Webkarte; ein Kanal weicht so um höchstens eine
   Stufe ab, siehe
   [0007](entscheidungen/0007-toenung-auf-der-grafikkarte.md).
 - **Name** in der Schrift des Spiels, mittig 2 Einheiten unter dem Fuss,
-  nur in der Grundgrösse.
-- **Grösse** (`Ebenen.stufen`): massgebend ist p, wie viele Einheiten ein
-  Block breit ist. Ab p = 1/2 steht die Nadel in ihrer Grundgrösse, ab
-  1/8 eine kleiner, ab 1/32 zwei kleiner, darunter gar nicht. Kleiner als
-  `small` fällt sie weg.
-- **Minimap:** p ist der Zoom, also mindestens 1; die Nadeln stehen
-  immer in ihrer Grundgrösse. Gezeichnet wird eine Nadel, deren Fuss auf
+  immer.
+- **Grösse:** fest, auf jeder Stufe gleich, die Nadel in ihrer `size`, in
+  Einheiten der Oberfläche des Mods wie die Wegpunkte, siehe
+  [0097](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entscheidungen/0097-banner-feste-groesse-tafel-beim-zeigen.md).
+  Bis zur Version 0.2.7 wurde sie beim Hinauszoomen kleiner und fiel
+  zuletzt weg.
+- **Minimap:** Gezeichnet wird eine Nadel, deren Fuss auf
   der sichtbaren Karte liegt, mit Rahmen innerhalb seiner Bänder, auch
   gedreht (`Minimap.marke`). Die Nadeln kommen nach Karte und Linien und
   vor Ring und Rahmen: Was am Rand über sie ragt, decken diese. Schild und
   Name bleiben im Quadrat der Minimap. Rund steht ein Schild am Rand so
   auch in den Ecken des Quadrats ausserhalb des Kreises; so ist es gewollt,
   sonst verschwände eine Stadt am Rand.
-- **Vollbildkarte:** p ist der Abstand der Chunklinien durch 16
-  (`Kartenblick.chunkAbstand`), der Fuss auf dem Raster der Kacheln wie
-  die Wegpunkte. Gezeichnet wird, was den Schirm berührt: das Schild 12
-  Einheiten zur Seite und 33 nach oben, der Name 11 nach unten und halb so
-  weit zur Seite, wie er breit ist.
+- **Vollbildkarte:** der Fuss auf dem Raster der Kacheln wie die
+  Wegpunkte. Gezeichnet wird, was den Schirm berühren kann: 16 Einheiten
+  zur Seite und 64 nach oben, so viel wie das grösste Banner, der Name 11
+  nach unten und halb so weit zur Seite, wie er breit ist.
 - **Reihenfolge:** unter Wegpunkten, Mitspielern und dem eigenen Kopf; die
   Ebenen nach `order`, die höhere oben, bei Gleichstand die kleinere `id`
   oben; in einer Ebene in der Reihenfolge der Objekte.
 - **An oder aus:** siehe „Umschalten“.
 - **Text:** Namen von Ebenen und Nadeln setzt der Mod als schlichten Text;
   Codes mit `§` streicht er.
+
+## Banner
+
+Ein Ort als Bild (`banner`), etwa eine Stadt mit dem Banner ihrer Nation
+(`Ebenen.Banner`).
+
+- **Gelesen** wie eine Nadel: `at`, `dimension`, `name` bis 64 Zeichen.
+  `image` ist ein Feld wie bei den Symbolen, `images/<Name>.png` oder
+  `.webp`; ohne gültiges Feld fällt das Banner weg. `y` braucht der Mod
+  nicht.
+- **Nadeln und Banner** zählen zusammen, höchstens 1000 je Ebene, wie im
+  Format; sie stehen in einer Liste in der Reihenfolge der Objekte
+  (`Ebenen.Ort`).
+- **Bild** vom Server wie ein Symbol, siehe „Symbole“, aber höchstens
+  32 × 64 Pixel statt genau einer Seite (`Symbole.banner`).
+- **Gezeichnet** Pixel auf Pixel in der Grösse des Bilds, in Einheiten der
+  Oberfläche, nie skaliert, auf jeder Stufe gleich. Der Fuss liegt in der
+  Mitte der Unterkante, ⌊Breite / 2⌋ rechts der linken Kante, wie bei der
+  Nadel. Darunter der Name wie bei der Nadel. Solange das Bild lädt oder
+  wenn es fehlt, fehlt das Banner samt Namen.
+- **Minimap, Vollbildkarte, Reihenfolge:** wie die Nadeln, siehe dort.
 
 ## Symbole
 
@@ -130,14 +149,16 @@ die Nachrichten das Plugin:
   anderes holt der Mod nicht.
 - **Geholt** erst, wenn eine Nadel es zeichnet, in einem eigenen Thread,
   einmal je Ebene, Feld, Seite und `version`, höchstens 200 je Ebene wie
-  die Bilder im Format. Eine neue `version` gibt alle Symbole der Ebene
+  die Bilder im Format; die Bilder der Banner zählen mit. Eine neue `version` gibt alle Symbole der Ebene
   frei und holt neu, denn unter gleichem Namen kann ein Bild neu sein.
 - **Geprüft** wie der Download der Karte, siehe [Download](download.md),
   „Sicherheit“: die Adresse gegen das Heimnetz, keine Weiterleitung, kein
   Proxy, ohne Token. Höchstens 256 KiB, Header und Körper zusammen in
   höchstens 10 s, über denselben Weg wie die Kacheln (`Laden.sende`).
-  PNG oder WebP nur als einfaches `VP8L`, genau in seiner Grösse
-  (`Symbole.hole`). Ein Fehler steht im Log, das Schild bleibt leer.
+  PNG oder WebP nur als einfaches `VP8L`, genau in seiner Grösse, ein
+  Banner höchstens 32 × 64, geprüft am Kopf vor dem Dekodieren
+  (`Symbole.hole`). Ein Fehler steht im Log, das Schild bleibt leer, das
+  Banner fehlt.
 - **Freigegeben** wird ein Symbol, wenn seine Ebene eine neue `version`
   bekommt oder aus der Liste fällt, und alle beim Trennen, bei einem neuen
   Login und mit einer neuen Adresse. Danach fragt ein Auftrag für sie, der
@@ -297,7 +318,7 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 | Was | Höchstens | Darüber |
 |---|---|---|
 | Ebenen | 64 | die übrigen fehlen, das Log nennt es |
-| Nadeln je Ebene | 1000 | die Sammlung ist verworfen, die alte Ebene bleibt |
+| Nadeln und Banner je Ebene | 1000, wie im Format | die Sammlung ist verworfen, die alte Ebene bleibt |
 | Teile je Ebene | 256; für 4 MiB braucht ein Plugin rund 130 | der Teil gilt nicht |
 | Nachricht | 1 MiB | verworfen, siehe [Download](download.md), „Kanal“ |
 | Name einer Nadel oder Ebene | 64 Zeichen | der Name fehlt |
@@ -305,6 +326,7 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 | Feld eines Symbols | 76 Zeichen | das Symbol fehlt |
 | Symbole je Ebene | 200 | die übrigen fehlen, das Log nennt es |
 | Bild eines Symbols | 256 KiB, 10 s | das Symbol fehlt |
+| Bild eines Banners | 32 × 64 Pixel, 256 KiB, 10 s | das Banner fehlt |
 | Objekte je Ebene | 10 000, wie im Format | die Sammlung ist verworfen |
 | Punkte je Form, über alle Ringe | 10 000, wie im Format | die Form fehlt |
 | Löcher je Polygon | 100, wie im Format | die Form fehlt |
@@ -345,5 +367,3 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 
 - **Infotafel** beim Zeigen und Anklicken.
 - **Anheften** an Regionen (#36).
-- **Banner** (`banner`) und Nadeln in fester Grösse, nach
-  [0097](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entscheidungen/0097-banner-feste-groesse-tafel-beim-zeigen.md).
