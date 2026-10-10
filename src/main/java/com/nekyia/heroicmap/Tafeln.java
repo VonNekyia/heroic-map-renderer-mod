@@ -5,23 +5,25 @@ import com.google.gson.JsonParser;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
-import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
- * Die Tafeln vom Plugin: je Objekt und {@code version} einmal über den Kanal gefragt, höchstens
- * {@link #MAX} behalten; eine neue {@code version} einer Ebene leert ihre Tafeln. Siehe
- * docs/ebenen.md, „Infotafel“.
+ * Die Tafeln vom Plugin: je Objekt und {@code version} über den Kanal gefragt, ohne Antwort nach
+ * {@link #WARTEN_MS} einmal neu, höchstens {@link #MAX} behalten; eine neue {@code version} einer
+ * Ebene leert ihre Tafeln. Siehe docs/ebenen.md, „Infotafel“.
  */
 final class Tafeln {
 
-    static final Tafeln INSTANZ = new Tafeln(Kanal::frageTafel);
+    /** Wie der Mod fragt; true, wenn die Frage hinausging. Nur der Gametest setzt einen anderen. */
+    static Predicate<Ziel> fragen = Kanal::frageTafel;
+    static final Tafeln INSTANZ = new Tafeln(z -> fragen.test(z));
     /** So viele Tafeln behält der Mod, wie mit dem Plugin vereinbart; so viele Fragen merkt er sich höchstens. */
     static final int MAX = 256, MAX_GEFRAGT = 1024;
+    /** So lange wartet der Mod auf eine Antwort, bevor er einmal neu fragt, und danach noch einmal, bevor er aufgibt. */
+    static final long WARTEN_MS = 5000;
 
     /** Ein Objekt einer Ebene in einer {@code version}. */
     record Ziel(String ebene, String version, String id) {
@@ -42,48 +44,75 @@ final class Tafeln {
                 if (ebene == null || version == null || id == null) {
                     return null;
                 }
-                return new Antwort(new Ziel(ebene, version, id), json.has("panel") ? Tafel.lies(json.getAsJsonObject("panel")) : null);
+                return new Antwort(new Ziel(ebene, version, id), json.has("panel") ? panel(json) : null);
+            } catch (RuntimeException e) {
+                return null;
+            }
+        }
+
+        /** Ein unlesbares {@code panel} oder eins ohne gültige Bausteine heisst: ohne Tafel. */
+        private static Tafel panel(JsonObject json) {
+            try {
+                Tafel t = Tafel.lies(json.getAsJsonObject("panel"));
+                return t.bausteine().isEmpty() ? null : t;
             } catch (RuntimeException e) {
                 return null;
             }
         }
     }
 
-    private final Consumer<Ziel> frage;
+    /** Eine offene Frage: wann sie zuletzt hinausging und wie oft. */
+    private record Frage(long seit, int mal) {
+    }
+
+    private final Predicate<Ziel> frage;
     private final Map<Ziel, Optional<Tafel>> tafeln = new LinkedHashMap<>(16, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<Ziel, Optional<Tafel>> aelteste) {
             return size() > MAX;
         }
     };
-    private final Set<Ziel> gefragt = new LinkedHashSet<>();
+    private final Map<Ziel, Frage> gefragt = new LinkedHashMap<>();
     private final Map<String, String> versionen = new HashMap<>();
 
-    Tafeln(Consumer<Ziel> frage) {
+    Tafeln(Predicate<Ziel> frage) {
         this.frage = frage;
     }
 
     /**
      * Die Tafel des Ziels: leer, wenn es keine hat; null, solange die Antwort aussteht. Beim ersten
-     * Mal fragt sie das Plugin.
+     * Mal fragt sie das Plugin, nach {@link #WARTEN_MS} ohne Antwort einmal neu. Bleibt auch die
+     * zweite ohne Antwort oder geht keine Frage hinaus, weil der Server den Kanal nicht hört, gilt
+     * das Ziel als ohne Tafel.
      */
-    Optional<Tafel> tafel(Ziel z) {
+    Optional<Tafel> tafel(Ziel z, long ms) {
         neueVersion(z);
         Optional<Tafel> t = tafeln.get(z);
-        if (t == null && gefragt.add(z)) {
+        if (t != null) {
+            return t;
+        }
+        Frage f = gefragt.get(z);
+        if (f != null && ms - f.seit() < WARTEN_MS) {
+            return null;
+        }
+        if ((f == null || f.mal() < 2) && frage.test(z)) {
+            gefragt.remove(z);
+            gefragt.put(z, new Frage(ms, f == null ? 1 : 2));
             if (gefragt.size() > MAX_GEFRAGT) {
-                Iterator<Ziel> aelteste = gefragt.iterator();
+                Iterator<Ziel> aelteste = gefragt.keySet().iterator();
                 aelteste.next();
                 aelteste.remove();
             }
-            frage.accept(z);
+            return null;
         }
-        return t;
+        gefragt.remove(z);
+        tafeln.put(z, Optional.empty());
+        return Optional.empty();
     }
 
     /** Eine Antwort; nur auf eine Frage, die noch offen ist. */
     void antwort(Antwort a) {
-        if (gefragt.remove(a.ziel())) {
+        if (gefragt.remove(a.ziel()) != null) {
             neueVersion(a.ziel());
             tafeln.put(a.ziel(), Optional.ofNullable(a.tafel()));
         }
@@ -93,7 +122,7 @@ final class Tafeln {
         String alt = versionen.put(z.ebene(), z.version());
         if (alt != null && !alt.equals(z.version())) {
             tafeln.keySet().removeIf(k -> k.ebene().equals(z.ebene()));
-            gefragt.removeIf(k -> k.ebene().equals(z.ebene()) && !k.version().equals(z.version()));
+            gefragt.keySet().removeIf(k -> k.ebene().equals(z.ebene()) && !k.version().equals(z.version()));
         }
     }
 
@@ -139,12 +168,14 @@ final class Tafeln {
     /**
      * Wann die Vollbildkarte eine Tafel zeigt: Ruht der Zeiger {@link #RUHE_MS} auf einem Ziel, geht
      * seine auf. Verlässt er Ziel und Tafel, geht sie nach {@link #NACHLAUF_MS} zu. Ein Klick auf das
-     * Ziel hält sie, bis zum Knopf, Escape oder einem Klick daneben.
+     * Ziel hält sie, bis zum Knopf, Escape oder einem Klick daneben. Von Hand geschlossen, öffnet sie
+     * erst wieder, wenn der Zeiger ein anderes Ziel berührt hat.
      */
     static final class Zeigen {
 
         static final long RUHE_MS = 150, NACHLAUF_MS = 300;
-        private Ziel unter, offen;
+        /** Das Ziel unter dem Zeiger, das offene und das unter dem Zeiger, als die Tafel von Hand zuging. */
+        private Ziel unter, offen, gesperrt;
         private long seit, weg = -1;
         private boolean gehalten;
 
@@ -153,6 +184,7 @@ final class Tafeln {
             if (!Objects.equals(z, unter)) {
                 unter = z;
                 seit = ms;
+                gesperrt = null;
             }
             if (offen != null && !gehalten) {
                 if (ueberTafel || offen.equals(z)) {
@@ -164,7 +196,7 @@ final class Tafeln {
                     weg = -1;
                 }
             }
-            if (z != null && !gehalten && !ueberTafel && !z.equals(offen) && ms - seit >= RUHE_MS) {
+            if (z != null && !gehalten && !ueberTafel && !z.equals(offen) && !z.equals(gesperrt) && ms - seit >= RUHE_MS) {
                 offen = z;
                 weg = -1;
             }
@@ -177,13 +209,31 @@ final class Tafeln {
             weg = -1;
         }
 
-        /** Schliesst die Tafel; true, wenn eine offen war. So schliessen Escape und ein Klick daneben zuerst nur sie. */
+        /**
+         * Schliesst die Tafel; true, wenn eine offen war. So schliessen Escape und ein Klick daneben zuerst
+         * nur sie. Das Ziel unter dem Zeiger öffnet sie nicht gleich wieder.
+         */
         boolean schliesse() {
             boolean war = offen != null;
             offen = null;
+            gesperrt = unter;
             gehalten = false;
             weg = -1;
             return war;
+        }
+
+        /** Die Antwort zur offenen Tafel, null, solange sie aussteht: Gibt es keine, geht sie zu, auch gehalten. */
+        void antwort(Optional<Tafel> t) {
+            if (offen != null && t != null && t.isEmpty()) {
+                schliesse();
+            }
+        }
+
+        /** Die Antwort zur offenen Tafel, null, solange sie aussteht: Gibt es keine, geht sie zu, auch gehalten. */
+        void antwort(Optional<Tafel> t) {
+            if (offen != null && t != null && t.isEmpty()) {
+                schliesse();
+            }
         }
 
         Ziel offen() {

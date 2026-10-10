@@ -22,37 +22,36 @@ class TafelnTest {
         List<Tafeln.Ziel> gefragt = new ArrayList<>();
         Tafeln t = new Tafeln(gefragt::add);
         Tafeln.Ziel stadt = new Tafeln.Ziel("b:staedte", "v1", "stadt-17");
-        assertNull(t.tafel(stadt));
-        assertNull(t.tafel(stadt));
+        assertNull(t.tafel(stadt, 0));
+        assertNull(t.tafel(stadt, 10));
         assertEquals(List.of(stadt), gefragt);
         t.antwort(new Tafeln.Antwort(stadt, TAFEL));
-        assertEquals(Optional.of(TAFEL), t.tafel(stadt));
+        assertEquals(Optional.of(TAFEL), t.tafel(stadt, 20));
         // Ohne panel: gemerkt als keine Tafel, nicht wieder gefragt.
         Tafeln.Ziel ohne = new Tafeln.Ziel("b:staedte", "v1", "dorf");
-        t.tafel(ohne);
+        t.tafel(ohne, 0);
         t.antwort(new Tafeln.Antwort(ohne, null));
-        assertEquals(Optional.empty(), t.tafel(ohne));
+        assertEquals(Optional.empty(), t.tafel(ohne, 20));
         assertEquals(2, gefragt.size());
         // Eine Antwort, um die der Mod nicht bat, gilt nicht.
         Tafeln.Ziel fremd = new Tafeln.Ziel("b:staedte", "v1", "fremd");
         t.antwort(new Tafeln.Antwort(fremd, TAFEL));
-        assertNull(t.tafel(fremd));
+        assertNull(t.tafel(fremd, 0));
     }
 
     @Test
     void neueVersionLeertUndHoechstens256() {
-        Tafeln t = new Tafeln(z -> {
-        });
+        Tafeln t = new Tafeln(z -> true);
         for (int i = 0; i < Tafeln.MAX + 10; i++) {
             Tafeln.Ziel z = new Tafeln.Ziel("b:staedte", "v1", "s" + i);
-            t.tafel(z);
+            t.tafel(z, 0);
             t.antwort(new Tafeln.Antwort(z, TAFEL));
         }
         assertEquals(Tafeln.MAX, t.behalten());
         // Eine neue version der Ebene leert ihre Tafeln; eine späte Antwort der alten gilt nicht mehr.
         Tafeln.Ziel alt = new Tafeln.Ziel("b:staedte", "v1", "spaet");
-        t.tafel(alt);
-        t.tafel(new Tafeln.Ziel("b:staedte", "v2", "s1"));
+        t.tafel(alt, 0);
+        t.tafel(new Tafeln.Ziel("b:staedte", "v2", "s1"), 0);
         assertEquals(0, t.behalten());
         t.antwort(new Tafeln.Antwort(alt, TAFEL));
         assertEquals(0, t.behalten());
@@ -81,6 +80,82 @@ class TafelnTest {
         assertEquals(a, z.offen());
         assertTrue(z.schliesse());
         assertFalse(z.schliesse());
+    }
+
+    @Test
+    void zweiteFrageNachFuenfSekundenDannOhneTafel() {
+        List<Tafeln.Ziel> gefragt = new ArrayList<>();
+        Tafeln t = new Tafeln(gefragt::add);
+        Tafeln.Ziel z = new Tafeln.Ziel("b:e", "v", "a");
+        assertNull(t.tafel(z, 0));
+        assertNull(t.tafel(z, Tafeln.WARTEN_MS - 1));
+        assertEquals(1, gefragt.size());
+        // Nach 5 s ohne Antwort einmal neu, dann noch einmal 5 s „lädt …“.
+        assertNull(t.tafel(z, Tafeln.WARTEN_MS));
+        assertEquals(2, gefragt.size());
+        assertNull(t.tafel(z, 2 * Tafeln.WARTEN_MS - 1));
+        // Bleibt auch die zweite ohne Antwort, gilt das Ziel als ohne Tafel; eine späte Antwort ändert das nicht.
+        assertEquals(Optional.empty(), t.tafel(z, 2 * Tafeln.WARTEN_MS));
+        t.antwort(new Tafeln.Antwort(z, TAFEL));
+        assertEquals(Optional.empty(), t.tafel(z, 3 * Tafeln.WARTEN_MS));
+        assertEquals(2, gefragt.size());
+    }
+
+    @Test
+    void ohneKanalGleichOhneTafel() {
+        // Geht die Frage nicht hinaus, merkt der Mod sie nicht; eine Antwort darauf gilt nicht.
+        Tafeln t = new Tafeln(z -> false);
+        Tafeln.Ziel z = new Tafeln.Ziel("b:e", "v", "a");
+        assertEquals(Optional.empty(), t.tafel(z, 0));
+        t.antwort(new Tafeln.Antwort(z, TAFEL));
+        assertEquals(Optional.empty(), t.tafel(z, 1));
+    }
+
+    @Test
+    void escapeOeffnetSieNichtGleichWieder() {
+        Tafeln.Zeigen z = new Tafeln.Zeigen();
+        Tafeln.Ziel a = new Tafeln.Ziel("b:e", "v", "a"), b = new Tafeln.Ziel("b:e", "v", "b");
+        z.zeiger(a, false, 0);
+        z.zeiger(a, false, Tafeln.Zeigen.RUHE_MS);
+        assertEquals(a, z.offen());
+        // Von Hand geschlossen, mit dem Zeiger weiter auf a: Sie bleibt zu, so schliesst der zweite Escape die Karte.
+        assertTrue(z.schliesse());
+        z.zeiger(a, false, 1000);
+        z.zeiger(a, false, 5000);
+        assertNull(z.offen());
+        assertFalse(z.schliesse());
+        // Erst nach einem anderen Ziel öffnet a wieder.
+        z.zeiger(b, false, 6000);
+        z.zeiger(a, false, 6010);
+        z.zeiger(a, false, 6010 + Tafeln.Zeigen.RUHE_MS);
+        assertEquals(a, z.offen());
+    }
+
+    @Test
+    void keineTafelSchliesstAuchGehalten() {
+        // Gehalten ohne Tafel hielte sie sonst jede andere auf.
+        Tafeln.Zeigen z = new Tafeln.Zeigen();
+        Tafeln.Ziel a = new Tafeln.Ziel("b:e", "v", "a"), b = new Tafeln.Ziel("b:e", "v", "b");
+        z.halte(a);
+        z.antwort(null);
+        assertEquals(a, z.offen());
+        z.antwort(Optional.empty());
+        assertNull(z.offen());
+        assertFalse(z.gehalten());
+        z.zeiger(b, false, 0);
+        z.zeiger(b, false, Tafeln.Zeigen.RUHE_MS);
+        assertEquals(b, z.offen());
+    }
+
+    @Test
+    void panelUnlesbarOderLeerHeisstOhneTafel() {
+        String kopf = "{\"v\":1,\"typ\":\"tafel\",\"ebene\":\"b:e\",\"version\":\"v\",\"id\":\"a\",\"panel\":";
+        // Ohne blocks, blocks kein Feld, nur unbekannte Bausteine: eine Antwort, ohne Tafel.
+        for (String panel : new String[] {"{}", "{\"blocks\":5}", "{\"blocks\":[{\"type\":\"unbekannt\"}]}", "7"}) {
+            Tafeln.Antwort a = Tafeln.Antwort.lies(kopf + panel + "}");
+            assertEquals(new Tafeln.Ziel("b:e", "v", "a"), a.ziel(), panel);
+            assertNull(a.tafel(), panel);
+        }
     }
 
     @Test

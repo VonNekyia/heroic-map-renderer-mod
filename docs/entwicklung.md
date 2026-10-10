@@ -156,6 +156,8 @@ Schrift, mittig auf ein Quadrat gesetzt.
 - **Doku:** `pruefe-doku.sh` vom Branch `master` des Hauptrepositorys,
   dieselbe Prüfung wie dort. Der Schritt läuft mit `shell: bash`, also mit
   `pipefail`: Scheitert der Download, wird der Job rot.
+  Danach sucht er Konfliktmarken eines Merges (`<<<<<<<`, `>>>>>>>` am
+  Anfang einer Zeile) in allen Dateien; eine heisst rot.
 
 ## Doku prüfen
 

@@ -332,6 +332,57 @@ class SymboleTest {
     }
 
     @Test
+    void tafelbilderEigenesBudget() throws Exception {
+        // Je 512 × 512, also 1 MiB: 16 passen in 16 MiB, das 17. gibt das am längsten nicht gezeigte frei.
+        byte[] gross = png(Tafel.MAX_BILD);
+        for (int i = 0; i < 17; i++) {
+            dateien.put(PFAD + "t" + i + ".png", gross);
+        }
+        Aufbau a = aufbau();
+        Symbole s = a.symbole();
+        // Die Deckel der Symbole und Banner gelten nicht: 200 Symbole voll, Tafelbilder kommen trotzdem.
+        for (int i = 0; i < Symbole.MAX_BILDER; i++) {
+            s.symbol("beispiel:staedte", "v1", "images/b" + i + ".png", 16);
+        }
+        s.warte();
+        // Je Bild warten: Die Ablage läuft im Test auf dem Thread des Holers, nie neben einer neuen Frage.
+        for (int i = 0; i < 16; i++) {
+            s.tafelBild("beispiel:staedte", "v1", "images/t" + i + ".png", Tafel.MAX_BILD, Tafel.MAX_BILD);
+            s.warte();
+        }
+        assertEquals(16, a.abgelegt().size());
+        assertEquals(List.of(), a.frei());
+        // t0 gerade gezeigt; t1 ist jetzt das älteste und geht frei, sobald t16 da ist.
+        assertNotNull(s.tafelBild("beispiel:staedte", "v1", "images/t0.png", Tafel.MAX_BILD, Tafel.MAX_BILD));
+        s.tafelBild("beispiel:staedte", "v1", "images/t16.png", Tafel.MAX_BILD, Tafel.MAX_BILD);
+        s.warte();
+        assertEquals(List.of(a.abgelegt().get(1)), a.frei());
+        // Beim Leeren gehen alle übrigen frei.
+        s.leeren();
+        assertEquals(17, a.frei().size());
+    }
+
+    @Test
+    void tafelbildVerkleinertGeglaettet() throws Exception {
+        // 4 × 2, links schwarz, rechts weiss: auf 2 × 1 links schwarz, rechts weiss; auf 1 × 1 Grau.
+        int[] argb = {0xFF000000, 0xFF000000, 0xFFFFFFFF, 0xFFFFFFFF, 0xFF000000, 0xFF000000, 0xFFFFFFFF, 0xFFFFFFFF};
+        Kacheln.Bild b = new Kacheln.Bild(4, 2, argb);
+        Kacheln.Bild halb = Symbole.verkleinert(b, 2, 1);
+        assertEquals(0xFF000000, halb.argb()[0]);
+        assertEquals(0xFFFFFFFF, halb.argb()[1]);
+        int grau = Symbole.verkleinert(b, 1, 1).argb()[0];
+        assertTrue((grau & 0xFF) > 0x60 && (grau & 0xFF) < 0xA0, Integer.toHexString(grau));
+        // Über den Server: 32 × 32 auf der Tafel 16 × 16 kommt als 16 × 16.
+        dateien.put(PFAD + "gross.png", png(32));
+        Symbole s = aufbau().symbole();
+        s.tafelBild("beispiel:staedte", "v1", "images/gross.png", 16, 16);
+        s.warte();
+        Symbole.Textur t = s.tafelBild("beispiel:staedte", "v1", "images/gross.png", 16, 16);
+        assertEquals(16, t.breite());
+        assertEquals(16, t.hoehe());
+    }
+
+    @Test
     void nachNeuerVersionKeineAnfrageFuerDieAlte() throws Exception {
         Symbole s = aufbau().symbole();
         // Die erste Anfrage hält den Thread, ein Feld der alten version wartet dahinter.

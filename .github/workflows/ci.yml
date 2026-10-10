@@ -39,3 +39,9 @@ jobs:
         timeout-minutes: 5
         shell: bash
         run: curl -fsSL https://raw.githubusercontent.com/VonNekyia/heroic-map-renderer/master/.github/pruefe-doku.sh | bash
+
+      # Ein Merge, dessen Konflikt nicht gelöst ist, lässt Marken stehen; keine Datei darf eine tragen.
+      - name: Keine Konfliktmarken
+        timeout-minutes: 5
+        shell: bash
+        run: "! git grep -nE '^(<<<<<<<|>>>>>>>)( |$)' -- ."

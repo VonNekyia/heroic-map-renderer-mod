@@ -621,6 +621,40 @@ class EbenenTest {
     }
 
     @Test
+    void versionDerDatenBisDieNeueGanzDaIst() {
+        // Die Liste nennt v2, gezeichnet wird noch v1: Tafel und Bilder fragen mit v1, sonst wechselten sie je Frame.
+        Ebenen e = new Ebenen();
+        liste(e, eintrag("b:staedte", "v1"));
+        assertNull(e.version("b:staedte"));
+        teil(e, "b:staedte", "v1", 1, 1, nadel("alt", 1));
+        liste(e, eintrag("b:staedte", "v2"));
+        teil(e, "b:staedte", "v2", 1, 2, nadel("neu1", 1));
+        assertEquals("v1", e.version("b:staedte"));
+        assertEquals("v1", e.nadeln("b:staedte").getFirst().version());
+        teil(e, "b:staedte", "v2", 2, 2, nadel("neu2", 2));
+        assertEquals("v2", e.version("b:staedte"));
+        assertEquals("v2", e.nadeln("b:staedte").getFirst().version());
+        // Fällt die Ebene aus der Liste, ist auch ihre version weg.
+        liste(e, eintrag("b:andere", "v1"));
+        assertNull(e.version("b:staedte"));
+    }
+
+    @Test
+    void kastenOhneHolenEnthaeltDenGenauen() {
+        // Zum Wegschneiden und als Vorprüfung beim Treffer: Jedes Banner bis 32 × 64 liegt im groben Kasten.
+        Ebenen.Banner b = new Ebenen.Banner(0, 0, Ebenen.UEBERWELT, "x", "images/b.png", "b:e", "v", "id");
+        for (float name : new float[] {0, 10, 80}) {
+            float[] grob = Ebenen.grob(b, name);
+            for (int w = 1; w <= Symbole.BANNER_BREITE; w++) {
+                for (int h = 1; h <= Symbole.BANNER_HOEHE; h++) {
+                    float[] k = Ebenen.kasten(w, h, name);
+                    assertTrue(grob[0] <= k[0] && grob[1] <= k[1] && grob[2] >= k[2] && grob[3] >= k[3], w + " × " + h);
+                }
+            }
+        }
+    }
+
+    @Test
     void kastenWieGezeichnet() {
         // Ungerade Breite: links ⌊21 / 2⌋ wie beim Zeichnen, also -10 bis 11, nicht ±10,5.
         assertArrayEquals(new float[] {-10, -40, 11, 0}, Ebenen.kasten(21, 40, 0));

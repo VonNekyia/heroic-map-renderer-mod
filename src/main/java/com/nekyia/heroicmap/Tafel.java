@@ -19,10 +19,16 @@ record Tafel(List<Baustein> bausteine) {
     static final int MAX_ZEILEN = 64, MAX_REIHEN = 20;
     /** Die Schrift der Tafel, hell auf allen Fassungen, denn die Fläche ist überall dunkel. */
     static final int SCHRIFT = 0xFFD9D9D9;
-    /** In Einheiten des GUI: Breite des Inhalts höchstens, Innenabstand, Abstand zwischen Bausteinen und vor einem Abschnitt. */
+    /**
+     * In Einheiten des GUI: Breite des Inhalts höchstens, Innenabstand, Abstand zwischen Bausteinen und vor einem Abschnitt.
+     * Siehe docs/entscheidungen/0010-tafel-200-einheiten.md.
+     */
     static final int BREITE = 200, INNEN = 6, ABSTAND = 4, VOR_ABSCHNITT = 6;
-    /** Wertung: das Label links, die Punkte quadratisch mit einer Einheit Lücke. */
-    static final int LABEL = 70, PUNKT = 5;
+    /**
+     * Wertung: die Spalte der Labels so breit wie das breiteste und eine Lücke, höchstens {@code LABEL};
+     * die Punkte quadratisch mit einer Einheit Lücke.
+     */
+    static final int LABEL = 80, LUECKE = 4, PUNKT = 5;
 
     sealed interface Baustein permits Titel, Zeilen, Bild, Abschnitt, Wertung, Spalten {
     }
@@ -158,6 +164,15 @@ record Tafel(List<Baustein> bausteine) {
         List<String> umbruch(String text, int breite, boolean fett);
 
         int zeile();
+
+        /** Der Text, so weit er in {@code breite} passt. */
+        default String kuerze(String text, int breite, boolean fett) {
+            String t = text;
+            while (!t.isEmpty() && breite(t, fett) > breite) {
+                t = t.substring(0, t.length() - 1);
+            }
+            return t;
+        }
     }
 
     /** Ein Stück der gesetzten Tafel, relativ zur linken oberen Ecke des Inhalts. */
@@ -210,16 +225,17 @@ record Tafel(List<Baustein> bausteine) {
                 case Abschnitt a -> {
                     int z = a.kopfBild() != null ? bild(a.kopfBild(), x, y, b, aus)
                             : a.kopfText() != null ? text(a.kopfText(), SCHRIFT, true, x, y, b, m, aus) : y;
-                    yield a.inhalt().isEmpty() ? z : setze(a.inhalt(), x, z + ABSTAND, b, m, aus);
+                    // Ohne Überschrift kein Abstand vor dem Inhalt.
+                    yield a.inhalt().isEmpty() ? z : setze(a.inhalt(), x, z == y ? z : z + ABSTAND, b, m, aus);
                 }
                 case Wertung w -> {
-                    int z = y;
+                    int z = y, spalte = spalte(w, m);
                     for (Reihe r : w.reihen()) {
-                        aus.add(new Text(x, z, r.name(), SCHRIFT, false));
+                        aus.add(new Text(x, z, m.kuerze(r.name(), spalte - LUECKE, false), SCHRIFT, false));
                         for (int i = 0; i < r.max(); i++) {
                             // Die Punkte über dem Wert in der Farbe zu 25 % deckend.
                             int farbe = i < r.wert() ? r.farbe() : (r.farbe() & 0x00FFFFFF) | 0x40000000;
-                            aus.add(new Punkt(x + LABEL + i * (PUNKT + 1), z + (m.zeile() - PUNKT) / 2, PUNKT, farbe));
+                            aus.add(new Punkt(x + spalte + i * (PUNKT + 1), z + (m.zeile() - PUNKT) / 2, PUNKT, farbe));
                         }
                         z += m.zeile();
                     }
@@ -255,6 +271,11 @@ record Tafel(List<Baustein> bausteine) {
         return y + h;
     }
 
+    /** Die Spalte der Labels einer Wertung: das breiteste Label und die Lücke, höchstens {@link #LABEL}. */
+    private static int spalte(Wertung w, Masse m) {
+        return Math.min(w.reihen().stream().mapToInt(r -> m.breite(r.name(), false)).max().orElse(0) + LUECKE, LABEL);
+    }
+
     /** Wie breit ein Baustein ohne Umbruch wäre. */
     private static int natuerlich(Baustein b, Masse m) {
         return switch (b) {
@@ -263,7 +284,7 @@ record Tafel(List<Baustein> bausteine) {
             case Bild bild -> bild.breite();
             case Abschnitt a -> Math.max(a.kopfBild() != null ? a.kopfBild().breite() : a.kopfText() != null ? m.breite(a.kopfText(), true) : 0,
                     a.inhalt().stream().mapToInt(i -> natuerlich(i, m)).max().orElse(0));
-            case Wertung w -> w.reihen().stream().mapToInt(r -> LABEL + r.max() * (PUNKT + 1)).max().orElse(0);
+            case Wertung w -> spalte(w, m) + w.reihen().stream().mapToInt(r -> r.max() * (PUNKT + 1)).max().orElse(0);
             case Spalten s -> s.links().stream().mapToInt(i -> natuerlich(i, m)).max().orElse(0) + ABSTAND
                     + s.rechts().stream().mapToInt(i -> natuerlich(i, m)).max().orElse(0);
         };

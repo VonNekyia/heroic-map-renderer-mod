@@ -127,6 +127,29 @@ class TafelTest {
     }
 
     @Test
+    void wertungSpalteNachDemBreitestenLabel() {
+        // Masse im Test: 6 je Zeichen. „Wehr“ und „Handel“: Spalte 36 + 4, die Punkte dahinter.
+        Tafel.Satz s = Tafel.setze(lies("{\"type\":\"rating\",\"rows\":[{\"label\":\"Wehr\",\"value\":1,\"max\":3},"
+                + "{\"label\":\"Handel\",\"value\":2,\"max\":3}]}"), MASSE);
+        Tafel.Punkt erster = (Tafel.Punkt) s.stuecke().stream().filter(x -> x instanceof Tafel.Punkt).findFirst().orElseThrow();
+        assertEquals(6 * 6 + Tafel.LUECKE, erster.x());
+        // Ein langes Label: Spalte höchstens LABEL, das Label abgeschnitten, so läuft es nicht in die Punkte.
+        Tafel.Satz lang = Tafel.setze(lies("{\"type\":\"rating\",\"rows\":[{\"label\":\"" + "x".repeat(40)
+                + "\",\"value\":1,\"max\":3}]}"), MASSE);
+        Tafel.Text label = (Tafel.Text) lang.stuecke().getFirst();
+        Tafel.Punkt punkt = (Tafel.Punkt) lang.stuecke().get(1);
+        assertEquals(Tafel.LABEL, punkt.x());
+        assertTrue(MASSE.breite(label.text(), false) <= Tafel.LABEL - Tafel.LUECKE);
+        assertTrue(label.text().length() < 40);
+    }
+
+    @Test
+    void abschnittOhneUeberschriftOhneAbstand() {
+        Tafel.Satz s = Tafel.setze(lies("{\"type\":\"section\",\"blocks\":[{\"type\":\"title\",\"text\":\"A\"}]}"), MASSE);
+        assertEquals(0, ((Tafel.Text) s.stuecke().getFirst()).y());
+    }
+
+    @Test
     void ohneBausteine() {
         Tafel t = lies("");
         assertEquals(0, t.bausteine().size());

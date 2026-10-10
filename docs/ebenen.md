@@ -7,12 +7,9 @@ code:
   - src/main/java/com/nekyia/heroicmap/Symbole.java
   - src/main/java/com/nekyia/heroicmap/Formen.java
   - src/main/java/com/nekyia/heroicmap/Trapeze.java
-<<<<<<< HEAD
   - src/main/java/com/nekyia/heroicmap/Tafel.java
   - src/main/java/com/nekyia/heroicmap/Tafeln.java
-=======
   - src/main/java/com/nekyia/heroicmap/mixin/FontManagerMixin.java
->>>>>>> banner
   - src/main/resources/assets/heroicmap/font/karte.json
   - src/main/java/com/nekyia/heroicmap/Kartenblick.java
   - src/main/java/com/nekyia/heroicmap/Minimap.java
@@ -372,28 +369,50 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   `version` alt ist. Felder und Rechte stehen beim Plugin,
   [Ebenen](https://github.com/VonNekyia/heroic-map-renderer-plugin/blob/main/docs/ebenen.md),
   „Tafeln“.
-  - Der Mod fragt erst, wenn die Tafel aufgehen soll, und je Objekt und
-    `version` einmal, auch wenn keine Antwort kommt.
+  - Der Mod fragt erst, wenn die Tafel aufgehen soll, je Objekt und
+    `version` der gezeichneten Daten, nicht der Liste, die schon eine
+    neuere nennen kann (`Ebenen.version`, `Ort.version`).
+  - Er merkt eine Frage erst, wenn sie hinausging. Hört der Server den
+    Kanal nicht, gilt das Objekt gleich als ohne Tafel.
+  - Kommt nach 5 s keine Antwort, fragt er einmal neu; bleibt auch die
+    ohne Antwort, gilt das Objekt nach weiteren 5 s als ohne Tafel, so
+    hat es der Reviewer entschieden. Solange er wartet, steht eine kleine
+    Tafel „lädt …“.
   - Er behält höchstens 256 Tafeln, die zuletzt gezeigten; eine Antwort
-    ohne `panel` merkt er sich als „keine Tafel“.
+    ohne `panel`, mit einem unlesbaren oder einem ohne gültige Bausteine
+    merkt er sich als „keine Tafel“.
   - Eine neue `version` einer Ebene leert ihre Tafeln.
   - Eine Antwort, um die er nicht bat, gilt nicht.
   - Gelesen auf dem Thread des Netzes wie die Teile (`Tafeln.Antwort`).
 - **Ziel** (`Karte.tafelUnter`): oben liegen Nadeln und Banner, die
   spätere über der früheren, gemessen am Kasten von Bild und Name, wie
   gezeichnet, mit dem Fuss auf ganzen Pixeln (`Ebenen.kasten`), wie die
-  Webkarte. Erst prüft der Mod die Lage, dann misst er den Namen und holt
-  das Bild eines Banners; so lädt er keine Banner ausserhalb. Sonst
+  Webkarte. Erst prüft der Mod den Kasten ohne Holen, mit der grössten
+  Grösse eines Banners (`Ebenen.kastenOhneHolen`), dann den genauen, der
+  das Bild eines Banners holt; so lädt er kein Banner, das der Zeiger
+  nicht berühren kann. Denselben Kasten ohne Holen nimmt das
+  Wegschneiden beim Zeichnen. Sonst
   die oberste Fläche nach gerade/ungerade oder der oberste Kreis
   (`Tafeln.trifft`). Ein Objekt braucht eine `id`. Linien und Schrift
   haben keine Tafel.
 - **Zeigen** (`Tafeln.Zeigen`): Ruht der Zeiger 150 ms auf dem Ziel, geht
-  die Tafel auf, neben der Stelle, ganz auf dem Schirm. Verlässt er Ziel
-  und Tafel, geht sie nach 300 ms zu; dazwischen kann er in die Tafel
-  wandern. Ein Klick ohne Zug auf das Ziel hält sie offen, bis zum Knopf ×
-  oben rechts, Escape oder einem Klick daneben. Escape und ein Klick
-  daneben schliessen zuerst nur die Tafel; erst der nächste wirkt auf die
-  Karte. Ein Klick in die Tafel wirkt nie auf die Karte.
+  die Tafel auf. Verlässt er Ziel und Tafel, geht sie nach 300 ms zu;
+  dazwischen kann er in die Tafel wandern. Beim Ziehen der Karte geht
+  keine auf.
+- **Lage:** wie die Tooltips des Spiels rechts unter der Stelle, an der
+  sie aufging; ist dort kein Platz, links von ihr oder über ihr, so
+  rutscht sie nicht unter den Zeiger. Ganz auf dem Schirm.
+- **Halten:** Ein Klick ohne Zug auf das Ziel oder in die Tafel hält sie
+  offen, bis zum Knopf ×, Escape oder einem Klick daneben. Ein Klick auf
+  ein anderes Ziel schliesst sie und hält dessen Tafel. Escape und ein
+  Klick daneben schliessen zuerst nur die Tafel; erst der nächste wirkt
+  auf die Karte. Von Hand geschlossen, öffnet sie erst wieder, wenn der
+  Zeiger ein anderes Ziel berührt hat; so schliesst der zweite Escape die
+  Karte, auch mit dem Zeiger auf dem Ziel. Ein Klick in die Tafel und ein
+  Zug, der in ihr beginnt, wirken nie auf die Karte, ebenso der Druck,
+  der eine gehaltene Tafel schliesst.
+- **Zu** geht sie auch, wenn ihr Objekt keine Tafel hat, auch gehalten,
+  und wenn ihre Ebene nicht mehr gezeichnet wird oder neue Daten hat.
 - **Gelesen** (`Tafel.lies`): die Bausteine des Formats, `title`, `lines`,
   `image`, `section`, `rating` und `columns`; unbekannte fallen weg.
   Höchstens 64 Bausteine, zwei Ebenen tief: `columns` und `section` nur
@@ -402,21 +421,35 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   Reihen je Wertung. Texte schlicht, Codes mit `§` gestrichen.
 - **Gesetzt** (`Tafel.setze`) in Einheiten der Oberfläche, mit der Schrift
   des Spiels in ihrer Grösse: Der Inhalt ist so breit wie sein breitester
-  Baustein, höchstens 200 Einheiten; 6 Innenabstand, 4 zwischen
-  Bausteinen, 6 vor einem Abschnitt. Titel fett, Zeilen umbrochen. Bilder
-  in ihrer Grösse, breiter als der Inhalt mit gleichem Seitenverhältnis
-  verkleinert, nie vergrössert; ohne Bild steht `alt`. Wertungen mit dem
-  Label links in 70 Einheiten, die Punkte 5 gross, die über dem Wert in der
-  Farbe zu 25 % deckend. Spalten oben bündig, die rechte so breit wie ihr
-  Inhalt, höchstens die Hälfte.
+  Baustein, höchstens 200 Einheiten, und nicht 320 wie auf der Webkarte;
+  6 Innenabstand, 4 zwischen Bausteinen, 6 vor einem Abschnitt, siehe
+  [0010](entscheidungen/0010-tafel-200-einheiten.md). Rechts eine eigene
+  Spalte von 8 Einheiten für den Knopf ×. Titel fett, Zeilen umbrochen.
+  Ein Abschnitt ohne Überschrift beginnt ohne Abstand. Bilder in ihrer
+  Grösse, breiter als der Inhalt mit gleichem Seitenverhältnis
+  verkleinert; ohne Bild steht `alt`, umbrochen. Wertungen mit dem Label
+  links in einer Spalte so breit wie das breiteste und 4 Lücke, höchstens
+  80; ein längeres Label ist abgeschnitten. Die Punkte 5 gross, die über
+  dem Wert in der Farbe zu 25 % deckend. Spalten oben bündig, die rechte
+  so breit wie ihr Inhalt, höchstens die Hälfte.
+- **Gespeichert:** der Satz der offenen Tafel, bis sich Tafel,
+  GUI-Massstab oder Schrift ändern; das Ziel unter dem Zeiger sucht der
+  Mod nur neu, wenn sich Zeiger, Ansicht, Ebenen oder Schrift ändern.
 - **Gezeichnet** über allem auf der Karte, unter dem Menü der rechten
   Taste. Der Grund ist der 9-Slice des Rahmens der Minimap,
   `rahmen/<skin>/tafel.png`, 16 × 16 mit 5 Rand; „ohne“ und „biom“ nehmen
   den schlichten unter `rahmen/ohne/`. Die Schrift ist hell, `#D9D9D9`,
-  denn die Fläche ist überall dunkel. Höher als der Schirm, scrollt das
-  Mausrad über der Tafel sie statt die Karte zu zoomen.
+  denn die Fläche ist überall dunkel. Der Knopf × steht beim Zeigen blass,
+  gehalten hell. Höher als der Schirm, scrollt das Mausrad über der Tafel
+  sie; passt sie, zoomt es die Karte.
 - **Bilder** holt der Mod wie die Symbole, siehe „Symbole“, höchstens
-  512 × 512 (`Symbole.tafelBild`).
+  512 × 512 (`Symbole.tafelBild`), mit eigenem Budget: höchstens 16 MiB
+  an Pixeln und 1024 Einträge, darüber gibt er die am längsten nicht
+  gezeigten frei; so hat es der Reviewer entschieden. Die Deckel der
+  Symbole und Banner gelten für sie nicht. Grösser als auf der Tafel
+  verkleinert der Mod ein Bild vorab im eigenen Thread geglättet auf
+  genau ihre Grösse; kleiner vergrössert er es um einen ganzen Faktor,
+  gerundet, wie bei den Bannern.
 
 ![Die Tafel der Nadel „Nordhafen“ beim Zeigen; Szene `orte` des Gametests](bilder/tafel-zeigen.png)
 
@@ -452,6 +485,11 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 | Feld eines Symbols | 76 Zeichen | das Symbol fehlt |
 | Bilder je Ebene (Symbole und Banner) | 200, wie im Format | die übrigen fehlen, das Log nennt es |
 | Bilder über alle Ebenen | 1000 | die übrigen fehlen, das Log nennt es |
+| Tafeln, die der Mod behält | 256 | die am längsten nicht gezeigte fällt weg |
+| Bild einer Tafel | 512 × 512 Pixel, 256 KiB, 10 s | `alt` steht statt seiner |
+| Bilder der Tafeln | 16 MiB an Pixeln, 1024 Einträge | die am längsten nicht gezeigten gehen frei |
+| Bausteine einer Tafel | 64, wie im Format | die übrigen fehlen |
+| Zeilen je Baustein, Reihen je Wertung | 64, 20 | die übrigen fehlen |
 | Bild eines Symbols | 256 KiB, 10 s | das Symbol fehlt |
 | Bild eines Banners | 32 × 64 Pixel, 256 KiB, 10 s | das Banner fehlt |
 | Objekte je Ebene | 10 000, wie im Format | die Sammlung ist verworfen |
@@ -480,7 +518,8 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
   Speicher und einmal auf der Grafikkarte, weil die `DynamicTexture` ihr
   Bild behält. 200 je Ebene über 64 Ebenen wären bis 12 800 Banner, rund
   100 MiB und noch einmal so viel auf der Grafikkarte; darum höchstens
-  1000 Bilder über alle Ebenen, also bis rund 8 MiB und 8 MiB.
+  1000 Bilder über alle Ebenen, also bis rund 8 MiB und 8 MiB. Dazu die
+  Bilder der Tafeln mit eigenem Budget, bis 16 MiB und 16 MiB.
 - **Speicher der Formen:** je Punkt 16 Byte, je Trapez 48 Byte, mit
   höchstens 3 Trapezen je Punkt und 16 je Fläche rund 200 Byte je Punkt.
   Über alle Ebenen höchstens 500 000 Punkte, rund 100 MB; während eine
@@ -489,7 +528,10 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
   Kartenschrift braucht mit Text und Pfad rund 250 bis 280 Byte.
 - **Kosten:** Je Frame geht der Mod alle Nadeln und Banner der sichtbaren
   Ebenen durch, im schlimmsten Fall 64 000, und zeichnet die Namen der
-  sichtbaren auf jeder Stufe, je einen Text und einen Kasten. Ein Raster nach Regionen kommt erst,
+  sichtbaren auf jeder Stufe, je einen Text und einen Kasten. Das Ziel
+  unter dem Zeiger sucht die Vollbildkarte nur nach einer Änderung von
+  Zeiger, Ansicht, Ebenen oder Schrift, über alle Nadeln, Banner und
+  Formen der sichtbaren Ebenen; den Satz einer Tafel rechnet sie einmal. Ein Raster nach Regionen kommt erst,
   wenn eine Messung es verlangt. Die Formen rechnet er nur bei einer
   neuen Ansicht neu, siehe „Flächen, Kreise und Linien“. Der schlimmste
   Neubau legt 1 000 000 Ecken, das Budget; geprüft geht er alle sichtbaren

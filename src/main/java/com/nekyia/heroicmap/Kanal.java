@@ -90,11 +90,13 @@ record Kanal(String json, Ebenen.Teil teil, Tafeln.Antwort tafel) implements Cus
         return json.toString();
     }
 
-    /** Fragt die Tafel eines Objekts, wenn der Server den Kanal hört. Siehe docs/ebenen.md, „Infotafel“. */
-    static void frageTafel(Tafeln.Ziel z) {
-        if (offen()) {
-            ClientPlayNetworking.send(new Kanal(tafel(z)));
+    /** Fragt die Tafel eines Objekts, wenn der Server den Kanal hört; true, wenn die Frage hinausging. Siehe docs/ebenen.md, „Infotafel“. */
+    static boolean frageTafel(Tafeln.Ziel z) {
+        if (!offen()) {
+            return false;
         }
+        ClientPlayNetworking.send(new Kanal(tafel(z)));
+        return true;
     }
 
     /** Die Frage {@code tafel}: Ebene, version und Kennung des Objekts. */

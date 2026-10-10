@@ -100,6 +100,9 @@ final class Ebenen {
 
         /** Die Kennung in der Ebene, für die Tafel; null ohne. */
         String id();
+
+        /** Die {@code version} der Daten, aus denen der Ort kommt. */
+        String version();
     }
 
     /**
@@ -204,6 +207,10 @@ final class Ebenen {
     }
 
     private List<Eintrag> liste = List.of();
+    /** Je Ebene die {@code version} der Daten, die gezeichnet werden; die Liste kann schon eine neuere nennen. */
+    private final Map<String, String> versionen = new HashMap<>();
+    /** Zählt jede Änderung an Liste, Daten oder Wahl; die Vollbildkarte sucht ihr Ziel nur danach neu. */
+    private int stand;
     private final Map<String, List<Ort>> nadeln = new HashMap<>();
     private final Map<String, List<Form>> formen = new HashMap<>();
     /** Die Punkte der fertigen Formen je Ebene. */
@@ -250,6 +257,8 @@ final class Ebenen {
         // Oben liegt, was später gezeichnet wird: aufsteigend nach order, bei Gleichstand nach id absteigend.
         neu.sort(Comparator.comparingInt(Eintrag::order).thenComparing(Eintrag::id, Comparator.reverseOrder()));
         liste = List.copyOf(neu);
+        stand++;
+        versionen.keySet().retainAll(liste.stream().map(Eintrag::id).toList());
         nadeln.keySet().retainAll(liste.stream().map(Eintrag::id).toList());
         formen.keySet().retainAll(liste.stream().map(Eintrag::id).toList());
         punkte.keySet().retainAll(liste.stream().map(Eintrag::id).toList());
@@ -293,6 +302,8 @@ final class Ebenen {
                 LOGGER.warn("Heroic Map: Ebene {} ({}): {} Banner oder Formen ungültig, oder Formen ohne Füllung, weil zu aufwendig",
                         t.id(), t.version(), s.verworfen);
             }
+            versionen.put(t.id(), t.version());
+            stand++;
             nadeln.put(t.id(), s.teile.stream().flatMap(x -> x.nadeln().stream()).toList());
             formen.put(t.id(), s.teile.stream().flatMap(x -> x.formen().stream()).toList());
             punkte.put(t.id(), s.punkte);
@@ -632,6 +643,8 @@ final class Ebenen {
     /** Beim Trennen und bei einem neuen Login: Der Server schickt danach alles neu. */
     void leeren() {
         liste = List.of();
+        stand++;
+        versionen.clear();
         nadeln.clear();
         formen.clear();
         punkte.clear();
@@ -679,6 +692,7 @@ final class Ebenen {
     /** Schaltet eine Ebene an oder aus und schreibt die Wahl gleich. */
     void setze(String id, boolean an) {
         wahl.put(id, an);
+        stand++;
         if (datei == null) {
             return;
         }
@@ -692,6 +706,15 @@ final class Ebenen {
         } catch (IOException e) {
             LOGGER.warn("Heroic Map: {} nicht geschrieben", datei, e);
         }
+    }
+
+    /** Die {@code version} der Daten einer Ebene, die gezeichnet werden; null, solange keine ganz da ist. */
+    String version(String id) {
+        return versionen.get(id);
+    }
+
+    int stand() {
+        return stand;
     }
 
     /** Die Flächen, Kreise und Linien einer Ebene, die schon ganz da ist, sonst keine. */
@@ -744,6 +767,22 @@ final class Ebenen {
                 Symbole.Textur t = Symbole.INSTANZ.banner(b.ebene(), b.version(), b.bild());
                 yield t == null ? null : kasten(t.breite(), t.hoehe(), name);
             }
+        };
+    }
+
+    /**
+     * Wie {@link #kasten(Font, Ort)}, ohne das Bild eines Banners zu holen: mit der grössten Grösse eines
+     * Banners. Zum Wegschneiden und als Vorprüfung beim Treffer; der genaue Kasten liegt immer darin.
+     */
+    static float[] kastenOhneHolen(Font font, Ort o) {
+        return grob(o, o.name() == null ? 0 : nameBreite(font, o.name()));
+    }
+
+    /** Der grobe Kasten zu einem Namen, dessen Kasten {@code name} breit ist; siehe {@link #kastenOhneHolen}. */
+    static float[] grob(Ort o, float name) {
+        return switch (o) {
+            case Nadel n -> kasten(SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe(), name);
+            case Banner b -> kasten(Symbole.BANNER_BREITE, Symbole.BANNER_HOEHE, name);
         };
     }
 
