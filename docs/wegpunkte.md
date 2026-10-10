@@ -59,7 +59,11 @@ Wegpunkten“ (mod#79).
 - **Doppelklick auf ein Objekt vom Server:** Der erste Klick merkt sich
   beim Loslassen ohne Zug das Ziel unter der Maus (`Karte.letztesZiel`),
   eine Nadel, ein Banner, eine Fläche oder einen Kreis mit `id`; eine Nadel
-  geht vor, wie bei der Tafel. Der zweite heftet es an, wenn unter ihm
+  geht vor, wie bei der Tafel. Liegt dort eine eigene Form, merkt er sich
+  sie statt der Fläche oder des Kreises vom Server darunter
+  (`Karte.letzteEigene`), so wie sie über ihnen gezeichnet ist. Bis 0.2.17
+  ging die Fläche vom Server vor, und eine eigene Region in einem Land vom
+  Server liess sich nicht anheften. Der zweite heftet es an, wenn unter ihm
   dasselbe Ziel liegt; ein Knopf geht vor. Eine Tafel hält dabei keiner
   der Klicks, siehe [Ebenen](ebenen.md), „Infotafel“.
 - **Treffer:** eine halbe Kopfseite und eine Einheit um die Mitte der
@@ -136,6 +140,11 @@ Linie, drei und mehr eine Region, ein Vieleck in der Folge der Punkte.
   letzten mit der Maus, und unten links steht der Hinweis „Linksklick auf
   Wegpunkte: Punkt dazu, auf den ersten: Region; Rechtsklick: Form fertig;
   Esc bricht ab“.
+- **Keine Tafel,** solange die Form im Bau ist (`Karte.tafel`). Sonst ging
+  die Tafel einer Region vom Server dort auf, wo das Menü „Punkt
+  hinzufügen“ war, rechts unter ihm, lag über den nächsten Wegpunkten und
+  nahm deren Klick; so fügte ein Linksklick bis 0.2.17 auf einem Server
+  mit Ländern oft nichts an (Test des Users am 10.10.).
 - **Nicht dazu** kommt ein Punkt, der schon dabei ist, einer aus einer
   anderen Dimension oder einer über 64 (`Wegpunkte.MAX_PUNKTE_FORM`). Wer
   die Dimension wechselt, verliert die Form im Bau.
@@ -197,7 +206,7 @@ Welt kommen in eigenen PRs.
   einen Kreis vom Server, siehe „Bedienung“. Vom Server lässt sich nur
   anheften, was eine `id` hat; ohne `id` gibt es auch keine Tafel. Der
   erste Klick merkt sich die eigene Form unter der Maus
-  (`Karte.letzteEigene`), wenn dort nichts vom Server liegt.
+  (`Karte.letzteEigene`), wenn dort keine Nadel liegt, siehe „Bedienung“.
 - **Ganze Ebene:** Ein Doppelklick auf ihren Schalter in der Liste der
   Vollbildkarte heftet alles von ihr an oder löst es, siehe
   [Vollbildkarte](vollbildkarte.md), „Ebenen“ (mod#76).
@@ -307,11 +316,17 @@ Welt kommen in eigenen PRs.
   einer eigenen Region heften sie an. Dazu „Zum Spieler“, „Optionen …“ und
   zurück, und ein Wegpunkt, 2,5 s still gehalten, an der Maus verschoben,
   ein zweites Mal mit Escape abgebrochen (mod#75). Formen wie ein Spieler
-  (mod#79): fünf Wegpunkte über „Wegpunkt setzen“; auf dem ersten „Punkt
-  hinzufügen“, Linksklicks auf den zweiten, dritten und ersten schliessen
-  eine Region; „Punkt hinzufügen“, ein Linksklick und „Form fertig“ geben
-  eine Linie; ein Doppelklick in die Region heftet sie an, „Form löschen“
-  löscht sie.
+  (mod#79), über einer grossen Region vom Server mit Tafel, wie auf einem
+  Server mit Ländern, jeder Klick von Hand: in acht Schritten hinfahren,
+  ruhen, drücken, drei Ticks halten und eine halbe Einheit zittern,
+  loslassen (`Bedienung.spielerKlick`). Fünf Wegpunkte über „Wegpunkt
+  setzen“; auf dem ersten „Punkt hinzufügen“, die Tafel der Region geht
+  auf, wo das Menü war; Linksklicks auf den dritten, rechts unter dem
+  Menü, den zweiten und den ersten schliessen eine Region; „Punkt
+  hinzufügen“, ein Linksklick und „Form fertig“ geben eine Linie; ein
+  Doppelklick in die Region heftet sie an und nicht die Region vom Server;
+  ein Doppelklick von Hand auf einen Wegpunkt in ihr heftet ihn an, und
+  die Karte bleibt stehen; „Form löschen“ löscht die Region.
 - `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
   [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und

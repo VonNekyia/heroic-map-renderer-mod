@@ -802,11 +802,13 @@ final class Karte extends Screen {
             hinzu(m.punkt());
             return true;
         }
-        // Ein Klick ohne Zug auf ein Ziel ohne Marke merkt es für einen Doppelklick; eine Tafel hält er nicht.
+        // Ein Klick ohne Zug auf ein Ziel ohne Marke merkt es für einen Doppelklick; eine Tafel hält er nicht. Wie gezeichnet:
+        // Eine Nadel geht einer eigenen Form vor, eine eigene Form einer Fläche oder einem Kreis vom Server darunter.
         if (m == null && e.button() == InputConstants.MOUSE_BUTTON_LEFT && gezogen <= ZUG && ziel == null && blick != null
                 && !drin(tafelKasten, e.x(), e.y())) {
-            letztesZiel = tafelUnter(e.x(), e.y());
-            letzteEigene = letztesZiel == null ? eigeneUnter(e.x(), e.y()) : null;
+            Tafeln.Ziel nadel = nadelUnter(e.x(), e.y());
+            letzteEigene = nadel == null ? eigeneUnter(e.x(), e.y()) : null;
+            letztesZiel = nadel != null ? nadel : letzteEigene == null ? formUnter(e.x(), e.y()) : null;
         }
         if (m == null || e.button() != InputConstants.MOUSE_BUTTON_LEFT) {
             return knopf;
@@ -839,8 +841,13 @@ final class Karte extends Screen {
      */
     private void tafel(GuiGraphicsExtractor g, int mausX, int mausY) {
         long ms = Util.getMillis();
-        boolean ueber = drin(tafelKasten, mausX, mausY);
-        boolean frei = ziel == null && haengt == null && !ueber && !(taste && gezogen > ZUG) && getChildAt(mausX, mausY).isEmpty();
+        // Solange eine Form im Bau ist, geht keine Tafel auf: Sie ginge dort auf, wo das Menü war, und läge über
+        // den Wegpunkten, die der Spieler anklickt. Siehe docs/wegpunkte.md, „Formen aus Wegpunkten“.
+        if (zug != null && zeigen.offen() != null) {
+            zeigen.zu();
+        }
+        boolean ueber = zug == null && drin(tafelKasten, mausX, mausY);
+        boolean frei = ziel == null && zug == null && haengt == null && !ueber && !(taste && gezogen > ZUG) && getChildAt(mausX, mausY).isEmpty();
         zeigen.zeiger(frei ? zielUnter(mausX, mausY) : null, ueber, ms);
         if (zeigen.offen() != null && !Tafeln.gilt(Ebenen.INSTANZ, zeigen.offen())) {
             zeigen.zu();

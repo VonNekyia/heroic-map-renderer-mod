@@ -4,6 +4,11 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.18
+
+- **Adding waypoints to a shape works on servers with layers:** after "Add point", the info panel of a region under the waypoints no longer opens where the menu was and swallows the next clicks; no panels open while a shape is being built.
+- **Double-click your own region inside a region from the server** pins your region, not the one from the server.
+
 ## 0.2.17
 
 - **Layers on the full map:** a "Layers" button opens a list with a switch per layer from the server; the list stays open or closed as you left it.
