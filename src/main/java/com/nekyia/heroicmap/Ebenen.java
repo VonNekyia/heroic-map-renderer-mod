@@ -23,6 +23,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import org.joml.Matrix3x2fStack;
 import org.slf4j.Logger;
@@ -70,7 +71,10 @@ final class Ebenen {
     static final String UEBERWELT = "minecraft:overworld";
     /** Die Farbe des Schilds ohne {@code color}. */
     static final int FARBE = 0xFFD9443A;
-    private static final int TEXT = 0xFFFFFFFF;
+    /** Der Name unter dem Fuss: Kartenschrift mit 12 Einheiten je Geviert, Zeilenhöhe 1,4, 3 Einheiten Rand zur Seite. */
+    static final float NAME_GROESSE = 12, NAME_ZEILE = 1.4f * NAME_GROESSE, NAME_RAND = 3;
+    /** Die Farben der UI wie auf der Webkarte: Grund weiss mit Alpha 0,8, Schrift schwarz, ohne Kontur. */
+    private static final int NAME_GRUND = 0xCCFFFFFF, NAME_SCHRIFT = 0xFF000000;
     private static final Logger LOGGER = LoggerFactory.getLogger(HeroicMap.ID);
 
     /** Ein Eintrag der Liste; {@code order} höher liegt oben. */
@@ -710,7 +714,7 @@ final class Ebenen {
             }
         }
         if (o.name() != null) {
-            g.centeredText(font, o.name(), 0, 2, TEXT);
+            name(g, font, o.name());
         }
         pose.popMatrix();
     }
@@ -727,6 +731,29 @@ final class Ebenen {
                 yield t == null ? null : new int[] {t.breite(), t.hoehe()};
             }
         };
+    }
+
+    /** Wie breit der Kasten um den Namen ist, in Einheiten des GUI. */
+    static float nameBreite(Font font, String name) {
+        return font.width(Component.literal(name).withStyle(Formen.STIL)) * NAME_GROESSE / 16 + 2 * NAME_RAND;
+    }
+
+    /**
+     * Der Name im Kasten direkt unter dem Fuss, mittig, die Grossbuchstaben mittig im Kasten.
+     * Siehe docs/ebenen.md, „Nadeln“.
+     */
+    private static void name(GuiGraphicsExtractor g, Font font, String name) {
+        Component c = Component.literal(name).withStyle(Formen.STIL);
+        float m = NAME_GROESSE / 16, breite = font.width(c) * m;
+        int halb = (int) Math.ceil(breite / 2 + NAME_RAND);
+        g.fill(-halb, 0, halb, Math.round(NAME_ZEILE), NAME_GRUND);
+        Matrix3x2fStack pose = g.pose();
+        pose.pushMatrix();
+        // Die Oberkante der Grossbuchstaben liegt KAPPE − GRUNDLINIE Einheiten der Schrift über dem y des Texts.
+        pose.translate(-breite / 2, (Math.round(NAME_ZEILE) - Formen.KAPPE * m) / 2 + (Formen.KAPPE - Formen.GRUNDLINIE) * m);
+        pose.scale(m);
+        g.text(font, c, 0, 0, NAME_SCHRIFT, false);
+        pose.popMatrix();
     }
 
     /** Feld, Symbol und Rahmen der Nadel in ihrer Grösse, der Fuss im Ursprung. */
