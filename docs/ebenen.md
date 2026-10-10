@@ -7,6 +7,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/Symbole.java
   - src/main/java/com/nekyia/heroicmap/Formen.java
   - src/main/java/com/nekyia/heroicmap/Trapeze.java
+  - src/main/java/com/nekyia/heroicmap/mixin/FontManagerMixin.java
   - src/main/resources/assets/heroicmap/font/karte.json
   - src/main/java/com/nekyia/heroicmap/Kartenblick.java
   - src/main/java/com/nekyia/heroicmap/Minimap.java
@@ -92,8 +93,12 @@ die Nachrichten das Plugin:
   abzuschneiden wie die Webkarte; ein Kanal weicht so um höchstens eine
   Stufe ab, siehe
   [0007](entscheidungen/0007-toenung-auf-der-grafikkarte.md).
-- **Name** in der Schrift des Spiels, mittig 2 Einheiten unter dem Fuss,
-  immer.
+- **Name** immer, in der Kartenschrift mit 12 Einheiten je Geviert, also
+  Grossbuchstaben rund 8 hoch, wie die Webkarte; so hat es der Reviewer
+  entschieden (`Ebenen.name`). Er steht mittig in einem Kasten direkt unter
+  dem Fuss, 17 Einheiten hoch (Zeilenhöhe 1,4), mit 3 Einheiten Rand zur
+  Seite. Die Grossbuchstaben stehen mittig im Kasten. Farben der UI wie auf
+  der Webkarte: Grund weiss mit Alpha 0,8, Schrift schwarz, ohne Kontur.
 - **Grösse:** fest, auf jeder Stufe gleich, die Nadel in ihrer `size`, in
   Einheiten der Oberfläche des Mods wie die Wegpunkte, siehe
   [0097](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entscheidungen/0097-banner-feste-groesse-tafel-beim-zeigen.md).
@@ -108,8 +113,8 @@ die Nachrichten das Plugin:
   sonst verschwände eine Stadt am Rand.
 - **Vollbildkarte:** der Fuss auf dem Raster der Kacheln wie die
   Wegpunkte. Gezeichnet wird, was den Schirm berühren kann: 16 Einheiten
-  zur Seite und 64 nach oben, so viel wie das grösste Banner, der Name 11
-  nach unten und halb so weit zur Seite, wie er breit ist.
+  zur Seite und 64 nach oben, so viel wie das grösste Banner, der Name 17
+  nach unten und halb so weit zur Seite, wie sein Kasten breit ist.
 - **Reihenfolge:** unter Wegpunkten, Mitspielern und dem eigenen Kopf; die
   Ebenen nach `order`, die höhere oben, bei Gleichstand die kleinere `id`
   oben; in einer Ebene in der Reihenfolge der Objekte.
@@ -326,7 +331,10 @@ in der Schrift IM Fell English SC (`Formen.glyphen`, `Formen.texte`).
   gleich, hängt der Mod sie nur wieder an. Lädt das Spiel seine
   Ressourcen neu (F3+T, andere Pakete), baut jede Ansicht neu
   (`Formen.neuGeladen`, nach den Schriften des Spiels): Die Texte halten
-  Glyphen der alten Schrift.
+  Glyphen der alten Schrift. Ebenso, wenn „Unicode-Schrift erzwingen“ oder
+  die japanischen Glyphen wechseln: Das Spiel tauscht dann die Schriften in
+  `FontManager.updateOptions`, ohne neu zu laden (per javap;
+  `FontManagerMixin`).
 - **Budget:** Ein Neubau legt höchstens 20 000 Zeichen samt den Kopien
   der Kontur (`Formen.MAX_ZEICHEN`). Eine Schrift geht ganz ab oder gar
   nicht: Passt sie nicht mehr ganz, fehlt sie, und keine Kontur steht

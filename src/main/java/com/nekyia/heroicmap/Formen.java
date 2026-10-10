@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
  * entlang des ganzen Zugs. Jede Füllung und jeder Rand ist ein Element des GUI in einer Farbe,
  * geschnitten mit der Form der Minimap oder dem Schirm. Siehe docs/ebenen.md, „Flächen, Kreise und Linien“.
  */
-final class Formen {
+public final class Formen {
 
     /** Die Spitze einer Gehrung reicht höchstens so viele halbe Breiten weit, also bis zu Ecken von 60°; spitzer wird es eine Fase. */
     static final double GEHRUNG = 2;
@@ -64,8 +64,11 @@ final class Formen {
     /** Zählt jedes Neuladen der Ressourcen: Die gespeicherten Texte halten Glyphen der Schrift, die dabei verfällt. */
     private static int generation;
 
-    /** Ruft der Reload-Listener nach den Schriften des Spiels; danach baut jede Ansicht neu. */
-    static void neuGeladen() {
+    /**
+     * Ruft der Reload-Listener nach den Schriften des Spiels, ebenso {@code FontManagerMixin}, wenn die
+     * Optionen der Schrift wechseln; danach baut jede Ansicht neu.
+     */
+    public static void neuGeladen() {
         generation++;
     }
 

@@ -3,6 +3,7 @@
   "package": "com.nekyia.heroicmap.mixin",
   "compatibilityLevel": "JAVA_25",
   "client": [
+    "FontManagerMixin",
     "LevelExtractorMixin"
   ],
   "injectors": {
