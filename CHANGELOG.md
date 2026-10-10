@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.22
+
+- **Banner names follow an arc:** the name under a banner now curves below it, each letter upright to the arc, like on the web map; pin names stay straight.
+
 ## 0.2.21
 
 - **Choose the scale of your own map:** next to "Myself" a switch picks 1, 2 or 4 pixels per block, like the server's maps. It stays until you delete the map in the map list.
