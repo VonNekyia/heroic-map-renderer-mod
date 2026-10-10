@@ -248,10 +248,15 @@ final class Karte extends Screen {
                 }
                 int halb = n.name() == null ? 16 : Math.max(16, (int) Math.ceil(Ebenen.nameBreite(font, n.name()) / 2) + 1);
                 if (x > -halb && x < width + halb) {
-                    Ebenen.zeichne(g, font, Math.round(x * k) / (float) k, Math.round(y * k) / (float) k, n);
+                    Ebenen.zeichne(g, font, aufPixel(x, k), aufPixel(y, k), n);
                 }
             }
         }
+    }
+
+    /** Auf ganze Pixel bei GUI-Massstab {@code k}, wie Nadeln und Banner gezeichnet werden. */
+    private static float aufPixel(double v, int k) {
+        return Math.round(v * k) / (float) k;
     }
 
     /**
@@ -488,16 +493,22 @@ final class Karte extends Screen {
             return null;
         }
         String dimension = minecraft.player.level().dimension().identifier().toString();
-        int scale = satz.scale();
+        int scale = satz.scale(), k = minecraft.getWindow().getGuiScale();
         Tafeln.Ziel treffer = null;
         for (Ebenen.Eintrag e : Ebenen.INSTANZ.sichtbar()) {
             for (Ebenen.Ort o : Ebenen.INSTANZ.nadeln(e.id())) {
-                int[] m = o.id() == null || !o.dimension().equals(dimension) ? null : Ebenen.masse(o);
-                if (m != null) {
-                    double x = blick.rasterX(Projektion.zuPixel(o.x(), scale), width), y = blick.rasterY(Projektion.zuPixel(o.z(), scale), height);
-                    if (mx >= x - m[0] / 2.0 && mx < x + m[0] / 2.0 && my >= y - m[1] && my < y) {
-                        treffer = new Tafeln.Ziel(e.id(), e.version(), o.id());
-                    }
+                if (o.id() == null || !o.dimension().equals(dimension)) {
+                    continue;
+                }
+                // Der Fuss wie gezeichnet; erst die Lage, dann der Kasten, denn der misst den Namen und holt das Bild.
+                float x = aufPixel(blick.rasterX(Projektion.zuPixel(o.x(), scale), width), k);
+                float y = aufPixel(blick.rasterY(Projektion.zuPixel(o.z(), scale), height), k);
+                if (my < y - Symbole.BANNER_HOEHE || my >= y + Math.round(Ebenen.NAME_ZEILE)) {
+                    continue;
+                }
+                float[] m = Ebenen.kasten(font, o);
+                if (m != null && mx >= x + m[0] && mx < x + m[2] && my >= y + m[1] && my < y + m[3]) {
+                    treffer = new Tafeln.Ziel(e.id(), e.version(), o.id());
                 }
             }
         }

@@ -732,17 +732,32 @@ final class Ebenen {
     }
 
     /**
-     * Breite und Höhe des Orts in Einheiten des GUI über seinem Fuss, ohne Namen, für den Treffer
-     * unter dem Zeiger; null bei einem Banner, dessen Bild noch fehlt.
+     * Der Kasten von Bild und Name relativ zum Fuss, {links, oben, rechts, unten} in Einheiten des GUI,
+     * so wie {@link #zeichne} ihn füllt; null bei einem Banner, dessen Bild noch fehlt. Misst den Namen
+     * und holt das Bild eines Banners, also erst die Lage prüfen.
      */
-    static int[] masse(Ort o) {
+    static float[] kasten(Font font, Ort o) {
+        float name = o.name() == null ? 0 : nameBreite(font, o.name());
         return switch (o) {
-            case Nadel n -> new int[] {SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe()};
+            case Nadel n -> kasten(SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe(), name);
             case Banner b -> {
                 Symbole.Textur t = Symbole.INSTANZ.banner(b.ebene(), b.version(), b.bild());
-                yield t == null ? null : new int[] {t.breite(), t.hoehe()};
+                yield t == null ? null : kasten(t.breite(), t.hoehe(), name);
             }
         };
+    }
+
+    /**
+     * Der Kasten eines Bilds von {@code breite} × {@code hoehe} über dem Fuss, links ⌊Breite / 2⌋ wie
+     * gezeichnet, und eines Namens mit dem Kasten {@code name} breit darunter; 0 heisst ohne Namen.
+     */
+    static float[] kasten(int breite, int hoehe, float name) {
+        float links = -(breite / 2), rechts = links + breite;
+        if (name <= 0) {
+            return new float[] {links, -hoehe, rechts, 0};
+        }
+        float halb = (float) Math.ceil(name / 2);
+        return new float[] {Math.min(links, -halb), -hoehe, Math.max(rechts, halb), Math.round(NAME_ZEILE)};
     }
 
     /** Wie breit der Kasten um den Namen ist, in Einheiten des GUI. */
@@ -757,6 +772,7 @@ final class Ebenen {
     private static void name(GuiGraphicsExtractor g, Font font, String name) {
         Component c = Component.literal(name).withStyle(Formen.STIL);
         float m = NAME_GROESSE / 16, breite = font.width(c) * m;
+        // Wie kasten: halb so breit wie der Kasten um den Namen, aufgerundet.
         int halb = (int) Math.ceil(breite / 2 + NAME_RAND);
         g.fill(-halb, 0, halb, Math.round(NAME_ZEILE), NAME_GRUND);
         Matrix3x2fStack pose = g.pose();

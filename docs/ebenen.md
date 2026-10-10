@@ -380,7 +380,10 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   - Eine Antwort, um die er nicht bat, gilt nicht.
   - Gelesen auf dem Thread des Netzes wie die Teile (`Tafeln.Antwort`).
 - **Ziel** (`Karte.tafelUnter`): oben liegen Nadeln und Banner, die
-  spätere über der früheren, gemessen an ihrem Bild über dem Fuss; sonst
+  spätere über der früheren, gemessen am Kasten von Bild und Name, wie
+  gezeichnet, mit dem Fuss auf ganzen Pixeln (`Ebenen.kasten`), wie die
+  Webkarte. Erst prüft der Mod die Lage, dann misst er den Namen und holt
+  das Bild eines Banners; so lädt er keine Banner ausserhalb. Sonst
   die oberste Fläche nach gerade/ungerade oder der oberste Kreis
   (`Tafeln.trifft`). Ein Objekt braucht eine `id`. Linien und Schrift
   haben keine Tafel.

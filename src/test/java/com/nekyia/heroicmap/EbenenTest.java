@@ -621,6 +621,16 @@ class EbenenTest {
     }
 
     @Test
+    void kastenWieGezeichnet() {
+        // Ungerade Breite: links ⌊21 / 2⌋ wie beim Zeichnen, also -10 bis 11, nicht ±10,5.
+        assertArrayEquals(new float[] {-10, -40, 11, 0}, Ebenen.kasten(21, 40, 0));
+        // Ein Name breiter als das Bild: Er zählt zum Kasten, 17 Einheiten unter dem Fuss, halb so breit aufgerundet.
+        assertArrayEquals(new float[] {-26, -40, 26, 17}, Ebenen.kasten(21, 40, 51));
+        // Ein schmaler Name ändert die Seiten nicht.
+        assertArrayEquals(new float[] {-10, -40, 11, 17}, Ebenen.kasten(21, 40, 8));
+    }
+
+    @Test
     void kartenschriftGrenzen() {
         StringBuilder pfad = new StringBuilder();
         for (int i = 0; i <= Ebenen.MAX_PFAD; i++) {
