@@ -255,6 +255,13 @@ Der schwarze Umriss entfällt mit Rahmen.
 
 ## Kosten
 
+Gemessen am 10.10. mit „kompass“, 4 px und Zoom 4, siehe
+[Minimap, Verzierungen drehen mit](messungen/2026-10-10-minimap-verzierungen.md):
+das HUD-Element im Median eckig 0,016 bis 0,021 ms, rund 0,025 bis
+0,033 ms, gedreht wie ungedreht; dass die Verzierungen mitdrehen, kostet
+nichts Messbares. Ohne Rahmen sind es eckig 0,002 bis 0,003 ms, siehe
+[Minimap](minimap.md), „Kosten“.
+
 Geschätzt, nicht gemessen:
 
 - **Eckig** je Frame höchstens 20 Rechtecke für 5 Bänder und 4 Ornamente,

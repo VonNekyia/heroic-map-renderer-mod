@@ -48,5 +48,6 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [2026-10-07, Minimap, 8 und 16 px](messungen/2026-10-07-minimap-8-16px.md): was die Minimap bei 8 und 16 Pixeln je Block kostet, je Chunk, je Region und je Frame.
 - [2026-10-09, Minimap, Drehen](messungen/2026-10-09-minimap-drehen.md): was die drehende Minimap je Frame kostet, eckig und rund, im Stand und im Flug; rund gedreht ist billiger als ungedreht.
 - [2026-10-09, Minimap, Vieleck auch ungedreht](messungen/2026-10-09-minimap-vieleck.md): was die Minimap je Frame kostet, seit sie auch ungedreht mit dem Vieleck zeichnet, gegen main; rund so billig wie eckig.
+- [2026-10-10, Minimap, Verzierungen drehen mit](messungen/2026-10-10-minimap-verzierungen.md): was die Minimap mit dem Rahmen „kompass“ je Frame kostet, seit die Verzierungen mitdrehen, gegen main im Wechsel A B A B unter Grundlast; unverändert.
 - [2026-10-09, Selbst gezeichnete Karte, Schreiben der Kacheln](messungen/2026-10-09-selbst-schreiben.md): was `Kachelwerk.schreibe` je Durchlauf kostet und wie viele PNG es je Stunde schreibt, für eine Farm und einen Flug.
 - [2026-10-06, Vollbildkarte, Übernahme der Kacheln](messungen/2026-10-06-vollbildkarte-uebernahme.md): was eine Kachel den Render-Thread kostet, mit und ohne Kopieren der Pixel dort, und wie schnell der Dekoder liefert.
