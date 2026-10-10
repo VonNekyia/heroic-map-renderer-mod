@@ -873,4 +873,16 @@ class EbenenTest {
         assertEquals(0xFF000000, Ebenen.farbe("#000000"));
         assertEquals(0xFF000000, Ebenen.farbe("#00000000"));
     }
+
+    @Test
+    void kennungEinesMods() {
+        // Mit Namensraum wie ein Identifier, nicht heroicmap:. Siehe docs/api.md, „Kennungen“.
+        assertTrue(Ebenen.kennungEinesMods("meinmod:staedte"));
+        assertTrue(Ebenen.kennungEinesMods("heroicmap-tests:probe"));
+        assertFalse(Ebenen.kennungEinesMods("staedte"));
+        assertFalse(Ebenen.kennungEinesMods(":staedte"));
+        assertFalse(Ebenen.kennungEinesMods("heroicmap:staedte"));
+        assertFalse(Ebenen.kennungEinesMods("MeinMod:Staedte"));
+        assertFalse(Ebenen.kennungEinesMods(null));
+    }
 }

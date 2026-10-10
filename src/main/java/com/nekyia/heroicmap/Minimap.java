@@ -67,6 +67,8 @@ public final class Minimap {
     /** Norden, Osten, Süden, Westen als Richtung im Bild, x nach Osten, y nach Süden; gezeichnet in der Reihenfolge MARKEN, N zuletzt. */
     private static final double[][] RICHTUNGEN = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
     private static final int[] MARKEN = {1, 2, 3, 0};
+    /** Ziele im Menü ({@link #ziel}): 0 bis 3 die Marken N, O, S, W, dazu der Spieler; oder keins. */
+    static final int SPIELER = 4, KEIN_ZIEL = -1;
     /** Farbe der Chunklinien: Schwarz, zu 30 % deckend, so bleibt die Karte darunter lesbar. */
     static final int LINIE = 0x4D000000;
     private static final int TEXT = 0xFFFFFFFF;
@@ -89,6 +91,8 @@ public final class Minimap {
      * der Minimap mit der Vorgabe von 128 Einheiten; auf der Minimap wächst sie mit deren Seite.
      */
     static final int KOPF = 6;
+    /** Der Kopf in der Darstellung {@link Darstellung#DURCHSICHTIG}: Alpha 50 %. */
+    static final int HALB_SCHWARZ = 0x80000000;
     /** Ändert sich die Höhe des Kopfes unter einer Decke um so viele Blöcke, wird neu gezeichnet. */
     private static final int DECKE_SCHRITT = 2;
 
@@ -120,6 +124,10 @@ public final class Minimap {
     enum Koordinaten { AUS, XZ, XYZ }
 
     private Koordinaten koordinaten = Koordinaten.XZ;
+    /** Wie der eigene Spieler aussieht, auf Minimap und Vollbildkarte. Siehe docs/minimap.md, „Spieler“. */
+    enum Darstellung { KOPF, PFEIL, DURCHSICHTIG }
+
+    private Darstellung darstellung = Darstellung.KOPF;
     /** Dreht die Minimap mit der Blickrichtung, die oben liegt. Siehe docs/minimap.md, „Drehen“. */
     private boolean drehen = true;
     /** Hat der Spieler Drehen selbst gewählt? Nur dann steht es in der Datei, sonst gilt die Vorgabe. */
@@ -133,6 +141,13 @@ public final class Minimap {
     /** Solange das Menü offen ist: die Ecke des Griffs, 0 bis 3, sonst -1; und ob die Maus auf ihm liegt. */
     private int griffEcke = -1;
     private boolean griffAktiv;
+    /** Was im Menü unter der Maus liegt ({@link #ziel}), vom Menü je Frame gesetzt; eine Marke darunter nimmt ihr aktives Bild. */
+    private int hervor = KEIN_ZIEL;
+    /** Im Menü, aus diesem Frame: Mitte und halbe Seite des Spielers als Ziel, sonst -1; die Marken N, O, S, W als Ziele, ihr Skin, und ob das Menü sie halb zeichnet. */
+    private float spielerX, spielerY, spielerHalb = -1;
+    private List<Ornament> menueMarken = List.of();
+    private Skin menueSkin;
+    private boolean menueHalb;
     /** Die Form der Karte ({@link #schnitt(Rahmen, int, Skin)}) und wofür. */
     private float[] schnitt;
     private int schnittX, schnittY, schnittSeite, schnittMassstab, schnittBaender;
@@ -312,6 +327,14 @@ public final class Minimap {
         this.koordinaten = koordinaten;
     }
 
+    Darstellung darstellung() {
+        return darstellung;
+    }
+
+    void setzeDarstellung(Darstellung darstellung) {
+        this.darstellung = darstellung;
+    }
+
     String skin() {
         return skin;
     }
@@ -338,6 +361,45 @@ public final class Minimap {
     void griff(int ecke, boolean aktiv) {
         griffEcke = ecke;
         griffAktiv = aktiv;
+    }
+
+    /** Vom Menü je Frame: das Ziel unter der Maus, {@link #KEIN_ZIEL} ohne Menü. */
+    void hervor(int ziel) {
+        hervor = ziel;
+    }
+
+    /**
+     * Was im Menü unter (x, y) liegt, wie zuletzt gezeichnet: eine Marke 0 bis 3 (N, O, S, W), der Spieler
+     * {@link #SPIELER} oder {@link #KEIN_ZIEL}. Eine Marke trifft man mindestens 9 × 9 Einheiten um ihre Mitte.
+     * Siehe docs/minimap.md, „Aussehen an der Minimap“.
+     */
+    int ziel(double x, double y) {
+        if (spielerHalb >= 0 && Math.abs(x - spielerX) <= spielerHalb && Math.abs(y - spielerY) <= spielerHalb) {
+            return SPIELER;
+        }
+        double h = menueSkin == null ? 0 : Math.max(4, menueSkin.groesste / 2.0 + 1);
+        for (int j = 0; j < menueMarken.size(); j++) {
+            Ornament o = menueMarken.get(j);
+            if (Math.abs(x - o.x()) <= h && Math.abs(y - o.y()) <= h) {
+                return MARKEN[j];
+            }
+        }
+        return KEIN_ZIEL;
+    }
+
+    /**
+     * Vom Menü über allem: Zeigt der Rahmen keine Marken, Verzierungen aus oder „ohne“, die Marken halb deckend, bei
+     * „ohne“ die von „grau“ auf dem Umriss; die unter der Maus ganz und aktiv. Siehe docs/rahmen.md, „Im Menü“.
+     */
+    void geister(GuiGraphicsExtractor g) {
+        if (!menueHalb || menueSkin == null) {
+            return;
+        }
+        for (int j = 0; j < menueMarken.size(); j++) {
+            Ornament o = menueMarken.get(j);
+            boolean an = MARKEN[j] == hervor;
+            menueSkin.ornament(g, o.teil() + (an ? 1 : 0), o.ecke(), o.x(), o.y(), an ? 1 : 0.5f, o.winkel());
+        }
     }
 
     void setzeShow(boolean show) {
@@ -469,6 +531,11 @@ public final class Minimap {
             case "xyz" -> Koordinaten.XYZ;
             default -> Koordinaten.XZ;
         };
+        darstellung = switch (String.valueOf(p.getProperty("spieler")).trim()) {
+            case "pfeil" -> Darstellung.PFEIL;
+            case "durchsichtig" -> Darstellung.DURCHSICHTIG;
+            default -> Darstellung.KOPF;
+        };
         // Vorgabe an. Ein altes drehen=true war gewählt, denn die Vorgabe war aus; ein altes drehen=false nicht unterscheidbar.
         String wahl = p.getProperty("drehen_wahl");
         drehenGewaehlt = wahl != null || "true".equals(p.getProperty("drehen"));
@@ -502,6 +569,7 @@ public final class Minimap {
         p.setProperty("chunklinien", Boolean.toString(chunklinien));
         p.setProperty("effekte", Boolean.toString(effekte));
         p.setProperty("koordinaten", koordinaten.name().toLowerCase(Locale.ROOT));
+        p.setProperty("spieler", darstellung.name().toLowerCase(Locale.ROOT));
         if (drehenGewaehlt) {
             p.setProperty("drehen_wahl", Boolean.toString(drehen));
         }
@@ -617,6 +685,10 @@ public final class Minimap {
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer spieler = mc.player;
         ClientLevel level = mc.level;
+        // Ziele im Menü gelten nur für diesen Frame.
+        menueMarken = List.of();
+        menueSkin = null;
+        spielerHalb = -1;
         if (!sichtbar || spieler == null || level == null) {
             gibUmrissFrei();
             return;
@@ -679,10 +751,20 @@ public final class Minimap {
         wegpunkte(g, r, dimension, links, oben, k, kopf, lage);
         mitspieler(g, mc, r, spieler, dimension, links, oben, a, k, kopf, lage);
         // In der Mitte des Bildes, auf dem Pixel, den ecke dafür nimmt; gedreht genau in der Mitte, der Pfeil nach oben.
-        if (lage == null) {
-            avatar(g, spieler, (r.x() * k + n / 2) / (float) k, (r.y() * k + n / 2) / (float) k, a, kopf, false);
-        } else {
-            avatar(g, spieler, (float) (lage.cx() / k), (float) (lage.cy() / k), a, kopf, true);
+        float sx = lage == null ? (r.x() * k + n / 2) / (float) k : (float) (lage.cx() / k);
+        float sy = lage == null ? (r.y() * k + n / 2) / (float) k : (float) (lage.cy() / k);
+        avatar(g, spieler, sx, sy, a, kopf, lage != null, darstellung);
+        if (mc.gui.screen() instanceof Einstellungen || mc.gui.screen() instanceof Anzeige) {
+            // Ziele für Klicks im Menü. Ohne Marken am Rahmen zeichnet das Menü sie halb, bei „ohne“ die von „grau“ auf dem Umriss.
+            spielerX = sx;
+            spielerY = sy;
+            spielerHalb = kopf / 2 + 2;
+            menueHalb = rahmen == null || !verzierungen;
+            menueSkin = rahmen != null ? rahmen : Skin.von("grau");
+            if (menueSkin != null) {
+                menueMarken = ornamente(rahmen != null ? r : new Rahmen(r.x() - 2, r.y() - 2, r.seite() + 4),
+                        rahmen != null ? rahmen.baender() : 1, rund, lage, k, true, -1, false, KEIN_ZIEL);
+            }
         }
         Object[] werte = werte(koordinaten, spieler.getX(), spieler.getY(), spieler.getZ());
         if (werte != null) {
@@ -1043,7 +1125,7 @@ public final class Minimap {
         } else {
             skin.baender(g, r.x(), r.y(), r.seite(), r.seite(), baender);
         }
-        for (Ornament o : ornamente(r, skin.baender(), rund, lage, k, verzierungen, griffEcke, griffAktiv)) {
+        for (Ornament o : ornamente(r, skin.baender(), rund, lage, k, verzierungen, griffEcke, griffAktiv, hervor)) {
             skin.ornament(g, o.teil(), o.ecke(), o.x(), o.y(), deckung, o.winkel());
         }
     }
@@ -1055,19 +1137,18 @@ public final class Minimap {
     /**
      * Was der Rahmen über den Bändern zeichnet, in dieser Reihenfolge: mit {@code marken} die Marken
      * O, S, W, N auf der Mitte der Bänder, ungedreht fest rechts, unten, links und oben, gedreht starr
-     * mit der Karte; im Menü zuletzt der Griff an seiner Ecke, nie gedreht. In den Ecken sonst nichts.
-     * Siehe docs/rahmen.md, „Marken“.
+     * mit der Karte, die Marke {@code hervor} (0 bis 3, N, O, S, W) aktiv; im Menü zuletzt der Griff an seiner
+     * Ecke, nie gedreht. In den Ecken sonst nichts. Siehe docs/rahmen.md, „Marken“.
      */
     static List<Ornament> ornamente(Rahmen r, int baender, boolean rund, Drehung.Lage lage, int k, boolean marken,
-            int griffEcke, boolean griffAktiv) {
+            int griffEcke, boolean griffAktiv, int hervor) {
         List<Ornament> aus = new ArrayList<>(5);
         if (marken) {
-            int aktiv = griffEcke >= 0 ? 1 : 0;
             double winkel = lage == null ? 0 : lage.winkel();
             for (int i : MARKEN) {
                 double[] p = lage == null ? Skin.marke(r.x(), r.y(), r.seite(), baender, rund, RICHTUNGEN[i][0], RICHTUNGEN[i][1])
                         : verzierung(r, baender, rund, lage, RICHTUNGEN[i], k);
-                aus.add(new Ornament(Skin.MARKE_JE_RICHTUNG[i] + aktiv, 0, p[0], p[1], winkel));
+                aus.add(new Ornament(Skin.MARKE_JE_RICHTUNG[i] + (i == hervor ? 1 : 0), 0, p[0], p[1], winkel));
             }
         }
         if (griffEcke >= 0) {
@@ -1280,22 +1361,40 @@ public final class Minimap {
     }
 
     /**
-     * Der eigene Spieler: sein Kopf aus dem Skin, daneben ein kleiner Pfeil in Blickrichtung,
-     * {@code groesse} Einheiten gross, mit {@code oben} nach oben. Gezeichnet in Achteln, so wachsen Rand und Pfeil mit.
-     * Siehe docs/minimap.md, „Bedienung“.
+     * Der eigene Spieler in der {@code art}: sein Kopf aus dem Skin, deckend oder halb durchsichtig, mit einem
+     * kleinen Pfeil in Blickrichtung darüber, oder nur der Pfeil, doppelt so gross; {@code groesse} Einheiten
+     * gross, mit {@code oben} nach oben. Gezeichnet in Achteln, so wachsen Rand und Pfeil mit.
+     * Siehe docs/minimap.md, „Spieler“.
      */
-    static void avatar(GuiGraphicsExtractor g, AbstractClientPlayer spieler, float x, float y, float a, float groesse, boolean oben) {
+    static void avatar(GuiGraphicsExtractor g, AbstractClientPlayer spieler, float x, float y, float a, float groesse, boolean oben,
+            Darstellung art) {
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.translate(x, y);
         pose.scale(groesse / 8f);
-        g.fill(-5, -5, 5, 5, 0xFF000000);
-        PlayerFaceExtractor.extractRenderState(g, spieler.getSkin(), -4, -4, 8);
+        if (art == Darstellung.KOPF) {
+            g.fill(-5, -5, 5, 5, 0xFF000000);
+            PlayerFaceExtractor.extractRenderState(g, spieler.getSkin(), -4, -4, 8);
+        } else if (art == Darstellung.DURCHSICHTIG) {
+            // Halb: nur der Rand, nicht unter dem Gesicht, sonst schiene Schwarz statt der Karte durch.
+            g.fill(-5, -5, 5, -4, HALB_SCHWARZ);
+            g.fill(-5, 4, 5, 5, HALB_SCHWARZ);
+            g.fill(-5, -4, -4, 4, HALB_SCHWARZ);
+            g.fill(4, -4, 5, 4, HALB_SCHWARZ);
+            PlayerFaceExtractor.extractRenderState(g, spieler.getSkin(), -4, -4, 8, HALB_SCHWARZ | 0xFFFFFF);
+        }
         // Der Pfeil kreist um den Kopf; bei Gier 0 blickt der Spieler nach Süden, auf der Karte nach unten. Dreht die Karte, zeigt er nach oben.
         if (!oben) {
             pose.rotate((float) Math.toRadians(spieler.getViewYRot(a) + 180));
         }
-        pose.translate(0, -5);
+        // Die Zeilen des Pfeils sind 3, 5 und 7 Achtel breit, ab -i - 1: Ihre Mitte liegt ein halbes Achtel rechts.
+        if (art == Darstellung.PFEIL) {
+            // Ohne Kopf seine Mitte auf dem Spieler; die vier Zeilen reichen von -3 bis 1.
+            pose.scale(2);
+            pose.translate(-0.5f, 1);
+        } else {
+            pose.translate(-0.5f, -5);
+        }
         for (int i = 0; i < 3; i++) {
             g.fill(-i - 1, -3 + i, i + 2, -1 + i, 0xFF000000);
         }

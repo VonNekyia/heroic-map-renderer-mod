@@ -22,8 +22,9 @@ import org.joml.Matrix3x2fStack;
  * Das Menü hinter {@code /hmap}: Minimap an oder aus, Zoom, Mitspieler, die Karten des Servers und die
  * auf der Platte, dazu das Untermenü „Einstellungen …“ für Vorlieben der Anzeige ({@link Anzeige}).
  * Die Minimap im HUD bleibt sichtbar; Ziehen verschiebt sie, der Griff an der Ecke zur Mitte des
- * Schirms zieht sie grösser oder kleiner, mit der linken wie der rechten Taste. Die Knöpfe passen
- * sich dem Platz an. Gespeichert wird beim Schliessen.
+ * Schirms zieht sie grösser oder kleiner, mit der linken wie der rechten Taste. Ein Klick auf den
+ * Spieler oder eine Marke stellt ihr Aussehen ein ({@link MinimapKlick}). Die Knöpfe passen sich dem
+ * Platz an. Gespeichert wird beim Schliessen.
  * Siehe docs/minimap.md, „Bedienung“.
  */
 final class Einstellungen extends Screen {
@@ -34,9 +35,11 @@ final class Einstellungen extends Screen {
     /** Breite der Knöpfe, höchstens; schmaler, wenn neben der Minimap weniger Platz ist. */
     private static final int BREITE = 200;
 
-    private enum Zug { KEINER, LAGE, GROESSE }
+    /** KLICK: gedrückt auf Spieler oder Marke; wandert die Maus weiter als {@link MinimapKlick#WEG}, wird daraus LAGE. */
+    private enum Zug { KEINER, KLICK, LAGE, GROESSE }
 
     private Zug zug = Zug.KEINER;
+    private final MinimapKlick klick = new MinimapKlick();
     /** Beim Verschieben: wo die Maus die Minimap gegriffen hat. Beim Ziehen: die feste Ecke. */
     private int festX, festY;
     /** Beim Ziehen: liegt der Griff links oder oben? */
@@ -163,6 +166,10 @@ final class Einstellungen extends Screen {
             }
             koordinaten(g, r, mausX, mausY);
         }
+        // Zuletzt, über dem Umriss: halbe Marken, Zeiger und Tooltip; am Griff gilt der Griff.
+        boolean frei = (zug == Zug.KEINER || zug == Zug.KLICK)
+                && !(Minimap.INSTANZ.sichtbar() && imGriff(mausX, mausY, Minimap.INSTANZ.rahmen(width, height)));
+        klick.zeichne(g, font, mausX, mausY, frei);
     }
 
     /** Über der Minimap die Koordinaten des Blocks unter der Maus, fest unten links, genau wie gezeichnet. */
@@ -212,8 +219,10 @@ final class Einstellungen extends Screen {
             startY = Mth.floor(e.y());
             return true;
         }
-        if (r.enthaelt(e.x(), e.y())) {
-            zug = Zug.LAGE;
+        // Auf Spieler oder Marke entscheidet erst das Loslassen, ob es ein Klick war; Ziehen verschiebt wie sonst.
+        boolean ziel = klick.druecke(e);
+        if (ziel || r.enthaelt(e.x(), e.y())) {
+            zug = ziel ? Zug.KLICK : Zug.LAGE;
             festX = Mth.floor(e.x()) - r.x();
             festY = Mth.floor(e.y()) - r.y();
             return true;
@@ -226,6 +235,12 @@ final class Einstellungen extends Screen {
         Minimap m = Minimap.INSTANZ;
         int mx = Mth.floor(e.x()), my = Mth.floor(e.y());
         switch (zug) {
+            case KLICK -> {
+                if (klick.gezogen(e)) {
+                    zug = Zug.LAGE;
+                    m.verschiebe(mx - festX, my - festY, width, height);
+                }
+            }
             case LAGE -> m.verschiebe(mx - festX, my - festY, width, height);
             case GROESSE -> {
                 // Relativ zum Griff: Der Griff sitzt rund nicht in der Ecke, die Seite springt so nicht.
@@ -244,8 +259,9 @@ final class Einstellungen extends Screen {
 
     @Override
     public boolean mouseReleased(MouseButtonEvent e) {
+        boolean geklickt = zug == Zug.KLICK && klick.lasse(e);
         zug = Zug.KEINER;
-        return super.mouseReleased(e);
+        return geklickt || super.mouseReleased(e);
     }
 
     /** Der Griff sitzt an der Ecke, die zur Mitte des Schirms zeigt ({@link Minimap#griffEcke}); so hat er dort Platz zum Ziehen. */
@@ -317,6 +333,7 @@ final class Einstellungen extends Screen {
     @Override
     public void removed() {
         Minimap.INSTANZ.griff(-1, false);
+        Minimap.INSTANZ.hervor(Minimap.KEIN_ZIEL);
         Minimap.INSTANZ.schreibe(HeroicMap.einstellungen());
         // Eine andere Ablage heisst ein anderer Ordner der Welt, auch für die Wegpunkte.
         Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());

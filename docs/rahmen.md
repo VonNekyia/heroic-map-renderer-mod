@@ -1,6 +1,6 @@
 ---
 title: Rahmen
-description: Die Rahmen der Minimap als umschaltbare Skins - Wahl im Untermenü, die Vorgabe „biom“ nach dem Biom unter dem Spieler, die sechs festen Skins, ihre Dateien und Quellen, Bänder eckig und rund, die Marken N, O, S, W, genordet fest und gedreht mitdrehend, ihr Schalter, der Griff im Menü, Abstand zum Rand, Kosten und Bilder.
+description: Die Rahmen der Minimap als umschaltbare Skins - Wahl per Klick auf eine Marke im Menü, die Vorgabe „biom“ nach dem Biom unter dem Spieler, die sechs festen Skins, ihre Dateien und Quellen, Bänder eckig und rund, die Marken N, O, S, W, genordet fest und gedreht mitdrehend, ihr Schalter, der Griff im Menü, Abstand zum Rand, Kosten und Bilder.
 code:
   - src/main/java/com/nekyia/heroicmap/Skin.java
   - src/main/java/com/nekyia/heroicmap/Biom.java
@@ -8,6 +8,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/Einstellungen.java
   - src/main/java/com/nekyia/heroicmap/Anzeige.java
+  - src/main/java/com/nekyia/heroicmap/MinimapKlick.java
   - src/main/java/com/nekyia/heroicmap/Drehung.java
   - src/test/java/com/nekyia/heroicmap/DrehungTest.java
   - src/main/resources/heroicmap.accesswidener
@@ -18,8 +19,8 @@ code:
 # Rahmen
 
 Um die Minimap kann ein Rahmen liegen, ein Skin aus dem Paket des
-Designers: Bänder in festen Farben und Marken für N, O, S und W. Die Wahl
-steht im Untermenü „Einstellungen …“; die Vorgabe ist „biom“, ein Rahmen,
+Designers: Bänder in festen Farben und Marken für N, O, S und W. Gewählt
+wird mit einem Klick auf eine Marke der Minimap im Menü; die Vorgabe ist „biom“, ein Rahmen,
 der mit dem Biom unter dem Spieler wechselt. „Ohne“ ist der dünne Umriss
 wie bisher. Die Vollbildkarte bekommt keinen Rahmen. Warum so:
 [0005](entscheidungen/0005-rahmen-als-skins.md) und
@@ -27,8 +28,11 @@ wie bisher. Die Vollbildkarte bekommt keinen Rahmen. Warum so:
 
 ## Wahl
 
-- **Wo:** Knopf „Rahmen“ im Untermenü „Einstellungen …“, siehe
-  [Minimap](minimap.md), „Bedienung“. Der Tooltip beschreibt den Skin.
+- **Wo:** ein Klick auf eine Marke N, O, S, W der Minimap im Menü von
+  `/hmap` oder im Untermenü „Einstellungen …“ schaltet zum nächsten Skin,
+  siehe [Minimap](minimap.md), „Aussehen an der Minimap“. Der Tooltip
+  nennt und beschreibt den Skin. Bis 0.2.27 war es der Knopf „Rahmen“ im
+  Untermenü.
 - **Vorgabe `biom`.** Gespeichert als `rahmen_wahl` in
   `heroicmap.properties`, nur wenn der Spieler den Rahmen selbst gewählt
   hat, auch „ohne“; sonst gilt die Vorgabe, auch wenn sie sich wieder
@@ -195,7 +199,8 @@ im Atlas des GUI; F3+T und Ressourcenpakete laden ihn neu:
 Der Rahmen zeigt die Himmelsrichtungen als Marken, genordet wie gedreht;
 Ornamente in den Ecken gibt es nicht. So hat es der User am 10.10.
 entschieden, siehe [0012](entscheidungen/0012-marken-statt-verzierungen.md).
-Ohne Rahmen gibt es keine, die Bilder gehören zum Skin.
+Ohne Rahmen gibt es keine, die Bilder gehören zum Skin; nur im Menü stehen
+dann die von „grau“, siehe „Im Menü“.
 
 - **Wo:** von der Mitte der Minimap in die Himmelsrichtung, auf der Mitte
   der Bänder, rund auf dem Kreis, eckig auf dem Quadrat (`Skin.marke`,
@@ -203,7 +208,7 @@ Ohne Rahmen gibt es keine, die Bilder gehören zum Skin.
   links, die linke obere Ecke bei `⌊p − w / 2 + 0,5⌋` (`Skin.lage`);
   gedreht wandern sie am Rahmen entlang, siehe „Drehen“.
 - **Bild:** fest je Richtung, N `norden`, S `marke`, O und W `marke_quer`
-  (`Skin.MARKE_JE_RICHTUNG`); im Menü `_aktiv`. Es dreht mit, siehe
+  (`Skin.MARKE_JE_RICHTUNG`); im Menü unter der Maus `_aktiv`. Es dreht mit, siehe
   „Drehen“.
 - **Reihenfolge:** Bänder, die Marken, `norden` zuletzt, im Menü darüber
   der Griff.
@@ -232,7 +237,28 @@ Der Schalter „Verzierungen“ im Untermenü „Einstellungen …“, in der Ze
 von „Drehen“, stellt die Marken an oder aus; gespeichert als
 `verzierungen` in `heroicmap.properties`, Vorgabe an. Aus zeigt der Rahmen
 nur seine Bänder oder den Ring, gedreht wie ungedreht. Der Griff im Menü
-bleibt, der Abstand zum Rand auch.
+bleibt, der Abstand zum Rand auch; im Menü stehen die Marken halb, siehe
+„Im Menü“.
+
+## Im Menü
+
+Ein Klick auf eine Marke wechselt den Rahmen, siehe [Minimap](minimap.md),
+„Aussehen an der Minimap“. Damit es immer eine gibt:
+
+- **Halbe Marken:** Zeigt der Rahmen keine, mit dem Schalter
+  „Verzierungen“ aus oder bei „ohne“, zeichnet das Menü sie zu 50 %
+  deckend, nur dort, nicht im HUD sonst (`Minimap.geister`). Mit Rahmen
+  dessen Marken an ihrem Ort, bei „ohne“ die von „grau“ auf der Mitte des
+  Umrisses, 1,5 Einheiten ausserhalb der Karte, auch gedreht.
+- **Über dem Umriss:** Das Menü zeichnet die halben Marken zuletzt, nach dem
+  weissen Umriss, der sonst durch sie liefe.
+- **Unter der Maus** nimmt die Marke ihr Bild `_aktiv`, die halbe dazu ganz
+  deckend.
+- **Am Rand des Schirms** kann bei „ohne“ eine halbe Marke um bis zu eine
+  Einheit angeschnitten sein: Der Abstand zum Rand ist dort 4 Einheiten,
+  siehe „Abstand zum Rand“, und gilt nur für das HUD.
+
+![Das Menü mit „uhr“ und Verzierungen aus: die Marken halb, N unter der Maus hell, der Tooltip zum Rahmen](bilder/rahmen-menue-halb.png)
 
 ## Abstand zum Rand
 
@@ -278,7 +304,8 @@ Geschätzt, nicht gemessen:
 ## Bilder
 
 Der Gametest `Bilder` nimmt jeden Rahmen eckig und rund bei 4 px auf,
-`rahmen-<skin>.png`, und das Menü mit `uhr`, siehe [Minimap](minimap.md),
+`rahmen-<skin>.png`, und das Menü mit `uhr`, dazu mit Verzierungen aus
+und der Maus auf N (`rahmen-menue-halb.png`), siehe [Minimap](minimap.md),
 „Bilder“.
 `rahmen-abstand.png` setzt die Bildschirmfotos `rahmen-biom-0` und
 `rahmen-uhr-0` dieses Gametests zusammen, aus einem Lauf auf main `49e4f3c` und

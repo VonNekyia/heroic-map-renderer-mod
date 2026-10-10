@@ -42,7 +42,9 @@ die Nachrichten das Plugin:
 - **`ebenen`:** die Liste, je Ebene `id`, `name`, `visible`, `order` und
   `version` (`Ebenen.liste`). Was nicht mehr darin steht, ist weg, mit
   seinen Nadeln, Formen und halben Teilen. Steht eine Kennung zweimal darin, gilt
-  der erste Eintrag.
+  der erste Eintrag. Die Ebenen von Client-Mods kommen dazu und bleiben,
+  bei gleicher Kennung gilt die vom Server, siehe
+  [API für Client-Mods](api.md) (`Ebenen.mische`).
 - **`ebene`:** ein Teil einer Ebene, `teil` von `teile`, mit seiner
   `version` (`Ebenen.teil`).
   - Gelesen schon auf dem Thread des Netzes (`Kanal.lies`,
@@ -636,7 +638,7 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   Passen nicht alle auf den Schirm, blättern `<` und `>`. Ohne Ebenen
   steht dort „Der Server schickt keine Ebenen.“
 - **Auf der Vollbildkarte** dieselbe Wahl in einer Liste unter dem Knopf
-  „Ebenen +“; ein Doppelklick heftet dort die ganze Ebene an, siehe
+  „Ebenen +“; ein Doppelklick auf ihren Namen heftet dort die ganze Ebene an, siehe
   [Vollbildkarte](vollbildkarte.md), „Ebenen“ (mod#76).
 - **Vorgabe** ist `visible` der Ebene; die Wahl des Spielers geht vor.
 - **Gespeichert** gleich beim Umschalten, in `ebenen.properties` im Ordner
