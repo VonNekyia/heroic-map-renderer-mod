@@ -527,13 +527,38 @@ class EbenenTest {
         assertEquals(0, o.sperrung());
         assertEquals(Ebenen.SCHRIFTFARBE, o.farbe());
         assertEquals(0, o.konturBreite());
-        // Kontur ohne Angaben: 2 breit in #F2E8D0; die Sperrung gekappt.
+        // Eine Kontur ohne Angaben ist keine, wie auf der Webkarte; die Sperrung gekappt.
         Ebenen.Schrift k = (Ebenen.Schrift) g.formen().get(2);
         assertEquals(Ebenen.MAX_SPERRUNG, k.sperrung());
-        assertEquals(2, k.konturBreite());
+        assertEquals(0, k.konturBreite());
         assertEquals(Ebenen.KONTURFARBE, k.konturFarbe());
         // Punkte: 3 + 1 + 1.
         assertEquals(5, g.punkte());
+    }
+
+    @Test
+    void kartenschriftGrenzfaelleWieDieWebkarte() {
+        StringBuilder pfad64 = new StringBuilder();
+        for (int i = 0; i < Ebenen.MAX_PFAD; i++) {
+            pfad64.append(i == 0 ? "" : ",").append("[").append(i).append(",0]");
+        }
+        JsonArray objekte = JsonParser.parseString("["
+                + "{\"type\":\"label\",\"text\":\"null\",\"path\":[[0,0]],\"size\":0},"
+                + "{\"type\":\"label\",\"text\":\"zahl\",\"path\":[[0,0]],\"outline\":5},"
+                + "{\"type\":\"label\",\"text\":\"leer\",\"path\":[[0,0]],\"outline\":null},"
+                + "{\"type\":\"label\",\"text\":\"64\",\"path\":[" + pfad64 + "]},"
+                + "{\"type\":\"label\",\"text\":\"Caf\\u0065\\u0301\",\"path\":[[0,0]]}"
+                + "]").getAsJsonArray();
+        Ebenen.Gelesen g = Ebenen.formen(objekte);
+        assertEquals(0, g.verworfen());
+        // size 0 heisst die Vorgabe; eine Kontur, die kein Objekt ist, fehlt, die Schrift bleibt.
+        assertEquals(16, ((Ebenen.Schrift) g.formen().get(0)).groesse());
+        assertEquals(0, ((Ebenen.Schrift) g.formen().get(1)).konturBreite());
+        assertEquals(0, ((Ebenen.Schrift) g.formen().get(2)).konturBreite());
+        // 64 Punkte gehen, 65 nicht (kartenschriftGrenzen).
+        assertEquals(2 * Ebenen.MAX_PFAD, ((Ebenen.Schrift) g.formen().get(3)).pfad().length);
+        // In NFC: e mit Akut wird é.
+        assertEquals("Caf\u00e9", ((Ebenen.Schrift) g.formen().get(4)).text());
     }
 
     @Test

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
+import java.util.List;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import org.joml.Matrix3x2f;
 import org.junit.jupiter.api.Test;
@@ -185,7 +186,8 @@ class FormenTest {
         Formen.Ansicht a = new Formen.Ansicht((wx, wz, aus) -> {
             aus[0] = wx;
             aus[1] = wz;
-        }, 1, 1, 1, Drehung.rechteck(0, 0, 384, 384), new double[] {0, 0, 384, 384}, new Matrix3x2f(), new ScreenRectangle(0, 0, 384, 384));
+        }, 1, 1, 1, Drehung.rechteck(0, 0, 384, 384), new double[] {0, 0, 384, 384}, new Matrix3x2f(), new ScreenRectangle(0, 0, 384, 384),
+                Double.POSITIVE_INFINITY);
         // Weit draussen: nichts. Der Kasten ganz innen: nur er.
         assertNull(Formen.bogen(a, kreis(1000, 1000, 100), kasten));
         assertTrue(Formen.bogen(a, kreis(192, 192, 100_000), kasten).innen());
@@ -215,7 +217,8 @@ class FormenTest {
             kreise.add(new Ebenen.Kreis(Ebenen.UEBERWELT, i % 100, i / 100, 100_000, 0x40FF0000, new Ebenen.Rand(0xFFFFFFFF, 2, 0, 0)));
         }
         Formen.Ansicht a = new Formen.Ansicht(Minimap.abbild(8, 3, 0, 0, Drehung.Lage.von(0.3, 192, 192, 0, 0)), 24, 3, 1,
-                Drehung.rechteck(0, 0, 384, 384), new double[] {-16, -16, 16, 16}, new Matrix3x2f(), new ScreenRectangle(0, 0, 384, 384));
+                Drehung.rechteck(0, 0, 384, 384), new double[] {-16, -16, 16, 16}, new Matrix3x2f(), new ScreenRectangle(0, 0, 384, 384),
+                Double.POSITIVE_INFINITY);
         java.util.List<Formen.Vielecke> aus = new java.util.ArrayList<>();
         long start = System.nanoTime();
         Formen.baue(a, Ebenen.UEBERWELT, kreise, aus);
@@ -301,6 +304,72 @@ class FormenTest {
     }
 
     @Test
+    void kappeNachEinheitenDesGui() {
+        // 16 Blöcke zu 1 Einheit: 16 hoch. Unter 8 Einheiten fehlt die Schrift, über 96 bleibt sie 96.
+        assertEquals(16, Formen.kappe(16, 1, 1, Double.POSITIVE_INFINITY), 1e-9);
+        assertEquals(0, Formen.kappe(7.9, 1, 1, Double.POSITIVE_INFINITY), 1e-9);
+        assertEquals(96, Formen.kappe(200, 1, 1, Double.POSITIVE_INFINITY), 1e-9);
+        // In Einheiten des GUI, nicht in Pixeln: bei GUI-Massstab 4 (einheit 4) gleich hoch, nur in mehr Pixeln.
+        assertEquals(16 * 4, Formen.kappe(16, 4, 4, Double.POSITIVE_INFINITY), 1e-9);
+        // Minimap mit 128 Einheiten: höchstens 12,8 Einheiten hoch.
+        assertEquals(12.8 * 2, Formen.kappe(16, 4, 2, 12.8), 1e-9);
+    }
+
+    private static Ebenen.Schrift schrift(String text, float kontur) {
+        return new Ebenen.Schrift(Ebenen.UEBERWELT, text, new double[] {0, 0, 100, 0}, 16, 0, 0xFF2B2B2B, 0xFFF2E8D0, kontur,
+                new double[] {0, 0, 100, 0});
+    }
+
+    @Test
+    void erstDieKonturDannDieFuellung() {
+        // Zwei Zeichen mit Kontur: erst 2 · 8 Kopien der Kontur, dann die 2 Füllungen; so deckt keine Kontur ein Zeichen davor.
+        List<Formen.Glyphe> g = Formen.glyphen(schrift("AB", 1), new double[] {0, 0, 100, 0}, new double[] {8, 8}, 16, 1,
+                Drehung.rechteck(-1000, -1000, 1000, 1000), new int[] {Formen.MAX_ZEICHEN});
+        assertEquals(18, g.size());
+        for (int i = 0; i < 16; i++) {
+            assertEquals(0xFFF2E8D0, g.get(i).farbe());
+            assertTrue(g.get(i).dx() != 0 || g.get(i).dy() != 0);
+        }
+        assertEquals(List.of(0, 1), List.of(g.get(16).zeichen(), g.get(17).zeichen()));
+        assertEquals(0xFF2B2B2B, g.get(17).farbe());
+        // Die Kontur reicht höchstens 0,12 der Höhe: 64 Einheiten breit gewünscht, bei 16 hoch also 1,92, in Einheiten der Schrift.
+        List<Formen.Glyphe> breit = Formen.glyphen(schrift("A", 64), new double[] {0, 0, 100, 0}, new double[] {8}, 16, 1,
+                Drehung.rechteck(-1000, -1000, 1000, 1000), new int[] {Formen.MAX_ZEICHEN});
+        double massstab = 16 / Formen.KAPPE;
+        assertEquals(0.12 * 16 / massstab, breit.getFirst().dx(), 1e-9);
+    }
+
+    @Test
+    void zeichenAusserhalbDerFormFehlen() {
+        // Der Text liegt mittig um x 50; im Schnitt von 0 bis 50 liegt nur das linke Zeichen.
+        List<Formen.Glyphe> g = Formen.glyphen(schrift("AB", 0), new double[] {0, 0, 100, 0}, new double[] {20, 20}, 16, 1,
+                Drehung.rechteck(0, -10, 50, 10), new int[] {Formen.MAX_ZEICHEN});
+        assertEquals(1, g.size());
+        assertEquals(0, g.getFirst().zeichen());
+    }
+
+    @Test
+    void budgetDerZeichen() {
+        int[] rest = {5};
+        List<Formen.Glyphe> g = Formen.glyphen(schrift("ABCDEFGH", 1), new double[] {0, 0, 100, 0}, new double[] {8, 8, 8, 8, 8, 8, 8, 8}, 16, 1,
+                Drehung.rechteck(-1000, -1000, 1000, 1000), rest);
+        assertEquals(5, g.size());
+        assertEquals(0, rest[0]);
+    }
+
+    @Test
+    void schriftSichtbarDurchIhrenText() {
+        // Der Pfad liegt links neben der Welt, der lange Text reicht hinein; ein kurzer nicht.
+        Formen.Ansicht a = ansicht(Minimap.abbild(1, 1, 0, 0, Drehung.Lage.von(0, 0, 0, 0, 0)));
+        Ebenen.Schrift lang = new Ebenen.Schrift(Ebenen.UEBERWELT, "x".repeat(64), new double[] {-200, 30}, 16, 0, 0, 0, 0,
+                new double[] {-200, 30, -200, 30});
+        Ebenen.Schrift kurz = new Ebenen.Schrift(Ebenen.UEBERWELT, "x", new double[] {-200, 30}, 16, 0, 0, 0, 0,
+                new double[] {-200, 30, -200, 30});
+        assertTrue(Formen.sichtbar(a, lang));
+        assertFalse(Formen.sichtbar(a, kurz));
+    }
+
+    @Test
     void gleicheAnsichtGleicherSchluessel() {
         // Der Speicher rechnet nur neu, wenn sich der Schlüssel ändert; gedreht und verschoben ändert er sich.
         Formen.Ansicht a = ansicht(Minimap.abbild(2, 2, 100, 200, Drehung.Lage.von(0.3, 64, 64, 10, 20)));
@@ -314,6 +383,6 @@ class FormenTest {
 
     private static Formen.Ansicht ansicht(Formen.Abbild abbild) {
         return new Formen.Ansicht(abbild, 4, 2, 1, Drehung.rechteck(0, 0, 256, 256), new double[] {0, 0, 64, 64}, new Matrix3x2f(),
-                new ScreenRectangle(0, 0, 256, 256));
+                new ScreenRectangle(0, 0, 256, 256), Double.POSITIVE_INFINITY);
     }
 }

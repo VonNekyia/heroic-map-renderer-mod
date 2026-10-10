@@ -172,10 +172,9 @@ final class Karte extends Screen {
         Formen.Ansicht a = new Formen.Ansicht(blick.abbild(scale, width, height), blick.chunkAbstand(scale) / 16, 1, minecraft.getWindow().getGuiScale(), Drehung.rechteck(0, 0, width, height),
                 new double[] {blick.basisRasterX(0, width) / scale, blick.basisRasterZ(0, height) / scale,
                         blick.basisRasterX(width, width) / scale, blick.basisRasterZ(height, height) / scale},
-                pose, new ScreenRectangle(0, 0, width, height).transformMaxBounds(pose));
+                pose, new ScreenRectangle(0, 0, width, height).transformMaxBounds(pose), Double.POSITIVE_INFINITY);
         List<List<Ebenen.Form>> ebenen = Ebenen.INSTANZ.sichtbar().stream().map(e -> Ebenen.INSTANZ.formen(e.id())).toList();
-        Formen.zeichne(g, a, dimension, ebenen, formenSpeicher);
-        Formen.schriften(g, font, a, dimension, ebenen);
+        Formen.zeichne(g, a, dimension, ebenen, formenSpeicher, font);
     }
 
     /** Chunklinien je 16 Blöcke als ein Element des GUI. Siehe docs/minimap.md, „Chunklinien“. */

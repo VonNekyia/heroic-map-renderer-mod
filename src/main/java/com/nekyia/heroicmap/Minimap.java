@@ -690,17 +690,12 @@ public final class Minimap {
         pose.scale(1f / k);
         Matrix3x2f kopie = new Matrix3x2f(pose);
         Formen.Ansicht a = new Formen.Ansicht(abbild(zoom, k, links, oben, lage), block, k, 1, form, new double[] {(bereich[0] + links) / block, (bereich[1] + oben) / block, (bereich[2] + links) / block,
-                (bereich[3] + oben) / block}, kopie, new ScreenRectangle(r.x() * k, r.y() * k, n, n).transformMaxBounds(kopie));
+                (bereich[3] + oben) / block}, kopie, new ScreenRectangle(r.x() * k, r.y() * k, n, n).transformMaxBounds(kopie),
+                // Die Kartenschrift höchstens ein Zehntel der Seite hoch, sonst erschlüge sie die Karte.
+                r.seite() / 10.0);
         List<List<Ebenen.Form>> ebenen = Ebenen.INSTANZ.sichtbar().stream().map(e -> Ebenen.INSTANZ.formen(e.id())).toList();
-        Formen.zeichne(g, a, dimension, ebenen, formenSpeicher);
-        // Die Schrift bleibt im Quadrat der Minimap, wie die Nadeln.
+        Formen.zeichne(g, a, dimension, ebenen, formenSpeicher, Minecraft.getInstance().font);
         pose.popMatrix();
-        g.enableScissor(r.x(), r.y(), r.x() + r.seite(), r.y() + r.seite());
-        pose.pushMatrix();
-        pose.scale(1f / k);
-        Formen.schriften(g, Minecraft.getInstance().font, a, dimension, ebenen);
-        pose.popMatrix();
-        g.disableScissor();
     }
 
     /** Wie die Formen einen Punkt der Welt in die Pixel der Minimap legen: wie die Karte, mit {@code lage} gedreht. */

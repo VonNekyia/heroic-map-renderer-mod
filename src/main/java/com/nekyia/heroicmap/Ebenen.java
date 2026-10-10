@@ -10,6 +10,7 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -438,21 +439,26 @@ final class Ebenen {
     }
 
     /**
-     * Eine Kartenschrift: {@code text} bis {@link #MAX_TEXT} Zeichen, {@code path} 1 bis {@link #MAX_PFAD}
-     * Punkte, {@code size} Vorgabe 16 Blöcke, {@code spacing} Vorgabe 0, gekappt auf 0 bis
-     * {@link #MAX_SPERRUNG}; {@code outline} ohne {@code width} 2 breit, ohne {@code color} in {@link #KONTURFARBE}.
+     * Eine Kartenschrift: {@code text} bis {@link #MAX_TEXT} Zeichen, in NFC; {@code path} 1 bis
+     * {@link #MAX_PFAD} Punkte; {@code size} Vorgabe 16 Blöcke, auch für 0 und Ungültiges; {@code spacing}
+     * Vorgabe 0, gekappt auf 0 bis {@link #MAX_SPERRUNG}. {@code outline} nur als Objekt, ohne {@code width}
+     * ohne Kontur, ohne {@code color} in {@link #KONTURFARBE}. Wo das Format schweigt, wie die Webkarte.
      */
     private static Schrift schrift(JsonObject o, String dimension) {
         String text = text(o, "text", MAX_TEXT);
         if (text == null || text.isBlank()) {
             throw new IllegalArgumentException("Text");
         }
+        text = Normalizer.normalize(text, Normalizer.Form.NFC);
         double[] pfad = ring(o.getAsJsonArray("path"), 1);
         if (pfad.length / 2 > MAX_PFAD) {
             throw new IllegalArgumentException("Pfad " + pfad.length / 2);
         }
         float groesse = o.has("size") ? o.get("size").getAsFloat() : 16;
-        if (!(groesse > 0 && groesse <= MAX_RADIUS)) {
+        if (!(groesse > 0)) {
+            groesse = 16;
+        }
+        if (groesse > MAX_RADIUS) {
             throw new IllegalArgumentException("Grösse " + groesse);
         }
         float sperrung = o.has("spacing") ? o.get("spacing").getAsFloat() : 0;
@@ -460,10 +466,10 @@ final class Ebenen {
         int farbe = o.has("color") ? farbeMitAlpha(o.get("color").getAsString(), SCHRIFTFARBE) : SCHRIFTFARBE;
         int konturFarbe = KONTURFARBE;
         float konturBreite = 0;
-        if (o.has("outline")) {
+        if (o.has("outline") && o.get("outline").isJsonObject()) {
             JsonObject k = o.getAsJsonObject("outline");
             konturFarbe = k.has("color") ? farbeMitAlpha(k.get("color").getAsString(), KONTURFARBE) : KONTURFARBE;
-            float b = k.has("width") ? k.get("width").getAsFloat() : 2;
+            float b = k.has("width") ? k.get("width").getAsFloat() : 0;
             konturBreite = b > 0 ? Math.min(b, MAX_BREITE) : 0;
         }
         return new Schrift(dimension, text, pfad, groesse, sperrung, farbe, konturFarbe, konturBreite, box(List.of(pfad)));
