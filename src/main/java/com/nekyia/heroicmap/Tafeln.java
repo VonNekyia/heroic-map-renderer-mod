@@ -24,6 +24,23 @@ final class Tafeln {
     static final int MAX = 256, MAX_GEFRAGT = 1024;
     /** So lange wartet der Mod auf eine Antwort, bevor er einmal neu fragt, und danach noch einmal, bevor er aufgibt. */
     static final long WARTEN_MS = 5000;
+    /** So lange ohne Antwort zeigt die Karte nichts, erst danach „lädt …“; so blitzt es bei einem Ziel ohne Tafel nicht. */
+    static final long LAEDT_MS = 200;
+
+    /** Das Ziel eines Orts: die {@code version} der Daten, aus denen er kommt, nicht die der Liste. */
+    static Ziel ziel(String ebene, Ebenen.Ort o) {
+        return new Ziel(ebene, o.version(), o.id());
+    }
+
+    /** Das Ziel einer Fläche oder eines Kreises: die {@code version} der gezeichneten Daten seiner Ebene. */
+    static Ziel ziel(Ebenen e, String ebene, String id) {
+        return new Ziel(ebene, e.version(ebene), id);
+    }
+
+    /** Wird die Ebene des Ziels noch gezeichnet, in der {@code version} des Ziels? Sonst geht seine Tafel zu. */
+    static boolean gilt(Ebenen e, Ziel z) {
+        return z.version().equals(e.version(z.ebene())) && e.sichtbar().stream().anyMatch(x -> x.id().equals(z.ebene()));
+    }
 
     /** Ein Objekt einer Ebene in einer {@code version}. */
     record Ziel(String ebene, String version, String id) {
@@ -82,8 +99,8 @@ final class Tafeln {
     /**
      * Die Tafel des Ziels: leer, wenn es keine hat; null, solange die Antwort aussteht. Beim ersten
      * Mal fragt sie das Plugin, nach {@link #WARTEN_MS} ohne Antwort einmal neu. Bleibt auch die
-     * zweite ohne Antwort oder geht keine Frage hinaus, weil der Server den Kanal nicht hört, gilt
-     * das Ziel als ohne Tafel.
+     * zweite ohne Antwort, gilt das Ziel als ohne Tafel. Geht keine Frage hinaus, weil der Server den
+     * Kanal nicht hört, ist es ohne Tafel, ungemerkt.
      */
     Optional<Tafel> tafel(Ziel z, long ms) {
         neueVersion(z);
@@ -95,19 +112,23 @@ final class Tafeln {
         if (f != null && ms - f.seit() < WARTEN_MS) {
             return null;
         }
-        if ((f == null || f.mal() < 2) && frage.test(z)) {
+        if (f != null && f.mal() >= 2) {
             gefragt.remove(z);
-            gefragt.put(z, new Frage(ms, f == null ? 1 : 2));
-            if (gefragt.size() > MAX_GEFRAGT) {
-                Iterator<Ziel> aelteste = gefragt.keySet().iterator();
-                aelteste.next();
-                aelteste.remove();
-            }
-            return null;
+            tafeln.put(z, Optional.empty());
+            return Optional.empty();
+        }
+        if (!frage.test(z)) {
+            // Ohne Kanal ohne Tafel, aber nicht gemerkt: Hört der Server später, fragt der Mod dann.
+            return Optional.empty();
         }
         gefragt.remove(z);
-        tafeln.put(z, Optional.empty());
-        return Optional.empty();
+        gefragt.put(z, new Frage(ms, f == null ? 1 : 2));
+        if (gefragt.size() > MAX_GEFRAGT) {
+            Iterator<Ziel> aelteste = gefragt.keySet().iterator();
+            aelteste.next();
+            aelteste.remove();
+        }
+        return null;
     }
 
     /** Eine Antwort; nur auf eine Frage, die noch offen ist. */
@@ -210,8 +231,9 @@ final class Tafeln {
         }
 
         /**
-         * Schliesst die Tafel; true, wenn eine offen war. So schliessen Escape und ein Klick daneben zuerst
-         * nur sie. Das Ziel unter dem Zeiger öffnet sie nicht gleich wieder.
+         * Schliesst die Tafel von Hand, mit Escape, × oder einem Klick; true, wenn eine offen war. So
+         * schliessen Escape und ein Klick daneben zuerst nur sie. Das Ziel unter dem Zeiger öffnet sie
+         * nicht gleich wieder.
          */
         boolean schliesse() {
             boolean war = offen != null;
@@ -225,8 +247,19 @@ final class Tafeln {
         /** Die Antwort zur offenen Tafel, null, solange sie aussteht: Gibt es keine, geht sie zu, auch gehalten. */
         void antwort(Optional<Tafel> t) {
             if (offen != null && t != null && t.isEmpty()) {
-                schliesse();
+                zu();
             }
+        }
+
+        /**
+         * Schliesst die Tafel von selbst, ohne Hand: Das geschlossene Ziel öffnet erst wieder, wenn der
+         * Zeiger ein anderes berührt hat; ein anderes Ziel unter dem Zeiger öffnet wie sonst.
+         */
+        void zu() {
+            gesperrt = offen;
+            offen = null;
+            gehalten = false;
+            weg = -1;
         }
 
         Ziel offen() {

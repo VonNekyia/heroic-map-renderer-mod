@@ -105,6 +105,8 @@ final class Symbole {
     private InetAddress spielserver;
     /** Gesetzt, sobald das Log einmal sagte, dass über alle Ebenen kein Bild mehr dazukommt; bis zum Leeren. */
     private boolean voll;
+    /** Zählt jedes angekommene Symbol und Banner; die Vollbildkarte sucht ihr Ziel danach neu. */
+    private int stand;
     /** Ein Bild einer Tafel in der Grösse, in der die Tafel es zeigt. */
     private record Tafelbild(String ebene, String version, String feld, int breite, int hoehe) {
     }
@@ -186,7 +188,8 @@ final class Symbole {
 
     /**
      * Ein Bild einer Tafel, höchstens {@link Tafel#MAX_BILD} im Quadrat, für {@code breite} × {@code hoehe}
-     * auf der Tafel: Ist es grösser, verkleinert der Mod es vorab geglättet auf genau diese Grösse.
+     * Pixel des Schirms, also die Grösse auf der Tafel mal GUI-Massstab: Ist es grösser, verkleinert der
+     * Mod es vorab geglättet auf genau diese Grösse.
      * Eigenes Budget, unabhängig von Symbolen und Bannern; sonst wie {@link #symbol}.
      */
     Textur tafelBild(String ebene, String version, String feld, int breite, int hoehe) {
@@ -220,6 +223,10 @@ final class Symbole {
             });
         });
         return null;
+    }
+
+    int stand() {
+        return stand;
     }
 
     /** Über dem Budget: die am längsten nicht gezeigten Bilder der Tafeln frei, das neueste bleibt. */
@@ -301,6 +308,7 @@ final class Symbole {
                 renderThread.execute(() -> {
                     if (r == runde.get() && !ziel.frei && ebenen.get(ebene) == ziel && ziel.texturen.containsKey(schluessel)) {
                         ziel.texturen.put(schluessel, new Textur(ablage.apply(uri, bild), bild.breite(), bild.hoehe()));
+                        stand++;
                     }
                 });
             }

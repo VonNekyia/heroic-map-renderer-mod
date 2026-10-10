@@ -169,7 +169,8 @@ record Tafel(List<Baustein> bausteine) {
         default String kuerze(String text, int breite, boolean fett) {
             String t = text;
             while (!t.isEmpty() && breite(t, fett) > breite) {
-                t = t.substring(0, t.length() - 1);
+                // Nach Codepoints, so teilt es kein Surrogatpaar.
+                t = t.substring(0, t.offsetByCodePoints(t.length(), -1));
             }
             return t;
         }
@@ -274,6 +275,14 @@ record Tafel(List<Baustein> bausteine) {
     /** Die Spalte der Labels einer Wertung: das breiteste Label und die Lücke, höchstens {@link #LABEL}. */
     private static int spalte(Wertung w, Masse m) {
         return Math.min(w.reihen().stream().mapToInt(r -> m.breite(r.name(), false)).max().orElse(0) + LUECKE, LABEL);
+    }
+
+    /**
+     * Um wie viel ein Bild von {@code w} × {@code h} Pixeln in einem Kasten von {@code kw} × {@code kh}
+     * Pixeln vergrössert steht: ein ganzer Faktor, abgerundet, mindestens 1; so bleibt es im Kasten.
+     */
+    static int faktor(int w, int h, int kw, int kh) {
+        return Math.max(1, Math.min(kw / w, kh / h));
     }
 
     /** Wie breit ein Baustein ohne Umbruch wäre. */

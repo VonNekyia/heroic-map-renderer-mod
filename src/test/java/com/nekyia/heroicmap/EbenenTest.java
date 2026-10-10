@@ -640,6 +640,31 @@ class EbenenTest {
     }
 
     @Test
+    void zielDerKarteMitDerVersionDerDaten() {
+        // Wie Karte.tafelUnter und Karte.tafel: Solange v2 nicht ganz da ist, trägt das Ziel v1 und gilt; sonst ginge
+        // die Tafel jeden Frame zu.
+        Ebenen e = new Ebenen();
+        liste(e, eintrag("b:staedte", "v1"));
+        teil(e, "b:staedte", "v1", 1, 1, nadel("alt", 1));
+        liste(e, eintrag("b:staedte", "v2"));
+        teil(e, "b:staedte", "v2", 1, 2, nadel("neu1", 1));
+        Tafeln.Ziel ort = Tafeln.ziel("b:staedte", e.nadeln("b:staedte").getFirst());
+        Tafeln.Ziel flaeche = Tafeln.ziel(e, "b:staedte", "f");
+        assertEquals(new Tafeln.Ziel("b:staedte", "v1", "alt"), ort);
+        assertEquals("v1", flaeche.version());
+        assertTrue(Tafeln.gilt(e, ort));
+        assertTrue(Tafeln.gilt(e, flaeche));
+        // Ist v2 ganz da, gilt das alte Ziel nicht mehr; ausgeschaltet gilt keins.
+        teil(e, "b:staedte", "v2", 2, 2, nadel("neu2", 2));
+        assertFalse(Tafeln.gilt(e, ort));
+        Tafeln.Ziel neu = Tafeln.ziel("b:staedte", e.nadeln("b:staedte").getFirst());
+        assertEquals("v2", neu.version());
+        assertTrue(Tafeln.gilt(e, neu));
+        e.setze("b:staedte", false);
+        assertFalse(Tafeln.gilt(e, neu));
+    }
+
+    @Test
     void kastenOhneHolenEnthaeltDenGenauen() {
         // Zum Wegschneiden und als Vorprüfung beim Treffer: Jedes Banner bis 32 × 64 liegt im groben Kasten.
         Ebenen.Banner b = new Ebenen.Banner(0, 0, Ebenen.UEBERWELT, "x", "images/b.png", "b:e", "v", "id");

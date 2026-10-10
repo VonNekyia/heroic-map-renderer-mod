@@ -56,6 +56,7 @@ final class Karte extends Screen {
     /** Die offene Tafel: ihr Ziel, wo der Zeiger war, als sie aufging, wie weit sie gescrollt ist, und wo sie und ihr Knopf zuletzt lagen. */
     private Tafeln.Ziel tafelOffen;
     private int tafelX, tafelY, tafelScroll;
+    private long tafelSeit;
     private int[] tafelKasten, tafelKnopf;
     /** Ist die Tafel höher als ihr Platz? Nur dann scrollt das Rad sie statt die Karte zu zoomen. */
     private boolean tafelZuHoch;
@@ -464,8 +465,8 @@ final class Karte extends Screen {
         long ms = Util.getMillis();
         boolean ueber = drin(tafelKasten, mausX, mausY);
         zeigen.zeiger(ziel == null && !ueber && !(taste && gezogen > ZUG) ? zielUnter(mausX, mausY) : null, ueber, ms);
-        if (zeigen.offen() != null && !gilt(zeigen.offen())) {
-            zeigen.schliesse();
+        if (zeigen.offen() != null && !Tafeln.gilt(Ebenen.INSTANZ, zeigen.offen())) {
+            zeigen.zu();
         }
         Optional<Tafel> t = zeigen.offen() == null ? null : Tafeln.INSTANZ.tafel(zeigen.offen(), ms);
         zeigen.antwort(t);
@@ -475,11 +476,12 @@ final class Karte extends Screen {
             tafelX = mausX;
             tafelY = mausY;
             tafelScroll = 0;
+            tafelSeit = ms;
         }
         tafelKasten = null;
         tafelKnopf = null;
         tafelZuHoch = false;
-        if (offen == null) {
+        if (offen == null || t == null && ms - tafelSeit < Tafeln.LAEDT_MS) {
             return;
         }
         Tafel.Satz s = t == null ? laedt() : satz(t.get());
@@ -503,15 +505,25 @@ final class Karte extends Screen {
                 }
                 case Tafel.Bildstueck b -> {
                     int bx = x + Tafel.INNEN + b.x(), by = y + Tafel.INNEN + b.y() - tafelScroll;
-                    Symbole.Textur bild = Symbole.INSTANZ.tafelBild(offen.ebene(), offen.version(), b.bild().feld(), b.breite(), b.hoehe());
+                    // In Pixeln des Schirms: Grösser als sein Kasten ist das Bild schon auf ihn verkleinert, Pixel auf Pixel;
+                    // kleiner vergrössert der Mod es um einen ganzen Faktor, abgerundet, so bleibt es im Kasten.
+                    int gs = minecraft.getWindow().getGuiScale(), pw = b.breite() * gs, ph = b.hoehe() * gs;
+                    Symbole.Textur bild = Symbole.INSTANZ.tafelBild(offen.ebene(), offen.version(), b.bild().feld(), pw, ph);
                     if (bild != null) {
-                        // Grösser ist es schon verkleinert; kleiner vergrössert der Mod um einen ganzen Faktor, gerundet, wie bei Bannern.
-                        int f = Math.max(1, Math.round(Math.min((float) b.breite() / bild.breite(), (float) b.hoehe() / bild.hoehe())));
-                        g.blit(RenderPipelines.GUI_TEXTURED, bild.id(), bx, by, 0, 0, bild.breite() * f, bild.hoehe() * f, bild.breite(),
+                        int f = Tafel.faktor(bild.breite(), bild.hoehe(), pw, ph);
+                        g.pose().pushMatrix();
+                        g.pose().translate(bx, by);
+                        g.pose().scale(1f / gs);
+                        g.blit(RenderPipelines.GUI_TEXTURED, bild.id(), 0, 0, 0, 0, bild.breite() * f, bild.hoehe() * f, bild.breite(),
                                 bild.hoehe(), bild.breite(), bild.hoehe());
+                        g.pose().popMatrix();
                     } else if (b.bild().alt() != null) {
+                        // Umbrochen in der Breite, gekappt auf die Höhe des Bilds.
                         int zy = by;
                         for (FormattedCharSequence zeile : font.split(Component.literal(b.bild().alt()), b.breite())) {
+                            if (zy + font.lineHeight > by + b.hoehe()) {
+                                break;
+                            }
                             g.text(font, zeile, bx, zy, Tafel.SCHRIFT, false);
                             zy += font.lineHeight;
                         }
@@ -544,18 +556,13 @@ final class Karte extends Screen {
         return tafelSatz;
     }
 
-    /** Wird die Ebene des Ziels noch gezeichnet, in der {@code version} des Ziels? Sonst geht seine Tafel zu. */
-    private static boolean gilt(Tafeln.Ziel z) {
-        return z.version().equals(Ebenen.INSTANZ.version(z.ebene())) && Ebenen.INSTANZ.sichtbar().stream().anyMatch(e -> e.id().equals(z.ebene()));
-    }
-
-    /** Das Ziel unter dem Zeiger, neu gesucht nur, wenn sich Zeiger, Ansicht, Ebenen oder Schrift ändern. */
+    /** Das Ziel unter dem Zeiger, neu gesucht nur, wenn sich Zeiger, Ansicht, Ebenen, Bilder oder Schrift ändern. */
     private Tafeln.Ziel zielUnter(double mx, double my) {
         if (blick == null) {
             return null;
         }
         double[] jetzt = {mx, my, blick.mx, blick.mz, blick.zoom, blick.lupe, width, height, minecraft.getWindow().getGuiScale(),
-            Ebenen.INSTANZ.stand(), Formen.generation};
+            Ebenen.INSTANZ.stand(), Symbole.INSTANZ.stand(), Formen.generation};
         if (!Arrays.equals(jetzt, suche)) {
             suche = jetzt;
             gefunden = tafelUnter(mx, my);
@@ -585,7 +592,7 @@ final class Karte extends Screen {
                 float[] m = Ebenen.kasten(font, o);
                 if (m != null && drin(m, x, y, mx, my)) {
                     // Die version der gezeichneten Daten, nicht die der Liste; die kann schon neuer sein.
-                    treffer = new Tafeln.Ziel(e.id(), o.version(), o.id());
+                    treffer = Tafeln.ziel(e.id(), o);
                 }
             }
         }
@@ -604,7 +611,7 @@ final class Karte extends Screen {
                     default -> null;
                 };
                 if (id != null && f.dimension().equals(dimension) && Tafeln.trifft(f, wx, wz)) {
-                    return new Tafeln.Ziel(ebenen.get(i).id(), Ebenen.INSTANZ.version(ebenen.get(i).id()), id);
+                    return Tafeln.ziel(Ebenen.INSTANZ, ebenen.get(i).id(), id);
                 }
             }
         }

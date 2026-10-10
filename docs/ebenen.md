@@ -373,11 +373,13 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
     `version` der gezeichneten Daten, nicht der Liste, die schon eine
     neuere nennen kann (`Ebenen.version`, `Ort.version`).
   - Er merkt eine Frage erst, wenn sie hinausging. Hört der Server den
-    Kanal nicht, gilt das Objekt gleich als ohne Tafel.
+    Kanal nicht, ist das Objekt ohne Tafel, ohne dass der Mod es sich
+    merkt; hört der Server später, fragt er dann.
   - Kommt nach 5 s keine Antwort, fragt er einmal neu; bleibt auch die
     ohne Antwort, gilt das Objekt nach weiteren 5 s als ohne Tafel, so
-    hat es der Reviewer entschieden. Solange er wartet, steht eine kleine
-    Tafel „lädt …“.
+    hat es der Reviewer entschieden. Wartet er länger als 200 ms, steht
+    eine kleine Tafel „lädt …“; vorher nichts, so blitzt sie bei einem
+    Objekt ohne Tafel nicht auf, auch das entschieden.
   - Er behält höchstens 256 Tafeln, die zuletzt gezeigten; eine Antwort
     ohne `panel`, mit einem unlesbaren oder einem ohne gültige Bausteine
     merkt er sich als „keine Tafel“.
@@ -411,8 +413,11 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   Karte, auch mit dem Zeiger auf dem Ziel. Ein Klick in die Tafel und ein
   Zug, der in ihr beginnt, wirken nie auf die Karte, ebenso der Druck,
   der eine gehaltene Tafel schliesst.
-- **Zu** geht sie auch, wenn ihr Objekt keine Tafel hat, auch gehalten,
-  und wenn ihre Ebene nicht mehr gezeichnet wird oder neue Daten hat.
+- **Zu** geht sie auch von selbst, wenn ihr Objekt keine Tafel hat, auch
+  gehalten, und wenn ihre Ebene nicht mehr gezeichnet wird oder neue
+  Daten hat. Dann öffnet dieses Objekt erst wieder, wenn der Zeiger ein
+  anderes berührt hat; ein anderes Ziel unter dem Zeiger öffnet wie sonst
+  (`Tafeln.Zeigen.zu`).
 - **Gelesen** (`Tafel.lies`): die Bausteine des Formats, `title`, `lines`,
   `image`, `section`, `rating` und `columns`; unbekannte fallen weg.
   Höchstens 64 Bausteine, zwei Ebenen tief: `columns` und `section` nur
@@ -427,14 +432,16 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   Spalte von 8 Einheiten für den Knopf ×. Titel fett, Zeilen umbrochen.
   Ein Abschnitt ohne Überschrift beginnt ohne Abstand. Bilder in ihrer
   Grösse, breiter als der Inhalt mit gleichem Seitenverhältnis
-  verkleinert; ohne Bild steht `alt`, umbrochen. Wertungen mit dem Label
+  verkleinert; ohne Bild steht `alt`, umbrochen und gekappt auf die Höhe
+  des Bilds. Wertungen mit dem Label
   links in einer Spalte so breit wie das breiteste und 4 Lücke, höchstens
   80; ein längeres Label ist abgeschnitten. Die Punkte 5 gross, die über
   dem Wert in der Farbe zu 25 % deckend. Spalten oben bündig, die rechte
   so breit wie ihr Inhalt, höchstens die Hälfte.
 - **Gespeichert:** der Satz der offenen Tafel, bis sich Tafel,
   GUI-Massstab oder Schrift ändern; das Ziel unter dem Zeiger sucht der
-  Mod nur neu, wenn sich Zeiger, Ansicht, Ebenen oder Schrift ändern.
+  Mod nur neu, wenn sich Zeiger, Ansicht, Ebenen oder Schrift ändern oder
+  ein Symbol oder Banner ankommt (`Symbole.stand`).
 - **Gezeichnet** über allem auf der Karte, unter dem Menü der rechten
   Taste. Der Grund ist der 9-Slice des Rahmens der Minimap,
   `rahmen/<skin>/tafel.png`, 16 × 16 mit 5 Rand; „ohne“ und „biom“ nehmen
@@ -446,10 +453,12 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   512 × 512 (`Symbole.tafelBild`), mit eigenem Budget: höchstens 16 MiB
   an Pixeln und 1024 Einträge, darüber gibt er die am längsten nicht
   gezeigten frei; so hat es der Reviewer entschieden. Die Deckel der
-  Symbole und Banner gelten für sie nicht. Grösser als auf der Tafel
-  verkleinert der Mod ein Bild vorab im eigenen Thread geglättet auf
-  genau ihre Grösse; kleiner vergrössert er es um einen ganzen Faktor,
-  gerundet, wie bei den Bannern.
+  Symbole und Banner gelten für sie nicht. Gerechnet in Pixeln des
+  Schirms: Grösser als auf der Tafel mal GUI-Massstab verkleinert der
+  Mod ein Bild vorab im eigenen Thread geglättet auf genau diese Grösse
+  und zeichnet es Pixel auf Pixel; so bleibt bei grossem Massstab das
+  Detail. Kleiner vergrössert er es um einen ganzen Faktor, abgerundet,
+  so bleibt es in seinem Kasten (`Tafel.faktor`).
 
 ![Die Tafel der Nadel „Nordhafen“ beim Zeigen; Szene `orte` des Gametests](bilder/tafel-zeigen.png)
 

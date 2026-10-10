@@ -102,13 +102,42 @@ class TafelnTest {
     }
 
     @Test
-    void ohneKanalGleichOhneTafel() {
-        // Geht die Frage nicht hinaus, merkt der Mod sie nicht; eine Antwort darauf gilt nicht.
-        Tafeln t = new Tafeln(z -> false);
+    void ohneKanalOhneTafelUngemerkt() {
+        // Geht die Frage nicht hinaus, ist das Ziel ohne Tafel, ungemerkt; eine Antwort darauf gilt nicht.
+        boolean[] kanal = {false};
+        Tafeln t = new Tafeln(z -> kanal[0]);
         Tafeln.Ziel z = new Tafeln.Ziel("b:e", "v", "a");
         assertEquals(Optional.empty(), t.tafel(z, 0));
         t.antwort(new Tafeln.Antwort(z, TAFEL));
-        assertEquals(Optional.empty(), t.tafel(z, 1));
+        assertEquals(0, t.behalten());
+        // Hört der Server später, fragt der Mod dann, und die Antwort gilt.
+        kanal[0] = true;
+        assertNull(t.tafel(z, 1));
+        t.antwort(new Tafeln.Antwort(z, TAFEL));
+        assertEquals(Optional.of(TAFEL), t.tafel(z, 2));
+    }
+
+    @Test
+    void vonSelbstZuSperrtDasGeschlosseneZiel() {
+        // A zeigt „lädt …“, der Zeiger geht auf B; dann kommt für A „ohne Tafel“. B öffnet trotzdem nach seiner Ruhe.
+        Tafeln.Zeigen z = new Tafeln.Zeigen();
+        Tafeln.Ziel a = new Tafeln.Ziel("b:e", "v", "a"), b = new Tafeln.Ziel("b:e", "v", "b");
+        z.zeiger(a, false, 0);
+        z.zeiger(a, false, Tafeln.Zeigen.RUHE_MS);
+        assertEquals(a, z.offen());
+        z.zeiger(b, false, 200);
+        z.antwort(Optional.empty());
+        assertNull(z.offen());
+        z.zeiger(b, false, 200 + Tafeln.Zeigen.RUHE_MS);
+        assertEquals(b, z.offen());
+        // Gesperrt ist A: Mit dem Zeiger wieder auf A und Ruhe öffnet es, denn der Zeiger berührte dazwischen B.
+        z.zeiger(a, false, 1000);
+        z.zeiger(a, false, 1000 + Tafeln.Zeigen.RUHE_MS);
+        assertEquals(a, z.offen());
+        // Bleibt der Zeiger auf dem Ziel ohne Tafel, öffnet es nicht im Kreis.
+        z.antwort(Optional.empty());
+        z.zeiger(a, false, 2000);
+        assertNull(z.offen());
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.nekyia.heroicmap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -142,6 +143,23 @@ class TafelTest {
         assertEquals(Tafel.LABEL, punkt.x());
         assertTrue(MASSE.breite(label.text(), false) <= Tafel.LABEL - Tafel.LUECKE);
         assertTrue(label.text().length() < 40);
+    }
+
+    @Test
+    void faktorAbgerundet() {
+        // 30 Pixel in einem Kasten von 48: nicht 60 breit, sondern 30; 16 in 48 dreimal; das Seitenverhältnis zählt.
+        assertEquals(1, Tafel.faktor(30, 30, 48, 48));
+        assertEquals(3, Tafel.faktor(16, 16, 48, 48));
+        assertEquals(1, Tafel.faktor(30, 10, 48, 48));
+        assertEquals(1, Tafel.faktor(64, 64, 48, 48));
+    }
+
+    @Test
+    void kuerzenTeiltKeinSurrogatpaar() {
+        // Im Test zählt jedes char 6: Ein Emoji ist zwei char, gekürzt bleibt es ganz oder fehlt ganz.
+        String t = MASSE.kuerze("\uD83D\uDE00".repeat(10), 6 * 7, false);
+        assertEquals(6, t.length());
+        assertFalse(Character.isHighSurrogate(t.charAt(t.length() - 1)));
     }
 
     @Test

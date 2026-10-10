@@ -186,9 +186,12 @@ class SymboleTest {
         Aufbau a = aufbau();
         Symbole s = a.symbole();
         // Zwei Banner mit demselben Bild: eine Anfrage, eine Textur in 22 × 40.
+        int stand = s.stand();
         assertNull(s.banner("beispiel:staedte", "v1", "images/banner.png"));
         assertNull(s.banner("beispiel:staedte", "v1", "images/banner.png"));
         s.warte();
+        // Ein angekommenes Bild hebt den Stand; die Vollbildkarte sucht ihr Ziel danach neu.
+        assertEquals(stand + 1, s.stand());
         Symbole.Textur t = s.banner("beispiel:staedte", "v1", "images/banner.png");
         assertEquals(t, s.banner("beispiel:staedte", "v1", "images/banner.png"));
         assertEquals(List.of(PFAD + "banner.png"), new ArrayList<>(anfragen));
