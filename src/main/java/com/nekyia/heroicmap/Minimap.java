@@ -75,7 +75,10 @@ public final class Minimap {
     static final long BUDGET_NS = 2_000_000L;
     /** So viele Chunks hat der Worker höchstens vor sich. */
     private static final int IN_ARBEIT = 4;
-    /** Seite der Minimap in Einheiten des GUI: Vorgabe, kleinste, grösste. Ein Pixel der Minimap ist eine Einheit. */
+    /**
+     * Seite der Minimap in Einheiten des GUI: Vorgabe im ersten Schirm, kleinste beim Ziehen,
+     * grösste immer. Ein Pixel der Minimap ist eine Einheit.
+     */
     static final int GROESSE = 128, KLEINSTE = 64, GROESSTE = 256;
     /** Chunks je Richtung über den sichtbaren Bereich hinaus. */
     static final int VORRAT = 2;
@@ -139,7 +142,12 @@ public final class Minimap {
     private Rahmen eckenRahmen;
     private boolean eckenRund;
     private double[][] ecken;
+    /** Die Seite als Anteil der kürzeren Seite des Schirms; NaN, bis der erste Schirm ihn aus {@link #groesse} ableitet. Siehe docs/minimap.md, „Bedienung“. */
+    private float anteil = Float.NaN;
+    /** Die Seite in Einheiten, solange der Anteil fehlt: die Vorgabe oder {@code groesse} aus einer älteren Datei. */
     private int groesse = GROESSE;
+    /** Die Seite aus dem letzten {@link #rahmen(int, int)}, nach ihr richtet sich die Reichweite. */
+    private int seite = GROESSE;
     /** Wie die Ordner der Welten heissen, siehe docs/download.md, „Ablage“. */
     private Downloads.Ablage ablage = Downloads.Ablage.IP;
     /** Die Lage im freien Platz des Schirms: 0 links oder oben, 1 rechts oder unten. */
@@ -355,8 +363,23 @@ public final class Minimap {
         }
     }
 
+    /**
+     * Lage und Seite auf diesem Schirm: Die Seite ist ein Anteil seiner kürzeren Seite, so folgt sie
+     * dem Fenster; höchstens {@link #GROESSTE}, das hält die Kosten. Siehe docs/entscheidungen/0013-groesse-als-anteil-des-schirms.md.
+     */
     Rahmen rahmen(int breite, int hoehe) {
-        return rahmen(breite, hoehe, groesse, lageX, lageY, rand());
+        int kurz = Math.min(breite, hoehe);
+        if (Float.isNaN(anteil) && kurz > 0) {
+            // Ohne Anteil gilt die Seite im ersten Schirm; so springt nichts.
+            anteil = groesse / (float) kurz;
+        }
+        Rahmen r = rahmen(breite, hoehe, Float.isNaN(anteil) ? groesse : Math.min(GROESSTE, Math.round(anteil * kurz)), lageX, lageY, rand());
+        if (r.seite() != seite) {
+            // Gezogen oder ein anderes Fenster: Die Reichweite ändert sich, der nächste Frame passt den Bereich an.
+            seite = r.seite();
+            mitte = null;
+        }
+        return r;
     }
 
     /** Der Abstand zum Rand des Schirms: {@link #RAND}, mit Rahmen mindestens dessen Einrückung, so bleibt die zier ganz auf dem Schirm. */
@@ -383,14 +406,9 @@ public final class Minimap {
                 rand + Math.round(lageY * (hoehe - seite - 2 * rand)), seite);
     }
 
-    /** Gibt der Minimap die Seite und legt sie dann wie {@link #verschiebe}. */
+    /** Gibt der Minimap die Seite auf diesem Schirm, als Anteil gemerkt, und legt sie dann wie {@link #verschiebe}. */
     void stelle(int x, int y, int seite, int breite, int hoehe) {
-        int neu = Mth.clamp(seite, KLEINSTE, GROESSTE);
-        if (neu != groesse) {
-            groesse = neu;
-            // Die Reichweite ändert sich; der nächste Frame passt den Bereich an.
-            mitte = null;
-        }
+        anteil = Mth.clamp(seite, KLEINSTE, GROESSTE) / (float) Math.min(breite, hoehe);
         verschiebe(x, y, breite, hoehe);
     }
 
@@ -443,7 +461,10 @@ public final class Minimap {
             case "ip_port" -> Downloads.Ablage.IP_PORT;
             default -> Downloads.Ablage.IP;
         };
+        // Vor dem Anteil stand die Seite in Einheiten; sie gilt im ersten Schirm, siehe rahmen.
         groesse = Mth.clamp(zahl(p.getProperty("groesse"), GROESSE), KLEINSTE, GROESSTE);
+        float a = bruch(p.getProperty("groesse_anteil"), Float.NaN);
+        anteil = a > 0 ? a : Float.NaN;
         lageX = bruch(p.getProperty("lage_x"), 1);
         lageY = bruch(p.getProperty("lage_y"), 0);
     }
@@ -464,7 +485,11 @@ public final class Minimap {
             p.setProperty("rahmen_wahl", skin);
         }
         p.setProperty("ablage", ablage.name().toLowerCase(Locale.ROOT));
-        p.setProperty("groesse", Integer.toString(groesse));
+        if (Float.isNaN(anteil)) {
+            p.setProperty("groesse", Integer.toString(groesse));
+        } else {
+            p.setProperty("groesse_anteil", Float.toString(anteil));
+        }
         p.setProperty("lage_x", Float.toString(lageX));
         p.setProperty("lage_y", Float.toString(lageY));
         try {
@@ -524,7 +549,7 @@ public final class Minimap {
 
     /** Chunks je Richtung um den Spieler, die die Minimap zeichnet: sichtbar plus Vorrat. */
     int reichweite() {
-        return reichweite(zoom, sicht(groesse, drehen, rund));
+        return reichweite(zoom, sicht(seite, drehen, rund));
     }
 
     /** Wie viel Gegend die Minimap braucht, als Seite eines Quadrats: eckig und gedreht reicht sie in den Ecken √2 weiter. */
@@ -571,9 +596,10 @@ public final class Minimap {
             gibUmrissFrei();
             return;
         }
+        // Vor arbeite: Die Seite bestimmt die Reichweite.
+        Rahmen r = rahmen(g.guiWidth(), g.guiHeight());
         arbeite(mc, level, spieler);
 
-        Rahmen r = rahmen(g.guiWidth(), g.guiHeight());
         float a = anteil(level, spieler, zeit);
         int k = mc.getWindow().getGuiScale(), n = r.seite() * k;
         int links = ecke(spieler.xo, spieler.getX(), a, zoom, k, n);

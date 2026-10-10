@@ -100,6 +100,52 @@ class MinimapTest {
     }
 
     @Test
+    void groesseFolgtDemFenster(@TempDir Path ordner) throws Exception {
+        // Der erste Schirm nimmt die Vorgabe als Anteil seiner kürzeren Seite: 854 × 480 bei GUI-Massstab 2.
+        Minimap m = new Minimap();
+        m.setzeSkin(Skin.OHNE);
+        assertEquals(128, m.rahmen(427, 240).seite());
+        // 1280 × 720 beim selben GUI-Massstab: anderthalbmal so gross; bei GUI-Massstab 1 ebenso viele Pixel.
+        assertEquals(192, m.rahmen(640, 360).seite());
+        assertEquals(256, m.rahmen(854, 480).seite());
+        // Darüber nicht: 256 Einheiten halten die Kosten, siehe 0013.
+        assertEquals(Minimap.GROESSTE, m.rahmen(1280, 720).seite());
+        // Ein kleineres Fenster, eine kleinere Minimap, auch unter der kleinsten beim Ziehen; die Reichweite folgt.
+        assertEquals(43, m.rahmen(160, 80).seite());
+        assertEquals(Minimap.reichweite(m.zoom(), Minimap.sicht(43, true, false)), m.reichweite());
+        // Gezogen gilt die Seite für diesen Schirm; der Anteil übersteht den Neustart.
+        m.stelle(4, 4, 200, 640, 360);
+        assertEquals(200, m.rahmen(640, 360).seite());
+        assertEquals(133, m.rahmen(427, 240).seite());
+        Path datei = ordner.resolve("heroicmap.properties");
+        m.schreibe(datei);
+        Minimap neu = new Minimap();
+        neu.lies(datei);
+        neu.setzeSkin(Skin.OHNE);
+        assertEquals(133, neu.rahmen(427, 240).seite());
+    }
+
+    @Test
+    void alteGroesseGiltImErstenSchirm(@TempDir Path ordner) throws Exception {
+        // Eine Datei von vor dem Anteil: Die Seite in Einheiten gilt im ersten Schirm, danach folgt sie dem Fenster.
+        Path datei = ordner.resolve("heroicmap.properties");
+        Files.writeString(datei, "groesse=200\n");
+        Minimap m = new Minimap();
+        m.lies(datei);
+        m.setzeSkin(Skin.OHNE);
+        assertEquals(200, m.rahmen(640, 360).seite());
+        assertEquals(100, m.rahmen(320, 180).seite());
+        m.schreibe(datei);
+        assertTrue(Files.readString(datei).contains("groesse_anteil="));
+        // Ein Anteil von 0 oder Unlesbares gilt nicht; dann wieder die Seite aus groesse.
+        Files.writeString(datei, "groesse_anteil=0\ngroesse=100\n");
+        m = new Minimap();
+        m.lies(datei);
+        m.setzeSkin(Skin.OHNE);
+        assertEquals(100, m.rahmen(640, 360).seite());
+    }
+
+    @Test
     void einstellungenUeberstehenDenNeustart(@TempDir Path ordner) throws Exception {
         Path datei = ordner.resolve("config").resolve("heroicmap.properties");
         Minimap vorher = new Minimap();

@@ -84,10 +84,22 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
   oben nach links oben. Der weisse Griff sitzt an der Ecke, die zur Mitte des
   Schirms zeigt, rund auf dem Ring in der Diagonale dorthin; ihn ziehen
   macht die Minimap grösser oder kleiner, die Ecke gegenüber bleibt
-  stehen. Die Seite liegt zwischen 64 und 256 Einheiten des GUI
-  (`Minimap.KLEINSTE`, `Minimap.GROESSTE`) und höchstens so gross, wie der
-  Schirm Platz hat. Grösser zeigt mehr Gegend beim selben Zoom und
+  stehen, zwischen 64 und 256 Einheiten des GUI (`Minimap.KLEINSTE`,
+  `Minimap.GROESSTE`). Grösser zeigt mehr Gegend beim selben Zoom und
   zeichnet mehr Chunks, siehe „Neu zeichnen“, „Bereich“.
+- **Grösse nach dem Fenster:** Die Seite ist ein Anteil der kürzeren Seite
+  des Schirms (`Minimap.rahmen`), so hat es der User gewünscht, siehe
+  [0013](entscheidungen/0013-groesse-als-anteil-des-schirms.md). Ein
+  kleineres Fenster gibt eine kleinere Minimap, ein grösseres eine
+  grössere; der GUI-Massstab ändert ihre Grösse in Pixeln nicht. Die
+  Vorgabe sind 128 Einheiten im ersten Schirm, bei 854 × 480 und
+  GUI-Massstab 2 also 128 von 240. Die Seite ist höchstens 256 Einheiten
+  gross, das hält die Kosten, und höchstens so gross, wie der Schirm Platz
+  hat; in einem kleineren Fenster auch unter 64. Der Zoom bleibt, kleiner
+  zeigt also weniger Gegend.
+
+![Das ganze Fenster bei 854 × 480 und bei 1280 × 720, beide bei GUI-Massstab 2 und halb so gross: die Minimap anderthalbmal so gross](bilder/minimap-fenster.png)
+
 - **Knöpfe** stehen im grösseren freien Platz neben der Minimap, 200
   Einheiten breit oder schmaler, bis 120, wenn dort weniger Platz ist
   (`Einstellungen.spalte`), im Untermenü ebenso. Im Hauptmenü teilen sich
@@ -103,9 +115,12 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
 - **Gespeichert** wird beim Schliessen des Menüs, in
   `config/heroicmap.properties`. Die Lage steht dort als Anteil des freien
   Platzes, 0 links oder oben bis 1 rechts oder unten, so bleibt die Minimap
-  bei einer anderen Fenstergrösse in ihrer Ecke. Fehlt die Datei oder ist
-  ein Wert unlesbar, gilt die Vorgabe. Eine Datei von vor dem Zoom hat nur
-  `massstab`; dann gilt er für Auflösung und Zoom, der Ausschnitt bleibt.
+  bei einer anderen Fenstergrösse in ihrer Ecke. Die Seite steht als
+  `groesse_anteil`. Fehlt die Datei oder ist ein Wert unlesbar, gilt die
+  Vorgabe. Eine Datei von vor dem Zoom hat nur `massstab`; dann gilt er für
+  Auflösung und Zoom, der Ausschnitt bleibt. Eine Datei von vor dem Anteil
+  hat `groesse` in Einheiten; sie gilt im ersten Schirm und wird dort zum
+  Anteil, so springt nichts.
 - **Tasten:** Vorbelegt ist nur `.` für die
   [Vollbildkarte](vollbildkarte.md). „Minimap zeigen oder verbergen“ und
   „Zoom der Minimap“ gibt es auch als Tasten, ohne Belegung, unter
@@ -637,7 +652,8 @@ Der Gametest `Bilder` baut eine Szene in einer flachen Welt und nimmt die
 Minimap bei 1, 2 und 4 Pixeln je Block auf, mit dem Zoom gleich der
 Auflösung, dann rund bei 4 px, das Menü und das Untermenü
 „Einstellungen …“ (siehe „Bedienung“ und „Form“), den Rand rund ohne
-Rahmen bei GUI-Massstab 1 und 2 (siehe „Form“), zuletzt die
+Rahmen bei GUI-Massstab 1 und 2 (siehe „Form“), das ganze Fenster bei
+854 × 480 und 1280 × 720 (siehe „Bedienung“), zuletzt die
 Chunklinien auf Vollbildkarte und Minimap (siehe „Chunklinien“):
 
 ```bash

@@ -118,6 +118,7 @@ public final class Bilder implements FabricClientGameTest {
             rahmen(context);
             umriss(context);
             drehen(context, server);
+            fenster(context);
             vollbildkarte(context);
             formen(context, server);
             orte(context, server);
@@ -739,6 +740,52 @@ public final class Bilder implements FabricClientGameTest {
             Minimap.INSTANZ.setzeRund(false);
         });
         context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getYRot()) < 0.1f && Minimap.INSTANZ.fertig(), 1200);
+    }
+
+    /**
+     * Das ganze Fenster bei 854 × 480 und 1280 × 720, beide bei GUI-Massstab 2, halb so gross
+     * nebeneinander: Die Minimap ist im grösseren anderthalbmal so gross. Siehe docs/minimap.md, „Bedienung“.
+     */
+    private static void fenster(ClientGameTestContext context) {
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        int[][] groessen = {{854, 480}, {1280, 720}};
+        BufferedImage[] teile = new BufferedImage[groessen.length];
+        int[] seiten = new int[groessen.length];
+        for (int i = 0; i < groessen.length; i++) {
+            context.getInput().resizeWindow(groessen[i][0], groessen[i][1]);
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(2);
+                mc.resizeGui();
+            });
+            context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
+            context.waitTicks(2);
+            seiten[i] = context.computeOnClient(mc -> Minimap.INSTANZ.rahmen(mc.getWindow().getGuiScaledWidth(),
+                    mc.getWindow().getGuiScaledHeight()).seite());
+            Path bild = context.takeScreenshot(TestScreenshotOptions.of("fenster-" + i).disableCounterPrefix());
+            try {
+                BufferedImage ganz = ImageIO.read(bild.toFile());
+                teile[i] = new BufferedImage(ganz.getWidth() / 2, ganz.getHeight() / 2, BufferedImage.TYPE_INT_RGB);
+                teile[i].getGraphics().drawImage(ganz, 0, 0, teile[i].getWidth(), teile[i].getHeight(), null);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        context.getInput().resizeWindow(vorher[0], vorher[1]);
+        context.runOnClient(mc -> {
+            mc.options.guiScale().set(vorher[2]);
+            mc.resizeGui();
+        });
+        context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
+        if (Math.abs(seiten[1] - seiten[0] * 1.5) > 1) {
+            throw new AssertionError("Seite " + seiten[0] + " bei 854 × 480, " + seiten[1] + " bei 1280 × 720");
+        }
+        if (!AUSGABE.isEmpty()) {
+            try {
+                ImageIO.write(nebeneinander(0, teile), "png", Path.of(AUSGABE, "minimap-fenster.png").toFile());
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
     }
 
     /** Die Minimap samt Ornamenten: ihr Rahmen und so viel darum, wie sie Abstand zum Rand hält. */

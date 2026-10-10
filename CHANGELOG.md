@@ -4,6 +4,12 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.19
+
+- **Minimap size follows the window:** the minimap keeps its share of the window's shorter side, so a smaller window gives a smaller minimap. At most 256 GUI units, as before.
+
+
+
 ## 0.2.18
 
 - **Adding waypoints to a shape works on servers with layers:** after "Add point", the info panel of a region under the waypoints no longer opens where the menu was and swallows the next clicks; no panels open while a shape is being built.
