@@ -227,8 +227,18 @@ final class Kacheln implements AutoCloseable {
      * über TwelveMonkeys. Für die Symbole der Ebenen, siehe docs/ebenen.md, „Symbole“.
      */
     static Bild vp8l(byte[] webp, int seite) throws IOException {
-        BufferedImage bild = verlustfrei(webp, seite);
-        return bild == null ? null : new Bild(seite, seite, bild.getRGB(0, 0, seite, seite, null, 0, seite));
+        return vp8l(webp, seite, seite, false);
+    }
+
+    /** Wie {@link #vp8l(byte[], int)}, genau {@code breite} × {@code hoehe} oder mit {@code hoechstens} bis dahin. */
+    static Bild vp8l(byte[] webp, int breite, int hoehe, boolean hoechstens) throws IOException {
+        BufferedImage bild = verlustfrei(webp, breite, hoehe, hoechstens);
+        return bild == null ? null : bild(bild);
+    }
+
+    private static Bild bild(BufferedImage bild) {
+        int b = bild.getWidth(), h = bild.getHeight();
+        return new Bild(b, h, bild.getRGB(0, 0, b, h, null, 0, b));
     }
 
     /**
@@ -236,6 +246,10 @@ final class Kacheln implements AutoCloseable {
      * des Dekoders, ins selbe Bildformat wie TwelveMonkeys; jede andere WebP gibt null.
      */
     private static BufferedImage verlustfrei(byte[] webp, int seite) throws IOException {
+        return verlustfrei(webp, seite, seite, false);
+    }
+
+    private static BufferedImage verlustfrei(byte[] webp, int maxBreite, int maxHoehe, boolean hoechstens) throws IOException {
         // RIFF, Länge, WEBPVP8L, Länge, Signatur 0x2F, dann LSB zuerst 14 + 14 Bit Grösse − 1,
         // 1 Bit Alpha, 3 Bit Version.
         if (webp.length < 25 || webp[20] != 0x2F) {
@@ -247,7 +261,7 @@ final class Kacheln implements AutoCloseable {
             return null;
         }
         int breite = (kopf & 0x3FFF) + 1, hoehe = (kopf >>> 14 & 0x3FFF) + 1;
-        pruefe(breite, hoehe, seite);
+        pruefe(breite, hoehe, maxBreite, maxHoehe, hoechstens);
         BufferedImage bild = new BufferedImage(breite, hoehe,
                 (kopf >>> 28 & 1) == 1 ? BufferedImage.TYPE_4BYTE_ABGR : BufferedImage.TYPE_3BYTE_BGR);
         try (MemoryCacheImageInputStream rein = new MemoryCacheImageInputStream(
@@ -261,20 +275,26 @@ final class Kacheln implements AutoCloseable {
 
     /** Dekodiert eine PNG-Kachel; die Grösse aus dem Kopf muss {@code seite} × {@code seite} sein, wie bei WebP. */
     static Bild png(byte[] png, int seite) throws IOException {
+        return png(png, seite, seite, false);
+    }
+
+    /** Wie {@link #png(byte[], int)}, genau {@code breite} × {@code hoehe} oder mit {@code hoechstens} bis dahin; geprüft vor dem Dekodieren. */
+    static Bild png(byte[] png, int breite, int hoehe, boolean hoechstens) throws IOException {
         ImageReader leser = ImageIO.getImageReadersByFormatName("png").next();
         try (MemoryCacheImageInputStream rein = new MemoryCacheImageInputStream(new ByteArrayInputStream(png))) {
             leser.setInput(rein);
-            pruefe(leser.getWidth(0), leser.getHeight(0), seite);
-            BufferedImage bild = leser.read(0);
-            return new Bild(seite, seite, bild.getRGB(0, 0, seite, seite, null, 0, seite));
+            pruefe(leser.getWidth(0), leser.getHeight(0), breite, hoehe, hoechstens);
+            return bild(leser.read(0));
         } finally {
             leser.dispose();
         }
     }
 
-    private static void pruefe(int breite, int hoehe, int seite) throws IOException {
-        if (breite != seite || hoehe != seite) {
-            throw new IOException("Grösse " + breite + " × " + hoehe + " statt " + seite + " × " + seite);
+    private static void pruefe(int breite, int hoehe, int maxBreite, int maxHoehe, boolean hoechstens) throws IOException {
+        boolean gut = hoechstens ? breite >= 1 && hoehe >= 1 && breite <= maxBreite && hoehe <= maxHoehe
+                : breite == maxBreite && hoehe == maxHoehe;
+        if (!gut) {
+            throw new IOException("Grösse " + breite + " × " + hoehe + (hoechstens ? " über " : " statt ") + maxBreite + " × " + maxHoehe);
         }
     }
 
