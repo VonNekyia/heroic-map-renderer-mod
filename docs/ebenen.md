@@ -250,8 +250,15 @@ Thread des Netzes wie die Nadeln.
   denn jedes Abbild ist affin, dazu Schnitt, Pose und Grenzen. Im Stand
   kostet das je Frame fast nichts; im Flug und beim Drehen rechnet er neu.
 - **Budget an Ecken, nicht an Zeit:** Ein Neubau legt höchstens
-  1 000 000 Ecken (`Formen.MAX_ECKEN`); was darüber geht, fehlt. Bei
-  gleicher Ansicht fehlt immer dasselbe, also flackert nichts. Ein Budget
+  1 000 000 Ecken (`Formen.MAX_ECKEN`); was darüber geht, fehlt, und
+  ist das Budget leer, rechnet der Mod auch nicht weiter.
+  - Welche fehlen: Die Ebenen kommen nach `order`, die oberste zuletzt,
+    also fallen die obersten zuerst weg. Die Ebene an der Grenze verliert
+    erst ihre Ränder und Linien, dann ihre Füllungen.
+  - Bei ruhender Ansicht fehlt immer dasselbe, also flackert nichts.
+    Beim Bewegen kann sich die Grenze von Neubau zu Neubau verschieben.
+  - Das Log warnt einmal je Ebene und `version`, deren Formen das Budget
+    leeren. Ein Budget
   an Zeit wie beim Neuzeichnen der Karte, siehe [Minimap](minimap.md),
   „Neu zeichnen“, taugt hier nicht: Dort kann ein Abzug auf den nächsten
   Frame warten, eine halb gezeichnete Ebene aber flackerte. Warum so:
@@ -361,7 +368,12 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
   Neubau legt 1 000 000 Ecken, das Budget; geprüft geht er alle sichtbaren
   Formen einmal durch, die Füllungen mit ihren Trapezen. Die Trapeze
   rechnet er einmal je `version`, höchstens 256 Kanten je Punkt über alle
-  Bänder, das Einfügen beim Sortieren mitgezählt.
+  Bänder, das Sortieren mitgezählt. Die neuen Kanten eines Bands sortiert
+  er für sich und mischt sie unter die alten; so kostet es gleich viel, in
+  welcher Folge die Ecken kommen.
+- **Grafikkarte:** Das Budget zählt Ecken, nicht Pixel. 10 000
+  durchscheinende Kästen über die ganze Ansicht passen hinein, die
+  Grafikkarte zeichnet dann aber jeden Pixel 10 000-mal.
 
 ## Was noch fehlt
 
