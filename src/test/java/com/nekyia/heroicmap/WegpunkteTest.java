@@ -29,7 +29,7 @@ class WegpunkteTest {
 
         Wegpunkte nachher = new Wegpunkte();
         nachher.lies(ordner);
-        assertEquals(List.of(new Wegpunkte.Punkt(WELT, 12, -40, 0, true), new Wegpunkte.Punkt("minecraft:the_nether", 1, 2, 0, false)),
+        assertEquals(List.of(new Wegpunkte.Punkt(1, WELT, 12, -40, 0, true), new Wegpunkte.Punkt(2, "minecraft:the_nether", 1, 2, 0, false)),
                 nachher.punkte());
         assertTrue(nachher.angeheftet(SAM));
     }
@@ -106,13 +106,85 @@ class WegpunkteTest {
         w.umschalten(w.punkte().getFirst());
         Wegpunkte.Punkt erster = w.punkte().getFirst();
         assertTrue(w.verschiebe(erster, 10, -3));
-        assertEquals(new Wegpunkte.Punkt(WELT, 10, -3, erster.farbe(), true), w.punkte().getFirst());
+        assertEquals(new Wegpunkte.Punkt(erster.id(), WELT, 10, -3, erster.farbe(), true), w.punkte().getFirst());
         // Auf einen besetzten Block nicht, und einen, den es nicht mehr gibt, auch nicht.
         assertFalse(w.verschiebe(w.punkte().getFirst(), 5, 5));
         assertFalse(w.verschiebe(erster, 20, 20));
         Wegpunkte nachher = new Wegpunkte();
         nachher.lies(ordner);
         assertEquals(10, nachher.punkte().getFirst().x());
+    }
+
+    @Test
+    void festeIdsAuchAusAltenDateien() {
+        // Ohne id, mit doppelter id: Der Mod vergibt neue, nach der höchsten.
+        Wegpunkte w = new Wegpunkte();
+        w.lies(JsonParser.parseString("""
+                {"wegpunkte":[
+                  {"id":7,"dimension":"minecraft:overworld","x":1,"z":1,"farbe":0,"minimap":false},
+                  {"dimension":"minecraft:overworld","x":2,"z":2,"farbe":0,"minimap":false},
+                  {"id":7,"dimension":"minecraft:overworld","x":3,"z":3,"farbe":0,"minimap":false}]}
+                """).getAsJsonObject());
+        assertEquals(List.of(7, 8, 9), w.punkte().stream().map(Wegpunkte.Punkt::id).toList());
+        w.setze(WELT, 4, 4);
+        assertEquals(10, w.punkte().getLast().id());
+    }
+
+    @Test
+    void formenAusWegpunktenGehenMitUndBleiben(@TempDir Path ordner) {
+        Wegpunkte w = new Wegpunkte();
+        w.lies(ordner);
+        w.setze(WELT, 0, 0);
+        w.setze(WELT, 10, 0);
+        w.setze(WELT, 10, 10);
+        w.setze("minecraft:the_nether", 5, 5);
+        List<Integer> ids = w.punkte().stream().map(Wegpunkte.Punkt::id).toList();
+        // Zwei sind eine Linie, drei eine Region; der erste am Ende schliesst nur; eine andere Dimension nicht.
+        assertTrue(w.setzeForm(List.of(ids.get(0), ids.get(1))));
+        assertTrue(w.setzeForm(List.of(ids.get(0), ids.get(1), ids.get(2), ids.get(0))));
+        assertFalse(w.setzeForm(List.of(ids.get(0), ids.get(3))));
+        assertFalse(w.setzeForm(List.of(ids.get(0))));
+        assertFalse(w.eigeneFormen().get(0).region());
+        assertTrue(w.eigeneFormen().get(1).region());
+        assertEquals(List.of(ids.get(0), ids.get(1), ids.get(2)), w.eigeneFormen().get(1).punkte());
+        // Verschoben geht die Region mit.
+        w.verschiebe(w.punkte().get(2), 20, 20);
+        Ebenen.Flaeche f = (Ebenen.Flaeche) w.form(w.eigeneFormen().get(1));
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new double[] {0.5, 0.5, 20.5, 20.5}, f.box());
+        // Angeheftet zählt in die gemeinsamen 64; über den Neustart bleibt alles.
+        assertTrue(w.umschalten(w.eigeneFormen().get(1)));
+        assertEquals(1, w.angeheftet());
+        Wegpunkte nachher = new Wegpunkte();
+        nachher.lies(ordner);
+        assertEquals(w.eigeneFormen(), nachher.eigeneFormen());
+        // Ein gelöschter Wegpunkt fällt heraus: Die Region wird zur Linie, die Linie verschwindet.
+        nachher.loesche(nachher.punkte().getFirst());
+        assertEquals(1, nachher.eigeneFormen().size());
+        assertEquals(List.of(ids.get(1), ids.get(2)), nachher.eigeneFormen().getFirst().punkte());
+        assertFalse(nachher.eigeneFormen().getFirst().region());
+    }
+
+    @Test
+    void formenGrenzenUndAlteDatei() {
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        for (int i = 0; i <= Wegpunkte.MAX_PUNKTE_FORM; i++) {
+            w.setze(WELT, i, 0);
+        }
+        List<Integer> alle = w.punkte().stream().map(Wegpunkte.Punkt::id).toList();
+        assertFalse(w.setzeForm(alle));
+        assertTrue(w.setzeForm(alle.subList(0, Wegpunkte.MAX_PUNKTE_FORM)));
+        // Eine Datei von vor mod#79 ohne „eigene_formen“ liest der Mod ohne Fehler; Verweise ins Leere fallen weg.
+        Wegpunkte alt = new Wegpunkte();
+        alt.lies(JsonParser.parseString("""
+                {"wegpunkte":[{"id":1,"dimension":"minecraft:overworld","x":1,"z":1,"farbe":0,"minimap":false},
+                  {"id":2,"dimension":"minecraft:overworld","x":2,"z":2,"farbe":0,"minimap":false}],
+                 "eigene_formen":[{"punkte":[1,99,2],"farbe":1,"minimap":false},{"punkte":[99],"farbe":1,"minimap":false}]}
+                """).getAsJsonObject());
+        assertEquals(List.of(new Wegpunkte.EigeneForm(List.of(1, 2), 1, false)), alt.eigeneFormen());
+        Wegpunkte ohne = new Wegpunkte();
+        ohne.lies(JsonParser.parseString("{\"wegpunkte\":[]}").getAsJsonObject());
+        assertTrue(ohne.eigeneFormen().isEmpty());
     }
 
     @Test
@@ -157,7 +229,8 @@ class WegpunkteTest {
                  "spieler":["keine-uuid","00000000-0000-0000-0000-000000000001"]}
                 """).getAsJsonObject());
         // Die Farbe läuft in die Liste der Farben.
-        assertEquals(List.of(new Wegpunkte.Punkt(WELT, 1, 2, 99 % Wegpunkte.FARBEN.length, false)), w.punkte());
+        // Ohne id in der Datei vergibt der Mod die erste freie.
+        assertEquals(List.of(new Wegpunkte.Punkt(1, WELT, 1, 2, 99 % Wegpunkte.FARBEN.length, false)), w.punkte());
         assertTrue(w.angeheftet(SAM));
     }
 

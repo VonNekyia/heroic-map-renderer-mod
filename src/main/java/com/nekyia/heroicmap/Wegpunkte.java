@@ -37,8 +37,26 @@ final class Wegpunkte {
     /** Die Farben der Wegpunkte, der Reihe nach. */
     static final int[] FARBEN = {0xFFE04040, 0xFF4090F0, 0xFF40C040, 0xFFF0C020, 0xFFC050F0, 0xFFF08020, 0xFF40D0D0, 0xFFF070B0};
 
-    /** Ein Wegpunkt auf dem Block (x, z); {@code farbe} ist ein Index in {@link #FARBEN}. */
-    record Punkt(String dimension, int x, int z, int farbe, boolean angeheftet) {
+    /**
+     * Ein Wegpunkt auf dem Block (x, z), mit einer festen {@code id}, auf die eigene Formen verweisen;
+     * {@code farbe} ist ein Index in {@link #FARBEN}.
+     */
+    record Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet) {
+    }
+
+    /**
+     * Eine eigene Form aus Wegpunkten, über ihre ids in Reihenfolge: zwei sind eine Linie, drei und mehr
+     * eine Region. Verschiebt der Spieler einen Wegpunkt, geht die Form mit. Siehe docs/wegpunkte.md, „Formen aus Wegpunkten“.
+     */
+    record EigeneForm(List<Integer> punkte, int farbe, boolean angeheftet) {
+
+        EigeneForm {
+            punkte = List.copyOf(punkte);
+        }
+
+        boolean region() {
+            return punkte.size() >= 3;
+        }
     }
 
     /**
@@ -58,6 +76,8 @@ final class Wegpunkte {
 
     /** So viele eigene Regionen je Welt; darüber setzt der Mod keine neue. */
     static final int MAX_REGIONEN = 256;
+    /** So viele eigene Formen aus Wegpunkten je Welt, und so viele Punkte je Form. */
+    static final int MAX_EIGENE_FORMEN = 256, MAX_PUNKTE_FORM = 64;
     /** So viele Regionen und Kreise je Welt angeheftet, eigene und vom Server zusammen; darüber heftet der Mod keine an. */
     static final int MAX_ANGEHEFTET = 64;
     /** So viele Nadeln und Banner je Welt angeheftet, eine eigene Grenze; darüber heftet der Mod keine an. */
@@ -67,6 +87,9 @@ final class Wegpunkte {
 
     private final List<Punkt> punkte = new ArrayList<>();
     private final List<Region> regionen = new ArrayList<>();
+    private final List<EigeneForm> eigene = new ArrayList<>();
+    /** Die nächste freie id eines Wegpunkts. */
+    private int naechsteId = 1;
     /** Die Mitspieler, die auf der Minimap angeheftet sind. */
     private final Set<UUID> spieler = new LinkedHashSet<>();
     /** Die angehefteten Flächen und Kreise vom Server. */
@@ -123,7 +146,9 @@ final class Wegpunkte {
         for (JsonElement element : liste(json, "wegpunkte")) {
             try {
                 JsonObject o = element.getAsJsonObject();
-                Punkt p = new Punkt(o.get("dimension").getAsString(), o.get("x").getAsInt(), o.get("z").getAsInt(),
+                // Eine Datei von vor mod#79 nennt keine id; dann vergibt der Mod sie unten.
+                int id = o.has("id") ? o.get("id").getAsInt() : 0;
+                Punkt p = new Punkt(id, o.get("dimension").getAsString(), o.get("x").getAsInt(), o.get("z").getAsInt(),
                         Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length), o.get("minimap").getAsBoolean());
                 if (finde(p.dimension(), p.x(), p.z()) < 0) {
                     punkte.add(p);
@@ -132,6 +157,7 @@ final class Wegpunkte {
                 // Nur dieser Eintrag fällt weg.
             }
         }
+        vergibIds();
         for (JsonElement element : liste(json, "regionen")) {
             try {
                 JsonObject o = element.getAsJsonObject();
@@ -163,6 +189,23 @@ final class Wegpunkte {
                 // Nur dieser Eintrag fällt weg.
             }
         }
+        // Eine Datei von vor mod#79 hat keine eigenen Formen. Verweise auf Wegpunkte, die es nicht gibt, fallen weg.
+        for (JsonElement element : liste(json, "eigene_formen")) {
+            try {
+                JsonObject o = element.getAsJsonObject();
+                List<Integer> ids = new ArrayList<>();
+                for (JsonElement id : o.getAsJsonArray("punkte")) {
+                    ids.add(id.getAsInt());
+                }
+                List<Integer> gueltig = gueltig(ids);
+                if (gueltig != null && eigene.size() < MAX_EIGENE_FORMEN) {
+                    eigene.add(new EigeneForm(gueltig, Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length),
+                            o.get("minimap").getAsBoolean() && angeheftet() < MAX_ANGEHEFTET));
+                }
+            } catch (RuntimeException kaputt) {
+                // Nur dieser Eintrag fällt weg.
+            }
+        }
         // Eine Datei von vor mod#71 hat keine Liste; dann ist keine Nadel angeheftet.
         for (JsonElement element : liste(json, "nadeln")) {
             try {
@@ -184,6 +227,7 @@ final class Wegpunkte {
         JsonArray liste = new JsonArray();
         for (Punkt p : punkte) {
             JsonObject o = new JsonObject();
+            o.addProperty("id", p.id());
             o.addProperty("dimension", p.dimension());
             o.addProperty("x", p.x());
             o.addProperty("z", p.z());
@@ -211,6 +255,17 @@ final class Wegpunkte {
         json.add("spieler", uuids);
         json.add("formen", json(formen));
         json.add("nadeln", json(nadeln));
+        JsonArray zuege = new JsonArray();
+        for (EigeneForm f : eigene) {
+            JsonObject o = new JsonObject();
+            JsonArray ids = new JsonArray();
+            f.punkte().forEach(ids::add);
+            o.add("punkte", ids);
+            o.addProperty("farbe", f.farbe());
+            o.addProperty("minimap", f.angeheftet());
+            zuege.add(o);
+        }
+        json.add("eigene_formen", zuege);
         return json;
     }
 
@@ -228,6 +283,8 @@ final class Wegpunkte {
     void leeren() {
         punkte.clear();
         regionen.clear();
+        eigene.clear();
+        naechsteId = 1;
         spieler.clear();
         formen.clear();
         nadeln.clear();
@@ -243,7 +300,7 @@ final class Wegpunkte {
     /** Setzt einen Wegpunkt auf den Block; steht dort schon einer, bleibt er. */
     void setze(String dimension, int x, int z) {
         if (finde(dimension, x, z) < 0) {
-            punkte.add(new Punkt(dimension, x, z, farbe(dimension), false));
+            punkte.add(new Punkt(naechsteId++, dimension, x, z, farbe(dimension), false));
             schreibe();
         }
     }
@@ -313,6 +370,12 @@ final class Wegpunkte {
                 anzahl++;
             }
         }
+        for (EigeneForm e : eigene) {
+            if (dimension.equals(dimension(e))) {
+                belegt[e.farbe()] = true;
+                anzahl++;
+            }
+        }
         for (int f = 0; f < FARBEN.length; f++) {
             if (!belegt[f]) {
                 return f;
@@ -321,11 +384,121 @@ final class Wegpunkte {
         return anzahl % FARBEN.length;
     }
 
+    /** Löscht den Wegpunkt; aus eigenen Formen fällt er heraus, eine Form mit weniger als zwei Punkten verschwindet. */
     void loesche(Punkt p) {
         int i = finde(p.dimension(), p.x(), p.z());
         if (i >= 0) {
-            punkte.remove(i);
+            int id = punkte.remove(i).id();
+            for (int k = eigene.size() - 1; k >= 0; k--) {
+                EigeneForm f = eigene.get(k);
+                if (f.punkte().contains(id)) {
+                    List<Integer> rest = gueltig(f.punkte().stream().filter(x -> x != id).toList());
+                    if (rest == null) {
+                        eigene.remove(k);
+                    } else {
+                        eigene.set(k, new EigeneForm(rest, f.farbe(), f.angeheftet()));
+                    }
+                }
+            }
             schreibe();
+        }
+    }
+
+    List<EigeneForm> eigeneFormen() {
+        return Collections.unmodifiableList(eigene);
+    }
+
+    /** Der Wegpunkt mit dieser id, oder null. */
+    Punkt punkt(int id) {
+        for (Punkt p : punkte) {
+            if (p.id() == id) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    /** Die Dimension einer eigenen Form, die ihres ersten Punkts. */
+    String dimension(EigeneForm f) {
+        Punkt p = punkt(f.punkte().getFirst());
+        return p == null ? null : p.dimension();
+    }
+
+    /**
+     * Setzt eine eigene Form aus den Wegpunkten {@code ids} in dieser Reihenfolge; false, wenn es weniger
+     * als zwei verschiedene sind, mehr als {@link #MAX_PUNKTE_FORM}, sie nicht in einer Dimension liegen oder
+     * es schon {@link #MAX_EIGENE_FORMEN} gibt.
+     */
+    boolean setzeForm(List<Integer> ids) {
+        // Der erste Punkt am Ende schliesst nur die Region.
+        List<Integer> wunsch = ids.size() > 2 && ids.getLast().equals(ids.getFirst()) ? ids.subList(0, ids.size() - 1) : ids;
+        List<Integer> gueltig = gueltig(wunsch);
+        if (gueltig == null || gueltig.size() != wunsch.size() || eigene.size() >= MAX_EIGENE_FORMEN) {
+            return false;
+        }
+        eigene.add(new EigeneForm(gueltig, farbe(punkt(gueltig.getFirst()).dimension()), false));
+        schreibe();
+        return true;
+    }
+
+    void loesche(EigeneForm f) {
+        if (eigene.remove(f)) {
+            schreibe();
+        }
+    }
+
+    /** Heftet die eigene Form an die Minimap oder löst sie; false, wenn schon {@link #MAX_ANGEHEFTET} angeheftet sind. */
+    boolean umschalten(EigeneForm f) {
+        int i = eigene.indexOf(f);
+        if (i < 0) {
+            return true;
+        }
+        if (!f.angeheftet() && angeheftet() >= MAX_ANGEHEFTET) {
+            return false;
+        }
+        eigene.set(i, new EigeneForm(f.punkte(), f.farbe(), !f.angeheftet()));
+        schreibe();
+        return true;
+    }
+
+    /**
+     * Die ids, die es als Wegpunkte gibt, alle in einer Dimension, ohne einen Punkt zweimal hintereinander
+     * und höchstens {@link #MAX_PUNKTE_FORM}; null, wenn weniger als zwei bleiben.
+     */
+    private List<Integer> gueltig(List<Integer> ids) {
+        List<Integer> aus = new ArrayList<>();
+        String dimension = null;
+        for (int id : ids) {
+            Punkt p = punkt(id);
+            if (p == null || dimension != null && !dimension.equals(p.dimension()) || !aus.isEmpty() && aus.getLast() == id) {
+                continue;
+            }
+            dimension = p.dimension();
+            aus.add(id);
+        }
+        // Ein letzter Punkt gleich dem ersten schliesst nur, er zählt nicht doppelt.
+        if (aus.size() > 2 && aus.getLast().equals(aus.getFirst())) {
+            aus.removeLast();
+        }
+        return aus.size() < 2 || aus.size() > MAX_PUNKTE_FORM ? null : aus;
+    }
+
+    /** Vergibt jedem Wegpunkt ohne gültige oder mit doppelter id eine neue; danach die nächste freie. */
+    private void vergibIds() {
+        Set<Integer> belegt = new HashSet<>();
+        int hoechste = 0;
+        for (Punkt p : punkte) {
+            if (p.id() > 0 && belegt.add(p.id())) {
+                hoechste = Math.max(hoechste, p.id());
+            }
+        }
+        naechsteId = hoechste + 1;
+        Set<Integer> gesehen = new HashSet<>();
+        for (int i = 0; i < punkte.size(); i++) {
+            Punkt p = punkte.get(i);
+            if (p.id() <= 0 || !gesehen.add(p.id())) {
+                punkte.set(i, new Punkt(naechsteId++, p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet()));
+            }
         }
     }
 
@@ -339,7 +512,7 @@ final class Wegpunkte {
             return false;
         }
         Punkt alt = punkte.get(i);
-        punkte.set(i, new Punkt(alt.dimension(), x, z, alt.farbe(), alt.angeheftet()));
+        punkte.set(i, new Punkt(alt.id(), alt.dimension(), x, z, alt.farbe(), alt.angeheftet()));
         schreibe();
         return true;
     }
@@ -349,7 +522,7 @@ final class Wegpunkte {
         int i = finde(p.dimension(), p.x(), p.z());
         if (i >= 0) {
             Punkt alt = punkte.get(i);
-            punkte.set(i, new Punkt(alt.dimension(), alt.x(), alt.z(), alt.farbe(), !alt.angeheftet()));
+            punkte.set(i, new Punkt(alt.id(), alt.dimension(), alt.x(), alt.z(), alt.farbe(), !alt.angeheftet()));
             schreibe();
         }
     }
@@ -411,6 +584,9 @@ final class Wegpunkte {
         int n = formen.size();
         for (Region r : regionen) {
             n += r.angeheftet() ? 1 : 0;
+        }
+        for (EigeneForm f : eigene) {
+            n += f.angeheftet() ? 1 : 0;
         }
         return n;
     }
@@ -498,17 +674,67 @@ final class Wegpunkte {
         fuerNadeln = List.copyOf(orte);
         angeheftetOrte = Collections.newSetFromMap(new IdentityHashMap<>());
         angeheftetOrte.addAll(orte);
-        List<Ebenen.Form> eigene = regionen.stream().filter(Region::angeheftet).<Ebenen.Form>map(Wegpunkte::flaeche).toList();
-        if (!eigene.isEmpty()) {
-            minimap.add(eigene);
+        List<Ebenen.Form> aufKarte = new ArrayList<>(), aufMinimap = new ArrayList<>();
+        regionen.stream().filter(Region::angeheftet).map(Wegpunkte::flaeche).forEach(aufMinimap::add);
+        for (EigeneForm f : this.eigene) {
+            Ebenen.Form form = form(f);
+            if (form != null) {
+                aufKarte.add(f.angeheftet() ? breiter(form) : form);
+                if (f.angeheftet()) {
+                    aufMinimap.add(form);
+                }
+            }
+        }
+        if (!aufKarte.isEmpty()) {
+            karte.add(List.copyOf(aufKarte));
+        }
+        if (!aufMinimap.isEmpty()) {
+            minimap.add(List.copyOf(aufMinimap));
         }
         fuerKarte = List.copyOf(karte);
         fuerMinimap = List.copyOf(minimap);
     }
 
+    /**
+     * Die eigene Form als Form zum Zeichnen, an der Mitte ihrer Wegpunkte: eine Region als Fläche in ihrer
+     * Farbe zu 25 % mit 1 Einheit Rand, eine Linie 2 Einheiten breit; null, wenn ihre Punkte fehlen.
+     */
+    Ebenen.Form form(EigeneForm f) {
+        double[] p = new double[2 * f.punkte().size()];
+        String dimension = null;
+        for (int i = 0; i < f.punkte().size(); i++) {
+            Punkt q = punkt(f.punkte().get(i));
+            if (q == null) {
+                return null;
+            }
+            dimension = q.dimension();
+            p[2 * i] = q.x() + 0.5;
+            p[2 * i + 1] = q.z() + 0.5;
+        }
+        int farbe = FARBEN[f.farbe()];
+        double[] box = box(p);
+        if (!f.region()) {
+            return new Ebenen.Linie(dimension, p, new Ebenen.Rand(farbe, 2, 0, 0), box);
+        }
+        return new Ebenen.Flaeche(dimension, farbe & 0x00FFFFFF | 0x40000000, Trapeze.von(List.of(p)), new Ebenen.Rand(farbe, 1, 0, 0),
+                List.of(p), box, null);
+    }
+
+    private static double[] box(double[] p) {
+        double[] b = {Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY};
+        for (int i = 0; i < p.length; i += 2) {
+            b[0] = Math.min(b[0], p[i]);
+            b[1] = Math.min(b[1], p[i + 1]);
+            b[2] = Math.max(b[2], p[i]);
+            b[3] = Math.max(b[3], p[i + 1]);
+        }
+        return b;
+    }
+
     /** Die Form mit einem Rand {@link #BREITER} breiter; ohne Rand einer in der Füllung ohne Alpha, wie die Vorgabe des Formats. */
     static Ebenen.Form breiter(Ebenen.Form f) {
         return switch (f) {
+            case Ebenen.Linie l -> new Ebenen.Linie(l.dimension(), l.punkte(), breiter(l.rand(), 0), l.box());
             case Ebenen.Flaeche fl -> new Ebenen.Flaeche(fl.dimension(), fl.fuellung(), fl.trapeze(), breiter(fl.rand(), fl.fuellung()), fl.ringe(),
                     fl.box(), fl.id());
             case Ebenen.Kreis k -> new Ebenen.Kreis(k.dimension(), k.x(), k.z(), k.radius(), k.fuellung(), breiter(k.rand(), k.fuellung()), k.id());
