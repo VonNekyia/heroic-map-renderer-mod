@@ -1,6 +1,6 @@
 ---
 title: Wegpunkte
-description: Wegpunkte auf der Vollbildkarte setzen und löschen, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
+description: Wegpunkte und eigene Regionen auf der Vollbildkarte setzen und löschen, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Wegpunkte.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
@@ -30,6 +30,8 @@ gewünscht.
 | Rechtsklick auf einen Wegpunkt | das Menü für seinen Block: „Hierher teleportieren“, wenn erlaubt, und „Wegpunkt löschen“ |
 | Klick auf eine Marke | legt sie beim Loslassen in die Mitte: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück. Wer auf einer Marke zu ziehen beginnt und weiter als 3 Einheiten zieht (`Karte.ZUG`), zieht nur die Karte |
 | Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder |
+| Rechtsklick, „Region von hier“, dann „Region bis hier“ | setzt eine eigene Region, das Rechteck der Blöcke zwischen beiden Ecken samt ihnen, siehe „Regionen“; dazwischen zeigt eine gestrichelte Vorschau das Rechteck bis zur Maus, „Region abbrechen“ oder `Esc` brechen ab |
+| Rechtsklick in eine eigene Region oder auf ihre Raute | „Region löschen“ |
 
 - **Doppelklick:** Das Spiel meldet einen Klick als doppelt, wenn derselbe
   Knopf im selben Schirm weniger als 250 ms nach dem letzten kommt, gleich
@@ -100,6 +102,28 @@ gewünscht.
   GUI-Massstab 2 sind es 12 Pixel, die Texel also abwechselnd 1 und 2
   Pixel breit. Ob 6 Einheiten gut aussehen, sieht der User im Spiel.
 
+## Regionen
+
+Eigene Regionen des Spielers, „Region-Wegpunkte“, so wünscht es der User
+(mod#35). Ein Rechteck aus zwei Ecken, entschieden vom Reviewer; ein
+Vieleck kommt nur, wenn der User es will.
+
+- **Setzen** über das Menü der rechten Taste, wo auch „Wegpunkt setzen“
+  steht: „Region von hier“ merkt die erste Ecke, „Region bis hier“ setzt das
+  Rechteck (`Wegpunkte.setze` mit vier Zahlen). Die Ecken dürfen in jeder
+  Folge kommen. Dieselbe Region noch einmal bleibt eine. Höchstens 256 je
+  Welt (`Wegpunkte.MAX_REGIONEN`); darüber setzt der Mod keine.
+- **Farbe** wie ein Wegpunkt: die erste der 8 Farben, die in der Dimension
+  unter Wegpunkten und Regionen noch frei ist.
+- **Gezeichnet** auf der Vollbildkarte nach den Formen der Ebenen, vor
+  Nadeln und Marken (`Karte.regionen`): die Fläche in ihrer Farbe zu 25 %,
+  1 Einheit Rand deckend, auf ganzen Pixeln wie die Kacheln. In ihrer Mitte
+  die Raute eines Wegpunkts; sie verhält sich wie eine Marke: Ein Klick legt
+  sie in die Mitte, ausserhalb des Schirms steht sie am Rand.
+- **Löschen:** Rechtsklick in die Region oder auf ihre Raute, „Region
+  löschen“; überlappen zwei, die zuletzt gesetzte.
+- **Minimap:** keine; angeheftet kommen Regionen mit mod#36 dorthin.
+
 ## Ablage
 
 - **Je Welt** in `wegpunkte.json` im Ordner der Welt, `heroicmap/<welt>/`,
@@ -114,11 +138,13 @@ gewünscht.
 
   ```json
   {"wegpunkte":[{"dimension":"minecraft:overworld","x":12,"z":-40,"farbe":0,"minimap":true}],
+   "regionen":[{"dimension":"minecraft:overworld","x0":2,"z0":-5,"x1":10,"z1":3,"farbe":1,"minimap":false}],
    "spieler":["00000000-0000-0000-0000-000000000001"]}
   ```
 
   `farbe` ist ein Index in `Wegpunkte.FARBEN`, `minimap` heisst angeheftet,
-  `spieler` sind die angehefteten Mitspieler.
+  `spieler` sind die angehefteten Mitspieler. Eine Region nennt die Blöcke
+  ihrer Ecken, `x0` ≤ `x1` und `z0` ≤ `z1`, beide samt.
 - **Schreiben** nach jeder Änderung, über `wegpunkte.json.tmp`, dann
   verschieben; nie liegt eine halbe Datei da.
 - **Lesen:** Ein unlesbarer Eintrag fällt weg, die übrigen bleiben. Ist die

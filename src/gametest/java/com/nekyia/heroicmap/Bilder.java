@@ -164,6 +164,8 @@ public final class Bilder implements FabricClientGameTest {
                     throw new AssertionError("Teil der Orte nicht lesbar");
                 }
                 Ebenen.INSTANZ.teil(t);
+                // Eine eigene Region links unten, wie der Spieler sie über das Menü setzt (docs/wegpunkte.md, „Regionen“).
+                Wegpunkte.INSTANZ.setze(Ebenen.UEBERWELT, -14, 2, -5, 8);
                 Minimap.INSTANZ.setzeScale(4);
                 Minimap.INSTANZ.setzeZoom(4);
             });
@@ -200,6 +202,7 @@ public final class Bilder implements FabricClientGameTest {
                 mc.gui.setScreen(null);
                 Ebenen.INSTANZ.leeren();
                 Symbole.INSTANZ.leeren();
+                Wegpunkte.INSTANZ.loesche(Wegpunkte.INSTANZ.region(Ebenen.UEBERWELT, -10, 5));
             });
         } finally {
             bilder.stop(0);

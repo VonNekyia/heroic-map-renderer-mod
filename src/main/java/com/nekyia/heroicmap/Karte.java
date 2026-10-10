@@ -47,6 +47,8 @@ final class Karte extends Screen {
     private static final double ZUG = 3;
     /** Die Spalte des Knopfs × rechts in der Tafel, in Einheiten des GUI; beim Zeigen blass, gehalten hell. */
     private static final int SCHLIESSEN = 8, BLASS = 0x80D9D9D9;
+    /** Die Vorschau einer Region, die der Spieler setzt. */
+    private static final int VORSCHAU = 0xCCFFFFFF;
 
     private final Satz satz;
     private final Kacheln kacheln;
@@ -99,11 +101,15 @@ final class Karte extends Screen {
 
     /**
      * Was auf der Karte steht und sich anklicken lässt: die Mitte auf dem Schirm, die halbe Seite,
-     * der Ort in der Welt und was es ist; für den eigenen Spieler sind {@code spieler} und
-     * {@code punkt} null.
+     * der Ort in der Welt und was es ist; für den eigenen Spieler sind {@code spieler}, {@code punkt}
+     * und {@code region} null.
      */
-    record Marke(float x, float y, float halb, double weltX, double weltZ, UUID spieler, Wegpunkte.Punkt punkt) {
+    record Marke(float x, float y, float halb, double weltX, double weltZ, UUID spieler, Wegpunkte.Punkt punkt, Wegpunkte.Region region) {
     }
+
+    /** Die erste Ecke einer Region, die der Spieler gerade setzt, und ihre Dimension; sonst null. */
+    private int[] regionVon;
+    private String regionDimension;
 
     /** {@code satz} ist null, wenn für diese Dimension nichts geladen ist. */
     Karte(Satz satz) {
@@ -162,6 +168,7 @@ final class Karte extends Screen {
             linien(g);
         }
         formen(g);
+        regionen(g, mausX, mausY);
         marken(g);
         int[] block = block(mausX, mausY);
         g.text(font, Component.literal(satz.name() + "   ").append(Component.translatable("heroicmap.koordinaten", block[0], block[1])),
@@ -226,6 +233,13 @@ final class Karte extends Screen {
         String dimension = spieler.level().dimension().identifier().toString();
         nadeln(g, dimension);
         int bunt = Mth.hsvToArgb((System.currentTimeMillis() % BUNT_MS) / (float) BUNT_MS, 1f, 1f, 255);
+        // Eine eigene Region steht wie ein Wegpunkt als Raute in ihrer Mitte. Siehe docs/wegpunkte.md, „Regionen“.
+        for (Wegpunkte.Region r : Wegpunkte.INSTANZ.regionen()) {
+            if (r.dimension().equals(dimension)) {
+                Marke m = marke((r.x0() + r.x1() + 1) / 2.0, (r.z0() + r.z1() + 1) / 2.0, null, null, r);
+                Minimap.wegpunkt(g, m.x(), m.y(), Minimap.KOPF, Wegpunkte.FARBEN[r.farbe()], r.angeheftet() ? bunt : 0);
+            }
+        }
         for (Wegpunkte.Punkt p : Wegpunkte.INSTANZ.punkte()) {
             if (p.dimension().equals(dimension)) {
                 Marke m = marke(p.x() + 0.5, p.z() + 0.5, null, p);
@@ -281,13 +295,17 @@ final class Karte extends Screen {
      * Schirms, am Rand in seiner Richtung, nicht unter den Knöpfen.
      */
     private Marke marke(double x, double z, UUID uuid, Wegpunkte.Punkt punkt) {
+        return marke(x, z, uuid, punkt, null);
+    }
+
+    private Marke marke(double x, double z, UUID uuid, Wegpunkte.Punkt punkt, Wegpunkte.Region region) {
         float halb = Minimap.KOPF / 2f + 1;
         double[] p = Kartenblick.marke(blick.rasterX(Projektion.zuPixel(x, satz.scale()), width),
                 blick.rasterY(Projektion.zuPixel(z, satz.scale()), height), width, height, RAND, halb,
                 knopfX, knopfUnten);
         // Auf ganze Pixel wie die Kacheln, deren Kanten auf ganzen Einheiten liegen.
         int k = minecraft.getWindow().getGuiScale();
-        Marke m = new Marke(Math.round(p[0] * k) / (float) k, Math.round(p[1] * k) / (float) k, halb, x, z, uuid, punkt);
+        Marke m = new Marke(Math.round(p[0] * k) / (float) k, Math.round(p[1] * k) / (float) k, halb, x, z, uuid, punkt, region);
         marken.add(m);
         return m;
     }
@@ -301,7 +319,7 @@ final class Karte extends Screen {
         for (int i = marken.size() - 1; i >= 0; i--) {
             Marke m = marken.get(i);
             if (Math.abs(x - m.x()) <= m.halb() && Math.abs(y - m.y()) <= m.halb()) {
-                if (m.punkt() != null || m.spieler() != null) {
+                if (m.punkt() != null || m.spieler() != null || m.region() != null) {
                     return m;
                 }
                 eigen = eigen == null ? m : eigen;
@@ -343,6 +361,68 @@ final class Karte extends Screen {
 
     List<Component> eintraege() {
         return eintraege.stream().map(Eintrag::text).toList();
+    }
+
+    /**
+     * Die eigenen Regionen dieser Dimension: die Fläche in ihrer Farbe zu 25 %, 1 Einheit Rand deckend,
+     * auf ganzen Pixeln wie die Kacheln; dazu die Vorschau, solange der Spieler eine setzt, gestrichelt
+     * von der ersten Ecke bis zum Block unter der Maus. Siehe docs/wegpunkte.md, „Regionen“.
+     */
+    private void regionen(GuiGraphicsExtractor g, int mausX, int mausY) {
+        if (minecraft.player == null) {
+            return;
+        }
+        String dimension = minecraft.player.level().dimension().identifier().toString();
+        if (regionVon != null && !dimension.equals(regionDimension)) {
+            regionVon = null;
+        }
+        int gs = minecraft.getWindow().getGuiScale();
+        g.pose().pushMatrix();
+        g.pose().scale(1f / gs);
+        for (Wegpunkte.Region r : Wegpunkte.INSTANZ.regionen()) {
+            int[] k = r.dimension().equals(dimension) ? kasten(r.x0(), r.z0(), r.x1(), r.z1(), gs) : null;
+            if (k != null) {
+                int farbe = Wegpunkte.FARBEN[r.farbe()];
+                g.fill(k[0], k[1], k[2], k[3], farbe & 0x00FFFFFF | 0x40000000);
+                g.fill(k[0], k[1], k[2], k[1] + gs, farbe);
+                g.fill(k[0], k[3] - gs, k[2], k[3], farbe);
+                g.fill(k[0], k[1], k[0] + gs, k[3], farbe);
+                g.fill(k[2] - gs, k[1], k[2], k[3], farbe);
+            }
+        }
+        if (regionVon != null) {
+            int[] b = block(mausX, mausY);
+            int[] k = kasten(Math.min(regionVon[0], b[0]), Math.min(regionVon[1], b[1]), Math.max(regionVon[0], b[0]),
+                    Math.max(regionVon[1], b[1]), gs);
+            if (k != null) {
+                // Striche von 4 Einheiten mit 2 Lücke, in Weiss, das auf jeder Karte zu sehen ist.
+                for (int x = k[0]; x < k[2]; x += 6 * gs) {
+                    g.fill(x, k[1], Math.min(x + 4 * gs, k[2]), k[1] + gs, VORSCHAU);
+                    g.fill(x, k[3] - gs, Math.min(x + 4 * gs, k[2]), k[3], VORSCHAU);
+                }
+                for (int y = k[1]; y < k[3]; y += 6 * gs) {
+                    g.fill(k[0], y, k[0] + gs, Math.min(y + 4 * gs, k[3]), VORSCHAU);
+                    g.fill(k[2] - gs, y, k[2], Math.min(y + 4 * gs, k[3]), VORSCHAU);
+                }
+            }
+        }
+        g.pose().popMatrix();
+    }
+
+    /**
+     * Die Blöcke von (x0, z0) bis (x1, z1) samt beiden als Kasten {links, oben, rechts, unten} in Pixeln
+     * des Schirms, gekappt knapp ausserhalb; null, wenn er den Schirm nicht berührt.
+     */
+    private int[] kasten(int x0, int z0, int x1, int z1, int gs) {
+        int scale = satz.scale();
+        double l = blick.rasterX(Projektion.zuPixel(x0, scale), width) * gs, r = blick.rasterX(Projektion.zuPixel(x1 + 1, scale), width) * gs;
+        double o = blick.rasterY(Projektion.zuPixel(z0, scale), height) * gs, u = blick.rasterY(Projektion.zuPixel(z1 + 1, scale), height) * gs;
+        if (r <= 0 || l >= width * gs || u <= 0 || o >= height * gs) {
+            return null;
+        }
+        int rand = 2 * gs;
+        return new int[] {(int) Math.max(-rand, Math.round(l)), (int) Math.max(-rand, Math.round(o)),
+            (int) Math.min(width * gs + rand, Math.round(r)), (int) Math.min(height * gs + rand, Math.round(u))};
     }
 
     /** Der Block unter (x, y) des Schirms, so wie die Kacheln ihn zeichnen. */
@@ -415,7 +495,7 @@ final class Karte extends Screen {
             return gedrueckt != null;
         }
         if (e.button() == InputConstants.MOUSE_BUTTON_RIGHT) {
-            menue(e.x(), e.y(), m != null ? m.punkt() : null);
+            menue(e.x(), e.y(), m != null ? m.punkt() : null, m != null ? m.region() : null);
             return true;
         }
         return false;
@@ -660,9 +740,10 @@ final class Karte extends Screen {
     }
 
     /** Öffnet das Menü an (x, y) für den Block dort, oder für den Wegpunkt {@code punkt}. */
-    private void menue(double x, double y, Wegpunkte.Punkt punkt) {
+    private void menue(double x, double y, Wegpunkte.Punkt punkt, Wegpunkte.Region marke) {
         int[] z = punkt != null ? new int[] {punkt.x(), punkt.z()} : block(x, y);
         String dimension = minecraft.level.dimension().identifier().toString();
+        Wegpunkte.Region region = marke != null ? marke : Wegpunkte.INSTANZ.region(dimension, z[0], z[1]);
         List<Eintrag> neu = new ArrayList<>();
         if (minecraft.getConnection() != null && !minecraft.level.dimensionType().hasCeiling()
                 && Teleport.erlaubt(minecraft.getConnection().getCommands())) {
@@ -671,9 +752,26 @@ final class Karte extends Screen {
                 onClose();
             }));
         }
-        neu.add(punkt != null
-                ? new Eintrag(Component.translatable("heroicmap.karte.wegpunkt_loeschen"), () -> Wegpunkte.INSTANZ.loesche(punkt))
-                : new Eintrag(Component.translatable("heroicmap.karte.wegpunkt"), () -> Wegpunkte.INSTANZ.setze(dimension, z[0], z[1])));
+        if (regionVon != null) {
+            // Die zweite Ecke: Erst ein Klick auf den Eintrag setzt die Region, Escape bricht ab.
+            int[] von = regionVon;
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_bis"), () -> {
+                Wegpunkte.INSTANZ.setze(dimension, von[0], von[1], z[0], z[1]);
+                regionVon = null;
+            }));
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_abbrechen"), () -> regionVon = null));
+        } else {
+            neu.add(punkt != null
+                    ? new Eintrag(Component.translatable("heroicmap.karte.wegpunkt_loeschen"), () -> Wegpunkte.INSTANZ.loesche(punkt))
+                    : new Eintrag(Component.translatable("heroicmap.karte.wegpunkt"), () -> Wegpunkte.INSTANZ.setze(dimension, z[0], z[1])));
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_von"), () -> {
+                regionVon = z;
+                regionDimension = dimension;
+            }));
+            if (region != null) {
+                neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_loeschen"), () -> Wegpunkte.INSTANZ.loesche(region)));
+            }
+        }
         ziel = z;
         eintraege = neu;
         // Das Menü bleibt ganz auf dem Schirm, auch bei grossem GUI-Massstab.
@@ -737,8 +835,12 @@ final class Karte extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent ereignis) {
-        // Escape schliesst zuerst nur die Tafel.
+        // Escape schliesst zuerst nur die Tafel, dann bricht es eine Region ab, die der Spieler setzt.
         if (ereignis.key() == InputConstants.KEY_ESCAPE && tafelKasten != null && zeigen.schliesse()) {
+            return true;
+        }
+        if (ereignis.key() == InputConstants.KEY_ESCAPE && regionVon != null) {
+            regionVon = null;
             return true;
         }
         if (HeroicMap.karte != null && HeroicMap.karte.matches(ereignis)) {
