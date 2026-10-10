@@ -108,6 +108,8 @@
   "heroicmap.menue.rahmen": "Frame",
   "heroicmap.rahmen.ohne": "None",
   "heroicmap.rahmen.ohne.beschreibung": "The thin outline as before.",
+  "heroicmap.rahmen.biom": "Biome",
+  "heroicmap.rahmen.biom.beschreibung": "Changes with the biome below you: forest, grassland, mountains, snow, desert, tropics, swamp or water.",
   "heroicmap.rahmen.grau": "Grey",
   "heroicmap.rahmen.grau.beschreibung": "Plain iron frame like the compass, 3 px.",
   "heroicmap.rahmen.holz": "Wood",
