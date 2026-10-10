@@ -717,12 +717,13 @@ public final class Minimap {
             int baender) {
         g.enableScissor(r.x(), r.y(), r.x() + r.seite(), r.y() + r.seite());
         // ponytail: alle Nadeln je Frame, höchstens 64 000; ein Raster nach Regionen, wenn das je zählt.
+        int[] namen = {Ebenen.MAX_NAMEN};
         for (Ebenen.Eintrag e : Ebenen.INSTANZ.sichtbar()) {
             for (Ebenen.Ort n : Ebenen.INSTANZ.nadeln(e.id())) {
                 if (n.dimension().equals(dimension)) {
                     float[] m = marke(r, n.x(), n.z(), links, oben, k, zoom, rund, r.seite() / 2.0 - baender, false, lage);
                     if (m != null) {
-                        Ebenen.zeichne(g, font, m[0], m[1], n);
+                        Ebenen.zeichne(g, font, m[0], m[1], n, namen);
                     }
                 }
             }

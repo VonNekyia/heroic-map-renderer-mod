@@ -253,18 +253,19 @@ final class Karte extends Screen {
      */
     private void nadeln(GuiGraphicsExtractor g, String dimension) {
         int k = minecraft.getWindow().getGuiScale();
+        int[] namen = {Ebenen.MAX_NAMEN};
         for (Ebenen.Eintrag e : Ebenen.INSTANZ.sichtbar()) {
             for (Ebenen.Ort n : Ebenen.INSTANZ.nadeln(e.id())) {
                 double x = blick.rasterX(Projektion.zuPixel(n.x(), satz.scale()), width);
                 double y = blick.rasterY(Projektion.zuPixel(n.z(), satz.scale()), height);
-                // Erst die Höhe: Unter dem Fuss reicht der Name 17 Einheiten, über ihm höchstens ein Banner 64. Dann der
-                // Kasten ohne Holen; er misst den Namen, holt aber kein Bild.
-                if (!n.dimension().equals(dimension) || y <= -18 || y >= height + 65) {
+                // Erst die Höhe: Unter dem Fuss reicht der Name NAME_UNTEN Einheiten, über ihm höchstens ein Banner 64. Dann
+                // der Kasten ohne Holen; er misst den Namen, holt aber kein Bild.
+                if (!n.dimension().equals(dimension) || y <= -Ebenen.NAME_UNTEN || y >= height + 65) {
                     continue;
                 }
                 float[] r = Ebenen.kastenOhneHolen(font, n);
                 if (x + r[2] > 0 && x + r[0] < width) {
-                    Ebenen.zeichne(g, font, aufPixel(x, k), aufPixel(y, k), n);
+                    Ebenen.zeichne(g, font, aufPixel(x, k), aufPixel(y, k), n, namen);
                 }
             }
         }
