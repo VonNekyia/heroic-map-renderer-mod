@@ -19,6 +19,51 @@ record Tafel(List<Baustein> bausteine) {
     static final int MAX_ZEILEN = 64, MAX_REIHEN = 20;
     /** Die Schrift der Tafel, hell auf allen Fassungen, denn die Fläche ist überall dunkel. */
     static final int SCHRIFT = 0xFFD9D9D9;
+    /** Der Grund der Tafel, gegen den der Kontrast eines Titels zählt, wie in rahmen/ohne/tafel.png ohne Alpha. */
+    static final int GRUND = 0xFF101014;
+    /** So viel Kontrast braucht ein Titel nach WCAG für grosse oder fette Schrift. */
+    static final double KONTRAST = 3;
+
+    /**
+     * Ein Titel in einer Farbe, die auf dem dunklen Grund unter {@link #KONTRAST} bleibt, wird im
+     * selben Farbton heller: je Schritt 10 % mehr Weiss beigemischt, bis der Kontrast reicht. Das
+     * Alpha bleibt. Siehe docs/ebenen.md, „Infotafel“.
+     */
+    static int lesbar(int farbe) {
+        for (int schritt = 0; schritt < 10; schritt++) {
+            int c = mitWeiss(farbe, schritt);
+            if (kontrast(c, GRUND) >= KONTRAST) {
+                return c;
+            }
+        }
+        return mitWeiss(farbe, 10);
+    }
+
+    /** Die Farbe mit {@code zehntel}·10 % Weiss gemischt, je Kanal gerundet, das Alpha wie es war. */
+    static int mitWeiss(int farbe, int zehntel) {
+        int aus = farbe & 0xFF000000;
+        for (int s = 0; s < 24; s += 8) {
+            int k = farbe >> s & 0xFF;
+            aus |= (int) Math.round(k + (255 - k) * zehntel / 10.0) << s;
+        }
+        return aus;
+    }
+
+    /** Der Kontrast nach WCAG: (L1 + 0,05) / (L2 + 0,05), die hellere Leuchtdichte oben. */
+    static double kontrast(int a, int b) {
+        double la = leuchtdichte(a), lb = leuchtdichte(b);
+        return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+    }
+
+    /** Die relative Leuchtdichte nach WCAG aus sRGB, ohne Alpha. */
+    static double leuchtdichte(int farbe) {
+        return 0.2126 * linear(farbe >> 16 & 0xFF) + 0.7152 * linear(farbe >> 8 & 0xFF) + 0.0722 * linear(farbe & 0xFF);
+    }
+
+    private static double linear(int kanal) {
+        double c = kanal / 255.0;
+        return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    }
     /**
      * In Einheiten des GUI: Breite des Inhalts höchstens, Innenabstand, Abstand zwischen Bausteinen und vor einem Abschnitt.
      * Siehe docs/entscheidungen/0010-tafel-200-einheiten.md.
@@ -89,7 +134,7 @@ record Tafel(List<Baustein> bausteine) {
         Baustein b = switch (typ) {
             case "title" -> {
                 String t = Ebenen.text(o, "text", MAX_TITEL);
-                yield t == null ? null : new Titel(t, o.has("color") ? Ebenen.farbeMitAlpha(o.get("color").getAsString(), SCHRIFT) : SCHRIFT);
+                yield t == null ? null : new Titel(t, o.has("color") ? lesbar(Ebenen.farbeMitAlpha(o.get("color").getAsString(), SCHRIFT)) : SCHRIFT);
             }
             case "lines" -> {
                 List<String> zeilen = new ArrayList<>();

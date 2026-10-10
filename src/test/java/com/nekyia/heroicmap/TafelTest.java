@@ -169,6 +169,29 @@ class TafelTest {
     }
 
     @Test
+    void titelAufDunklemGrundLesbar() {
+        // Weiss gegen Schwarz 21:1, gleich gegen gleich 1:1.
+        assertEquals(21, Tafel.kontrast(0xFFFFFFFF, 0xFF000000), 1e-9);
+        assertEquals(1, Tafel.kontrast(0xFF101014, Tafel.GRUND), 1e-9);
+        // Hell genug bleibt, wie sie ist, mit Alpha.
+        assertEquals(0x80E5C33F, Tafel.lesbar(0x80E5C33F));
+        // Dunkelblau: so viele Schritte Weiss, bis 3:1 reicht; einer weniger reichte nicht. Das Alpha bleibt.
+        int blau = 0xFF2B3A55, hell = Tafel.lesbar(blau);
+        int schritte = 0;
+        while (Tafel.mitWeiss(blau, schritte) != hell) {
+            schritte++;
+        }
+        assertTrue(schritte > 0 && schritte <= 10);
+        assertTrue(Tafel.kontrast(hell, Tafel.GRUND) >= Tafel.KONTRAST);
+        assertTrue(Tafel.kontrast(Tafel.mitWeiss(blau, schritte - 1), Tafel.GRUND) < Tafel.KONTRAST);
+        assertEquals(0xFF000000, hell & 0xFF000000);
+        // Gelesen: ein Titel in Schwarz steht aufgehellt, nicht schwarz.
+        Tafel t = lies("{\"type\":\"title\",\"text\":\"Nacht\",\"color\":\"#000000\"}");
+        int farbe = ((Tafel.Titel) t.bausteine().getFirst()).farbe();
+        assertTrue(Tafel.kontrast(farbe, Tafel.GRUND) >= Tafel.KONTRAST, Integer.toHexString(farbe));
+    }
+
+    @Test
     void ohneBausteine() {
         Tafel t = lies("");
         assertEquals(0, t.bausteine().size());
