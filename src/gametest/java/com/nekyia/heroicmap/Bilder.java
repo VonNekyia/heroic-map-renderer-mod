@@ -500,7 +500,8 @@ public final class Bilder implements FabricClientGameTest {
         context.runOnClient(mc -> {
             Ebenen.INSTANZ.empfange(JsonParser.parseString("""
                     {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:formen","name":{"de":"Formen","en":"Shapes"},
-                      "visible":true,"order":1,"version":"1"}]}""").getAsJsonObject());
+                      "visible":true,"order":1,"version":"1"},{"id":"test:grenzen","name":{"de":"Grenzen","en":"Borders"},
+                      "visible":false,"order":2,"version":"1"}]}""").getAsJsonObject());
             Ebenen.Teil t = Ebenen.Teil.lies(FORMEN);
             if (t == null || t.formen().size() != 5) {
                 throw new AssertionError("Teil der Formen nicht lesbar");
@@ -537,6 +538,14 @@ public final class Bilder implements FabricClientGameTest {
         context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
         context.waitTicks(40);
         Path karte = context.takeScreenshot(TestScreenshotOptions.of("formen-karte").disableCounterPrefix());
+        // Dieselbe Karte mit offener Liste der Ebenen: „Formen“ an und ganz angeheftet, „Grenzen“ aus (docs/vollbildkarte.md, „Ebenen“).
+        context.runOnClient(mc -> {
+            Kartenlage.ebenenOffen(Downloads.weltOrdner(), true);
+            mc.gui.setScreen(new Karte(Satz.lies(baum)));
+        });
+        context.waitTicks(40);
+        Path liste = context.takeScreenshot(TestScreenshotOptions.of("ebenen-liste").disableCounterPrefix());
+        context.runOnClient(mc -> Kartenlage.ebenenOffen(Downloads.weltOrdner(), false));
         if (!AUSGABE.isEmpty()) {
             BufferedImage beide = new BufferedImage(teile[0].getWidth() + teile[1].getWidth(),
                     Math.max(teile[0].getHeight(), teile[1].getHeight()), BufferedImage.TYPE_INT_RGB);
@@ -545,6 +554,7 @@ public final class Bilder implements FabricClientGameTest {
             try {
                 ImageIO.write(beide, "png", Path.of(AUSGABE, "formen.png").toFile());
                 Files.copy(karte, Path.of(AUSGABE, "formen-karte.png"), StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(liste, Path.of(AUSGABE, "ebenen-liste.png"), StandardCopyOption.REPLACE_EXISTING);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }

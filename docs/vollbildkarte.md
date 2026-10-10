@@ -1,6 +1,6 @@
 ---
 title: Vollbildkarte
-description: Die Karte über den ganzen Schirm aus den geladenen Kacheln, mit Bedienung samt Menü nach Rechtsklick, welchem Satz sie zeigt, Stufen und Lupe, wie Kacheln gelesen und behalten werden, Spieler und Koordinaten, dem Bild aus dem Gametest und was fehlt.
+description: Die Karte über den ganzen Schirm aus den geladenen Kacheln, mit Bedienung samt Menü nach Rechtsklick, Liste der Ebenen mit Anheften der ganzen Ebene, welchem Satz sie zeigt, Stufen und Lupe, wie Kacheln gelesen und behalten werden, Spieler und Koordinaten, dem Bild aus dem Gametest und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Karte.java
   - src/main/java/com/nekyia/heroicmap/Kartenblick.java
@@ -9,6 +9,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/webp
   - src/main/java/com/nekyia/heroicmap/Satz.java
   - src/main/java/com/nekyia/heroicmap/Auswahl.java
+  - src/main/java/com/nekyia/heroicmap/EbenenMenue.java
   - src/main/java/com/nekyia/heroicmap/Teleport.java
   - src/test/java/com/nekyia/heroicmap/TeleportTest.java
   - src/test/java/com/nekyia/heroicmap/KartenblickTest.java
@@ -41,6 +42,8 @@ sagt sie das und zeigt nichts.
 | Knopf „Karte laden …“ | zeigt die Karten des Servers, je Baum der Name und darunter ein Knopf je Massstab mit seiner Grösse (`Auswahl`), darüber die Wahl „Selbst“, siehe [Selbst gezeichnete Karte](selbst.md); die Knöpfe teilen sich die Breite des Schirms, höchstens 90 Einheiten je Knopf, so passen sie auch bei grossem GUI-Massstab; den Massstab, den der Spieler schon ganz hat (`Downloads.vollstaendig`: ein vollständiger Satz, und das Plugin misst den Abgleich an demselben Massstab), zeigt der Knopf als „Abgleich“ und gleicht ab wie der Knopf „Abgleich“, nach einer Ablehnung mit `wieder` bis dahin aus; ein Klick fragt wie `/hmap laden` erst im Dialog nach |
 | Knopf „Abgleich“ | fragt einen Abgleich des gezeigten Satzes an, wie `/hmap abgleich`; nur mit einem Satz vom Server, nicht auf der selbst gezeichneten Karte. Lehnt der Server mit `wieder` ab, ist der Knopf bis dahin aus und nennt die Uhrzeit |
 | Knopf „Zum Spieler“ | legt den eigenen Spieler in die Mitte, für den Fall, dass man sich verirrt hat, wie auf der Webkarte; Stufe und Lupe bleiben (mod#75) |
+| Knopf „Ebenen +“ unter „Zum Spieler“ | klappt die Liste der Ebenen auf, „Ebenen -“ wieder zu; nur, wenn der Server Ebenen schickt, siehe „Ebenen“ (mod#76) |
+| Klick, Doppelklick auf einen Schalter der Liste | schaltet die Ebene an oder aus; ein Doppelklick lässt sie, wie sie war, und heftet alles von ihr an oder löst es, siehe „Ebenen“ |
 | Knopf „Optionen …“ unten rechts | öffnet das Menü von `/hmap`, siehe [Minimap](minimap.md), „Bedienung“; „Fertig“ und `Esc` führen von dort zurück auf die Karte, an dieselbe Stelle (mod#75) |
 | `Esc` | bricht zuerst eine Form ab, die der Spieler aus Wegpunkten baut, sonst schliesst es die Karte |
 
@@ -61,7 +64,9 @@ Server, Welt und Dimension, so will es der User (mod#75); vorher begann die
 Karte jedes Mal beim Spieler, und man musste wieder herauszoomen.
 
 - **Gemerkt** beim Schliessen und vor jedem Untermenü (`Karte.removed`): die
-  Mitte in Blöcken, die Stufe und die Lupe (`Kartenlage`).
+  Mitte in Blöcken, die Stufe und die Lupe (`Kartenlage`). Ob die Liste der
+  Ebenen offen ist, merkt sie gleich beim Klick, für alle Dimensionen, siehe
+  „Ebenen“.
 - **Je Welt** in `karte.properties` im Ordner der Welt, neben
   `wegpunkte.json`, siehe [Download](download.md), „Ablage“; die Schlüssel
   beginnen mit der Dimension des Satzes, etwa `minecraft:overworld.zoom`.
@@ -73,7 +78,47 @@ Karte jedes Mal beim Spieler, und man musste wieder herauszoomen.
   (`Kartenblick.stelle`). Fehlt die Datei oder ist sie unlesbar, liegt der
   Spieler in der Mitte.
 - **Getestet** im Gametest `Bedienung`: eine Stufe gröber, schliessen und
-  wieder öffnen, Mitte, Stufe und Lupe wie vorher; dazu `KartenblickTest`.
+  wieder öffnen, Mitte, Stufe und Lupe wie vorher; dazu `KartenblickTest`
+  mit `listeDerEbenenBleibtOffen`.
+
+### Ebenen
+
+Auf der Vollbildkarte ein Schalter je Ebene, wie „Ebenen“ auf der
+Webkarte, so will es der User (mod#76). Ein Doppelklick heftet die ganze
+Ebene an.
+
+![Vollbildkarte mit offener Liste der Ebenen: „Formen“ an und ganz angeheftet, mit dem bunten Punkt, „Grenzen“ aus; Szene `formen` des Gametests](bilder/ebenen-liste.png)
+
+- **Knopf „Ebenen +“** unter „Zum Spieler“, nur, wenn der Server Ebenen
+  schickt (`Karte.ebenen`). Er klappt die Liste auf, „Ebenen -“ klappt sie
+  zu. Beim ersten Öffnen ist sie zu; offen oder zu merkt sich die Karte in
+  `karte.properties` unter `ebenen`, siehe „Lage merken“
+  (`Kartenlage.ebenenOffen`).
+- **Liste:** je Ebene ein Schalter mit ihrem Namen in der Sprache des
+  Spiels und „An“ oder „Aus“, die oberste zuerst, wie im Untermenü „Ebenen
+  …“, siehe [Ebenen](ebenen.md), „Umschalten“; dieselbe Wahl. Die Liste
+  reicht bis über „Optionen …“; passen nicht alle, führt der letzte Knopf
+  „Weitere …“ zum Untermenü. Kommen andere Ebenen, während die Karte offen
+  ist, baut sie die Liste neu (`Karte.tick`).
+- **Klick** auf einen Schalter schaltet die Ebene an oder aus.
+- **Doppelklick:** Der erste Klick schaltet um, der zweite zurück; so
+  bleibt die Ebene, wie sie war. Dazu heftet der zweite alles von ihr an,
+  was sich anheften lässt, Flächen, Kreise, Nadeln und Banner mit `id`,
+  siehe [Wegpunkte](wegpunkte.md), „Anheften“; ist schon alles
+  angeheftet, löst er alles (`Wegpunkte.alleUmschalten`).
+- **Grenzen:** Die 64 Flächen und Kreise und die 64 Nadeln und Banner
+  gelten weiter. Was nicht mehr passt, bleibt los, und unten links steht
+  „3 nicht angeheftet: höchstens 64 Regionen und 64 Nadeln und Banner“.
+  Dann ist die Ebene nicht ganz angeheftet, und ein weiterer Doppelklick
+  löst nichts, sondern heftet wieder an, was passt. Lösen geht dann je
+  Objekt.
+- **Bunter Punkt** links am Schalter, wenn alles Anheftbare der Ebene
+  angeheftet ist, in der Farbe des Rings angehefteter Marken
+  (`Karte.BUNT_MS`); eine Ebene ohne etwas mit `id` bekommt keinen
+  (`Wegpunkte.ganzAngeheftet`). Neu gerechnet nur, wenn sich Ebenen oder
+  Wegpunkte ändern (`Ebenen.stand`, `Wegpunkte.stand`).
+- **Über einem Knopf** geht keine Tafel auf; die Knöpfe gehen der Karte
+  darunter vor.
 
 ### Teleportieren
 
