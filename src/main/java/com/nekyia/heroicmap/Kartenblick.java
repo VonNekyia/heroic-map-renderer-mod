@@ -66,6 +66,14 @@ final class Kartenblick {
         return kanteZ(hoehe) + ty * kachel * lupe;
     }
 
+    /** Wie die Formen einen Punkt der Welt auf den Schirm legen: auf das Raster der Kacheln, wie die Nadeln. */
+    Formen.Abbild abbild(int scale, int breite, int hoehe) {
+        return (wx, wz, aus) -> {
+            aus[0] = rasterX(Projektion.zuPixel(wx, scale), breite);
+            aus[1] = rasterY(Projektion.zuPixel(wz, scale), hoehe);
+        };
+    }
+
     /** Wo die Karte den Pixel {@code basisX} der Basis zeichnet: von der Kante aus, wie die Kacheln. */
     double rasterX(double basisX, int breite) {
         return kanteX(breite) + basisX / teiler() * lupe;

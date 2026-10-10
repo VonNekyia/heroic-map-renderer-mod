@@ -1,5 +1,6 @@
 package com.nekyia.heroicmap;
 
+import com.google.gson.JsonParser;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
@@ -103,8 +104,77 @@ public final class Bilder implements FabricClientGameTest {
             umriss(context);
             drehen(context, server);
             vollbildkarte(context);
+            formen(context, server);
             selbst(context);
         }
+    }
+
+    /** Eine Ebene mit Flächen, Kreis und Linie um den Spieler; der Teil wie vom Plugin. */
+    private static final String FORMEN = """
+            {"v":1,"typ":"ebene","id":"test:formen","version":"1","teil":1,"teile":1,"objects":[
+              {"type":"region","fill":"#3060E080","polygons":[{"outer":[[-12,-12],[4,-12],[4,-4],[-4,-4],[-4,4],[-12,4]],
+                "holes":[[[-10,-10],[-6,-10],[-6,-6],[-10,-6]]]}]},
+              {"type":"region","fill":"#E0403080","stroke":{"color":"#FFFFFF","width":1,"style":"dashed"},
+                "polygons":[{"outer":[[2,2],[14,2],[2,14]]}]},
+              {"type":"circle","center":[9,-8],"radius":5,"fill":"#40C04060","stroke":{"style":"dashed"}},
+              {"type":"line","points":[[-15,10],[0,8],[15,14]],"stroke":{"color":"#FFD700","width":3,"style":"dashed","dash":[6,4]}}
+            ]}""";
+
+    /**
+     * Flächen, Kreis und Linie einer Ebene: die Minimap genordet und gedreht mit „uhr“ bei 4 px und Zoom 4,
+     * dann die Vollbildkarte. Siehe docs/ebenen.md, „Flächen, Kreise und Linien“.
+     */
+    private static void formen(ClientGameTestContext context, TestServerContext server) {
+        context.runOnClient(mc -> {
+            Ebenen.INSTANZ.empfange(JsonParser.parseString("""
+                    {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:formen","name":{"de":"Formen","en":"Shapes"},
+                      "visible":true,"order":1,"version":"1"}]}""").getAsJsonObject());
+            Ebenen.Teil t = Ebenen.Teil.lies(FORMEN);
+            if (t == null || t.formen().size() != 4) {
+                throw new AssertionError("Teil der Formen nicht lesbar");
+            }
+            Ebenen.INSTANZ.teil(t);
+            Minimap.INSTANZ.setzeScale(4);
+            Minimap.INSTANZ.setzeZoom(4);
+        });
+        BufferedImage[] teile = new BufferedImage[2];
+        for (int i = 0; i < teile.length; i++) {
+            boolean gedreht = i == 1;
+            server.runCommand("tp @a 0.5 -30 0.5 " + (gedreht ? 30 : 0) + " 90");
+            context.runOnClient(mc -> {
+                Minimap.INSTANZ.setzeDrehen(gedreht);
+                Minimap.INSTANZ.setzeSkin(gedreht ? "uhr" : Skin.OHNE);
+                Minimap.INSTANZ.setzeRund(gedreht);
+            });
+            context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getYRot() - (gedreht ? 30 : 0)) < 0.1f && Minimap.INSTANZ.fertig(), 1200);
+            context.waitTicks(2);
+            teile[i] = mitRand(context, context.takeScreenshot(TestScreenshotOptions.of("formen-" + i).disableCounterPrefix()));
+        }
+        Path baum = testsatz();
+        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
+        context.waitTicks(40);
+        Path karte = context.takeScreenshot(TestScreenshotOptions.of("formen-karte").disableCounterPrefix());
+        if (!AUSGABE.isEmpty()) {
+            BufferedImage beide = new BufferedImage(teile[0].getWidth() + teile[1].getWidth(),
+                    Math.max(teile[0].getHeight(), teile[1].getHeight()), BufferedImage.TYPE_INT_RGB);
+            beide.getGraphics().drawImage(teile[0], 0, 0, null);
+            beide.getGraphics().drawImage(teile[1], teile[0].getWidth(), 0, null);
+            try {
+                ImageIO.write(beide, "png", Path.of(AUSGABE, "formen.png").toFile());
+                Files.copy(karte, Path.of(AUSGABE, "formen-karte.png"), StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        server.runCommand("tp @a 0.5 -30 0.5 0 90");
+        context.runOnClient(mc -> {
+            mc.gui.setScreen(null);
+            Ebenen.INSTANZ.leeren();
+            Minimap.INSTANZ.setzeDrehen(false);
+            Minimap.INSTANZ.setzeSkin(Skin.OHNE);
+            Minimap.INSTANZ.setzeRund(false);
+        });
+        context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getYRot()) < 0.1f && Minimap.INSTANZ.fertig(), 1200);
     }
 
     /** Die Minimap rund bei 4 px, dann das Menü über der Szene. Siehe docs/minimap.md, „Bedienung“. */
