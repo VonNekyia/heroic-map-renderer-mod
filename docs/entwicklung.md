@@ -150,7 +150,9 @@ Schrift, mittig auf ein Quadrat gesetzt.
 
 `.github/workflows/ci.yml` hat zwei Jobs:
 
-- **Gradle:** `./gradlew build` unter Ubuntu mit Java 25.
+- **Gradle:** `./gradlew build compileGametestJava` unter Ubuntu mit
+  Java 25. Die Gametests kompiliert er nur; laufen lassen kann er sie
+  nicht, sie brauchen ein Fenster des Spiels.
   `gradle/actions/setup-gradle` prüft dabei auch, dass `gradle-wrapper.jar`
   ein Wrapper von Gradle ist.
 - **Doku:** `pruefe-doku.sh` vom Branch `master` des Hauptrepositorys,

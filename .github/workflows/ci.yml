@@ -21,9 +21,10 @@ jobs:
       # Prüft auch, dass gradle-wrapper.jar ein Wrapper von Gradle ist.
       - uses: gradle/actions/setup-gradle@v6
 
+      # Die Gametests nur kompiliert: Laufen brauchen sie ein Fenster; so fällt ein Fehler im Code der Szenen schon hier auf.
       - name: Bauen und testen
         timeout-minutes: 20
-        run: ./gradlew build
+        run: ./gradlew build compileGametestJava
 
   doku:
     name: Doku
