@@ -4,9 +4,29 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
-## 0.2.14
+## 0.2.18
 
 - **Beams above pinned waypoints:** each pinned waypoint in view distance shows a beacon beam in its colour in the world. Switch it off with "World effects" in the settings.
+
+## 0.2.16
+
+- **Your own lines and regions from waypoints,** instead of "Region from here": right-click a waypoint, "Add point", then left-click more waypoints. Click the first one again to close a region, or choose "Finish shape" for a line. Moving a waypoint moves its shapes; deleting it takes it out of them.
+- **Pin your own shapes** with a double-click, lines too; "Delete shape" in the right-click menu removes one and keeps the waypoints.
+- **Old rectangles stay:** regions set with "Region from here" are still drawn and can be pinned and deleted.
+
+## 0.2.15
+
+- **The full map remembers where it was:** zoom and position per server, world and dimension.
+- **"To player" button** on the full map, and **"Options …"** at the bottom right for the menu of /hmap.
+- **Double-click a waypoint without the map jumping;** a single click still centres it a moment later.
+- **No more pinned info panels:** a click no longer keeps a panel open; panels show while you point at something.
+- **Move a waypoint:** hold the left button on it for two seconds, then drag; Esc cancels.
+- **New icon:** the mod's logo, a spruce on an island.
+
+## 0.2.14
+
+- **Doors, fences and torches on the minimap:** thin blocks now take at least one pixel, so doors, fence posts, panes, bars and torches show at low resolution too.
+- **Chests look like chests** on the minimap and the self-drawn map: the top of their lid instead of plain planks; ender chests no longer black.
 
 ## 0.2.13
 

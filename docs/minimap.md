@@ -18,6 +18,7 @@ code:
   - src/main/resources/heroicmap.accesswidener
   - src/test/java/com/nekyia/heroicmap/LichtTest.java
   - src/test/java/com/nekyia/heroicmap/MinimapTest.java
+  - src/test/java/com/nekyia/heroicmap/ChunkMalerTest.java
   - src/gametest/java/com/nekyia/heroicmap/Bilder.java
   - src/gametest/java/com/nekyia/heroicmap/Messung.java
   - src/gametest/java/com/nekyia/heroicmap/Bedienung.java
@@ -389,7 +390,10 @@ nicht, siehe „Neu zeichnen“ (`ChunkMaler.male`).
   führt sie nach, belegt per javap am Client 26.3.
 - **Je Block:** die Flächen des Modells und die Oberfläche einer
   Flüssigkeit, nach ihrer Höhe geordnet, siehe „Wasser“. Von Flüssigkeiten
-  zählt nur die oberste Oberfläche der Spalte.
+  zählt nur die oberste Oberfläche der Spalte. Blockentities ohne Fläche im
+  Modell, etwa Truhen, siehe „Blockentities“.
+- **Dünne Blöcke** wie Türen, Zaunpfosten, Scheiben, Gitter und Fackeln
+  stehen mindestens einen Pixel breit da, siehe „Flächen und Pixel“.
 - **Decke:** Hat die Dimension eine Decke (`DimensionType.hasCeiling`), wie
   der Nether, beginnt die Spalte auf Höhe des Kopfes. Ist der Block dort
   voll (`isSolidRender`), bleibt die Spalte leer: eine Wand. Wandert der
@@ -426,6 +430,17 @@ Tönung (`putQuadWithTint`).
 
 Ein Pixel gehört zu einer Fläche, wenn seine Mitte in einem ihrer beiden
 Dreiecke (0, 1, 2) und (0, 2, 3) liegt, in x und z (`ChunkMaler.schicht`).
+
+- **Mindestens ein Pixel:** Trifft eine Fläche in einer Achse keine Mitte
+  eines Pixels, gilt in dieser Achse die Reihe, in der ihre Mitte liegt; dort
+  prüft der Mod an ihrer Mitte statt an der des Pixels (`ChunkMaler.duenn`).
+  So ist jede Fläche mindestens einen Pixel breit. Die Oberseite einer Tür
+  ist 3/16 Block tief; bei 2 px je Block liegen die Mitten bei 1/4 und 3/4,
+  und vorher fehlte die Tür ganz, ebenso Zaunpfosten (6/16), Scheiben,
+  Gitter (2/16) und Fackeln. Bei 1 px nimmt eine Tür so den ganzen Block
+  ein. Das will der User für alle dünnen Blöcke (mod#80).
+
+  ![Türen, Truhen und ein Stück Dorf auf der Minimap bei 1, 2 und 4 px, oben vor mod#80, unten danach; Szene `tueren` des Gametests](bilder/tueren-vergleich.png)
 
 - **Abtasten:** (16 / scale)² Punkte je Pixel, bei 4 px also 4 × 4, bei
   1 px 16 × 16; so zählt bei einer vollen Oberseite jedes Texel. u und v
@@ -490,11 +505,30 @@ Tiefe wie der Renderer, siehe
 ## Blockentities
 
 Truhen, Schilder, Banner und Köpfe haben im Modell keine Fläche, sie
-zeichnet ein Renderer für Blockentities. Für sie legt der Mod das
-Partikel-Sprite des Modells deckend über ihre Form von oben, das Rechteck
-aus `getShape(...).bounds()` in x und z, in dessen Höhe, im Licht des
-Blocks darüber (`ChunkMaler.sammleBlockentity`). Blöcke mit `RenderShape.INVISIBLE`, etwa Barrieren, zeichnen
-nichts.
+zeichnet ein Renderer für Blockentities. Für sie legt der Mod ein Bild
+deckend über ihre Form von oben, das Rechteck aus `getShape(...).bounds()` in
+x und z, in dessen Höhe, im Licht des Blocks darüber
+(`ChunkMaler.sammleBlockentity`). Blöcke mit `RenderShape.INVISIBLE`, etwa
+Barrieren, zeichnen nichts.
+
+- **Truhen** zeigen die Oberseite ihres Deckels aus ihrer Textur im Atlas
+  der Truhen (`AtlasIds.CHESTS`), so wie das Spiel sie wählt und dreht;
+  belegt per javap am Client 26.3:
+  - Textur nach `ChestRenderer.getChestMaterial`: eine Kupfertruhe nach
+    ihrem Zustand, die Endertruhe, die Fallentruhe, sonst die gewöhnliche
+    (`ChunkMaler.truhe`, `Sheets.chooseSprite` mit dem `ChestType`).
+    Weihnachten nicht, wie auf der Serverkarte.
+  - Deckel im Modell (`ChestModel`): einzeln über x 1 bis 15, als linke
+    Hälfte einer Doppeltruhe 0 bis 15, als rechte 1 bis 16, über z 1 bis 15.
+    Seine Oberseite liegt in der Textur von 64 × 64 bei u 28 bis 42, als
+    Hälfte 29 bis 44, und v 0 bis 14, die Front bei v 0.
+  - Gedreht wie im Spiel um die Mitte um −`facing.toYRot()`
+    (`ChestRenderer.createModelTransformation`); der Mod rechnet jede Ecke
+    der Form zurück ins Modell (`ChunkMaler.deckel`).
+
+  Vorher lag das Partikel-Sprite darüber, bei Truhen das Eichenbrett, bei
+  der Endertruhe Obsidian; eine Truhe sah aus wie ein Holzblock (mod#80).
+- **Alle übrigen** bekommen das Partikel-Sprite ihres Modells.
 
 ## Neu zeichnen
 
@@ -626,18 +660,22 @@ Haus mit einem Schild an der Wand, Bambus, ein Kopf, drei Bäume, ein Weg, Glas,
 ein Feld. Gras, Blumen und Weizen stehen senkrecht und fehlen von oben.
 
 Danach die Ebenen (siehe [ebenen.md](ebenen.md)): Flächen, Kreis, Linie und
-Kartenschrift, der Kreis und eine eigene Region angeheftet (`formen.png`,
+Kartenschrift, der Kreis und eine eigene Region aus drei Wegpunkten angeheftet (`formen.png`,
 `formen-karte.png`), dann Nadeln in drei
-Grössen, ein Banner und ihre Namen, dazu eine eigene Region; die Minimap
+Grössen, ein Banner und ihre Namen, dazu ein altes Rechteck; die Minimap
 ohne Angeheftetes, mit angehefteter Nadel und angeheftetem Banner und nah am
 Banner (`orte.png`), die Vollbildkarte (`orte-karte.png`), auf
 der Vollbildkarte noch einmal mit „Unicode-Schrift erzwingen“
 (`orte-unicode.png`). Die Bilder der Nadeln und des Banners holt der Mod
 von einem Server, den der Test auf 127.0.0.1 startet. Dann die Tafel
-einer Nadel beim Zeigen und per Klick gehalten (`tafel-zeigen.png`,
-`tafel-gehalten.png`); die Antwort des Plugins legt der Test selbst ab.
+einer Nadel beim Zeigen (`tafel-zeigen.png`); ein Klick hält sie nicht, und
+Escape schliesst die Karte. Die Antwort des Plugins legt der Test selbst ab.
 Zuletzt das Banner in drei Grössen bei GUI-Massstab 2 und 3
-(`banner-groessen.png`).
+(`banner-groessen.png`). Westlich der Szene Türen in vier Richtungen, offen
+und aus Eisen, Truhen einzeln und doppelt, Ender- und Fallentruhe, ein Fass,
+dazu ein Stück Dorf mit Zaun, Fackeln, Scheiben, Gitter, Mauer und
+Falltüren, auf der Minimap bei 1, 2 und 4 px (`tueren.png`); bei 2 px prüft
+der Test, dass die Türen zu sehen sind.
 
 ## Was anders ist als top-north
 

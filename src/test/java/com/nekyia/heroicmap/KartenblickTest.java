@@ -6,7 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /** Wie die Vollbildkarte Kacheln auf den Schirm legt. Siehe docs/vollbildkarte.md. */
 class KartenblickTest {
@@ -208,5 +211,40 @@ class KartenblickTest {
         // Stufe 4: ein Pixel der Stufe sind vier der Basis; der Inhalt folgt der Maus.
         assertEquals(-40, blick.mx, 1e-9);
         assertEquals(80, blick.mz, 1e-9);
+    }
+
+    @Test
+    void stelltGeklemmtWieZuletzt() {
+        Kartenblick blick = new Kartenblick(256, 0, 4, 4);
+        blick.stelle(12, -34, 4, 4);
+        assertEquals(12, blick.mx, 1e-9);
+        assertEquals(4, blick.zoom);
+        assertEquals(4, blick.lupe);
+        // Eine Stufe, die der Satz nicht hat, kommt auf die nächste; eine Lupe gibt es nur auf der feinsten Stufe.
+        blick.stelle(0, 0, 9, 3);
+        assertEquals(4, blick.zoom);
+        assertEquals(2, blick.lupe);
+        blick.stelle(0, 0, 2, 4);
+        assertEquals(2, blick.zoom);
+        assertEquals(1, blick.lupe);
+        blick.stelle(0, 0, -3, 0);
+        assertEquals(0, blick.zoom);
+        assertEquals(1, blick.lupe);
+    }
+
+    @Test
+    void lageJeDimensionUeberstehtDenNeustart(@TempDir Path ordner) throws Exception {
+        assertNull(Kartenlage.lies(ordner, "minecraft:overworld"));
+        Kartenlage.schreibe(ordner, "minecraft:overworld", new Kartenlage.Lage(120.5, -40.25, 3, 1));
+        Kartenlage.schreibe(ordner, "minecraft:the_nether", new Kartenlage.Lage(8, 9, 2, 1));
+        assertEquals(new Kartenlage.Lage(120.5, -40.25, 3, 1), Kartenlage.lies(ordner, "minecraft:overworld"));
+        assertEquals(new Kartenlage.Lage(8, 9, 2, 1), Kartenlage.lies(ordner, "minecraft:the_nether"));
+        // Ohne Ordner, im Einzelspieler, nur im Speicher; eine kaputte Datei gibt keine Lage.
+        Kartenlage.schreibe(null, "minecraft:the_end", new Kartenlage.Lage(1, 2, 0, 1));
+        assertEquals(new Kartenlage.Lage(1, 2, 0, 1), Kartenlage.lies(null, "minecraft:the_end"));
+        Kartenlage.leeren();
+        assertNull(Kartenlage.lies(null, "minecraft:the_end"));
+        Files.writeString(ordner.resolve("karte.properties"), "minecraft\\:overworld.x=eins\n");
+        assertNull(Kartenlage.lies(ordner, "minecraft:overworld"));
     }
 }

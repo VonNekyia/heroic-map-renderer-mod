@@ -73,13 +73,10 @@ class TafelnTest {
         assertEquals(a, z.offen());
         z.zeiger(null, false, 2000 + Tafeln.Zeigen.NACHLAUF_MS);
         assertNull(z.offen());
-        // Ein Klick hält sie, auch wenn der Zeiger zu b wandert; Escape oder ein Klick daneben schliesst zuerst nur sie.
-        z.halte(a);
+        // Wandert der Zeiger zu b, öffnet nach der Ruhe b; gehalten wird nichts (mod#75).
         z.zeiger(b, false, 5000);
-        z.zeiger(b, false, 9000);
-        assertEquals(a, z.offen());
-        assertTrue(z.schliesse());
-        assertFalse(z.schliesse());
+        z.zeiger(b, false, 5000 + Tafeln.Zeigen.RUHE_MS);
+        assertEquals(b, z.offen());
     }
 
     @Test
@@ -141,38 +138,18 @@ class TafelnTest {
     }
 
     @Test
-    void escapeOeffnetSieNichtGleichWieder() {
+    void keineTafelSchliesst() {
+        // Solange die Antwort aussteht, bleibt sie offen; ohne Tafel geht sie zu, und ein anderes Ziel öffnet wie sonst.
         Tafeln.Zeigen z = new Tafeln.Zeigen();
         Tafeln.Ziel a = new Tafeln.Ziel("b:e", "v", "a"), b = new Tafeln.Ziel("b:e", "v", "b");
         z.zeiger(a, false, 0);
         z.zeiger(a, false, Tafeln.Zeigen.RUHE_MS);
-        assertEquals(a, z.offen());
-        // Von Hand geschlossen, mit dem Zeiger weiter auf a: Sie bleibt zu, so schliesst der zweite Escape die Karte.
-        assertTrue(z.schliesse());
-        z.zeiger(a, false, 1000);
-        z.zeiger(a, false, 5000);
-        assertNull(z.offen());
-        assertFalse(z.schliesse());
-        // Erst nach einem anderen Ziel öffnet a wieder.
-        z.zeiger(b, false, 6000);
-        z.zeiger(a, false, 6010);
-        z.zeiger(a, false, 6010 + Tafeln.Zeigen.RUHE_MS);
-        assertEquals(a, z.offen());
-    }
-
-    @Test
-    void keineTafelSchliesstAuchGehalten() {
-        // Gehalten ohne Tafel hielte sie sonst jede andere auf.
-        Tafeln.Zeigen z = new Tafeln.Zeigen();
-        Tafeln.Ziel a = new Tafeln.Ziel("b:e", "v", "a"), b = new Tafeln.Ziel("b:e", "v", "b");
-        z.halte(a);
         z.antwort(null);
         assertEquals(a, z.offen());
         z.antwort(Optional.empty());
         assertNull(z.offen());
-        assertFalse(z.gehalten());
-        z.zeiger(b, false, 0);
-        z.zeiger(b, false, Tafeln.Zeigen.RUHE_MS);
+        z.zeiger(b, false, 1000);
+        z.zeiger(b, false, 1000 + Tafeln.Zeigen.RUHE_MS);
         assertEquals(b, z.offen());
     }
 

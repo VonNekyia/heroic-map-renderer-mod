@@ -1,6 +1,6 @@
 ---
 title: Wegpunkte
-description: Wegpunkte und eigene Regionen auf der Vollbildkarte setzen und löschen, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
+description: Wegpunkte auf der Vollbildkarte setzen und löschen, eigene Linien und Regionen aus Wegpunkten, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Wegpunkte.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
@@ -10,6 +10,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/Strahlen.java
   - src/test/java/com/nekyia/heroicmap/StrahlenTest.java
   - src/gametest/java/com/nekyia/heroicmap/Messung.java
+  - src/main/java/com/nekyia/heroicmap/Tafeln.java
   - src/test/java/com/nekyia/heroicmap/WegpunkteTest.java
   - src/test/java/com/nekyia/heroicmap/MinimapTest.java
   - src/main/java/com/nekyia/heroicmap/Kartenblick.java
@@ -24,8 +25,10 @@ stehen sie als Raute in ihrer Farbe, wie Mitspieler und der eigene Spieler;
 was ausserhalb des Schirms liegt, steht am Rand in seiner Richtung. Ein
 Klick legt eine Marke in die Mitte, ein Doppelklick heftet einen Wegpunkt
 oder Mitspieler an die [Minimap](minimap.md). So hat es der User am 08.10.
-gewünscht. Ebenso heftet ein Doppelklick eine eigene Region oder eine
-Fläche oder einen Kreis vom Server an, siehe „Anheften“ (mod#36).
+gewünscht. Ebenso heftet ein Doppelklick eine eigene Form oder eine
+Fläche oder einen Kreis vom Server an, siehe „Anheften“ (mod#36). Aus
+Wegpunkten baut der Spieler eigene Linien und Regionen, siehe „Formen aus
+Wegpunkten“ (mod#79).
 
 ## Bedienung
 
@@ -33,11 +36,16 @@ Fläche oder einen Kreis vom Server an, siehe „Anheften“ (mod#36).
 |---|---|
 | Rechtsklick, „Wegpunkt setzen“ | der Eintrag unter „Hierher teleportieren“; setzt einen Wegpunkt auf den Block unter der Maus, in der ersten der 8 Farben (`Wegpunkte.FARBEN`), die in der Dimension noch frei ist, sind alle vergeben, reihum. Steht dort schon einer, bleibt es einer. Den Eintrag gibt es auch ohne Recht zum Teleportieren und unter einer Decke |
 | Rechtsklick auf einen Wegpunkt | das Menü für seinen Block: „Hierher teleportieren“, wenn erlaubt, und „Wegpunkt löschen“ |
-| Klick auf eine Marke | legt sie beim Loslassen in die Mitte: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück. Wer auf einer Marke zu ziehen beginnt und weiter als 3 Einheiten zieht (`Karte.ZUG`), zieht nur die Karte |
-| Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder |
-| Doppelklick auf die Raute einer eigenen Region, auf eine Fläche, einen Kreis, eine Nadel oder ein Banner vom Server | heftet sie an die Minimap oder löst sie wieder, siehe „Anheften“ |
-| Rechtsklick, „Region von hier“, dann ein Linksklick oder „Region bis hier“ | setzt eine eigene Region, das Rechteck der Blöcke zwischen beiden Ecken samt ihnen, siehe „Regionen“; dazwischen zeigt eine gestrichelte Vorschau das Rechteck bis zur Maus und unten links der Hinweis „Linksklick setzt die zweite Ecke, Esc bricht ab“; ziehen verschiebt die Karte weiter, „Region abbrechen“ oder `Esc` brechen ab |
-| Rechtsklick in eine eigene Region oder auf ihre Raute | „Region löschen“ |
+| Klick auf eine Marke | legt sie in die Mitte, sobald kein zweiter Klick mehr folgen kann, 250 ms nach dem Loslassen: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück. Wer auf einer Marke zu ziehen beginnt und weiter als 3 Einheiten zieht (`Karte.ZUG`), zieht nur die Karte |
+| Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder; die Karte bewegt sich dabei nicht |
+| Linke Taste 2 s still auf einem Wegpunkt halten | er hängt an der Maus, die Karte zieht nicht mit; beim Loslassen liegt er auf dem Block darunter, mit Farbe und Anheften (`Wegpunkte.verschiebe`). Liegt dort schon einer, bleibt er, wo er war; `Esc` bricht ab. Still heisst: nicht weiter als 3 Einheiten gezogen (`Karte.ZUG`); unter 2 s ist es ein Klick oder ein Zug wie sonst (`Karte.HALTEN_MS`, mod#75). Nur Wegpunkte, nicht die Rauten eigener Regionen |
+| Doppelklick in eine eigene Region, auf eine eigene Linie, auf die Raute eines alten Rechtecks, auf eine Fläche, einen Kreis, eine Nadel oder ein Banner vom Server | heftet sie an die Minimap oder löst sie wieder, siehe „Anheften“ |
+| Rechtsklick auf einen Wegpunkt, „Punkt hinzufügen“ | beginnt eine Form mit ihm oder fügt ihn an die Form im Bau an, siehe „Formen aus Wegpunkten“ |
+| Linksklick auf einen Wegpunkt, solange eine Form im Bau ist | fügt ihn an, statt ihn in die Mitte zu legen; auf den ersten Punkt schliesst er bei drei und mehr Punkten die Region. Ziehen verschiebt die Karte wie sonst |
+| Rechtsklick, „Form fertig“ | speichert die Form im Bau, mit zwei Punkten eine Linie, mit mehr eine Region; den Eintrag gibt es ab zwei Punkten |
+| Rechtsklick, „Form abbrechen“, oder `Esc` | verwirft die Form im Bau; die Wegpunkte bleiben |
+| Rechtsklick in eine eigene Region oder auf eine eigene Linie | „Form löschen“; die Wegpunkte bleiben |
+| Rechtsklick in ein altes Rechteck oder auf seine Raute | „Region löschen“ |
 
 - **Doppelklick:** Das Spiel meldet einen Klick als doppelt, wenn derselbe
   Knopf im selben Schirm weniger als 250 ms nach dem letzten kommt, gleich
@@ -45,17 +53,18 @@ Fläche oder einen Kreis vom Server an, siehe „Anheften“ (mod#36).
   (`mouseClicked` gab `true`; `MouseHandler.onButton`, belegt per javap am
   Client 26.3). Die Karte nimmt jeden Linksklick an, auch einen auf
   freie Karte, sonst zählte ein Doppelklick auf eine Fläche nie. Der erste
-  Klick hat die Marke schon in die Mitte gelegt; der zweite zählt deshalb
-  für die Marke des ersten (`Karte.letzte`), nicht für die unter der Maus.
-  Jeder andere Klick vergisst sie; ein schneller Klick nach „Wegpunkt
-  setzen“ heftet so nichts an.
+  Klick auf eine Marke legt sie erst in die Mitte, wenn 250 ms lang kein
+  zweiter kam (`MouseHandler.DOUBLE_CLICK_THRESHOLD_MS`, `Karte.wartend`);
+  so bewegt ein Doppelklick die Karte nicht, wie der User es will (mod#75).
+  Der zweite zählt für die Marke des ersten (`Karte.letzte`), nicht für die
+  unter der Maus, und hebt das Zentrieren auf. Jeder andere Klick vergisst
+  sie; ein schneller Klick nach „Wegpunkt setzen“ heftet so nichts an.
 - **Doppelklick auf ein Objekt vom Server:** Der erste Klick merkt sich
   beim Loslassen ohne Zug das Ziel unter der Maus (`Karte.letztesZiel`),
   eine Nadel, ein Banner, eine Fläche oder einen Kreis mit `id`; eine Nadel
   geht vor, wie bei der Tafel. Der zweite heftet es an, wenn unter ihm
-  dasselbe Ziel liegt; ein Knopf geht vor. Schliesst der erste Klick die gehaltene Tafel desselben Ziels, zählt
-  er ebenso. Die Tafel bleibt, wie der erste Klick sie liess, siehe
-  [Ebenen](ebenen.md), „Infotafel“.
+  dasselbe Ziel liegt; ein Knopf geht vor. Eine Tafel hält dabei keiner
+  der Klicks, siehe [Ebenen](ebenen.md), „Infotafel“.
 - **Treffer:** eine halbe Kopfseite und eine Einheit um die Mitte der
   Marke. Ein Wegpunkt oder Mitspieler geht dem eigenen Kopf vor, sonst
   liesse sich ein Wegpunkt am eigenen Standort nicht greifen; sonst die
@@ -151,23 +160,55 @@ Leuchtfeuers in seiner Farbe, so wünscht es der Maintainer (mod#36).
   GUI-Massstab 2 sind es 12 Pixel, die Texel also abwechselnd 1 und 2
   Pixel breit. Ob 6 Einheiten gut aussehen, sieht der User im Spiel.
 
+## Formen aus Wegpunkten
+
+Eigene Linien und Regionen baut der Spieler aus seinen Wegpunkten, statt
+„Region von hier“, so will es der User (mod#79). Zwei Punkte sind eine
+Linie, drei und mehr eine Region, ein Vieleck in der Folge der Punkte.
+
+- **Bauen:** Rechtsklick auf einen Wegpunkt, „Punkt hinzufügen“ beginnt die
+  Form. Danach fügt ein Linksklick ohne Zug auf einen Wegpunkt ihn an, oder
+  wieder „Punkt hinzufügen“ (`Karte.hinzu`). Ein Linksklick auf den ersten
+  Punkt schliesst die Region, sobald drei dabei sind; „Form fertig“ speichert
+  die Form, wie sie ist (`Karte.fertig`, `Wegpunkte.setzeForm`). Solange sie
+  im Bau ist, verbindet eine gepunktete weisse Vorschau die Punkte und den
+  letzten mit der Maus, und unten links steht der Hinweis „Linksklick auf
+  Wegpunkte: Punkt dazu, auf den ersten: Region; Rechtsklick: Form fertig;
+  Esc bricht ab“.
+- **Nicht dazu** kommt ein Punkt, der schon dabei ist, einer aus einer
+  anderen Dimension oder einer über 64 (`Wegpunkte.MAX_PUNKTE_FORM`). Wer
+  die Dimension wechselt, verliert die Form im Bau.
+- **Verweise:** Jeder Wegpunkt hat eine feste `id`; die Form nennt die ids
+  ihrer Punkte in Reihenfolge (`Wegpunkte.EigeneForm`). Wer einen Wegpunkt
+  verschiebt, verschiebt die Form mit. Wer ihn löscht, nimmt ihn aus jeder
+  Form; bleiben weniger als zwei Punkte, fällt die Form weg. Aus einer
+  Region mit drei Punkten wird so eine Linie.
+- **Höchstens 256** Formen je Welt (`Wegpunkte.MAX_EIGENE_FORMEN`);
+  darüber speichert „Form fertig“ nichts, und unten links steht „Höchstens
+  256 eigene Formen“.
+- **Farbe** wie ein Wegpunkt: die erste der 8 Farben, die in der Dimension
+  unter Wegpunkten, Rechtecken und Formen noch frei ist.
+- **Gezeichnet** auf der Vollbildkarte über den Formen der Ebenen
+  (`Wegpunkte.form`, `Wegpunkte.karte`): eine Region als Fläche in ihrer
+  Farbe zu 25 % mit 1 Einheit Rand, eine Linie 2 Einheiten breit, beide
+  durch die Mitten der Blöcke ihrer Wegpunkte. Die Wegpunkte selbst stehen
+  darüber wie sonst.
+- **Treffer:** in einer Region, oder höchstens 3 Einheiten des GUI neben
+  einer Linie (`Karte.eigeneUnter`, `Tafeln.abstand`); überlappen zwei, die
+  zuletzt gebaute. Ein Wegpunkt geht vor.
+- **Löschen:** Rechtsklick in die Region oder auf die Linie, „Form
+  löschen“. Die Wegpunkte bleiben.
+- **Anheften:** Doppelklick, siehe „Anheften“. Auch Linien, entschieden
+  vom Reviewer; den Schleier in der Welt bekommen nur Regionen.
+
 ## Regionen
 
-Eigene Regionen des Spielers, „Region-Wegpunkte“, so wünscht es der User
-(mod#35). Ein Rechteck aus zwei Ecken, entschieden vom Reviewer; ein
-Vieleck kommt nur, wenn der User es will.
+Die Rechtecke aus „Region von hier“ bis 0.2.15 (mod#35, mod#73). Neue
+gibt es nicht mehr, entschieden vom Reviewer (mod#79); vorhandene bleiben
+ohne Umwandlung.
 
-- **Setzen** über das Menü der rechten Taste, wo auch „Wegpunkt setzen“
-  steht: „Region von hier“ merkt die erste Ecke. Danach setzt ein Linksklick
-  ohne Zug die zweite Ecke auf den Block unter der Maus, auch auf einer
-  Marke; wer zieht, verschiebt die Karte, die Vorschau bleibt. Ebenso setzt
-  „Region bis hier“ im Menü der rechten Taste das Rechteck
-  (`Wegpunkte.setze` mit vier Zahlen). Ohne den Linksklick nahm die Karte
-  den Klick als Verschieben, und es entstand keine Region (mod#73). Die Ecken dürfen in jeder
-  Folge kommen. Dieselbe Region noch einmal bleibt eine. Höchstens 256 je
-  Welt (`Wegpunkte.MAX_REGIONEN`); darüber setzt der Mod keine.
-- **Farbe** wie ein Wegpunkt: die erste der 8 Farben, die in der Dimension
-  unter Wegpunkten und Regionen noch frei ist.
+- **Aus der Datei** gelesen, höchstens 256 je Welt
+  (`Wegpunkte.MAX_REGIONEN`).
 - **Gezeichnet** auf der Vollbildkarte nach den Formen der Ebenen, vor
   Nadeln und Marken (`Karte.regionen`): die Fläche in ihrer Farbe zu 25 %,
   1 Einheit Rand deckend, auf ganzen Pixeln wie die Kacheln. In ihrer Mitte
@@ -175,13 +216,15 @@ Vieleck kommt nur, wenn der User es will.
   sie in die Mitte, ausserhalb des Schirms steht sie am Rand.
 - **Löschen:** Rechtsklick in die Region oder auf ihre Raute, „Region
   löschen“; überlappen zwei, die zuletzt gesetzte.
+- **Anheften:** Doppelklick auf die Raute, siehe „Anheften“.
 - **Minimap:** nur angeheftet, siehe „Anheften“.
 
 ## Anheften
 
 Regionen und Kreise lassen sich anheften wie Wegpunkte, so wünscht es der
-Maintainer (mod#36): eigene Regionen und Flächen und Kreise der Ebenen vom
-Server. Linien nicht, entschieden vom Reviewer. Ebenso Nadeln und Banner,
+Maintainer (mod#36): eigene Formen und Rechtecke und Flächen und Kreise der
+Ebenen vom Server. Linien vom Server nicht, entschieden vom Reviewer; eigene
+Linien schon (mod#79). Ebenso Nadeln und Banner,
 so will es der User (mod#71); auf der Minimap stehen sie nur angeheftet,
 siehe [Ebenen](ebenen.md), „Nadeln“. Angeheftete Wegpunkte bekommen in der
 Welt einen Strahl, siehe „Strahl“; der Schleier an Regionen kommt in einem
@@ -189,12 +232,14 @@ eigenen PR.
 
 ![Minimap genordet und gedreht: nur der angeheftete Kreis und die angeheftete eigene Region, die übrigen Formen fehlen; Szene `formen` des Gametests](bilder/formen.png)
 
-- **Doppelklick** auf der Vollbildkarte auf die Raute einer eigenen Region
-  oder auf eine Fläche oder einen Kreis vom Server, siehe „Bedienung“.
-  Anheften lässt sich nur, was eine `id` hat; ohne `id` gibt es auch keine
-  Tafel.
-- **Höchstens 64** Regionen und Kreise je Welt, eigene und vom Server
-  zusammen (`Wegpunkte.MAX_ANGEHEFTET`). Darüber heftet der Doppelklick
+- **Doppelklick** auf der Vollbildkarte in eine eigene Region, auf eine
+  eigene Linie, auf die Raute eines Rechtecks oder auf eine Fläche oder
+  einen Kreis vom Server, siehe „Bedienung“. Vom Server lässt sich nur
+  anheften, was eine `id` hat; ohne `id` gibt es auch keine Tafel. Der
+  erste Klick merkt sich die eigene Form unter der Maus
+  (`Karte.letzteEigene`), wenn dort nichts vom Server liegt.
+- **Höchstens 64** Formen, Rechtecke und Kreise je Welt, eigene und vom
+  Server zusammen (`Wegpunkte.MAX_ANGEHEFTET`). Darüber heftet der Doppelklick
   nichts an, und unten links steht „Höchstens 64 Regionen angeheftet; erst
   eine lösen“. Lösen geht immer. Auch aus der Datei liest der Mod nicht
   mehr.
@@ -213,12 +258,12 @@ eigenen PR.
   Ebenen bleiben, auch wenn deren Daten gerade da sind: Nach dem Wechsel
   über einen Proxy können sie noch vom vorigen Server sein.
 - **Minimap:** die angehefteten Flächen und Kreise der sichtbaren Ebenen,
-  wie die Vollbildkarte sie zeichnet, darüber die angehefteten eigenen
-  Regionen als Fläche in ihrer Farbe zu 25 % mit 1 Einheit Rand
-  (`Wegpunkte.flaeche`). Alle liegen unter der Kartenschrift und den
+  wie die Vollbildkarte sie zeichnet, darüber die angehefteten Rechtecke
+  (`Wegpunkte.flaeche`) und eigenen Formen (`Wegpunkte.form`) wie auf der
+  Vollbildkarte. Alle liegen unter der Kartenschrift und den
   Nadeln; eine ausgeblendete Ebene fehlt auch angeheftet.
-- **Vollbildkarte:** Der Rand angehefteter Flächen, Kreise und eigener
-  Regionen ist 2 Einheiten breiter (`Wegpunkte.BREITER`), höchstens 64 wie
+- **Vollbildkarte:** Der Rand angehefteter Flächen, Kreise, Rechtecke und
+  eigener Formen ist 2 Einheiten breiter (`Wegpunkte.BREITER`), höchstens 64 wie
   jeder Rand. Hat eine Form keinen Rand, bekommt sie einen von 2 Einheiten
   in der Füllung ohne Alpha, wie die Vorgabe des Formats. Die Raute einer
   angehefteten Region hat den bunten Ring wie ein Wegpunkt.
@@ -242,7 +287,8 @@ eigenen PR.
 - **Format:**
 
   ```json
-  {"wegpunkte":[{"dimension":"minecraft:overworld","x":12,"z":-40,"farbe":0,"minimap":true}],
+  {"wegpunkte":[{"id":1,"dimension":"minecraft:overworld","x":12,"z":-40,"farbe":0,"minimap":true}],
+   "eigene_formen":[{"punkte":[1,2,3],"farbe":2,"minimap":false}],
    "regionen":[{"dimension":"minecraft:overworld","x0":2,"z0":-5,"x1":10,"z1":3,"farbe":1,"minimap":false}],
    "spieler":["00000000-0000-0000-0000-000000000001"],
    "formen":[{"ebene":"b:staedte","id":"westmark"}],
@@ -250,11 +296,15 @@ eigenen PR.
   ```
 
   `farbe` ist ein Index in `Wegpunkte.FARBEN`, `minimap` heisst angeheftet,
+  `eigene_formen` nennt die ids ihrer Wegpunkte in Reihenfolge,
   `spieler` sind die angehefteten Mitspieler, `formen` die angehefteten
   Flächen und Kreise vom Server, `nadeln` die angehefteten Nadeln und
   Banner. Eine Region nennt die Blöcke ihrer Ecken,
   `x0` ≤ `x1` und `z0` ≤ `z1`, beide samt. Eine Datei von vor mod#36 ohne
   `formen` oder von vor mod#71 ohne `nadeln` liest der Mod ohne Fehler.
+  Wegpunkte von vor mod#79 ohne `id`, oder mit einer doppelten, bekommen
+  beim Lesen eine neue (`Wegpunkte.vergibIds`); einer Form, deren Punkte
+  fehlen, fallen sie heraus wie beim Löschen.
 - **Schreiben** nach jeder Änderung, über `wegpunkte.json.tmp`, dann
   verschieben; nie liegt eine halbe Datei da.
 - **Lesen:** Ein unlesbarer Eintrag fällt weg, die übrigen bleiben. Ist die
@@ -273,6 +323,8 @@ eigenen PR.
   Angeheftetes auf der Minimap, breiterer Rand auf der Karte) und
   `breiterOhneRandNimmtDieFuellung`. Zu Nadeln: `nadelnAnheftenUndBehalten`,
   `hoechstens64NadelnEigeneGrenze` und `nadelnAufDerMinimapNurAngeheftet`.
+  Zu Formen aus Wegpunkten: `festeIdsAuchAusAltenDateien`,
+  `formenAusWegpunktenGehenMitUndBleiben` und `formenGrenzenUndAlteDatei`.
 - `StrahlenTest`: nur angeheftete Wegpunkte dieser Dimension in Sichtweite,
   genau an der Grenze, höchstens 64, die ersten der Reihe nach; breiter in
   der Ferne, durchs Fernrohr nicht.
@@ -292,14 +344,20 @@ eigenen PR.
   zurück, und ein Rechtsklick bietet „Wegpunkt löschen“. Dazu ein Kreis
   vom Server: Ein Klick heftet nichts an, ein Doppelklick heftet an, ein
   zweiter löst; ein Doppelklick auf eine Nadel und einer auf die Raute
-  einer eigenen Region heften sie an. Eine Region wie ein Spieler:
-  Rechtsklick, „Region von hier“, die Karte ziehen setzt keine Region, die
-  Maus bewegen und ein Linksklick setzt die zweite Ecke.
+  einer eigenen Region heften sie an. Dazu „Zum Spieler“, „Optionen …“ und
+  zurück, und ein Wegpunkt, 2,5 s still gehalten, an der Maus verschoben,
+  ein zweites Mal mit Escape abgebrochen (mod#75). Formen wie ein Spieler
+  (mod#79): fünf Wegpunkte über „Wegpunkt setzen“; auf dem ersten „Punkt
+  hinzufügen“, Linksklicks auf den zweiten, dritten und ersten schliessen
+  eine Region; „Punkt hinzufügen“, ein Linksklick und „Form fertig“ geben
+  eine Linie; ein Doppelklick in die Region heftet sie an, „Form löschen“
+  löscht sie.
 - `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
   [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und
   einem am Rand, siehe [Vollbildkarte](vollbildkarte.md), „Bild“; in der
-  Szene `formen` ein angehefteter Kreis und eine angeheftete eigene Region
+  Szene `formen` ein angehefteter Kreis und eine angeheftete Region aus
+  drei Wegpunkten
   auf Minimap und Vollbildkarte, siehe [Ebenen](ebenen.md), „Flächen,
   Kreise und Linien“; in der Szene `strahl` die Strahlen zweier
   angehefteter Wegpunkte (`strahl.png`).
@@ -308,5 +366,7 @@ eigenen PR.
 
 ## Was fehlt
 
-- **Namen, Farbe wählen, verschieben:** Ein Wegpunkt hat nur Block und
-  Farbe; ändern heisst löschen und neu setzen.
+- **Namen, Farbe wählen:** Ein Wegpunkt hat nur Block und Farbe; die Farbe
+  ändern heisst löschen und neu setzen. Verschieben geht, siehe „Bedienung“.
+- **Formen ändern:** Einen Punkt in eine fertige Form einfügen oder ihre
+  Farbe wählen geht nicht; dafür die Form löschen und neu bauen.

@@ -11,10 +11,12 @@ import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.builders.UVPair;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.renderer.block.FluidModel;
 import net.minecraft.client.renderer.block.ModelBlockRenderer;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
+import net.minecraft.client.renderer.blockentity.state.ChestRenderState;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.chunk.RenderRegionCache;
 import net.minecraft.client.renderer.chunk.RenderSectionRegion;
@@ -23,14 +25,23 @@ import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.ModelManager;
 import net.minecraft.client.resources.model.geometry.BakedQuad;
+import net.minecraft.client.resources.model.sprite.SpriteId;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
+import net.minecraft.data.AtlasIds;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.AbstractChestBlock;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.CopperChestBlock;
+import net.minecraft.world.level.block.EnderChestBlock;
 import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.TrappedChestBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.FluidState;
@@ -260,8 +271,9 @@ final class ChunkMaler {
     }
 
     /**
-     * Blockentities wie Truhen, Schilder und Köpfe haben im Modell keine Fläche: das
-     * Partikel-Sprite über ihre Form von oben, im Licht des Blocks darüber.
+     * Blockentities wie Truhen, Schilder und Köpfe haben im Modell keine Fläche: über ihre Form von
+     * oben das Partikel-Sprite, bei einer Truhe der Deckel aus ihrer Textur; im Licht des Blocks darüber.
+     * Siehe docs/minimap.md, „Blockentities“.
      */
     private void sammleBlockentity(BlockStateModel model, BlockState state) {
         AABB box;
@@ -277,13 +289,74 @@ final class ChunkMaler {
         }
         float x0 = (float) Math.max(0, box.minX), x1 = (float) Math.min(1, box.maxX);
         float z0 = (float) Math.max(0, box.minZ), z1 = (float) Math.min(1, box.maxZ);
-        TextureAtlasSprite s = model.particleMaterial().sprite();
-        float du = s.getU1() - s.getU0(), dv = s.getV1() - s.getV0();
-        float ua = s.getU0() + x0 * du, ub = s.getU0() + x1 * du, va = s.getV0() + z0 * dv, vb = s.getV0() + z1 * dv;
+        float[] xz = {x0, z0, x0, z1, x1, z1, x1, z0}, uv = new float[8];
+        TextureAtlasSprite s;
+        float du, dv;
+        if (state.getBlock() instanceof AbstractChestBlock<?>) {
+            ChestType typ = state.hasProperty(ChestBlock.TYPE) ? state.getValue(ChestBlock.TYPE) : ChestType.SINGLE;
+            Direction facing = state.hasProperty(BlockStateProperties.HORIZONTAL_FACING)
+                    ? state.getValue(BlockStateProperties.HORIZONTAL_FACING) : Direction.NORTH;
+            SpriteId id = Sheets.chooseSprite(truhe(state), typ);
+            // atlasLocation ist der Pfad der Textur des Atlas, nicht seine Kennung; die Truhen liegen in AtlasIds.CHESTS.
+            s = Minecraft.getInstance().getAtlasManager().getAtlasOrThrow(AtlasIds.CHESTS).getSprite(id.texture());
+            float[] pixel = deckel(facing, typ, xz);
+            du = (s.getU1() - s.getU0()) / 64;
+            dv = (s.getV1() - s.getV0()) / 64;
+            for (int k = 0; k < 4; k++) {
+                uv[2 * k] = s.getU0() + pixel[2 * k] * du;
+                uv[2 * k + 1] = s.getV0() + pixel[2 * k + 1] * dv;
+            }
+        } else {
+            s = model.particleMaterial().sprite();
+            du = s.getU1() - s.getU0();
+            dv = s.getV1() - s.getV0();
+            for (int k = 0; k < 4; k++) {
+                uv[2 * k] = s.getU0() + xz[2 * k] * du;
+                uv[2 * k + 1] = s.getV0() + xz[2 * k + 1] * dv;
+            }
+        }
         auftrag.licht().hell(LightCoordsUtil.getLightCoords(welt, pos.above()), hell);
-        flaechen.add(new Flaeche((float) box.maxY, new float[] {x0, z0, x0, z1, x1, z1, x1, z0},
-                new float[] {ua, va, ua, vb, ub, vb, ub, va}, s, ChunkSectionLayer.SOLID,
+        flaechen.add(new Flaeche((float) box.maxY, xz, uv, s, ChunkSectionLayer.SOLID,
                 new float[][] {hell.clone(), hell.clone(), hell.clone(), hell.clone()}));
+    }
+
+    /**
+     * Die Textur einer Truhe, wie das Spiel sie wählt (ChestRenderer.getChestMaterial, belegt per javap
+     * am Client 26.3): Kupfer nach seinem Zustand, Ender, Falle, sonst die gewöhnliche; Weihnachten nicht.
+     */
+    static ChestRenderState.ChestMaterialType truhe(BlockState state) {
+        return switch (state.getBlock()) {
+            case CopperChestBlock k -> switch (k.getState()) {
+                case UNAFFECTED -> ChestRenderState.ChestMaterialType.COPPER_UNAFFECTED;
+                case EXPOSED -> ChestRenderState.ChestMaterialType.COPPER_EXPOSED;
+                case WEATHERED -> ChestRenderState.ChestMaterialType.COPPER_WEATHERED;
+                case OXIDIZED -> ChestRenderState.ChestMaterialType.COPPER_OXIDIZED;
+            };
+            case EnderChestBlock e -> ChestRenderState.ChestMaterialType.ENDER_CHEST;
+            case TrappedChestBlock t -> ChestRenderState.ChestMaterialType.TRAPPED;
+            default -> ChestRenderState.ChestMaterialType.REGULAR;
+        };
+    }
+
+    /**
+     * Wo die Ecken {@code xz} des Blocks auf der Oberseite des Deckels liegen, in Pixeln einer Textur von
+     * 64: einzeln u 28 bis 42, als linke oder rechte Hälfte 29 bis 44, v 0 bis 14. Das Spiel dreht das
+     * Modell um die Mitte um −{@code facing.toYRot()}; der Deckel reicht im Modell einzeln über x 1 bis 15,
+     * links 0 bis 15, rechts 1 bis 16, und über z 1 bis 15 (ChestModel, ChestRenderer, belegt per javap).
+     */
+    static float[] deckel(Direction facing, ChestType typ, float[] xz) {
+        double w = Math.toRadians(facing.toYRot()), c = Math.cos(w), sn = Math.sin(w);
+        int von = typ == ChestType.SINGLE ? 28 : 29, breite = typ == ChestType.SINGLE ? 14 : 15;
+        // Wo im Modell x = 0 auf u fällt: einzeln und rechts beginnt der Deckel bei x = 1.
+        double null0 = typ == ChestType.LEFT ? von : von - 1;
+        float[] aus = new float[8];
+        for (int k = 0; k < 4; k++) {
+            double dx = xz[2 * k] - 0.5, dz = xz[2 * k + 1] - 0.5;
+            double mx = dx * c + dz * sn + 0.5, mz = -dx * sn + dz * c + 0.5;
+            aus[2 * k] = (float) Math.clamp(null0 + mx * 16, von, von + breite);
+            aus[2 * k + 1] = (float) Math.clamp(15 - mz * 16, 0, 14);
+        }
+        return aus;
     }
 
     /** Die Oberfläche einer Flüssigkeit, in der Höhe, in der das Spiel sie zeichnet. */
@@ -349,8 +422,9 @@ final class ChunkMaler {
 
     /**
      * Legt eine Fläche unter das, was die Spalte schon deckt. Ein Pixel gehört zur Fläche,
-     * wenn seine Mitte darin liegt; die Textur wird über den Pixel in linearem Licht
-     * gemittelt, mit dem Test der Schicht. Siehe docs/minimap.md, „Flächen und Pixel“.
+     * wenn seine Mitte darin liegt; trifft sie in einer Achse keine Mitte, gilt dort die Reihe, in der
+     * ihre Mitte liegt, so ist jede Fläche mindestens ein Pixel breit. Die Textur wird über den Pixel
+     * in linearem Licht gemittelt, mit dem Test der Schicht. Siehe docs/minimap.md, „Flächen und Pixel“.
      */
     private void schicht(float[] xz, float[] uv, TextureAtlasSprite sprite, ChunkSectionLayer schicht, float[][] ecken) {
         Texel textur = auftrag.texel().get(sprite);
@@ -366,13 +440,14 @@ final class ChunkMaler {
         // Eine volle Oberseite mit dem ganzen Sprite: das gemittelte Raster, ohne abzutasten.
         float[] voll = ganzeOberseite(xz, uv, sprite) ? raster(sprite, textur, schicht) : null;
         int n = Math.max(1, 16 / scale);
+        float[] reiheX = duenn(xz, 0, scale), reiheZ = duenn(xz, 1, scale);
         for (int pz = 0; pz < scale; pz++) {
             for (int px = 0; px < scale; px++) {
                 int i = (pz * scale + px) * 4;
-                if (summe[i + 3] >= DECKT) {
+                if (summe[i + 3] >= DECKT || reiheX != null && px != (int) reiheX[0] || reiheZ != null && pz != (int) reiheZ[0]) {
                     continue;
                 }
-                float cx = (px + 0.5f) / scale, cz = (pz + 0.5f) / scale;
+                float cx = reiheX != null ? reiheX[1] : (px + 0.5f) / scale, cz = reiheZ != null ? reiheZ[1] : (pz + 0.5f) / scale;
                 int[] d = dreieck(xz, cx, cz);
                 if (d == null) {
                     continue;
@@ -424,6 +499,25 @@ final class ChunkMaler {
                 summe[i + 3] += rest * alpha;
             }
         }
+    }
+
+    /**
+     * Ist die Fläche {@code xz} in der Achse {@code achse} (0 x, 1 z) so schmal, dass sie bei
+     * {@code scale} Pixeln je Block keine Mitte eines Pixels trifft: {Reihe, wo sie geprüft wird}, die Reihe
+     * ihrer Mitte und ihre Mitte; sonst null.
+     */
+    static float[] duenn(float[] xz, int achse, int scale) {
+        float min = Float.POSITIVE_INFINITY, max = Float.NEGATIVE_INFINITY;
+        for (int k = 0; k < 4; k++) {
+            min = Math.min(min, xz[2 * k + achse]);
+            max = Math.max(max, xz[2 * k + achse]);
+        }
+        // Mitten liegen bei (r + 0,5) / scale; keine im Bereich, wenn die erste darüber hinter der letzten darunter liegt.
+        if (Math.ceil(min * scale - 0.5f) <= Math.floor(max * scale - 0.5f)) {
+            return null;
+        }
+        float mitte = (min + max) / 2;
+        return new float[] {Math.clamp((int) Math.floor(mitte * scale), 0, scale - 1), mitte};
     }
 
     /** Sammelt die Texel eines Pixels nach der Regel seiner Schicht. */
