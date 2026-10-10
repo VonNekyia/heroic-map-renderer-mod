@@ -3,6 +3,7 @@ package com.nekyia.heroicmap;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
@@ -135,6 +136,108 @@ class FormenTest {
         Formen.streifen(s, new double[] {-weit, 100, weit, 100, weit, 200, -weit, 200}, 4, true, 3, 24, 18);
         assertTrue(System.nanoTime() - start < 100_000_000L);
         assertTrue(s.n > 10 && s.n < 30, "Striche " + s.n);
+    }
+
+    @Test
+    void winzigesMusterDurchgezogen() {
+        // Mehr als 1000 Striche auf einer sichtbaren Strecke: durchgezogen, ein Viereck statt Millionen.
+        Formen.Sammler s = new Formen.Sammler(Drehung.rechteck(0, 0, 384, 384));
+        long start = System.nanoTime();
+        Formen.streifen(s, new double[] {-1e6, 100, 1e6, 100}, 2, false, 1, 0.01, 0.01);
+        assertTrue(System.nanoTime() - start < 100_000_000L);
+        assertEquals(1, s.n);
+    }
+
+    @Test
+    void gedrehteQuadrateMitGehrung() {
+        // Der Fall aus dem Review: Gedreht und mit gebrochener Mitte trennt die Rundung keine Ecke mehr.
+        java.util.Random zufall = new java.util.Random(7);
+        for (int versuch = 0; versuch < 200; versuch++) {
+            double mx = 100 + zufall.nextDouble() * 50, my = 100 + zufall.nextDouble() * 50, w = zufall.nextDouble() * Math.PI;
+            double[] p = new double[8];
+            for (int i = 0; i < 4; i++) {
+                double a = w + i * Math.PI / 2, d = 8 * Math.sqrt(2);
+                p[2 * i] = mx + d * Math.cos(a + Math.PI / 4);
+                p[2 * i + 1] = my + d * Math.sin(a + Math.PI / 4);
+            }
+            Formen.Sammler s = sammler();
+            Formen.streifen(s, p, 4, true, 1, 0, 0);
+            assertEquals(4, s.n, "Versuch " + versuch);
+            assertEquals(18 * 18 - 14 * 14, flaeche(s), 1e-2, "Versuch " + versuch);
+        }
+    }
+
+    @Test
+    void ringMitErstemPunktDraussen() {
+        // Der erste Punkt liegt ausserhalb; die Ecke bei (50, 10) bekommt trotzdem ihre Gehrung.
+        Formen.Sammler s = new Formen.Sammler(Drehung.rechteck(0, 0, 100, 100));
+        Formen.streifen(s, new double[] {-50, 10, 50, 10, 50, 50, 10, 50}, 4, true, 1, 0, 0);
+        int mitEcke = 0;
+        for (int v = 0; v < s.n; v++) {
+            mitEcke += ecke(s, v, 49, 11) && ecke(s, v, 51, 9) ? 1 : 0;
+        }
+        assertEquals(2, mitEcke);
+    }
+
+    @Test
+    void kreiseNurImKasten() {
+        double[] kasten = {0, 0, 384, 384};
+        Formen.Ansicht a = new Formen.Ansicht((wx, wz, aus) -> {
+            aus[0] = wx;
+            aus[1] = wz;
+        }, 1, 1, 1, Drehung.rechteck(0, 0, 384, 384), new double[] {0, 0, 384, 384}, new Matrix3x2f(), new ScreenRectangle(0, 0, 384, 384));
+        // Weit draussen: nichts. Der Kasten ganz innen: nur er.
+        assertNull(Formen.bogen(a, kreis(1000, 1000, 100), kasten));
+        assertTrue(Formen.bogen(a, kreis(192, 192, 100_000), kasten).innen());
+        // Die Mitte im Kasten: das ganze Vieleck.
+        Formen.Bogen ganz = Formen.bogen(a, kreis(192, 192, 100), kasten);
+        assertTrue(ganz.ganz());
+        assertEquals(Formen.ecken(100), ganz.punkte().length / 2);
+        // Die Mitte weit draussen, der Rand quer durch: nur wenige Ecken, alle nah am Kasten.
+        Formen.Bogen bogen = Formen.bogen(a, kreis(192, -99_800, 100_000), kasten);
+        assertFalse(bogen.ganz() || bogen.innen());
+        assertTrue(bogen.punkte().length / 2 < 20, "Ecken " + bogen.punkte().length / 2);
+        for (int i = 0; i < bogen.punkte().length; i += 2) {
+            // Eine Ecke vor und hinter dem Kasten; eine Sehne ist hier rund 630 lang.
+            assertTrue(Math.abs(bogen.punkte()[i] - 192) < 2000);
+        }
+        // Die Phase ist die Länge des Kreises bis zur ersten Ecke: Das Muster bleibt beim Verschieben stehen.
+        int n = Formen.ecken(100_000);
+        double sehne = 2 * 100_000 * Math.sin(Math.PI / n);
+        assertEquals(0, Math.IEEEremainder(bogen.phase(), sehne), 1e-6);
+    }
+
+    @Test
+    void zehntausendGrosseKreise() {
+        // Der Fall aus dem Review: 10 000 Kreise mit 100 000 Blöcken um den Spieler, bei Zoom 8 und GUI-Massstab 3.
+        java.util.List<Ebenen.Form> kreise = new java.util.ArrayList<>();
+        for (int i = 0; i < 10_000; i++) {
+            kreise.add(new Ebenen.Kreis(Ebenen.UEBERWELT, i % 100, i / 100, 100_000, 0x40FF0000, new Ebenen.Rand(0xFFFFFFFF, 2, 0, 0)));
+        }
+        Formen.Ansicht a = new Formen.Ansicht(Minimap.abbild(8, 3, 0, 0, Drehung.Lage.von(0.3, 192, 192, 0, 0)), 24, 3, 1,
+                Drehung.rechteck(0, 0, 384, 384), new double[] {-16, -16, 16, 16}, new Matrix3x2f(), new ScreenRectangle(0, 0, 384, 384));
+        java.util.List<Formen.Vielecke> aus = new java.util.ArrayList<>();
+        long start = System.nanoTime();
+        Formen.baue(a, Ebenen.UEBERWELT, kreise, aus);
+        assertTrue(System.nanoTime() - start < 1_000_000_000L, "Neubau " + (System.nanoTime() - start) / 1_000_000 + " ms");
+        // Je Kreis eine Füllung, der Kasten; kein Rand, der liegt weit draussen.
+        assertEquals(10_000, aus.size());
+    }
+
+    @Test
+    void budgetDerEcken() {
+        // Zwei Vierecke passen in 8 Ecken, das dritte fehlt; der Rest ist geteilt.
+        int[] rest = {8};
+        Formen.Sammler s = new Formen.Sammler(Drehung.rechteck(0, 0, 10, 10), rest);
+        for (int i = 0; i < 3; i++) {
+            s.vieleck(new float[] {1, 1, 1, 2, 2, 2, 2, 1}, 4);
+        }
+        assertEquals(2, s.n);
+        assertEquals(0, rest[0]);
+    }
+
+    private static Ebenen.Kreis kreis(double x, double z, double r) {
+        return new Ebenen.Kreis(Ebenen.UEBERWELT, x, z, r, 0x40FF0000, new Ebenen.Rand(0xFFFFFFFF, 2, 0, 0));
     }
 
     @Test

@@ -51,6 +51,9 @@ die Nachrichten das Plugin:
   - Nennt die Liste eine neue `version`, verwirft der Mod die halben
     Teile der alten. Weil die Liste je Kennung genau eine `version` nennt,
     entsteht so nie eine Ebene aus zwei Versionen.
+  - Eine Sammlung über einer Grenze ist verworfen; die übrigen Teile
+    ihrer `version` übergeht der Mod. So meldet das Log sie einmal, und
+    sie zählt nicht weiter in die Punkte über alle Ebenen.
 - **Vergessen** beim Trennen und bei jedem neuen Login; das Plugin schickt
   danach alles neu.
 - **Kaputt:** Eine Nachricht, die sich nicht lesen lässt, ändert nichts,
@@ -179,11 +182,29 @@ Thread des Netzes wie die Nadeln.
   halbe Breiten (Ecken spitzer als 60°) oder ist eine Strecke zu kurz für
   sie, enden beide Strecken gerade und ein Dreieck füllt aussen die Fase;
   innen überlappen sie dann ein wenig. Die Enden einer Linie sind gerade.
+  Zwei Punkte näher als 10⁻⁶ Einheiten gelten als einer, und an den Enden
+  eines Stücks nimmt der Zug die genauen Punkte; sonst machte die Rundung
+  auf der gedrehten Minimap winzige Stücke, und die Gehrung fiele aus.
 - **Striche** (`Formen.streifen`): gestrichelt laufen die Striche über
-  die Ecken weiter, mit Gehrung wie der durchgezogene Zug.
+  die Ecken weiter, mit Gehrung wie der durchgezogene Zug. Strich und
+  Lücke sind mindestens 1 Einheit. Kämen auf ein sichtbares Stück einer
+  Strecke mehr als 1000 Striche, zeichnet der Mod es durchgezogen. Am
+  ersten Punkt eines gestrichelten Rings beginnt das Muster; dort stossen
+  zwei Striche ohne Gehrung aneinander.
 - **Kreis:** ein Vieleck mit so vielen Ecken, dass die Sehne höchstens
   einen halben Pixel vom Kreis abweicht, mindestens 16, höchstens 4096
-  (`Formen.ecken`).
+  (`Formen.ecken`). Gerechnet nur, was im Kasten des Schnitts liegt
+  (`Formen.bogen`):
+  - Liegt der Kreis ganz neben dem Kasten, fehlt er.
+  - Liegt der ganze Kasten im Kreis, füllt der Mod nur den Kasten, ohne
+    Rand; so kosten 10 000 grosse Kreise um den Spieler je einen.
+  - Liegt die Mitte im Kasten, das ganze Vieleck.
+  - Sonst nur der Bogen über den Kasten, mit einer Ecke davor und
+    dahinter. Die Füllung ist der Ausschnitt von der Mitte über den Bogen,
+    erst in Doubles gekappt, denn die Mitte kann weit draussen liegen.
+  - Die Ecken sind stets die des ganzen Vielecks, und das Muster der
+    Striche beginnt mit der Länge bis zur ersten: So bleibt es beim
+    Verschieben stehen.
 - **Linie:** ein Rand ohne Fläche. Zu sehen sind Linien, sobald das
   Plugin sie schickt; laut Format schickt es bisher nur Nadeln, Regionen
   und Kreise.
@@ -199,7 +220,7 @@ Thread des Netzes wie die Nadeln.
   - Von jeder Strecke nimmt er nur das Stück im Kasten des Schnitts
     (`Formen.imKasten`); davor und dahinter schiebt sich nur das Muster
     der Striche weiter. Eine gestrichelte Weltgrenze von 60 Mio. Blöcken
-    kostet so so viel wie ihr sichtbares Stück.
+    kostet so viel wie ihr sichtbares Stück.
   - Ein Stück, das ganz in der Form der Minimap liegt, schneidet er nicht.
   - Jede Füllung und jeder Rand ist ein Element des GUI in einer Farbe.
 - **Neu gerechnet** nur, wenn sich die Ansicht, die Dimension oder eine
@@ -207,11 +228,13 @@ Thread des Netzes wie die Nadeln.
   Elemente wieder an. Die Ansicht erkennt er an drei abgebildeten Punkten,
   denn jedes Abbild ist affin, dazu Schnitt, Pose und Grenzen. Im Stand
   kostet das je Frame fast nichts; im Flug und beim Drehen rechnet er neu.
-- **Kein Budget je Frame** wie beim Neuzeichnen der Karte, siehe
-  [Minimap](minimap.md), „Neu zeichnen“: Dort kann ein Abzug auf den
-  nächsten Frame warten, und das Bild bleibt richtig. Eine halb gezeichnete
-  Ebene flackerte. Die Kosten der Formen begrenzen stattdessen die Grenzen
-  unten, das sichtbare Stück und der Speicher der Ansicht.
+- **Budget an Ecken, nicht an Zeit:** Ein Neubau legt höchstens
+  1 000 000 Ecken (`Formen.MAX_ECKEN`); was darüber geht, fehlt. Bei
+  gleicher Ansicht fehlt immer dasselbe, also flackert nichts. Ein Budget
+  an Zeit wie beim Neuzeichnen der Karte, siehe [Minimap](minimap.md),
+  „Neu zeichnen“, taugt hier nicht: Dort kann ein Abzug auf den nächsten
+  Frame warten, eine halb gezeichnete Ebene aber flackerte. Warum so:
+  [0009](entscheidungen/0009-formen-als-trapeze.md).
 
 ## Kartenschrift
 
@@ -295,21 +318,28 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 | Text einer Kartenschrift | 64 Zeichen, wie im Format | die Schrift fehlt |
 | Punkte im Pfad einer Kartenschrift | 64, wie im Format | die Schrift fehlt |
 | Sperrung, Kontur einer Kartenschrift | 2, 64 Einheiten | gekappt |
+| Strich, Lücke | mindestens 1 Einheit | gehoben |
+| Striche je sichtbarem Stück einer Strecke | 1000 | durchgezogen |
+| Ecken je Neubau der Formen | 1 000 000 | der Rest fehlt |
 
 - **Speicher:** Halbe Sammlungen gibt es höchstens eine je Ebene der
   Liste, also 64, mit je höchstens 1000 Nadeln. Symbole höchstens 200 je
   Ebene, also 12 800 Texturen, je 1 KiB im Speicher und auf der
   Grafikkarte, weil die `DynamicTexture` ihr Bild behält; zusammen rund
   25 MiB.
-- **Speicher der Formen:** je Punkt 16 Byte, je Trapez 48 Byte, also mit
-  3 Trapezen je Punkt höchstens 160 Byte je Punkt. Über alle Ebenen
-  höchstens 500 000 Punkte, rund 80 MB; während eine neue `version` kommt,
-  liegen alte und neue Sammlung kurz nebeneinander, rund 160 MB. Ein
-  Plugin für Claims braucht ein Vielfaches weniger.
+- **Speicher der Formen:** je Punkt 16 Byte, je Trapez 48 Byte, mit
+  höchstens 3 Trapezen je Punkt und 16 je Fläche rund 200 Byte je Punkt.
+  Über alle Ebenen höchstens 500 000 Punkte, rund 100 MB; während eine
+  neue `version` kommt, liegen alte und neue Sammlung kurz nebeneinander,
+  rund 200 MB. Ein Plugin für Claims braucht ein Vielfaches weniger.
 - **Kosten:** Je Frame geht der Mod alle Nadeln der sichtbaren Ebenen
   durch, im schlimmsten Fall 64 000. Ein Raster nach Regionen kommt erst,
   wenn eine Messung es verlangt. Die Formen rechnet er nur bei einer
-  neuen Ansicht neu, siehe „Flächen, Kreise und Linien“.
+  neuen Ansicht neu, siehe „Flächen, Kreise und Linien“. Der schlimmste
+  Neubau legt 1 000 000 Ecken, das Budget; geprüft geht er alle sichtbaren
+  Formen einmal durch, die Füllungen mit ihren Trapezen. Die Trapeze
+  rechnet er einmal je `version`, höchstens 256 Kanten je Punkt über alle
+  Bänder, das Einfügen beim Sortieren mitgezählt.
 
 ## Was noch fehlt
 
