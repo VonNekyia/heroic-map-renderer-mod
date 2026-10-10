@@ -25,6 +25,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.ARGB;
 import org.joml.Matrix3x2fStack;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,6 +85,12 @@ final class Ebenen {
     static final int NAME_UNTEN = (int) Math.ceil(NAME_OBEN + NAME_GROESSE + NAME_KONTUR);
     /** So viele Namen zeichnet eine Ansicht je Frame, je neun Texte; die übrigen fehlen, das Log sagt es einmal. */
     static final int MAX_NAMEN = 500;
+    /**
+     * So hoch steht ein Banner höchstens, in Einheiten des GUI, und halb so breit, wie bisher 32 × 64:
+     * gezeichnet mit so vielen ganzen Pixeln des Schirms je Pixel des Bilds, wie hineinpassen, mindestens
+     * einem. Siehe docs/ebenen.md, „Banner“.
+     */
+    static final int BANNER_HOEHE = 32;
     private static boolean namenGewarnt;
     private static final Logger LOGGER = LoggerFactory.getLogger(HeroicMap.ID);
 
@@ -750,10 +757,11 @@ final class Ebenen {
 
     /**
      * Zeichnet den Ort mit dem Fuss bei (x, y), in Einheiten des GUI auf ganzen Pixeln, in fester
-     * Grösse, darunter den Namen. Siehe docs/ebenen.md, „Nadeln“,
+     * Grösse, darunter den Namen; ein Banner bei GUI-Massstab {@code gs} mit der Deckung {@code deckung},
+     * der Name bleibt deckend. Siehe docs/ebenen.md, „Nadeln“,
      * und docs/ebenen.md, „Banner“.
      */
-    static void zeichne(GuiGraphicsExtractor g, Font font, float x, float y, Ort o, int[] namen) {
+    static void zeichne(GuiGraphicsExtractor g, Font font, float x, float y, Ort o, int[] namen, int gs, float deckung) {
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.translate(x, y);
@@ -765,8 +773,7 @@ final class Ebenen {
                     pose.popMatrix();
                     return;
                 }
-                // Pixel auf Pixel; der Fuss ⌊Breite / 2⌋ rechts der linken Kante, wie bei der Nadel.
-                g.blit(RenderPipelines.GUI_TEXTURED, t.id(), -t.breite() / 2, -t.hoehe(), 0, 0, t.breite(), t.hoehe(), t.breite(), t.hoehe());
+                banner(g, t, gs, BANNER_HOEHE, deckung);
             }
         }
         if (o.name() != null && namen[0]-- > 0) {
@@ -780,23 +787,58 @@ final class Ebenen {
 
     /**
      * Der Kasten von Bild und Name relativ zum Fuss, {links, oben, rechts, unten} in Einheiten des GUI,
-     * so wie {@link #zeichne} ihn füllt; null bei einem Banner, dessen Bild noch fehlt. Misst den Namen
-     * und holt das Bild eines Banners, also erst die Lage prüfen.
+     * so wie {@link #zeichne} ihn bei GUI-Massstab {@code gs} füllt; null bei einem Banner, dessen Bild
+     * noch fehlt. Misst den Namen und holt das Bild eines Banners, also erst die Lage prüfen.
      */
-    static float[] kasten(Font font, Ort o) {
+    static float[] kasten(Font font, Ort o, int gs) {
         float name = o.name() == null ? 0 : nameBreite(font, o.name());
         return switch (o) {
             case Nadel n -> kasten(SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe(), name);
             case Banner b -> {
                 Symbole.Textur t = Symbole.INSTANZ.banner(b.ebene(), b.version(), b.bild());
-                yield t == null ? null : kasten(t.breite(), t.hoehe(), name);
+                yield t == null ? null : bannerKasten(t.breite(), t.hoehe(), gs, name);
             }
         };
     }
 
     /**
-     * Wie {@link #kasten(Font, Ort)}, ohne das Bild eines Banners zu holen: mit der grössten Grösse eines
-     * Banners. Zum Wegschneiden und als Vorprüfung beim Treffer; der genaue Kasten liegt immer darin.
+     * Das Bild eines Banners mit dem Fuss im Ursprung, in Pixeln des Schirms, ganze je Pixel des Bilds
+     * ({@link #faktor}), höchstens {@code hoechstens} Einheiten hoch; der Fuss ⌊Breite / 2⌋ rechts der
+     * linken Kante, wie bei der Nadel.
+     */
+    static void banner(GuiGraphicsExtractor g, Symbole.Textur t, int gs, int hoechstens, float deckung) {
+        int f = faktor(t.breite(), t.hoehe(), gs, hoechstens), w = t.breite() * f, h = t.hoehe() * f;
+        Matrix3x2fStack pose = g.pose();
+        pose.pushMatrix();
+        pose.scale(1f / gs);
+        g.blit(RenderPipelines.GUI_TEXTURED, t.id(), -w / 2, -h, 0, 0, w, h, t.breite(), t.hoehe(), t.breite(), t.hoehe(), ARGB.white(deckung));
+        pose.popMatrix();
+    }
+
+    /** {@link #faktor(int, int, int, int)} mit {@link #BANNER_HOEHE}. */
+    static int faktor(int breite, int hoehe, int gs) {
+        return faktor(breite, hoehe, gs, BANNER_HOEHE);
+    }
+
+    /**
+     * Wie viele Pixel des Schirms ein Pixel eines Banners von {@code breite} × {@code hoehe} bei
+     * GUI-Massstab {@code gs} bekommt: so viele ganze, wie in {@code hoechstens} / 2 × {@code hoechstens}
+     * Einheiten passen, mindestens einer. Kleiner wird es nie, sonst wären die Pixel nicht mehr sauber.
+     */
+    static int faktor(int breite, int hoehe, int gs, int hoechstens) {
+        return Math.max(1, Math.min(hoechstens / 2 * gs / breite, hoechstens * gs / hoehe));
+    }
+
+    /** Der Kasten eines Banners wie gezeichnet, in Einheiten des GUI: links ⌊Breite / 2⌋ Pixel des Schirms. */
+    static float[] bannerKasten(int breite, int hoehe, int gs, float name) {
+        int f = faktor(breite, hoehe, gs), w = breite * f;
+        return kasten(-(w / 2) / (float) gs, w / (float) gs, hoehe * f / (float) gs, name);
+    }
+
+    /**
+     * Wie {@link #kasten(Font, Ort, int)}, ohne das Bild eines Banners zu holen: mit der grössten Grösse eines
+     * Bilds, ein Pixel je Einheit. Zum Wegschneiden und als Vorprüfung beim Treffer; der genaue Kasten liegt
+     * bei jedem GUI-Massstab darin.
      */
     static float[] kastenOhneHolen(Font font, Ort o) {
         return grob(o, o.name() == null ? 0 : nameBreite(font, o.name()));
@@ -815,7 +857,11 @@ final class Ebenen {
      * gezeichnet, und eines Namens mit dem Kasten {@code name} breit darunter; 0 heisst ohne Namen.
      */
     static float[] kasten(int breite, int hoehe, float name) {
-        float links = -(breite / 2), rechts = links + breite;
+        return kasten(-(breite / 2), breite, hoehe, name);
+    }
+
+    private static float[] kasten(float links, float breite, float hoehe, float name) {
+        float rechts = links + breite;
         if (name <= 0) {
             return new float[] {links, -hoehe, rechts, 0};
         }

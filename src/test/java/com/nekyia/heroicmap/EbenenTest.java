@@ -666,17 +666,35 @@ class EbenenTest {
 
     @Test
     void kastenOhneHolenEnthaeltDenGenauen() {
-        // Zum Wegschneiden und als Vorprüfung beim Treffer: Jedes Banner bis 32 × 64 liegt im groben Kasten.
+        // Zum Wegschneiden und als Vorprüfung beim Treffer: Jedes Banner bis 32 × 64 liegt bei jedem GUI-Massstab im groben Kasten.
         Ebenen.Banner b = new Ebenen.Banner(0, 0, Ebenen.UEBERWELT, "x", "images/b.png", "b:e", "v", "id");
         for (float name : new float[] {0, 10, 80}) {
             float[] grob = Ebenen.grob(b, name);
-            for (int w = 1; w <= Symbole.BANNER_BREITE; w++) {
-                for (int h = 1; h <= Symbole.BANNER_HOEHE; h++) {
-                    float[] k = Ebenen.kasten(w, h, name);
-                    assertTrue(grob[0] <= k[0] && grob[1] <= k[1] && grob[2] >= k[2] && grob[3] >= k[3], w + " × " + h);
+            for (int gs = 1; gs <= 6; gs++) {
+                for (int w = 1; w <= Symbole.BANNER_BREITE; w++) {
+                    for (int h = 1; h <= Symbole.BANNER_HOEHE; h++) {
+                        float[] k = Ebenen.bannerKasten(w, h, gs, name);
+                        assertTrue(grob[0] <= k[0] && grob[1] <= k[1] && grob[2] >= k[2] && grob[3] >= k[3], w + " × " + h + " bei " + gs);
+                    }
                 }
             }
         }
+    }
+
+    @Test
+    void bannerAufGanzenPixeln() {
+        // 21 × 40 wie im Gametest: bei GS 2 ein Pixel je Bildpixel, 20 Einheiten hoch; bei GS 3 zwei, bei GS 4 drei.
+        assertEquals(1, Ebenen.faktor(21, 40, 2));
+        assertEquals(2, Ebenen.faktor(21, 40, 3));
+        assertEquals(3, Ebenen.faktor(21, 40, 4));
+        // Nie unter einem Pixel je Bildpixel, auch wenn das Bild dann grösser steht als BANNER_HOEHE.
+        assertEquals(1, Ebenen.faktor(32, 64, 1));
+        // Ein schmales Bild füllt die Höhe, ein breites die Breite.
+        assertEquals(4, Ebenen.faktor(8, 16, 2));
+        assertEquals(2, Ebenen.faktor(16, 8, 2));
+        // Der Kasten wie gezeichnet: links ⌊21 / 2⌋ Pixel des Schirms, in Einheiten.
+        assertArrayEquals(new float[] {-5, -20, 5.5f, 0}, Ebenen.bannerKasten(21, 40, 2, 0));
+        assertArrayEquals(new float[] {-7, -80 / 3f, 7, 0}, Ebenen.bannerKasten(21, 40, 3, 0));
     }
 
     @Test

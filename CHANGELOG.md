@@ -4,6 +4,12 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.13
+
+- **Pins and banners on the minimap only when pinned:** double-click a pin or banner on the full map to pin it; pinned ones show a small dot under them there. Up to 64 per world.
+- **Smaller banners,** drawn on whole screen pixels.
+- **Banners fade near you:** a pinned banner on the minimap turns see-through as you come closer than 24 blocks, down to 35 % at 8.
+
 ## 0.2.12
 
 - **Pin regions and circles:** double-click a region or circle from the server, or the diamond of your own region, on the full map; it then shows on the minimap too. Up to 64 per world.

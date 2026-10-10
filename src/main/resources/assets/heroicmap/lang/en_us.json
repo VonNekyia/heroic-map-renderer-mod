@@ -50,6 +50,7 @@
   "heroicmap.karte.region_abbrechen": "Cancel region",
   "heroicmap.karte.region_loeschen": "Delete region",
   "heroicmap.karte.angeheftet_voll": "At most %s regions pinned; unpin one first",
+  "heroicmap.karte.nadeln_voll": "At most %s pins and banners pinned; unpin one first",
   "heroicmap.auswahl.titel": "Maps of this server",
   "heroicmap.auswahl.massstab": "%s px · %s",
   "heroicmap.auswahl.abgleich": "%s px · Sync",

@@ -602,7 +602,7 @@ public final class Minimap {
         String dimension = level.dimension().identifier().toString();
         formen(g, r, links, oben, k, bild, bereich, form, dimension);
         // Vor Ring und Rahmen: Was am Rand über sie ragt, decken sie.
-        nadeln(g, mc.font, r, dimension, links, oben, k, lage, rahmen == null ? 0 : rahmen.baender());
+        nadeln(g, mc.font, r, dimension, links, oben, k, lage, rahmen == null ? 0 : rahmen.baender(), spieler.getX(), spieler.getZ());
         if (rund && rahmen == null) {
             // Nach Karte und Linien, ihr Vieleck ragt unter den Ring. Siehe docs/minimap.md, „Form“.
             Matrix3x2fStack pose = g.pose();
@@ -713,27 +713,36 @@ public final class Minimap {
     }
 
     /**
-     * Die Nadeln und Banner der sichtbaren Ebenen in dieser Dimension, deren Fuss auf der sichtbaren
-     * Karte liegt, innerhalb der {@code baender} eines Rahmens; Schild, Banner und Name bleiben im
-     * Quadrat der Minimap. Siehe docs/ebenen.md, „Nadeln“,
+     * Die angehefteten Nadeln und Banner der sichtbaren Ebenen in dieser Dimension, deren Fuss auf der
+     * sichtbaren Karte liegt, innerhalb der {@code baender} eines Rahmens; Schild, Banner und Name bleiben
+     * im Quadrat der Minimap. Ein Banner nah am Spieler bei (sx, sz) wird durchsichtig.
+     * Siehe docs/ebenen.md, „Nadeln“,
      * und docs/ebenen.md, „Banner“.
      */
     private void nadeln(GuiGraphicsExtractor g, Font font, Rahmen r, String dimension, int links, int oben, int k, Drehung.Lage lage,
-            int baender) {
+            int baender, double sx, double sz) {
         g.enableScissor(r.x(), r.y(), r.x() + r.seite(), r.y() + r.seite());
-        // ponytail: alle Nadeln je Frame, höchstens 64 000; ein Raster nach Regionen, wenn das je zählt.
         int[] namen = {Ebenen.MAX_NAMEN};
-        for (Ebenen.Eintrag e : Ebenen.INSTANZ.sichtbar()) {
-            for (Ebenen.Ort n : Ebenen.INSTANZ.nadeln(e.id())) {
-                if (n.dimension().equals(dimension)) {
-                    float[] m = marke(r, n.x(), n.z(), links, oben, k, zoom, rund, r.seite() / 2.0 - baender, false, lage);
-                    if (m != null) {
-                        Ebenen.zeichne(g, font, m[0], m[1], n, namen);
-                    }
+        for (Ebenen.Ort n : Wegpunkte.INSTANZ.nadeln(Ebenen.INSTANZ)) {
+            if (n.dimension().equals(dimension)) {
+                float[] m = marke(r, n.x(), n.z(), links, oben, k, zoom, rund, r.seite() / 2.0 - baender, false, lage);
+                if (m != null) {
+                    float d = n instanceof Ebenen.Banner ? deckung(Math.hypot(n.x() - sx, n.z() - sz)) : 1;
+                    Ebenen.zeichne(g, font, m[0], m[1], n, namen, k, d);
                 }
             }
         }
         g.disableScissor();
+    }
+
+    /** Ab so vielen Blöcken waagrechtem Abstand wird ein angeheftetes Banner auf der Minimap durchsichtig, bis {@link #NAH_DECKUNG} bei {@link #NAH_BIS}. */
+    static final double NAH_AB = 24, NAH_BIS = 8;
+    static final float NAH_DECKUNG = 0.35f;
+
+    /** Die Deckung eines Banners im Abstand {@code abstand} vom Spieler: 1 ab {@link #NAH_AB}, linear bis {@link #NAH_DECKUNG} bei {@link #NAH_BIS} und darunter. */
+    static float deckung(double abstand) {
+        double t = Mth.clamp((abstand - NAH_BIS) / (NAH_AB - NAH_BIS), 0, 1);
+        return (float) (NAH_DECKUNG + (1 - NAH_DECKUNG) * t);
     }
 
     /** Die angehefteten Wegpunkte dieser Dimension, ausserhalb der Form an ihrem Rand. Siehe docs/wegpunkte.md. */

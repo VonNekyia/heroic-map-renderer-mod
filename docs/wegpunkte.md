@@ -1,6 +1,6 @@
 ---
 title: Wegpunkte
-description: Wegpunkte und eigene Regionen auf der Vollbildkarte setzen und löschen, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen und Kreise vom Server, höchstens 64 angeheftete Regionen, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
+description: Wegpunkte und eigene Regionen auf der Vollbildkarte setzen und löschen, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Wegpunkte.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
@@ -32,7 +32,7 @@ Fläche oder einen Kreis vom Server an, siehe „Anheften“ (mod#36).
 | Rechtsklick auf einen Wegpunkt | das Menü für seinen Block: „Hierher teleportieren“, wenn erlaubt, und „Wegpunkt löschen“ |
 | Klick auf eine Marke | legt sie beim Loslassen in die Mitte: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück. Wer auf einer Marke zu ziehen beginnt und weiter als 3 Einheiten zieht (`Karte.ZUG`), zieht nur die Karte |
 | Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder |
-| Doppelklick auf die Raute einer eigenen Region, auf eine Fläche oder einen Kreis vom Server | heftet sie an die Minimap oder löst sie wieder, siehe „Anheften“ |
+| Doppelklick auf die Raute einer eigenen Region, auf eine Fläche, einen Kreis, eine Nadel oder ein Banner vom Server | heftet sie an die Minimap oder löst sie wieder, siehe „Anheften“ |
 | Rechtsklick, „Region von hier“, dann „Region bis hier“ | setzt eine eigene Region, das Rechteck der Blöcke zwischen beiden Ecken samt ihnen, siehe „Regionen“; dazwischen zeigt eine gestrichelte Vorschau das Rechteck bis zur Maus, „Region abbrechen“ oder `Esc` brechen ab |
 | Rechtsklick in eine eigene Region oder auf ihre Raute | „Region löschen“ |
 
@@ -46,11 +46,11 @@ Fläche oder einen Kreis vom Server an, siehe „Anheften“ (mod#36).
   für die Marke des ersten (`Karte.letzte`), nicht für die unter der Maus.
   Jeder andere Klick vergisst sie; ein schneller Klick nach „Wegpunkt
   setzen“ heftet so nichts an.
-- **Doppelklick auf eine Fläche oder einen Kreis:** Der erste Klick merkt
-  sich beim Loslassen ohne Zug das Ziel unter der Maus (`Karte.letztesZiel`),
-  nur eine Fläche oder einen Kreis mit `id`, keine Nadel darüber. Der
-  zweite heftet es an, wenn unter ihm dasselbe Ziel liegt; ein Knopf geht
-  vor. Schliesst der erste Klick die gehaltene Tafel desselben Ziels, zählt
+- **Doppelklick auf ein Objekt vom Server:** Der erste Klick merkt sich
+  beim Loslassen ohne Zug das Ziel unter der Maus (`Karte.letztesZiel`),
+  eine Nadel, ein Banner, eine Fläche oder einen Kreis mit `id`; eine Nadel
+  geht vor, wie bei der Tafel. Der zweite heftet es an, wenn unter ihm
+  dasselbe Ziel liegt; ein Knopf geht vor. Schliesst der erste Klick die gehaltene Tafel desselben Ziels, zählt
   er ebenso. Die Tafel bleibt, wie der erste Klick sie liess, siehe
   [Ebenen](ebenen.md), „Infotafel“.
 - **Treffer:** eine halbe Kopfseite und eine Einheit um die Mitte der
@@ -138,7 +138,9 @@ Vieleck kommt nur, wenn der User es will.
 
 Regionen und Kreise lassen sich anheften wie Wegpunkte, so wünscht es der
 Maintainer (mod#36): eigene Regionen und Flächen und Kreise der Ebenen vom
-Server. Linien nicht, entschieden vom Reviewer. Strahl und Schleier in der
+Server. Linien nicht, entschieden vom Reviewer. Ebenso Nadeln und Banner,
+so will es der User (mod#71); auf der Minimap stehen sie nur angeheftet,
+siehe [Ebenen](ebenen.md), „Nadeln“. Strahl und Schleier in der
 Welt kommen in eigenen PRs.
 
 ![Minimap genordet und gedreht: nur der angeheftete Kreis und die angeheftete eigene Region, die übrigen Formen fehlen; Szene `formen` des Gametests](bilder/formen.png)
@@ -152,9 +154,15 @@ Welt kommen in eigenen PRs.
   nichts an, und unten links steht „Höchstens 64 Regionen angeheftet; erst
   eine lösen“. Lösen geht immer. Auch aus der Datei liest der Mod nicht
   mehr.
+- **Höchstens 64 Nadeln und Banner** je Welt, eine eigene Grenze
+  (`Wegpunkte.MAX_NADELN_ANGEHEFTET`), entschieden vom Reviewer: Nadeln sind
+  Punkte und kosten auf der Minimap fast nichts, die 64 Regionen begrenzen
+  später auch den Schleier in der Welt. Darüber steht unten links
+  „Höchstens 64 Nadeln und Banner angeheftet; erst eins lösen“.
 - **Vom Server** merkt sich der Mod die Kennungen `{ebene, id}`
   (`Wegpunkte.Anheftung`), nicht die `version`: So bleibt angeheftet, was
-  eine neue `version` der Ebene noch hat.
+  eine neue `version` der Ebene noch hat. Flächen und Kreise stehen in
+  `formen`, Nadeln und Banner in `nadeln`.
 - **Tote Einträge:** Kommt eine Ebene ganz an, vergisst der Mod, was von ihr
   angeheftet ist und sie nicht mehr hat (`Wegpunkte.pruefe`, aus
   `Kanal.anmelden`); sonst füllten tote Einträge die 64. Einträge anderer
@@ -193,14 +201,16 @@ Welt kommen in eigenen PRs.
   {"wegpunkte":[{"dimension":"minecraft:overworld","x":12,"z":-40,"farbe":0,"minimap":true}],
    "regionen":[{"dimension":"minecraft:overworld","x0":2,"z0":-5,"x1":10,"z1":3,"farbe":1,"minimap":false}],
    "spieler":["00000000-0000-0000-0000-000000000001"],
-   "formen":[{"ebene":"b:staedte","id":"westmark"}]}
+   "formen":[{"ebene":"b:staedte","id":"westmark"}],
+   "nadeln":[{"ebene":"b:staedte","id":"nordhafen"}]}
   ```
 
   `farbe` ist ein Index in `Wegpunkte.FARBEN`, `minimap` heisst angeheftet,
   `spieler` sind die angehefteten Mitspieler, `formen` die angehefteten
-  Flächen und Kreise vom Server. Eine Region nennt die Blöcke ihrer Ecken,
+  Flächen und Kreise vom Server, `nadeln` die angehefteten Nadeln und
+  Banner. Eine Region nennt die Blöcke ihrer Ecken,
   `x0` ≤ `x1` und `z0` ≤ `z1`, beide samt. Eine Datei von vor mod#36 ohne
-  `formen` liest der Mod ohne Fehler.
+  `formen` oder von vor mod#71 ohne `nadeln` liest der Mod ohne Fehler.
 - **Schreiben** nach jeder Änderung, über `wegpunkte.json.tmp`, dann
   verschieben; nie liegt eine halbe Datei da.
 - **Lesen:** Ein unlesbarer Eintrag fällt weg, die übrigen bleiben. Ist die
@@ -217,7 +227,8 @@ Welt kommen in eigenen PRs.
   `hoechstens64Angeheftet`, `toteEintraegeFallenWeg`,
   `listenFuerKarteUndMinimap` (dieselben Listen ohne Änderung, nur
   Angeheftetes auf der Minimap, breiterer Rand auf der Karte) und
-  `breiterOhneRandNimmtDieFuellung`.
+  `breiterOhneRandNimmtDieFuellung`. Zu Nadeln: `nadelnAnheftenUndBehalten`,
+  `hoechstens64NadelnEigeneGrenze` und `nadelnAufDerMinimapNurAngeheftet`.
 - `MinimapTest`: `kopfWaechstMitDerSeite`, `amRandInSeinerRichtung` und
   `markeAufDemPixelDerKarte`.
 - `KartenblickTest`: `markenAufDemRasterDerKacheln`,
@@ -232,8 +243,8 @@ Welt kommen in eigenen PRs.
   Doppelklick heftet an; am eigenen Standort holt ein Klick den Spieler
   zurück, und ein Rechtsklick bietet „Wegpunkt löschen“. Dazu ein Kreis
   vom Server: Ein Klick heftet nichts an, ein Doppelklick heftet an, ein
-  zweiter löst; ein Doppelklick auf die Raute einer eigenen Region heftet
-  sie an.
+  zweiter löst; ein Doppelklick auf eine Nadel und einer auf die Raute
+  einer eigenen Region heften sie an.
 - `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
   [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und

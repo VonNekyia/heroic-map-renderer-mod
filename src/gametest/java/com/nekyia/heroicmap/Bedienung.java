@@ -256,9 +256,9 @@ public final class Bedienung implements FabricClientGameTest {
     }
 
     /**
-     * Ein Kreis vom Server und eine eigene Region: Ein Klick auf den Kreis heftet nichts an, ein
-     * Doppelklick heftet ihn an, ein zweiter löst ihn; ein Doppelklick auf die Raute der Region heftet
-     * sie an. Siehe docs/wegpunkte.md, „Anheften“.
+     * Ein Kreis und eine Nadel vom Server und eine eigene Region: Ein Klick auf den Kreis heftet nichts
+     * an, ein Doppelklick heftet ihn an, ein zweiter löst ihn; ein Doppelklick auf die Nadel oder die Raute
+     * der Region heftet sie an. Siehe docs/wegpunkte.md, „Anheften“.
      */
     private static void anheften(ClientGameTestContext context, TestInput maus, int k) {
         int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
@@ -268,8 +268,11 @@ public final class Bedienung implements FabricClientGameTest {
         double kx = breite / 2.0 + 60, ky = hoehe / 2.0 + 30;
         long cx = Math.round((mitte[0] + 60) / 4), cz = Math.round((mitte[1] + 30) / 4);
         int rx = (int) Math.round((mitte[0] - 70) / 4), rz = (int) Math.round((mitte[1] + 30) / 4);
+        // Die Nadel unter der Mitte; geklickt wird 8 Einheiten über ihrem Fuss, auf dem Schild.
+        double nx = mitte[0] / 4, nz = (mitte[1] + 50) / 4, ny = hoehe / 2.0 + 50 - 8;
         boolean frei = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).marken().stream()
-                .noneMatch(m -> Math.abs(m.x() - kx) < 12 && Math.abs(m.y() - ky) < 12));
+                .noneMatch(m -> Math.abs(m.x() - kx) < 12 && Math.abs(m.y() - ky) < 12
+                        || Math.abs(m.x() - breite / 2.0) < 12 && Math.abs(m.y() - ny) < 12));
         if (!frei) {
             throw new AssertionError("Eine Marke liegt auf dem Kreis; der Test braucht dort freie Karte");
         }
@@ -278,7 +281,8 @@ public final class Bedienung implements FabricClientGameTest {
                     {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:anheften","visible":true,"version":"1"}]}""").getAsJsonObject());
             Ebenen.INSTANZ.teil(Ebenen.Teil.lies("""
                     {"v":1,"typ":"ebene","jetzt":1,"id":"test:anheften","version":"1","teil":1,"teile":1,"objects":[
-                      {"type":"circle","id":"see","center":[%d,%d],"radius":6,"fill":"#40C04060"}]}""".formatted(cx, cz)));
+                      {"type":"circle","id":"see","center":[%d,%d],"radius":6,"fill":"#40C04060"},
+                      {"type":"pin","id":"hafen","at":[%s,%s],"name":"Hafen"}]}""".formatted(cx, cz, nx, nz)));
             Wegpunkte.INSTANZ.setze(mc.level.dimension().identifier().toString(), rx, rz, rx + 2, rz + 2);
         });
         context.waitTick();
@@ -300,6 +304,17 @@ public final class Bedienung implements FabricClientGameTest {
             if (kreisAngeheftet(context) != an) {
                 throw new AssertionError("Doppelklick auf den Kreis: angeheftet " + !an + " statt " + an);
             }
+        }
+
+        warte250();
+        maus.setCursorPos(breite / 2.0 * k, ny * k);
+        context.waitTick();
+        maus.pressMouse(LINKS);
+        context.waitTick();
+        maus.pressMouse(LINKS);
+        context.waitTicks(2);
+        if (!context.computeOnClient(mc -> Wegpunkte.INSTANZ.nadelAngeheftet("test:anheften", "hafen"))) {
+            throw new AssertionError("Doppelklick auf die Nadel heftet sie nicht an");
         }
 
         warte250();
