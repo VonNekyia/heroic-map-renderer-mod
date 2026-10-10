@@ -11,7 +11,8 @@
       "com.nekyia.heroicmap.Messung",
       "com.nekyia.heroicmap.Uebernahme",
       "com.nekyia.heroicmap.Server",
-      "com.nekyia.heroicmap.Bedienung"
+      "com.nekyia.heroicmap.Bedienung",
+      "com.nekyia.heroicmap.Blockentities"
     ]
   },
   "depends": {

@@ -233,30 +233,47 @@ class KartenblickTest {
     }
 
     @Test
-    void lageJeDimensionUeberstehtDenNeustart(@TempDir Path ordner) throws Exception {
-        assertNull(Kartenlage.lies(ordner, "minecraft:overworld"));
-        Kartenlage.schreibe(ordner, "minecraft:overworld", new Kartenlage.Lage(120.5, -40.25, 3, 1));
-        Kartenlage.schreibe(ordner, "minecraft:the_nether", new Kartenlage.Lage(8, 9, 2, 1));
-        assertEquals(new Kartenlage.Lage(120.5, -40.25, 3, 1), Kartenlage.lies(ordner, "minecraft:overworld"));
-        assertEquals(new Kartenlage.Lage(8, 9, 2, 1), Kartenlage.lies(ordner, "minecraft:the_nether"));
-        // Ohne Ordner, im Einzelspieler, nur im Speicher; eine kaputte Datei gibt keine Lage.
-        Kartenlage.schreibe(null, "minecraft:the_end", new Kartenlage.Lage(1, 2, 0, 1));
-        assertEquals(new Kartenlage.Lage(1, 2, 0, 1), Kartenlage.lies(null, "minecraft:the_end"));
+    void lageJeSatzUeberstehtDenNeustart(@TempDir Path ordner) throws Exception {
+        Satz server = satz(ordner, "baum", "minecraft:overworld", 4), grob = satz(ordner, "baum", "minecraft:overworld", 1);
+        Satz selbst = satz(ordner, "selbst-overworld", "minecraft:overworld", 2), nether = satz(ordner, "nether", "minecraft:the_nether", 4);
+        assertNull(Kartenlage.lies(ordner, server));
+        Kartenlage.schreibe(ordner, server, new Kartenlage.Lage(120.5, -40.25, 3, 1));
+        Kartenlage.schreibe(ordner, nether, new Kartenlage.Lage(8, 9, 2, 1));
+        assertEquals(new Kartenlage.Lage(120.5, -40.25, 3, 1), Kartenlage.lies(ordner, server));
+        assertEquals(new Kartenlage.Lage(8, 9, 2, 1), Kartenlage.lies(ordner, nether));
+        // Ein anderer Satz derselben Dimension, mit anderem Baum oder Massstab, beginnt beim Spieler.
+        assertNull(Kartenlage.lies(ordner, selbst));
+        assertNull(Kartenlage.lies(ordner, grob));
+        assertEquals("baum/4", Kartenlage.schluessel(server));
+        // Ohne Ordner nur im Speicher, ebenso je Satz.
+        Kartenlage.schreibe(null, selbst, new Kartenlage.Lage(1, 2, 0, 1));
+        assertEquals(new Kartenlage.Lage(1, 2, 0, 1), Kartenlage.lies(null, selbst));
+        assertNull(Kartenlage.lies(null, server));
         Kartenlage.leeren();
-        assertNull(Kartenlage.lies(null, "minecraft:the_end"));
-        Files.writeString(ordner.resolve("karte.properties"), "minecraft\\:overworld.x=eins\n");
-        assertNull(Kartenlage.lies(ordner, "minecraft:overworld"));
+        assertNull(Kartenlage.lies(null, selbst));
+        // Alte Einträge je Dimension gelten nicht mehr; eine kaputte Datei gibt keine Lage.
+        Files.writeString(ordner.resolve("karte.properties"), "minecraft\\:overworld.x=1\nminecraft\\:overworld.z=2\n"
+                + "minecraft\\:overworld.zoom=3\nminecraft\\:overworld.lupe=1\n");
+        assertNull(Kartenlage.lies(ordner, server));
+        Files.writeString(ordner.resolve("karte.properties"), "baum/4.x=eins\n");
+        assertNull(Kartenlage.lies(ordner, server));
+    }
+
+    /** Ein Satz im Baum {@code baum} der Welt {@code welt}; die Lage braucht nur seinen Ordner. */
+    private static Satz satz(Path welt, String baum, String dimension, int massstab) {
+        return new Satz(welt.resolve(baum).resolve(String.valueOf(massstab)), baum, dimension, massstab, 256, 0, 8, 4);
     }
 
     @Test
     void listeDerEbenenBleibtOffen(@TempDir Path ordner) {
         // Beim ersten Öffnen zu; offen gemerkt neben der Lage, die bleibt.
         assertFalse(Kartenlage.ebenenOffen(ordner));
-        Kartenlage.schreibe(ordner, "minecraft:overworld", new Kartenlage.Lage(1, 2, 3, 1));
+        Satz satz = satz(ordner, "baum", "minecraft:overworld", 4);
+        Kartenlage.schreibe(ordner, satz, new Kartenlage.Lage(1, 2, 3, 1));
         Kartenlage.ebenenOffen(ordner, true);
         assertTrue(Kartenlage.ebenenOffen(ordner));
-        assertEquals(new Kartenlage.Lage(1, 2, 3, 1), Kartenlage.lies(ordner, "minecraft:overworld"));
-        Kartenlage.schreibe(ordner, "minecraft:overworld", new Kartenlage.Lage(4, 5, 3, 1));
+        assertEquals(new Kartenlage.Lage(1, 2, 3, 1), Kartenlage.lies(ordner, satz));
+        Kartenlage.schreibe(ordner, satz, new Kartenlage.Lage(4, 5, 3, 1));
         assertTrue(Kartenlage.ebenenOffen(ordner));
         // Ohne Ordner nur im Speicher, bis zum Verlassen der Welt.
         Kartenlage.ebenenOffen(null, true);

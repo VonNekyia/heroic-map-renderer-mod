@@ -27,7 +27,7 @@ import org.slf4j.Logger;
 /**
  * Die Wegpunkte, eigenen Formen und alten Rechtecke des Spielers und was er auf der Minimap angeheftet hat,
  * Wegpunkte, Mitspieler, eigene Formen und Rechtecke und Flächen, Kreise, Nadeln und Banner vom Server. Je Welt in
- * {@code wegpunkte.json} im Ordner der Welt; im Einzelspieler nur im Speicher. Nur der
+ * {@code wegpunkte.json} im Ordner der Welt, auch im Einzelspieler; ohne Ordner nur im Speicher. Nur der
  * Render-Thread liest und ändert sie. Siehe docs/wegpunkte.md.
  */
 final class Wegpunkte {
@@ -108,7 +108,7 @@ final class Wegpunkte {
     private List<Ebenen.Ort> fuerNadeln = List.of();
     /** Dieselben Nadeln und Banner nach Identität, so prüft die Vollbildkarte je Nadel ohne Allokation. */
     private Set<Ebenen.Ort> angeheftetOrte = Set.of();
-    /** Die Datei, oder null im Einzelspieler. */
+    /** Die Datei, oder null ohne Ordner der Welt. */
     private Path datei;
     /** Ist gelesen, seit dem letzten Leeren? */
     private boolean geladen;

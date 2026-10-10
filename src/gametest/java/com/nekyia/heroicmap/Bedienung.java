@@ -12,6 +12,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.TestInput;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
+import net.minecraft.client.MouseHandler;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
@@ -33,6 +34,7 @@ public final class Bedienung implements FabricClientGameTest {
         // Mit Befehlen, sonst schickt der Server execute und tp nicht, und das Teleport-Menü fehlt.
         try (TestSingleplayerContext spiel = context.worldBuilder().adjustSettings(s -> s.setAllowCommands(true)).create()) {
             spiel.getConnection().waitForChunksRender();
+            Bilder.leereWelt(context);
             kleinerSchirm(context);
             context.runOnClient(mc -> mc.gui.setScreen(new Einstellungen()));
             context.waitTicks(2);
@@ -191,10 +193,17 @@ public final class Bedienung implements FabricClientGameTest {
         rand = marke(context, punkt);
         maus.setCursorPos(rand.x() * k, rand.y() * k);
         context.waitTick();
+        long vorKlick = System.currentTimeMillis();
         maus.pressMouse(LINKS);
         context.waitTicks(2);
-        // Erst wenn kein zweiter Klick mehr kommen kann, legt der Klick die Marke in die Mitte (mod#75).
-        if (!Arrays.equals(mitte(context), nachZug)) {
+        double[] gleich = mitte(context);
+        // Erst wenn kein zweiter Klick mehr kommen kann, legt der Klick die Marke in die Mitte (mod#75). Das gilt nach der
+        // Uhr, nicht nach Ticks: Unter Last dauern zwei Ticks länger als das Fenster, dann sagt die Prüfung nichts.
+        long vergangen = System.currentTimeMillis() - vorKlick;
+        if (vergangen >= MouseHandler.DOUBLE_CLICK_THRESHOLD_MS) {
+            System.out.println("[heroicmap-bedienung] Prüfung „zentriert erst nach dem Fenster“ übersprungen: " + vergangen
+                    + " ms bis zur Prüfung, das Fenster ist " + MouseHandler.DOUBLE_CLICK_THRESHOLD_MS + " ms");
+        } else if (!Arrays.equals(gleich, nachZug)) {
             throw new AssertionError("Der Klick zentrierte, bevor ein Doppelklick ausgeschlossen war");
         }
         warte250();

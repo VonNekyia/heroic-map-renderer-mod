@@ -4,9 +4,39 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
-## 0.2.20
+## 0.2.26
 
 - **Beams above pinned waypoints:** each pinned waypoint in view distance shows a beacon beam in its colour in the world. Switch it off with "World effects" in the settings.
+
+## 0.2.25
+
+- **Banners of secret layers:** layers only some players may see now show their banners too; the mod asks the server for each banner it draws, and only players allowed to see the layer get them.
+
+## 0.2.24
+
+- **Banners drawn by the server:** when a layer gives a banner a design, the mod shows the banner the server renders for it, with a crown for capitals; until it arrives, the layer's image stands in.
+
+## 0.2.23
+
+- **Banner names follow an arc:** the name under a banner now curves below it, each letter upright to the arc, like on the web map; pin names stay straight.
+
+## 0.2.22
+
+- **The full map remembers its view per map, not per dimension.** Switching to another map of the same dimension, such as your own, no longer opens it at the zoom of the last one, where your own map may still be empty. After the update the full map starts once at your position.
+
+## 0.2.21
+
+- **Choose the scale of your own map:** next to "Myself" a switch picks 1, 2 or 4 pixels per block, like the server's maps. It stays until you delete the map in the map list.
+- **Your own map in singleplayer:** "Myself" now works in singleplayer worlds too. Waypoints and the full map's position are kept there across restarts as well.
+
+## 0.2.20
+
+- **Chests, doors, signs and heads show on the minimap right away,** also with Sodium; before, they only appeared after the next block was placed.
+
+## 0.2.19
+
+- **Compass marks instead of corner ornaments:** the frame now shows N, E, S, W marks on its bands, fixed when the minimap points north and turning with the map when it rotates; the corner ornaments are gone. The Ornaments switch in Settings turns the marks off. With a frame the minimap keeps a little more distance from the screen edge, so turned marks stay on screen.
+- **Minimap size follows the window:** the minimap keeps its share of the window's shorter side, so a smaller window gives a smaller minimap. At most 256 GUI units, as before.
 
 ## 0.2.18
 

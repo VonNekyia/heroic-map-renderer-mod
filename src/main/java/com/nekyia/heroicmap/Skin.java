@@ -20,6 +20,7 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.data.AtlasIds;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
+import org.joml.Matrix3x2fStack;
 import org.slf4j.Logger;
 
 /**
@@ -39,10 +40,12 @@ final class Skin {
             Biom.KATEGORIEN.stream().map(k -> BIOM + "/" + k)).toList();
     /** Der Schatten eines Ornaments: Schwarz zu 50 %, um (+1, +1) versetzt. */
     static final int SCHATTEN = 0x80000000;
-    /** Die Ornamente: zier, griff und die Marken beim Drehen, je mit {@code _aktiv} eins dahinter. */
-    static final int ZIER = 0, GRIFF = 2, NORDEN = 4, MARKE = 6, MARKE_QUER = 8;
-    private static final String[] TEILE = {"zier", "zier_aktiv", "griff", "griff_aktiv", "norden", "norden_aktiv",
-        "marke", "marke_aktiv", "marke_quer", "marke_quer_aktiv"};
+    /** Die Ornamente: der Griff im Menü und die Marken, je mit {@code _aktiv} eins dahinter. */
+    static final int GRIFF = 0, NORDEN = 2, MARKE = 4, MARKE_QUER = 6;
+    /** Das Bild der Marke je Richtung N, O, S, W, fest; gedreht dreht es mit. Siehe docs/rahmen.md, „Marken“. */
+    static final int[] MARKE_JE_RICHTUNG = {NORDEN, MARKE_QUER, MARKE, MARKE_QUER};
+    private static final String[] TEILE = {"griff", "griff_aktiv", "norden", "norden_aktiv", "marke", "marke_aktiv",
+        "marke_quer", "marke_quer_aktiv"};
     private static final Logger LOGGER = LogUtils.getLogger();
     /** Geladene Skins, ein Fehlschlag als null, bis der Atlas des GUI neu lädt. */
     private static final Map<String, Skin> GELADEN = new HashMap<>();
@@ -57,18 +60,18 @@ final class Skin {
     /** Je Band von aussen nach innen: die Farbe oben und links, die unten und rechts. */
     final int[] licht, schatten;
     final boolean mitSchatten;
-    /** Die längere Seite der zier, in Pixeln. */
-    final int zier;
+    /** Die längere Seite der grössten Marke, in Pixeln. */
+    final int groesste;
     private final Identifier[] sprites = new Identifier[TEILE.length];
     private Identifier ring;
     private int ringSeite;
 
-    private Skin(String name, int[] licht, int[] schatten, boolean mitSchatten, int zier) {
+    private Skin(String name, int[] licht, int[] schatten, boolean mitSchatten, int groesste) {
         this.name = name;
         this.licht = licht;
         this.schatten = schatten;
         this.mitSchatten = mitSchatten;
-        this.zier = zier;
+        this.groesste = groesste;
         for (int i = 0; i < TEILE.length; i++) {
             sprites[i] = sprite(name, TEILE[i]);
         }
@@ -103,9 +106,12 @@ final class Skin {
 
     private static Skin laden(String name) {
         try {
-            TextureAtlasSprite zier = gui().getSprite(sprite(name, "zier"));
-            return lies(name, text(name, "palette.txt"), text(name, "info.txt"),
-                    Math.max(zier.contents().width(), zier.contents().height()));
+            int groesste = 0;
+            for (String teil : new String[] {"norden", "marke", "marke_quer"}) {
+                TextureAtlasSprite s = gui().getSprite(sprite(name, teil));
+                groesste = Math.max(groesste, Math.max(s.contents().width(), s.contents().height()));
+            }
+            return lies(name, text(name, "palette.txt"), text(name, "info.txt"), groesste);
         } catch (IOException | RuntimeException e) {
             LOGGER.warn("Heroic Map: Rahmen {} unlesbar", name, e);
             return null;
@@ -130,10 +136,10 @@ final class Skin {
     /**
      * Liest {@code palette.txt}: eine Zeile je Band von aussen nach innen, eine Farbe oder zwei,
      * Licht und Schatten; {@code //} beginnt einen Kommentar. Aus {@code info.txt} nur {@code schatten}.
-     * {@code zier} ist die längere Seite der zier in Pixeln. Mindestens zwei Bänder, siehe
+     * {@code groesste} ist die längere Seite der grössten Marke in Pixeln. Mindestens zwei Bänder, siehe
      * docs/minimap.md, „Form“.
      */
-    static Skin lies(String name, String palette, String info, int zier) {
+    static Skin lies(String name, String palette, String info, int groesste) {
         List<int[]> baender = new ArrayList<>();
         for (String zeile : palette.lines().toList()) {
             int kommentar = zeile.indexOf("//");
@@ -151,7 +157,7 @@ final class Skin {
             throw new IllegalArgumentException("palette.txt mit weniger als 2 Bändern");
         }
         int[] licht = baender.stream().mapToInt(b -> b[0]).toArray(), schatten = baender.stream().mapToInt(b -> b[1]).toArray();
-        return new Skin(name, licht, schatten, info.lines().map(String::trim).anyMatch("schatten=ja"::equals), zier);
+        return new Skin(name, licht, schatten, info.lines().map(String::trim).anyMatch("schatten=ja"::equals), groesste);
     }
 
     private static int farbe(String text) {
@@ -167,12 +173,15 @@ final class Skin {
 
     /** Wie weit die Minimap mit diesem Rahmen mindestens vom Rand des Schirms bleibt; siehe {@link #einrueckung(int)}. */
     int einrueckung() {
-        return einrueckung(zier);
+        return einrueckung(groesste);
     }
 
-    /** Die halbe Seite der zier, aufgerundet: So bleibt die zier in der Ecke ganz auf dem Schirm. */
-    static int einrueckung(int zier) {
-        return (zier + 1) / 2;
+    /**
+     * Die halbe Diagonale der grössten Marke, aufgerundet: So bleibt sie in jeder Drehung ganz auf dem
+     * Schirm, und die Minimap springt beim Umschalten nicht. Siehe docs/rahmen.md, „Abstand zum Rand“.
+     */
+    static int einrueckung(int groesste) {
+        return (int) Math.ceil(groesste * Math.sqrt(2) / 2);
     }
 
     /** Das Band des Pixels (x, y) im Rechteck w × h, von aussen gezählt. */
@@ -247,8 +256,8 @@ final class Skin {
     }
 
     /**
-     * Wo die Ornamente sitzen, in Einheiten des GUI, auf der Mitte der Bänder: eckig an den Ecken,
-     * rund bei 45°; oben links, oben rechts, unten links, unten rechts.
+     * Wo der Griff an den Ecken sitzt, in Einheiten des GUI, auf der Mitte der Bänder: eckig in der
+     * Ecke, rund bei 45°; oben links, oben rechts, unten links, unten rechts.
      */
     static double[][] ecken(double x, double y, double w, double h, int baender, boolean rund) {
         double m = baender / 2.0;
@@ -260,8 +269,8 @@ final class Skin {
     }
 
     /**
-     * Wo eine Marke beim Drehen sitzt, in Einheiten des GUI: von der Mitte der Minimap (x, y, Seite
-     * s) in Richtung (ux, uy), auf der Mitte der Bänder; rund auf dem Kreis, eckig auf dem Quadrat.
+     * Wo eine Marke sitzt, in Einheiten des GUI: von der Mitte der Minimap (x, y, Seite s) in
+     * Richtung (ux, uy), auf der Mitte der Bänder; rund auf dem Kreis, eckig auf dem Quadrat.
      */
     static double[] marke(double x, double y, double s, int baender, boolean rund, double ux, double uy) {
         double h = s / 2 - baender / 2.0, laenge = Math.hypot(ux, uy);
@@ -269,17 +278,12 @@ final class Skin {
         return new double[] {x + s / 2 + ux * t, y + s / 2 + uy * t};
     }
 
-    /** Welches Bild eine Marke nimmt: N die Nordmarke, sonst oben und unten marke, links und rechts marke_quer. */
-    static int markeFuer(boolean norden, double ux, double uy) {
-        return norden ? NORDEN : Math.abs(uy) >= Math.abs(ux) ? MARKE : MARKE_QUER;
-    }
-
     /** Die linke obere Ecke eines Bilds der Breite w, dessen Mitte auf p liegen soll. */
     static int lage(double p, int w) {
         return (int) Math.floor(p - w / 2.0 + 0.5);
     }
 
-    /** Spiegelt das Sprite für die Ecke e (0 oben links bis 3 unten rechts) waagrecht? zier ist für oben links gezeichnet, griff für unten rechts. */
+    /** Spiegelt das Sprite für die Ecke e (0 oben links bis 3 unten rechts) waagrecht? griff ist für unten rechts gezeichnet, ohne griff Ecke 0 nie. */
     static boolean spiegeltX(int e, boolean griff) {
         return ((e ^ (griff ? 3 : 0)) & 1) != 0;
     }
@@ -289,20 +293,37 @@ final class Skin {
     }
 
     /**
-     * Zeichnet das Ornament {@code teil} ({@link #ZIER} oder {@link #GRIFF}, plus 1 für aktiv) der
-     * Ecke e mit der Mitte auf (px, py), zu {@code deckung} deckend, mit Schatten, wenn der Skin ihn will. Gespiegelt über
+     * Zeichnet das Ornament {@code teil} (etwa {@link #NORDEN} oder {@link #GRIFF}, plus 1 für aktiv) der
+     * Ecke e mit der Mitte auf (px, py), um {@code winkel} gedreht, zu {@code deckung} deckend, mit
+     * Schatten, wenn der Skin ihn will; der Schatten bleibt auf dem Schirm um (+1, +1). Gespiegelt über
      * vertauschte UV: Die Ecken des Quads bleiben in derselben Reihenfolge, das GUI verwirft es nicht.
      */
-    void ornament(GuiGraphicsExtractor g, int teil, int e, double px, double py, float deckung) {
+    void ornament(GuiGraphicsExtractor g, int teil, int e, double px, double py, float deckung, double winkel) {
         TextureAtlasSprite s = gui().getSprite(sprites[teil]);
-        int w = s.contents().width(), h = s.contents().height(), x = lage(px, w), y = lage(py, h);
         boolean griff = teil == GRIFF || teil == GRIFF + 1, sx = spiegeltX(e, griff), sy = spiegeltY(e, griff);
         float u0 = sx ? s.getU1() : s.getU0(), u1 = sx ? s.getU0() : s.getU1();
         float v0 = sy ? s.getV1() : s.getV0(), v1 = sy ? s.getV0() : s.getV1();
         if (mitSchatten) {
-            g.innerBlit(RenderPipelines.GUI_TEXTURED, s.atlasLocation(), x + 1, x + 1 + w, y + 1, y + 1 + h, u0, u1, v0, v1,
-                    ARGB.multiplyAlpha(SCHATTEN, deckung));
+            blit(g, s, px + 1, py + 1, winkel, u0, u1, v0, v1, ARGB.multiplyAlpha(SCHATTEN, deckung));
         }
-        g.innerBlit(RenderPipelines.GUI_TEXTURED, s.atlasLocation(), x, x + w, y, y + h, u0, u1, v0, v1, ARGB.multiplyAlpha(-1, deckung));
+        blit(g, s, px, py, winkel, u0, u1, v0, v1, ARGB.multiplyAlpha(-1, deckung));
+    }
+
+    /**
+     * Das Bild mit der Mitte auf (px, py): ungedreht auf ganzen Einheiten ({@link #lage}), gedreht
+     * starr um seine Mitte; dann werden die Kanten treppig wie die der gedrehten Karte.
+     */
+    private static void blit(GuiGraphicsExtractor g, TextureAtlasSprite s, double px, double py, double winkel,
+            float u0, float u1, float v0, float v1, int farbe) {
+        int w = s.contents().width(), h = s.contents().height();
+        Matrix3x2fStack pose = g.pose();
+        pose.pushMatrix();
+        if (winkel == 0) {
+            pose.translate(lage(px, w), lage(py, h));
+        } else {
+            pose.translate((float) px, (float) py).rotate((float) winkel).translate(-w / 2f, -h / 2f);
+        }
+        g.innerBlit(RenderPipelines.GUI_TEXTURED, s.atlasLocation(), 0, w, 0, h, u0, u1, v0, v1, farbe);
+        pose.popMatrix();
     }
 }
