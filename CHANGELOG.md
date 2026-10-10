@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.20
+
+- **Chests, doors, signs and heads show on the minimap right away,** also with Sodium; before, they only appeared after the next block was placed.
+
 ## 0.2.19
 
 - **Compass marks instead of corner ornaments:** the frame now shows N, E, S, W marks on its bands, fixed when the minimap points north and turning with the map when it rotates; the corner ornaments are gone. The Ornaments switch in Settings turns the marks off. With a frame the minimap keeps a little more distance from the screen edge, so turned marks stay on screen.

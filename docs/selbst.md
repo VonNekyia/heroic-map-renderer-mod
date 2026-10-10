@@ -10,6 +10,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/Auswahl.java
   - src/main/java/com/nekyia/heroicmap/Freigabe.java
   - src/main/java/com/nekyia/heroicmap/mixin/LevelExtractorMixin.java
+  - src/main/java/com/nekyia/heroicmap/mixin/ClientLevelMixin.java
   - src/test/java/com/nekyia/heroicmap/SelbstTest.java
   - src/test/java/com/nekyia/heroicmap/PyramideTest.java
   - src/test/java/com/nekyia/heroicmap/KachelwerkMessung.java
@@ -60,8 +61,8 @@ mit der des Servers. Warum: [0004](entscheidungen/0004-karte-selbst-zeichnen.md)
 
 ## Wann gezeichnet wird
 
-- **Auslöser:** der Mixin an `LevelExtractor.setSectionDirty`, derselbe wie
-  für die Minimap, siehe [Minimap](minimap.md), „Neu zeichnen“: ein Chunk,
+- **Auslöser:** die Mixins an `LevelExtractor.setSectionDirty` und an
+  `ClientLevel`, dieselben wie für die Minimap, siehe [Minimap](minimap.md), „Neu zeichnen“: ein Chunk,
   dessen Licht der Client einschaltet, und jede Änderung eines Blocks. Bei
   der Wahl kommen alle geladenen Chunks in Sichtweite dazu.
 - **Bereit:** der Chunk und alle 8 Nachbarn geladen und mit Licht

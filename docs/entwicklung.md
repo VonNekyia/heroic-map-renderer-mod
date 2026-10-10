@@ -85,13 +85,15 @@ Mit `-Pzusatzmods=<ordner>` lädt das Spiel im Gametest zusätzlich die
 Mods aus diesem Ordner (`fabric.addMods`), etwa die eines Modpacks ohne
 Fabric API und ohne diesen Mod. So lässt sich prüfen, ob eine andere Mod
 stört; seit 26.x sind die Namen im Spiel nicht mehr verschleiert, fertige
-Mods laufen deshalb auch hier.
+Mods laufen deshalb auch hier. Für `Blockentities` reicht ein Ordner mit
+`sodium-fabric-0.9.2+mc26.3.jar`.
 
 | Gametest | tut |
 |---|---|
 | `Anmeldung` | die Reihenfolge beim Login: Beim ersten Level gibt es den Spieler noch nicht, wohl aber die Verbindung des Levels, aus der `Downloads.server` liest, siehe [Download](download.md), „Ablage“ |
 | `Bilder` | baut eine Szene und nimmt die Minimap auf, danach das Menü und die Vollbildkarte aus einem Testsatz mit zwei Wegpunkten, das Untermenü „Einstellungen …“, jeden Rahmen eckig und rund und das Menü mit Rahmen, die drehende Minimap, das ganze Fenster bei 854 × 480 und 1280 × 720 mit der Seite im Verhältnis, die Szene `formen` mit Flächen, Kreis, Linie und Kartenschrift und der offenen Liste der Ebenen, die Szene `orte` mit Nadeln, einem Banner und ihren Namen, gleich gross auf zwei Stufen der Vollbildkarte, und „Unicode-Schrift erzwingen“, das die Generation der Kartenschrift hebt, zuletzt die selbst gezeichnete Karte der Szene, gewählt über die Knöpfe, neben der Minimap, die als beschäftigt gilt, auch mit Chunklinien; mit `-Pbilder=<ordner>` landen die Bilder dort, siehe [Minimap](minimap.md), „Bilder“, und [Vollbildkarte](vollbildkarte.md), „Bild“ |
 | `Bedienung` | das Menü und die Vollbildkarte mit echten Eingaben der Maus (`TestInput`): im Menü verschiebt Ziehen mit der linken wie der rechten Taste die ganze Minimap; auf der Karte verschiebt links ziehen den Inhalt, ein Linksklick öffnet kein Menü, ein Rechtsklick öffnet „Hierher teleportieren“, ein Klick darauf teleportiert; Wegpunkte setzen, ziehen und klicken auf Marken am Rand, Doppelklick, Wegpunkt am eigenen Standort, einen Kreis und eine Nadel vom Server und ein altes Rechteck anheften; eine Region und eine Linie aus Wegpunkten bauen, die Region per Doppelklick anheften und löschen; die Liste der Ebenen aufklappen, eine Ebene aus- und anschalten, per Doppelklick ganz anheften und lösen, zuklappen; Menü und Untermenü bei 1280 × 720 und GUI-Massstab 3; siehe [Minimap](minimap.md), „Bedienung“, [Vollbildkarte](vollbildkarte.md), „Bedienung“, und [Wegpunkte](wegpunkte.md), „Tests“ |
+| `Blockentities` | Truhe, Tür, Schild und Kopf, im Einzelspieler gesetzt und abgebaut wie ein Spieler, mit Rechts- und Linksklick; die Minimap zeigt sie ohne weiteres Zutun, verglichen am Bildschirmfoto an der Stelle des Blocks. Mit Sodium über `-Pzusatzmods`; siehe [Minimap](minimap.md), „Neu zeichnen“ |
 | `Messung` | nur mit `-Pmessung=<datei>`: Zeit je Chunk und Frametime mit und ohne Minimap, siehe [Minimap](minimap.md), „Kosten“ |
 | `Server` | nur mit `-Pserver=<adresse>`: von Ende zu Ende gegen einen echten Paper-Server mit dem Plugin, Angebot, voller Download des kleinsten Massstabs des ersten Baums, jeder Dialog mit Ja, die Vollbildkarte als Bild `server-karte`; siehe unten |
 | `Uebernahme` | nur mit `-Puebernahme=<datei>`: was eine Kachel der Vollbildkarte den Render-Thread kostet, siehe [Vollbildkarte](vollbildkarte.md), „Kacheln“ |
