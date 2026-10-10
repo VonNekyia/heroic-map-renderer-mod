@@ -151,7 +151,7 @@ die Kameras von oben sagt: Seine Karten sind von oben gesehen, ein Kreis
 bleibt rund. Was er zeichnet, kommt aus `Ebenen.formen`, gelesen auf dem
 Thread des Netzes wie die Nadeln.
 
-![Fläche mit Loch, Kreis, Dreieck und Linie einer Ebene auf der Minimap, genordet und gedreht mit dem Rahmen „uhr“; Szene `formen` des Gametests](bilder/formen.png)
+![Fläche mit Loch, Kreis, Dreieck, Linie und Kartenschrift einer Ebene auf der Minimap, genordet und gedreht mit dem Rahmen „uhr“; Szene `formen` des Gametests](bilder/formen.png)
 
 ![Dieselben Formen auf der Vollbildkarte](bilder/formen-karte.png)
 
