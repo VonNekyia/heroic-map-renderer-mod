@@ -48,28 +48,36 @@ class SkinTest {
         assertEquals(baender.keySet(), Set.copyOf(Skin.ORDNER));
         int biomRand = 0;
         for (String name : Skin.ORDNER) {
-            BufferedImage zier = bild(name, "zier");
-            Skin s = Skin.lies(name, text(name, "palette.txt"), text(name, "info.txt"), Math.max(zier.getWidth(), zier.getHeight()));
+            // Wie Skin.laden: die längste Seite der Marken.
+            int groesste = 0;
+            for (String teil : List.of("norden", "marke", "marke_quer")) {
+                BufferedImage b = bild(name, teil);
+                groesste = Math.max(groesste, Math.max(b.getWidth(), b.getHeight()));
+            }
+            Skin s = Skin.lies(name, text(name, "palette.txt"), text(name, "info.txt"), groesste);
             assertEquals(baender.get(name), s.baender(), name);
-            for (String teil : List.of("zier", "zier_aktiv", "griff", "griff_aktiv")) {
+            for (String teil : List.of("griff", "griff_aktiv", "norden", "norden_aktiv", "marke", "marke_aktiv", "marke_quer",
+                    "marke_quer_aktiv")) {
                 assertNotNull(bild(name, teil), name + "/" + teil);
             }
-            // Mit Rahmen hält die Minimap so viel Abstand, dass die zier in der Ecke ganz auf dem Schirm bleibt.
+            // Die zier gibt es nicht mehr, auch nicht im Jar.
+            assertNull(bild(name, "zier"), name);
+            // Mit Rahmen hält die Minimap so viel Abstand, dass jede Marke in jeder Drehung ganz auf dem
+            // Schirm bleibt, auch ihr Schatten um (+1, +1): Ihre Mitte liegt auf der Mitte der Bänder.
             int rand = Minimap.rand(s);
             biomRand = name.startsWith(Skin.BIOM + "/") ? Math.max(biomRand, rand) : biomRand;
-            double[][] ecken = Skin.ecken(rand, rand, 128, 128, s.baender(), false);
-            assertTrue(Skin.lage(ecken[0][0], zier.getWidth()) >= 0, name);
-            assertTrue(Skin.lage(ecken[0][1], zier.getHeight()) >= 0, name);
+            assertTrue(rand + s.baender() / 2.0 - groesste * Math.sqrt(2) / 2 - 1 >= 0, name);
         }
         // „biom“ hält den grössten Abstand seiner Kategorien, so springt die Minimap beim Wechsel nicht.
-        assertEquals(6, biomRand);
+        assertEquals(11, biomRand);
     }
 
     @Test
     void abstandZumRandMitRahmen() {
         assertEquals(Minimap.RAND, Minimap.rand(null));
-        assertEquals(Minimap.RAND, Minimap.rand(Skin.lies("grau", "#000000\n#000000", "", 7)));
-        assertEquals(8, Minimap.rand(Skin.lies("uhr", "#000000\n#000000", "", 15)));
+        assertEquals(Minimap.RAND, Minimap.rand(Skin.lies("klein", "#000000\n#000000", "", 5)));
+        assertEquals(5, Minimap.rand(Skin.lies("grau", "#000000\n#000000", "", 7)));
+        assertEquals(13, Minimap.rand(Skin.lies("uhr", "#000000\n#000000", "", 17)));
     }
 
     @Test
@@ -153,20 +161,27 @@ class SkinTest {
         assertTrue(rund[2][0] < 64 && rund[2][1] > 64);
         // Die Mitte eines Bilds der Breite 13 auf 11,5: von 5 bis 18.
         assertEquals(5, Skin.lage(11.5, 13));
-        assertEquals(4, Skin.einrueckung(7));
-        assertEquals(8, Skin.einrueckung(15));
+        // Die halbe Diagonale, aufgerundet: So bleibt eine gedrehte Verzierung ganz auf dem Schirm.
+        assertEquals(5, Skin.einrueckung(7));
+        assertEquals(11, Skin.einrueckung(15));
+        for (int w = 5; w <= 16; w++) {
+            for (int grad = 0; grad < 90; grad++) {
+                double a = Math.toRadians(grad), halb = w * (Math.cos(a) + Math.sin(a)) / 2;
+                assertTrue(halb <= Skin.einrueckung(w), w + " bei " + grad + "°");
+            }
+        }
     }
 
     @Test
     void spiegelnJeEcke() {
-        // zier ist für oben links gezeichnet, griff für unten rechts; Ecken 0 oben links bis 3 unten rechts.
-        boolean[][] zier = {{false, false}, {true, false}, {false, true}, {true, true}};
+        // griff ist für unten rechts gezeichnet; Ecken 0 oben links bis 3 unten rechts. Die Marken, Ecke 0, nie.
+        boolean[][] griff = {{true, true}, {false, true}, {true, false}, {false, false}};
         for (int e = 0; e < 4; e++) {
-            assertEquals(zier[e][0], Skin.spiegeltX(e, false), "zier " + e);
-            assertEquals(zier[e][1], Skin.spiegeltY(e, false), "zier " + e);
-            assertEquals(!zier[e][0], Skin.spiegeltX(e, true), "griff " + e);
-            assertEquals(!zier[e][1], Skin.spiegeltY(e, true), "griff " + e);
+            assertEquals(griff[e][0], Skin.spiegeltX(e, true), "griff " + e);
+            assertEquals(griff[e][1], Skin.spiegeltY(e, true), "griff " + e);
         }
+        assertFalse(Skin.spiegeltX(0, false));
+        assertFalse(Skin.spiegeltY(0, false));
     }
 
     @Test

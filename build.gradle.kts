@@ -60,6 +60,7 @@ tasks.matching { it.name == "runClientGameTest" }.configureEach {
     (this as JavaExec).systemProperty("heroicmap.bilder", bilder.get())
     systemProperty("heroicmap.messung", messung.get())
     systemProperty("heroicmap.messung.drehen", providers.gradleProperty("messungDrehen").orElse("false").get())
+    systemProperty("heroicmap.messung.rahmen", providers.gradleProperty("messungRahmen").orElse("ohne").get())
     systemProperty("heroicmap.uebernahme", uebernahme.get())
     systemProperty("heroicmap.server", server.get())
     providers.gradleProperty("zusatzmods").orNull?.let { systemProperty("fabric.addMods", file(it).absolutePath) }

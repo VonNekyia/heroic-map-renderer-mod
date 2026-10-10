@@ -83,8 +83,8 @@ class MinimapTest {
         assertEquals(new Minimap.Rahmen(4, 360 - 128 - 4, 128), Minimap.rahmen(640, 360, 128, 0, 1, Minimap.RAND));
         // Ein kleiner Schirm kappt die Seite.
         assertEquals(200 - 8, Minimap.rahmen(300, 200, 256, 1, 0, Minimap.RAND).seite());
-        // Mit Rahmen rückt sie um dessen Einrückung vom Rand, etwa 8 bei „uhr“.
-        assertEquals(new Minimap.Rahmen(640 - 128 - 8, 8, 128), Minimap.rahmen(640, 360, 128, 1, 0, 8));
+        // Mit Rahmen rückt sie um dessen Einrückung vom Rand, etwa 11 bei „uhr“.
+        assertEquals(new Minimap.Rahmen(640 - 128 - 11, 11, 128), Minimap.rahmen(640, 360, 128, 1, 0, 11));
     }
 
     @Test
@@ -100,6 +100,52 @@ class MinimapTest {
     }
 
     @Test
+    void groesseFolgtDemFenster(@TempDir Path ordner) throws Exception {
+        // Der erste Schirm nimmt die Vorgabe als Anteil seiner kürzeren Seite: 854 × 480 bei GUI-Massstab 2.
+        Minimap m = new Minimap();
+        m.setzeSkin(Skin.OHNE);
+        assertEquals(128, m.rahmen(427, 240).seite());
+        // 1280 × 720 beim selben GUI-Massstab: anderthalbmal so gross; bei GUI-Massstab 1 ebenso viele Pixel.
+        assertEquals(192, m.rahmen(640, 360).seite());
+        assertEquals(256, m.rahmen(854, 480).seite());
+        // Darüber nicht: 256 Einheiten halten die Kosten, siehe 0013.
+        assertEquals(Minimap.GROESSTE, m.rahmen(1280, 720).seite());
+        // Ein kleineres Fenster, eine kleinere Minimap, auch unter der kleinsten beim Ziehen; die Reichweite folgt.
+        assertEquals(43, m.rahmen(160, 80).seite());
+        assertEquals(Minimap.reichweite(m.zoom(), Minimap.sicht(43, true, false)), m.reichweite());
+        // Gezogen gilt die Seite für diesen Schirm; der Anteil übersteht den Neustart.
+        m.stelle(4, 4, 200, 640, 360);
+        assertEquals(200, m.rahmen(640, 360).seite());
+        assertEquals(133, m.rahmen(427, 240).seite());
+        Path datei = ordner.resolve("heroicmap.properties");
+        m.schreibe(datei);
+        Minimap neu = new Minimap();
+        neu.lies(datei);
+        neu.setzeSkin(Skin.OHNE);
+        assertEquals(133, neu.rahmen(427, 240).seite());
+    }
+
+    @Test
+    void alteGroesseGiltImErstenSchirm(@TempDir Path ordner) throws Exception {
+        // Eine Datei von vor dem Anteil: Die Seite in Einheiten gilt im ersten Schirm, danach folgt sie dem Fenster.
+        Path datei = ordner.resolve("heroicmap.properties");
+        Files.writeString(datei, "groesse=200\n");
+        Minimap m = new Minimap();
+        m.lies(datei);
+        m.setzeSkin(Skin.OHNE);
+        assertEquals(200, m.rahmen(640, 360).seite());
+        assertEquals(100, m.rahmen(320, 180).seite());
+        m.schreibe(datei);
+        assertTrue(Files.readString(datei).contains("groesse_anteil="));
+        // Ein Anteil von 0 oder Unlesbares gilt nicht; dann wieder die Seite aus groesse.
+        Files.writeString(datei, "groesse_anteil=0\ngroesse=100\n");
+        m = new Minimap();
+        m.lies(datei);
+        m.setzeSkin(Skin.OHNE);
+        assertEquals(100, m.rahmen(640, 360).seite());
+    }
+
+    @Test
     void einstellungenUeberstehenDenNeustart(@TempDir Path ordner) throws Exception {
         Path datei = ordner.resolve("config").resolve("heroicmap.properties");
         Minimap vorher = new Minimap();
@@ -112,11 +158,14 @@ class MinimapTest {
         vorher.setzeAblage(Downloads.Ablage.HASH);
         vorher.setzeChunklinien(true);
         vorher.setzeDrehen(true);
+        vorher.setzeVerzierungen(false);
         vorher.stelle(20, 30, 200, 640, 360);
         vorher.schreibe(datei);
 
         Minimap nachher = new Minimap();
+        assertTrue(nachher.verzierungen(), "Vorgabe an");
         nachher.lies(datei);
+        assertFalse(nachher.verzierungen());
         assertFalse(nachher.sichtbar());
         assertEquals(4, nachher.aufloesung());
         assertEquals(1, nachher.zoom());

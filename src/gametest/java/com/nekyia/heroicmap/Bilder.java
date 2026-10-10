@@ -118,6 +118,7 @@ public final class Bilder implements FabricClientGameTest {
             rahmen(context);
             umriss(context);
             drehen(context, server);
+            fenster(context);
             vollbildkarte(context);
             formen(context, server);
             orte(context, server);
@@ -638,7 +639,7 @@ public final class Bilder implements FabricClientGameTest {
                 }
             }
         }
-        // Das Menü mit „uhr“: an der Ecke zur Mitte der Griff statt der zier, ohne den weissen Umriss.
+        // Das Menü mit „uhr“: an der Ecke zur Mitte der Griff, ohne den weissen Umriss.
         context.runOnClient(mc -> {
             Minimap.INSTANZ.setzeSkin("uhr");
             Minimap.INSTANZ.setzeRund(false);
@@ -694,20 +695,22 @@ public final class Bilder implements FabricClientGameTest {
 
     /**
      * Die drehende Minimap bei Gier 30, mit Chunklinien: eckig ohne Rahmen, rund mit „uhr“, eckig mit
-     * „kompass“, nebeneinander. Siehe docs/minimap.md, „Drehen“.
+     * „kompass“, die Marken gedreht, zuletzt „kompass“ ohne Marken, nebeneinander. Siehe
+     * docs/minimap.md, „Drehen“.
      */
     private static void drehen(ClientGameTestContext context, TestServerContext server) {
         server.runCommand("tp @a 0.5 -30 0.5 30 90");
-        String[][] arten = {{Skin.OHNE, "eckig"}, {"uhr", "rund"}, {"kompass", "eckig"}};
+        String[][] arten = {{Skin.OHNE, "eckig", "an"}, {"uhr", "rund", "an"}, {"kompass", "eckig", "an"}, {"kompass", "eckig", "aus"}};
         BufferedImage[] teile = new BufferedImage[arten.length];
         for (int i = 0; i < arten.length; i++) {
             String skin = arten[i][0];
-            boolean rund = arten[i][1].equals("rund");
+            boolean rund = arten[i][1].equals("rund"), verzierungen = arten[i][2].equals("an");
             context.runOnClient(mc -> {
                 Minimap.INSTANZ.setzeDrehen(true);
                 Minimap.INSTANZ.setzeChunklinien(true);
                 Minimap.INSTANZ.setzeSkin(skin);
                 Minimap.INSTANZ.setzeRund(rund);
+                Minimap.INSTANZ.setzeVerzierungen(verzierungen);
             });
             context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getYRot() - 30) < 0.1f && Minimap.INSTANZ.fertig(), 1200);
             context.waitTicks(2);
@@ -737,8 +740,55 @@ public final class Bilder implements FabricClientGameTest {
             Minimap.INSTANZ.setzeChunklinien(false);
             Minimap.INSTANZ.setzeSkin(Skin.OHNE);
             Minimap.INSTANZ.setzeRund(false);
+            Minimap.INSTANZ.setzeVerzierungen(true);
         });
         context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getYRot()) < 0.1f && Minimap.INSTANZ.fertig(), 1200);
+    }
+
+    /**
+     * Das ganze Fenster bei 854 × 480 und 1280 × 720, beide bei GUI-Massstab 2, halb so gross
+     * nebeneinander: Die Minimap ist im grösseren anderthalbmal so gross. Siehe docs/minimap.md, „Bedienung“.
+     */
+    private static void fenster(ClientGameTestContext context) {
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        int[][] groessen = {{854, 480}, {1280, 720}};
+        BufferedImage[] teile = new BufferedImage[groessen.length];
+        int[] seiten = new int[groessen.length];
+        for (int i = 0; i < groessen.length; i++) {
+            context.getInput().resizeWindow(groessen[i][0], groessen[i][1]);
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(2);
+                mc.resizeGui();
+            });
+            context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
+            context.waitTicks(2);
+            seiten[i] = context.computeOnClient(mc -> Minimap.INSTANZ.rahmen(mc.getWindow().getGuiScaledWidth(),
+                    mc.getWindow().getGuiScaledHeight()).seite());
+            Path bild = context.takeScreenshot(TestScreenshotOptions.of("fenster-" + i).disableCounterPrefix());
+            try {
+                BufferedImage ganz = ImageIO.read(bild.toFile());
+                teile[i] = new BufferedImage(ganz.getWidth() / 2, ganz.getHeight() / 2, BufferedImage.TYPE_INT_RGB);
+                teile[i].getGraphics().drawImage(ganz, 0, 0, teile[i].getWidth(), teile[i].getHeight(), null);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        context.getInput().resizeWindow(vorher[0], vorher[1]);
+        context.runOnClient(mc -> {
+            mc.options.guiScale().set(vorher[2]);
+            mc.resizeGui();
+        });
+        context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
+        if (Math.abs(seiten[1] - seiten[0] * 1.5) > 1) {
+            throw new AssertionError("Seite " + seiten[0] + " bei 854 × 480, " + seiten[1] + " bei 1280 × 720");
+        }
+        if (!AUSGABE.isEmpty()) {
+            try {
+                ImageIO.write(nebeneinander(0, teile), "png", Path.of(AUSGABE, "minimap-fenster.png").toFile());
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
     }
 
     /** Die Minimap samt Ornamenten: ihr Rahmen und so viel darum, wie sie Abstand zum Rand hält. */

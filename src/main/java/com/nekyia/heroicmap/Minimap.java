@@ -14,6 +14,7 @@ import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -75,7 +76,10 @@ public final class Minimap {
     static final long BUDGET_NS = 2_000_000L;
     /** So viele Chunks hat der Worker höchstens vor sich. */
     private static final int IN_ARBEIT = 4;
-    /** Seite der Minimap in Einheiten des GUI: Vorgabe, kleinste, grösste. Ein Pixel der Minimap ist eine Einheit. */
+    /**
+     * Seite der Minimap in Einheiten des GUI: Vorgabe im ersten Schirm, kleinste beim Ziehen,
+     * grösste immer. Ein Pixel der Minimap ist eine Einheit.
+     */
     static final int GROESSE = 128, KLEINSTE = 64, GROESSTE = 256;
     /** Chunks je Richtung über den sichtbaren Bereich hinaus. */
     static final int VORRAT = 2;
@@ -121,6 +125,8 @@ public final class Minimap {
     /** Der Rahmen, ein Name aus {@link Skin#NAMEN}; „ohne“ ist der Umriss. Siehe docs/rahmen.md. */
     private String skin = Skin.BIOM;
     private boolean skinGewaehlt;
+    /** Die Marken N, O, S, W des Rahmens; aus nur Bänder oder Ring. Siehe docs/rahmen.md, „Verzierungen“. */
+    private boolean verzierungen = true;
     private Biom biom = new Biom();
     /** Solange das Menü offen ist: die Ecke des Griffs, 0 bis 3, sonst -1; und ob die Maus auf ihm liegt. */
     private int griffEcke = -1;
@@ -139,7 +145,12 @@ public final class Minimap {
     private Rahmen eckenRahmen;
     private boolean eckenRund;
     private double[][] ecken;
+    /** Die Seite als Anteil der kürzeren Seite des Schirms; NaN, bis der erste Schirm ihn aus {@link #groesse} ableitet. Siehe docs/minimap.md, „Bedienung“. */
+    private float anteil = Float.NaN;
+    /** Die Seite in Einheiten, solange der Anteil fehlt: die Vorgabe oder {@code groesse} aus einer älteren Datei. */
     private int groesse = GROESSE;
+    /** Die Seite aus dem letzten {@link #rahmen(int, int)}, nach ihr richtet sich die Reichweite. */
+    private int seite = GROESSE;
     /** Wie die Ordner der Welten heissen, siehe docs/download.md, „Ablage“. */
     private Downloads.Ablage ablage = Downloads.Ablage.IP;
     /** Die Lage im freien Platz des Schirms: 0 links oder oben, 1 rechts oder unten. */
@@ -300,12 +311,20 @@ public final class Minimap {
         skinGewaehlt = true;
     }
 
+    boolean verzierungen() {
+        return verzierungen;
+    }
+
+    void setzeVerzierungen(boolean verzierungen) {
+        this.verzierungen = verzierungen;
+    }
+
     /** Der Skin, den die Minimap gerade zeichnet, bei „biom“ der der gezeigten Kategorie; null ohne Rahmen. */
     Skin skinJetzt() {
         return Skin.von(Skin.BIOM.equals(skin) ? Biom.ORDNER.get(biom.gezeigt()) : skin);
     }
 
-    /** Vom Menü je Frame: wo der Griff liegt, -1 ohne Menü. Mit Skin zeichnet die Minimap ihn statt der zier. */
+    /** Vom Menü je Frame: wo der Griff liegt, -1 ohne Menü. Mit Skin zeichnet die Minimap ihn über den Bändern. */
     void griff(int ecke, boolean aktiv) {
         griffEcke = ecke;
         griffAktiv = aktiv;
@@ -355,11 +374,26 @@ public final class Minimap {
         }
     }
 
+    /**
+     * Lage und Seite auf diesem Schirm: Die Seite ist ein Anteil seiner kürzeren Seite, so folgt sie
+     * dem Fenster; höchstens {@link #GROESSTE}, das hält die Kosten. Siehe docs/entscheidungen/0013-groesse-als-anteil-des-schirms.md.
+     */
     Rahmen rahmen(int breite, int hoehe) {
-        return rahmen(breite, hoehe, groesse, lageX, lageY, rand());
+        int kurz = Math.min(breite, hoehe);
+        if (Float.isNaN(anteil) && kurz > 0) {
+            // Ohne Anteil gilt die Seite im ersten Schirm; so springt nichts.
+            anteil = groesse / (float) kurz;
+        }
+        Rahmen r = rahmen(breite, hoehe, Float.isNaN(anteil) ? groesse : Math.min(GROESSTE, Math.round(anteil * kurz)), lageX, lageY, rand());
+        if (r.seite() != seite) {
+            // Gezogen oder ein anderes Fenster: Die Reichweite ändert sich, der nächste Frame passt den Bereich an.
+            seite = r.seite();
+            mitte = null;
+        }
+        return r;
     }
 
-    /** Der Abstand zum Rand des Schirms: {@link #RAND}, mit Rahmen mindestens dessen Einrückung, so bleibt die zier ganz auf dem Schirm. */
+    /** Der Abstand zum Rand des Schirms: {@link #RAND}, mit Rahmen mindestens dessen Einrückung, so bleiben die Marken ganz auf dem Schirm. */
     int rand() {
         if (!Skin.BIOM.equals(skin)) {
             return rand(Skin.von(skin));
@@ -383,14 +417,9 @@ public final class Minimap {
                 rand + Math.round(lageY * (hoehe - seite - 2 * rand)), seite);
     }
 
-    /** Gibt der Minimap die Seite und legt sie dann wie {@link #verschiebe}. */
+    /** Gibt der Minimap die Seite auf diesem Schirm, als Anteil gemerkt, und legt sie dann wie {@link #verschiebe}. */
     void stelle(int x, int y, int seite, int breite, int hoehe) {
-        int neu = Mth.clamp(seite, KLEINSTE, GROESSTE);
-        if (neu != groesse) {
-            groesse = neu;
-            // Die Reichweite ändert sich; der nächste Frame passt den Bereich an.
-            mitte = null;
-        }
+        anteil = Mth.clamp(seite, KLEINSTE, GROESSTE) / (float) Math.min(breite, hoehe);
         verschiebe(x, y, breite, hoehe);
     }
 
@@ -438,12 +467,16 @@ public final class Minimap {
         String rahmen = String.valueOf(rahmenWahl != null ? rahmenWahl : p.getProperty("rahmen")).trim();
         skinGewaehlt = Skin.NAMEN.contains(rahmen) && (rahmenWahl != null || !Skin.OHNE.equals(rahmen));
         skin = skinGewaehlt ? rahmen : Skin.BIOM;
+        verzierungen = !"false".equals(p.getProperty("verzierungen"));
         ablage = switch (String.valueOf(p.getProperty("ablage")).trim()) {
             case "hash" -> Downloads.Ablage.HASH;
             case "ip_port" -> Downloads.Ablage.IP_PORT;
             default -> Downloads.Ablage.IP;
         };
+        // Vor dem Anteil stand die Seite in Einheiten; sie gilt im ersten Schirm, siehe rahmen.
         groesse = Mth.clamp(zahl(p.getProperty("groesse"), GROESSE), KLEINSTE, GROESSTE);
+        float a = bruch(p.getProperty("groesse_anteil"), Float.NaN);
+        anteil = a > 0 ? a : Float.NaN;
         lageX = bruch(p.getProperty("lage_x"), 1);
         lageY = bruch(p.getProperty("lage_y"), 0);
     }
@@ -463,8 +496,13 @@ public final class Minimap {
         if (skinGewaehlt) {
             p.setProperty("rahmen_wahl", skin);
         }
+        p.setProperty("verzierungen", Boolean.toString(verzierungen));
         p.setProperty("ablage", ablage.name().toLowerCase(Locale.ROOT));
-        p.setProperty("groesse", Integer.toString(groesse));
+        if (Float.isNaN(anteil)) {
+            p.setProperty("groesse", Integer.toString(groesse));
+        } else {
+            p.setProperty("groesse_anteil", Float.toString(anteil));
+        }
         p.setProperty("lage_x", Float.toString(lageX));
         p.setProperty("lage_y", Float.toString(lageY));
         try {
@@ -524,7 +562,7 @@ public final class Minimap {
 
     /** Chunks je Richtung um den Spieler, die die Minimap zeichnet: sichtbar plus Vorrat. */
     int reichweite() {
-        return reichweite(zoom, sicht(groesse, drehen, rund));
+        return reichweite(zoom, sicht(seite, drehen, rund));
     }
 
     /** Wie viel Gegend die Minimap braucht, als Seite eines Quadrats: eckig und gedreht reicht sie in den Ecken √2 weiter. */
@@ -571,9 +609,10 @@ public final class Minimap {
             gibUmrissFrei();
             return;
         }
+        // Vor arbeite: Die Seite bestimmt die Reichweite.
+        Rahmen r = rahmen(g.guiWidth(), g.guiHeight());
         arbeite(mc, level, spieler);
 
-        Rahmen r = rahmen(g.guiWidth(), g.guiHeight());
         float a = anteil(level, spieler, zeit);
         int k = mc.getWindow().getGuiScale(), n = r.seite() * k;
         int links = ecke(spieler.xo, spieler.getX(), a, zoom, k, n);
@@ -620,9 +659,9 @@ public final class Minimap {
             Skin alt = vorher == null ? null : Skin.von(Biom.ORDNER.get(vorher));
             float t = alt == null ? 1 : biom.anteil(ms);
             if (alt != null) {
-                zeichneRahmen(g, alt, r, lage, 1, 1 - t);
+                zeichneRahmen(g, alt, r, lage, k, 1, 1 - t);
             }
-            zeichneRahmen(g, rahmen, r, lage, t, t);
+            zeichneRahmen(g, rahmen, r, lage, k, t, t);
         }
         float kopf = kopf(r.seite());
         wegpunkte(g, r, dimension, links, oben, k, kopf, lage);
@@ -981,40 +1020,63 @@ public final class Minimap {
     }
 
     /**
-     * Die Marken N, O, S, W beim Drehen: wo die Himmelsrichtung von der Mitte aus über den Rahmen
-     * zeigt, auf der Mitte der Bänder; N zuletzt, zuoberst. Siehe docs/rahmen.md, „Marken“.
-     */
-    private void marken(GuiGraphicsExtractor g, Skin skin, Rahmen r, Drehung.Lage lage, float deckung) {
-        for (int i : MARKEN) {
-            double ux = lage.richtungX(RICHTUNGEN[i][0], RICHTUNGEN[i][1]), uy = lage.richtungY(RICHTUNGEN[i][0], RICHTUNGEN[i][1]);
-            double[] p = Skin.marke(r.x(), r.y(), r.seite(), skin.baender(), rund, ux, uy);
-            skin.ornament(g, Skin.markeFuer(i == 0, ux, uy) + (griffEcke >= 0 ? 1 : 0), 0, p[0], p[1], deckung);
-        }
-    }
-
-    /**
      * Der Rahmen eines Skins über Karte und Linien, in Einheiten des GUI: die Bänder, eckig als
-     * Rechtecke, rund als Ring; dann die zier an den Ecken, im Menü an der Ecke des Griffs der Griff;
-     * gedreht die Marken. Die Bänder zu {@code baender}, die Ornamente zu {@code deckung} deckend. Siehe docs/rahmen.md.
+     * Rechtecke, rund als Ring; darüber die Ornamente aus {@link #ornamente}. Die Bänder zu
+     * {@code baender}, die Ornamente zu {@code deckung} deckend. Siehe docs/rahmen.md.
      */
-    private void zeichneRahmen(GuiGraphicsExtractor g, Skin skin, Rahmen r, Drehung.Lage lage, float baender, float deckung) {
+    private void zeichneRahmen(GuiGraphicsExtractor g, Skin skin, Rahmen r, Drehung.Lage lage, int k, float baender, float deckung) {
         if (rund) {
             g.innerBlit(RenderPipelines.GUI_TEXTURED, skin.ring(r.seite()), r.x(), r.x() + r.seite(), r.y(), r.y() + r.seite(),
                     0, 1, 0, 1, ARGB.multiplyAlpha(-1, baender));
         } else {
             skin.baender(g, r.x(), r.y(), r.seite(), r.seite(), baender);
         }
-        double[][] ecken = ecken(skin, r);
-        for (int e = 0; e < ecken.length; e++) {
-            int teil = e == griffEcke ? Skin.GRIFF + (griffAktiv ? 1 : 0) : Skin.ZIER + (griffEcke >= 0 ? 1 : 0);
-            skin.ornament(g, teil, e, ecken[e][0], ecken[e][1], deckung);
-        }
-        if (lage != null) {
-            marken(g, skin, r, lage, deckung);
+        for (Ornament o : ornamente(r, skin.baender(), rund, lage, k, verzierungen, griffEcke, griffAktiv)) {
+            skin.ornament(g, o.teil(), o.ecke(), o.x(), o.y(), deckung, o.winkel());
         }
     }
 
-    /** Wo die Ornamente des Rahmens sitzen ({@link Skin#ecken}), neu gerechnet nur, wenn sich Skin, Lage oder Form ändern. */
+    /** Ein Bild über den Bändern: Teil aus {@link Skin}, Ecke zum Spiegeln, Mitte in Einheiten des GUI, Winkel. */
+    record Ornament(int teil, int ecke, double x, double y, double winkel) {
+    }
+
+    /**
+     * Was der Rahmen über den Bändern zeichnet, in dieser Reihenfolge: mit {@code marken} die Marken
+     * O, S, W, N auf der Mitte der Bänder, ungedreht fest rechts, unten, links und oben, gedreht starr
+     * mit der Karte; im Menü zuletzt der Griff an seiner Ecke, nie gedreht. In den Ecken sonst nichts.
+     * Siehe docs/rahmen.md, „Marken“.
+     */
+    static List<Ornament> ornamente(Rahmen r, int baender, boolean rund, Drehung.Lage lage, int k, boolean marken,
+            int griffEcke, boolean griffAktiv) {
+        List<Ornament> aus = new ArrayList<>(5);
+        if (marken) {
+            int aktiv = griffEcke >= 0 ? 1 : 0;
+            double winkel = lage == null ? 0 : lage.winkel();
+            for (int i : MARKEN) {
+                double[] p = lage == null ? Skin.marke(r.x(), r.y(), r.seite(), baender, rund, RICHTUNGEN[i][0], RICHTUNGEN[i][1])
+                        : verzierung(r, baender, rund, lage, RICHTUNGEN[i], k);
+                aus.add(new Ornament(Skin.MARKE_JE_RICHTUNG[i] + aktiv, 0, p[0], p[1], winkel));
+            }
+        }
+        if (griffEcke >= 0) {
+            double[] p = Skin.ecken(r.x(), r.y(), r.seite(), r.seite(), baender, rund)[griffEcke];
+            aus.add(new Ornament(Skin.GRIFF + (griffAktiv ? 1 : 0), griffEcke, p[0], p[1], 0));
+        }
+        return aus;
+    }
+
+    /**
+     * Wo eine Marke in {@code richtung} des Kartenbilds gedreht sitzt, auf der Mitte der Bänder
+     * ({@link Skin#marke}), die Mitte auf ganzen Pixeln des Schirms, sonst zitterte sie beim Laufen.
+     * Siehe docs/rahmen.md, „Drehen“.
+     */
+    static double[] verzierung(Rahmen r, int baender, boolean rund, Drehung.Lage lage, double[] richtung, int k) {
+        double[] p = Skin.marke(r.x(), r.y(), r.seite(), baender, rund,
+                lage.richtungX(richtung[0], richtung[1]), lage.richtungY(richtung[0], richtung[1]));
+        return new double[] {Math.round(p[0] * k) / (double) k, Math.round(p[1] * k) / (double) k};
+    }
+
+    /** Wo der Griff an den Ecken sitzen kann ({@link Skin#ecken}), für das Menü; neu gerechnet nur, wenn sich Skin, Lage oder Form ändern. */
     double[][] ecken(Skin skin, Rahmen r) {
         if (skin != eckenSkin || !r.equals(eckenRahmen) || rund != eckenRund) {
             ecken = Skin.ecken(r.x(), r.y(), r.seite(), r.seite(), skin.baender(), rund);
