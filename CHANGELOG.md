@@ -4,6 +4,15 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.15
+
+- **The full map remembers where it was:** zoom and position per server, world and dimension.
+- **"To player" button** on the full map, and **"Options …"** at the bottom right for the menu of /hmap.
+- **Double-click a waypoint without the map jumping;** a single click still centres it a moment later.
+- **No more pinned info panels:** a click no longer keeps a panel open; panels show while you point at something.
+- **Move a waypoint:** hold the left button on it for two seconds, then drag; Esc cancels.
+- **New icon:** the mod's logo, a spruce on an island.
+
 ## 0.2.14
 
 - **Doors, fences and torches on the minimap:** thin blocks now take at least one pixel, so doors, fence posts, panes, bars and torches show at low resolution too.

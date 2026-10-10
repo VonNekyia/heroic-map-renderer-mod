@@ -65,6 +65,11 @@ final class Kartenlage {
         }
     }
 
+    /** Beim Trennen: Was nur im Speicher lag, gilt für die nächste Welt nicht. */
+    static void leeren() {
+        SPEICHER.clear();
+    }
+
     private static Properties datei(Path ordner) {
         Properties p = new Properties();
         Path datei = ordner.resolve("karte.properties");

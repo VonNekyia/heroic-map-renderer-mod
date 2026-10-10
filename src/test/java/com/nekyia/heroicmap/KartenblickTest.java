@@ -242,6 +242,8 @@ class KartenblickTest {
         // Ohne Ordner, im Einzelspieler, nur im Speicher; eine kaputte Datei gibt keine Lage.
         Kartenlage.schreibe(null, "minecraft:the_end", new Kartenlage.Lage(1, 2, 0, 1));
         assertEquals(new Kartenlage.Lage(1, 2, 0, 1), Kartenlage.lies(null, "minecraft:the_end"));
+        Kartenlage.leeren();
+        assertNull(Kartenlage.lies(null, "minecraft:the_end"));
         Files.writeString(ordner.resolve("karte.properties"), "minecraft\\:overworld.x=eins\n");
         assertNull(Kartenlage.lies(ordner, "minecraft:overworld"));
     }

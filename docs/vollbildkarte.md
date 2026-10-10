@@ -65,12 +65,15 @@ Karte jedes Mal beim Spieler, und man musste wieder herauszoomen.
 - **Je Welt** in `karte.properties` im Ordner der Welt, neben
   `wegpunkte.json`, siehe [Download](download.md), „Ablage“; die Schlüssel
   beginnen mit der Dimension des Satzes, etwa `minecraft:overworld.zoom`.
-  Im Einzelspieler gibt es keinen Ordner, dann nur im Speicher.
+  Im Einzelspieler gibt es keinen Ordner, dann nur im Speicher, bis zum
+  Verlassen der Welt (`Kartenlage.leeren`).
 - **Gelesen** beim Öffnen, einmal, nicht bei jeder neuen Grösse des
   Fensters (`Karte.gestellt`). Die Stufe kommt auf die Stufen des Satzes,
   die Lupe auf 1, 2 oder 4 und nur auf der feinsten Stufe
   (`Kartenblick.stelle`). Fehlt die Datei oder ist sie unlesbar, liegt der
   Spieler in der Mitte.
+- **Getestet** im Gametest `Bedienung`: eine Stufe gröber, schliessen und
+  wieder öffnen, Mitte, Stufe und Lupe wie vorher; dazu `KartenblickTest`.
 
 ### Teleportieren
 

@@ -399,6 +399,11 @@ final class Karte extends Screen {
         return b + 8;
     }
 
+    /** Für die Gametests: Stufe und Lupe, oder null ohne Satz. */
+    int[] stufe() {
+        return blick == null ? null : new int[] {blick.zoom, blick.lupe};
+    }
+
     /** Für die Gametests: der Wegpunkt an der Maus, oder null. */
     Wegpunkte.Punkt haengt() {
         return haengt;

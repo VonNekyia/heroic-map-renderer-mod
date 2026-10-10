@@ -111,6 +111,7 @@ public final class Bedienung implements FabricClientGameTest {
         zumSpieler(context, maus, k);
         optionen(context, maus, k);
         verschieben(context, maus, k);
+        lageGemerkt(context, maus, k);
         maus.setCursorPos(x * k, y * k);
         context.waitTick();
 
@@ -545,6 +546,31 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("Escape beim Verschieben liess den Wegpunkt nicht, wo er war, oder schloss die Karte");
         }
         warte250();
+    }
+
+    /** Eine Stufe gröber, schliessen und wieder öffnen: Mitte, Stufe und Lupe wie vorher. Siehe docs/vollbildkarte.md, „Lage merken“. */
+    private static void lageGemerkt(ClientGameTestContext context, TestInput maus, int k) {
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+        maus.setCursorPos(breite / 2.0 * k, hoehe / 2.0 * k);
+        context.waitTick();
+        maus.scroll(-1);
+        context.waitTicks(2);
+        double[] mitte = mitte(context);
+        int[] stufe = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).stufe());
+        maus.pressKey(InputConstants.KEY_ESCAPE);
+        context.waitTicks(2);
+        Path baum = Bilder.testsatz();
+        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
+        context.waitTicks(5);
+        int[] nachher = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).stufe());
+        if (!Arrays.equals(mitte(context), mitte) || !Arrays.equals(nachher, stufe)) {
+            throw new AssertionError("Wieder geöffnet: Mitte " + Arrays.toString(mitte(context)) + " Stufe " + Arrays.toString(nachher)
+                    + " statt " + Arrays.toString(mitte) + " " + Arrays.toString(stufe));
+        }
+        // Zurück auf die feinste Stufe für die Schritte danach.
+        maus.scroll(1);
+        context.waitTicks(2);
     }
 
     private static boolean kreisAngeheftet(ClientGameTestContext context) {
