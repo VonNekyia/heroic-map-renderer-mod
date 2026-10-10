@@ -16,13 +16,13 @@ class StrahlenTest {
     @Test
     void nurAngeheftetInDieserDimensionUndInSichtweite() {
         List<Wegpunkte.Punkt> punkte = List.of(
-                new Wegpunkte.Punkt(WELT, 10, 0, 0, true),
-                new Wegpunkte.Punkt(WELT, 20, 0, 1, false),
-                new Wegpunkte.Punkt("minecraft:the_nether", 0, 0, 2, true),
+                new Wegpunkte.Punkt(1, WELT, 10, 0, 0, true),
+                new Wegpunkte.Punkt(2, WELT, 20, 0, 1, false),
+                new Wegpunkte.Punkt(3, "minecraft:the_nether", 0, 0, 2, true),
                 // Genau auf der Sichtweite zählt die Mitte des Blocks: 99,5 noch, 100,5 nicht mehr.
-                new Wegpunkte.Punkt(WELT, 99, 0, 3, true),
-                new Wegpunkte.Punkt(WELT, 100, 0, 4, true),
-                new Wegpunkte.Punkt(WELT, -70, -70, 5, true));
+                new Wegpunkte.Punkt(4, WELT, 99, 0, 3, true),
+                new Wegpunkte.Punkt(5, WELT, 100, 0, 4, true),
+                new Wegpunkte.Punkt(6, WELT, -70, -70, 5, true));
         int[] aus = new int[Strahlen.MAX_STRAHLEN];
         int n = Strahlen.waehle(punkte, WELT, 0, 0, 100, aus);
         assertArrayEquals(new int[] {0, 3, 5}, Arrays.copyOf(aus, n));
@@ -32,7 +32,7 @@ class StrahlenTest {
     void hoechstensSovieleWieInDasFeldPassen() {
         List<Wegpunkte.Punkt> punkte = new ArrayList<>();
         for (int i = 0; i < Strahlen.MAX_STRAHLEN + 10; i++) {
-            punkte.add(new Wegpunkte.Punkt(WELT, i, 0, 0, true));
+            punkte.add(new Wegpunkte.Punkt(i + 1, WELT, i, 0, 0, true));
         }
         int[] aus = new int[Strahlen.MAX_STRAHLEN];
         assertEquals(Strahlen.MAX_STRAHLEN, Strahlen.waehle(punkte, WELT, 0, 0, 1000, aus));
