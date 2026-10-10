@@ -561,9 +561,10 @@ public final class Bedienung implements FabricClientGameTest {
 
     /**
      * Die Liste der Ebenen wie ein Spieler: Kommen Ebenen, während die Karte offen ist, erscheint der Knopf
-     * „Ebenen“; ein Klick klappt die Liste auf. Ein Klick auf einen Schalter schaltet die Ebene aus, ein
-     * zweiter wieder an; ein Doppelklick lässt sie an und heftet alles mit id an, ein zweiter löst es.
-     * Zuletzt klappt der Knopf die Liste wieder zu. Siehe docs/vollbildkarte.md, „Ebenen“.
+     * „Ebenen“; ein Klick klappt die Liste auf. Ein Klick auf „An“/„Aus“ schaltet die Ebene aus, ein zweiter
+     * wieder an, und ein Doppelklick darauf schaltet nur zweimal; angeheftet wird dabei nichts. Ein Doppelklick
+     * auf die Überschrift heftet alles mit id an, ein zweiter löst es; die Ebene bleibt an. Zuletzt klappt der
+     * Knopf die Liste wieder zu. Siehe docs/vollbildkarte.md, „Ebenen“ (mod#103).
      */
     private static void ebenen(ClientGameTestContext context, TestInput maus, int k) {
         context.runOnClient(mc -> {
@@ -581,29 +582,30 @@ public final class Bedienung implements FabricClientGameTest {
         if (!context.computeOnClient(mc -> Kartenlage.ebenenOffen(Downloads.weltOrdner()))) {
             throw new AssertionError("Der Knopf „Ebenen“ merkte die offene Liste nicht");
         }
-        double[] s = context.computeOnClient(mc -> {
-            for (Object kind : mc.gui.screen().children()) {
-                if (kind instanceof AbstractWidget w && w.getMessage().getString().startsWith("Liste")) {
-                    return new double[] {w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0};
-                }
-            }
-            throw new AssertionError("Kein Schalter der Ebene in der Liste");
-        });
+        double[] zeile = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zeile("test:liste"));
+        if (zeile == null) {
+            throw new AssertionError("Keine Zeile der Ebene in der Liste");
+        }
+        double[] knopf = {zeile[0], zeile[1]}, ueberschrift = {zeile[2], zeile[3]};
         for (boolean an : new boolean[] {false, true}) {
-            klicke(context, maus, k, s, false);
-            if (ebeneAn(context) != an) {
-                throw new AssertionError("Ein Klick auf den Schalter: Ebene an " + !an + " statt " + an);
+            klicke(context, maus, k, knopf, false);
+            if (ebeneAn(context) != an || !keinsAngeheftet(context)) {
+                throw new AssertionError("Ein Klick auf „An/Aus“: Ebene an " + ebeneAn(context) + " statt " + an
+                        + ", nichts angeheftet " + keinsAngeheftet(context));
             }
         }
+        // Ein Doppelklick auf den Knopf schaltet nur, aus und wieder an; er heftet nichts an (mod#103).
+        klicke(context, maus, k, knopf, true);
+        if (!ebeneAn(context) || !keinsAngeheftet(context)) {
+            throw new AssertionError("Doppelklick auf „An/Aus“: Ebene an " + ebeneAn(context) + ", nichts angeheftet " + keinsAngeheftet(context));
+        }
         for (boolean ganz : new boolean[] {true, false}) {
-            klicke(context, maus, k, s, true);
-            boolean jetzt = context.computeOnClient(mc -> Wegpunkte.INSTANZ.angeheftet("test:liste", "see")
+            klicke(context, maus, k, ueberschrift, true);
+            boolean alles = context.computeOnClient(mc -> Wegpunkte.INSTANZ.angeheftet("test:liste", "see")
                     && Wegpunkte.INSTANZ.nadelAngeheftet("test:liste", "hafen"));
-            boolean keins = context.computeOnClient(mc -> !Wegpunkte.INSTANZ.angeheftet("test:liste", "see")
-                    && !Wegpunkte.INSTANZ.nadelAngeheftet("test:liste", "hafen"));
-            if (!ebeneAn(context) || (ganz ? !jetzt : !keins)) {
-                throw new AssertionError("Doppelklick auf den Schalter: an " + ebeneAn(context) + ", Kreis und Nadel angeheftet "
-                        + jetzt + " statt " + ganz);
+            if (!ebeneAn(context) || (ganz ? !alles : !keinsAngeheftet(context))) {
+                throw new AssertionError("Doppelklick auf die Überschrift: an " + ebeneAn(context) + ", Kreis und Nadel angeheftet "
+                        + alles + " statt " + ganz);
             }
         }
         klicke(context, maus, k, knopf(context, "heroicmap.karte.ebenen_zu"), false);
@@ -612,6 +614,11 @@ public final class Bedienung implements FabricClientGameTest {
         }
         context.runOnClient(mc -> Ebenen.INSTANZ.leeren());
         context.waitTicks(2);
+    }
+
+    private static boolean keinsAngeheftet(ClientGameTestContext context) {
+        return context.computeOnClient(mc -> !Wegpunkte.INSTANZ.angeheftet("test:liste", "see")
+                && !Wegpunkte.INSTANZ.nadelAngeheftet("test:liste", "hafen"));
     }
 
     private static boolean ebeneAn(ClientGameTestContext context) {
