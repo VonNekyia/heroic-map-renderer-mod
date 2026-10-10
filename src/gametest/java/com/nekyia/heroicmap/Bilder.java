@@ -27,6 +27,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -97,6 +98,7 @@ public final class Bilder implements FabricClientGameTest {
             }
             server.runCommand("tp @a 0.5 -30 0.5 0 90");
             spiel.getConnection().waitForChunksRender();
+            leereWelt(context);
             // Die Bilder zeigen die Minimap genordet und ohne Rahmen; gedreht nur in drehen(), Rahmen nur in rahmen().
             context.runOnClient(mc -> {
                 Minimap.INSTANZ.setzeDrehen(false);
@@ -916,20 +918,23 @@ public final class Bilder implements FabricClientGameTest {
     }
 
     /**
-     * Die selbst gezeichnete Karte der Szene, gewählt wie ein Spieler: Karte ohne Satz, „Karte
-     * laden …“, „Selbst“, Ja, Zurück; die Karte zeigt dann die eigene. Auch wenn die Minimap als
-     * beschäftigt gilt, wird um den Spieler alles gezeichnet; dann schreiben und auf der feinsten
-     * Stufe aufnehmen. Siehe docs/selbst.md, „Bild“.
+     * Die selbst gezeichnete Karte der Szene, in dieser Einzelspielerwelt gewählt wie ein Spieler:
+     * Karte ohne Satz, „Karte laden …“, Massstab auf 2 px, „Selbst“, Ja, Zurück; die Karte zeigt dann
+     * die eigene auf ihrer feinsten Stufe. Auch wenn die Minimap als beschäftigt gilt, wird um den
+     * Spieler alles gezeichnet; dann schreiben und aufnehmen. Siehe docs/selbst.md, „Bild“.
      */
     private static void selbst(ClientGameTestContext context) {
-        Path welt = FabricLoader.getInstance().getGameDir().resolve(HeroicMap.ID).resolve("test").resolve("selbst");
+        // Der Ordner der Einzelspielerwelt, wie ihn der Mod nimmt; ohne ihn ginge „Selbst“ nicht (mod#83).
+        Path welt = context.computeOnClient(mc -> Downloads.weltOrdner());
+        if (welt == null || !welt.getParent().getFileName().toString().startsWith("einzelspieler_")) {
+            throw new AssertionError("Ordner der Einzelspielerwelt: " + welt);
+        }
         try {
-            Laden.loesche(welt);
+            Laden.loesche(welt.resolve(Selbst.baum("minecraft:overworld")));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
         context.runOnClient(mc -> {
-            Selbst.INSTANZ.fuerTest(welt);
             // Die Minimap gilt ab der Wahl als beschäftigt: Die eigene Karte bekommt höchstens einen Chunk je Tick.
             Minimap.INSTANZ.fuerTestBeschaeftigt(true);
             Karte ohne = new Karte(null);
@@ -937,6 +942,16 @@ public final class Bilder implements FabricClientGameTest {
             mc.gui.setScreen(new Auswahl(ohne));
         });
         context.waitTicks(2);
+        // Der Umschalter des Massstabs mit der Maus, von 4 px weiter auf 1 und auf 2.
+        int[] knopf = context.computeOnClient(mc -> mc.gui.screen().children().stream()
+                .filter(w -> w instanceof CycleButton<?>).map(w -> (CycleButton<?>) w).findFirst()
+                .map(c -> new int[] {c.getX() + c.getWidth() / 2, c.getY() + c.getHeight() / 2, mc.getWindow().getGuiScale()})
+                .orElseThrow());
+        for (int i = 0; i < 2; i++) {
+            context.getInput().setCursorPos(knopf[0] * knopf[2], knopf[1] * knopf[2]);
+            context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+            context.waitTick();
+        }
         context.clickScreenButton("heroicmap.selbst.knopf");
         context.waitFor(mc -> mc.gui.screen() instanceof ConfirmScreen, 100);
         context.clickScreenButton("gui.yes");
@@ -944,15 +959,20 @@ public final class Bilder implements FabricClientGameTest {
         context.clickScreenButton("gui.back");
         context.waitTicks(2);
         String baum = context.computeOnClient(mc -> mc.gui.screen() instanceof Karte k && k.satz() != null
-                ? k.satz().ordner().getParent().getFileName().toString() : null);
-        if (baum == null || !baum.startsWith(Selbst.PRAEFIX)) {
-            throw new AssertionError("Nach „Selbst“ zeigt die Karte " + baum);
+                ? k.satz().ordner().getParent().getFileName().toString() + " " + k.satz().massstab() + " " + k.satz().stufe() : null);
+        if (baum == null || !baum.startsWith(Selbst.PRAEFIX) || !baum.endsWith(" 2 7")) {
+            throw new AssertionError("Nach „Selbst“ mit 2 px zeigt die Karte " + baum);
         }
         context.runOnClient(mc -> mc.gui.screen().onClose());
 
         context.waitFor(mc -> Selbst.INSTANZ.fertig(mc.player.chunkPosition(), 2), 1200);
         context.runOnClient(mc -> Minimap.INSTANZ.fuerTestBeschaeftigt(false));
         context.computeOnClient(mc -> Selbst.INSTANZ.schreibeJetzt()).join();
+        // Mit 2 px liegt die feinste Stufe auf 7, im Ordner des Massstabs.
+        Path stufe = welt.resolve(Selbst.baum("minecraft:overworld")).resolve("2").resolve("7");
+        if (!Files.isDirectory(stufe)) {
+            throw new AssertionError("Keine Kacheln auf Stufe 7 unter " + stufe);
+        }
         context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(welt, "minecraft:overworld"))));
         context.waitTicks(40);
         Path bild = context.takeScreenshot(TestScreenshotOptions.of("selbst").disableCounterPrefix());
@@ -978,8 +998,24 @@ public final class Bilder implements FabricClientGameTest {
         }
         context.runOnClient(mc -> {
             Minimap.INSTANZ.setzeChunklinien(false);
-            Selbst.INSTANZ.fuerTest(null);
             Selbst.INSTANZ.leeren();
+        });
+    }
+
+    /**
+     * Leert den Ordner dieser Einzelspielerwelt unter heroicmap/ und liest die Wegpunkte neu: Der
+     * Mod merkt sich dort Wegpunkte, Kartenlage und die eigene Karte, sonst brächte ein früherer Lauf
+     * sie mit. Siehe docs/download.md, „Ablage“.
+     */
+    static void leereWelt(ClientGameTestContext context) {
+        context.runOnClient(mc -> {
+            Path welt = Downloads.weltOrdner();
+            try {
+                Laden.loesche(welt);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            Wegpunkte.INSTANZ.lies(welt);
         });
     }
 

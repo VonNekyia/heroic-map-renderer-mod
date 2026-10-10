@@ -70,8 +70,8 @@ Karte jedes Mal beim Spieler, und man musste wieder herauszoomen.
 - **Je Welt** in `karte.properties` im Ordner der Welt, neben
   `wegpunkte.json`, siehe [Download](download.md), „Ablage“; die Schlüssel
   beginnen mit der Dimension des Satzes, etwa `minecraft:overworld.zoom`.
-  Im Einzelspieler gibt es keinen Ordner, dann nur im Speicher, bis zum
-  Verlassen der Welt (`Kartenlage.leeren`).
+  Im Einzelspieler im Ordner nach dem Speicherordner der Welt, siehe
+  [Download](download.md), „Ablage“.
 - **Gelesen** beim Öffnen, einmal, nicht bei jeder neuen Grösse des
   Fensters (`Karte.gestellt`). Die Stufe kommt auf die Stufen des Satzes,
   die Lupe auf 1, 2 oder 4 und nur auf der feinsten Stufe

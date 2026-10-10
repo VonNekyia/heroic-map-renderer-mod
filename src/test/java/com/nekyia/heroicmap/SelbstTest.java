@@ -179,7 +179,7 @@ class SelbstTest {
         // Ein Baum vom Server, nach dem Namen vor dem eigenen (Satz.fuer sortiert): Der eigene geht trotzdem vor.
         satzVomServer(welt.resolve("a-server"), "minecraft:overworld");
         assertEquals("Survival", Satz.fuer(welt, "minecraft:overworld").name());
-        Path baum = Selbst.anlegen(welt, "minecraft:overworld");
+        Path baum = Selbst.anlegen(welt, "minecraft:overworld", Selbst.MASSSTAB);
         Satz satz = Satz.fuer(welt, "minecraft:overworld");
         assertEquals(baum.resolve("4"), satz.ordner());
         assertEquals(Selbst.MAX_ZOOM, satz.stufe());
@@ -202,9 +202,41 @@ class SelbstTest {
     @Test
     void anPrueftDieDimension(@TempDir Path welt) throws Exception {
         // Der Baum der einen Dimension mit der Dimension einer anderen in satz.json: nicht an.
-        Path baum = Selbst.anlegen(welt, "mod:a_b");
+        Path baum = Selbst.anlegen(welt, "mod:a_b", Selbst.MASSSTAB);
         Files.move(baum, welt.resolve(Selbst.baum("mod:a/b")));
         assertFalse(Selbst.an(welt, "mod:a/b"));
+    }
+
+    @Test
+    void massstabJeKarte(@TempDir Path welten) throws Exception {
+        // Wie ein Satz des Servers: map.json für jeden Massstab gleich, die feinste Stufe nach dem Massstab,
+        // Stufe 0 deckt immer 16 384 Blöcke.
+        for (int massstab : Selbst.MASSSTAEBE) {
+            Path welt = welten.resolve(String.valueOf(massstab));
+            Path baum = Selbst.anlegen(welt, "minecraft:overworld", massstab);
+            Satz satz = Satz.fuer(welt, "minecraft:overworld");
+            assertEquals(baum.resolve(String.valueOf(massstab)), satz.ordner());
+            assertEquals(massstab, satz.massstab());
+            assertEquals(Selbst.SCALE, satz.scale());
+            assertEquals(Selbst.MAX_ZOOM, satz.maxZoom());
+            assertEquals(Selbst.MAX_ZOOM - Integer.numberOfTrailingZeros(Selbst.SCALE / massstab), satz.stufe());
+            assertEquals(16_384, Selbst.KACHEL / massstab << satz.stufe());
+        }
+    }
+
+    @Test
+    void chunkLiegtJeMassstabInSeinerKachel(@TempDir Path ordner) throws Exception {
+        // 1 px: 16 × 16 Chunks je Kachel auf Stufe 6, Chunk (17, -1) in Kachel (1, -1) bei (16, 240); 2 px: 8 × 8 auf Stufe 7.
+        Kachelwerk eins = new Kachelwerk(ordner.resolve("1"), 256, 16, 6, 6);
+        eins.lege(17, -1, voll(16, ROT));
+        assertEquals(new Kachelwerk.Kachel(6, 1, -1), schreibe(eins, true).getFirst());
+        int[] kachel = lies(ordner.resolve("1/6/1/-1.png"));
+        assertEquals(ROT, kachel[240 * 256 + 16]);
+        assertEquals(0, kachel[240 * 256 + 15]);
+        Kachelwerk zwei = new Kachelwerk(ordner.resolve("2"), 256, 32, 7, 7);
+        zwei.lege(-9, 8, voll(32, BLAU));
+        assertEquals(new Kachelwerk.Kachel(7, -2, 1), schreibe(zwei, true).getFirst());
+        assertEquals(BLAU, lies(ordner.resolve("2/7/-2/1.png"))[0 * 256 + 7 * 32]);
     }
 
     @Test

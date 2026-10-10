@@ -36,6 +36,15 @@ class AblageTest {
     }
 
     @Test
+    void einzelspielerNachSpeicherordnerUndHash() {
+        // So tief wie eine Welt hinter einer Adresse, damit die Kartenliste sie findet; bereinigt wie ein Host.
+        assertEquals("einzelspieler_neue_welt__2_/welt-0123456789abcdef", Downloads.einzelspieler("Neue Welt (2)", SEED));
+        assertEquals(2, Path.of(Downloads.einzelspieler("Neue Welt (2)", SEED)).getNameCount());
+        // Ein Name, den Windows für ein Gerät hält, ist mit einzelspieler_ davor keiner mehr.
+        assertEquals("einzelspieler_con/welt-0123456789abcdef", Downloads.einzelspieler("CON", SEED));
+    }
+
+    @Test
     void baumUnterDemHashSeinerDimension(@TempDir Path wurzel) {
         // Paper hat einen Seed je Welt: Der Spieler steht in E, der Baum zeigt D.
         Welten welten = new Welten(wurzel.resolve("welten.properties"));

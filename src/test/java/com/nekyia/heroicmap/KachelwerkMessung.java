@@ -4,18 +4,18 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Was {@link Kachelwerk#schreibe} kostet, ms je Durchlauf und Dateien je Stunde, für eine Farm und
- * für einen Flug; nur mit {@code -Pkachelwerk=<datei>}, dorthin gehen die Zahlen.
- * Siehe docs/selbst.md, „Kosten“.
+ * Was {@link Kachelwerk#schreibe} kostet, ms je Durchlauf, Dateien je Stunde und Platz auf der
+ * Platte danach, für eine Farm und einen Flug, je Massstab der eigenen Karte; nur mit
+ * {@code -Pkachelwerk=<datei>}, dorthin gehen die Zahlen. Siehe docs/selbst.md, „Kosten“.
  */
 @EnabledIfSystemProperty(named = "heroicmap.kachelwerk", matches = ".+")
 class KachelwerkMessung {
@@ -28,14 +28,16 @@ class KachelwerkMessung {
     @Test
     void farmUndFlug(@TempDir Path ordner) throws IOException {
         List<String> zeilen = new ArrayList<>();
-        zeilen.add(lauf("Farm", ordner.resolve("farm"), (werk, runde) -> werk.lege(3, 3, chunk(runde))));
-        zeilen.add(lauf("Flug", ordner.resolve("flug"), (werk, runde) -> {
-            for (int r = 0; r < FLUG_REIHEN; r++) {
-                for (int i = 0; i < FLUG_BREITE; i++) {
-                    werk.lege(runde * FLUG_REIHEN + r, i - FLUG_BREITE / 2, chunk(runde * 1000 + r * 31 + i));
+        for (int massstab : Selbst.MASSSTAEBE) {
+            zeilen.add(lauf("Farm", massstab, ordner.resolve("farm-" + massstab), (werk, runde) -> werk.lege(3, 3, chunk(runde, massstab))));
+            zeilen.add(lauf("Flug", massstab, ordner.resolve("flug-" + massstab), (werk, runde) -> {
+                for (int r = 0; r < FLUG_REIHEN; r++) {
+                    for (int i = 0; i < FLUG_BREITE; i++) {
+                        werk.lege(runde * FLUG_REIHEN + r, i - FLUG_BREITE / 2, chunk(runde * 1000 + r * 31 + i, massstab));
+                    }
                 }
-            }
-        }));
+            }));
+        }
         Files.write(Path.of(System.getProperty("heroicmap.kachelwerk")), zeilen);
     }
 
@@ -43,9 +45,10 @@ class KachelwerkMessung {
         void lege(Kachelwerk werk, int runde);
     }
 
-    /** Eine Stunde: je Runde legen und schreiben; gezählt werden die Dateien und die Zeit je Durchlauf. */
-    private static String lauf(String name, Path ordner, Runde runde) throws IOException {
-        Kachelwerk werk = new Kachelwerk(ordner, 256, 64, 0, 8);
+    /** Eine Stunde: je Runde legen und schreiben; gezählt werden die Dateien, die Zeit je Durchlauf und am Ende der Platz. */
+    private static String lauf(String name, int massstab, Path ordner, Runde runde) throws IOException {
+        int stufe = Selbst.MAX_ZOOM - Integer.numberOfTrailingZeros(Selbst.SCALE / massstab);
+        Kachelwerk werk = new Kachelwerk(ordner, Selbst.KACHEL, 16 * massstab, Selbst.MIN_ZOOM, stufe);
         List<Long> fein = new ArrayList<>(), grob = new ArrayList<>();
         int dateien = 0;
         for (int i = 1; i <= RUNDEN; i++) {
@@ -57,8 +60,12 @@ class KachelwerkMessung {
             (alle ? grob : fein).add(System.nanoTime() - start);
             dateien += fertig.size();
         }
-        return String.format(Locale.ROOT, "%s: %d Dateien je Stunde; fein ms Median %.2f p95 %.2f; grob ms Median %.2f p95 %.2f",
-                name, dateien, ms(fein, 0.5), ms(fein, 0.95), ms(grob, 0.5), ms(grob, 0.95));
+        long bytes;
+        try (Stream<Path> alle = Files.walk(ordner)) {
+            bytes = alle.filter(Files::isRegularFile).mapToLong(p -> p.toFile().length()).sum();
+        }
+        return String.format(Locale.ROOT, "%s %d px: %d Dateien je Stunde; fein ms Median %.2f p95 %.2f; grob ms Median %.2f p95 %.2f; Platte %.1f MiB",
+                name, massstab, dateien, ms(fein, 0.5), ms(fein, 0.95), ms(grob, 0.5), ms(grob, 0.95), bytes / 1048576.0);
     }
 
     private static double ms(List<Long> ns, double anteil) {
@@ -66,22 +73,37 @@ class KachelwerkMessung {
         return werte[Math.min(werte.length - 1, (int) (anteil * werte.length))] / 1e6;
     }
 
-    /** Ein Chunk wie Gelände: je Block eine von 16 Farben, 4 × 4 Pixel gleich. */
-    private static int[] chunk(int samen) {
+    /**
+     * Ein Chunk wie Gelände mit {@code massstab} Pixeln je Block: je Block eine von 16 Farben, je Pixel
+     * leicht anders, wie gemittelte Texel; mit einer Farbe je Block käme 4 px zu klein heraus.
+     */
+    private static int[] chunk(int samen, int massstab) {
         Random zufall = new Random(samen);
         int[] farben = new int[16];
         for (int i = 0; i < farben.length; i++) {
-            farben[i] = 0xFF000000 | zufall.nextInt(0x1000000);
+            farben[i] = zufall.nextInt(0x1000000);
         }
-        int[] pixel = new int[64 * 64];
+        int seite = 16 * massstab;
+        int[] pixel = new int[seite * seite];
         for (int bz = 0; bz < 16; bz++) {
             for (int bx = 0; bx < 16; bx++) {
                 int farbe = farben[zufall.nextInt(farben.length)];
-                for (int y = 0; y < 4; y++) {
-                    Arrays.fill(pixel, (bz * 4 + y) * 64 + bx * 4, (bz * 4 + y) * 64 + bx * 4 + 4, farbe);
+                for (int y = 0; y < massstab; y++) {
+                    for (int x = 0; x < massstab; x++) {
+                        pixel[(bz * massstab + y) * seite + bx * massstab + x] = 0xFF000000 | rauschen(farbe, zufall);
+                    }
                 }
             }
         }
         return pixel;
+    }
+
+    /** Die Farbe, je Kanal um bis zu ±8 verschoben. */
+    private static int rauschen(int farbe, Random zufall) {
+        int aus = 0;
+        for (int k = 0; k < 24; k += 8) {
+            aus |= Math.clamp(((farbe >> k) & 0xFF) + zufall.nextInt(17) - 8, 0, 255) << k;
+        }
+        return aus;
     }
 }

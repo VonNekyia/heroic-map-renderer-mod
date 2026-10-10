@@ -31,15 +31,18 @@ import org.slf4j.Logger;
 
 /**
  * Die selbst gezeichnete Karte, die Wahl „Selbst“: Für die Dimension zeichnet ein Worker jeden
- * Chunk, den der Client lädt oder ändert, mit dem Maler der Minimap, 4 Pixel je Block, in die
- * Kacheln eines eigenen Baums; die Vollbildkarte zeigt dann nur diesen. Siehe docs/selbst.md.
+ * Chunk, den der Client lädt oder ändert, mit dem Maler der Minimap, 1, 2 oder 4 Pixel je Block,
+ * in die Kacheln eines eigenen Baums; die Vollbildkarte zeigt dann nur diesen. Siehe docs/selbst.md.
  */
 public final class Selbst {
 
     public static final Selbst INSTANZ = new Selbst();
     private static final Logger LOGGER = LogUtils.getLogger();
-    /** Pixel je Block, Kachelgrösse und Stufen des Baums. */
+    /** {@code scale} in {@code map.json}, Kachelgrösse und Stufen des Baums, für jeden Massstab gleich, wie bei einem Satz des Servers. */
     static final int SCALE = 4, KACHEL = 256, MIN_ZOOM = 0, MAX_ZOOM = 8;
+    /** Die Massstäbe zur Wahl in Pixeln je Block, wie bei den Karten des Servers, und die Vorgabe. Siehe docs/selbst.md, „Massstab“. */
+    static final List<Integer> MASSSTAEBE = List.of(1, 2, 4);
+    static final int MASSSTAB = 4;
     /** So beginnt der Name jedes selbst gezeichneten Baums. */
     static final String PRAEFIX = "selbst-";
     /** Je Chunk höchstens so oft: Wasser fliesst, Getreide wächst. */
@@ -77,8 +80,6 @@ public final class Selbst {
     private Satz satz;
     private boolean gesucht;
     private Licht licht;
-    /** Im Gametest der Ordner der Welt; sonst null, dann gilt {@link Downloads#weltOrdner()}. */
-    private Path testWelt;
 
     private Selbst() {
         worker.scheduleWithFixedDelay(() -> schreibe(false), SCHREIBEN_MS, SCHREIBEN_MS, TimeUnit.MILLISECONDS);
@@ -111,9 +112,13 @@ public final class Selbst {
         return satz != null && dimension.equals(satz.dimension()) && selbst(baum);
     }
 
-    /** Legt den Baum der Dimension in der Welt an, {@code satz.json} und {@code map.json}, und gibt ihn zurück. */
-    static Path anlegen(Path welt, String dimension) throws IOException {
-        Path baum = welt.resolve(baum(dimension)), ordner = baum.resolve(String.valueOf(SCALE));
+    /**
+     * Legt den Baum der Dimension in der Welt an, mit {@code massstab} Pixeln je Block: {@code satz.json}
+     * und {@code map.json} im Ordner des Massstabs; {@code map.json} ist für jeden gleich, die feinste
+     * Stufe sagt {@link Satz#stufe}. Gibt den Baum zurück.
+     */
+    static Path anlegen(Path welt, String dimension, int massstab) throws IOException {
+        Path baum = welt.resolve(baum(dimension)), ordner = baum.resolve(String.valueOf(massstab));
         Files.createDirectories(ordner);
         JsonObject karte = new JsonObject();
         karte.addProperty("tileSize", KACHEL);
@@ -122,16 +127,16 @@ public final class Selbst {
         karte.addProperty("scale", SCALE);
         Files.writeString(ordner.resolve("map.json"), karte.toString(), StandardCharsets.UTF_8);
         Files.writeString(baum.resolve(MARKE), "Heroic Map: selbst gezeichnet, " + dimension + "\n", StandardCharsets.UTF_8);
-        Satz.schreibe(baum, "Selbst", dimension, SCALE);
+        Satz.schreibe(baum, "Selbst", dimension, massstab);
         return baum;
     }
 
-    /** Der Ordner der Welt, in dem der Mod zeichnen kann, oder null, etwa im Einzelspieler; im Gametest der Testordner. */
+    /** Der Ordner der Welt, auf einem Server wie im Einzelspieler, oder null ohne Welt. */
     Path weltOrdner() {
-        return testWelt != null ? testWelt : Downloads.weltOrdner();
+        return Downloads.weltOrdner();
     }
 
-    /** Geht „Selbst“ hier? Nicht ohne Ordner der Welt, etwa im Einzelspieler, und nicht unter einer Decke. */
+    /** Geht „Selbst“ hier? Nicht ohne Ordner der Welt und nicht unter einer Decke. */
     boolean moeglich(Minecraft mc) {
         return weltOrdner() != null && mc.level != null && !mc.level.dimensionType().hasCeiling();
     }
@@ -141,13 +146,22 @@ public final class Selbst {
         return moeglich(mc) && an(weltOrdner(), dimension(mc.level));
     }
 
-    /** Die Wahl „Selbst“: legt den Baum an und zeichnet die geladenen Chunks. Gibt den Fehler zurück, oder null. */
-    Component waehle(Minecraft mc) {
+    /** Der Massstab der eigenen Karte dieser Dimension, oder 0, wenn sie nicht selbst gezeichnet wird. */
+    int massstab(Minecraft mc) {
+        Satz s = an(mc) ? Satz.lies(weltOrdner().resolve(baum(dimension(mc.level)))) : null;
+        return s == null ? 0 : s.massstab();
+    }
+
+    /**
+     * Die Wahl „Selbst“ mit {@code massstab} Pixeln je Block: legt den Baum an und zeichnet die
+     * geladenen Chunks. Gibt den Fehler zurück, oder null.
+     */
+    Component waehle(Minecraft mc, int massstab) {
         if (!moeglich(mc) || mc.player == null) {
             return Component.translatable("heroicmap.selbst.geht_nicht");
         }
         try {
-            anlegen(weltOrdner(), dimension(mc.level));
+            anlegen(weltOrdner(), dimension(mc.level), massstab);
         } catch (IOException e) {
             LOGGER.warn("Heroic Map: Karte zum selbst Zeichnen nicht angelegt", e);
             return Component.translatable("heroicmap.selbst.fehler");
@@ -284,8 +298,8 @@ public final class Selbst {
         if (licht == null) {
             licht = Licht.von(level.dimensionType());
         }
-        ChunkMaler.Auftrag auftrag = ChunkMaler.abziehen(level, chunk, SCALE, Integer.MAX_VALUE, licht, Minimap.INSTANZ.texel(mc), 0);
         Satz s = satz;
+        ChunkMaler.Auftrag auftrag = ChunkMaler.abziehen(level, chunk, s.massstab(), Integer.MAX_VALUE, licht, Minimap.INSTANZ.texel(mc), 0);
         inArbeit.incrementAndGet();
         worker.execute(() -> {
             try {
@@ -304,11 +318,14 @@ public final class Selbst {
         });
     }
 
-    /** Im Worker: das Werk für den Satz; ein anderes schreibt vorher, was es noch hat. */
+    /**
+     * Im Worker: das Werk für den Satz, die feinste Stufe die seines Massstabs; ein anderes schreibt
+     * vorher, was es noch hat.
+     */
     private Kachelwerk werk(Satz s) {
         if (werk == null || !werk.ordner().equals(s.ordner())) {
             schreibe(true);
-            werk = new Kachelwerk(s.ordner(), s.kachel(), 16 * SCALE, s.minZoom(), s.maxZoom());
+            werk = new Kachelwerk(s.ordner(), s.kachel(), 16 * s.massstab(), s.minZoom(), s.stufe());
         }
         return werk;
     }
@@ -367,13 +384,6 @@ public final class Selbst {
             gemeldet = true;
             LOGGER.warn("Heroic Map: Chunk für die selbst gezeichnete Karte nicht gezeichnet oder geschrieben", e);
         }
-    }
-
-    /** Für den Gametest: zeichnet in {@code welt} statt in den Ordner der Welt des Servers. */
-    void fuerTest(Path welt) {
-        testWelt = welt;
-        satz = null;
-        gesucht = false;
     }
 
     /** Für den Gametest: Ist um den Chunk {@code mitte} im Radius {@code r} alles gezeichnet? */

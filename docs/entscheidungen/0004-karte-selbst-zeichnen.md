@@ -12,6 +12,12 @@ code:
 
 # 0004: Die Karte selbst zeichnen
 
+Teilweise abgelöst durch [0014](0014-eigene-karte-mit-massstab.md): Die
+eigene Karte hat 1, 2 oder 4 Pixel je Block zur Wahl, nicht nur 4.
+
+Teilweise abgelöst durch [0015](0015-ordner-fuer-einzelspielerwelten.md):
+Auch im Einzelspieler gibt es einen Ordner der Welt und damit „Selbst“.
+
 ## Anlass
 
 Der User wünscht sich am 08.10. neben den drei Massstäben des Servers eine

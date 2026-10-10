@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -27,6 +28,8 @@ final class Auswahl extends Screen {
     private boolean selbst, selbstAn;
     /** Wurde hier „Selbst“ gewählt? Dann zeigt die Karte beim Zurückgehen die eigene. */
     private boolean gewaehlt;
+    /** Der Massstab für „Selbst“, Pixel je Block. */
+    private int massstab = Selbst.MASSSTAB;
     private String dimension;
     /** Was beim letzten Knopf schiefging, oder null. */
     private Component hinweis;
@@ -43,11 +46,19 @@ final class Auswahl extends Screen {
         selbstAn = Selbst.INSTANZ.an(minecraft);
         dimension = minecraft.level == null ? "" : minecraft.level.dimension().identifier().toString();
         int y = 34;
-        if (selbst) {
-            Button knopf = Button.builder(Component.translatable(selbstAn ? "heroicmap.selbst.an" : "heroicmap.selbst.knopf"),
-                    b -> frageSelbst()).bounds(width / 2 - 45, y + 12, 90, 20).build();
-            knopf.active = !selbstAn;
+        if (selbst && selbstAn) {
+            Button knopf = Button.builder(Component.translatable("heroicmap.selbst.an", Selbst.INSTANZ.massstab(minecraft)), b -> {
+            }).bounds(width / 2 - 60, y + 12, 120, 20).build();
+            knopf.active = false;
             addRenderableWidget(knopf);
+            y += ZEILE;
+        } else if (selbst) {
+            // Der Massstab steht fest, bis die Karte in der Kartenliste gelöscht ist. Siehe docs/selbst.md, „Massstab“.
+            addRenderableWidget(CycleButton.builder((Integer px) -> Component.translatable("heroicmap.menue.px", px), massstab)
+                    .withValues(Selbst.MASSSTAEBE)
+                    .create(width / 2 - 94, y + 12, 90, 20, Component.translatable("heroicmap.selbst.massstab"), (b, px) -> massstab = px));
+            addRenderableWidget(Button.builder(Component.translatable("heroicmap.selbst.knopf"), b -> frageSelbst())
+                    .bounds(width / 2 + 4, y + 12, 90, 20).build());
             y += ZEILE;
         }
         for (Downloads.Baum baum : baeume) {
@@ -107,14 +118,14 @@ final class Auswahl extends Screen {
     private void frageSelbst() {
         minecraft.gui.setScreen(new ConfirmScreen(ja -> {
             if (ja) {
-                hinweis = Selbst.INSTANZ.waehle(minecraft);
+                hinweis = Selbst.INSTANZ.waehle(minecraft, massstab);
                 if (hinweis == null) {
                     gewaehlt = true;
                     hinweis = Component.translatable("heroicmap.selbst.gewaehlt");
                 }
             }
             minecraft.gui.setScreen(this);
-        }, Component.translatable("heroicmap.selbst.titel"), Component.translatable("heroicmap.selbst.frage")));
+        }, Component.translatable("heroicmap.selbst.titel"), Component.translatable("heroicmap.selbst.frage", massstab)));
     }
 
     /** Zurück; kam die Liste von der Karte und wurde „Selbst“ gewählt, öffnet die Karte neu mit der eigenen. */
