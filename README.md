@@ -11,6 +11,19 @@ dem Plugin von [heroic-map-renderer](https://github.com/VonNekyia/heroic-map-ren
 
 ![Minimap bei 4 Pixeln je Block](docs/bilder/minimap-4px.png)
 
+## Gegen andere Karten
+
+Die Vollbildkarte vom Server zeichnet der Renderer: je Million Pixel rund
+6- bis 12-mal schneller als Pl3xMap, Dynmap `flat` und squaremap, mit 1,3
+bis 1,5 statt 3,0 bis 6,4 GiB RAM, dafür mit mehr Platz.[^benchmark]
+
+![Zeit, RAM, Platz und Sekunden je Million Pixel von squaremap, Pl3xMap, Dynmap und Heroic auf Welten mit 3 000, 5 000 und 15 000 Blöcken Seitenlänge](https://raw.githubusercontent.com/VonNekyia/heroic-map-renderer/master/docs/bilder/benchmark.svg)
+
+[^benchmark]: Gemessen am 10.10.2026 mit Heroic v0.3.0 als CLI und als
+    Plugin 0.1.0, spätere Fassungen nicht. Aufbau, Messrechner und alle
+    Zahlen in
+    [Benchmark gegen andere Karten](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/messungen/2026-10-10-benchmark-karten.md).
+
 ## Stand
 
 Im Aufbau: Minimap und Vollbildkarte laufen. Der
