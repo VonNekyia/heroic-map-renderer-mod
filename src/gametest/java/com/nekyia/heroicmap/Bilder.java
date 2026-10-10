@@ -15,7 +15,9 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import javax.imageio.ImageIO;
 import net.fabricmc.loader.api.FabricLoader;
@@ -137,6 +139,9 @@ public final class Bilder implements FabricClientGameTest {
                 "outline":{"color":"#F2E8D0CC","width":1}}
             ]}""";
 
+    /** Die Wegpunkte der eigenen Region in der Szene der Formen, rechts vom Spieler zwischen Kreis und Dreieck der Ebene. */
+    private static final int[][] DREIECK = {{6, -2}, {12, -3}, {8, 1}};
+
     /** Nadeln in drei Grössen, ein Banner und eine Kartenschrift; die Bilder holt der Mod von einem Server im Test. */
     private static final String ORTE = """
             {"v":1,"typ":"ebene","id":"test:orte","version":"1","teil":1,"teile":1,"objects":[
@@ -171,7 +176,7 @@ public final class Bilder implements FabricClientGameTest {
                     throw new AssertionError("Teil der Orte nicht lesbar");
                 }
                 Ebenen.INSTANZ.teil(t);
-                // Eine eigene Region links unten, wie der Spieler sie über das Menü setzt (docs/wegpunkte.md, „Regionen“).
+                // Ein altes Rechteck links unten, wie es bis 0.2.15 das Menü setzte (docs/wegpunkte.md, „Regionen“).
                 Wegpunkte.INSTANZ.setze(Ebenen.UEBERWELT, -14, 2, -5, 8);
                 Minimap.INSTANZ.setzeScale(4);
                 Minimap.INSTANZ.setzeZoom(2);
@@ -502,8 +507,16 @@ public final class Bilder implements FabricClientGameTest {
             }
             Ebenen.INSTANZ.teil(t);
             Wegpunkte.INSTANZ.umschalten("test:formen", "see");
-            Wegpunkte.INSTANZ.setze(Ebenen.UEBERWELT, 12, -2, 14, 0);
-            Wegpunkte.INSTANZ.umschalten(Wegpunkte.INSTANZ.regionen().getLast());
+            // Eine eigene Region aus drei Wegpunkten (docs/wegpunkte.md, „Formen aus Wegpunkten“).
+            List<Integer> ids = new ArrayList<>();
+            for (int[] e : DREIECK) {
+                Wegpunkte.INSTANZ.setze(Ebenen.UEBERWELT, e[0], e[1]);
+                ids.add(Wegpunkte.INSTANZ.punkte().stream().filter(q -> q.x() == e[0] && q.z() == e[1]).findFirst().orElseThrow().id());
+            }
+            if (!Wegpunkte.INSTANZ.setzeForm(ids)) {
+                throw new AssertionError("Region aus drei Wegpunkten nicht gesetzt");
+            }
+            Wegpunkte.INSTANZ.umschalten(Wegpunkte.INSTANZ.eigeneFormen().getLast());
             Minimap.INSTANZ.setzeScale(4);
             Minimap.INSTANZ.setzeZoom(4);
         });
@@ -541,7 +554,11 @@ public final class Bilder implements FabricClientGameTest {
             mc.gui.setScreen(null);
             Ebenen.INSTANZ.leeren();
             Wegpunkte.INSTANZ.umschalten("test:formen", "see");
-            Wegpunkte.INSTANZ.loesche(Wegpunkte.INSTANZ.regionen().getLast());
+            // Die drei Wegpunkte löschen, mit ihnen die Region.
+            for (int[] e : DREIECK) {
+                Wegpunkte.INSTANZ.punkte().stream().filter(q -> q.x() == e[0] && q.z() == e[1]).findFirst()
+                        .ifPresent(Wegpunkte.INSTANZ::loesche);
+            }
             Minimap.INSTANZ.setzeDrehen(false);
             Minimap.INSTANZ.setzeSkin(Skin.OHNE);
             Minimap.INSTANZ.setzeRund(false);

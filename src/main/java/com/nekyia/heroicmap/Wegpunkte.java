@@ -25,8 +25,8 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 
 /**
- * Die Wegpunkte und eigenen Regionen des Spielers und was er auf der Minimap angeheftet hat,
- * Wegpunkte, Mitspieler, eigene Regionen und Flächen, Kreise, Nadeln und Banner vom Server. Je Welt in
+ * Die Wegpunkte, eigenen Formen und alten Rechtecke des Spielers und was er auf der Minimap angeheftet hat,
+ * Wegpunkte, Mitspieler, eigene Formen und Rechtecke und Flächen, Kreise, Nadeln und Banner vom Server. Je Welt in
  * {@code wegpunkte.json} im Ordner der Welt; im Einzelspieler nur im Speicher. Nur der
  * Render-Thread liest und ändert sie. Siehe docs/wegpunkte.md.
  */
@@ -60,7 +60,7 @@ final class Wegpunkte {
     }
 
     /**
-     * Eine eigene Region, das Rechteck der Blöcke von (x0, z0) bis (x1, z1) samt beiden, x0 ≤ x1 und
+     * Ein altes Rechteck aus „Region von hier“, die Blöcke von (x0, z0) bis (x1, z1) samt beiden, x0 ≤ x1 und
      * z0 ≤ z1; {@code farbe} ist ein Index in {@link #FARBEN}. Siehe docs/wegpunkte.md, „Regionen“.
      */
     record Region(String dimension, int x0, int z0, int x1, int z1, int farbe, boolean angeheftet) {
@@ -74,7 +74,7 @@ final class Wegpunkte {
     record Anheftung(String ebene, String id) {
     }
 
-    /** So viele eigene Regionen je Welt; darüber setzt der Mod keine neue. */
+    /** So viele alte Rechtecke je Welt liest der Mod. */
     static final int MAX_REGIONEN = 256;
     /** So viele eigene Formen aus Wegpunkten je Welt, und so viele Punkte je Form. */
     static final int MAX_EIGENE_FORMEN = 256, MAX_PUNKTE_FORM = 64;
@@ -322,6 +322,7 @@ final class Wegpunkte {
     /**
      * Setzt eine Region über die Blöcke von (ax, az) bis (bx, bz) samt beiden, gleich in welcher Folge
      * die Ecken kamen; gibt es sie schon oder schon {@link #MAX_REGIONEN}, bleibt es, wie es ist.
+     * Nur noch Tests setzen so ein altes Rechteck; der Spieler baut Formen aus Wegpunkten.
      */
     void setze(String dimension, int ax, int az, int bx, int bz) {
         Region r = region(dimension, ax, az, bx, bz, farbe(dimension), false);

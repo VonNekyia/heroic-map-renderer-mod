@@ -4,6 +4,12 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.16
+
+- **Your own lines and regions from waypoints,** instead of "Region from here": right-click a waypoint, "Add point", then left-click more waypoints. Click the first one again to close a region, or choose "Finish shape" for a line. Moving a waypoint moves its shapes; deleting it takes it out of them.
+- **Pin your own shapes** with a double-click, lines too; "Delete shape" in the right-click menu removes one and keeps the waypoints.
+- **Old rectangles stay:** regions set with "Region from here" are still drawn and can be pinned and deleted.
+
 ## 0.2.15
 
 - **The full map remembers where it was:** zoom and position per server, world and dimension.
