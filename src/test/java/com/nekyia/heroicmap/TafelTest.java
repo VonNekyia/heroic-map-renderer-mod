@@ -173,6 +173,9 @@ class TafelTest {
         // Weiss gegen Schwarz 21:1, gleich gegen gleich 1:1.
         assertEquals(21, Tafel.kontrast(0xFFFFFFFF, 0xFF000000), 1e-9);
         assertEquals(1, Tafel.kontrast(0xFF101014, Tafel.GRUND), 1e-9);
+        // Die Beispiele aus dem Format, genau: So rechnen Webkarte und Mod gleich.
+        assertEquals(0xFF556177, Tafel.lesbar(0xFF2B3A55));
+        assertEquals(0xCC666666, Tafel.lesbar(0xCC000000));
         // Hell genug bleibt, wie sie ist, mit Alpha.
         assertEquals(0x80E5C33F, Tafel.lesbar(0x80E5C33F));
         // Dunkelblau: so viele Schritte Weiss, bis 3:1 reicht; einer weniger reichte nicht. Das Alpha bleibt.
