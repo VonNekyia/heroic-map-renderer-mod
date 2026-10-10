@@ -105,10 +105,13 @@ die Nachrichten das Plugin:
   Verhältnis 200 zu 320 (`Ebenen.NAME_GROESSE`); die Grossbuchstaben sind so
   rund 6,8 hoch, ihre Oberkante liegt 2 unter dem Fuss. Die Kontur ist 1,25
   Einheiten gewünscht, wie 2 px dort, gekappt wie bei der Kartenschrift auf
-  0,12 der Höhe der Grossbuchstaben, also rund 0,81 (`Formen.kontur`). Der
-  Name reicht 13 Einheiten nach unten (`Ebenen.NAME_UNTEN`). Höchstens 500
-  Namen je Ansicht und Frame, je neun Texte (`Ebenen.MAX_NAMEN`); die
-  übrigen fehlen, das Log sagt es einmal. Das
+  0,12 der Höhe der Grossbuchstaben, also rund 0,81 (`Formen.kontur`). Ein
+  Banner trägt seinen Namen im Bogen, siehe „Banner“; eine Nadel gerade.
+  Der gerade Name reicht 13 Einheiten nach unten (`Ebenen.NAME_UNTEN`).
+  Höchstens 500 Namen je Ansicht und Frame, je
+  neun Texte; ein Name im Bogen zählt je Zeichen einen, denn er zeichnet je
+  Zeichen neun (`Ebenen.MAX_NAMEN`). Die übrigen fehlen, das Log sagt es
+  einmal. Das
   Format sagt: unter dem Fuss, Kartenschrift, feste Grösse, siehe
   [Ebenen](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/ebenen.md)
   und
@@ -130,9 +133,11 @@ die Nachrichten das Plugin:
 - **Vollbildkarte:** alle Nadeln und Banner, der Fuss auf dem Raster der
   Kacheln wie die Wegpunkte. Unter dem Fuss einer angehefteten Nadel steht
   ein Punkt, 4 Einheiten breit und 2 hoch, zwischen Fuss und Name, in der
-  wechselnden Farbe des Rings der Wegpunkte (`Karte.PUNKT`). Gezeichnet wird, was den Schirm berühren kann: 16 Einheiten
-  zur Seite und 64 nach oben, so viel wie das grösste Banner, der Name 13
-  nach unten und halb so weit zur Seite, wie er samt Kontur breit ist.
+  wechselnden Farbe des Rings der Wegpunkte (`Karte.PUNKT`). Gezeichnet wird, was den Schirm berühren kann: der Kasten
+  ohne Holen (`Ebenen.kastenOhneHolen`), das grösste Bild, 32 × 64, und
+  der Name, gerade halb so weit zur Seite, wie er samt Kontur breit ist,
+  im Bogen sein grober Kasten. Vorher fällt weg, was mehr als 32 Einheiten
+  über dem oberen Rand steht (`Ebenen.UNTEN_HOECHSTENS`).
 - **Reihenfolge:** über allen Formen und aller Kartenschrift jeder Ebene,
   unter Wegpunkten, Mitspielern und dem eigenen Kopf; die Ebenen nach
   `order`, die höhere oben, bei Gleichstand die kleinere `id` oben; in
@@ -144,11 +149,14 @@ die Nachrichten das Plugin:
 ## Banner
 
 Ein Ort als Bild (`banner`), etwa eine Stadt mit dem Banner ihrer Nation
-(`Ebenen.Banner`).
+(`Ebenen.Banner`). Mit einem Entwurf zeichnet der Renderer das Banner selbst,
+und der Mod holt das Sprite, siehe „Sprites aus Entwürfen“.
 
 - **Gelesen** wie eine Nadel: `at`, `dimension`, `name` bis 64 Zeichen.
   `image` ist ein Feld wie bei den Symbolen, `images/<Name>.png` oder
-  `.webp`. Ohne gültiges Feld fällt das Banner weg, und das Log nennt es,
+  `.webp`. `design` gilt als Teil einer Kennung, `capital` nur mit ihm.
+  Mit `design` ist `image` nur Ersatz; ein ungültiges zählt dann nicht.
+  Ohne `design` und ohne gültiges Feld fällt das Banner weg, und das Log nennt es,
   wie das Format verlangt: einmal je Ebene und `version`, zusammen mit
   den verworfenen Formen. `y` braucht der Mod
   nicht.
@@ -170,14 +178,84 @@ Ein Ort als Bild (`banner`), etwa eine Stadt mit dem Banner ihrer Nation
     Einheit, also 40 Einheiten hoch. Der User fand das zu gross (mod#71).
   - Der Fuss liegt in der Mitte der Unterkante, ⌊Breite / 2⌋ Pixel des
     Schirms rechts der linken Kante, wie bei der Nadel. Darunter der Name
-    wie bei der Nadel. Solange das Bild lädt oder wenn es fehlt, fehlt das
-    Banner samt Namen.
+    im Bogen, siehe unten. Solange das Bild lädt oder wenn es fehlt, fehlt
+    das Banner samt Namen.
   - **Grösse zur Wahl:** 32 ist die Vorgabe, bis der User wählt; 24 steht
     daneben. Bei GS 2 zeigen beide ein Bild von 40 Pixeln gleich gross,
     denn zwischen 40 und 80 Pixeln gibt es keine saubere Grösse; ab GS 3
     sind sie verschieden.
 
   ![Das Banner des Gametests wie bis 0.2.12, höchstens 32 und höchstens 24 Einheiten hoch, links bei GUI-Massstab 2, rechts bei 3](bilder/banner-groessen.png)
+- **Name im Bogen** unter dem Fuss, nach unten gewölbt, so will es der
+  User für Webkarte und Mod gleich (renderer#262), Masse aus dem Format,
+  siehe
+  [Ebenen](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/ebenen.md),
+  „Nadeln und Banner“, und
+  [0102](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entscheidungen/0102-name-im-bogen.md).
+  In Einheiten der Oberfläche, `s` = 10 die Schriftgrösse, `h` die Höhe
+  des Bilds, wie gezeichnet (`Ebenen.bogen`):
+  - **Sperrung** `0,125 · s` = 1,25 zwischen den Zeichen, wie 2 px auf der
+    Webkarte (`Ebenen.BOGEN_SPERRUNG`).
+  - **Radius** `max(2 · h, L / (2π / 3))`, `L` die Vorschübe aller Zeichen
+    und die Sperrung dazwischen: Ein langer Name öffnet den Bogen bis 120°,
+    darüber wird er flacher (`Ebenen.radius`).
+  - **Lage:** der tiefste Punkt `0,75 · s` = 7,5 unter dem Fuss, die Mitte
+    des Namens darauf. Jedes Zeichen steht aufrecht zum Bogen, die Mitte
+    seiner Grossbuchstaben auf dem Bogen, wie bei der Kartenschrift.
+  - **Gezeichnet** Zeichen für Zeichen gedreht, wie die Kartenschrift:
+    erst die Kontur aller Zeichen als acht versetzte Kopien, dann die
+    Zeichen (`Ebenen.bogenName`). Die Zeichen und ihre Vorschübe misst der
+    Mod einmal je Name und Schrift (`Ebenen.zeichen`).
+  - **Schräger Satz:** Der Mod zeichnet Banner nur aus `image`, der Winkel
+    ist also 0, wie das Format es dafür sagt.
+
+  ![Der Name im Bogen auf der Webkarte von oben, „Hafenstadt“, und im Mod auf der Vollbildkarte, „Westmark“, je mittig unter dem Fuss](bilder/name-bogen-vergleich.png)
+  - **Getestet** am Bild im Gametest `Bilder` (`Bilder.nameImBogen`): Die
+    Pixel in der Schriftfarbe um den Fuss von „Westmark“ liegen waagrecht
+    mittig, der tiefste darunter, die Enden höher; dazu
+    `EbenenTest.nameImBogenNachDemFormat`.
+  - **Kasten** für Treffer und Wegschneiden: je Zeichen sein Rechteck samt
+    Kontur, gedreht, 0,55 · s über und unter der Mitte (`Ebenen.bogenKasten`).
+    Der grobe Kasten ohne Bild gilt für jeden Radius: Die Mitte eines
+    Zeichens liegt waagrecht höchstens `L / 2` vom tiefsten Punkt und
+    höchstens so hoch über ihm wie das Ende des engsten Bogens, jede Ecke
+    höchstens die halbe Diagonale ihres Zeichens von seiner Mitte
+    (`Ebenen.grob`). Der engste und der weiteste Bogen allein reichen
+    nicht, denn mit dem Radius ändert sich auch die Drehung der Zeichen.
+- **Sprites aus Entwürfen** nach 0100 des Renderers, siehe
+  [Ebenen](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/ebenen.md),
+  „Banner“, „Sprites“ (`Symbole.sprite`):
+  - **Welcher Satz:** immer `oben`, auf Minimap und Vollbildkarte; der Mod
+    zeigt nur genordete Bäume von oben, siehe [Projektion](projektion.md).
+    Die Regel je Baum der Webkarte kommt erst mit einer schrägen
+    Projektion im Mod, entschieden vom Reviewer.
+  - **Geholt** wie die Bilder, siehe „Symbole“: über den Server ohne Token,
+    erst wenn das Banner gezeichnet wird, mit derselben Prüfung der
+    Adresse, denselben Neuversuchen und gegen dasselbe Budget der Ebene.
+    Das Sprite unter
+    `<Adresse>/layers/<modname>/banner/<teil>/oben/<entwurf>.png`, mit
+    `capital` unter `oben/krone/`, höchstens 32 × 64; je Ebene und `version`
+    einmal `oben/satz.json`, höchstens 4 KiB (`Symbole.spriteUri`,
+    `Symbole.satzUri`, `Symbole.MAX_SATZ`).
+  - **`satz.json`:** `foot` zwei ganze Zahlen von 0 bis 32 und 64, `angle`
+    eine endliche Zahl, ohne sie 0 (`Symbole.spritesatz`). Liegt der Fuss
+    nicht auf dem Sprite, gilt das Sprite nicht, und das Log sagt es
+    einmal je Ebene und `version`. `angle` ist im Satz `oben` 0; der Mod
+    liest ihn, dreht aber nichts.
+  - **Gezeichnet** Pixel auf Pixel mit demselben Faktor wie ein Bild, die
+    linke obere Ecke `foot` Pixel des Sprites links über dem Ort. Der Name
+    im Bogen nimmt die gezeichnete Höhe der Leinwand als `h`; mit und
+    ohne Krone ist die Leinwand dieselbe, also auch der Bogen. Kasten wie
+    gezeichnet (`Ebenen.spriteKasten`); der grobe Kasten nimmt 32 × 64 zu
+    jeder Seite des Fusses (`Ebenen.grob`).
+  - **Ersatz:** Solange das Sprite oder `satz.json` lädt, fehlt oder nicht
+    taugt, zeichnet der Mod `image`, wie das Format sagt; ohne `image`
+    nichts.
+  - **Getestet** im Gametest `Bilder`: „Südburg“ mit Entwurf und Krone,
+    ohne Bild; das Sprite mit Krone liegt am Bildschirmfoto mit seiner
+    linken oberen Ecke `foot` links über dem Ort (`Bilder.spriteUmDenFuss`).
+  - **Geheime Ebenen** haben keine Sprites unter `layers/`; ihre kommen
+    über den Kanal, siehe „Geheime Banner“.
 - **Nah durchsichtig** auf der Minimap: Ein angeheftetes Banner ist ab 24
   Blöcken waagrechtem Abstand vom Spieler deckend und wird darunter linear
   durchsichtiger, bis 35 % bei 8 Blöcken und näher (`Minimap.NAH_AB`,
@@ -191,6 +269,41 @@ Ein Ort als Bild (`banner`), etwa eine Stadt mit dem Banner ihrer Nation
 ![Die Minimap bei Zoom 2: ohne Angeheftetes, mit angehefteter Nadel und angeheftetem Banner, und nah am Banner, das dort durchsichtig wird; Szene `orte` des Gametests](bilder/orte.png)
 
 ![Alle Orte auf der Vollbildkarte, die angehefteten mit dem Punkt unter dem Fuss](bilder/orte-karte.png)
+
+## Geheime Banner
+
+Banner einer Ebene mit `permission` sieht nur, wer die Ebene sehen darf;
+ihre Sprites liegen nicht unter `layers/`, sondern kommen über den Kanal,
+Schritt 2b zu 0100 des Renderers, Format mit dem Backend abgestimmt, siehe
+[Plugin](https://github.com/VonNekyia/heroic-map-renderer-plugin/blob/main/docs/ebenen.md),
+„Banner im Mod“ (`Geheimbanner`).
+
+- **Geheim** ist eine Ebene mit `"secret": true` in ihrem Eintrag der Liste
+  `ebenen` (`Ebenen.geheim`); ohne das Feld ist sie öffentlich.
+- **Frage** `{"v":1,"typ":"banner","ebene","version","entwurf","krone"}`,
+  `entwurf` aus `design`, `krone` aus `capital` (`Kanal.banner`). Erst wenn
+  das Banner gezeichnet oder getroffen wird, je Schlüssel aus Ebene,
+  `version`, Entwurf und Krone einmal je Verbindung. Höchstens 8 offen und
+  20 je Sekunde (`Geheimbanner.MAX_OFFEN`, `Geheimbanner.MAX_JE_SEKUNDE`),
+  so viele, wie das Plugin nimmt; darüber fragt es beim nächsten Zeichnen.
+- **Antwort** mit denselben Feldern, `satz` wie `satz.json` und `png` als
+  Base64, gelesen auf dem Thread des Netzes (`Geheimbanner.Antwort.lies`):
+  höchstens 342 KiB Base64, ein PNG bis 32 × 64. Gezeichnet wie ein
+  öffentliches Sprite, siehe „Banner“, „Sprites aus Entwürfen“.
+- **Nicht wieder gefragt** wird für diese `version`, wenn die Antwort ohne
+  `png` kommt, das PNG nicht taugt, der Fuss nicht auf dem Sprite liegt
+  oder in 10 s keine kommt (`Geheimbanner.FRIST_MS`); ohne Rechte schweigt
+  das Plugin. Eine neue `version` der Ebene gibt ihre Sprites frei und
+  fragt neu, ebenso eine neue Verbindung.
+- **Bis die Antwort da ist,** zeigt der Mod nichts; ein Bild gibt es bei
+  geheimen Bannern nicht.
+- **Nur Antworten auf offene Fragen** nimmt der Mod; eine andere verwirft
+  er.
+- **Getestet:** `GeheimbannerTest` (einmal fragen, 8 offen, 20 je Sekunde,
+  ohne Antwort oder `png` nicht wieder, neue `version`, Lesen) und
+  `KanalTest.bannerDurchDenCodec`; im Gametest `Bilder` ein Banner „Wacht“
+  einer geheimen Ebene, das fragt; der Test legt die Antwort ab, und am
+  Bildschirmfoto steht das Sprite um seinen Fuss (`Bilder.geheimUmDenFuss`).
 
 ## Symbole
 

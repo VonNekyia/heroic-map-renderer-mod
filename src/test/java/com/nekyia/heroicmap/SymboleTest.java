@@ -487,4 +487,79 @@ class SymboleTest {
         s.warte();
         assertEquals(List.of(PFAD + "warte.png"), new ArrayList<>(anfragen));
     }
+
+    private static final String SPRITES = "/tiles/layers/beispiel/banner/staedte/oben/";
+
+    @Test
+    void adressenDerSprites() {
+        assertEquals(URI.create(basis + "/layers/beispiel/banner/staedte/oben/nordreich.png"),
+                Symbole.spriteUri(basis, "beispiel:staedte", "nordreich", false));
+        assertEquals(URI.create(basis + "/layers/beispiel/banner/staedte/oben/krone/nordreich.png"),
+                Symbole.spriteUri(basis, "beispiel:staedte", "nordreich", true));
+        assertEquals(URI.create(basis + "/layers/beispiel/banner/staedte/oben/satz.json"), Symbole.satzUri(basis, "beispiel:staedte"));
+        // Ein Teil, der keiner einer Kennung ist, gibt keine Adresse: weder Entwurf noch Ebene.
+        assertNull(Symbole.spriteUri(basis, "beispiel:staedte", "../geheim", false));
+        assertNull(Symbole.spriteUri(basis, "beispiel:staedte", ".nordreich", false));
+        assertNull(Symbole.spriteUri(basis, "beispiel:staedte", "nordreich.", false));
+        assertNull(Symbole.spriteUri(basis, "beispiel:staedte", "lpt1", false));
+        assertNull(Symbole.satzUri(basis, "beispiel:../x"));
+        assertNull(Symbole.satzUri(null, "beispiel:staedte"));
+    }
+
+    @Test
+    void satzJsonLesen() {
+        assertEquals(new Symbole.Spritesatz(10, 46, 0), Symbole.spritesatz("{\"foot\":[10,46],\"angle\":0}"));
+        assertEquals(new Symbole.Spritesatz(12, 52, 26.56505117707799),
+                Symbole.spritesatz("{\"foot\":[12,52],\"angle\":26.56505117707799}"));
+        // Ohne angle 0; der Fuss darf auf der Kante liegen, bis zur grössten Leinwand.
+        assertEquals(new Symbole.Spritesatz(32, 64, 0), Symbole.spritesatz("{\"foot\":[32,64]}"));
+        // Kein Paar ganzer Zahlen ab 0 bis 32 × 64, kein Objekt, kein Zahlwert: nichts.
+        for (String falsch : new String[] {"{\"foot\":[10.5,46]}", "{\"foot\":[-1,46]}", "{\"foot\":[33,10]}", "{\"foot\":[10]}",
+            "{\"angle\":0}", "{\"foot\":[1,2],\"angle\":\"schräg\"}", "[]", "kein json"}) {
+            assertNull(Symbole.spritesatz(falsch), falsch);
+        }
+    }
+
+    @Test
+    void spriteMitFussAusSatzJson() throws Exception {
+        dateien.put(SPRITES + "satz.json", "{\"foot\":[10,46],\"angle\":0}".getBytes(StandardCharsets.UTF_8));
+        dateien.put(SPRITES + "nordreich.png", png(20, 46));
+        dateien.put(SPRITES + "krone/nordreich.png", png(20, 46));
+        Aufbau a = aufbau();
+        Symbole s = a.symbole();
+        // Beim ersten Fragen holt er satz.json und das Sprite; bis beide da sind, null.
+        assertNull(s.sprite("beispiel:staedte", "v1", "nordreich", false));
+        s.warte();
+        Symbole.Sprite ohne = s.sprite("beispiel:staedte", "v1", "nordreich", false);
+        assertEquals(10, ohne.fussX());
+        assertEquals(46, ohne.fussY());
+        assertEquals(20, ohne.textur().breite());
+        // Die Krone ist ein eigenes Sprite; satz.json holt er je Ebene und version nur einmal.
+        assertNull(s.sprite("beispiel:staedte", "v1", "nordreich", true));
+        s.warte();
+        assertEquals(46, s.sprite("beispiel:staedte", "v1", "nordreich", true).textur().hoehe());
+        assertEquals(1, anfragen.stream().filter(x -> x.endsWith("satz.json")).count());
+        assertEquals(List.of(SPRITES + "satz.json", SPRITES + "nordreich.png", SPRITES + "krone/nordreich.png"), new ArrayList<>(anfragen));
+    }
+
+    @Test
+    void spriteOhneSatzOderMitFussDanebenNimmtDasBild() throws Exception {
+        dateien.put(SPRITES + "nordreich.png", png(20, 46));
+        Aufbau a = aufbau();
+        Symbole s = a.symbole();
+        // Ohne satz.json kein Sprite; die Ansicht nimmt dann das Bild.
+        s.sprite("beispiel:staedte", "v1", "nordreich", false);
+        s.warte();
+        assertNull(s.sprite("beispiel:staedte", "v1", "nordreich", false));
+        // Ein Fuss ausserhalb des Sprites: auch kein Sprite.
+        dateien.put(SPRITES + "satz.json", "{\"foot\":[21,46]}".getBytes(StandardCharsets.UTF_8));
+        s.sprite("beispiel:staedte", "v2", "nordreich", false);
+        s.warte();
+        assertNull(s.sprite("beispiel:staedte", "v2", "nordreich", false));
+        // Mit dem Fuss auf der Kante gilt es, in einer neuen version.
+        dateien.put(SPRITES + "satz.json", "{\"foot\":[20,46]}".getBytes(StandardCharsets.UTF_8));
+        s.sprite("beispiel:staedte", "v3", "nordreich", false);
+        s.warte();
+        assertEquals(20, s.sprite("beispiel:staedte", "v3", "nordreich", false).fussX());
+    }
 }

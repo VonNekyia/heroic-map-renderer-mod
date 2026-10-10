@@ -30,7 +30,9 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
+import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.storage.LevelResource;
 import org.slf4j.Logger;
 
 /**
@@ -516,15 +518,28 @@ final class Downloads {
     }
 
     /**
-     * Der Ordner der Welt, in der der Spieler steht, nach der Wahl Ablage, oder null im
-     * Einzelspieler. Siehe docs/download.md, „Ablage“.
+     * Der Ordner der Welt, in der der Spieler steht: auf einem Server nach der Wahl Ablage, im
+     * Einzelspieler nach dem Speicherordner der Welt; null ohne Welt. Siehe docs/download.md, „Ablage“.
      */
     static Path weltOrdner() {
         Minecraft mc = Minecraft.getInstance();
         ServerData server = server();
         ClientLevel level = mc.level;
-        return server == null || level == null ? null
-                : wurzel().resolve(weltOrdner(Minimap.INSTANZ.ablage(), server.ip, level.getBiomeManager().biomeZoomSeed));
+        IntegratedServer intern = mc.getSingleplayerServer();
+        if (level == null || server == null && intern == null) {
+            return null;
+        }
+        long seed = level.getBiomeManager().biomeZoomSeed;
+        return wurzel().resolve(server != null ? weltOrdner(Minimap.INSTANZ.ablage(), server.ip, seed)
+                : einzelspieler(intern.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize().getFileName().toString(), seed));
+    }
+
+    /**
+     * Der Pfad einer Einzelspielerwelt unter {@code heroicmap/}: {@code einzelspieler_<speicherordner>/welt-<hash>},
+     * so tief wie eine Welt hinter einer Adresse, damit die Kartenliste sie findet.
+     */
+    static String einzelspieler(String speicherordner, long seed) {
+        return name("einzelspieler_" + speicherordner) + "/welt-" + HexFormat.of().toHexDigits(seed);
     }
 
     /**

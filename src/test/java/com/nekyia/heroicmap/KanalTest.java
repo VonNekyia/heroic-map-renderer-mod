@@ -58,6 +58,21 @@ class KanalTest {
     }
 
     @Test
+    void bannerDurchDenCodec() {
+        // Die Frage wie in der Doku des Plugins: Ebene, version, Entwurf, Krone.
+        JsonObject frage = JsonParser.parseString(Kanal.banner(new Geheimbanner.Schluessel("b:geheim", "v5", "nordreich", true))).getAsJsonObject();
+        assertEquals("{\"v\":1,\"typ\":\"banner\",\"ebene\":\"b:geheim\",\"version\":\"v5\",\"entwurf\":\"nordreich\",\"krone\":true}",
+                frage.toString());
+        // Die Antwort liest schon der Thread des Netzes; ohne png ist sie eine ohne Sprite.
+        String text = "{\"v\":1,\"typ\":\"banner\",\"jetzt\":1,\"ebene\":\"b:geheim\",\"version\":\"v5\",\"entwurf\":\"nordreich\",\"krone\":true}";
+        Kanal k = Kanal.CODEC.decode(new FriendlyByteBuf(Unpooled.wrappedBuffer(text.getBytes(StandardCharsets.UTF_8))));
+        assertEquals("", k.json());
+        assertNull(k.tafel());
+        assertEquals(new Geheimbanner.Schluessel("b:geheim", "v5", "nordreich", true), k.banner().schluessel());
+        assertNull(k.banner().bild());
+    }
+
+    @Test
     void anfrageMitNeu() {
         JsonObject json = JsonParser.parseString(Kanal.anfrage("welt", 2, "voll", true)).getAsJsonObject();
         assertTrue(json.get("neu").getAsBoolean());

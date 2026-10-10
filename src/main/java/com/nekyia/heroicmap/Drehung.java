@@ -55,6 +55,11 @@ final class Drehung {
             return py - (x - cx) * sin + (y - cy) * cos;
         }
 
+        /** Um wie viel das Bild dreht, in Bogenmass, im Sinn von {@link #x} und {@link #y}. */
+        double winkel() {
+            return Math.atan2(sin, cos);
+        }
+
         /** Eine Richtung (dx, dy) gedreht, x; ohne Verschiebung. */
         double richtungX(double dx, double dy) {
             return dx * cos - dy * sin;

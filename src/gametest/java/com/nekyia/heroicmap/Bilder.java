@@ -12,6 +12,7 @@ import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -27,6 +28,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -97,6 +99,7 @@ public final class Bilder implements FabricClientGameTest {
             }
             server.runCommand("tp @a 0.5 -30 0.5 0 90");
             spiel.getConnection().waitForChunksRender();
+            leereWelt(context);
             // Die Bilder zeigen die Minimap genordet und ohne Rahmen; gedreht nur in drehen(), Rahmen nur in rahmen().
             context.runOnClient(mc -> {
                 Minimap.INSTANZ.setzeDrehen(false);
@@ -118,6 +121,7 @@ public final class Bilder implements FabricClientGameTest {
             rahmen(context);
             umriss(context);
             drehen(context, server);
+            fenster(context);
             vollbildkarte(context);
             formen(context, server);
             orte(context, server);
@@ -144,7 +148,10 @@ public final class Bilder implements FabricClientGameTest {
     /** Die Wegpunkte der eigenen Region in der Szene der Formen, rechts vom Spieler zwischen Kreis und Dreieck der Ebene. */
     private static final int[][] DREIECK = {{6, -2}, {12, -3}, {8, 1}};
 
-    /** Nadeln in drei Grössen, ein Banner und eine Kartenschrift; die Bilder holt der Mod von einem Server im Test. */
+    /**
+     * Nadeln in drei Grössen, ein Banner mit Bild, eins mit Entwurf und Krone ohne Bild, und eine Kartenschrift; Bilder
+     * und Sprites holt der Mod von einem Server im Test.
+     */
     private static final String ORTE = """
             {"v":1,"typ":"ebene","id":"test:orte","version":"1","teil":1,"teile":1,"objects":[
               {"type":"pin","id":"nordhafen","at":[0.5,0.5],"size":"large","name":"Nordhafen","color":"#3A6EA5",
@@ -152,6 +159,7 @@ public final class Bilder implements FabricClientGameTest {
               {"type":"pin","at":[-9,-7],"name":"Eichenfeld","symbol":{"medium":"images/anker-m.png"}},
               {"type":"pin","at":[9,9],"size":"small","name":"Furt"},
               {"type":"banner","id":"westmark","at":[10,-9],"name":"Westmark","image":"images/banner.png"},
+              {"type":"banner","id":"suedburg","at":[-20,12],"name":"Südburg","design":"suedreich","capital":true},
               {"type":"label","text":"Nordland","path":[[-14,-12],[14,-14]],"size":3,"outline":{"width":1}}
             ]}""";
 
@@ -165,19 +173,26 @@ public final class Bilder implements FabricClientGameTest {
      */
     private static void orte(ClientGameTestContext context, TestServerContext server) {
         HttpServer bilder = bilderServer(Map.of("anker.png", bild(16, 16, ANKER), "anker-m.png", bild(9, 9, ANKER), "banner.png",
-                bild(21, 40, BANNER)));
+                bild(21, 40, BANNER)), Map.of("orte/oben/satz.json", SATZ.getBytes(StandardCharsets.UTF_8),
+                "orte/oben/suedreich.png", bild(SPRITE_BREITE, SPRITE_HOEHE, OHNE_KRONE),
+                "orte/oben/krone/suedreich.png", bild(SPRITE_BREITE, SPRITE_HOEHE, MIT_KRONE)));
+        // Der Server im Test hört den Kanal nicht: Der Test lässt die Frage nach dem geheimen Banner als gesendet gelten.
+        List<Geheimbanner.Schluessel> geheimGefragt = new ArrayList<>();
+        Geheimbanner.fragen = geheimGefragt::add;
         try {
             context.runOnClient(mc -> {
                 Ebenen.INSTANZ.empfange(JsonParser.parseString("""
                         {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:orte","name":{"de":"Orte","en":"Places"},
-                          "visible":true,"order":1,"version":"1"}]}""").getAsJsonObject());
+                          "visible":true,"order":1,"version":"1"},{"id":"test:geheim","name":{"de":"Geheim","en":"Secret"},
+                          "visible":true,"order":2,"version":"1","secret":true}]}""").getAsJsonObject());
                 Symbole.INSTANZ.basis(JsonParser.parseString("{\"url\":\"http://127.0.0.1:" + bilder.getAddress().getPort() + "/tiles\"}")
                         .getAsJsonObject(), InetAddress.getLoopbackAddress());
                 Ebenen.Teil t = Ebenen.Teil.lies(ORTE);
-                if (t == null || t.nadeln().size() != 4) {
+                if (t == null || t.nadeln().size() != 5) {
                     throw new AssertionError("Teil der Orte nicht lesbar");
                 }
                 Ebenen.INSTANZ.teil(t);
+                Ebenen.INSTANZ.teil(Ebenen.Teil.lies(GEHEIM));
                 // Ein altes Rechteck links unten, wie es bis 0.2.15 das Menü setzte (docs/wegpunkte.md, „Regionen“).
                 Wegpunkte.INSTANZ.setze(Ebenen.UEBERWELT, -14, 2, -5, 8);
                 Minimap.INSTANZ.setzeScale(4);
@@ -200,8 +215,17 @@ public final class Bilder implements FabricClientGameTest {
             context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - 0.5) < 0.1 && Minimap.INSTANZ.fertig(), 600);
             Path baum = testsatz();
             context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
-            context.waitTicks(40);
+            context.waitTicks(20);
+            // Das geheime Banner fragte beim Zeichnen; die Antwort des Plugins legt der Test selbst ab.
+            if (!context.computeOnClient(mc -> geheimGefragt.contains(new Geheimbanner.Schluessel("test:geheim", "1", "geheimreich", false)))) {
+                throw new AssertionError("Das geheime Banner fragte nicht über den Kanal: " + geheimGefragt);
+            }
+            context.runOnClient(mc -> Geheimbanner.INSTANZ.antwort(Geheimbanner.Antwort.lies(geheimeAntwort())));
+            context.waitTicks(20);
             Path karte = context.takeScreenshot(TestScreenshotOptions.of("orte-karte").disableCounterPrefix());
+            nameImBogen(context, karte);
+            spriteUmDenFuss(context, karte);
+            geheimUmDenFuss(context, karte);
             gleichGrossAufZweiStufen(context, karte);
             // Die Option tauscht die Schriften ohne Neuladen; die gespeicherte Kartenschrift baut neu.
             int vorher = context.computeOnClient(mc -> Formen.generation);
@@ -236,6 +260,8 @@ public final class Bilder implements FabricClientGameTest {
             });
         } finally {
             bilder.stop(0);
+            Geheimbanner.fragen = Kanal::frageBanner;
+            context.runOnClient(mc -> Geheimbanner.INSTANZ.leeren());
         }
     }
 
@@ -341,6 +367,147 @@ public final class Bilder implements FabricClientGameTest {
                 }
                 g.pose().popMatrix();
             }
+        }
+    }
+
+    /**
+     * Am Bildschirmfoto der Vollbildkarte: Der Name von „Westmark“ liegt im Bogen waagrecht mittig unter dem Fuss des
+     * Banners, sein tiefster Punkt unter dem Fuss, die Enden höher. Gezählt werden die Pixel in der Schriftfarbe in einem
+     * Band von 4 Einheiten über bis 18 unter dem Fuss und 36 zu beiden Seiten; „Nordland“ endet darüber, „Eichenfeld“
+     * liegt links daneben. Siehe docs/ebenen.md, „Banner“.
+     */
+    private static void nameImBogen(ClientGameTestContext context, Path bild) {
+        int gs = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+        float[] fuss = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).fuss(Ebenen.INSTANZ.nadeln("test:orte").stream()
+                .filter(o -> "westmark".equals(o.id())).findFirst().orElseThrow()));
+        BufferedImage b;
+        try {
+            b = ImageIO.read(bild.toFile());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        int fx = Math.round(fuss[0] * gs), fy = Math.round(fuss[1] * gs), n = 0;
+        int links = Integer.MAX_VALUE, rechts = Integer.MIN_VALUE, unten = Integer.MIN_VALUE, linksY = 0, rechtsY = 0;
+        for (int y = Math.max(0, fy - 4 * gs); y <= Math.min(b.getHeight() - 1, fy + 18 * gs); y++) {
+            for (int x = Math.max(0, fx - 36 * gs); x <= Math.min(b.getWidth() - 1, fx + 36 * gs); x++) {
+                int rgb = b.getRGB(x, y);
+                if (Math.abs((rgb >> 16 & 0xFF) - 0x2B) <= 10 && Math.abs((rgb >> 8 & 0xFF) - 0x2B) <= 10 && Math.abs((rgb & 0xFF) - 0x2B) <= 10) {
+                    n++;
+                    if (x < links) {
+                        links = x;
+                        linksY = y;
+                    }
+                    if (x > rechts) {
+                        rechts = x;
+                        rechtsY = y;
+                    }
+                    unten = Math.max(unten, y);
+                }
+            }
+        }
+        if (n < 50) {
+            throw new AssertionError("Unter dem Fuss von „Westmark“ kaum Schrift: " + n + " Pixel");
+        }
+        float mitte = (links + rechts) / 2f / gs - fuss[0], tief = unten / (float) gs - fuss[1];
+        boolean gewoelbt = linksY < unten - 3 * gs && rechtsY < unten - 3 * gs;
+        if (Math.abs(mitte) > 3 || tief < 5 || tief > 16 || !gewoelbt) {
+            throw new AssertionError("Name im Bogen nicht mittig unter dem Fuss: Mitte " + mitte + " Einheiten neben ihm, der tiefste Punkt "
+                    + tief + " darunter, die Enden bei y " + linksY / (float) gs + " und " + rechtsY / (float) gs + " gegen " + unten / (float) gs);
+        }
+    }
+
+    /** Eine geheime Ebene mit einem Banner, dessen Sprite über den Kanal kommt; die Ebene hat keine Bilder auf dem Server. */
+    private static final String GEHEIM = """
+            {"v":1,"typ":"ebene","id":"test:geheim","version":"1","teil":1,"teile":1,"objects":[
+              {"type":"banner","id":"wacht","at":[18,8],"name":"Wacht","design":"geheimreich"}
+            ]}""";
+    /** Das Sprite von „Wacht“: 16 × 30, der Fuss bei (8, 30) wie unten mittig, in einer eigenen Farbe. */
+    private static final int GEHEIM_BREITE = 16, GEHEIM_HOEHE = 30, GEHEIM_FARBE = 0xD9A01F;
+
+    /** Die Antwort des Plugins auf die Frage nach dem Sprite von „Wacht“, wie in seiner Doku. */
+    private static String geheimeAntwort() {
+        return "{\"v\":1,\"typ\":\"banner\",\"jetzt\":1,\"ebene\":\"test:geheim\",\"version\":\"1\",\"entwurf\":\"geheimreich\","
+                + "\"krone\":false,\"satz\":{\"foot\":[8,30],\"angle\":0.0},\"png\":\""
+                + java.util.Base64.getEncoder().encodeToString(bild(GEHEIM_BREITE, GEHEIM_HOEHE, GEHEIM_FARBE)) + "\"}";
+    }
+
+    /** Am Bildschirmfoto: Das Sprite von „Wacht“ steht um seinen Fuss, wie das von „Südburg“. Siehe docs/ebenen.md, „Geheime Banner“. */
+    private static void geheimUmDenFuss(ClientGameTestContext context, Path bild) {
+        int gs = context.computeOnClient(mc -> mc.getWindow().getGuiScale()), f = Ebenen.faktor(GEHEIM_BREITE, GEHEIM_HOEHE, gs);
+        float[] fuss = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).fuss(Ebenen.INSTANZ.nadeln("test:geheim").getFirst()));
+        int[] k = kastenDerFarbe(bild, Math.round(fuss[0] * gs), Math.round(fuss[1] * gs), gs, GEHEIM_FARBE);
+        int sollLinks = Math.round(fuss[0] * gs) - 8 * f + f, sollOben = Math.round(fuss[1] * gs) - 30 * f + f;
+        if (k == null || Math.abs(k[0] - sollLinks) > 1 || Math.abs(k[1] - sollOben) > 1) {
+            throw new AssertionError("Geheimes Banner nicht um seinen Fuss: " + (k == null ? "kein Pixel" : "links oben bei " + k[0] + "," + k[1])
+                    + " statt " + sollLinks + "," + sollOben);
+        }
+    }
+
+    /** Der Kasten {links, oben, rechts, unten} der Pixel genau in {@code farbe} um (fx, fy), oder null ohne solche Pixel. */
+    private static int[] kastenDerFarbe(Path bild, int fx, int fy, int gs, int farbe) {
+        BufferedImage b;
+        try {
+            b = ImageIO.read(bild.toFile());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        int[] k = {Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE};
+        for (int y = Math.max(0, fy - 70 * gs); y <= Math.min(b.getHeight() - 1, fy + 40 * gs); y++) {
+            for (int x = Math.max(0, fx - 40 * gs); x <= Math.min(b.getWidth() - 1, fx + 40 * gs); x++) {
+                if ((b.getRGB(x, y) & 0xFFFFFF) == farbe) {
+                    k[0] = Math.min(k[0], x);
+                    k[1] = Math.min(k[1], y);
+                    k[2] = Math.max(k[2], x);
+                    k[3] = Math.max(k[3], y);
+                }
+            }
+        }
+        return k[0] == Integer.MAX_VALUE ? null : k;
+    }
+
+    /** Das Sprite von „Südburg“, 20 × 46 wie der Satz oben, mit dem Fuss nicht unten mittig; ohne Krone eine andere Farbe. */
+    private static final int SPRITE_BREITE = 20, SPRITE_HOEHE = 46, FUSS_X = 6, FUSS_Y = 40, OHNE_KRONE = 0xC03AC0, MIT_KRONE = 0x1FA88C;
+    private static final String SATZ = "{\"foot\":[" + FUSS_X + "," + FUSS_Y + "],\"angle\":0}";
+
+    /**
+     * Am Bildschirmfoto der Vollbildkarte: Das Sprite von „Südburg“ steht mit Krone, und seine linke obere Ecke liegt
+     * {@code foot} aus {@code satz.json} links über dem Ort, mal so viele Pixel des Schirms je Pixel, wie der Mod nimmt.
+     * Gesucht werden die Pixel in der Farbe des Sprites mit Krone um den Fuss. Siehe docs/ebenen.md, „Banner“.
+     */
+    private static void spriteUmDenFuss(ClientGameTestContext context, Path bild) {
+        int gs = context.computeOnClient(mc -> mc.getWindow().getGuiScale()), f = Ebenen.faktor(SPRITE_BREITE, SPRITE_HOEHE, gs);
+        float[] fuss = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).fuss(Ebenen.INSTANZ.nadeln("test:orte").stream()
+                .filter(o -> "suedburg".equals(o.id())).findFirst().orElseThrow()));
+        BufferedImage b;
+        try {
+            b = ImageIO.read(bild.toFile());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        int fx = Math.round(fuss[0] * gs), fy = Math.round(fuss[1] * gs), ohne = 0;
+        int links = Integer.MAX_VALUE, oben = Integer.MAX_VALUE, rechts = Integer.MIN_VALUE, unten = Integer.MIN_VALUE;
+        for (int y = Math.max(0, fy - 70 * gs); y <= Math.min(b.getHeight() - 1, fy + 40 * gs); y++) {
+            for (int x = Math.max(0, fx - 40 * gs); x <= Math.min(b.getWidth() - 1, fx + 40 * gs); x++) {
+                int rgb = b.getRGB(x, y) & 0xFFFFFF;
+                if (rgb == MIT_KRONE) {
+                    links = Math.min(links, x);
+                    oben = Math.min(oben, y);
+                    rechts = Math.max(rechts, x);
+                    unten = Math.max(unten, y);
+                } else if (rgb == OHNE_KRONE) {
+                    ohne++;
+                }
+            }
+        }
+        if (ohne > 0 || links == Integer.MAX_VALUE) {
+            throw new AssertionError("„Südburg“ steht nicht mit dem Sprite mit Krone: " + ohne + " Pixel ohne Krone, mit Krone "
+                    + (links == Integer.MAX_VALUE ? "keins" : "da"));
+        }
+        // Der gelbe Rand des Bilds deckt die äusserste Reihe; die Fläche beginnt einen Pixel des Sprites weiter innen.
+        int sollLinks = fx - FUSS_X * f + f, sollOben = fy - FUSS_Y * f + f;
+        if (Math.abs(links - sollLinks) > 1 || Math.abs(oben - sollOben) > 1) {
+            throw new AssertionError("Sprite nicht um seinen Fuss: links oben bei " + links + "," + oben + " statt " + sollLinks + "," + sollOben
+                    + " (Fuss " + fx + "," + fy + ", " + f + " Pixel je Pixel)");
         }
     }
 
@@ -452,8 +619,23 @@ public final class Bilder implements FabricClientGameTest {
 
     /** Ein Server auf 127.0.0.1, der die Bilder unter /tiles/layers/test/images/ ausliefert. */
     private static HttpServer bilderServer(Map<String, byte[]> dateien) {
+        return bilderServer(dateien, Map.of());
+    }
+
+    /** Wie oben, dazu die Sprites der Banner und ihr {@code satz.json} unter {@code layers/test/banner/}, je Pfad dahinter. */
+    private static HttpServer bilderServer(Map<String, byte[]> dateien, Map<String, byte[]> banner) {
         try {
             HttpServer s = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+            s.createContext("/tiles/layers/test/banner/", austausch -> {
+                byte[] inhalt = banner.get(austausch.getRequestURI().getPath().substring("/tiles/layers/test/banner/".length()));
+                if (inhalt == null) {
+                    austausch.sendResponseHeaders(404, -1);
+                } else {
+                    austausch.sendResponseHeaders(200, inhalt.length);
+                    austausch.getResponseBody().write(inhalt);
+                }
+                austausch.close();
+            });
             s.createContext("/tiles/layers/test/images/", austausch -> {
                 String pfad = austausch.getRequestURI().getPath();
                 byte[] inhalt = dateien.get(pfad.substring(pfad.lastIndexOf('/') + 1));
@@ -640,7 +822,7 @@ public final class Bilder implements FabricClientGameTest {
                 }
             }
         }
-        // Das Menü mit „uhr“: an der Ecke zur Mitte der Griff statt der zier, ohne den weissen Umriss.
+        // Das Menü mit „uhr“: an der Ecke zur Mitte der Griff, ohne den weissen Umriss.
         context.runOnClient(mc -> {
             Minimap.INSTANZ.setzeSkin("uhr");
             Minimap.INSTANZ.setzeRund(false);
@@ -696,20 +878,22 @@ public final class Bilder implements FabricClientGameTest {
 
     /**
      * Die drehende Minimap bei Gier 30, mit Chunklinien: eckig ohne Rahmen, rund mit „uhr“, eckig mit
-     * „kompass“, nebeneinander. Siehe docs/minimap.md, „Drehen“.
+     * „kompass“, die Marken gedreht, zuletzt „kompass“ ohne Marken, nebeneinander. Siehe
+     * docs/minimap.md, „Drehen“.
      */
     private static void drehen(ClientGameTestContext context, TestServerContext server) {
         server.runCommand("tp @a 0.5 -30 0.5 30 90");
-        String[][] arten = {{Skin.OHNE, "eckig"}, {"uhr", "rund"}, {"kompass", "eckig"}};
+        String[][] arten = {{Skin.OHNE, "eckig", "an"}, {"uhr", "rund", "an"}, {"kompass", "eckig", "an"}, {"kompass", "eckig", "aus"}};
         BufferedImage[] teile = new BufferedImage[arten.length];
         for (int i = 0; i < arten.length; i++) {
             String skin = arten[i][0];
-            boolean rund = arten[i][1].equals("rund");
+            boolean rund = arten[i][1].equals("rund"), verzierungen = arten[i][2].equals("an");
             context.runOnClient(mc -> {
                 Minimap.INSTANZ.setzeDrehen(true);
                 Minimap.INSTANZ.setzeChunklinien(true);
                 Minimap.INSTANZ.setzeSkin(skin);
                 Minimap.INSTANZ.setzeRund(rund);
+                Minimap.INSTANZ.setzeVerzierungen(verzierungen);
             });
             context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getYRot() - 30) < 0.1f && Minimap.INSTANZ.fertig(), 1200);
             context.waitTicks(2);
@@ -739,8 +923,55 @@ public final class Bilder implements FabricClientGameTest {
             Minimap.INSTANZ.setzeChunklinien(false);
             Minimap.INSTANZ.setzeSkin(Skin.OHNE);
             Minimap.INSTANZ.setzeRund(false);
+            Minimap.INSTANZ.setzeVerzierungen(true);
         });
         context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getYRot()) < 0.1f && Minimap.INSTANZ.fertig(), 1200);
+    }
+
+    /**
+     * Das ganze Fenster bei 854 × 480 und 1280 × 720, beide bei GUI-Massstab 2, halb so gross
+     * nebeneinander: Die Minimap ist im grösseren anderthalbmal so gross. Siehe docs/minimap.md, „Bedienung“.
+     */
+    private static void fenster(ClientGameTestContext context) {
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        int[][] groessen = {{854, 480}, {1280, 720}};
+        BufferedImage[] teile = new BufferedImage[groessen.length];
+        int[] seiten = new int[groessen.length];
+        for (int i = 0; i < groessen.length; i++) {
+            context.getInput().resizeWindow(groessen[i][0], groessen[i][1]);
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(2);
+                mc.resizeGui();
+            });
+            context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
+            context.waitTicks(2);
+            seiten[i] = context.computeOnClient(mc -> Minimap.INSTANZ.rahmen(mc.getWindow().getGuiScaledWidth(),
+                    mc.getWindow().getGuiScaledHeight()).seite());
+            Path bild = context.takeScreenshot(TestScreenshotOptions.of("fenster-" + i).disableCounterPrefix());
+            try {
+                BufferedImage ganz = ImageIO.read(bild.toFile());
+                teile[i] = new BufferedImage(ganz.getWidth() / 2, ganz.getHeight() / 2, BufferedImage.TYPE_INT_RGB);
+                teile[i].getGraphics().drawImage(ganz, 0, 0, teile[i].getWidth(), teile[i].getHeight(), null);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        context.getInput().resizeWindow(vorher[0], vorher[1]);
+        context.runOnClient(mc -> {
+            mc.options.guiScale().set(vorher[2]);
+            mc.resizeGui();
+        });
+        context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
+        if (Math.abs(seiten[1] - seiten[0] * 1.5) > 1) {
+            throw new AssertionError("Seite " + seiten[0] + " bei 854 × 480, " + seiten[1] + " bei 1280 × 720");
+        }
+        if (!AUSGABE.isEmpty()) {
+            try {
+                ImageIO.write(nebeneinander(0, teile), "png", Path.of(AUSGABE, "minimap-fenster.png").toFile());
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
     }
 
     /** Die Minimap samt Ornamenten: ihr Rahmen und so viel darum, wie sie Abstand zum Rand hält. */
@@ -946,20 +1177,23 @@ public final class Bilder implements FabricClientGameTest {
     }
 
     /**
-     * Die selbst gezeichnete Karte der Szene, gewählt wie ein Spieler: Karte ohne Satz, „Karte
-     * laden …“, „Selbst“, Ja, Zurück; die Karte zeigt dann die eigene. Auch wenn die Minimap als
-     * beschäftigt gilt, wird um den Spieler alles gezeichnet; dann schreiben und auf der feinsten
-     * Stufe aufnehmen. Siehe docs/selbst.md, „Bild“.
+     * Die selbst gezeichnete Karte der Szene, in dieser Einzelspielerwelt gewählt wie ein Spieler:
+     * Karte ohne Satz, „Karte laden …“, Massstab auf 2 px, „Selbst“, Ja, Zurück; die Karte zeigt dann
+     * die eigene auf ihrer feinsten Stufe. Auch wenn die Minimap als beschäftigt gilt, wird um den
+     * Spieler alles gezeichnet; dann schreiben und aufnehmen. Siehe docs/selbst.md, „Bild“.
      */
     private static void selbst(ClientGameTestContext context) {
-        Path welt = FabricLoader.getInstance().getGameDir().resolve(HeroicMap.ID).resolve("test").resolve("selbst");
+        // Der Ordner der Einzelspielerwelt, wie ihn der Mod nimmt; ohne ihn ginge „Selbst“ nicht (mod#83).
+        Path welt = context.computeOnClient(mc -> Downloads.weltOrdner());
+        if (welt == null || !welt.getParent().getFileName().toString().startsWith("einzelspieler_")) {
+            throw new AssertionError("Ordner der Einzelspielerwelt: " + welt);
+        }
         try {
-            Laden.loesche(welt);
+            Laden.loesche(welt.resolve(Selbst.baum("minecraft:overworld")));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
         context.runOnClient(mc -> {
-            Selbst.INSTANZ.fuerTest(welt);
             // Die Minimap gilt ab der Wahl als beschäftigt: Die eigene Karte bekommt höchstens einen Chunk je Tick.
             Minimap.INSTANZ.fuerTestBeschaeftigt(true);
             Karte ohne = new Karte(null);
@@ -967,22 +1201,39 @@ public final class Bilder implements FabricClientGameTest {
             mc.gui.setScreen(new Auswahl(ohne));
         });
         context.waitTicks(2);
+        // Der Umschalter des Massstabs mit der Maus, von 4 px weiter auf 1 und auf 2.
+        int[] knopf = context.computeOnClient(mc -> mc.gui.screen().children().stream()
+                .filter(w -> w instanceof CycleButton<?>).map(w -> (CycleButton<?>) w).findFirst()
+                .map(c -> new int[] {c.getX() + c.getWidth() / 2, c.getY() + c.getHeight() / 2, mc.getWindow().getGuiScale()})
+                .orElseThrow());
+        for (int i = 0; i < 2; i++) {
+            context.getInput().setCursorPos(knopf[0] * knopf[2], knopf[1] * knopf[2]);
+            context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+            context.waitTick();
+        }
         context.clickScreenButton("heroicmap.selbst.knopf");
         context.waitFor(mc -> mc.gui.screen() instanceof ConfirmScreen, 100);
         context.clickScreenButton("gui.yes");
         context.waitTicks(2);
         context.clickScreenButton("gui.back");
         context.waitTicks(2);
+        // Die Karte öffnet auf ihrer feinsten Stufe, nicht auf der des Testsatzes davor. Siehe docs/vollbildkarte.md, „Lage merken“.
         String baum = context.computeOnClient(mc -> mc.gui.screen() instanceof Karte k && k.satz() != null
-                ? k.satz().ordner().getParent().getFileName().toString() : null);
-        if (baum == null || !baum.startsWith(Selbst.PRAEFIX)) {
-            throw new AssertionError("Nach „Selbst“ zeigt die Karte " + baum);
+                ? k.satz().ordner().getParent().getFileName().toString() + " " + k.satz().massstab() + " " + k.satz().stufe()
+                        + " " + k.stufe()[0] : null);
+        if (baum == null || !baum.startsWith(Selbst.PRAEFIX) || !baum.endsWith(" 2 7 7")) {
+            throw new AssertionError("Nach „Selbst“ mit 2 px zeigt die Karte " + baum);
         }
         context.runOnClient(mc -> mc.gui.screen().onClose());
 
         context.waitFor(mc -> Selbst.INSTANZ.fertig(mc.player.chunkPosition(), 2), 1200);
         context.runOnClient(mc -> Minimap.INSTANZ.fuerTestBeschaeftigt(false));
         context.computeOnClient(mc -> Selbst.INSTANZ.schreibeJetzt()).join();
+        // Mit 2 px liegt die feinste Stufe auf 7, im Ordner des Massstabs; Stufe 8 gibt es nicht.
+        Path ordner = welt.resolve(Selbst.baum("minecraft:overworld")).resolve("2");
+        if (!Files.isDirectory(ordner.resolve("7")) || Files.exists(ordner.resolve("8"))) {
+            throw new AssertionError("Kacheln mit 2 px nicht bis Stufe 7 unter " + ordner);
+        }
         context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(welt, "minecraft:overworld"))));
         context.waitTicks(40);
         Path bild = context.takeScreenshot(TestScreenshotOptions.of("selbst").disableCounterPrefix());
@@ -1008,8 +1259,24 @@ public final class Bilder implements FabricClientGameTest {
         }
         context.runOnClient(mc -> {
             Minimap.INSTANZ.setzeChunklinien(false);
-            Selbst.INSTANZ.fuerTest(null);
             Selbst.INSTANZ.leeren();
+        });
+    }
+
+    /**
+     * Leert den Ordner dieser Einzelspielerwelt unter heroicmap/ und liest die Wegpunkte neu: Der
+     * Mod merkt sich dort Wegpunkte, Kartenlage und die eigene Karte, sonst brächte ein früherer Lauf
+     * sie mit. Siehe docs/download.md, „Ablage“.
+     */
+    static void leereWelt(ClientGameTestContext context) {
+        context.runOnClient(mc -> {
+            Path welt = Downloads.weltOrdner();
+            try {
+                Laden.loesche(welt);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            Wegpunkte.INSTANZ.lies(welt);
         });
     }
 

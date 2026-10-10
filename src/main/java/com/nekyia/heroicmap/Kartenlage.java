@@ -13,14 +13,15 @@ import java.util.Properties;
 import org.slf4j.Logger;
 
 /**
- * Wo die Vollbildkarte zuletzt stand, je Dimension: die Mitte in Blöcken, die Stufe und die Lupe; dazu,
- * ob die Liste der Ebenen offen ist. Je Welt in {@code karte.properties} im Ordner der Welt, im
- * Einzelspieler nur im Speicher. Nur der Render-Thread. Siehe docs/vollbildkarte.md, „Lage merken“.
+ * Wo die Vollbildkarte zuletzt stand, je Satz: die Mitte in Blöcken, die Stufe und die Lupe; dazu,
+ * ob die Liste der Ebenen offen ist. Je Welt in {@code karte.properties} im Ordner der Welt, auch
+ * im Einzelspieler; ohne Ordner nur im Speicher. Nur der Render-Thread. Siehe docs/vollbildkarte.md,
+ * „Lage merken“.
  */
 final class Kartenlage {
 
     private static final Logger LOGGER = LogUtils.getLogger();
-    /** Ohne Ordner, im Einzelspieler: je Dimension nur im Speicher. */
+    /** Ohne Ordner, etwa vor dem ersten Level: je Satz nur im Speicher. */
     private static final Map<String, Lage> SPEICHER = new HashMap<>();
     /** Ohne Ordner: ob die Liste der Ebenen offen ist. */
     private static boolean ebenenImSpeicher;
@@ -32,32 +33,42 @@ final class Kartenlage {
     private Kartenlage() {
     }
 
-    /** Die Lage für {@code dimension} im Ordner der Welt, oder null, wenn keine da oder lesbar ist. */
-    static Lage lies(Path ordner, String dimension) {
+    /** Die Lage für {@code satz} im Ordner der Welt, oder null, wenn keine da oder lesbar ist. */
+    static Lage lies(Path ordner, Satz satz) {
+        String s = schluessel(satz);
         if (ordner == null) {
-            return SPEICHER.get(dimension);
+            return SPEICHER.get(s);
         }
         Properties p = datei(ordner);
         try {
-            return new Lage(Double.parseDouble(p.getProperty(dimension + ".x")), Double.parseDouble(p.getProperty(dimension + ".z")),
-                    Integer.parseInt(p.getProperty(dimension + ".zoom")), Integer.parseInt(p.getProperty(dimension + ".lupe")));
+            return new Lage(Double.parseDouble(p.getProperty(s + ".x")), Double.parseDouble(p.getProperty(s + ".z")),
+                    Integer.parseInt(p.getProperty(s + ".zoom")), Integer.parseInt(p.getProperty(s + ".lupe")));
         } catch (RuntimeException fehlt) {
             return null;
         }
     }
 
-    /** Merkt die Lage für {@code dimension}; die anderer Dimensionen bleibt. */
-    static void schreibe(Path ordner, String dimension, Lage l) {
+    /** Merkt die Lage für {@code satz}; die anderer Sätze bleibt. */
+    static void schreibe(Path ordner, Satz satz, Lage l) {
+        String s = schluessel(satz);
         if (ordner == null) {
-            SPEICHER.put(dimension, l);
+            SPEICHER.put(s, l);
             return;
         }
         Properties p = datei(ordner);
-        p.setProperty(dimension + ".x", Double.toString(l.x()));
-        p.setProperty(dimension + ".z", Double.toString(l.z()));
-        p.setProperty(dimension + ".zoom", Integer.toString(l.zoom()));
-        p.setProperty(dimension + ".lupe", Integer.toString(l.lupe()));
+        p.setProperty(s + ".x", Double.toString(l.x()));
+        p.setProperty(s + ".z", Double.toString(l.z()));
+        p.setProperty(s + ".zoom", Integer.toString(l.zoom()));
+        p.setProperty(s + ".lupe", Integer.toString(l.lupe()));
         speichere(ordner, p);
+    }
+
+    /**
+     * Baum und Massstab des Satzes, mit {@code /} auf jedem System. Je Satz, nicht je Dimension: Sonst
+     * öffnete ein anderer Satz derselben Dimension mit der Stufe des vorigen.
+     */
+    static String schluessel(Satz satz) {
+        return satz.ordner().getParent().getFileName() + "/" + satz.ordner().getFileName();
     }
 
     /** Ist die Liste der Ebenen offen? Ohne Eintrag zu, wie beim ersten Öffnen. */

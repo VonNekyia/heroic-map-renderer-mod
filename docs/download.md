@@ -43,11 +43,12 @@ der Mod mit den Kacheln zeigt, steht unter [Vollbildkarte](vollbildkarte.md).
   Download ein, `abgelehnt` zeigt er dem Spieler, mit `wieder` als
   Uhrzeit. `spieler` nennt die Mitspieler, siehe [Minimap](minimap.md),
   „Mitspieler“. `ebenen` und `ebene` bringen die Ebenen, `tafel` die Tafel
-  eines Objekts, siehe [Ebenen](ebenen.md), „Infotafel“; `ebene` und
-  `tafel` liest schon der Thread des Netzes. Nachrichten mit einem anderen
+  eines Objekts, siehe [Ebenen](ebenen.md), „Infotafel“, `banner` das
+  Sprite eines geheimen Banners, siehe [Ebenen](ebenen.md), „Geheime
+  Banner“; `ebene`, `tafel` und `banner` liest schon der Thread des Netzes. Nachrichten mit einem anderen
   `v` als 1 oder über 1 MiB verwirft er; so gross wird nur ein Teil einer
   Ebene.
-- **Senden:** `anfrage`, `show` und `tafel` nur, wenn
+- **Senden:** `anfrage`, `show`, `tafel` und `banner` nur, wenn
   `ClientPlayNetworking.canSend` wahr ist, also wenn das Plugin den Kanal
   angemeldet hat. Zu `show` siehe [Minimap](minimap.md), „Mitspieler“.
 - **`neu: true`** steht in der `anfrage` eines vollen Downloads, wenn es
@@ -129,7 +130,8 @@ Ohne Unterbefehl öffnet `/hmap` das Menü, siehe [Minimap](minimap.md), „Bedi
   und schickt dann `anfrage voll` mit `neu: true`. Sonst brächte der
   Abgleich je Tag nur ein Zehntel der Karte, denn sein Deckel ist 10 %
   des Satzes. Den Abgleich dieses Tages verbraucht das trotzdem.
-- **Im Einzelspieler** gibt es keinen Server und keinen Download.
+- **Im Einzelspieler** gibt es keinen Server und keinen Download, aber einen
+  Ordner der Welt, siehe „Ablage“.
 
 ## Sicherheit
 
@@ -235,6 +237,16 @@ Einzelheiten stehen im Log.
   | Hash | `hash` | `welt-<hash>` |
   | IP + Hash, die Vorgabe | `ip` | `<host>/welt-<hash>` |
   | IP:Port + Hash | `ip_port` | `<host>_<port>/welt-<hash>` |
+
+  Im Einzelspieler gilt die Wahl nicht, dort ist `<welt>`
+  `einzelspieler_<speicherordner>/welt-<hash>`, `<speicherordner>` der
+  Name des Ordners der Welt unter `saves/`, bereinigt wie ein Host
+  (`Downloads.einzelspieler`). Er liegt so tief wie eine Welt hinter einer
+  Adresse, so findet ihn die Kartenliste. Darin liegen die eigene Karte,
+  Wegpunkte und Kartenlage, siehe
+  [0015](entscheidungen/0015-ordner-fuer-einzelspielerwelten.md). Wird die
+  Welt umbenannt, beginnt ein neuer Ordner; wird sie gelöscht, bleibt er,
+  bis der Spieler ihn in der Kartenliste löscht.
 
   `<hash>` ist der Hash des Seeds, den der Server dem Client mit jeder Welt
   schickt (`BiomeManager.biomeZoomSeed`, per Access Widener), 16 Stellen

@@ -52,7 +52,7 @@ sagt sie das und zeigt nichts.
   der Maus, so wie die Kacheln ihn zeichnen (`Kartenblick.basisRasterX`),
   fest wie auf der Karte im Browser; so will es der User.
 - **Beim Öffnen** steht die Karte wie beim letzten Schliessen, siehe „Lage
-  merken“; beim allerersten Mal liegt der Spieler in der Mitte.
+  merken“; beim ersten Mal je Satz liegt der Spieler in der Mitte.
 - **Geht ein Knopf nicht,** etwa weil der Server den Baum nicht anbietet oder
   schon ein Download läuft, steht der Grund über den Koordinaten.
 - **Ohne Satz** zeigt die Karte nur den Hinweis und den Knopf zum Laden.
@@ -60,7 +60,7 @@ sagt sie das und zeigt nichts.
 ### Lage merken
 
 Beim Öffnen stehen Mitte, Stufe und Lupe wie beim letzten Schliessen, je
-Server, Welt und Dimension, so will es der User (mod#75); vorher begann die
+Server, Welt und Satz, so will es der User (mod#75); vorher begann die
 Karte jedes Mal beim Spieler, und man musste wieder herauszoomen.
 
 - **Gemerkt** beim Schliessen und vor jedem Untermenü (`Karte.removed`): die
@@ -69,9 +69,16 @@ Karte jedes Mal beim Spieler, und man musste wieder herauszoomen.
   „Ebenen“.
 - **Je Welt** in `karte.properties` im Ordner der Welt, neben
   `wegpunkte.json`, siehe [Download](download.md), „Ablage“; die Schlüssel
-  beginnen mit der Dimension des Satzes, etwa `minecraft:overworld.zoom`.
-  Im Einzelspieler gibt es keinen Ordner, dann nur im Speicher, bis zum
-  Verlassen der Welt (`Kartenlage.leeren`).
+  beginnen mit Baum und Massstab des Satzes, mit `/` auf jedem System,
+  etwa `<baum>/4.zoom` (`Kartenlage.schluessel`).
+  Im Einzelspieler im Ordner nach dem Speicherordner der Welt, siehe
+  [Download](download.md), „Ablage“.
+- **Je Satz, nicht je Dimension:** Sonst öffnete ein anderer Satz derselben
+  Dimension mit der Stufe des vorigen, etwa die eigene Karte nach einem
+  groben Blick auf die des Servers. Dort ist sie grob oft noch leer, siehe
+  [Selbst gezeichnete Karte](selbst.md), „Kacheln“. Ein neuer Satz beginnt beim
+  Spieler auf der feinsten Stufe. Einträge je Dimension aus 0.2.21 und
+  früher liest die Karte nicht mehr; sie beginnt dann einmal beim Spieler.
 - **Gelesen** beim Öffnen, einmal, nicht bei jeder neuen Grösse des
   Fensters (`Karte.gestellt`). Die Stufe kommt auf die Stufen des Satzes,
   die Lupe auf 1, 2 oder 4 und nur auf der feinsten Stufe
@@ -79,7 +86,7 @@ Karte jedes Mal beim Spieler, und man musste wieder herauszoomen.
   Spieler in der Mitte.
 - **Getestet** im Gametest `Bedienung`: eine Stufe gröber, schliessen und
   wieder öffnen, Mitte, Stufe und Lupe wie vorher; dazu `KartenblickTest`
-  mit `listeDerEbenenBleibtOffen`.
+  mit `lageJeSatzUeberstehtDenNeustart` und `listeDerEbenenBleibtOffen`.
 
 ### Ebenen
 

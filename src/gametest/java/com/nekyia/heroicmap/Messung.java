@@ -40,6 +40,8 @@ public final class Messung implements FabricClientGameTest {
     private static final String AUSGABE = System.getProperty("heroicmap.messung", "");
     /** Mit {@code -PmessungDrehen=true} nur die Läufe zum Drehen, siehe docs/minimap.md, „Drehen“. */
     private static final boolean NUR_DREHEN = Boolean.getBoolean("heroicmap.messung.drehen");
+    /** Mit {@code -PmessungRahmen=<skin>} misst sie mit diesem Rahmen, sonst ohne, siehe docs/rahmen.md, „Kosten“. */
+    private static final String RAHMEN = System.getProperty("heroicmap.messung.rahmen", Skin.OHNE);
     /** Mit {@code -PmessungEffekte=true} nur die Läufe zu den Effekten in der Welt, siehe docs/wegpunkte.md, „Strahl“. */
     private static final boolean NUR_EFFEKTE = Boolean.getBoolean("heroicmap.messung.effekte");
     private static final int SICHTWEITE = 12;
@@ -79,8 +81,8 @@ public final class Messung implements FabricClientGameTest {
                     }
                 });
         context.runOnClient(mc -> {
-            // Wie die Messreihen davor: ohne Rahmen.
-            Minimap.INSTANZ.setzeSkin(Skin.OHNE);
+            // Wie die Messreihen davor ohne Rahmen, ausser -PmessungRahmen sagt einen.
+            Minimap.INSTANZ.setzeSkin(RAHMEN);
             mc.options.renderDistance().set(SICHTWEITE);
             mc.options.framerateLimit().set(260);
             mc.options.enableVsync().set(false);
@@ -214,7 +216,7 @@ public final class Messung implements FabricClientGameTest {
                 mc.player.setYRot(30);
             });
             zeige(context, true);
-            String art = "fps=frei scale=4 zoom=4 form=" + (rund ? "rund" : "eckig") + " drehen=" + (drehen ? "an" : "aus");
+            String art = "fps=frei scale=4 zoom=4 form=" + (rund ? "rund" : "eckig") + " drehen=" + (drehen ? "an" : "aus") + " rahmen=" + RAHMEN;
             warteAufFreieFrames(context, art);
             for (int runde = 1; runde <= RUNDEN; runde++) {
                 for (boolean an : new boolean[] {false, true}) {

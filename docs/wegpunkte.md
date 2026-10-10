@@ -350,9 +350,9 @@ Schleier am Rand, siehe „Schleier“.
   (`ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE`, `Wegpunkte.wechsel`),
   wenn der Ordner ein anderer ist, und nach dem Schliessen des Menüs, falls
   die Ablage eine andere ist; vergessen beim Trennen. Ein Wechsel über einen
-  Proxy bringt so die Wegpunkte der neuen Welt. Im Einzelspieler gibt es
-  keinen Ordner; dort liegen sie nur im Speicher und bleiben beim Wechsel
-  der Dimension.
+  Proxy bringt so die Wegpunkte der neuen Welt. Im Einzelspieler ist es der
+  Ordner nach dem Speicherordner der Welt, siehe [Download](download.md),
+  „Ablage“.
 - **Format:**
 
   ```json

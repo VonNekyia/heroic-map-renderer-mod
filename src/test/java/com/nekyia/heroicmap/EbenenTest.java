@@ -666,10 +666,12 @@ class EbenenTest {
 
     @Test
     void kastenOhneHolenEnthaeltDenGenauen() {
-        // Zum Wegschneiden und als Vorprüfung beim Treffer: Jedes Banner bis 32 × 64 liegt bei jedem GUI-Massstab im groben Kasten.
-        Ebenen.Banner b = new Ebenen.Banner(0, 0, Ebenen.UEBERWELT, "x", "images/b.png", "b:e", "v", "id");
-        for (float name : new float[] {0, 10, 80}) {
-            float[] grob = Ebenen.grob(b, name);
+        // Zum Wegschneiden und als Vorprüfung beim Treffer: Jedes Banner bis 32 × 64 liegt bei jedem GUI-Massstab im groben
+        // Kasten, samt dem Namen im Bogen, kurz, mittel und so lang, dass er 120° öffnet.
+        double[][] namen = {{}, {6}, {6, 4, 6, 5, 6, 6, 5}, new double[40]};
+        java.util.Arrays.fill(namen[3], 6);
+        for (double[] name : namen) {
+            float[] grob = Ebenen.grob(name);
             for (int gs = 1; gs <= 6; gs++) {
                 for (int w = 1; w <= Symbole.BANNER_BREITE; w++) {
                     for (int h = 1; h <= Symbole.BANNER_HOEHE; h++) {
@@ -693,8 +695,8 @@ class EbenenTest {
         assertEquals(4, Ebenen.faktor(8, 16, 2));
         assertEquals(2, Ebenen.faktor(16, 8, 2));
         // Der Kasten wie gezeichnet: links ⌊21 / 2⌋ Pixel des Schirms, in Einheiten.
-        assertArrayEquals(new float[] {-5, -20, 5.5f, 0}, Ebenen.bannerKasten(21, 40, 2, 0));
-        assertArrayEquals(new float[] {-7, -80 / 3f, 7, 0}, Ebenen.bannerKasten(21, 40, 3, 0));
+        assertArrayEquals(new float[] {-5, -20, 5.5f, 0}, Ebenen.bannerKasten(21, 40, 2, new double[0]));
+        assertArrayEquals(new float[] {-7, -80 / 3f, 7, 0}, Ebenen.bannerKasten(21, 40, 3, new double[0]));
     }
 
     @Test
@@ -707,6 +709,40 @@ class EbenenTest {
         assertArrayEquals(new float[] {-26, -40, 26, Ebenen.NAME_UNTEN}, Ebenen.kasten(21, 40, 51));
         // Ein schmaler Name ändert die Seiten nicht.
         assertArrayEquals(new float[] {-10, -40, 11, Ebenen.NAME_UNTEN}, Ebenen.kasten(21, 40, 8));
+    }
+
+    @Test
+    void nameImBogenNachDemFormat() {
+        // Drei Zeichen je 6 breit, Sperrung 1,25: Länge 20,5. Unter einem Banner 20 hoch ist der Radius 2 · 20 = 40.
+        double[] name = {6, 6, 6};
+        assertEquals(20.5, Ebenen.laenge(name), 1e-9);
+        assertEquals(40, Ebenen.radius(name, 20), 1e-9);
+        double[] b = Ebenen.bogen(name, 40);
+        // Das mittlere Zeichen auf dem tiefsten Punkt, 0,75 · s = 7,5 unter dem Fuss, waagrecht.
+        assertEquals(0, b[3], 1e-9);
+        assertEquals(7.5, b[4], 1e-9);
+        assertEquals(0, b[5], 1e-9);
+        // Die äusseren symmetrisch und höher, links nach rechts unten geneigt, rechts nach rechts oben: nach unten gewölbt.
+        assertEquals(-b[6], b[0], 1e-9);
+        assertEquals(b[7], b[1], 1e-9);
+        assertTrue(b[1] < 7.5);
+        assertTrue(b[2] > 0 && b[8] < 0);
+        // Auf dem Kreis um (0, 7,5 − 40), im Abstand der Vorschübe samt Sperrung: 7,25 auf dem Bogen.
+        assertEquals(40, Math.hypot(b[0], b[1] - (7.5 - 40)), 1e-9);
+        assertEquals(7.25 / 40, b[2], 1e-9);
+        // Ein langer Name öffnet höchstens 120°: Der Radius wächst, sobald 2 · h nicht mehr reicht.
+        double[] lang = new double[40];
+        java.util.Arrays.fill(lang, 6);
+        double r = Ebenen.radius(lang, 20);
+        assertEquals(Ebenen.laenge(lang) / (2 * Math.PI / 3), r, 1e-9);
+        double[] l = Ebenen.bogen(lang, r);
+        double erstes = (-Ebenen.laenge(lang) / 2 + 3) / r;
+        assertEquals(-erstes, l[2], 1e-9);
+        assertTrue(Math.abs(l[2]) < Math.PI / 3);
+        // Der Kasten deckt alle Zeichen samt ihrer halben Höhe, unten weit unter UNTEN_HOECHSTENS.
+        float[] k = Ebenen.bogenKasten(name, 40);
+        assertTrue(k[3] <= Ebenen.UNTEN_HOECHSTENS && k[3] >= 7.5 + Ebenen.BOGEN_HALB);
+        assertTrue(k[0] <= b[0] - 3 && k[2] >= b[6] + 3);
     }
 
     @Test
@@ -747,9 +783,69 @@ class EbenenTest {
         List<Ebenen.Ort> n = Ebenen.nadeln("b:staedte", "v1", objekte);
         // Ohne gültiges Bild fällt ein Banner weg; Nadeln und Banner stehen in ihrer Reihenfolge.
         assertEquals(3, n.size());
-        assertEquals(new Ebenen.Banner(120.5, -340.5, Ebenen.UEBERWELT, "Hafenstadt", "images/banner-nord.png", "b:staedte", "v1", "s"), n.get(0));
-        assertEquals(new Ebenen.Banner(3, 4, "minecraft:the_nether", null, "images/weiss.webp", "b:staedte", "v1", "w"), n.get(1));
+        assertEquals(new Ebenen.Banner(120.5, -340.5, Ebenen.UEBERWELT, "Hafenstadt", "images/banner-nord.png", "b:staedte", "v1", "s", null, false),
+                n.get(0));
+        assertEquals(new Ebenen.Banner(3, 4, "minecraft:the_nether", null, "images/weiss.webp", "b:staedte", "v1", "w", null, false), n.get(1));
         assertTrue(n.get(2) instanceof Ebenen.Nadel);
+    }
+
+    @Test
+    void geheimAusDerListe() {
+        Ebenen e = new Ebenen();
+        e.empfange(JsonParser.parseString("{\"v\":1,\"typ\":\"ebenen\",\"jetzt\":1,\"ebenen\":["
+                + "{\"id\":\"b:geheim\",\"version\":\"v1\",\"secret\":true},{\"id\":\"b:offen\",\"version\":\"v1\"},"
+                + "{\"id\":\"b:nein\",\"version\":\"v1\",\"secret\":false}]}").getAsJsonObject());
+        // Nur mit "secret": true; ohne das Feld ist eine Ebene öffentlich. Beim Leeren vergisst der Mod es.
+        assertTrue(e.geheim("b:geheim"));
+        assertFalse(e.geheim("b:offen"));
+        assertFalse(e.geheim("b:nein"));
+        e.leeren();
+        assertFalse(e.geheim("b:geheim"));
+    }
+
+    @Test
+    void bannerMitEntwurf() {
+        JsonArray objekte = JsonParser.parseString("["
+                // Mit Entwurf und Krone, das Bild als Ersatz.
+                + "{\"id\":\"a\",\"type\":\"banner\",\"at\":[1,2],\"design\":\"nordreich\",\"capital\":true,\"image\":\"images/b.png\"},"
+                // Mit Entwurf ohne Bild: gilt, solange das Sprite kommt; ein ungültiges Bild zählt nicht.
+                + "{\"id\":\"b\",\"type\":\"banner\",\"at\":[1,2],\"design\":\"weiss-1.2\",\"image\":\"../b.png\"},"
+                // capital ohne design wirkt nicht.
+                + "{\"id\":\"c\",\"type\":\"banner\",\"at\":[1,2],\"capital\":true,\"image\":\"images/b.png\"},"
+                // Ein Entwurf, der kein Teil einer Kennung ist, zählt nicht; ohne Bild fällt das Banner weg.
+                + "{\"id\":\"d\",\"type\":\"banner\",\"at\":[1,2],\"design\":\"../geheim\"},"
+                + "{\"id\":\"e\",\"type\":\"banner\",\"at\":[1,2],\"design\":\"com1\",\"image\":\"images/b.png\"}"
+                + "]").getAsJsonArray();
+        List<Ebenen.Ort> n = Ebenen.nadeln("b:staedte", "v1", objekte);
+        assertEquals(List.of("a", "b", "c", "e"), n.stream().map(Ebenen.Ort::id).toList());
+        assertEquals(new Ebenen.Banner(1, 2, Ebenen.UEBERWELT, null, "images/b.png", "b:staedte", "v1", "a", "nordreich", true), n.get(0));
+        assertEquals(new Ebenen.Banner(1, 2, Ebenen.UEBERWELT, null, null, "b:staedte", "v1", "b", "weiss-1.2", false), n.get(1));
+        assertEquals(new Ebenen.Banner(1, 2, Ebenen.UEBERWELT, null, "images/b.png", "b:staedte", "v1", "c", null, false), n.get(2));
+        assertEquals(new Ebenen.Banner(1, 2, Ebenen.UEBERWELT, null, "images/b.png", "b:staedte", "v1", "e", null, false), n.get(3));
+    }
+
+    @Test
+    void spriteUmSeinenFuss() {
+        // 20 × 46 mit dem Fuss bei (10, 46) wie der Satz oben: bei GS 2 ein Pixel je Pixel, also 10 links, 23 darüber.
+        assertArrayEquals(new float[] {-5, -23, 5, 0}, Ebenen.spriteKasten(20, 46, 10, 46, 2, new double[0]));
+        // Ein Fuss nicht unten mittig: Das Sprite reicht so weit über den Fuss hinaus, wie die Leinwand.
+        assertArrayEquals(new float[] {-2, -10, 8, 13}, Ebenen.spriteKasten(20, 46, 4, 20, 2, new double[0]));
+        // Der grobe Kasten eines Banners mit Entwurf enthält jedes Sprite bis 32 × 64 bei jedem Fuss und GS.
+        double[] name = {6, 4, 6, 5, 6};
+        float[] grob = Ebenen.grob(name, true);
+        for (int gs = 1; gs <= 6; gs++) {
+            for (int w = 1; w <= Symbole.BANNER_BREITE; w += 3) {
+                for (int h = 1; h <= Symbole.BANNER_HOEHE; h += 5) {
+                    for (int fx : new int[] {0, w / 2, w}) {
+                        for (int fy : new int[] {0, h / 2, h}) {
+                            float[] k = Ebenen.spriteKasten(w, h, fx, fy, gs, name);
+                            assertTrue(grob[0] <= k[0] && grob[1] <= k[1] && grob[2] >= k[2] && grob[3] >= k[3],
+                                    w + " × " + h + ", Fuss " + fx + "," + fy + " bei " + gs);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @Test
