@@ -150,6 +150,7 @@ class SymboleTest {
         dateien.put(PFAD + "banner.png", png(22, 40));
         dateien.put(PFAD + "voll.png", png(Symbole.BANNER_BREITE, Symbole.BANNER_HOEHE));
         dateien.put(PFAD + "zu_breit.png", png(Symbole.BANNER_BREITE + 1, Symbole.BANNER_HOEHE));
+        dateien.put(PFAD + "zu_hoch.png", png(Symbole.BANNER_BREITE, Symbole.BANNER_HOEHE + 1));
         InetAddress hier = InetAddress.getLoopbackAddress();
         Kacheln.Bild b = holeBanner("banner.png", hier);
         assertEquals(22, b.breite());
@@ -157,8 +158,54 @@ class SymboleTest {
         assertEquals(22 * 40, b.argb().length);
         assertEquals(Symbole.BANNER_HOEHE, holeBanner("voll.png", hier).hoehe());
         assertNull(holeBanner("zu_breit.png", hier));
+        assertNull(holeBanner("zu_hoch.png", hier));
         // Ein Symbol bleibt genau so gross: 22 × 40 ist keins.
         assertNull(hole("banner.png", hier, Symbole.FRIST));
+    }
+
+    @Test
+    void bannerAlsWebP() throws IOException {
+        // 22 × 40, nicht quadratisch, nur VP8L: als Banner ja, als Symbol nicht.
+        byte[] webp;
+        try (var rein = SymboleTest.class.getResourceAsStream("/banner.webp")) {
+            webp = rein.readAllBytes();
+        }
+        Kacheln.Bild b = Kacheln.vp8l(webp, Symbole.BANNER_BREITE, Symbole.BANNER_HOEHE, true);
+        assertEquals(22, b.breite());
+        assertEquals(40, b.hoehe());
+        assertEquals(0xFF2E4A8C, b.argb()[0]);
+        dateien.put(PFAD + "banner.webp", webp);
+        InetAddress hier = InetAddress.getLoopbackAddress();
+        assertEquals(40, holeBanner("banner.webp", hier).hoehe());
+        assertNull(hole("banner.webp", hier, Symbole.FRIST));
+    }
+
+    @Test
+    void bannerTeilenEinBildUndZaehlenMit() throws Exception {
+        dateien.put(PFAD + "banner.png", png(22, 40));
+        Aufbau a = aufbau();
+        Symbole s = a.symbole();
+        // Zwei Banner mit demselben Bild: eine Anfrage, eine Textur in 22 × 40.
+        assertNull(s.banner("beispiel:staedte", "v1", "images/banner.png"));
+        assertNull(s.banner("beispiel:staedte", "v1", "images/banner.png"));
+        s.warte();
+        Symbole.Textur t = s.banner("beispiel:staedte", "v1", "images/banner.png");
+        assertEquals(t, s.banner("beispiel:staedte", "v1", "images/banner.png"));
+        assertEquals(List.of(PFAD + "banner.png"), new ArrayList<>(anfragen));
+        assertEquals(1, a.abgelegt().size());
+        assertEquals(22, t.breite());
+        assertEquals(40, t.hoehe());
+        // Banner zählen mit den Symbolen gegen 200: nach 199 Symbolen holt der Mod kein zweites Banner.
+        for (int i = 0; i < Symbole.MAX_BILDER - 1; i++) {
+            s.symbol("beispiel:staedte", "v1", "images/b" + i + ".png", 16);
+        }
+        assertNull(s.banner("beispiel:staedte", "v1", "images/zweites.png"));
+        s.warte();
+        assertEquals(Symbole.MAX_BILDER, anfragen.size());
+        assertTrue(anfragen.stream().noneMatch(p -> p.endsWith("zweites.png")));
+        // Eine neue version gibt die Textur des Banners frei.
+        s.banner("beispiel:staedte", "v2", "images/banner.png");
+        assertEquals(List.of(t.id()), a.frei());
     }
 
     private Kacheln.Bild holeBanner(String name, InetAddress spielserver) {
@@ -265,6 +312,23 @@ class SymboleTest {
         }
         s.warte();
         assertEquals(Symbole.MAX_BILDER, anfragen.size());
+    }
+
+    @Test
+    void hoechstens1000BilderUeberAlleEbenen() throws Exception {
+        // Sechs Ebenen mit je 200 Bildern: 1000 Anfragen, dann keine mehr; nach dem Leeren wieder.
+        Symbole s = aufbau().symbole();
+        for (int e = 0; e < 6; e++) {
+            for (int i = 0; i < Symbole.MAX_BILDER; i++) {
+                s.symbol("beispiel:e" + e, "v1", "images/b" + i + ".png", 16);
+            }
+        }
+        s.warte();
+        assertEquals(Symbole.MAX_BILDER_GESAMT, anfragen.size());
+        s.leeren();
+        s.symbol("beispiel:e0", "v1", "images/neu.png", 16);
+        s.warte();
+        assertEquals(Symbole.MAX_BILDER_GESAMT + 1, anfragen.size());
     }
 
     @Test

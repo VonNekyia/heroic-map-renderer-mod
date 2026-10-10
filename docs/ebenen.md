@@ -32,7 +32,7 @@ code:
 
 Ein Plugin auf dem Server legt Ebenen über die Karte, etwa die Städte einer
 Nation (#35). Der Mod empfängt sie über den Kanal und zeichnet ihre Nadeln,
-Flächen, Kreise, Linien und Kartenschrift auf Minimap und Vollbildkarte. Das Format beschreibt der
+Banner, Flächen, Kreise, Linien und Kartenschrift auf Minimap und Vollbildkarte. Das Format beschreibt der
 Renderer:
 [Ebenen](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/ebenen.md);
 die Nachrichten das Plugin:
@@ -76,8 +76,8 @@ die Nachrichten das Plugin:
 
 ## Nadeln
 
-- **Nur `pin`:** Andere Objekte und unbekannte Felder übergeht der Mod.
-  `y` braucht er nicht, denn seine Karten sind von oben gesehen. Ohne
+- **Gelesen:** Unbekannte Felder übergeht der Mod. `y` braucht er nicht,
+  denn seine Karten sind von oben gesehen. Ohne
   `dimension` gilt `minecraft:overworld`; der Mod zeigt nur die Nadeln der
   Dimension des Spielers.
 - **Schild und Nadel** dieselben Bilder wie auf der Webkarte, in drei
@@ -101,8 +101,11 @@ die Nachrichten das Plugin:
   Stufe ab, siehe
   [0007](entscheidungen/0007-toenung-auf-der-grafikkarte.md).
 - **Name** immer, in der Kartenschrift mit 12 Einheiten je Geviert, also
-  Grossbuchstaben rund 8 hoch, wie die Webkarte; so hat es der Reviewer
-  entschieden (`Ebenen.name`). Er steht mittig in einem Kasten direkt unter
+  Grossbuchstaben rund 8 hoch, wie die Webkarte (`Ebenen.name`). Das
+  Format sagt: unter dem Fuss, Kartenschrift, feste Grösse, siehe
+  [Ebenen](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/ebenen.md)
+  und
+  [0097](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entscheidungen/0097-banner-feste-groesse-tafel-beim-zeigen.md). Er steht mittig in einem Kasten direkt unter
   dem Fuss, 17 Einheiten hoch (Zeilenhöhe 1,4), mit 3 Einheiten Rand zur
   Seite. Die Grossbuchstaben stehen mittig im Kasten. Farben der UI wie auf
   der Webkarte: Grund weiss mit Alpha 0,8, Schrift schwarz, ohne Kontur.
@@ -122,11 +125,12 @@ die Nachrichten das Plugin:
   Wegpunkte. Gezeichnet wird, was den Schirm berühren kann: 16 Einheiten
   zur Seite und 64 nach oben, so viel wie das grösste Banner, der Name 17
   nach unten und halb so weit zur Seite, wie sein Kasten breit ist.
-- **Reihenfolge:** unter Wegpunkten, Mitspielern und dem eigenen Kopf; die
-  Ebenen nach `order`, die höhere oben, bei Gleichstand die kleinere `id`
-  oben; in einer Ebene in der Reihenfolge der Objekte.
+- **Reihenfolge:** über allen Formen und aller Kartenschrift jeder Ebene,
+  unter Wegpunkten, Mitspielern und dem eigenen Kopf; die Ebenen nach
+  `order`, die höhere oben, bei Gleichstand die kleinere `id` oben; in
+  einer Ebene in der Reihenfolge der Objekte.
 - **An oder aus:** siehe „Umschalten“.
-- **Text:** Namen von Ebenen und Nadeln setzt der Mod als schlichten Text;
+- **Text:** Namen von Ebenen, Nadeln und Bannern setzt der Mod als schlichten Text;
   Codes mit `§` streicht er.
 
 ## Banner
@@ -136,7 +140,9 @@ Ein Ort als Bild (`banner`), etwa eine Stadt mit dem Banner ihrer Nation
 
 - **Gelesen** wie eine Nadel: `at`, `dimension`, `name` bis 64 Zeichen.
   `image` ist ein Feld wie bei den Symbolen, `images/<Name>.png` oder
-  `.webp`; ohne gültiges Feld fällt das Banner weg. `y` braucht der Mod
+  `.webp`. Ohne gültiges Feld fällt das Banner weg, und das Log nennt es,
+  wie das Format verlangt: einmal je Ebene und `version`, zusammen mit
+  den verworfenen Formen. `y` braucht der Mod
   nicht.
 - **Nadeln und Banner** zählen zusammen, höchstens 1000 je Ebene, wie im
   Format; sie stehen in einer Liste in der Reihenfolge der Objekte
@@ -166,7 +172,9 @@ Ein Ort als Bild (`banner`), etwa eine Stadt mit dem Banner ihrer Nation
   anderes holt der Mod nicht.
 - **Geholt** erst, wenn eine Nadel es zeichnet, in einem eigenen Thread,
   einmal je Ebene, Feld, Seite und `version`, höchstens 200 je Ebene wie
-  die Bilder im Format; die Bilder der Banner zählen mit. Eine neue `version` gibt alle Symbole der Ebene
+  die Bilder im Format; die Bilder der Banner zählen mit. Über alle Ebenen
+  höchstens 1000 (`Symbole.MAX_BILDER_GESAMT`), entschieden vom Reviewer,
+  siehe „Grenzen“. Eine neue `version` gibt alle Symbole der Ebene
   frei und holt neu, denn unter gleichem Namen kann ein Bild neu sein.
 - **Geprüft** wie der Download der Karte, siehe [Download](download.md),
   „Sicherheit“: die Adresse gegen das Heimnetz, keine Weiterleitung, kein
@@ -294,7 +302,7 @@ in der Schrift IM Fell English SC (`Formen.glyphen`, `Formen.texte`).
   Zeichen als schlichter Text in NFC, `path` 1 bis 64 Punkte. `size` ist
   die Höhe der Grossbuchstaben in Blöcken, Vorgabe 16. `spacing` ist der
   Abstand zwischen den Zeichen in Anteilen davon, Vorgabe 0, gekappt auf 0
-  bis 2. `color` Vorgabe `#2B2B2B`, mit Alpha. `font` übergeht der Mod; es
+  bis 1 wie im Format. `color` Vorgabe `#2B2B2B`, mit Alpha. `font` übergeht der Mod; es
   gibt nur `map`. `kern` kennt der Mod nicht.
 - **Wo das Format schweigt, wie die Webkarte,** so hat es der Reviewer
   entschieden: `size` 0 oder ungültig heisst 16; eine `outline`, die kein
@@ -436,10 +444,11 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 | Nadeln und Banner je Ebene | 1000, wie im Format | die Sammlung ist verworfen, die alte Ebene bleibt |
 | Teile je Ebene | 256; für 4 MiB braucht ein Plugin rund 130 | der Teil gilt nicht |
 | Nachricht | 1 MiB | verworfen, siehe [Download](download.md), „Kanal“ |
-| Name einer Nadel oder Ebene | 64 Zeichen | der Name fehlt |
+| Name einer Nadel, eines Banners oder einer Ebene | 64 Zeichen | der Name fehlt |
 | Kennung, `version`, Dimension | 129 Zeichen | Nachricht oder Nadel gilt nicht |
 | Feld eines Symbols | 76 Zeichen | das Symbol fehlt |
-| Symbole je Ebene | 200 | die übrigen fehlen, das Log nennt es |
+| Bilder je Ebene (Symbole und Banner) | 200, wie im Format | die übrigen fehlen, das Log nennt es |
+| Bilder über alle Ebenen | 1000 | die übrigen fehlen, das Log nennt es |
 | Bild eines Symbols | 256 KiB, 10 s | das Symbol fehlt |
 | Bild eines Banners | 32 × 64 Pixel, 256 KiB, 10 s | das Banner fehlt |
 | Objekte je Ebene | 10 000, wie im Format | die Sammlung ist verworfen |
@@ -454,7 +463,7 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 | Breite eines Rands, Strich, Lücke | 64, 1000, 1000 Einheiten | gekappt |
 | Text einer Kartenschrift | 64 Zeichen, wie im Format | die Schrift fehlt |
 | Punkte im Pfad einer Kartenschrift | 64, wie im Format | die Schrift fehlt |
-| Sperrung einer Kartenschrift | 2 | gekappt |
+| Sperrung einer Kartenschrift | 1, wie im Format | gekappt |
 | Breite der Kontur einer Kartenschrift | 64 Einheiten und 0,12 der Höhe der Grossbuchstaben | gekappt |
 | Grösse einer Kartenschrift | 100 000 Blöcke | die Schrift fehlt |
 | Zeichen der Kartenschrift je Neubau, samt Kontur | 20 000 | eine Schrift, die nicht mehr ganz passt, fehlt |
@@ -463,18 +472,21 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 | Ecken je Neubau der Formen | 1 000 000 | der Rest fehlt |
 
 - **Speicher:** Halbe Sammlungen gibt es höchstens eine je Ebene der
-  Liste, also 64, mit je höchstens 1000 Nadeln. Symbole höchstens 200 je
-  Ebene, also 12 800 Texturen, je 1 KiB im Speicher und auf der
-  Grafikkarte, weil die `DynamicTexture` ihr Bild behält; zusammen rund
-  25 MiB.
+  Liste, also 64, mit je höchstens 1000 Nadeln. Ein Bild hat im Speicher
+  4 Byte je Pixel, ein Symbol bis 1 KiB, ein Banner bis 8 KiB, einmal im
+  Speicher und einmal auf der Grafikkarte, weil die `DynamicTexture` ihr
+  Bild behält. 200 je Ebene über 64 Ebenen wären bis 12 800 Banner, rund
+  100 MiB und noch einmal so viel auf der Grafikkarte; darum höchstens
+  1000 Bilder über alle Ebenen, also bis rund 8 MiB und 8 MiB.
 - **Speicher der Formen:** je Punkt 16 Byte, je Trapez 48 Byte, mit
   höchstens 3 Trapezen je Punkt und 16 je Fläche rund 200 Byte je Punkt.
   Über alle Ebenen höchstens 500 000 Punkte, rund 100 MB; während eine
   neue `version` kommt, liegen alte und neue Sammlung kurz nebeneinander,
   rund 200 MB. Ein Plugin für Claims braucht ein Vielfaches weniger. Eine
   Kartenschrift braucht mit Text und Pfad rund 250 bis 280 Byte.
-- **Kosten:** Je Frame geht der Mod alle Nadeln der sichtbaren Ebenen
-  durch, im schlimmsten Fall 64 000. Ein Raster nach Regionen kommt erst,
+- **Kosten:** Je Frame geht der Mod alle Nadeln und Banner der sichtbaren
+  Ebenen durch, im schlimmsten Fall 64 000, und zeichnet die Namen der
+  sichtbaren auf jeder Stufe, je einen Text und einen Kasten. Ein Raster nach Regionen kommt erst,
   wenn eine Messung es verlangt. Die Formen rechnet er nur bei einer
   neuen Ansicht neu, siehe „Flächen, Kreise und Linien“. Der schlimmste
   Neubau legt 1 000 000 Ecken, das Budget; geprüft geht er alle sichtbaren

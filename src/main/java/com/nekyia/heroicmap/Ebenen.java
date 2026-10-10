@@ -67,7 +67,7 @@ final class Ebenen {
     static final int RANDFARBE = 0xFF2B2B2B;
     /** Kartenschrift: höchstens so viele Punkte im Pfad, wie im Format; Farbe und Kontur ohne Angabe; Sperrung gekappt. */
     static final int MAX_PFAD = 64, SCHRIFTFARBE = 0xFF2B2B2B, KONTURFARBE = 0xFFF2E8D0;
-    static final float MAX_SPERRUNG = 2;
+    static final float MAX_SPERRUNG = 1;
     static final String UEBERWELT = "minecraft:overworld";
     /** Die Farbe des Schilds ohne {@code color}. */
     static final int FARBE = 0xFFD9443A;
@@ -87,10 +87,6 @@ final class Ebenen {
         }
     }
 
-    /**
-     * Eine Nadel mit dem Fuss bei (x, z); {@code groesse} 0 ist {@code large}, 1 {@code medium}, 2
-     * {@code small}. Dazu ihre Ebene und deren {@code version} und die Felder ihrer Symbole oder null.
-     */
     /** Ein Ort der Karte mit Fuss bei (x, z): eine Nadel oder ein Banner; zusammen höchstens {@link #MAX_NADELN} je Ebene. */
     sealed interface Ort permits Nadel, Banner {
 
@@ -106,6 +102,10 @@ final class Ebenen {
         String id();
     }
 
+    /**
+     * Eine Nadel mit dem Fuss bei (x, z); {@code groesse} 0 ist {@code large}, 1 {@code medium}, 2
+     * {@code small}. Dazu ihre Ebene und deren {@code version} und die Felder ihrer Symbole oder null.
+     */
     record Nadel(double x, double z, String dimension, String name, int groesse, int farbe, String ebene, String version,
             String symbolGross, String symbolMittel, String id) implements Ort {
     }
@@ -175,16 +175,18 @@ final class Ebenen {
                 }
                 String id = text(json, "id", MAX_KENNUNG), version = text(json, "version", MAX_KENNUNG);
                 Gelesen f = id == null || version == null ? null : Ebenen.formen(json.getAsJsonArray("objects"));
+                int[] banner = {0};
+                List<Ort> nadeln = f == null ? null : Ebenen.nadeln(id, version, json.getAsJsonArray("objects"), banner);
                 return f == null ? null
-                        : new Teil(id, version, json.get("teil").getAsInt(), json.get("teile").getAsInt(),
-                                Ebenen.nadeln(id, version, json.getAsJsonArray("objects")), f.formen(), f.punkte(), f.verworfen());
+                        : new Teil(id, version, json.get("teil").getAsInt(), json.get("teile").getAsInt(), nadeln, f.formen(), f.punkte(),
+                                f.verworfen() + banner[0]);
             } catch (RuntimeException e) {
                 return null;
             }
         }
     }
 
-    /** Die Formen eines Teils, ihre Punkte und wie viele Objekte als Form verworfen sind. */
+    /** Die Formen eines Teils, ihre Punkte und wie viele Objekte als Form verworfen sind; die Banner zählt {@link #nadeln}. */
     record Gelesen(List<Form> formen, int punkte, int verworfen) {
     }
 
@@ -260,8 +262,8 @@ final class Ebenen {
      * Ein Teil {@code ebene}. Er gilt nur mit der {@code version}, die die Liste nennt; das Plugin
      * schickt die Liste vor den Teilen. Sind alle Teile da, ersetzen ihre Nadeln die der Ebene, bis
      * dahin bleibt die alte. Kommt eine Sammlung über {@link #MAX_NADELN} Nadeln, {@link #MAX_OBJEKTE}
-     * Objekte oder {@link #MAX_PUNKTE_EBENE} Punkte, ist sie verworfen. Verworfene Formen meldet das Log
-     * einmal je Ebene und {@code version}, wenn sie fertig ist.
+     * Objekte oder {@link #MAX_PUNKTE_EBENE} Punkte, ist sie verworfen. Verworfene Formen und Banner meldet
+     * das Log einmal je Ebene und {@code version}, wenn sie fertig ist.
      */
     void teil(Teil t) {
         if (t.teile() < 1 || t.teile() > MAX_TEILE || t.teil() < 1 || t.teil() > t.teile()
@@ -288,8 +290,8 @@ final class Ebenen {
         } else if (s.da == s.teile.size()) {
             sammlungen.remove(t.id());
             if (s.verworfen > 0) {
-                LOGGER.warn("Heroic Map: Ebene {} ({}): {} Formen ungültig oder ohne Füllung, weil sie zu aufwendig war", t.id(), t.version(),
-                        s.verworfen);
+                LOGGER.warn("Heroic Map: Ebene {} ({}): {} Banner oder Formen ungültig, oder Formen ohne Füllung, weil zu aufwendig",
+                        t.id(), t.version(), s.verworfen);
             }
             nadeln.put(t.id(), s.teile.stream().flatMap(x -> x.nadeln().stream()).toList());
             formen.put(t.id(), s.teile.stream().flatMap(x -> x.formen().stream()).toList());
@@ -304,25 +306,35 @@ final class Ebenen {
         return je.values().stream().mapToInt(Integer::intValue).sum();
     }
 
+    /** Wie {@link #nadeln(String, String, JsonArray, int[])}, ohne die verworfenen Banner zu zählen. */
+    static List<Ort> nadeln(String ebene, String version, JsonArray objekte) {
+        return nadeln(ebene, version, objekte, new int[1]);
+    }
+
     /**
      * Die Nadeln und Banner aus den Objekten eines Teils, in ihrer Reihenfolge, zusammen höchstens
-     * {@link #MAX_NADELN} + 1; anderes und Kaputtes fällt weg, ebenso ein Banner ohne gültiges Bild.
+     * {@link #MAX_NADELN} + 1; anderes und Kaputtes fällt weg. Ein Banner ohne gültiges Bild oder
+     * kaputt zählt in {@code verworfen[0]}, damit das Log es nennt, wie das Format verlangt.
      */
-    static List<Ort> nadeln(String ebene, String version, JsonArray objekte) {
+    static List<Ort> nadeln(String ebene, String version, JsonArray objekte, int[] verworfen) {
         List<Ort> aus = new ArrayList<>();
         for (JsonElement e : objekte) {
             if (aus.size() > MAX_NADELN) {
                 break;
             }
+            String typ = "";
             try {
                 JsonObject o = e.getAsJsonObject();
-                String typ = o.has("type") ? o.get("type").getAsString() : "";
+                typ = o.has("type") ? o.get("type").getAsString() : "";
                 Ort n = typ.equals("pin") ? nadel(o, ebene, version) : typ.equals("banner") ? banner(o, ebene, version) : null;
                 if (n != null) {
                     aus.add(n);
+                } else if (typ.equals("banner")) {
+                    verworfen[0]++;
                 }
             } catch (RuntimeException fehler) {
                 // Ein kaputtes Objekt fehlt, die übrigen gelten.
+                verworfen[0] += typ.equals("banner") ? 1 : 0;
             }
         }
         return List.copyOf(aus);
@@ -346,7 +358,6 @@ final class Ebenen {
                 feld(symbol, "large"), feld(symbol, "medium"), text(o, "id", MAX_TEXT));
     }
 
-    /** Das Feld eines Symbols wie es steht, oder null, wenn es fehlt oder länger als {@link #MAX_FELD} ist; prüfen tut {@link Symbole#uri}. */
     /** Ein Banner; null ohne Bild unter {@code images/}, mit einem Feld über {@link #MAX_FELD} oder einer zu langen Dimension. */
     private static Banner banner(JsonObject o, String ebene, String version) {
         JsonArray at = o.getAsJsonArray("at");
@@ -357,6 +368,7 @@ final class Ebenen {
                         text(o, "id", MAX_TEXT));
     }
 
+    /** Das Feld eines Symbols wie es steht, oder null, wenn es fehlt oder länger als {@link #MAX_FELD} ist; prüfen tut {@link Symbole#uri}. */
     private static String feld(JsonObject symbol, String groesse) {
         String f = symbol.has(groesse) ? symbol.get(groesse).getAsString() : null;
         return f == null || f.length() > MAX_FELD ? null : f;
