@@ -212,14 +212,13 @@ final class Kacheln implements AutoCloseable {
             ImageReader leser = new WebPImageReaderSpi().createReaderInstance();
             try (MemoryCacheImageInputStream rein = new MemoryCacheImageInputStream(new ByteArrayInputStream(webp))) {
                 leser.setInput(rein);
-                pruefe(leser.getWidth(0), leser.getHeight(0), seite);
+                pruefe(leser.getWidth(0), leser.getHeight(0), seite, seite, false);
                 bild = leser.read(0);
             } finally {
                 leser.dispose();
             }
         }
-        int w = bild.getWidth(), h = bild.getHeight();
-        return new Bild(w, h, bild.getRGB(0, 0, w, h, null, 0, w));
+        return bild(bild);
     }
 
     /**
