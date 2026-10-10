@@ -108,6 +108,7 @@ public final class Bedienung implements FabricClientGameTest {
         wegpunkt(context, maus, k, x, y);
         anheften(context, maus, k);
         form(context, maus, k);
+        ebenen(context, maus, k);
         zumSpieler(context, maus, k);
         optionen(context, maus, k);
         verschieben(context, maus, k);
@@ -457,6 +458,78 @@ public final class Bedienung implements FabricClientGameTest {
         maus.moveCursor(6 * k, (zeile * 14 + 6) * k);
         context.waitTick();
         maus.pressMouse(LINKS);
+        context.waitTicks(2);
+    }
+
+    /**
+     * Die Liste der Ebenen wie ein Spieler: Kommen Ebenen, während die Karte offen ist, erscheint der Knopf
+     * „Ebenen“; ein Klick klappt die Liste auf. Ein Klick auf einen Schalter schaltet die Ebene aus, ein
+     * zweiter wieder an; ein Doppelklick lässt sie an und heftet alles mit id an, ein zweiter löst es.
+     * Zuletzt klappt der Knopf die Liste wieder zu. Siehe docs/vollbildkarte.md, „Ebenen“.
+     */
+    private static void ebenen(ClientGameTestContext context, TestInput maus, int k) {
+        context.runOnClient(mc -> {
+            Ebenen.INSTANZ.empfange(JsonParser.parseString("""
+                    {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:liste","name":{"de":"Liste","en":"Liste"},"visible":true,"version":"1"},
+                      {"id":"test:leer","name":{"de":"Leer","en":"Leer"},"visible":false,"version":"1"}]}""").getAsJsonObject());
+            Ebenen.INSTANZ.teil(Ebenen.Teil.lies("""
+                    {"v":1,"typ":"ebene","jetzt":1,"id":"test:liste","version":"1","teil":1,"teile":1,"objects":[
+                      {"type":"circle","id":"see","center":[0,0],"radius":2,"fill":"#40C04060"},
+                      {"type":"circle","center":[6,0],"radius":2},
+                      {"type":"pin","id":"hafen","at":[0,6],"name":"Hafen"}]}"""));
+        });
+        context.waitTicks(3);
+        klicke(context, maus, k, knopf(context, "heroicmap.karte.ebenen"), false);
+        if (!context.computeOnClient(mc -> Kartenlage.ebenenOffen(Downloads.weltOrdner()))) {
+            throw new AssertionError("Der Knopf „Ebenen“ merkte die offene Liste nicht");
+        }
+        double[] s = context.computeOnClient(mc -> {
+            for (Object kind : mc.gui.screen().children()) {
+                if (kind instanceof AbstractWidget w && w.getMessage().getString().startsWith("Liste")) {
+                    return new double[] {w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0};
+                }
+            }
+            throw new AssertionError("Kein Schalter der Ebene in der Liste");
+        });
+        for (boolean an : new boolean[] {false, true}) {
+            klicke(context, maus, k, s, false);
+            if (ebeneAn(context) != an) {
+                throw new AssertionError("Ein Klick auf den Schalter: Ebene an " + !an + " statt " + an);
+            }
+        }
+        for (boolean ganz : new boolean[] {true, false}) {
+            klicke(context, maus, k, s, true);
+            boolean jetzt = context.computeOnClient(mc -> Wegpunkte.INSTANZ.angeheftet("test:liste", "see")
+                    && Wegpunkte.INSTANZ.nadelAngeheftet("test:liste", "hafen"));
+            boolean keins = context.computeOnClient(mc -> !Wegpunkte.INSTANZ.angeheftet("test:liste", "see")
+                    && !Wegpunkte.INSTANZ.nadelAngeheftet("test:liste", "hafen"));
+            if (!ebeneAn(context) || (ganz ? !jetzt : !keins)) {
+                throw new AssertionError("Doppelklick auf den Schalter: an " + ebeneAn(context) + ", Kreis und Nadel angeheftet "
+                        + jetzt + " statt " + ganz);
+            }
+        }
+        klicke(context, maus, k, knopf(context, "heroicmap.karte.ebenen_zu"), false);
+        if (context.computeOnClient(mc -> Kartenlage.ebenenOffen(Downloads.weltOrdner()))) {
+            throw new AssertionError("Der Knopf klappte die Liste nicht zu");
+        }
+        context.runOnClient(mc -> Ebenen.INSTANZ.leeren());
+        context.waitTicks(2);
+    }
+
+    private static boolean ebeneAn(ClientGameTestContext context) {
+        return context.computeOnClient(mc -> Ebenen.INSTANZ.alle().stream().filter(e -> e.id().equals("test:liste")).allMatch(Ebenen.INSTANZ::an));
+    }
+
+    /** Ein Klick oder ein Doppelklick bei (x, y) in Einheiten des GUI, nach einer Pause, die keinen Doppelklick mit dem vorigen zulässt. */
+    private static void klicke(ClientGameTestContext context, TestInput maus, int k, double[] ort, boolean doppelt) {
+        warte250();
+        maus.setCursorPos(ort[0] * k, ort[1] * k);
+        context.waitTick();
+        maus.pressMouse(LINKS);
+        if (doppelt) {
+            context.waitTick();
+            maus.pressMouse(LINKS);
+        }
         context.waitTicks(2);
     }
 
