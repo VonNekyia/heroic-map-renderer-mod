@@ -59,7 +59,9 @@ record Kanal(String json, Ebenen.Teil teil, Tafeln.Antwort tafel) implements Cus
         PayloadTypeRegistry.serverboundPlay().register(TYPE, CODEC);
         ClientPlayNetworking.registerGlobalReceiver(TYPE, (nachricht, kontext) -> {
             if (nachricht.teil() != null) {
-                Ebenen.INSTANZ.teil(nachricht.teil());
+                if (Ebenen.INSTANZ.teil(nachricht.teil())) {
+                    Wegpunkte.INSTANZ.pruefe(Ebenen.INSTANZ, nachricht.teil().id());
+                }
             } else if (nachricht.tafel() != null) {
                 Tafeln.INSTANZ.antwort(nachricht.tafel());
             } else {

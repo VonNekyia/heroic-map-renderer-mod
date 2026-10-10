@@ -92,6 +92,8 @@ final class Karte extends Screen {
     private Marke gedrueckt;
     /** War das Drücken der zweite Klick eines Doppelklicks? */
     private boolean doppelklick;
+    /** Die Fläche oder der Kreis unter dem letzten Klick ohne Marke; ein Doppelklick darauf heftet sie an. */
+    private Tafeln.Ziel letztesZiel;
     /** Wie weit seit dem Drücken gezogen ist, in Einheiten des GUI. */
     private double gezogen;
 
@@ -210,8 +212,7 @@ final class Karte extends Screen {
                 new double[] {blick.basisRasterX(0, width) / scale, blick.basisRasterZ(0, height) / scale,
                         blick.basisRasterX(width, width) / scale, blick.basisRasterZ(height, height) / scale},
                 pose, new ScreenRectangle(0, 0, width, height).transformMaxBounds(pose), Double.POSITIVE_INFINITY);
-        List<List<Ebenen.Form>> ebenen = Ebenen.INSTANZ.sichtbar().stream().map(e -> Ebenen.INSTANZ.formen(e.id())).toList();
-        Formen.zeichne(g, a, dimension, ebenen, formenSpeicher, font, true);
+        Formen.zeichne(g, a, dimension, Wegpunkte.INSTANZ.karte(Ebenen.INSTANZ), formenSpeicher, font, true);
     }
 
     /** Chunklinien je 16 Blöcke als ein Element des GUI. Siehe docs/minimap.md, „Chunklinien“. */
@@ -365,8 +366,9 @@ final class Karte extends Screen {
 
     /**
      * Die eigenen Regionen dieser Dimension: die Fläche in ihrer Farbe zu 25 %, 1 Einheit Rand deckend,
-     * auf ganzen Pixeln wie die Kacheln; dazu die Vorschau, solange der Spieler eine setzt, gestrichelt
-     * von der ersten Ecke bis zum Block unter der Maus. Siehe docs/wegpunkte.md, „Regionen“.
+     * angeheftet {@link Wegpunkte#BREITER} breiter, auf ganzen Pixeln wie die Kacheln; dazu die Vorschau,
+     * solange der Spieler eine setzt, gestrichelt von der ersten Ecke bis zum Block unter der Maus.
+     * Siehe docs/wegpunkte.md, „Regionen“.
      */
     private void regionen(GuiGraphicsExtractor g, int mausX, int mausY) {
         if (minecraft.player == null) {
@@ -382,12 +384,12 @@ final class Karte extends Screen {
         for (Wegpunkte.Region r : Wegpunkte.INSTANZ.regionen()) {
             int[] k = r.dimension().equals(dimension) ? kasten(r.x0(), r.z0(), r.x1(), r.z1(), gs) : null;
             if (k != null) {
-                int farbe = Wegpunkte.FARBEN[r.farbe()];
+                int farbe = Wegpunkte.FARBEN[r.farbe()], b = Math.round((r.angeheftet() ? 1 + Wegpunkte.BREITER : 1) * gs);
                 g.fill(k[0], k[1], k[2], k[3], farbe & 0x00FFFFFF | 0x40000000);
-                g.fill(k[0], k[1], k[2], k[1] + gs, farbe);
-                g.fill(k[0], k[3] - gs, k[2], k[3], farbe);
-                g.fill(k[0], k[1], k[0] + gs, k[3], farbe);
-                g.fill(k[2] - gs, k[1], k[2], k[3], farbe);
+                g.fill(k[0], k[1], k[2], k[1] + b, farbe);
+                g.fill(k[0], k[3] - b, k[2], k[3], farbe);
+                g.fill(k[0], k[1], k[0] + b, k[3], farbe);
+                g.fill(k[2] - b, k[1], k[2], k[3], farbe);
             }
         }
         if (regionVon != null) {
@@ -432,7 +434,8 @@ final class Karte extends Screen {
 
     /**
      * Linksklick auf eine Marke, beim Loslassen ohne Zug, legt sie in die Mitte, ein Doppelklick
-     * heftet sie an die Minimap oder löst sie. Rechtsklick öffnet das Menü: „Hierher teleportieren“,
+     * heftet sie an die Minimap oder löst sie, ebenso auf eine Fläche oder einen Kreis vom Server.
+     * Rechtsklick öffnet das Menü: „Hierher teleportieren“,
      * nur mit execute und tp im Befehlsbaum und nicht unter einer Decke, sonst landete man auf dem
      * Dach; darunter „Wegpunkt setzen“, auf einem Wegpunkt „Wegpunkt löschen“. Erst ein Klick auf
      * einen Eintrag tut etwas. Siehe docs/vollbildkarte.md, „Bedienung“;
@@ -440,9 +443,11 @@ final class Karte extends Screen {
      */
     @Override
     public boolean mouseClicked(MouseButtonEvent e, boolean doppelt) {
-        // Jeder Klick, der true gibt, zählt für den nächsten Doppelklick; gemerkt bleibt nur ein Klick auf eine Marke.
+        // Jeder Klick, der true gibt, zählt für den nächsten Doppelklick; gemerkt bleibt nur ein Klick auf eine Marke oder eine Fläche.
         Marke vorige = letzte;
+        Tafeln.Ziel voriges = letztesZiel;
         letzte = null;
+        letztesZiel = null;
         gedrueckt = null;
         taste = e.button() == InputConstants.MOUSE_BUTTON_LEFT;
         gezogen = 0;
@@ -469,6 +474,12 @@ final class Karte extends Screen {
             klickVerbraucht = true;
             return true;
         }
+        // Der zweite Klick eines Doppelklicks auf dieselbe Fläche oder denselben Kreis heftet an oder löst; die Tafel bleibt.
+        if (doppelt && voriges != null && taste && getChildAt(e.x(), e.y()).isEmpty() && voriges.equals(tafelUnter(e.x(), e.y()))) {
+            anheften(Wegpunkte.INSTANZ.umschalten(voriges.ebene(), voriges.id()));
+            klickVerbraucht = true;
+            return true;
+        }
         if (zeigen.gehalten()) {
             // Ein Klick daneben schliesst zuerst nur die gehaltene Tafel; einer auf ein anderes Ziel hält beim Loslassen dessen.
             // Nur eine sichtbare Tafel verbraucht den Klick; eine, die noch lädt oder keine ist, geht still zu.
@@ -476,6 +487,8 @@ final class Karte extends Screen {
             boolean sichtbar = tafelKasten != null;
             zeigen.schliesse();
             if (sichtbar && (anderes == null || anderes.equals(alt))) {
+                // Auch dieser Klick zählt für einen Doppelklick auf dieselbe Fläche.
+                letztesZiel = anderes != null && taste && nadelUnter(e.x(), e.y()) == null ? anderes : null;
                 klickVerbraucht = true;
                 return true;
             }
@@ -491,8 +504,8 @@ final class Karte extends Screen {
             // Der erste Klick hat die Marke schon in die Mitte gelegt; der zweite zählt für dieselbe.
             doppelklick = doppelt && vorige != null;
             gedrueckt = doppelklick ? vorige : m;
-            // true, sonst zählt das Spiel den nächsten Klick nicht als doppelt; ziehen geht trotzdem.
-            return gedrueckt != null;
+            // true, sonst zählt das Spiel den nächsten Klick nicht als doppelt, auch auf einer Fläche; ziehen geht trotzdem.
+            return true;
         }
         if (e.button() == InputConstants.MOUSE_BUTTON_RIGHT) {
             menue(e.x(), e.y(), m != null ? m.punkt() : null, m != null ? m.region() : null);
@@ -516,6 +529,8 @@ final class Karte extends Screen {
         if (m == null && e.button() == InputConstants.MOUSE_BUTTON_LEFT && gezogen <= ZUG && ziel == null && blick != null
                 && !drin(tafelKasten, e.x(), e.y())) {
             Tafeln.Ziel z = tafelUnter(e.x(), e.y());
+            // Nur eine Fläche oder ein Kreis lässt sich anheften, keine Nadel, auch wenn sie keine Tafel hat.
+            letztesZiel = z != null && nadelUnter(e.x(), e.y()) == null ? z : null;
             // Halten nur, wenn eine Tafel da ist oder noch kommt; die Frage geht dabei schon hinaus.
             Optional<Tafel> t = z == null ? Optional.empty() : Tafeln.INSTANZ.tafel(z, Util.getMillis());
             if (t == null || t.isPresent()) {
@@ -531,10 +546,19 @@ final class Karte extends Screen {
             letzte = m;
         } else if (m.punkt() != null) {
             Wegpunkte.INSTANZ.umschalten(m.punkt());
+        } else if (m.region() != null) {
+            anheften(Wegpunkte.INSTANZ.umschalten(m.region()));
         } else if (m.spieler() != null) {
             Wegpunkte.INSTANZ.umschalten(m.spieler());
         }
         return true;
+    }
+
+    /** Sagt unten links, wenn schon {@link Wegpunkte#MAX_ANGEHEFTET} Regionen angeheftet sind und nichts geschah. */
+    private void anheften(boolean geschehen) {
+        if (!geschehen) {
+            hinweis = Component.translatable("heroicmap.karte.angeheftet_voll", Wegpunkte.MAX_ANGEHEFTET);
+        }
     }
 
     /**
@@ -653,6 +677,12 @@ final class Karte extends Screen {
 
     /** Das Ziel unter dem Zeiger: eine Nadel oder ein Banner, die spätere über der früheren, sonst die oberste Fläche oder der oberste Kreis. */
     private Tafeln.Ziel tafelUnter(double mx, double my) {
+        Tafeln.Ziel nadel = nadelUnter(mx, my);
+        return nadel != null ? nadel : formUnter(mx, my);
+    }
+
+    /** Die Nadel oder das Banner mit {@code id} unter dem Zeiger, die spätere über der früheren; sonst null. */
+    private Tafeln.Ziel nadelUnter(double mx, double my) {
         if (minecraft.player == null || satz == null) {
             return null;
         }
@@ -677,20 +707,23 @@ final class Karte extends Screen {
                 }
             }
         }
-        if (treffer != null) {
-            return treffer;
+        return treffer;
+    }
+
+    /** Die oberste Fläche oder der oberste Kreis mit {@code id} unter dem Zeiger; sonst null. */
+    private Tafeln.Ziel formUnter(double mx, double my) {
+        if (minecraft.player == null || satz == null) {
+            return null;
         }
+        String dimension = minecraft.player.level().dimension().identifier().toString();
+        int scale = satz.scale();
         double wx = blick.basisRasterX(mx, width) / scale, wz = blick.basisRasterZ(my, height) / scale;
         List<Ebenen.Eintrag> ebenen = Ebenen.INSTANZ.sichtbar();
         for (int i = ebenen.size() - 1; i >= 0; i--) {
             List<Ebenen.Form> formen = Ebenen.INSTANZ.formen(ebenen.get(i).id());
             for (int j = formen.size() - 1; j >= 0; j--) {
                 Ebenen.Form f = formen.get(j);
-                String id = switch (f) {
-                    case Ebenen.Flaeche fl -> fl.id();
-                    case Ebenen.Kreis k -> k.id();
-                    default -> null;
-                };
+                String id = Ebenen.id(f);
                 if (id != null && f.dimension().equals(dimension) && Tafeln.trifft(f, wx, wz)) {
                     return Tafeln.ziel(Ebenen.INSTANZ, ebenen.get(i).id(), id);
                 }

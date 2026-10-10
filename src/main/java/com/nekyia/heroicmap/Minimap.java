@@ -109,7 +109,7 @@ public final class Minimap {
     private boolean show = true;
     /** Chunklinien auf Minimap und Vollbildkarte, eine Vorliebe aus dem Untermenü. Siehe docs/minimap.md, „Chunklinien“. */
     private boolean chunklinien;
-    private final Formen.Speicher formenSpeicher = new Formen.Speicher();
+    private final Formen.Speicher formenSpeicher = new Formen.Speicher(), angeheftetSpeicher = new Formen.Speicher();
     /** Koordinaten unter der Minimap. Siehe docs/minimap.md, „Koordinaten“. */
     enum Koordinaten { AUS, XZ, XYZ }
 
@@ -677,9 +677,11 @@ public final class Minimap {
     }
 
     /**
-     * Die Flächen, Kreise und Linien der sichtbaren Ebenen in dieser Dimension, in Pixeln des Schirms
-     * mit {@code lage} wie die Karte und mit ihrer Form geschnitten; {@code bereich} ist, was vom Bild zu
-     * sehen sein kann. Siehe docs/ebenen.md, „Flächen, Kreise und Linien“.
+     * Die angehefteten Flächen und Kreise samt eigenen Regionen, darüber die Kartenschrift der sichtbaren
+     * Ebenen in dieser Dimension, in Pixeln des Schirms mit {@code lage} wie die Karte und mit ihrer Form
+     * geschnitten; {@code bereich} ist, was vom Bild zu sehen sein kann.
+     * Siehe docs/ebenen.md, „Flächen, Kreise und Linien“,
+     * und docs/wegpunkte.md, „Anheften“.
      */
     private void formen(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k, Drehung.Lage lage, double[] bereich, float[] form,
             String dimension) {
@@ -693,9 +695,11 @@ public final class Minimap {
                 (bereich[3] + oben) / block}, kopie, new ScreenRectangle(r.x() * k, r.y() * k, n, n).transformMaxBounds(kopie),
                 // Die Kartenschrift höchstens ein Zehntel der Seite hoch, sonst erschlüge sie die Karte.
                 r.seite() / 10.0);
+        Font font = Minecraft.getInstance().font;
+        // Flächen, Kreise und Linien nur auf der Vollbildkarte; auf die Minimap kommen Flächen und Kreise erst angeheftet (mod#59, mod#36).
+        Formen.zeichne(g, a, dimension, Wegpunkte.INSTANZ.minimap(Ebenen.INSTANZ), angeheftetSpeicher, font, true);
         List<List<Ebenen.Form>> ebenen = Ebenen.INSTANZ.sichtbar().stream().map(e -> Ebenen.INSTANZ.formen(e.id())).toList();
-        // Flächen, Kreise und Linien nur auf der Vollbildkarte; auf die Minimap kommen sie erst angeheftet (mod#59, mod#36).
-        Formen.zeichne(g, a, dimension, ebenen, formenSpeicher, Minecraft.getInstance().font, false);
+        Formen.zeichne(g, a, dimension, ebenen, formenSpeicher, font, false);
         pose.popMatrix();
     }
 

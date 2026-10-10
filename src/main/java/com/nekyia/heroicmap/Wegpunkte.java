@@ -12,17 +12,22 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 
 /**
  * Die Wegpunkte und eigenen Regionen des Spielers und was er auf der Minimap angeheftet hat,
- * Wegpunkte wie Mitspieler. Je Welt in {@code wegpunkte.json} im Ordner der Welt; im Einzelspieler
- * nur im Speicher. Nur der Render-Thread liest und ändert sie. Siehe docs/wegpunkte.md.
+ * Wegpunkte, Mitspieler, eigene Regionen und Flächen und Kreise vom Server. Je Welt in
+ * {@code wegpunkte.json} im Ordner der Welt; im Einzelspieler nur im Speicher. Nur der
+ * Render-Thread liest und ändert sie. Siehe docs/wegpunkte.md.
  */
 final class Wegpunkte {
 
@@ -46,13 +51,29 @@ final class Wegpunkte {
         }
     }
 
+    /** Eine angeheftete Fläche oder ein Kreis vom Server, über die Kennungen von Ebene und Objekt; hält so über neue {@code version}s. */
+    record Anheftung(String ebene, String id) {
+    }
+
     /** So viele eigene Regionen je Welt; darüber setzt der Mod keine neue. */
     static final int MAX_REGIONEN = 256;
+    /** So viele Regionen und Kreise je Welt angeheftet, eigene und vom Server zusammen; darüber heftet der Mod keine an. */
+    static final int MAX_ANGEHEFTET = 64;
+    /** So viele Einheiten breiter ist auf der Vollbildkarte der Rand angehefteter Regionen und Kreise. */
+    static final float BREITER = 2;
 
     private final List<Punkt> punkte = new ArrayList<>();
     private final List<Region> regionen = new ArrayList<>();
     /** Die Mitspieler, die auf der Minimap angeheftet sind. */
     private final Set<UUID> spieler = new LinkedHashSet<>();
+    /** Die angehefteten Flächen und Kreise vom Server. */
+    private final Set<Anheftung> formen = new LinkedHashSet<>();
+    /** Zählt jede Änderung; die Listen für Karte und Minimap baut der Mod danach neu. */
+    private int stand;
+    /** Die Listen für Karte und Minimap und woraus sie gebaut sind. */
+    private Ebenen gebautAus;
+    private int gebautEbenen, gebautStand;
+    private List<List<Ebenen.Form>> fuerKarte = List.of(), fuerMinimap = List.of();
     /** Die Datei, oder null im Einzelspieler. */
     private Path datei;
     /** Ist gelesen, seit dem letzten Leeren? */
@@ -90,6 +111,7 @@ final class Wegpunkte {
     }
 
     void lies(JsonObject json) {
+        stand++;
         for (JsonElement element : liste(json, "wegpunkte")) {
             try {
                 JsonObject o = element.getAsJsonObject();
@@ -106,7 +128,8 @@ final class Wegpunkte {
             try {
                 JsonObject o = element.getAsJsonObject();
                 Region r = region(o.get("dimension").getAsString(), o.get("x0").getAsInt(), o.get("z0").getAsInt(), o.get("x1").getAsInt(),
-                        o.get("z1").getAsInt(), Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length), o.get("minimap").getAsBoolean());
+                        o.get("z1").getAsInt(), Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length),
+                        o.get("minimap").getAsBoolean() && angeheftet() < MAX_ANGEHEFTET);
                 if (regionen.size() < MAX_REGIONEN && finde(r) < 0) {
                     regionen.add(r);
                 }
@@ -117,6 +140,17 @@ final class Wegpunkte {
         for (JsonElement element : liste(json, "spieler")) {
             try {
                 spieler.add(UUID.fromString(element.getAsString()));
+            } catch (RuntimeException kaputt) {
+                // Nur dieser Eintrag fällt weg.
+            }
+        }
+        // Eine Datei von vor mod#36 hat keine Liste; dann ist nichts vom Server angeheftet.
+        for (JsonElement element : liste(json, "formen")) {
+            try {
+                JsonObject o = element.getAsJsonObject();
+                if (angeheftet() < MAX_ANGEHEFTET) {
+                    formen.add(new Anheftung(o.get("ebene").getAsString(), o.get("id").getAsString()));
+                }
             } catch (RuntimeException kaputt) {
                 // Nur dieser Eintrag fällt weg.
             }
@@ -152,10 +186,18 @@ final class Wegpunkte {
         }
         JsonArray uuids = new JsonArray();
         spieler.forEach(u -> uuids.add(u.toString()));
+        JsonArray server = new JsonArray();
+        for (Anheftung a : formen) {
+            JsonObject o = new JsonObject();
+            o.addProperty("ebene", a.ebene());
+            o.addProperty("id", a.id());
+            server.add(o);
+        }
         JsonObject json = new JsonObject();
         json.add("wegpunkte", liste);
         json.add("regionen", rechtecke);
         json.add("spieler", uuids);
+        json.add("formen", server);
         return json;
     }
 
@@ -163,6 +205,8 @@ final class Wegpunkte {
         punkte.clear();
         regionen.clear();
         spieler.clear();
+        formen.clear();
+        stand++;
         datei = null;
         geladen = false;
     }
@@ -270,6 +314,139 @@ final class Wegpunkte {
         }
     }
 
+    /**
+     * Heftet die eigene Region an die Minimap oder löst sie; false, wenn schon {@link #MAX_ANGEHEFTET}
+     * angeheftet sind und nichts geschah.
+     */
+    boolean umschalten(Region r) {
+        int i = finde(r);
+        if (i < 0) {
+            return true;
+        }
+        Region alt = regionen.get(i);
+        if (!alt.angeheftet() && angeheftet() >= MAX_ANGEHEFTET) {
+            return false;
+        }
+        regionen.set(i, new Region(alt.dimension(), alt.x0(), alt.z0(), alt.x1(), alt.z1(), alt.farbe(), !alt.angeheftet()));
+        schreibe();
+        return true;
+    }
+
+    /** Wie oben für die Fläche oder den Kreis {@code id} der Ebene {@code ebene} vom Server. */
+    boolean umschalten(String ebene, String id) {
+        Anheftung a = new Anheftung(ebene, id);
+        if (!formen.remove(a)) {
+            if (angeheftet() >= MAX_ANGEHEFTET) {
+                return false;
+            }
+            formen.add(a);
+        }
+        schreibe();
+        return true;
+    }
+
+    boolean angeheftet(String ebene, String id) {
+        return formen.contains(new Anheftung(ebene, id));
+    }
+
+    /** Wie viele Regionen und Kreise angeheftet sind, eigene und vom Server. */
+    int angeheftet() {
+        int n = formen.size();
+        for (Region r : regionen) {
+            n += r.angeheftet() ? 1 : 0;
+        }
+        return n;
+    }
+
+    /**
+     * Ist die Ebene {@code ebene} eben ganz angekommen: vergisst, was von ihr angeheftet ist und sie
+     * nicht mehr hat; sonst füllten tote Einträge die {@link #MAX_ANGEHEFTET}. Andere Ebenen bleiben,
+     * sie können noch vom vorigen Server sein.
+     */
+    void pruefe(Ebenen e, String ebene) {
+        Set<String> ids = e.formen(ebene).stream().map(Ebenen::id).filter(Objects::nonNull).collect(Collectors.toSet());
+        if (formen.removeIf(a -> a.ebene().equals(ebene) && !ids.contains(a.id()))) {
+            schreibe();
+        }
+    }
+
+    /**
+     * Die Formen der sichtbaren Ebenen für die Vollbildkarte: Angeheftetes mit einem Rand, der
+     * {@link #BREITER} Einheiten breiter ist, sonst die Listen der Ebenen selbst. Dieselben Listen,
+     * bis sich Ebenen oder Wegpunkte ändern; so bleibt der {@link Formen.Speicher} gültig.
+     */
+    List<List<Ebenen.Form>> karte(Ebenen e) {
+        baue(e);
+        return fuerKarte;
+    }
+
+    /**
+     * Für die Minimap nur Angeheftetes: je sichtbare Ebene ihre angehefteten Flächen und Kreise,
+     * zuletzt die angehefteten eigenen Regionen. Dieselben Listen wie oben.
+     */
+    List<List<Ebenen.Form>> minimap(Ebenen e) {
+        baue(e);
+        return fuerMinimap;
+    }
+
+    private void baue(Ebenen e) {
+        if (e == gebautAus && e.stand() == gebautEbenen && stand == gebautStand) {
+            return;
+        }
+        gebautAus = e;
+        gebautEbenen = e.stand();
+        gebautStand = stand;
+        Map<String, Set<String>> je = new HashMap<>();
+        formen.forEach(a -> je.computeIfAbsent(a.ebene(), k -> new HashSet<>()).add(a.id()));
+        List<List<Ebenen.Form>> karte = new ArrayList<>(), minimap = new ArrayList<>();
+        for (Ebenen.Eintrag eintrag : e.sichtbar()) {
+            List<Ebenen.Form> alle = e.formen(eintrag.id());
+            Set<String> ids = je.getOrDefault(eintrag.id(), Set.of());
+            List<Ebenen.Form> breit = null, an = new ArrayList<>();
+            for (int i = 0; i < alle.size() && !ids.isEmpty(); i++) {
+                Ebenen.Form f = alle.get(i);
+                if (ids.contains(Ebenen.id(f))) {
+                    breit = breit == null ? new ArrayList<>(alle) : breit;
+                    breit.set(i, breiter(f));
+                    an.add(f);
+                }
+            }
+            karte.add(breit == null ? alle : List.copyOf(breit));
+            if (!an.isEmpty()) {
+                minimap.add(List.copyOf(an));
+            }
+        }
+        List<Ebenen.Form> eigene = regionen.stream().filter(Region::angeheftet).<Ebenen.Form>map(Wegpunkte::flaeche).toList();
+        if (!eigene.isEmpty()) {
+            minimap.add(eigene);
+        }
+        fuerKarte = List.copyOf(karte);
+        fuerMinimap = List.copyOf(minimap);
+    }
+
+    /** Die Form mit einem Rand {@link #BREITER} breiter; ohne Rand einer in der Füllung ohne Alpha, wie die Vorgabe des Formats. */
+    static Ebenen.Form breiter(Ebenen.Form f) {
+        return switch (f) {
+            case Ebenen.Flaeche fl -> new Ebenen.Flaeche(fl.dimension(), fl.fuellung(), fl.trapeze(), breiter(fl.rand(), fl.fuellung()), fl.ringe(),
+                    fl.box(), fl.id());
+            case Ebenen.Kreis k -> new Ebenen.Kreis(k.dimension(), k.x(), k.z(), k.radius(), k.fuellung(), breiter(k.rand(), k.fuellung()), k.id());
+            default -> f;
+        };
+    }
+
+    private static Ebenen.Rand breiter(Ebenen.Rand r, int fuellung) {
+        return r == null ? new Ebenen.Rand(0xFF000000 | fuellung, BREITER, 0, 0)
+                : new Ebenen.Rand(r.farbe(), Math.min(r.breite() + BREITER, Ebenen.MAX_BREITE), r.strich(), r.luecke());
+    }
+
+    /** Die eigene Region als Fläche, wie die Vollbildkarte sie zeichnet: in ihrer Farbe zu 25 %, 1 Einheit Rand deckend. */
+    static Ebenen.Flaeche flaeche(Region r) {
+        double[] ring = {r.x0(), r.z0(), r.x1() + 1, r.z0(), r.x1() + 1, r.z1() + 1, r.x0(), r.z1() + 1};
+        int farbe = FARBEN[r.farbe()];
+        return new Ebenen.Flaeche(r.dimension(), farbe & 0x00FFFFFF | 0x40000000, Trapeze.von(List.of(ring)), new Ebenen.Rand(farbe, 1, 0, 0),
+                List.of(ring), new double[] {r.x0(), r.z0(), r.x1() + 1, r.z1() + 1}, null);
+    }
+
     boolean angeheftet(UUID uuid) {
         return spieler.contains(uuid);
     }
@@ -292,8 +469,9 @@ final class Wegpunkte {
         return -1;
     }
 
-    /** Über eine Zwischendatei, so liegt nie eine halbe Datei da. */
+    /** Nach jeder Änderung; über eine Zwischendatei, so liegt nie eine halbe Datei da. */
     private void schreibe() {
+        stand++;
         if (datei == null) {
             return;
         }

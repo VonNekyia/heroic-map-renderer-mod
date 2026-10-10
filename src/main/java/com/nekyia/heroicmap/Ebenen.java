@@ -137,6 +137,15 @@ final class Ebenen {
         String dimension();
     }
 
+    /** Die {@code id} einer Fläche oder eines Kreises, oder null; nur sie haben eine Tafel und lassen sich anheften. */
+    static String id(Form f) {
+        return switch (f) {
+            case Flaeche fl -> fl.id();
+            case Kreis k -> k.id();
+            default -> null;
+        };
+    }
+
     /**
      * Eine Region: die Füllung mit Alpha als Trapeze aus {@link Trapeze}, null ohne Füllung oder wenn sie
      * zu aufwendig ist; der Rand (null ohne) um alle Ringe {x0, z0, …}; {@code box} {x0, z0, x1, z1}.
@@ -282,13 +291,13 @@ final class Ebenen {
      * schickt die Liste vor den Teilen. Sind alle Teile da, ersetzen ihre Nadeln die der Ebene, bis
      * dahin bleibt die alte. Kommt eine Sammlung über {@link #MAX_NADELN} Nadeln, {@link #MAX_OBJEKTE}
      * Objekte oder {@link #MAX_PUNKTE_EBENE} Punkte, ist sie verworfen. Verworfene Formen und Banner meldet
-     * das Log einmal je Ebene und {@code version}, wenn sie fertig ist.
+     * das Log einmal je Ebene und {@code version}, wenn sie fertig ist. True, wenn die Ebene damit ganz da ist.
      */
-    void teil(Teil t) {
+    boolean teil(Teil t) {
         if (t.teile() < 1 || t.teile() > MAX_TEILE || t.teil() < 1 || t.teil() > t.teile()
                 || liste.stream().noneMatch(e -> e.id().equals(t.id()) && e.version().equals(t.version()))
                 || t.version().equals(verworfen.get(t.id()))) {
-            return;
+            return false;
         }
         Sammlung s = sammlungen.get(t.id());
         if (s == null || s.teile.size() != t.teile()) {
@@ -317,7 +326,9 @@ final class Ebenen {
             nadeln.put(t.id(), s.teile.stream().flatMap(x -> x.nadeln().stream()).toList());
             formen.put(t.id(), s.teile.stream().flatMap(x -> x.formen().stream()).toList());
             punkte.put(t.id(), s.punkte);
+            return true;
         }
+        return false;
     }
 
     /** Die Punkte über alle Ebenen, je Ebene die fertige oder die halbe Sammlung, die grössere. */

@@ -126,7 +126,7 @@ public final class Bilder implements FabricClientGameTest {
                 "holes":[[[-10,-10],[-6,-10],[-6,-6],[-10,-6]]]}]},
               {"type":"region","fill":"#E0403080","stroke":{"color":"#FFFFFF","width":1,"style":"dashed"},
                 "polygons":[{"outer":[[2,2],[14,2],[2,14]]}]},
-              {"type":"circle","center":[9,-8],"radius":5,"fill":"#40C04060","stroke":{"style":"dashed"}},
+              {"type":"circle","id":"see","center":[9,-8],"radius":5,"fill":"#40C04060","stroke":{"style":"dashed"}},
               {"type":"line","points":[[-15,10],[0,8],[15,14]],"stroke":{"color":"#FFD700","width":3,"style":"dashed","dash":[6,4]}},
               {"type":"label","text":"Westmeer","path":[[-14,13],[0,9],[14,12]],"size":3,"spacing":0.2,"color":"#2B3A55",
                 "outline":{"color":"#F2E8D0CC","width":1}}
@@ -361,8 +361,10 @@ public final class Bilder implements FabricClientGameTest {
     }
 
     /**
-     * Flächen, Kreis und Linie einer Ebene: die Minimap genordet und gedreht mit „uhr“ bei 4 px und Zoom 4,
-     * dann die Vollbildkarte. Siehe docs/ebenen.md, „Flächen, Kreise und Linien“.
+     * Flächen, Kreis und Linie einer Ebene, der Kreis und eine eigene Region angeheftet: die Minimap
+     * genordet und gedreht mit „uhr“ bei 4 px und Zoom 4, dann die Vollbildkarte.
+     * Siehe docs/ebenen.md, „Flächen, Kreise und Linien“,
+     * und docs/wegpunkte.md, „Anheften“.
      */
     private static void formen(ClientGameTestContext context, TestServerContext server) {
         context.runOnClient(mc -> {
@@ -374,6 +376,9 @@ public final class Bilder implements FabricClientGameTest {
                 throw new AssertionError("Teil der Formen nicht lesbar");
             }
             Ebenen.INSTANZ.teil(t);
+            Wegpunkte.INSTANZ.umschalten("test:formen", "see");
+            Wegpunkte.INSTANZ.setze(Ebenen.UEBERWELT, 12, -2, 14, 0);
+            Wegpunkte.INSTANZ.umschalten(Wegpunkte.INSTANZ.regionen().getLast());
             Minimap.INSTANZ.setzeScale(4);
             Minimap.INSTANZ.setzeZoom(4);
         });
@@ -410,6 +415,8 @@ public final class Bilder implements FabricClientGameTest {
         context.runOnClient(mc -> {
             mc.gui.setScreen(null);
             Ebenen.INSTANZ.leeren();
+            Wegpunkte.INSTANZ.umschalten("test:formen", "see");
+            Wegpunkte.INSTANZ.loesche(Wegpunkte.INSTANZ.regionen().getLast());
             Minimap.INSTANZ.setzeDrehen(false);
             Minimap.INSTANZ.setzeSkin(Skin.OHNE);
             Minimap.INSTANZ.setzeRund(false);
