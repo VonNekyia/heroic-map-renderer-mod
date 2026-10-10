@@ -40,6 +40,8 @@ final class Karte extends Screen {
     private static final int TEXT = 0xFFFFFFFF;
     /** Breite der Knöpfe in Einheiten des GUI. */
     private static final int KNOPF = 90;
+    /** Breite des Knopfs „An“/„Aus“ einer Ebene; ihr Name steht links daneben. */
+    private static final int AN_AUS = 30;
     /** Höhe eines Eintrags im Menü nach Rechtsklick. */
     private static final int ZEILE = 14;
     /** Abstand der Marken vom Rand des Schirms; Platz für den Namen über einem Kopf. */
@@ -136,11 +138,11 @@ final class Karte extends Screen {
     /** Für welche Schalter alles angeheftet ist, gerechnet bei diesem Stand der Ebenen und der Wegpunkte. */
     private boolean[] ganz = new boolean[0];
     private int ganzEbenen = -1, ganzWegpunkte = -1;
-    /** Der Schalter unter dem letzten Klick; ein Doppelklick darauf heftet die ganze Ebene an. */
+    /** Die Ebene unter dem letzten Klick auf eine Überschrift; ein Doppelklick darauf heftet die ganze Ebene an. */
     private Schalter letzterSchalter;
 
-    /** Ein Schalter der Liste und die Kennung seiner Ebene. */
-    private record Schalter(CycleButton<Boolean> knopf, String ebene) {
+    /** Eine Zeile der Liste: der Knopf „An“/„Aus“, die Kennung seiner Ebene und ihr Name, die Überschrift links davor. */
+    private record Schalter(CycleButton<Boolean> knopf, String ebene, Component name) {
     }
 
     /** {@code satz} ist null, wenn für diese Dimension nichts geladen ist. */
@@ -194,8 +196,9 @@ final class Karte extends Screen {
     }
 
     /**
-     * Der Knopf „Ebenen“ unter {@code ueber}, ist die Liste offen, darunter je Ebene ein Schalter, die
-     * oberste zuerst, bis über „Optionen …“; passen nicht alle, führt der letzte zu „Ebenen …“. Ohne
+     * Der Knopf „Ebenen“ unter {@code ueber}, ist die Liste offen, darunter je Ebene ein Knopf „An“/„Aus“
+     * mit dem Namen links davor, die oberste zuerst, bis über „Optionen …“; passen nicht alle, führt der
+     * letzte zu „Ebenen …“. Ohne
      * Ebenen kein Knopf. Gibt den untersten Knopf zurück. Siehe docs/vollbildkarte.md, „Ebenen“.
      */
     private AbstractWidget ebenen(int x, AbstractWidget ueber) {
@@ -222,9 +225,10 @@ final class Karte extends Screen {
         int n = alle.size() <= platz ? alle.size() : platz - 1;
         for (int i = 0; i < n; i++) {
             Ebenen.Eintrag e = alle.get(i);
-            CycleButton<Boolean> k = addRenderableWidget(CycleButton.onOffBuilder(Ebenen.INSTANZ.an(e)).create(x, unterster.getY() + 22, KNOPF, 20,
-                    Component.literal(e.name(deutsch)), (b, an) -> Ebenen.INSTANZ.setze(e.id(), an)));
-            schalter.add(new Schalter(k, e.id()));
+            Component name = Component.literal(e.name(deutsch));
+            CycleButton<Boolean> k = addRenderableWidget(CycleButton.onOffBuilder(Ebenen.INSTANZ.an(e)).displayOnlyValue()
+                    .create(x + KNOPF - AN_AUS, unterster.getY() + 22, AN_AUS, 20, name, (b, an) -> Ebenen.INSTANZ.setze(e.id(), an)));
+            schalter.add(new Schalter(k, e.id(), name));
             unterster = k;
         }
         if (n < alle.size()) {
@@ -245,8 +249,11 @@ final class Karte extends Screen {
         }
     }
 
-    /** Ein bunter Punkt links an jedem Schalter, dessen Ebene ganz angeheftet ist; neu gerechnet, wenn sich Ebenen oder Wegpunkte ändern. */
-    private void ganzAngeheftet(GuiGraphicsExtractor g) {
+    /**
+     * Die Überschriften der Liste, rechtsbündig vor ihrem Knopf; ein langer Name ragt nach links über die Karte.
+     * Vor einer Ebene, die ganz angeheftet ist, ein bunter Punkt; neu gerechnet, wenn sich Ebenen oder Wegpunkte ändern.
+     */
+    private void ueberschriften(GuiGraphicsExtractor g) {
         if (schalter.isEmpty()) {
             return;
         }
@@ -260,17 +267,26 @@ final class Karte extends Screen {
         }
         int bunt = Mth.hsvToArgb((System.currentTimeMillis() % BUNT_MS) / (float) BUNT_MS, 1f, 1f, 255);
         for (int i = 0; i < ganz.length; i++) {
+            Schalter s = schalter.get(i);
+            int[] r = ueberschrift(s);
+            g.text(font, s.name(), r[0] + 6, r[1] + 6, TEXT, true);
             if (ganz[i]) {
-                CycleButton<Boolean> k = schalter.get(i).knopf();
-                g.fill(k.getX() - 6, k.getY() + 8, k.getX() - 2, k.getY() + 12, bunt);
+                g.fill(r[0], r[1] + 8, r[0] + 4, r[1] + 12, bunt);
             }
         }
     }
 
-    /** Der Schalter der Liste unter (x, y), oder null. */
-    private Schalter schalterUnter(double x, double y) {
+    /** Wo die Überschrift einer Zeile liegt, samt Platz für den Punkt davor: x, y, Breite, Höhe. */
+    private int[] ueberschrift(Schalter s) {
+        CycleButton<Boolean> k = s.knopf();
+        int breite = font.width(s.name()) + 6;
+        return new int[] {k.getX() - 4 - breite, k.getY(), breite, k.getHeight()};
+    }
+
+    /** Die Zeile, deren Überschrift unter (x, y) liegt, oder null. */
+    private Schalter ueberschriftUnter(double x, double y) {
         for (Schalter s : schalter) {
-            if (s.knopf().isMouseOver(x, y)) {
+            if (drin(ueberschrift(s), x, y)) {
                 return s;
             }
         }
@@ -334,7 +350,7 @@ final class Karte extends Screen {
                     : Component.translatable("heroicmap.karte.abgleich_ab", Downloads.uhr(ab)));
         }
         super.extractRenderState(g, mausX, mausY, delta);
-        ganzAngeheftet(g);
+        ueberschriften(g);
         if (haengt != null) {
             // Der Wegpunkt, der an der Maus hängt, unter dem Zeiger.
             Minimap.wegpunkt(g, mausX, mausY, Minimap.KOPF, Wegpunkte.FARBEN[haengt.farbe()], 0);
@@ -503,6 +519,18 @@ final class Karte extends Screen {
             b = Math.max(b, font.width(e.text()));
         }
         return b + 8;
+    }
+
+    /** Für die Gametests: die Mitte des Knopfs „An“/„Aus“ und die der Überschrift der Ebene {@code ebene}, oder null. */
+    double[] zeile(String ebene) {
+        for (Schalter s : schalter) {
+            if (s.ebene().equals(ebene)) {
+                int[] u = ueberschrift(s);
+                CycleButton<Boolean> k = s.knopf();
+                return new double[] {k.getX() + k.getWidth() / 2.0, k.getY() + k.getHeight() / 2.0, u[0] + u[2] / 2.0, u[1] + u[3] / 2.0};
+            }
+        }
+        return null;
     }
 
     /** Für die Gametests: Stufe und Lupe, oder null ohne Satz. */
@@ -747,20 +775,21 @@ final class Karte extends Screen {
             klickVerbraucht = true;
             return true;
         }
-        // Der erste Klick eines Doppelklicks auf einen Schalter schaltete die Ebene um; der zweite schaltet
-        // zurück und heftet alles von ihr an oder löst es. Siehe docs/vollbildkarte.md, „Ebenen“.
-        Schalter s = taste ? schalterUnter(e.x(), e.y()) : null;
-        if (s != null && doppelt && s.equals(vorigerSchalter)) {
-            s.knopf().setValue(!s.knopf().getValue());
-            Ebenen.INSTANZ.setze(s.ebene(), s.knopf().getValue());
-            int uebrig = Wegpunkte.INSTANZ.alleUmschalten(Ebenen.INSTANZ, s.ebene());
-            if (uebrig > 0) {
-                hinweis = Component.translatable("heroicmap.karte.ebene_voll", uebrig, Wegpunkte.MAX_ANGEHEFTET, Wegpunkte.MAX_NADELN_ANGEHEFTET);
+        // Ein Doppelklick auf die Überschrift einer Ebene heftet alles von ihr an oder löst es; ein Klick darauf
+        // tut nichts und zieht die Karte nicht. Der Knopf daneben schaltet nur. Siehe docs/vollbildkarte.md, „Ebenen“.
+        Schalter s = taste ? ueberschriftUnter(e.x(), e.y()) : null;
+        if (s != null) {
+            if (doppelt && s.equals(vorigerSchalter)) {
+                int uebrig = Wegpunkte.INSTANZ.alleUmschalten(Ebenen.INSTANZ, s.ebene());
+                if (uebrig > 0) {
+                    hinweis = Component.translatable("heroicmap.karte.ebene_voll", uebrig, Wegpunkte.MAX_ANGEHEFTET, Wegpunkte.MAX_NADELN_ANGEHEFTET);
+                }
+            } else {
+                letzterSchalter = s;
             }
             klickVerbraucht = true;
             return true;
         }
-        letzterSchalter = s;
         if (super.mouseClicked(e, doppelt)) {
             return true;
         }

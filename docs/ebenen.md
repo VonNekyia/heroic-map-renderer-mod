@@ -636,7 +636,7 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   Passen nicht alle auf den Schirm, blättern `<` und `>`. Ohne Ebenen
   steht dort „Der Server schickt keine Ebenen.“
 - **Auf der Vollbildkarte** dieselbe Wahl in einer Liste unter dem Knopf
-  „Ebenen +“; ein Doppelklick heftet dort die ganze Ebene an, siehe
+  „Ebenen +“; ein Doppelklick auf ihren Namen heftet dort die ganze Ebene an, siehe
   [Vollbildkarte](vollbildkarte.md), „Ebenen“ (mod#76).
 - **Vorgabe** ist `visible` der Ebene; die Wahl des Spielers geht vor.
 - **Gespeichert** gleich beim Umschalten, in `ebenen.properties` im Ordner

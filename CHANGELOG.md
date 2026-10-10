@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.27
+
+- **Layers on the full map: the name is a heading, the button only switches.** Each layer shows its name with an "On"/"Off" button next to it. A click on the button turns the layer on or off and does nothing else; a double click on the name pins everything of the layer to the minimap, another one unpins it. Before, the double click went on the switch and made it flicker.
+
 ## 0.2.26
 
 - **The arrow sits centred above your head** on the minimap and the full map; before, it stood about half a head pixel to the right.

@@ -43,7 +43,8 @@ sagt sie das und zeigt nichts.
 | Knopf „Abgleich“ | fragt einen Abgleich des gezeigten Satzes an, wie `/hmap abgleich`; nur mit einem Satz vom Server, nicht auf der selbst gezeichneten Karte. Lehnt der Server mit `wieder` ab, ist der Knopf bis dahin aus und nennt die Uhrzeit |
 | Knopf „Zum Spieler“ | legt den eigenen Spieler in die Mitte, für den Fall, dass man sich verirrt hat, wie auf der Webkarte; Stufe und Lupe bleiben (mod#75) |
 | Knopf „Ebenen +“ unter „Zum Spieler“ | klappt die Liste der Ebenen auf, „Ebenen -“ wieder zu; nur, wenn der Server Ebenen schickt, siehe „Ebenen“ (mod#76) |
-| Klick, Doppelklick auf einen Schalter der Liste | schaltet die Ebene an oder aus; ein Doppelklick lässt sie, wie sie war, und heftet alles von ihr an oder löst es, siehe „Ebenen“ |
+| Klick auf „An“/„Aus“ in der Liste | schaltet die Ebene an oder aus, sonst nichts, siehe „Ebenen“ |
+| Doppelklick auf den Namen einer Ebene in der Liste | heftet alles von ihr an die Minimap oder löst es, siehe „Ebenen“ |
 | Knopf „Optionen …“ unten rechts | öffnet das Menü von `/hmap`, siehe [Minimap](minimap.md), „Bedienung“; „Fertig“ und `Esc` führen von dort zurück auf die Karte, an dieselbe Stelle (mod#75) |
 | `Esc` | bricht zuerst eine Form ab, die der Spieler aus Wegpunkten baut, sonst schliesst es die Karte |
 
@@ -90,36 +91,42 @@ Karte jedes Mal beim Spieler, und man musste wieder herauszoomen.
 
 ### Ebenen
 
-Auf der Vollbildkarte ein Schalter je Ebene, wie „Ebenen“ auf der
-Webkarte, so will es der User (mod#76). Ein Doppelklick heftet die ganze
-Ebene an.
+Auf der Vollbildkarte je Ebene ihr Name und ein Knopf „An“/„Aus“, wie
+„Ebenen“ auf der Webkarte, so will es der User (mod#76). Ein Doppelklick
+auf den Namen heftet die ganze Ebene an (mod#103).
 
-![Vollbildkarte mit offener Liste der Ebenen: „Formen“ an und ganz angeheftet, mit dem bunten Punkt, „Grenzen“ aus; Szene `formen` des Gametests](bilder/ebenen-liste.png)
+![Vollbildkarte mit offener Liste der Ebenen: „Formen“ an und ganz angeheftet, mit dem bunten Punkt vor dem Namen, „Grenzen“ aus, „Grenzen der alten Königreiche“ an, ragt nach links über die Karte; Szene `formen` des Gametests](bilder/ebenen-liste.png)
 
 - **Knopf „Ebenen +“** unter „Zum Spieler“, nur, wenn der Server Ebenen
   schickt (`Karte.ebenen`). Er klappt die Liste auf, „Ebenen -“ klappt sie
   zu. Beim ersten Öffnen ist sie zu; offen oder zu merkt sich die Karte in
   `karte.properties` unter `ebenen`, siehe „Lage merken“
   (`Kartenlage.ebenenOffen`).
-- **Liste:** je Ebene ein Schalter mit ihrem Namen in der Sprache des
-  Spiels und „An“ oder „Aus“, die oberste zuerst, wie im Untermenü „Ebenen
-  …“, siehe [Ebenen](ebenen.md), „Umschalten“; dieselbe Wahl. Die Liste
+- **Liste:** je Ebene eine Zeile, die oberste zuerst, wie im Untermenü
+  „Ebenen …“, siehe [Ebenen](ebenen.md), „Umschalten“; dieselbe Wahl.
+  Rechts der Knopf „An“ oder „Aus“, 30 Einheiten breit (`Karte.AN_AUS`),
+  links davor der Name in der Sprache des Spiels als Überschrift, weiss
+  mit Schatten, rechtsbündig. Ein langer Name ragt nach links über die
+  Karte, statt abgeschnitten zu werden. Die Liste
   reicht bis über „Optionen …“; passen nicht alle, führt der letzte Knopf
   „Weitere …“ zum Untermenü. Kommen andere Ebenen, während die Karte offen
   ist, baut sie die Liste neu (`Karte.tick`).
-- **Klick** auf einen Schalter schaltet die Ebene an oder aus.
-- **Doppelklick:** Der erste Klick schaltet um, der zweite zurück; so
-  bleibt die Ebene, wie sie war. Dazu heftet der zweite alles von ihr an,
-  was sich anheften lässt, Flächen, Kreise, Nadeln und Banner mit `id`,
-  siehe [Wegpunkte](wegpunkte.md), „Anheften“; ist schon alles
-  angeheftet, löst er alles (`Wegpunkte.alleUmschalten`).
+- **Klick** auf „An“/„Aus“ schaltet die Ebene an oder aus, sonst nichts;
+  ein Doppelklick darauf schaltet zweimal.
+- **Doppelklick auf den Namen** heftet alles von der Ebene an, was sich
+  anheften lässt, Flächen, Kreise, Nadeln und Banner mit `id`, siehe
+  [Wegpunkte](wegpunkte.md), „Anheften“; ist schon alles angeheftet, löst
+  er alles (`Wegpunkte.alleUmschalten`). Ein Klick auf den Namen tut
+  nichts und zieht die Karte nicht. Bis 0.2.26 lag das Anheften auf dem
+  Doppelklick auf den Schalter, der dabei aus- und wieder anschaltete und
+  flackerte; so wollte es der User nicht mehr (mod#103).
 - **Grenzen:** Die 64 Flächen und Kreise und die 64 Nadeln und Banner
   gelten weiter. Was nicht mehr passt, bleibt los, und unten links steht
   „3 nicht angeheftet: höchstens 64 Regionen und 64 Nadeln und Banner“.
   Dann ist die Ebene nicht ganz angeheftet, und ein weiterer Doppelklick
   löst nichts, sondern heftet wieder an, was passt. Lösen geht dann je
   Objekt.
-- **Bunter Punkt** links am Schalter, wenn alles Anheftbare der Ebene
+- **Bunter Punkt** vor dem Namen, wenn alles Anheftbare der Ebene
   angeheftet ist, in der Farbe des Rings angehefteter Marken
   (`Karte.BUNT_MS`); eine Ebene ohne etwas mit `id` bekommt keinen
   (`Wegpunkte.ganzAngeheftet`). Neu gerechnet nur, wenn sich Ebenen oder
