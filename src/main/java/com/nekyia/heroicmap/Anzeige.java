@@ -11,7 +11,7 @@ import net.minecraft.network.chat.Component;
 
 /**
  * Das Untermenü „Einstellungen …“ für Vorlieben der Anzeige: Form, Auflösung, Chunklinien, Drehen,
- * Rahmen, die Ablage der Karten, die Koordinaten unter der Minimap und das Untermenü „Ebenen …“. Die Minimap im HUD bleibt sichtbar, jede Wahl wirkt gleich. Gespeichert wird
+ * Effekte in der Welt, Rahmen, die Ablage der Karten, die Koordinaten unter der Minimap und das Untermenü „Ebenen …“. Die Minimap im HUD bleibt sichtbar, jede Wahl wirkt gleich. Gespeichert wird
  * beim Schliessen. Siehe docs/minimap.md, „Bedienung“.
  */
 final class Anzeige extends Screen {
@@ -40,27 +40,31 @@ final class Anzeige extends Screen {
                 .create(x, y + 48, breite, 20, Component.translatable("heroicmap.menue.chunklinien"), (b, an) -> m.setzeChunklinien(an)));
         addRenderableWidget(CycleButton.onOffBuilder(m.drehen())
                 .create(x, y + 72, breite, 20, Component.translatable("heroicmap.menue.drehen"), (b, an) -> m.setzeDrehen(an)));
+        addRenderableWidget(CycleButton.onOffBuilder(m.effekte())
+                .withTooltip(an -> Tooltip.create(Component.translatable("heroicmap.menue.effekte.beschreibung")))
+                .create(x, y + 96, breite, 20, Component.translatable("heroicmap.menue.effekte"), (b, an) -> m.setzeEffekte(an)));
         addRenderableWidget(CycleButton.builder((String skin) -> Component.translatable("heroicmap.rahmen." + skin), m.skin())
                 .withValues(Skin.NAMEN)
                 .withTooltip(skin -> Tooltip.create(Component.translatable("heroicmap.rahmen." + skin + ".beschreibung")))
-                .create(x, y + 96, breite, 20, Component.translatable("heroicmap.menue.rahmen"), (b, skin) -> m.setzeSkin(skin)));
+                .create(x, y + 120, breite, 20, Component.translatable("heroicmap.menue.rahmen"), (b, skin) -> m.setzeSkin(skin)));
         addRenderableWidget(CycleButton.builder((Downloads.Ablage a) -> Component.translatable(
                         "heroicmap.menue.ablage." + a.name().toLowerCase(Locale.ROOT)), m.ablage())
                 .withValues(Downloads.Ablage.values())
-                .create(x, y + 120, breite, 20, Component.translatable("heroicmap.menue.ablage"), (b, a) -> m.setzeAblage(a)));
+                .create(x, y + 144, breite, 20, Component.translatable("heroicmap.menue.ablage"), (b, a) -> m.setzeAblage(a)));
         // Koordinaten und Ebenen teilen sich eine Zeile, so passt das Untermenü auch bei 240 Einheiten Höhe.
         int halb = (breite - 4) / 2;
         addRenderableWidget(CycleButton.builder((Minimap.Koordinaten k) -> Component.translatable(
                         "heroicmap.menue.koordinaten." + k.name().toLowerCase(Locale.ROOT)), m.koordinaten())
                 .withValues(Minimap.Koordinaten.values())
-                .create(x, y + 144, halb, 20, Component.translatable("heroicmap.menue.koordinaten"), (b, k) -> m.setzeKoordinaten(k)));
+                .create(x, y + 168, halb, 20, Component.translatable("heroicmap.menue.koordinaten"), (b, k) -> m.setzeKoordinaten(k)));
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.menue.ebenen"),
-                b -> minecraft.gui.setScreen(new EbenenMenue(this))).bounds(x + breite - halb, y + 144, halb, 20).build());
-        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x, y + 172, breite, 20).build());
+                b -> minecraft.gui.setScreen(new EbenenMenue(this))).bounds(x + breite - halb, y + 168, halb, 20).build());
+        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x, y + 196, breite, 20).build());
     }
 
+    /** Oben so weit, dass alles mittig steht, aber Platz für den Titel bleibt; bei 240 Einheiten Höhe reicht der Knopf „Fertig“ bis 236. */
     private int oben() {
-        return Math.max(30, height / 2 - 84);
+        return Math.max(20, height / 2 - 108);
     }
 
     /** Ohne Unschärfe und Abdunkeln, damit die Minimap im HUD zu sehen ist. */

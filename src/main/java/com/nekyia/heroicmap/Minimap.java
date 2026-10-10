@@ -109,6 +109,8 @@ public final class Minimap {
     private boolean show = true;
     /** Chunklinien auf Minimap und Vollbildkarte, eine Vorliebe aus dem Untermenü. Siehe docs/minimap.md, „Chunklinien“. */
     private boolean chunklinien;
+    /** Effekte in der Welt, Vorgabe an: der Strahl über angehefteten Wegpunkten. Siehe docs/wegpunkte.md, „Strahl“. */
+    private boolean effekte = true;
     private final Formen.Speicher formenSpeicher = new Formen.Speicher(), angeheftetSpeicher = new Formen.Speicher();
     /** Koordinaten unter der Minimap. Siehe docs/minimap.md, „Koordinaten“. */
     enum Koordinaten { AUS, XZ, XYZ }
@@ -283,6 +285,14 @@ public final class Minimap {
         this.chunklinien = chunklinien;
     }
 
+    boolean effekte() {
+        return effekte;
+    }
+
+    void setzeEffekte(boolean effekte) {
+        this.effekte = effekte;
+    }
+
     Koordinaten koordinaten() {
         return koordinaten;
     }
@@ -424,6 +434,7 @@ public final class Minimap {
         rund = "rund".equals(p.getProperty("form"));
         show = !"hidden".equals(p.getProperty("show"));
         chunklinien = "true".equals(p.getProperty("chunklinien"));
+        effekte = !"false".equals(p.getProperty("effekte"));
         koordinaten = switch (String.valueOf(p.getProperty("koordinaten")).trim()) {
             case "aus" -> Koordinaten.AUS;
             case "xyz" -> Koordinaten.XYZ;
@@ -456,6 +467,7 @@ public final class Minimap {
         p.setProperty("form", rund ? "rund" : "eckig");
         p.setProperty("show", show ? "simplevoicechat" : "hidden");
         p.setProperty("chunklinien", Boolean.toString(chunklinien));
+        p.setProperty("effekte", Boolean.toString(effekte));
         p.setProperty("koordinaten", koordinaten.name().toLowerCase(Locale.ROOT));
         if (drehenGewaehlt) {
             p.setProperty("drehen_wahl", Boolean.toString(drehen));

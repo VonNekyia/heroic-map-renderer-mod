@@ -16,6 +16,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.fabricmc.fabric.api.resource.v1.ResourceLoader;
 import net.fabricmc.fabric.api.resource.v1.reloader.ResourceReloaderKeys;
 import net.fabricmc.loader.api.FabricLoader;
@@ -113,6 +114,7 @@ public final class HeroicMap implements ClientModInitializer {
             Selbst.INSTANZ.leeren();
         }));
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath(ID, "minimap"), Minimap.INSTANZ::zeichne);
+        LevelRenderEvents.COLLECT_SUBMITS.register(Strahlen::zeichne);
         Kanal.anmelden();
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, kontext) -> dispatcher.register(
                 ClientCommands.literal("hmap")
