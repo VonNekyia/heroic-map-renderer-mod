@@ -41,6 +41,7 @@ final class Karte extends Screen {
     private final Satz satz;
     private final Kacheln kacheln;
     private final Kartenblick blick;
+    private final Formen.Speicher formenSpeicher = new Formen.Speicher();
     /** Was beim letzten Knopf schiefging, oder null. */
     private Component hinweis;
     /** Wo die Knöpfe rechts oben beginnen und enden; Marken und Namen weichen ihnen aus. */
@@ -168,16 +169,11 @@ final class Karte extends Screen {
         String dimension = minecraft.player.level().dimension().identifier().toString();
         int scale = satz.scale();
         Matrix3x2f pose = new Matrix3x2f(g.pose());
-        Formen.Ansicht a = new Formen.Ansicht((wx, wz, aus) -> {
-            aus[0] = blick.rasterX(Projektion.zuPixel(wx, scale), width);
-            aus[1] = blick.rasterY(Projektion.zuPixel(wz, scale), height);
-        }, blick.chunkAbstand(scale) / 16, 1, minecraft.getWindow().getGuiScale(), Drehung.rechteck(0, 0, width, height),
+        Formen.Ansicht a = new Formen.Ansicht(blick.abbild(scale, width, height), blick.chunkAbstand(scale) / 16, 1, minecraft.getWindow().getGuiScale(), Drehung.rechteck(0, 0, width, height),
                 new double[] {blick.basisRasterX(0, width) / scale, blick.basisRasterZ(0, height) / scale,
                         blick.basisRasterX(width, width) / scale, blick.basisRasterZ(height, height) / scale},
                 pose, new ScreenRectangle(0, 0, width, height).transformMaxBounds(pose));
-        for (Ebenen.Eintrag e : Ebenen.INSTANZ.sichtbar()) {
-            Formen.zeichne(g, a, dimension, Ebenen.INSTANZ.formen(e.id()));
-        }
+        Formen.zeichne(g, a, dimension, Ebenen.INSTANZ.sichtbar().stream().map(e -> Ebenen.INSTANZ.formen(e.id())).toList(), formenSpeicher);
     }
 
     /** Chunklinien je 16 Blöcke als ein Element des GUI. Siehe docs/minimap.md, „Chunklinien“. */

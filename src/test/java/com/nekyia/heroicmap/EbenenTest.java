@@ -279,13 +279,17 @@ class EbenenTest {
                 + "{\"id\":\"n\",\"type\":\"region\",\"polygons\":[{\"outer\":[[0,0],[1,0],[1,1]]}],\"stroke\":{\"width\":0}},"
                 + "{\"id\":\"p\",\"type\":\"pin\",\"at\":[0,0]}"
                 + "]").getAsJsonArray();
-        List<Ebenen.Form> f = Ebenen.formen(objekte);
+        Ebenen.Gelesen g = Ebenen.formen(objekte);
+        List<Ebenen.Form> f = g.formen();
         assertEquals(4, f.size());
+        assertEquals(0, g.verworfen());
+        // Punkte: 4 der Region, 1 für den Kreis, 2 der Linie, 3 der zweiten Region.
+        assertEquals(10, g.punkte());
         // Füllung mit Alpha; der Rand ohne Angabe 2 breit in der Füllung ohne Alpha.
         Ebenen.Flaeche r = (Ebenen.Flaeche) f.get(0);
         assertEquals(0x5540E53F, r.fuellung());
         assertEquals(new Ebenen.Rand(0xFF40E53F, 2, 0, 0), r.rand());
-        assertArrayEquals(new int[] {0, 0, 10, 10}, r.rechtecke());
+        assertArrayEquals(new double[] {0, 0, 10, 10, 0, 10}, r.trapeze());
         assertArrayEquals(new double[] {0, 0, 10, 10}, r.box());
         // Gestrichelt ohne dash: 8 und 6.
         Ebenen.Kreis k = (Ebenen.Kreis) f.get(1);
@@ -295,7 +299,7 @@ class EbenenTest {
         assertEquals(new Ebenen.Rand(Ebenen.RANDFARBE, 3, 10, 4), ((Ebenen.Linie) f.get(2)).rand());
         // width 0 heisst ohne Rand.
         assertNull(((Ebenen.Flaeche) f.get(3)).rand());
-        assertNull(((Ebenen.Flaeche) f.get(3)).rechtecke());
+        assertNull(((Ebenen.Flaeche) f.get(3)).trapeze());
     }
 
     @Test
@@ -318,9 +322,11 @@ class EbenenTest {
                 + "{\"type\":\"line\",\"points\":[[0,0],[30000001,0]]},"
                 + "{\"type\":\"circle\",\"center\":[0,0],\"radius\":" + Ebenen.MAX_RADIUS + "}"
                 + "]").getAsJsonArray();
-        // Nur der letzte Kreis hält alle Grenzen ein.
-        List<Ebenen.Form> f = Ebenen.formen(objekte);
+        // Nur der letzte Kreis hält alle Grenzen ein; die anderen sieben zählen als verworfen.
+        Ebenen.Gelesen g = Ebenen.formen(objekte);
+        List<Ebenen.Form> f = g.formen();
         assertEquals(1, f.size());
+        assertEquals(7, g.verworfen());
         assertEquals(Ebenen.MAX_RADIUS, ((Ebenen.Kreis) f.getFirst()).radius());
     }
 
@@ -348,6 +354,130 @@ class EbenenTest {
         teil(e, "b:staedte", "v1", 1, 2, kreise.toString());
         teil(e, "b:staedte", "v1", 2, 2, kreise.toString());
         assertEquals(List.of(), e.formen("b:staedte"));
+    }
+
+    @Test
+    void teilErsetzt() {
+        // Derselbe Teil zweimal: Der zweite ersetzt den ersten, auch in den Zählern; sonst wären es 12 001 Objekte.
+        Ebenen e = new Ebenen();
+        liste(e, eintrag("b:staedte", "v1"));
+        String kreise = mal("{\"type\":\"circle\",\"center\":[0,0],\"radius\":5}", 6000);
+        teil(e, "b:staedte", "v1", 1, 2, kreise);
+        teil(e, "b:staedte", "v1", 1, 2, "{\"type\":\"circle\",\"center\":[0,0],\"radius\":7}");
+        teil(e, "b:staedte", "v1", 2, 2, kreise);
+        assertEquals(6001, e.formen("b:staedte").size());
+        assertEquals(7, ((Ebenen.Kreis) e.formen("b:staedte").getFirst()).radius());
+    }
+
+    @Test
+    void deckelDerPunkte() {
+        String linie = linie(Ebenen.MAX_PUNKTE);
+        // Ein Teil mit 210 000 Punkten taugt nicht; er liest nicht weiter als bis über den Deckel.
+        assertNull(Ebenen.Teil.lies(ebene(1, 1, mal(linie, 21))));
+        // Zwei Teile mit je 150 000 Punkten: Die Sammlung kommt über den Deckel und ist verworfen.
+        Ebenen e = new Ebenen();
+        liste(e, eintrag("b:grenzen", "v1"));
+        teil(e, "b:grenzen", "v1", 1, 2, mal(linie, 15));
+        teil(e, "b:grenzen", "v1", 2, 2, mal(linie, 15));
+        assertEquals(List.of(), e.formen("b:grenzen"));
+        // Gegenprobe: 150 000 und 50 000 Punkte gehen.
+        liste(e, eintrag("b:grenzen", "v2"));
+        teil(e, "b:grenzen", "v2", 1, 2, mal(linie, 15));
+        teil(e, "b:grenzen", "v2", 2, 2, mal(linie, 5));
+        assertEquals(20, e.formen("b:grenzen").size());
+    }
+
+    @Test
+    void deckelUeberAlleEbenen() {
+        // Drei Ebenen mit je 190 000 Punkten: Die dritte käme über 500 000 und bleibt, wie sie war.
+        Ebenen e = new Ebenen();
+        liste(e, eintrag("b:a", "v1") + "," + eintrag("b:b", "v1") + "," + eintrag("b:c", "v1"));
+        String linien = mal(linie(Ebenen.MAX_PUNKTE), 19);
+        teil(e, "b:a", "v1", 1, 1, linien);
+        teil(e, "b:b", "v1", 1, 1, linien);
+        teil(e, "b:c", "v1", 1, 1, linien);
+        assertEquals(19, e.formen("b:a").size());
+        assertEquals(19, e.formen("b:b").size());
+        assertEquals(List.of(), e.formen("b:c"));
+        // Eine neue version der ersten zählt nicht doppelt: je Ebene die grössere der beiden Sammlungen.
+        liste(e, eintrag("b:a", "v2") + "," + eintrag("b:b", "v1") + "," + eintrag("b:c", "v1"));
+        teil(e, "b:a", "v2", 1, 1, mal(linie(Ebenen.MAX_PUNKTE), 18));
+        assertEquals(18, e.formen("b:a").size());
+    }
+
+    @Test
+    void punkteUeberAlleRinge() {
+        // Aussen 6000 und ein Loch mit 5000 Punkten: Jeder Ring allein hält die Grenze ein, zusammen nicht.
+        JsonArray objekte = JsonParser.parseString("[{\"type\":\"region\",\"fill\":\"#FF000080\",\"polygons\":[{\"outer\":" + kreis(6000, 1000)
+                + ",\"holes\":[" + kreis(5000, 100) + "]}]}]").getAsJsonArray();
+        Ebenen.Gelesen g = Ebenen.formen(objekte);
+        assertEquals(List.of(), g.formen());
+        assertEquals(1, g.verworfen());
+    }
+
+    @Test
+    void zehntausendGrosseDreiecke() {
+        // Der Fall aus dem Review: Grosse Flächen kosten so viel wie ihre Ecken, nicht wie ihre Fläche.
+        String dreieck = "{\"type\":\"region\",\"fill\":\"#FF000080\",\"polygons\":[{\"outer\":[[-1000000,-1000000],[1000000,-1000000],[0,1000000]]}]}";
+        Ebenen.Gelesen g = Ebenen.formen(JsonParser.parseString("[" + mal(dreieck, Ebenen.MAX_OBJEKTE) + "]").getAsJsonArray());
+        assertEquals(Ebenen.MAX_OBJEKTE, g.formen().size());
+        int trapeze = 0;
+        for (Ebenen.Form f : g.formen()) {
+            trapeze += ((Ebenen.Flaeche) f).trapeze().length / 6;
+        }
+        // Je Dreieck ein Trapez: oben 2 000 000 breit, unten spitz.
+        assertEquals(Ebenen.MAX_OBJEKTE, trapeze);
+    }
+
+    @Test
+    void ohneFuellungSchwarzerRand() {
+        // #00000000 heisst ohne Füllung; der Rand ohne Farbe ist trotzdem die Füllung ohne Alpha, also Schwarz.
+        JsonArray objekte = JsonParser.parseString("["
+                + "{\"type\":\"region\",\"fill\":\"#00000000\",\"polygons\":[{\"outer\":[[0,0],[10,0],[10,10]]}]},"
+                + "{\"type\":\"circle\",\"fill\":\"#00000000\",\"center\":[0,0],\"radius\":5}"
+                + "]").getAsJsonArray();
+        Ebenen.Gelesen g = Ebenen.formen(objekte);
+        Ebenen.Flaeche f = (Ebenen.Flaeche) g.formen().get(0);
+        assertNull(f.trapeze());
+        assertEquals(0xFF000000, f.rand().farbe());
+        assertFalse(Ebenen.sichtbar(((Ebenen.Kreis) g.formen().get(1)).fuellung()));
+        assertEquals(0xFF000000, ((Ebenen.Kreis) g.formen().get(1)).rand().farbe());
+        assertEquals(0, g.verworfen());
+    }
+
+    @Test
+    void randGekappt() {
+        JsonArray objekte = JsonParser.parseString("[{\"type\":\"line\",\"points\":[[0,0],[1,1]],"
+                + "\"stroke\":{\"width\":100,\"style\":\"dashed\",\"dash\":[5000,4000]}}]").getAsJsonArray();
+        assertEquals(new Ebenen.Rand(Ebenen.RANDFARBE, Ebenen.MAX_BREITE, Ebenen.MAX_STRICH, Ebenen.MAX_STRICH),
+                ((Ebenen.Linie) Ebenen.formen(objekte).formen().getFirst()).rand());
+    }
+
+    /** Dasselbe Objekt so oft, durch Kommas getrennt. */
+    private static String mal(String objekt, int anzahl) {
+        return String.join(",", java.util.Collections.nCopies(anzahl, objekt));
+    }
+
+    private static String ebene(int teil, int teile, String objekte) {
+        return "{\"v\":1,\"typ\":\"ebene\",\"jetzt\":1,\"id\":\"b:grenzen\",\"version\":\"v1\",\"teil\":" + teil + ",\"teile\":" + teile
+                + ",\"objects\":[" + objekte + "]}";
+    }
+
+    private static String linie(int punkte) {
+        StringBuilder p = new StringBuilder("{\"type\":\"line\",\"points\":[");
+        for (int i = 0; i < punkte; i++) {
+            p.append(i == 0 ? "" : ",").append("[").append(i).append(",0]");
+        }
+        return p.append("]}").toString();
+    }
+
+    private static String kreis(int punkte, double r) {
+        StringBuilder p = new StringBuilder("[");
+        for (int i = 0; i < punkte; i++) {
+            double w = 2 * Math.PI * i / punkte;
+            p.append(i == 0 ? "" : ",").append("[").append(r * Math.cos(w)).append(",").append(r * Math.sin(w)).append("]");
+        }
+        return p.append("]").toString();
     }
 
     @Test

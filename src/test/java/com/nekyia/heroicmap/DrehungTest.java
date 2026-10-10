@@ -292,6 +292,47 @@ class DrehungTest {
     }
 
     @Test
+    void formenWieDieMarken() {
+        // Die Formen legen einen Ort wie die Nadeln, gedreht und ungedreht, bis auf das Runden der Marken auf Pixel.
+        Minimap.Rahmen r = new Minimap.Rahmen(5, 7, 128);
+        int k = 3, zoom = 4, n = 384;
+        int links = Minimap.ecke(10.3, 10.3, 1f, zoom, k, n), oben = Minimap.ecke(-4.7, -4.7, 1f, zoom, k, n);
+        double[] p = new double[2], q = new double[2];
+        // Ungedreht liegt das Bild auf dem Raster der Karte, wie in Minimap.zeichne.
+        Minimap.abbild(zoom, k, links, oben, Drehung.Lage.von(0, r.x() * k, r.y() * k, 0, 0)).ab(12.5, -1.5, p);
+        float[] m = Minimap.marke(r, 12.5, -1.5, links, oben, k, zoom, false, 60, false, null);
+        assertEquals(m[0], p[0] / k, 0.5 / k + 1e-6);
+        assertEquals(m[1], p[1] / k, 0.5 / k + 1e-6);
+        Drehung.Lage lage = Minimap.lage(r, 10.3, -4.7, 30, zoom, k, links, oben);
+        Formen.Abbild gedreht = Minimap.abbild(zoom, k, links, oben, lage);
+        gedreht.ab(12.5, -1.5, p);
+        m = Minimap.marke(r, 12.5, -1.5, links, oben, k, zoom, false, 60, false, lage);
+        assertEquals(m[0], p[0] / k, 0.5 / k + 1e-6);
+        assertEquals(m[1], p[1] / k, 0.5 / k + 1e-6);
+        // Ein Block ist auch gedreht zoom · k Pixel lang, wie Formen.Ansicht.block in Minimap.formen.
+        gedreht.ab(0, 0, p);
+        gedreht.ab(1, 0, q);
+        assertEquals(zoom * k, Math.hypot(q[0] - p[0], q[1] - p[1]), 1e-9);
+    }
+
+    @Test
+    void formenAufDerKarte() {
+        // Auf der Vollbildkarte: Die Mitte des Blicks liegt in der Mitte des Schirms, ein Chunk ist chunkAbstand lang.
+        Kartenblick blick = new Kartenblick(256, 0, 6, 5);
+        int scale = 4;
+        blick.mx = Projektion.zuPixel(100, scale);
+        blick.mz = Projektion.zuPixel(-40, scale);
+        blick.lupe = 2;
+        double[] p = new double[2], q = new double[2];
+        Formen.Abbild a = blick.abbild(scale, 640, 360);
+        a.ab(100, -40, p);
+        assertEquals(320, p[0], 1);
+        assertEquals(180, p[1], 1);
+        a.ab(116, -40, q);
+        assertEquals(blick.chunkAbstand(scale), q[0] - p[0], 1e-9);
+    }
+
+    @Test
     void markeGedrehtAufGanzenPixeln() {
         // Gier 30 dreht schräg; bei GUI-Massstab 3 läge eine ungerundete Marke zwischen den Pixeln.
         Minimap.Rahmen r = new Minimap.Rahmen(5, 7, 128);

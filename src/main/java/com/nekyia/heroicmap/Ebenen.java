@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.regex.Pattern;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -45,8 +46,17 @@ final class Ebenen {
     static final int MAX_FELD = 76;
     /** Grenzen aus dem Format für Objekte, Punkte, Löcher und Radius, siehe docs/ebenen.md, „Grenzen“. */
     static final int MAX_OBJEKTE = 10_000, MAX_PUNKTE = 10_000, MAX_LOECHER = 100, MAX_RADIUS = 100_000;
-    /** Eigene Grenzen des Mods für die Füllung als Blöcke: Reihen und Rechtecke je Fläche, Rechtecke je Ebene. */
-    static final int MAX_REIHEN = 65_536, MAX_RECHTECKE = 100_000, MAX_RECHTECKE_EBENE = 500_000;
+    /**
+     * Eine eigene Grenze des Mods: so viele Punkte über alle Formen je Teil und je Sammlung, ein Kreis
+     * zählt einen. Als JSON sind das rund 3 MiB, so viel wie eine Datei im Format; im Speicher mit den
+     * Trapezen höchstens rund 30 MB.
+     */
+    static final int MAX_PUNKTE_EBENE = 200_000;
+    /**
+     * Über alle Ebenen höchstens so viele Punkte, je Ebene die fertige Sammlung oder die halbe, die
+     * grössere. So bleiben Formen im Speicher höchstens rund 80 MB, auch während einer neuen {@code version} rund 160 MB.
+     */
+    static final int MAX_PUNKTE_GESAMT = 500_000;
     /** Ein Rand ist höchstens so breit, Strich und Lücke höchstens so lang, in Einheiten des GUI. */
     static final float MAX_BREITE = 64, MAX_STRICH = 1000;
     /** Weiter draussen liegt kein Punkt einer Welt. */
@@ -88,13 +98,13 @@ final class Ebenen {
     }
 
     /**
-     * Eine Region: die Füllung (0 ohne) als Rechtecke in Blöcken aus {@link Raster}, null, wenn sie zu
-     * gross ist; der Rand (null ohne) um alle Ringe {x0, z0, …}; {@code box} {x0, z0, x1, z1}.
+     * Eine Region: die Füllung mit Alpha als Trapeze aus {@link Trapeze}, null ohne Füllung oder wenn sie
+     * zu aufwendig ist; der Rand (null ohne) um alle Ringe {x0, z0, …}; {@code box} {x0, z0, x1, z1}.
      */
-    record Flaeche(String dimension, int fuellung, int[] rechtecke, Rand rand, List<double[]> ringe, double[] box) implements Form {
+    record Flaeche(String dimension, int fuellung, double[] trapeze, Rand rand, List<double[]> ringe, double[] box) implements Form {
     }
 
-    /** Ein Kreis um (x, z) mit {@code radius} Blöcken, Füllung (0 ohne) und Rand (null ohne). */
+    /** Ein Kreis um (x, z) mit {@code radius} Blöcken, Füllung mit Alpha (Alpha 0 ohne) und Rand (null ohne). */
     record Kreis(String dimension, double x, double z, double radius, int fuellung, Rand rand) implements Form {
     }
 
@@ -114,10 +124,11 @@ final class Ebenen {
     private static final Schild[] SCHILDE = {Schild.von("gross", 23, 33), Schild.von("mittel", 15, 23), Schild.von("klein", 9, 15)};
 
     /**
-     * Ein Teil {@code ebene}, schon gelesen: nur seine Nadeln, höchstens {@link #MAX_NADELN} + 1, damit
-     * der Render-Thread kein JSON bekommt und keins liegen bleibt.
+     * Ein Teil {@code ebene}, schon gelesen: seine Nadeln, höchstens {@link #MAX_NADELN} + 1, und seine
+     * Formen mit ihren Punkten und wie viele verworfen sind, damit der Render-Thread kein JSON bekommt
+     * und keins liegen bleibt.
      */
-    record Teil(String id, String version, int teil, int teile, List<Nadel> nadeln, List<Form> formen) {
+    record Teil(String id, String version, int teil, int teile, List<Nadel> nadeln, List<Form> formen, int punkte, int verworfen) {
 
         /** Liest eine Nachricht auf dem Thread des Netzes; null, wenn sie keine {@code ebene} ist oder nicht taugt. */
         static Teil lies(String text) {
@@ -127,33 +138,38 @@ final class Ebenen {
                     return null;
                 }
                 String id = text(json, "id", MAX_KENNUNG), version = text(json, "version", MAX_KENNUNG);
-                return id == null || version == null ? null
+                Gelesen f = id == null || version == null ? null : Ebenen.formen(json.getAsJsonArray("objects"));
+                return f == null ? null
                         : new Teil(id, version, json.get("teil").getAsInt(), json.get("teile").getAsInt(),
-                                Ebenen.nadeln(id, version, json.getAsJsonArray("objects")), Ebenen.formen(json.getAsJsonArray("objects")));
+                                Ebenen.nadeln(id, version, json.getAsJsonArray("objects")), f.formen(), f.punkte(), f.verworfen());
             } catch (RuntimeException e) {
                 return null;
             }
         }
     }
 
-    /** Die Teile einer {@code version}, die noch nicht alle da sind, und wie viele Nadeln sie schon haben. */
+    /** Die Formen eines Teils, ihre Punkte und wie viele Objekte als Form verworfen sind. */
+    record Gelesen(List<Form> formen, int punkte, int verworfen) {
+    }
+
+    /** Die Teile einer {@code version}, die noch nicht alle da sind, und was sie schon zusammen haben. */
     private static final class Sammlung {
 
         final String version;
-        final List<List<Nadel>> teile;
-        final List<List<Form>> formTeile;
-        int da, nadeln, objekte, rechtecke;
+        final List<Teil> teile;
+        int da, nadeln, objekte, punkte, verworfen;
 
         Sammlung(String version, int teile) {
             this.version = version;
             this.teile = new ArrayList<>(Collections.nCopies(teile, null));
-            this.formTeile = new ArrayList<>(Collections.nCopies(teile, null));
         }
     }
 
     private List<Eintrag> liste = List.of();
     private final Map<String, List<Nadel>> nadeln = new HashMap<>();
     private final Map<String, List<Form>> formen = new HashMap<>();
+    /** Die Punkte der fertigen Formen je Ebene. */
+    private final Map<String, Integer> punkte = new HashMap<>();
     private final Map<String, Sammlung> sammlungen = new HashMap<>();
     /** Die Wahl des Spielers je Kennung und wo sie liegt; null heisst nur im Speicher. */
     private final Map<String, Boolean> wahl = new HashMap<>();
@@ -196,6 +212,7 @@ final class Ebenen {
         liste = List.copyOf(neu);
         nadeln.keySet().retainAll(liste.stream().map(Eintrag::id).toList());
         formen.keySet().retainAll(liste.stream().map(Eintrag::id).toList());
+        punkte.keySet().retainAll(liste.stream().map(Eintrag::id).toList());
         // Halbe Teile gelten nur, solange die Liste ihre version nennt.
         sammlungen.entrySet().removeIf(s -> liste.stream().noneMatch(e -> e.id().equals(s.getKey()) && e.version().equals(s.getValue().version)));
     }
@@ -204,7 +221,8 @@ final class Ebenen {
      * Ein Teil {@code ebene}. Er gilt nur mit der {@code version}, die die Liste nennt; das Plugin
      * schickt die Liste vor den Teilen. Sind alle Teile da, ersetzen ihre Nadeln die der Ebene, bis
      * dahin bleibt die alte. Kommt eine Sammlung über {@link #MAX_NADELN} Nadeln, {@link #MAX_OBJEKTE}
-     * Objekte oder {@link #MAX_RECHTECKE_EBENE} Rechtecke, ist sie verworfen.
+     * Objekte oder {@link #MAX_PUNKTE_EBENE} Punkte, ist sie verworfen. Verworfene Formen meldet das Log
+     * einmal je Ebene und {@code version}, wenn sie fertig ist.
      */
     void teil(Teil t) {
         if (t.teile() < 1 || t.teile() > MAX_TEILE || t.teil() < 1 || t.teil() > t.teile()
@@ -216,31 +234,33 @@ final class Ebenen {
             s = new Sammlung(t.version(), t.teile());
             sammlungen.put(t.id(), s);
         }
-        List<Nadel> vorher = s.teile.set(t.teil() - 1, t.nadeln());
-        List<Form> vorherFormen = s.formTeile.set(t.teil() - 1, t.formen());
+        Teil vorher = s.teile.set(t.teil() - 1, t);
         s.da += vorher == null ? 1 : 0;
-        s.nadeln += t.nadeln().size() - (vorher == null ? 0 : vorher.size());
-        s.objekte += t.nadeln().size() + t.formen().size() - (vorher == null ? 0 : vorher.size() + vorherFormen.size());
-        s.rechtecke += rechtecke(t.formen()) - (vorherFormen == null ? 0 : rechtecke(vorherFormen));
-        if (s.nadeln > MAX_NADELN || s.objekte > MAX_OBJEKTE || s.rechtecke > MAX_RECHTECKE_EBENE) {
-            LOGGER.warn("Heroic Map: Ebene {} ist zu gross ({} Nadeln, {} Objekte, {} Rechtecke), sie bleibt, wie sie war",
-                    t.id(), s.nadeln, s.objekte, s.rechtecke);
+        s.nadeln += t.nadeln().size() - (vorher == null ? 0 : vorher.nadeln().size());
+        s.objekte += t.nadeln().size() + t.formen().size() - (vorher == null ? 0 : vorher.nadeln().size() + vorher.formen().size());
+        s.punkte += t.punkte() - (vorher == null ? 0 : vorher.punkte());
+        s.verworfen += t.verworfen() - (vorher == null ? 0 : vorher.verworfen());
+        if (s.nadeln > MAX_NADELN || s.objekte > MAX_OBJEKTE || s.punkte > MAX_PUNKTE_EBENE || gesamt() > MAX_PUNKTE_GESAMT) {
+            LOGGER.warn("Heroic Map: Ebene {} ist zu gross ({} Nadeln, {} Objekte, {} Punkte, über alle Ebenen {}), sie bleibt, wie sie war",
+                    t.id(), s.nadeln, s.objekte, s.punkte, gesamt());
             sammlungen.remove(t.id());
         } else if (s.da == s.teile.size()) {
             sammlungen.remove(t.id());
-            nadeln.put(t.id(), s.teile.stream().flatMap(List::stream).toList());
-            formen.put(t.id(), s.formTeile.stream().flatMap(List::stream).toList());
+            if (s.verworfen > 0) {
+                LOGGER.warn("Heroic Map: Ebene {} ({}): {} Formen ungültig oder ohne Füllung, weil sie zu aufwendig war", t.id(), t.version(),
+                        s.verworfen);
+            }
+            nadeln.put(t.id(), s.teile.stream().flatMap(x -> x.nadeln().stream()).toList());
+            formen.put(t.id(), s.teile.stream().flatMap(x -> x.formen().stream()).toList());
+            punkte.put(t.id(), s.punkte);
         }
     }
 
-    private static int rechtecke(List<Form> formen) {
-        int n = 0;
-        for (Form f : formen) {
-            if (f instanceof Flaeche fl && fl.rechtecke() != null) {
-                n += fl.rechtecke().length / 4;
-            }
-        }
-        return n;
+    /** Die Punkte über alle Ebenen, je Ebene die fertige oder die halbe Sammlung, die grössere. */
+    private int gesamt() {
+        Map<String, Integer> je = new HashMap<>(punkte);
+        sammlungen.forEach((id, s) -> je.merge(id, s.punkte, Math::max));
+        return je.values().stream().mapToInt(Integer::intValue).sum();
     }
 
     /** Die Nadeln aus den Objekten eines Teils, in ihrer Reihenfolge, höchstens {@link #MAX_NADELN} + 1; anderes und Kaputtes fällt weg. */
@@ -291,28 +311,52 @@ final class Ebenen {
 
     /**
      * Die Flächen, Kreise und Linien aus den Objekten eines Teils, in ihrer Reihenfolge, höchstens
-     * {@link #MAX_OBJEKTE} + 1; anderes und Kaputtes fällt weg. Die Füllung einer Fläche rechnet
-     * schon hier {@link Raster}, auf dem Thread des Netzes.
+     * {@link #MAX_OBJEKTE} + 1; anderes fällt weg, Kaputtes zählt als verworfen, ebenso eine Füllung,
+     * die zu aufwendig ist. Die Füllung einer Fläche rechnet schon hier {@link Trapeze}, auf dem Thread
+     * des Netzes. Null, wenn die Formen mehr als {@link #MAX_PUNKTE_EBENE} Punkte haben; dann taugt der Teil nicht.
      */
-    static List<Form> formen(JsonArray objekte) {
+    static Gelesen formen(JsonArray objekte) {
         List<Form> aus = new ArrayList<>();
+        int punkte = 0, verworfen = 0;
         for (JsonElement e : objekte) {
             if (aus.size() > MAX_OBJEKTE) {
                 break;
             }
+            Form f;
             try {
-                Form f = form(e.getAsJsonObject());
-                if (f != null) {
-                    aus.add(f);
-                }
+                f = form(e.getAsJsonObject());
             } catch (RuntimeException fehler) {
-                // Ein kaputtes Objekt fehlt, die übrigen gelten.
+                verworfen++;
+                continue;
+            }
+            if (f != null) {
+                punkte += punkte(f);
+                if (punkte > MAX_PUNKTE_EBENE) {
+                    return null;
+                }
+                if (f instanceof Flaeche fl && fl.trapeze() == null && sichtbar(fl.fuellung())) {
+                    verworfen++;
+                }
+                aus.add(f);
             }
         }
-        return List.copyOf(aus);
+        return new Gelesen(List.copyOf(aus), punkte, verworfen);
     }
 
-    /** Eine Form, oder null, wenn das Objekt keine ist oder eine Grenze verletzt. */
+    private static int punkte(Form f) {
+        return switch (f) {
+            case Flaeche fl -> fl.ringe().stream().mapToInt(r -> r.length / 2).sum();
+            case Linie l -> l.punkte().length / 2;
+            case Kreis k -> 1;
+        };
+    }
+
+    /** Hat die Füllung Alpha? {@code #00000000} heisst ohne. */
+    static boolean sichtbar(int farbe) {
+        return farbe >>> 24 != 0;
+    }
+
+    /** Eine Form; null, wenn das Objekt keine sein will. Verletzt es eine Grenze, wirft sie. */
     private static Form form(JsonObject o) {
         String typ = o.has("type") ? o.get("type").getAsString() : "";
         if (!typ.equals("region") && !typ.equals("circle") && !typ.equals("line")) {
@@ -320,21 +364,26 @@ final class Ebenen {
         }
         String dimension = o.has("dimension") ? text(o, "dimension", MAX_KENNUNG) : UEBERWELT;
         if (dimension == null) {
-            return null;
+            throw new IllegalArgumentException("Grenze");
         }
-        int fuellung = o.has("fill") ? farbeMitAlpha(o.get("fill").getAsString(), 0) : 0;
-        // Ohne Farbe ist der Rand bei Region und Kreis die Füllung ohne Alpha.
-        int vorgabe = fuellung != 0 && !typ.equals("line") ? 0xFF000000 | fuellung : RANDFARBE;
+        String fill = o.has("fill") ? o.get("fill").getAsString() : null;
+        boolean gefuellt = fill != null && FARBE_MIT_ALPHA.matcher(fill).matches() && !typ.equals("line");
+        int fuellung = gefuellt ? farbeMitAlpha(fill, 0) : 0;
+        // Ohne Farbe ist der Rand bei Region und Kreis die Füllung ohne Alpha, auch bei #00000000.
+        int vorgabe = gefuellt ? 0xFF000000 | fuellung : RANDFARBE;
         Rand rand = rand(o, vorgabe);
         switch (typ) {
             case "circle" -> {
                 JsonArray c = o.getAsJsonArray("center");
                 double x = koordinate(c.get(0)), z = koordinate(c.get(1)), r = o.get("radius").getAsDouble();
-                return r > 0 && r <= MAX_RADIUS ? new Kreis(dimension, x, z, r, fuellung, rand) : null;
+                if (!(r > 0 && r <= MAX_RADIUS)) {
+                    throw new IllegalArgumentException("Radius " + r);
+                }
+                return new Kreis(dimension, x, z, r, fuellung, rand);
             }
             case "line" -> {
                 double[] p = ring(o.getAsJsonArray("points"), 2);
-                return p == null || p.length / 2 > MAX_PUNKTE ? null : new Linie(dimension, p, rand, box(List.of(p)));
+                return new Linie(dimension, p, rand, box(List.of(p)));
             }
             default -> {
                 List<double[]> ringe = new ArrayList<>();
@@ -343,37 +392,34 @@ final class Ebenen {
                     JsonObject poly = e.getAsJsonObject();
                     JsonArray loecher = poly.has("holes") ? poly.getAsJsonArray("holes") : new JsonArray();
                     if (loecher.size() > MAX_LOECHER) {
-                        return null;
+                        throw new IllegalArgumentException("Grenze");
                     }
                     double[] aussen = ring(poly.getAsJsonArray("outer"), 3);
-                    if (aussen == null) {
-                        return null;
-                    }
                     ringe.add(aussen);
+                    punkte += aussen.length / 2;
                     for (JsonElement l : loecher) {
                         double[] loch = ring(l.getAsJsonArray(), 3);
-                        if (loch == null) {
-                            return null;
-                        }
                         ringe.add(loch);
+                        punkte += loch.length / 2;
+                    }
+                    // Schon beim Lesen, nicht erst am Ende: Die Punkte über alle Ringe zählen.
+                    if (punkte > MAX_PUNKTE) {
+                        throw new IllegalArgumentException("Grenze");
                     }
                 }
-                for (double[] r : ringe) {
-                    punkte += r.length / 2;
+                if (ringe.isEmpty()) {
+                    throw new IllegalArgumentException("Grenze");
                 }
-                if (ringe.isEmpty() || punkte > MAX_PUNKTE) {
-                    return null;
-                }
-                int[] rechtecke = fuellung == 0 ? null : Raster.rechtecke(ringe, MAX_REIHEN, MAX_RECHTECKE);
-                return new Flaeche(dimension, rechtecke == null ? 0 : fuellung, rechtecke, rand, List.copyOf(ringe), box(ringe));
+                double[] trapeze = sichtbar(fuellung) ? Trapeze.von(ringe) : null;
+                return new Flaeche(dimension, fuellung, trapeze, rand, List.copyOf(ringe), box(ringe));
             }
         }
     }
 
-    /** Die Punkte [[x, z], …] als {x0, z0, …}; null mit weniger als {@code mindestens} oder mehr als {@link #MAX_PUNKTE}. */
+    /** Die Punkte [[x, z], …] als {x0, z0, …}; mit weniger als {@code mindestens} oder mehr als {@link #MAX_PUNKTE} wirft sie. */
     private static double[] ring(JsonArray punkte, int mindestens) {
         if (punkte.size() < mindestens || punkte.size() > MAX_PUNKTE) {
-            return null;
+            throw new IllegalArgumentException("Punkte " + punkte.size());
         }
         double[] r = new double[2 * punkte.size()];
         for (int i = 0; i < punkte.size(); i++) {
@@ -432,9 +478,11 @@ final class Ebenen {
         return new Rand(farbe, Math.min(breite, MAX_BREITE), strich, luecke);
     }
 
+    private static final Pattern FARBE_MIT_ALPHA = Pattern.compile("#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?");
+
     /** {@code #RRGGBB} deckend oder {@code #RRGGBBAA} mit Alpha als ARGB; sonst {@code sonst}. */
     static int farbeMitAlpha(String text, int sonst) {
-        if (!text.matches("#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?")) {
+        if (!FARBE_MIT_ALPHA.matcher(text).matches()) {
             return sonst;
         }
         int rgb = Integer.parseInt(text.substring(1, 7), 16);
@@ -466,6 +514,7 @@ final class Ebenen {
         liste = List.of();
         nadeln.clear();
         formen.clear();
+        punkte.clear();
         sammlungen.clear();
     }
 

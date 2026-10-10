@@ -106,6 +106,7 @@ public final class Minimap {
     private boolean show = true;
     /** Chunklinien auf Minimap und Vollbildkarte, eine Vorliebe aus dem Untermenü. Siehe docs/minimap.md, „Chunklinien“. */
     private boolean chunklinien;
+    private final Formen.Speicher formenSpeicher = new Formen.Speicher();
     /** Koordinaten unter der Minimap. Siehe docs/minimap.md, „Koordinaten“. */
     enum Koordinaten { AUS, XZ, XYZ }
 
@@ -648,16 +649,19 @@ public final class Minimap {
         pose.pushMatrix();
         pose.scale(1f / k);
         Matrix3x2f kopie = new Matrix3x2f(pose);
-        Formen.Ansicht a = new Formen.Ansicht((wx, wz, aus) -> {
+        Formen.Ansicht a = new Formen.Ansicht(abbild(zoom, k, links, oben, lage), block, k, 1, form, new double[] {(bereich[0] + links) / block, (bereich[1] + oben) / block, (bereich[2] + links) / block,
+                (bereich[3] + oben) / block}, kopie, new ScreenRectangle(r.x() * k, r.y() * k, n, n).transformMaxBounds(kopie));
+        Formen.zeichne(g, a, dimension, Ebenen.INSTANZ.sichtbar().stream().map(e -> Ebenen.INSTANZ.formen(e.id())).toList(), formenSpeicher);
+        pose.popMatrix();
+    }
+
+    /** Wie die Formen einen Punkt der Welt in die Pixel der Minimap legen: wie die Karte, mit {@code lage} gedreht. */
+    static Formen.Abbild abbild(int zoom, int k, int links, int oben, Drehung.Lage lage) {
+        return (wx, wz, aus) -> {
             double bx = Projektion.zuPixel(wx, zoom) * k - links, by = Projektion.zuPixel(wz, zoom) * k - oben;
             aus[0] = lage.x(bx, by);
             aus[1] = lage.y(bx, by);
-        }, block, k, 1, form, new double[] {(bereich[0] + links) / block, (bereich[1] + oben) / block, (bereich[2] + links) / block,
-                (bereich[3] + oben) / block}, kopie, new ScreenRectangle(r.x() * k, r.y() * k, n, n).transformMaxBounds(kopie));
-        for (Ebenen.Eintrag e : Ebenen.INSTANZ.sichtbar()) {
-            Formen.zeichne(g, a, dimension, Ebenen.INSTANZ.formen(e.id()));
-        }
-        pose.popMatrix();
+        };
     }
 
     /**
