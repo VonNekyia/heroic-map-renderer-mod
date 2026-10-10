@@ -198,7 +198,11 @@ public final class Bedienung implements FabricClientGameTest {
         double[] gleich = mitte(context);
         // Erst wenn kein zweiter Klick mehr kommen kann, legt der Klick die Marke in die Mitte (mod#75). Das gilt nach der
         // Uhr, nicht nach Ticks: Unter Last dauern zwei Ticks länger als das Fenster, dann sagt die Prüfung nichts.
-        if (System.currentTimeMillis() - vorKlick < MouseHandler.DOUBLE_CLICK_THRESHOLD_MS && !Arrays.equals(gleich, nachZug)) {
+        long vergangen = System.currentTimeMillis() - vorKlick;
+        if (vergangen >= MouseHandler.DOUBLE_CLICK_THRESHOLD_MS) {
+            System.out.println("[heroicmap-bedienung] Prüfung „zentriert erst nach dem Fenster“ übersprungen: " + vergangen
+                    + " ms bis zur Prüfung, das Fenster ist " + MouseHandler.DOUBLE_CLICK_THRESHOLD_MS + " ms");
+        } else if (!Arrays.equals(gleich, nachZug)) {
             throw new AssertionError("Der Klick zentrierte, bevor ein Doppelklick ausgeschlossen war");
         }
         warte250();
