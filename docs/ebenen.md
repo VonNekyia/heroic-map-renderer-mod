@@ -407,6 +407,10 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
 - **Bilder** holt der Mod wie die Symbole, siehe „Symbole“, höchstens
   512 × 512 (`Symbole.tafelBild`).
 
+![Die Tafel der Nadel „Nordhafen“ beim Zeigen; Szene `orte` des Gametests](bilder/tafel-zeigen.png)
+
+![Dieselbe Tafel per Klick gehalten, der Zeiger steht woanders](bilder/tafel-gehalten.png)
+
 ## Umschalten
 
 - **Untermenü „Ebenen …“** im Untermenü „Einstellungen …“, siehe
