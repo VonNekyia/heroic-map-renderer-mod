@@ -150,6 +150,10 @@ Ein Ort als Bild (`banner`), etwa eine Stadt mit dem Banner ihrer Nation
   wenn es fehlt, fehlt das Banner samt Namen.
 - **Minimap, Vollbildkarte, Reihenfolge:** wie die Nadeln, siehe dort.
 
+![Nadeln in drei Grössen und ein Banner mit ihren Namen in der Kartenschrift auf der Minimap; Szene `orte` des Gametests](bilder/orte.png)
+
+![Dieselben Orte auf der Vollbildkarte, in derselben Grösse](bilder/orte-karte.png)
+
 ## Symbole
 
 - **Adresse** aus der Liste `ebenen`, nur wenn die Liste gilt: `url`,
