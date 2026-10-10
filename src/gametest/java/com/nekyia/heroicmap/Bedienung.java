@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import net.fabricmc.fabric.api.client.gametest.v1.TestInput;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -187,6 +188,12 @@ public final class Bedienung implements FabricClientGameTest {
         context.waitTick();
         maus.pressMouse(LINKS);
         context.waitTicks(2);
+        // Erst wenn kein zweiter Klick mehr kommen kann, legt der Klick die Marke in die Mitte (mod#75).
+        if (!Arrays.equals(mitte(context), nachZug)) {
+            throw new AssertionError("Der Klick zentrierte, bevor ein Doppelklick ausgeschlossen war");
+        }
+        warte250();
+        context.waitTicks(2);
         double[] mitte = mitte(context);
         // Der Testsatz hat scale 4: die Mitte des Blocks in Pixeln der Basis.
         if (mitte[0] != (punkt.x() + 0.5) * 4 || mitte[1] != (punkt.z() + 0.5) * 4) {
@@ -213,16 +220,30 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("Nach „Wegpunkt setzen“ heftete ein schneller Klick den Wegpunkt davor an");
         }
 
+        // Den Wegpunkt aus der Mitte schieben, dann ein Doppelklick: angeheftet, und die Karte bleibt stehen (mod#75).
+        maus.setCursorPos(x * k, y * k);
+        context.waitTick();
+        maus.holdMouse(LINKS);
+        context.waitTick();
+        maus.moveCursor(30 * k, 20 * k);
+        context.waitTick();
+        maus.releaseMouse(LINKS);
         warte250();
         Karte.Marke mittig = marke(context, punkt);
+        double[] vorDoppel = mitte(context);
         maus.setCursorPos(mittig.x() * k, mittig.y() * k);
         context.waitTick();
         maus.pressMouse(LINKS);
         context.waitTick();
         maus.pressMouse(LINKS);
         context.waitTicks(2);
+        warte250();
+        context.waitTicks(2);
         if (!angeheftet(context, punkt)) {
             throw new AssertionError("Doppelklick heftet den Wegpunkt nicht an");
+        }
+        if (!Arrays.equals(mitte(context), vorDoppel)) {
+            throw new AssertionError("Der Doppelklick bewegte die Karte");
         }
 
         // Ein Wegpunkt am eigenen Standort: Ein Klick auf den eigenen Kopf am Rand holt den Spieler zurück,

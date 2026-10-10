@@ -8,6 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.MouseHandler;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
@@ -92,6 +93,9 @@ final class Karte extends Screen {
     private Marke gedrueckt;
     /** War das Drücken der zweite Klick eines Doppelklicks? */
     private boolean doppelklick;
+    /** Die Marke eines Klicks, die in die Mitte kommt, wenn kein zweiter Klick folgt, und seit wann sie wartet. */
+    private Marke wartend;
+    private long wartendSeit;
     /** Die Nadel, die Fläche oder der Kreis unter dem letzten Klick ohne Marke; ein Doppelklick darauf heftet an. */
     private Tafeln.Ziel letztesZiel;
     /** Wie weit seit dem Drücken gezogen ist, in Einheiten des GUI. */
@@ -150,6 +154,11 @@ final class Karte extends Screen {
             g.centeredText(font, Component.translatable("heroicmap.karte.keine"), width / 2, height / 2, TEXT);
             super.extractRenderState(g, mausX, mausY, delta);
             return;
+        }
+        // Ein Klick auf eine Marke zentriert erst, wenn kein zweiter folgt; so bewegt ein Doppelklick die Karte nicht.
+        if (wartend != null && Util.getMillis() - wartendSeit >= MouseHandler.DOUBLE_CLICK_THRESHOLD_MS) {
+            zentriere(wartend.weltX(), wartend.weltZ());
+            wartend = null;
         }
         int[] k = blick.kacheln(width, height);
         int seite = satz.kachel() * blick.lupe;
@@ -455,8 +464,8 @@ final class Karte extends Screen {
     }
 
     /**
-     * Linksklick auf eine Marke, beim Loslassen ohne Zug, legt sie in die Mitte, ein Doppelklick
-     * heftet sie an die Minimap oder löst sie, ebenso auf eine Nadel, ein Banner, eine Fläche oder einen Kreis vom Server.
+     * Linksklick auf eine Marke, beim Loslassen ohne Zug, legt sie in die Mitte, sobald kein zweiter
+     * Klick mehr folgen kann; ein Doppelklick heftet sie an die Minimap oder löst sie, ohne die Karte zu bewegen, ebenso auf eine Nadel, ein Banner, eine Fläche oder einen Kreis vom Server.
      * Rechtsklick öffnet das Menü: „Hierher teleportieren“,
      * nur mit execute und tp im Befehlsbaum und nicht unter einer Decke, sonst landete man auf dem
      * Dach; darunter „Wegpunkt setzen“, auf einem Wegpunkt „Wegpunkt löschen“. Erst ein Klick auf
@@ -510,9 +519,12 @@ final class Karte extends Screen {
         }
         Marke m = treffer(e.x(), e.y());
         if (e.button() == InputConstants.MOUSE_BUTTON_LEFT) {
-            // Der erste Klick hat die Marke schon in die Mitte gelegt; der zweite zählt für dieselbe.
+            // Der zweite zählt für die Marke des ersten, die noch nicht in die Mitte kam, und hebt das auf.
             doppelklick = doppelt && vorige != null;
             gedrueckt = doppelklick ? vorige : m;
+            if (doppelklick) {
+                wartend = null;
+            }
             // true, sonst zählt das Spiel den nächsten Klick nicht als doppelt, auch auf einer Fläche; ziehen geht trotzdem.
             return true;
         }
@@ -551,7 +563,8 @@ final class Karte extends Screen {
             return knopf;
         }
         if (!doppelklick) {
-            zentriere(m.weltX(), m.weltZ());
+            wartend = m;
+            wartendSeit = Util.getMillis();
             letzte = m;
         } else if (m.punkt() != null) {
             Wegpunkte.INSTANZ.umschalten(m.punkt());

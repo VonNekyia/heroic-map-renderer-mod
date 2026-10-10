@@ -30,8 +30,8 @@ Fläche oder einen Kreis vom Server an, siehe „Anheften“ (mod#36).
 |---|---|
 | Rechtsklick, „Wegpunkt setzen“ | der Eintrag unter „Hierher teleportieren“; setzt einen Wegpunkt auf den Block unter der Maus, in der ersten der 8 Farben (`Wegpunkte.FARBEN`), die in der Dimension noch frei ist, sind alle vergeben, reihum. Steht dort schon einer, bleibt es einer. Den Eintrag gibt es auch ohne Recht zum Teleportieren und unter einer Decke |
 | Rechtsklick auf einen Wegpunkt | das Menü für seinen Block: „Hierher teleportieren“, wenn erlaubt, und „Wegpunkt löschen“ |
-| Klick auf eine Marke | legt sie beim Loslassen in die Mitte: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück. Wer auf einer Marke zu ziehen beginnt und weiter als 3 Einheiten zieht (`Karte.ZUG`), zieht nur die Karte |
-| Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder |
+| Klick auf eine Marke | legt sie in die Mitte, sobald kein zweiter Klick mehr folgen kann, 250 ms nach dem Loslassen: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück. Wer auf einer Marke zu ziehen beginnt und weiter als 3 Einheiten zieht (`Karte.ZUG`), zieht nur die Karte |
+| Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder; die Karte bewegt sich dabei nicht |
 | Doppelklick auf die Raute einer eigenen Region, auf eine Fläche, einen Kreis, eine Nadel oder ein Banner vom Server | heftet sie an die Minimap oder löst sie wieder, siehe „Anheften“ |
 | Rechtsklick, „Region von hier“, dann ein Linksklick oder „Region bis hier“ | setzt eine eigene Region, das Rechteck der Blöcke zwischen beiden Ecken samt ihnen, siehe „Regionen“; dazwischen zeigt eine gestrichelte Vorschau das Rechteck bis zur Maus und unten links der Hinweis „Linksklick setzt die zweite Ecke, Esc bricht ab“; ziehen verschiebt die Karte weiter, „Region abbrechen“ oder `Esc` brechen ab |
 | Rechtsklick in eine eigene Region oder auf ihre Raute | „Region löschen“ |
@@ -42,10 +42,12 @@ Fläche oder einen Kreis vom Server an, siehe „Anheften“ (mod#36).
   (`mouseClicked` gab `true`; `MouseHandler.onButton`, belegt per javap am
   Client 26.3). Die Karte nimmt jeden Linksklick an, auch einen auf
   freie Karte, sonst zählte ein Doppelklick auf eine Fläche nie. Der erste
-  Klick hat die Marke schon in die Mitte gelegt; der zweite zählt deshalb
-  für die Marke des ersten (`Karte.letzte`), nicht für die unter der Maus.
-  Jeder andere Klick vergisst sie; ein schneller Klick nach „Wegpunkt
-  setzen“ heftet so nichts an.
+  Klick auf eine Marke legt sie erst in die Mitte, wenn 250 ms lang kein
+  zweiter kam (`MouseHandler.DOUBLE_CLICK_THRESHOLD_MS`, `Karte.wartend`);
+  so bewegt ein Doppelklick die Karte nicht, wie der User es will (mod#75).
+  Der zweite zählt für die Marke des ersten (`Karte.letzte`), nicht für die
+  unter der Maus, und hebt das Zentrieren auf. Jeder andere Klick vergisst
+  sie; ein schneller Klick nach „Wegpunkt setzen“ heftet so nichts an.
 - **Doppelklick auf ein Objekt vom Server:** Der erste Klick merkt sich
   beim Loslassen ohne Zug das Ziel unter der Maus (`Karte.letztesZiel`),
   eine Nadel, ein Banner, eine Fläche oder einen Kreis mit `id`; eine Nadel
