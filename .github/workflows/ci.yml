@@ -45,20 +45,42 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
-      # Ein Fenster ohne Bildschirm: Xvfb, OpenGL in Software über Mesa. Ohne libglx-mesa0 findet das Spiel kein GLX-Visual.
+      # Ein Fenster ohne Bildschirm: Xvfb, OpenGL in Software über Mesa, den Kontext über EGL (siehe Gametests).
       - name: Xvfb und Mesa
         timeout-minutes: 10
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri libglx-mesa0 mesa-utils
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri libglx-mesa0 libegl-mesa0 libegl1 mesa-utils
 
       # Zeigt Renderer und Version von OpenGL im Fenster ohne Bildschirm, bevor das Spiel startet.
       - name: OpenGL unter Xvfb
         timeout-minutes: 5
-        run: xvfb-run -a -s "-screen 0 1920x1080x24" glxinfo -B
+        run: |
+          xvfb-run -a -s "-screen 0 1920x1080x24" glxinfo -B
+          echo "GLX-Konfigurationen mit sRGB: $(xvfb-run -a -s '-screen 0 1920x1080x24' glxinfo -v | grep -c 'sRGB=Y')"
+          xvfb-run -a -s "-screen 0 1920x1080x24" glxinfo -v | grep -i -m5 srgb || true
+          xvfb-run -a -s "-screen 0 1920x1080x24" eglinfo -B || true
 
-      # 24 Bit Farbtiefe; mit der Vorgabe von xvfb-run, 8 Bit, gibt es kein OpenGL.
+      # 24 Bit Farbtiefe; mit der Vorgabe von xvfb-run, 8 Bit, gibt es kein OpenGL. Das Spiel verlangt über SDL3 einen
+      # sRGB-fähigen Framebuffer, den es über GLX unter Xvfb nicht fand; SDL_VIDEO_FORCE_EGL nimmt EGL statt GLX.
+      # Ohne Backend zeigt das Spiel einen Dialog und wartet auf einen Klick, der hier nie kommt: Dann bricht der
+      # Schritt gleich ab, statt bis zum Limit zu hängen.
       - name: Gametests
         timeout-minutes: 60
-        run: xvfb-run -a -s "-screen 0 1920x1080x24" ./gradlew runClientGameTest ${{ matrix.mods == 'sodium' && '-Psodium' || '' }}
+        env:
+          SDL_VIDEO_FORCE_EGL: "1"
+        run: |
+          xvfb-run -a -s "-screen 0 1920x1080x24" ./gradlew runClientGameTest ${{ matrix.mods == 'sodium' && '-Psodium' || '' }} &
+          lauf=$!
+          while kill -0 "$lauf" 2>/dev/null; do
+            n=$(grep -c 'Failed to create backend' build/run/clientGameTest/logs/latest.log 2>/dev/null) || n=0
+            if [ "$n" -ge 2 ]; then
+              echo "::error::Weder OpenGL noch Vulkan liess sich starten, siehe das Log im Artefakt"
+              pkill -f devlaunchinjector || true
+              wait "$lauf" || true
+              exit 1
+            fi
+            sleep 5
+          done
+          wait "$lauf"
 
       - name: Log und Bildschirmfotos
         if: failure()
