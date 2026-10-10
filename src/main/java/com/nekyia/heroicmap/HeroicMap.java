@@ -115,6 +115,7 @@ public final class HeroicMap implements ClientModInitializer {
         }));
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath(ID, "minimap"), Minimap.INSTANZ::zeichne);
         LevelRenderEvents.COLLECT_SUBMITS.register(Strahlen::zeichne);
+        LevelRenderEvents.COLLECT_SUBMITS.register(Schleier.INSTANZ::zeichne);
         Kanal.anmelden();
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, kontext) -> dispatcher.register(
                 ClientCommands.literal("hmap")

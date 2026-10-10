@@ -238,9 +238,12 @@ public final class Messung implements FabricClientGameTest {
     }
 
     /**
-     * Was die Strahlen je Frame kosten: {@link Strahlen#MAX_STRAHLEN} angeheftete Wegpunkte auf einer
-     * Spirale um den Spieler, 16 bis 142 Blöcke weit, also alle in Sichtweite; 4 px, Zoom 4, freie
-     * Bildrate, im Stand; Frametime ohne und mit Effekten in der Welt, im Wechsel.
+     * Was die Effekte in der Welt je Frame kosten: erst {@link Strahlen#MAX_STRAHLEN} angeheftete
+     * Wegpunkte auf einer Spirale um den Spieler, 16 bis 142 Blöcke weit, also alle in Sichtweite; dann
+     * dazu 47 angeheftete eigene Regionen als Quadrate um den Spieler, halbe Seite 4 bis 188 Blöcke, so
+     * hat der Schleier mehr als {@link Schleier#MAX_VIERECKE} Stücke, die Spitze. 4 px, Zoom 4, freie
+     * Bildrate, im Stand; Frametime ohne und mit Effekten im Wechsel, und wie lange ein Bau des Schleiers
+     * dauert.
      */
     private void effekte(ClientGameTestContext context) {
         context.runOnClient(mc -> {
@@ -266,6 +269,37 @@ public final class Messung implements FabricClientGameTest {
             for (boolean an : new boolean[] {false, true}) {
                 context.runOnClient(mc -> Minimap.INSTANZ.setzeEffekte(an));
                 frames(context, art + " effekte=" + (an ? "an" : "aus") + " stand", true, runde, () -> context.waitTicks(STAND_TICKS));
+            }
+        }
+
+        context.runOnClient(mc -> {
+            String welt = mc.level.dimension().identifier().toString();
+            for (int s = 4; s <= 188; s += 4) {
+                Wegpunkte.INSTANZ.setze(welt, -s, -s, s - 1, s - 1);
+                Wegpunkte.INSTANZ.umschalten(Wegpunkte.INSTANZ.regionen().getLast());
+            }
+            Minimap.INSTANZ.setzeEffekte(true);
+        });
+        context.waitTicks(20);
+        int vierecke = context.computeOnClient(mc -> Schleier.INSTANZ.vierecke());
+        // Der Bau allein, zehnmal hintereinander auf dem Render-Thread.
+        long[] bau = context.computeOnClient(mc -> {
+            long[] z = new long[10];
+            int weit = mc.options.getEffectiveRenderDistance() * 16;
+            for (int i = 0; i < z.length; i++) {
+                long t0 = System.nanoTime();
+                Schleier.INSTANZ.baue(mc.level, mc.player.getBlockX(), mc.player.getBlockZ(), weit, System.currentTimeMillis());
+                z[i] = System.nanoTime() - t0;
+            }
+            return z;
+        });
+        Arrays.sort(bau);
+        zeile("schleier vierecke=%d bau n=%d median=%.3f ms max=%.3f ms", vierecke, bau.length, ms(quantil(bau, 0.5)), ms(bau[bau.length - 1]));
+        String mitSchleier = art + " schleier=" + vierecke;
+        for (int runde = 1; runde <= RUNDEN; runde++) {
+            for (boolean an : new boolean[] {false, true}) {
+                context.runOnClient(mc -> Minimap.INSTANZ.setzeEffekte(an));
+                frames(context, mitSchleier + " effekte=" + (an ? "an" : "aus") + " stand", true, runde, () -> context.waitTicks(STAND_TICKS));
             }
         }
         context.runOnClient(mc -> {

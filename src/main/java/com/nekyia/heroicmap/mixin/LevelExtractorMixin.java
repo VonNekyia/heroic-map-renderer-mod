@@ -1,6 +1,7 @@
 package com.nekyia.heroicmap.mixin;
 
 import com.nekyia.heroicmap.Minimap;
+import com.nekyia.heroicmap.Schleier;
 import com.nekyia.heroicmap.Selbst;
 import net.minecraft.client.renderer.extract.LevelExtractor;
 import org.spongepowered.asm.mixin.Mixin;
@@ -11,7 +12,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * Die Wege, auf denen der Client einen Abschnitt neu zeichnen lässt, enden in
  * {@code setSectionDirty}: Block, Bereich, Licht, Chunk; {@code allChanged} nicht. Die Minimap
- * zeichnet die Spalte dann auch neu, ebenso die selbst gezeichnete Karte. Siehe docs/minimap.md, „Neu zeichnen“.
+ * zeichnet die Spalte dann auch neu, ebenso die selbst gezeichnete Karte; liegt der Schleier darüber, baut er
+ * neu. Siehe docs/minimap.md, „Neu zeichnen“.
  */
 @Mixin(LevelExtractor.class)
 abstract class LevelExtractorMixin {
@@ -20,5 +22,6 @@ abstract class LevelExtractorMixin {
     private void heroicmap$markiere(int x, int y, int z, boolean sofort, CallbackInfo info) {
         Minimap.INSTANZ.markiere(x, z);
         Selbst.INSTANZ.markiere(x, z);
+        Schleier.INSTANZ.markiere(x, z);
     }
 }

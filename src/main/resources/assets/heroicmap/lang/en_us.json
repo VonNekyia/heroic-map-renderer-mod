@@ -133,5 +133,5 @@
   "heroicmap.menue.drehen": "Rotate",
   "heroicmap.menue.chunklinien": "Chunk lines",
   "heroicmap.menue.effekte": "World effects",
-  "heroicmap.menue.effekte.beschreibung": "A beacon beam above each pinned waypoint in view distance"
+  "heroicmap.menue.effekte.beschreibung": "A beacon beam above each pinned waypoint and a veil along the edge of pinned regions"
 }

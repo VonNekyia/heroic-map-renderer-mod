@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.15
+
+- **Veils along pinned regions:** the edge of each pinned region and circle shows a soft veil in its colour, standing on the ground and fading out over four blocks. "World effects" in the settings switches it off together with the beams.
+
 ## 0.2.14
 
 - **Beams above pinned waypoints:** each pinned waypoint in view distance shows a beacon beam in its colour in the world. Switch it off with "World effects" in the settings.

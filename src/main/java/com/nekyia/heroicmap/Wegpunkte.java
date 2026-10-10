@@ -436,6 +436,11 @@ final class Wegpunkte {
         return fuerMinimap;
     }
 
+    /** Zählt jede Änderung an Wegpunkten, Regionen und Angeheftetem. */
+    int stand() {
+        return stand;
+    }
+
     /** Die angehefteten Nadeln und Banner der sichtbaren Ebenen für die Minimap, unten zuerst; dieselbe Liste wie oben. */
     List<Ebenen.Ort> nadeln(Ebenen e) {
         baue(e);
