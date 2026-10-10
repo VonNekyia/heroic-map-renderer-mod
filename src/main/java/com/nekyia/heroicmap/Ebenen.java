@@ -149,8 +149,13 @@ final class Ebenen {
             String symbolGross, String symbolMittel, String id) implements Ort {
     }
 
-    /** Ein Banner: das Bild {@code bild} der Ebene, Pixel auf Pixel, der Fuss unten mittig auf dem Ort; darunter der Name. */
-    record Banner(double x, double z, String dimension, String name, String bild, String ebene, String version, String id) implements Ort {
+    /**
+     * Ein Banner, Pixel auf Pixel: mit {@code design} das Sprite des Entwurfs im Satz {@code oben}, mit {@code krone} das
+     * aus {@code krone/}, der Fuss aus {@code satz.json}; sonst und solange das Sprite fehlt das Bild {@code bild} der
+     * Ebene, der Fuss unten mittig. Darunter der Name. Siehe docs/ebenen.md, „Banner“.
+     */
+    record Banner(double x, double z, String dimension, String name, String bild, String ebene, String version, String id,
+            String design, boolean krone) implements Ort {
     }
 
     /** Ein Rand in Einheiten des GUI: Farbe mit Alpha, Breite, gestrichelt Strich und Lücke, sonst beide 0. */
@@ -416,14 +421,22 @@ final class Ebenen {
                 feld(symbol, "large"), feld(symbol, "medium"), text(o, "id", MAX_TEXT));
     }
 
-    /** Ein Banner; null ohne Bild unter {@code images/}, mit einem Feld über {@link #MAX_FELD} oder einer zu langen Dimension. */
+    /**
+     * Ein Banner; {@code design} nur als Teil einer Kennung, {@code capital} nur mit ihm. Null ohne gültiges Bild unter
+     * {@code images/}, wenn es keinen Entwurf nennt, und mit einer zu langen Dimension; ein Bild über {@link #MAX_FELD}
+     * oder ausserhalb von {@code images/} zählt nicht.
+     */
     private static Banner banner(JsonObject o, String ebene, String version) {
         JsonArray at = o.getAsJsonArray("at");
         String dimension = o.has("dimension") ? text(o, "dimension", MAX_KENNUNG) : UEBERWELT;
         String bild = feld(o, "image");
-        return dimension == null || bild == null || !Symbole.FELD.matcher(bild).matches() ? null
+        bild = bild != null && Symbole.FELD.matcher(bild).matches() ? bild : null;
+        String design = o.has("design") ? o.get("design").getAsString() : null;
+        design = Symbole.teil(design) ? design : null;
+        boolean krone = design != null && o.has("capital") && o.get("capital").getAsBoolean();
+        return dimension == null || bild == null && design == null ? null
                 : new Banner(at.get(0).getAsDouble(), at.get(1).getAsDouble(), dimension, text(o, "name", MAX_TEXT), bild, ebene, version,
-                        text(o, "id", MAX_TEXT));
+                        text(o, "id", MAX_TEXT), design, krone);
     }
 
     /** Das Feld eines Symbols wie es steht, oder null, wenn es fehlt oder länger als {@link #MAX_FELD} ist; prüfen tut {@link Symbole#uri}. */
@@ -788,13 +801,16 @@ final class Ebenen {
         switch (o) {
             case Nadel n -> nadel(g, n);
             case Banner b -> {
-                Symbole.Textur t = Symbole.INSTANZ.banner(b.ebene(), b.version(), b.bild());
+                // Mit Entwurf das Sprite um seinen Fuss; solange es fehlt, das Bild, wie das Format sagt.
+                Symbole.Sprite sp = b.design() == null ? null : Symbole.INSTANZ.sprite(b.ebene(), b.version(), b.design(), b.krone());
+                Symbole.Textur t = sp != null ? sp.textur() : Symbole.INSTANZ.banner(b.ebene(), b.version(), b.bild());
                 if (t == null) {
                     pose.popMatrix();
                     return;
                 }
-                banner(g, t, gs, BANNER_HOEHE, deckung);
-                hoehe = t.hoehe() * faktor(t.breite(), t.hoehe(), gs) / (double) gs;
+                int f = faktor(t.breite(), t.hoehe(), gs);
+                bild(g, t, f, sp == null ? t.breite() * f / 2 : sp.fussX() * f, sp == null ? t.hoehe() * f : sp.fussY() * f, gs, deckung);
+                hoehe = t.hoehe() * f / (double) gs;
             }
         }
         // Eine Nadel trägt ihren Namen gerade, ein Banner im Bogen, so wählte es der User (0102 des Renderers).
@@ -823,6 +839,10 @@ final class Ebenen {
         return switch (o) {
             case Nadel n -> kasten(SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe(), o.name() == null ? 0 : nameBreite(font, o.name()));
             case Banner b -> {
+                Symbole.Sprite sp = b.design() == null ? null : Symbole.INSTANZ.sprite(b.ebene(), b.version(), b.design(), b.krone());
+                if (sp != null) {
+                    yield spriteKasten(sp.textur().breite(), sp.textur().hoehe(), sp.fussX(), sp.fussY(), gs, breiten(font, o));
+                }
                 Symbole.Textur t = Symbole.INSTANZ.banner(b.ebene(), b.version(), b.bild());
                 yield t == null ? null : bannerKasten(t.breite(), t.hoehe(), gs, breiten(font, o));
             }
@@ -835,11 +855,20 @@ final class Ebenen {
      * linken Kante, wie bei der Nadel.
      */
     static void banner(GuiGraphicsExtractor g, Symbole.Textur t, int gs, int hoechstens, float deckung) {
-        int f = faktor(t.breite(), t.hoehe(), gs, hoechstens), w = t.breite() * f, h = t.hoehe() * f;
+        int f = faktor(t.breite(), t.hoehe(), gs, hoechstens);
+        bild(g, t, f, t.breite() * f / 2, t.hoehe() * f, gs, deckung);
+    }
+
+    /**
+     * Das Bild oder Sprite {@code t} mit {@code f} Pixeln des Schirms je Pixel, seine linke obere Ecke {@code links} und
+     * {@code oben} Pixel des Schirms links über dem Ursprung, also dem Fuss.
+     */
+    private static void bild(GuiGraphicsExtractor g, Symbole.Textur t, int f, int links, int oben, int gs, float deckung) {
+        int w = t.breite() * f, h = t.hoehe() * f;
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.scale(1f / gs);
-        g.blit(RenderPipelines.GUI_TEXTURED, t.id(), -w / 2, -h, 0, 0, w, h, t.breite(), t.hoehe(), t.breite(), t.hoehe(), ARGB.white(deckung));
+        g.blit(RenderPipelines.GUI_TEXTURED, t.id(), -links, -oben, 0, 0, w, h, t.breite(), t.hoehe(), t.breite(), t.hoehe(), ARGB.white(deckung));
         pose.popMatrix();
     }
 
@@ -868,6 +897,16 @@ final class Ebenen {
     }
 
     /**
+     * Der Kasten eines Sprites wie gezeichnet, in Einheiten des GUI: seine linke obere Ecke {@code fussX}, {@code fussY}
+     * Pixel des Sprites links über dem Ort; dazu der Name im Bogen mit den Vorschüben {@code name}, leer heisst ohne.
+     */
+    static float[] spriteKasten(int breite, int hoehe, int fussX, int fussY, int gs, double[] name) {
+        int f = faktor(breite, hoehe, gs);
+        float[] bild = {-fussX * f / (float) gs, -fussY * f / (float) gs, (breite - fussX) * f / (float) gs, (hoehe - fussY) * f / (float) gs};
+        return name.length == 0 ? bild : vereint(bild, bogenKasten(name, radius(name, hoehe * f / (double) gs)));
+    }
+
+    /**
      * Wie {@link #kasten(Font, Ort, int)}, ohne das Bild eines Banners zu holen: mit der grössten Grösse eines
      * Bilds, ein Pixel je Einheit. Zum Wegschneiden und als Vorprüfung beim Treffer; der genaue Kasten liegt
      * bei jedem GUI-Massstab darin.
@@ -875,7 +914,7 @@ final class Ebenen {
     static float[] kastenOhneHolen(Font font, Ort o) {
         return switch (o) {
             case Nadel n -> kasten(SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe(), o.name() == null ? 0 : nameBreite(font, o.name()));
-            case Banner b -> grob(breiten(font, o));
+            case Banner b -> grob(breiten(font, o), b.design() != null);
         };
     }
 
@@ -886,7 +925,16 @@ final class Ebenen {
      * Ecke liegt höchstens die halbe Diagonale ihres Zeichens von seiner Mitte.
      */
     static float[] grob(double[] name) {
-        float[] bild = kasten(Symbole.BANNER_BREITE, Symbole.BANNER_HOEHE, 0);
+        return grob(name, false);
+    }
+
+    /**
+     * Wie {@link #grob(double[])}; mit {@code sprite} für ein Banner mit Entwurf: Sein Fuss liegt irgendwo auf einer
+     * Leinwand bis 32 × 64 Einheiten, wie gezeichnet bei jedem GUI-Massstab, also reicht das Sprite so weit zu jeder Seite.
+     */
+    static float[] grob(double[] name, boolean sprite) {
+        float[] bild = sprite ? new float[] {-Symbole.BANNER_BREITE, -Symbole.BANNER_HOEHE, Symbole.BANNER_BREITE, Symbole.BANNER_HOEHE}
+                : kasten(Symbole.BANNER_BREITE, Symbole.BANNER_HOEHE, 0);
         if (name.length == 0) {
             return bild;
         }

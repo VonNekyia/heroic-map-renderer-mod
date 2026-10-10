@@ -1,6 +1,8 @@
 package com.nekyia.heroicmap;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.mojang.blaze3d.platform.NativeImage;
 import java.awt.Graphics2D;
 import java.awt.Image;
@@ -12,6 +14,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.HashMap;
@@ -62,6 +65,11 @@ final class Symbole {
     /** Ein Feld wie {@code images/burg_16.png}: ohne Unterordner, ohne Punkt vorn, nur PNG und WebP. */
     static final Pattern FELD = Pattern.compile("images/[a-z0-9_-][a-z0-9_.-]{0,63}\\.(png|webp)");
     private static final Pattern MODNAME = Pattern.compile("[a-z0-9_-][a-z0-9_.-]{0,63}");
+    /** Ein Teil einer Kennung, auch der Name eines Entwurfs: 1 bis 64 Zeichen, nicht mit Punkt vorn oder hinten, kein Gerät von Windows. */
+    private static final Pattern TEIL = Pattern.compile("[a-z0-9_-]([a-z0-9_.-]{0,62}[a-z0-9_-])?");
+    private static final Pattern GERAET = Pattern.compile("(con|prn|aux|nul|com[0-9]|lpt[0-9])(\\..*)?");
+    /** So gross ist {@code satz.json} der Banner höchstens; heute rund 40 Byte. */
+    static final int MAX_SATZ = 4 << 10;
     private static final Logger LOGGER = LoggerFactory.getLogger(HeroicMap.ID);
     private static final AtomicInteger ZAEHLER = new AtomicInteger();
 
@@ -102,6 +110,11 @@ final class Symbole {
         boolean voll;
         /** Gesetzt, sobald die Felder frei sind; ein wartender Auftrag für sie fragt dann nicht mehr. */
         volatile boolean frei;
+        /** {@code satz.json} der Banner im Satz oben: der Satz, sobald er da ist; ob ein Abruf läuft; die Fehlschläge und wann zuletzt. */
+        Spritesatz satz;
+        boolean satzLaeuft, fussGewarnt;
+        long satzFehlZeit;
+        int satzFehler;
 
         Felder(String version) {
             this.version = version;
@@ -204,6 +217,155 @@ final class Symbole {
     record Textur(Identifier id, int breite, int hoehe) {
     }
 
+    /** Der Satz {@code oben} der Banner einer Ebene: der Fuss im Sprite, auf den Kanten der Pixel, und der Winkel der Unterkante, oben 0. */
+    record Spritesatz(int fussX, int fussY, double winkel) {
+    }
+
+    /** Ein Sprite eines Banners und sein Fuss in Pixeln des Sprites. */
+    record Sprite(Textur textur, int fussX, int fussY) {
+    }
+
+    /** Ist {@code s} ein Teil einer Kennung, siehe das Format, „Kennung“? */
+    static boolean teil(String s) {
+        return s != null && TEIL.matcher(s).matches() && !GERAET.matcher(s).matches();
+    }
+
+    /**
+     * Wo das Sprite eines Entwurfs im Satz {@code oben} liegt: {@code <basis>/layers/<modname>/banner/<teil>/oben/<entwurf>.png},
+     * mit Krone unter {@code oben/krone/}; null, wenn ein Teil nicht taugt. Siehe docs/ebenen.md, „Banner“.
+     */
+    static URI spriteUri(URI basis, String ebene, String entwurf, boolean krone) {
+        return teil(entwurf) ? bannerUri(basis, ebene, (krone ? "krone/" : "") + entwurf + ".png") : null;
+    }
+
+    /** Wo {@code satz.json} des Satzes {@code oben} der Ebene liegt; null, wenn ein Teil nicht taugt. */
+    static URI satzUri(URI basis, String ebene) {
+        return bannerUri(basis, ebene, "satz.json");
+    }
+
+    private static URI bannerUri(URI basis, String ebene, String datei) {
+        int doppelpunkt = ebene.indexOf(':');
+        if (basis == null || doppelpunkt < 0 || !MODNAME.matcher(ebene.substring(0, doppelpunkt)).matches()
+                || !teil(ebene.substring(doppelpunkt + 1))) {
+            return null;
+        }
+        String b = basis.toString();
+        return URI.create((b.endsWith("/") ? b : b + "/") + "layers/" + ebene.substring(0, doppelpunkt) + "/banner/"
+                + ebene.substring(doppelpunkt + 1) + "/oben/" + datei);
+    }
+
+    /**
+     * Das Sprite des Entwurfs {@code entwurf} der Ebene im Satz {@code oben}, mit oder ohne Krone, und sein Fuss aus
+     * {@code satz.json}; null, solange eins von beiden lädt, ohne Adresse, nach einem Fehler oder wenn der Fuss nicht auf
+     * der Leinwand liegt. Dann zeichnet die Ansicht {@code image}. Holt beides wie die Bilder, mit ihren Neuversuchen
+     * und gegen ihr Budget. Siehe docs/ebenen.md, „Banner“.
+     */
+    Sprite sprite(String ebene, String version, String entwurf, boolean krone) {
+        URI uri = spriteUri(basis, ebene, entwurf, krone);
+        if (uri == null) {
+            return null;
+        }
+        Felder f = felder(ebene, version);
+        Spritesatz satz = satz(f, ebene);
+        Textur t = textur(f, ebene, uri, "banner/oben/" + (krone ? "krone/" : "") + entwurf, BANNER_BREITE, BANNER_HOEHE, true);
+        if (satz == null || t == null) {
+            return null;
+        }
+        if (satz.fussX() > t.breite() || satz.fussY() > t.hoehe()) {
+            if (!f.fussGewarnt) {
+                f.fussGewarnt = true;
+                LOGGER.warn("Heroic Map: Der Fuss {},{} aus satz.json der Ebene {} liegt nicht auf dem Sprite {} × {}; die Banner nehmen ihr Bild",
+                        satz.fussX(), satz.fussY(), ebene, t.breite(), t.hoehe());
+            }
+            return null;
+        }
+        return new Sprite(t, satz.fussX(), satz.fussY());
+    }
+
+    /** {@code satz.json} der Ebene in den Felder ihrer version, oder null, solange er lädt oder fehlt; holt ihn beim ersten Fragen. */
+    private Spritesatz satz(Felder f, String ebene) {
+        if (f.satz != null || f.satzLaeuft || f.satzFehler > 0 && uhr.getAsLong() - f.satzFehlZeit < warten(f.satzFehler)) {
+            return f.satz;
+        }
+        URI uri = satzUri(basis, ebene);
+        if (uri == null) {
+            return null;
+        }
+        f.satzLaeuft = true;
+        int r = runde.get();
+        InetAddress server = spielserver;
+        boolean warnen = f.satzFehler == 0;
+        holer.execute(() -> {
+            if (r != runde.get() || f.frei) {
+                return;
+            }
+            Spritesatz neu = holeSatz(client, uri, server, FRIST, warnen);
+            renderThread.execute(() -> {
+                if (r != runde.get() || f.frei || ebenen.get(ebene) != f) {
+                    return;
+                }
+                f.satzLaeuft = false;
+                if (neu != null) {
+                    f.satz = neu;
+                    stand++;
+                } else {
+                    f.satzFehler++;
+                    f.satzFehlZeit = uhr.getAsLong();
+                }
+            });
+        });
+        return null;
+    }
+
+    /** Holt {@code satz.json} wie ein Bild: Adresse geprüft, ohne Weiterleitung, höchstens {@link #MAX_SATZ} Byte. Null bei jedem Fehler. */
+    static Spritesatz holeSatz(HttpClient client, URI uri, InetAddress spielserver, Duration frist, boolean warnen) {
+        try {
+            Adresse.Urteil urteil = Adresse.pruefe(uri, spielserver);
+            if (urteil != Adresse.Urteil.GUT) {
+                throw new IOException(urteil.name());
+            }
+            HttpRequest anfrage = HttpRequest.newBuilder(uri).timeout(frist).GET().build();
+            HttpResponse<byte[]> antwort = Laden.sende(client, anfrage, MAX_SATZ, Laden.Grund.NETZ, frist, uri.getPath());
+            if (antwort.statusCode() != 200) {
+                throw new IOException("HTTP " + antwort.statusCode());
+            }
+            Spritesatz s = spritesatz(new String(antwort.body(), StandardCharsets.UTF_8));
+            if (s == null) {
+                throw new IOException("kein foot aus zwei ganzen Zahlen ab 0 oder kein endlicher angle");
+            }
+            return s;
+        } catch (IOException | Laden.Fehler | RuntimeException e) {
+            if (warnen) {
+                LOGGER.warn("Heroic Map: {} nicht geladen: {}", uri, e.getMessage());
+            } else {
+                LOGGER.debug("Heroic Map: {} wieder nicht geladen: {}", uri, e.getMessage());
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return null;
+    }
+
+    /**
+     * Liest {@code satz.json}: {@code foot} zwei ganze Zahlen von 0 bis zur grössten Leinwand, 32 × 64, {@code angle} eine
+     * endliche Zahl in Grad, ohne sie 0; sonst null. Ob der Fuss auf dem Sprite liegt, prüft {@link #sprite}.
+     */
+    static Spritesatz spritesatz(String json) {
+        try {
+            JsonObject o = JsonParser.parseString(json).getAsJsonObject();
+            JsonArray fuss = o.getAsJsonArray("foot");
+            if (fuss == null || fuss.size() != 2) {
+                return null;
+            }
+            double x = fuss.get(0).getAsDouble(), y = fuss.get(1).getAsDouble(), winkel = o.has("angle") ? o.get("angle").getAsDouble() : 0;
+            boolean gut = x == Math.rint(x) && y == Math.rint(y) && x >= 0 && y >= 0 && x <= BANNER_BREITE && y <= BANNER_HOEHE
+                    && Double.isFinite(winkel);
+            return gut ? new Spritesatz((int) x, (int) y, winkel) : null;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     /**
      * Ein Bild einer Tafel, höchstens {@link Tafel#MAX_BILD} im Quadrat, für {@code breite} × {@code hoehe}
      * Pixel des Schirms, also die Grösse auf der Tafel mal GUI-Massstab: Ist es grösser, verkleinert der
@@ -280,9 +442,11 @@ final class Symbole {
     }
 
     private Textur textur(String ebene, String version, String feld, String schluessel, int breite, int hoehe, boolean hoechstens) {
-        if (feld == null) {
-            return null;
-        }
+        return feld == null ? null : textur(felder(ebene, version), ebene, uri(basis, ebene, feld), schluessel, breite, hoehe, hoechstens);
+    }
+
+    /** Die Felder der Ebene in dieser {@code version}; eine neue {@code version} gibt die alten frei. */
+    private Felder felder(String ebene, String version) {
         Felder f = ebenen.get(ebene);
         if (f == null || !f.version.equals(version)) {
             if (f != null) {
@@ -291,6 +455,10 @@ final class Symbole {
             f = new Felder(version);
             ebenen.put(ebene, f);
         }
+        return f;
+    }
+
+    private Textur textur(Felder f, String ebene, URI uri, String schluessel, int breite, int hoehe, boolean hoechstens) {
         long jetzt = uhr.getAsLong();
         if (f.texturen.containsKey(schluessel)) {
             Textur t = f.texturen.get(schluessel);
@@ -301,7 +469,7 @@ final class Symbole {
             }
             // Beim Einreihen als laufend markiert, so geht kein zweiter neben ihm hinaus.
             v[0] = Long.MAX_VALUE;
-            return hole(f, ebene, feld, schluessel, breite, hoehe, hoechstens, false);
+            return hole(f, ebene, uri, schluessel, breite, hoehe, hoechstens, false);
         }
         if (f.texturen.size() >= MAX_BILDER) {
             if (!f.voll) {
@@ -318,15 +486,14 @@ final class Symbole {
             return null;
         }
         f.texturen.put(schluessel, null);
-        return hole(f, ebene, feld, schluessel, breite, hoehe, hoechstens, true);
+        return hole(f, ebene, uri, schluessel, breite, hoehe, hoechstens, true);
     }
 
     /**
      * Holt das Bild im eigenen Thread; kommt es nicht, zählt der Fehlschlag mit seiner Zeit. Nur der
      * erste steht als WARN im Log ({@code warnen}), die neuen Versuche als DEBUG. Gibt null, es lädt.
      */
-    private Textur hole(Felder ziel, String ebene, String feld, String schluessel, int breite, int hoehe, boolean hoechstens, boolean warnen) {
-        URI uri = uri(basis, ebene, feld);
+    private Textur hole(Felder ziel, String ebene, URI uri, String schluessel, int breite, int hoehe, boolean hoechstens, boolean warnen) {
         if (uri == null) {
             return null;
         }

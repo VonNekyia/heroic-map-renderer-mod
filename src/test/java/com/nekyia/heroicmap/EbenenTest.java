@@ -783,9 +783,55 @@ class EbenenTest {
         List<Ebenen.Ort> n = Ebenen.nadeln("b:staedte", "v1", objekte);
         // Ohne gültiges Bild fällt ein Banner weg; Nadeln und Banner stehen in ihrer Reihenfolge.
         assertEquals(3, n.size());
-        assertEquals(new Ebenen.Banner(120.5, -340.5, Ebenen.UEBERWELT, "Hafenstadt", "images/banner-nord.png", "b:staedte", "v1", "s"), n.get(0));
-        assertEquals(new Ebenen.Banner(3, 4, "minecraft:the_nether", null, "images/weiss.webp", "b:staedte", "v1", "w"), n.get(1));
+        assertEquals(new Ebenen.Banner(120.5, -340.5, Ebenen.UEBERWELT, "Hafenstadt", "images/banner-nord.png", "b:staedte", "v1", "s", null, false),
+                n.get(0));
+        assertEquals(new Ebenen.Banner(3, 4, "minecraft:the_nether", null, "images/weiss.webp", "b:staedte", "v1", "w", null, false), n.get(1));
         assertTrue(n.get(2) instanceof Ebenen.Nadel);
+    }
+
+    @Test
+    void bannerMitEntwurf() {
+        JsonArray objekte = JsonParser.parseString("["
+                // Mit Entwurf und Krone, das Bild als Ersatz.
+                + "{\"id\":\"a\",\"type\":\"banner\",\"at\":[1,2],\"design\":\"nordreich\",\"capital\":true,\"image\":\"images/b.png\"},"
+                // Mit Entwurf ohne Bild: gilt, solange das Sprite kommt; ein ungültiges Bild zählt nicht.
+                + "{\"id\":\"b\",\"type\":\"banner\",\"at\":[1,2],\"design\":\"weiss-1.2\",\"image\":\"../b.png\"},"
+                // capital ohne design wirkt nicht.
+                + "{\"id\":\"c\",\"type\":\"banner\",\"at\":[1,2],\"capital\":true,\"image\":\"images/b.png\"},"
+                // Ein Entwurf, der kein Teil einer Kennung ist, zählt nicht; ohne Bild fällt das Banner weg.
+                + "{\"id\":\"d\",\"type\":\"banner\",\"at\":[1,2],\"design\":\"../geheim\"},"
+                + "{\"id\":\"e\",\"type\":\"banner\",\"at\":[1,2],\"design\":\"com1\",\"image\":\"images/b.png\"}"
+                + "]").getAsJsonArray();
+        List<Ebenen.Ort> n = Ebenen.nadeln("b:staedte", "v1", objekte);
+        assertEquals(List.of("a", "b", "c", "e"), n.stream().map(Ebenen.Ort::id).toList());
+        assertEquals(new Ebenen.Banner(1, 2, Ebenen.UEBERWELT, null, "images/b.png", "b:staedte", "v1", "a", "nordreich", true), n.get(0));
+        assertEquals(new Ebenen.Banner(1, 2, Ebenen.UEBERWELT, null, null, "b:staedte", "v1", "b", "weiss-1.2", false), n.get(1));
+        assertEquals(new Ebenen.Banner(1, 2, Ebenen.UEBERWELT, null, "images/b.png", "b:staedte", "v1", "c", null, false), n.get(2));
+        assertEquals(new Ebenen.Banner(1, 2, Ebenen.UEBERWELT, null, "images/b.png", "b:staedte", "v1", "e", null, false), n.get(3));
+    }
+
+    @Test
+    void spriteUmSeinenFuss() {
+        // 20 × 46 mit dem Fuss bei (10, 46) wie der Satz oben: bei GS 2 ein Pixel je Pixel, also 10 links, 23 darüber.
+        assertArrayEquals(new float[] {-5, -23, 5, 0}, Ebenen.spriteKasten(20, 46, 10, 46, 2, new double[0]));
+        // Ein Fuss nicht unten mittig: Das Sprite reicht so weit über den Fuss hinaus, wie die Leinwand.
+        assertArrayEquals(new float[] {-2, -10, 8, 13}, Ebenen.spriteKasten(20, 46, 4, 20, 2, new double[0]));
+        // Der grobe Kasten eines Banners mit Entwurf enthält jedes Sprite bis 32 × 64 bei jedem Fuss und GS.
+        double[] name = {6, 4, 6, 5, 6};
+        float[] grob = Ebenen.grob(name, true);
+        for (int gs = 1; gs <= 6; gs++) {
+            for (int w = 1; w <= Symbole.BANNER_BREITE; w += 3) {
+                for (int h = 1; h <= Symbole.BANNER_HOEHE; h += 5) {
+                    for (int fx : new int[] {0, w / 2, w}) {
+                        for (int fy : new int[] {0, h / 2, h}) {
+                            float[] k = Ebenen.spriteKasten(w, h, fx, fy, gs, name);
+                            assertTrue(grob[0] <= k[0] && grob[1] <= k[1] && grob[2] >= k[2] && grob[3] >= k[3],
+                                    w + " × " + h + ", Fuss " + fx + "," + fy + " bei " + gs);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @Test

@@ -149,11 +149,14 @@ die Nachrichten das Plugin:
 ## Banner
 
 Ein Ort als Bild (`banner`), etwa eine Stadt mit dem Banner ihrer Nation
-(`Ebenen.Banner`).
+(`Ebenen.Banner`). Mit einem Entwurf zeichnet der Renderer das Banner selbst,
+und der Mod holt das Sprite, siehe „Sprites aus Entwürfen“.
 
 - **Gelesen** wie eine Nadel: `at`, `dimension`, `name` bis 64 Zeichen.
   `image` ist ein Feld wie bei den Symbolen, `images/<Name>.png` oder
-  `.webp`. Ohne gültiges Feld fällt das Banner weg, und das Log nennt es,
+  `.webp`. `design` gilt als Teil einer Kennung, `capital` nur mit ihm.
+  Mit `design` ist `image` nur Ersatz; ein ungültiges zählt dann nicht.
+  Ohne `design` und ohne gültiges Feld fällt das Banner weg, und das Log nennt es,
   wie das Format verlangt: einmal je Ebene und `version`, zusammen mit
   den verworfenen Formen. `y` braucht der Mod
   nicht.
@@ -219,6 +222,40 @@ Ein Ort als Bild (`banner`), etwa eine Stadt mit dem Banner ihrer Nation
     höchstens die halbe Diagonale ihres Zeichens von seiner Mitte
     (`Ebenen.grob`). Der engste und der weiteste Bogen allein reichen
     nicht, denn mit dem Radius ändert sich auch die Drehung der Zeichen.
+- **Sprites aus Entwürfen** nach 0100 des Renderers, siehe
+  [Ebenen](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/ebenen.md),
+  „Banner“, „Sprites“ (`Symbole.sprite`):
+  - **Welcher Satz:** immer `oben`, auf Minimap und Vollbildkarte; der Mod
+    zeigt nur genordete Bäume von oben, siehe [Projektion](projektion.md).
+    Die Regel je Baum der Webkarte kommt erst mit einer schrägen
+    Projektion im Mod, entschieden vom Reviewer.
+  - **Geholt** wie die Bilder, siehe „Symbole“: über den Server ohne Token,
+    erst wenn das Banner gezeichnet wird, mit derselben Prüfung der
+    Adresse, denselben Neuversuchen und gegen dasselbe Budget der Ebene.
+    Das Sprite unter
+    `<Adresse>/layers/<modname>/banner/<teil>/oben/<entwurf>.png`, mit
+    `capital` unter `oben/krone/`, höchstens 32 × 64; je Ebene und `version`
+    einmal `oben/satz.json`, höchstens 4 KiB (`Symbole.spriteUri`,
+    `Symbole.satzUri`, `Symbole.MAX_SATZ`).
+  - **`satz.json`:** `foot` zwei ganze Zahlen von 0 bis 32 und 64, `angle`
+    eine endliche Zahl, ohne sie 0 (`Symbole.spritesatz`). Liegt der Fuss
+    nicht auf dem Sprite, gilt das Sprite nicht, und das Log sagt es
+    einmal je Ebene und `version`. `angle` ist im Satz `oben` 0; der Mod
+    liest ihn, dreht aber nichts.
+  - **Gezeichnet** Pixel auf Pixel mit demselben Faktor wie ein Bild, die
+    linke obere Ecke `foot` Pixel des Sprites links über dem Ort. Der Name
+    im Bogen nimmt die gezeichnete Höhe der Leinwand als `h`; mit und
+    ohne Krone ist die Leinwand dieselbe, also auch der Bogen. Kasten wie
+    gezeichnet (`Ebenen.spriteKasten`); der grobe Kasten nimmt 32 × 64 zu
+    jeder Seite des Fusses (`Ebenen.grob`).
+  - **Ersatz:** Solange das Sprite oder `satz.json` lädt, fehlt oder nicht
+    taugt, zeichnet der Mod `image`, wie das Format sagt; ohne `image`
+    nichts.
+  - **Getestet** im Gametest `Bilder`: „Südburg“ mit Entwurf und Krone,
+    ohne Bild; das Sprite mit Krone liegt am Bildschirmfoto mit seiner
+    linken oberen Ecke `foot` links über dem Ort (`Bilder.spriteUmDenFuss`).
+  - **Geheime Ebenen** haben keine Sprites unter `layers/`; ihr Weg über
+    den Kanal kommt in einem eigenen PR.
 - **Nah durchsichtig** auf der Minimap: Ein angeheftetes Banner ist ab 24
   Blöcken waagrechtem Abstand vom Spieler deckend und wird darunter linear
   durchsichtiger, bis 35 % bei 8 Blöcken und näher (`Minimap.NAH_AB`,
