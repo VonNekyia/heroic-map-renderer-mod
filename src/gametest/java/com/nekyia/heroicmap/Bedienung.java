@@ -360,17 +360,38 @@ public final class Bedienung implements FabricClientGameTest {
         warte250();
     }
 
+    /** Die Antwort des Plugins auf die Frage nach der Tafel der grossen Region unter den Wegpunkten. */
+    private static final String LAND = """
+            {"v":1,"typ":"tafel","ebene":"test:land","version":"1","id":"land","panel":{"blocks":[
+              {"type":"title","text":"Grosses Land"},
+              {"type":"lines","lines":["Eine Region vom Server","unter allen Wegpunkten","wie ein Land auf dem Server","mit einer langen Tafel"]}
+            ]}}""";
+
     /**
-     * Formen aus Wegpunkten wie ein Spieler: drei Wegpunkte über „Wegpunkt setzen“, auf dem ersten
-     * „Punkt hinzufügen“, Linksklick auf den zweiten und dritten, dann auf den ersten: eine Region. Zwei
-     * weitere, „Punkt hinzufügen“, Linksklick, „Form fertig“: eine Linie. Ein Doppelklick in die Region
-     * heftet sie an, „Form löschen“ löscht sie. Siehe docs/wegpunkte.md, „Formen aus Wegpunkten“.
+     * Formen aus Wegpunkten wie ein Spieler, über einer grossen Region vom Server mit Tafel, wie auf einem
+     * Server mit Ländern: drei Wegpunkte über „Wegpunkt setzen“, auf dem ersten „Punkt hinzufügen“, dann
+     * Linksklicks auf den dritten, den zweiten und den ersten: eine Region. Zwei weitere, „Punkt
+     * hinzufügen“, Linksklick, „Form fertig“: eine Linie. Ein Doppelklick in die Region heftet sie an, nicht
+     * die Region vom Server darunter; „Form löschen“ löscht sie. Jeder Klick fährt wie die Hand in
+     * Schritten hin, ruht, drückt, hält und lässt los (`spielerKlick`); so geht nach „Punkt hinzufügen“ die
+     * Tafel der Region auf, wo das Menü war. Siehe docs/wegpunkte.md, „Formen aus Wegpunkten“.
      */
     private static void form(ClientGameTestContext context, TestInput maus, int k) {
+        Tafeln.fragen = z -> true;
+        try {
+            formSchritte(context, maus, k);
+        } finally {
+            Tafeln.fragen = Kanal::frageTafel;
+            context.runOnClient(mc -> Ebenen.INSTANZ.leeren());
+        }
+    }
+
+    private static void formSchritte(ClientGameTestContext context, TestInput maus, int k) {
         int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
         int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
         double mx = breite / 2.0, my = hoehe / 2.0;
-        double[][] orte = {{mx - 90, my - 60}, {mx - 30, my - 60}, {mx - 60, my - 15}, {mx + 30, my - 60}, {mx + 80, my - 30}};
+        // Der dritte und der fünfte liegen rechts unter dem Menü am ersten und vierten, dort, wo die Tafel der Region aufgeht.
+        double[][] orte = {{mx - 90, my - 60}, {mx - 30, my - 60}, {mx - 50, my + 10}, {mx + 30, my - 60}, {mx + 80, my}};
         for (double[] o : orte) {
             boolean frei = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).marken().stream()
                     .noneMatch(m -> Math.abs(m.x() - o[0]) < 10 && Math.abs(m.y() - o[1]) < 10));
@@ -378,6 +399,18 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Eine Marke liegt bei " + o[0] + "," + o[1] + "; der Test braucht dort freie Karte");
             }
         }
+        // Eine grosse Region vom Server mit id unter allen Wegpunkten, 40 Blöcke um die Mitte; ein Block sind 4 Einheiten.
+        double[] mitte = mitte(context);
+        long bx = Math.round(mitte[0] / 4), bz = Math.round(mitte[1] / 4);
+        context.runOnClient(mc -> {
+            Ebenen.INSTANZ.empfange(JsonParser.parseString("""
+                    {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:land","visible":true,"version":"1"}]}""").getAsJsonObject());
+            Ebenen.INSTANZ.teil(Ebenen.Teil.lies("""
+                    {"v":1,"typ":"ebene","jetzt":1,"id":"test:land","version":"1","teil":1,"teile":1,"objects":[
+                      {"type":"region","id":"land","fill":"#40A0602A","polygons":[{"outer":[[%d,%d],[%d,%d],[%d,%d],[%d,%d]]}]}]}"""
+                    .formatted(bx - 40, bz - 40, bx + 40, bz - 40, bx + 40, bz + 40, bx - 40, bz + 40)));
+        });
+        context.waitTick();
         int vorher = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
         for (double[] o : orte) {
             eintrag(context, maus, k, o[0], o[1], "heroicmap.karte.wegpunkt");
@@ -388,16 +421,20 @@ public final class Bedienung implements FabricClientGameTest {
         }
         int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
 
-        // Region aus drei Punkten: auf dem ersten „Punkt hinzufügen“, dann Linksklick auf den zweiten, dritten und ersten.
+        // Region aus drei Punkten: auf dem ersten „Punkt hinzufügen“; die Tafel der Region geht auf, wo das Menü war.
+        // Dann Linksklicks auf den dritten, rechts unter dem Menü, den zweiten und den ersten.
         Karte.Marke a = marke(context, neu.get(0));
         eintrag(context, maus, k, a.x(), a.y(), "heroicmap.karte.punkt_hinzu");
-        for (int i : new int[] {1, 2, 0}) {
-            warte250();
-            Karte.Marke m = marke(context, neu.get(i));
-            maus.setCursorPos(m.x() * k, m.y() * k);
-            context.waitTick();
-            maus.pressMouse(LINKS);
-            context.waitTicks(2);
+        tafelDerRegion(context);
+        int[] reihe = {2, 1, 0};
+        for (int j = 0; j < reihe.length; j++) {
+            Karte.Marke m = marke(context, neu.get(reihe[j]));
+            spielerKlick(context, maus, k, m.x(), m.y());
+            List<Integer> zug = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug());
+            if (j < 2 && (zug == null || zug.size() != j + 2)) {
+                throw new AssertionError("Linksklick auf einen Wegpunkt fügte ihn nicht an: im Bau " + zug + ", Tafel offen "
+                        + context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelOffen()));
+            }
         }
         Wegpunkte.EigeneForm region = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size() == formen + 1
                 ? Wegpunkte.INSTANZ.eigeneFormen().getLast() : null);
@@ -411,11 +448,9 @@ public final class Bedienung implements FabricClientGameTest {
         Karte.Marke d = marke(context, neu.get(3));
         eintrag(context, maus, k, d.x(), d.y(), "heroicmap.karte.punkt_hinzu");
         warte250();
+        tafelDerRegion(context);
         Karte.Marke e = marke(context, neu.get(4));
-        maus.setCursorPos(e.x() * k, e.y() * k);
-        context.waitTick();
-        maus.pressMouse(LINKS);
-        context.waitTicks(2);
+        spielerKlick(context, maus, k, e.x(), e.y());
         eintrag(context, maus, k, mx + 60, my + 40, "heroicmap.karte.form_fertig");
         Wegpunkte.EigeneForm linie = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().getLast());
         if (linie.region() || linie.punkte().size() != 2) {
@@ -425,14 +460,34 @@ public final class Bedienung implements FabricClientGameTest {
         // Ein Doppelklick in die Region heftet sie an; „Form löschen“ löscht sie.
         warte250();
         double ix = (orte[0][0] + orte[1][0] + orte[2][0]) / 3, iy = (orte[0][1] + orte[1][1] + orte[2][1]) / 3;
-        maus.setCursorPos(ix * k, iy * k);
-        context.waitTick();
+        fahre(context, maus, k, ix, iy);
         maus.pressMouse(LINKS);
         context.waitTick();
         maus.pressMouse(LINKS);
         context.waitTicks(2);
-        if (!context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).angeheftet())) {
-            throw new AssertionError("Doppelklick in die Region heftete sie nicht an");
+        if (!context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).angeheftet())
+                || context.computeOnClient(mc -> Wegpunkte.INSTANZ.angeheftet("test:land", "land"))) {
+            throw new AssertionError("Doppelklick in die eigene Region heftete nicht sie an: eigene "
+                    + context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).angeheftet()) + ", vom Server "
+                    + context.computeOnClient(mc -> Wegpunkte.INSTANZ.angeheftet("test:land", "land")));
+        }
+        // Ein Doppelklick von Hand auf einen Wegpunkt in der Region heftet ihn an, die Karte bleibt stehen (mod#75).
+        double[] stand = mitte(context);
+        Karte.Marke b = marke(context, neu.get(1));
+        warte250();
+        fahre(context, maus, k, b.x(), b.y());
+        for (int i = 0; i < 2; i++) {
+            maus.holdMouse(LINKS);
+            context.waitTick();
+            maus.releaseMouse(LINKS);
+            context.waitTick();
+        }
+        warte250();
+        context.waitTicks(2);
+        double[] danach = mitte(context);
+        if (!angeheftet(context, neu.get(1)) || Math.abs(danach[0] - stand[0]) > 1e-6 || Math.abs(danach[1] - stand[1]) > 1e-6) {
+            throw new AssertionError("Doppelklick von Hand auf den Wegpunkt: angeheftet " + angeheftet(context, neu.get(1)) + ", Mitte "
+                    + Arrays.toString(stand) + " -> " + Arrays.toString(danach));
         }
         warte250();
         eintrag(context, maus, k, ix, iy, "heroicmap.karte.form_loeschen");
@@ -440,6 +495,40 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("„Form löschen“ löschte die Region nicht");
         }
         warte250();
+    }
+
+    /** Lässt die Tafel der grossen Region aufgehen, wo der Zeiger steht: Frage als gesendet, Antwort abgelegt. */
+    private static void tafelDerRegion(ClientGameTestContext context) {
+        context.waitTicks(3);
+        context.runOnClient(mc -> Tafeln.INSTANZ.antwort(Tafeln.Antwort.lies(LAND)));
+        context.waitTicks(3);
+    }
+
+    /** Fährt den Zeiger wie die Hand in acht Schritten von dort, wo er steht, nach (x, y) in Einheiten des GUI, dann ruht er. */
+    private static void fahre(ClientGameTestContext context, TestInput maus, int k, double x, double y) {
+        double[] von = context.computeOnClient(mc -> new double[] {mc.mouseHandler.xpos(), mc.mouseHandler.ypos()});
+        for (int i = 1; i <= 8; i++) {
+            maus.setCursorPos(von[0] + (x * k - von[0]) * i / 8, von[1] + (y * k - von[1]) * i / 8);
+            context.waitTick();
+        }
+        context.waitTicks(2);
+    }
+
+    /**
+     * Ein Linksklick wie von Hand: hinfahren, ruhen, drücken, drei Ticks halten und dabei eine halbe Einheit
+     * zittern, loslassen; danach eine Pause, die keinen Doppelklick mit dem nächsten zulässt.
+     */
+    private static void spielerKlick(ClientGameTestContext context, TestInput maus, int k, double x, double y) {
+        warte250();
+        fahre(context, maus, k, x, y);
+        maus.holdMouse(LINKS);
+        context.waitTick();
+        maus.moveCursor(0.5 * k, 0);
+        context.waitTick();
+        maus.moveCursor(-0.5 * k, 0);
+        context.waitTick();
+        maus.releaseMouse(LINKS);
+        context.waitTicks(2);
     }
 
     /** Rechtsklick bei (x, y), dann ein Klick auf den Eintrag mit diesem Text; die Einträge stehen 14 Einheiten untereinander. */
