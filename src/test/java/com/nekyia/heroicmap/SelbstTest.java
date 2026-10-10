@@ -237,6 +237,8 @@ class SelbstTest {
         zwei.lege(-9, 8, voll(32, BLAU));
         assertEquals(new Kachelwerk.Kachel(7, -2, 1), schreibe(zwei, true).getFirst());
         assertEquals(BLAU, lies(ordner.resolve("2/7/-2/1.png"))[0 * 256 + 7 * 32]);
+        // Ein Chunk in anderem Massstab passt nicht und wird abgelehnt, statt die Kachel still zu verdrehen.
+        assertThrows(IllegalArgumentException.class, () -> zwei.lege(0, 0, voll(64, ROT)));
     }
 
     @Test

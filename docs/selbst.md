@@ -115,7 +115,8 @@ hat es der User gewünscht, siehe
   Massstabs. Die Projektion ist die des Renderers, siehe
   [Projektion](projektion.md): Chunk (cx, cz) liegt in Kachel
   (⌊cx / n⌋, ⌊cz / n⌋), n die Chunks je Seite einer Kachel. Ein Chunk
-  ersetzt seinen Ausschnitt ganz (`Kachelwerk.lege`).
+  ersetzt seinen Ausschnitt ganz (`Kachelwerk.lege`); ein Bild in anderem
+  Massstab lehnt `lege` ab, statt die Kachel zu verdrehen.
 
   | Massstab | feinste Stufe | Chunks je Kachel | Blöcke je Kachel |
   |---|---|---|---|
@@ -175,7 +176,19 @@ hat es der User gewünscht, siehe
   | Flug mit 20 Blöcken/s, Sichtweite 12 | 105 ms | 324 ms | 16 306 |
 
   Bei der Farm schriebe jede Stufe je Änderung alle 5 s 6 480 PNG je
-  Stunde. Die Messung läuft ohne Minecraft mit
+  Stunde.
+- **Platz je Massstab,** eine Stunde Flug, gemessen am 10.10., siehe
+  [Selbst gezeichnete Karte, Platz je Massstab](messungen/2026-10-10-selbst-platz-je-massstab.md):
+
+  | Massstab | PNG je Stunde | Platz danach |
+  |---|---|---|
+  | 1 px | 4 276 | 118 MiB |
+  | 2 px | 7 366 | 477 MiB |
+  | 4 px | 16 306 | 1 877 MiB |
+
+  Die Zeiten zum Schreiben bei 1 und 2 px misst die nächste Messung in
+  Ruhe; die Tabelle unter „Schreiben“ gilt für 4 px. Beide laufen ohne
+  Minecraft mit
   `./gradlew test --tests '*KachelwerkMessung*' -Pkachelwerk=<datei>`.
 
 ## Bild

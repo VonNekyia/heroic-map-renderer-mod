@@ -931,6 +931,8 @@ public final class Bilder implements FabricClientGameTest {
         }
         try {
             Laden.loesche(welt.resolve(Selbst.baum("minecraft:overworld")));
+            // Die Lage merkt sich die Karte je Dimension, nicht je Satz; die Stufe des Testsatzes passte nicht zur eigenen Karte.
+            Files.deleteIfExists(welt.resolve("karte.properties"));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -968,10 +970,10 @@ public final class Bilder implements FabricClientGameTest {
         context.waitFor(mc -> Selbst.INSTANZ.fertig(mc.player.chunkPosition(), 2), 1200);
         context.runOnClient(mc -> Minimap.INSTANZ.fuerTestBeschaeftigt(false));
         context.computeOnClient(mc -> Selbst.INSTANZ.schreibeJetzt()).join();
-        // Mit 2 px liegt die feinste Stufe auf 7, im Ordner des Massstabs.
-        Path stufe = welt.resolve(Selbst.baum("minecraft:overworld")).resolve("2").resolve("7");
-        if (!Files.isDirectory(stufe)) {
-            throw new AssertionError("Keine Kacheln auf Stufe 7 unter " + stufe);
+        // Mit 2 px liegt die feinste Stufe auf 7, im Ordner des Massstabs; Stufe 8 gibt es nicht.
+        Path ordner = welt.resolve(Selbst.baum("minecraft:overworld")).resolve("2");
+        if (!Files.isDirectory(ordner.resolve("7")) || Files.exists(ordner.resolve("8"))) {
+            throw new AssertionError("Kacheln mit 2 px nicht bis Stufe 7 unter " + ordner);
         }
         context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(welt, "minecraft:overworld"))));
         context.waitTicks(40);

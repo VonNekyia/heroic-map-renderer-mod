@@ -68,6 +68,10 @@ final class Kachelwerk {
 
     /** Legt das Bild des Chunks (cx, cz), {@code chunk}² Pixel ARGB, in seine Kachel; es ersetzt, was dort war. */
     void lege(int cx, int cz, int[] pixel) {
+        if (pixel.length != chunk * chunk) {
+            // Ein Bild in anderem Massstab verdrehte die Kachel still.
+            throw new IllegalArgumentException("Chunk mit " + pixel.length + " Pixeln statt " + chunk * chunk);
+        }
         if (aufgegeben()) {
             return;
         }
