@@ -129,7 +129,8 @@ Ohne Unterbefehl öffnet `/hmap` das Menü, siehe [Minimap](minimap.md), „Bedi
   und schickt dann `anfrage voll` mit `neu: true`. Sonst brächte der
   Abgleich je Tag nur ein Zehntel der Karte, denn sein Deckel ist 10 %
   des Satzes. Den Abgleich dieses Tages verbraucht das trotzdem.
-- **Im Einzelspieler** gibt es keinen Server und keinen Download.
+- **Im Einzelspieler** gibt es keinen Server und keinen Download, aber einen
+  Ordner der Welt, siehe „Ablage“.
 
 ## Sicherheit
 
@@ -235,6 +236,16 @@ Einzelheiten stehen im Log.
   | Hash | `hash` | `welt-<hash>` |
   | IP + Hash, die Vorgabe | `ip` | `<host>/welt-<hash>` |
   | IP:Port + Hash | `ip_port` | `<host>_<port>/welt-<hash>` |
+
+  Im Einzelspieler gilt die Wahl nicht, dort ist `<welt>`
+  `einzelspieler_<speicherordner>/welt-<hash>`, `<speicherordner>` der
+  Name des Ordners der Welt unter `saves/`, bereinigt wie ein Host
+  (`Downloads.einzelspieler`). Er liegt so tief wie eine Welt hinter einer
+  Adresse, so findet ihn die Kartenliste. Darin liegen die eigene Karte,
+  Wegpunkte und Kartenlage, siehe
+  [0015](entscheidungen/0015-ordner-fuer-einzelspielerwelten.md). Wird die
+  Welt umbenannt, beginnt ein neuer Ordner; wird sie gelöscht, bleibt er,
+  bis der Spieler ihn in der Kartenliste löscht.
 
   `<hash>` ist der Hash des Seeds, den der Server dem Client mit jeder Welt
   schickt (`BiomeManager.biomeZoomSeed`, per Access Widener), 16 Stellen

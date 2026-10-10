@@ -239,7 +239,7 @@ class KartenblickTest {
         Kartenlage.schreibe(ordner, "minecraft:the_nether", new Kartenlage.Lage(8, 9, 2, 1));
         assertEquals(new Kartenlage.Lage(120.5, -40.25, 3, 1), Kartenlage.lies(ordner, "minecraft:overworld"));
         assertEquals(new Kartenlage.Lage(8, 9, 2, 1), Kartenlage.lies(ordner, "minecraft:the_nether"));
-        // Ohne Ordner, im Einzelspieler, nur im Speicher; eine kaputte Datei gibt keine Lage.
+        // Ohne Ordner nur im Speicher; eine kaputte Datei gibt keine Lage.
         Kartenlage.schreibe(null, "minecraft:the_end", new Kartenlage.Lage(1, 2, 0, 1));
         assertEquals(new Kartenlage.Lage(1, 2, 0, 1), Kartenlage.lies(null, "minecraft:the_end"));
         Kartenlage.leeren();

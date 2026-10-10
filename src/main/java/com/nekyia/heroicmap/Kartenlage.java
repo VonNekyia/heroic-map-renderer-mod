@@ -14,13 +14,14 @@ import org.slf4j.Logger;
 
 /**
  * Wo die Vollbildkarte zuletzt stand, je Dimension: die Mitte in Blöcken, die Stufe und die Lupe; dazu,
- * ob die Liste der Ebenen offen ist. Je Welt in {@code karte.properties} im Ordner der Welt, im
- * Einzelspieler nur im Speicher. Nur der Render-Thread. Siehe docs/vollbildkarte.md, „Lage merken“.
+ * ob die Liste der Ebenen offen ist. Je Welt in {@code karte.properties} im Ordner der Welt, auch
+ * im Einzelspieler; ohne Ordner nur im Speicher. Nur der Render-Thread. Siehe docs/vollbildkarte.md,
+ * „Lage merken“.
  */
 final class Kartenlage {
 
     private static final Logger LOGGER = LogUtils.getLogger();
-    /** Ohne Ordner, im Einzelspieler: je Dimension nur im Speicher. */
+    /** Ohne Ordner, etwa vor dem ersten Level: je Dimension nur im Speicher. */
     private static final Map<String, Lage> SPEICHER = new HashMap<>();
     /** Ohne Ordner: ob die Liste der Ebenen offen ist. */
     private static boolean ebenenImSpeicher;
