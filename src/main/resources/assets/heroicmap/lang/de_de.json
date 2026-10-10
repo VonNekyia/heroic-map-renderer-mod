@@ -108,6 +108,8 @@
   "heroicmap.menue.rahmen": "Rahmen",
   "heroicmap.rahmen.ohne": "Ohne",
   "heroicmap.rahmen.ohne.beschreibung": "Der dünne Umriss wie bisher.",
+  "heroicmap.rahmen.biom": "Biom",
+  "heroicmap.rahmen.biom.beschreibung": "Wechselt mit dem Biom unter dir: Wald, Grasland, Gebirge, Schnee, Wüste, Tropen, Sumpf oder Wasser.",
   "heroicmap.rahmen.grau": "Grau",
   "heroicmap.rahmen.grau.beschreibung": "Schlichter Eisenrahmen wie der Kompass, 3 px.",
   "heroicmap.rahmen.holz": "Holz",
