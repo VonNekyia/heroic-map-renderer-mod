@@ -1,6 +1,6 @@
 ---
 title: Minimap
-description: Bedienung über das Menü hinter /hmap und das Untermenü „Einstellungen …“, Chunklinien, Drehen mit der Blickrichtung, Koordinaten unter der Minimap, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
+description: Bedienung über das Menü hinter /hmap und das Untermenü „Einstellungen …“, Chunklinien, Effekte in der Welt, Drehen mit der Blickrichtung, Koordinaten unter der Minimap, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
 code:
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/ChunkMaler.java
@@ -60,6 +60,7 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
 | Auflösung der Minimap | 2 px je Block | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet |
 | Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte, siehe „Chunklinien“ |
 | Drehen | an | die Minimap dreht mit der Blickrichtung, siehe „Drehen“ |
+| Effekte in der Welt | an | der Strahl über angehefteten Wegpunkten, siehe [Wegpunkte](wegpunkte.md), „Strahl“ |
 | Koordinaten | xz | aus, `x z` oder `x y z` des Spielers unter der Minimap, siehe „Koordinaten“ |
 | Rahmen | biom | ein Skin um die Minimap, als Vorgabe nach dem Biom unter dem Spieler, siehe [Rahmen](rahmen.md) |
 | Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
@@ -94,7 +95,10 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
   „Kartenliste …“, „Einstellungen …“ und „Fertig“; im Untermenü
   „Koordinaten“ und „Ebenen …“. So passen Menü und
   Untermenü auch bei grossem GUI-Massstab auf den Schirm, bis 240
-  Einheiten Höhe, etwa 1280 × 720 bei GUI-Massstab 3.
+  Einheiten Höhe, etwa 1280 × 720 bei GUI-Massstab 3. Das Untermenü
+  beginnt dafür höchstens 108 Einheiten über der Mitte und mindestens 20
+  unter dem oberen Rand; bei 240 Einheiten endet „Fertig“ bei 236
+  (`Anzeige.oben`).
 - **Koordinaten:** Im Menü stehen über der Minimap `x` und `z` des Blocks
   unter der Maus fest unten links, wie auf der Karte im Browser, genau wie
   gezeichnet; nicht beim Ziehen. Zum Umschauen dient die

@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.13
+
+- **Beams above pinned waypoints:** each pinned waypoint in view distance shows a beacon beam in its colour in the world. Switch it off with "World effects" in the settings.
+
 ## 0.2.12
 
 - **Pin regions and circles:** double-click a region or circle from the server, or the diamond of your own region, on the full map; it then shows on the minimap too. Up to 64 per world.
