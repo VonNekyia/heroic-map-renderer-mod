@@ -4,6 +4,7 @@ description: Die Karte über den ganzen Schirm aus den geladenen Kacheln, mit Be
 code:
   - src/main/java/com/nekyia/heroicmap/Karte.java
   - src/main/java/com/nekyia/heroicmap/Kartenblick.java
+  - src/main/java/com/nekyia/heroicmap/Kartenlage.java
   - src/main/java/com/nekyia/heroicmap/Kacheln.java
   - src/main/java/com/nekyia/heroicmap/webp
   - src/main/java/com/nekyia/heroicmap/Satz.java
@@ -45,10 +46,29 @@ sagt sie das und zeigt nichts.
 - **Unten links** stehen der Name des Satzes und `x`, `z` des Blocks unter
   der Maus, so wie die Kacheln ihn zeichnen (`Kartenblick.basisRasterX`),
   fest wie auf der Karte im Browser; so will es der User.
-- **Beim Öffnen** liegt der Spieler in der Mitte.
+- **Beim Öffnen** steht die Karte wie beim letzten Schliessen, siehe „Lage
+  merken“; beim allerersten Mal liegt der Spieler in der Mitte.
 - **Geht ein Knopf nicht,** etwa weil der Server den Baum nicht anbietet oder
   schon ein Download läuft, steht der Grund über den Koordinaten.
 - **Ohne Satz** zeigt die Karte nur den Hinweis und den Knopf zum Laden.
+
+### Lage merken
+
+Beim Öffnen stehen Mitte, Stufe und Lupe wie beim letzten Schliessen, je
+Server, Welt und Dimension, so will es der User (mod#75); vorher begann die
+Karte jedes Mal beim Spieler, und man musste wieder herauszoomen.
+
+- **Gemerkt** beim Schliessen und vor jedem Untermenü (`Karte.removed`): die
+  Mitte in Blöcken, die Stufe und die Lupe (`Kartenlage`).
+- **Je Welt** in `karte.properties` im Ordner der Welt, neben
+  `wegpunkte.json`, siehe [Download](download.md), „Ablage“; die Schlüssel
+  beginnen mit der Dimension des Satzes, etwa `minecraft:overworld.zoom`.
+  Im Einzelspieler gibt es keinen Ordner, dann nur im Speicher.
+- **Gelesen** beim Öffnen, einmal, nicht bei jeder neuen Grösse des
+  Fensters (`Karte.gestellt`). Die Stufe kommt auf die Stufen des Satzes,
+  die Lupe auf 1, 2 oder 4 und nur auf der feinsten Stufe
+  (`Kartenblick.stelle`). Fehlt die Datei oder ist sie unlesbar, liegt der
+  Spieler in der Mitte.
 
 ### Teleportieren
 

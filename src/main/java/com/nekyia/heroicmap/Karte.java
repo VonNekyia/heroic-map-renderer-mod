@@ -113,6 +113,8 @@ final class Karte extends Screen {
     record Marke(float x, float y, float halb, double weltX, double weltZ, UUID spieler, Wegpunkte.Punkt punkt, Wegpunkte.Region region) {
     }
 
+    /** Ist die Lage beim Öffnen gestellt? {@code init} läuft bei jeder Grösse des Fensters und nach jedem Untermenü neu. */
+    private boolean gestellt;
     /** Die erste Ecke einer Region, die der Spieler gerade setzt, und ihre Dimension; sonst null. */
     private int[] regionVon;
     private String regionDimension;
@@ -128,9 +130,16 @@ final class Karte extends Screen {
     @Override
     protected void init() {
         LocalPlayer spieler = minecraft.player;
-        if (blick != null && spieler != null && blick.mx == 0 && blick.mz == 0) {
-            blick.mx = Projektion.zuPixel(spieler.getX(), satz.scale());
-            blick.mz = Projektion.zuPixel(spieler.getZ(), satz.scale());
+        // Wie beim letzten Schliessen, je Dimension des Satzes; sonst der Spieler in der Mitte. Siehe docs/vollbildkarte.md, „Lage merken“.
+        if (blick != null && spieler != null && !gestellt) {
+            gestellt = true;
+            Kartenlage.Lage l = Kartenlage.lies(Downloads.weltOrdner(), satz.dimension());
+            if (l != null) {
+                blick.stelle(Projektion.zuPixel(l.x(), satz.scale()), Projektion.zuPixel(l.z(), satz.scale()), l.zoom(), l.lupe());
+            } else {
+                blick.mx = Projektion.zuPixel(spieler.getX(), satz.scale());
+                blick.mz = Projektion.zuPixel(spieler.getZ(), satz.scale());
+            }
         }
         int x = width - KNOPF - 4;
         Button unterster = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.laden"),
@@ -904,6 +913,16 @@ final class Karte extends Screen {
             kacheln.close();
         }
         super.onClose();
+    }
+
+    /** Beim Schliessen und vor jedem Untermenü: Mitte, Stufe und Lupe merken. */
+    @Override
+    public void removed() {
+        if (blick != null && gestellt) {
+            Kartenlage.schreibe(Downloads.weltOrdner(), satz.dimension(),
+                    new Kartenlage.Lage(blick.mx / satz.scale(), blick.mz / satz.scale(), blick.zoom, blick.lupe));
+        }
+        super.removed();
     }
 
     @Override
