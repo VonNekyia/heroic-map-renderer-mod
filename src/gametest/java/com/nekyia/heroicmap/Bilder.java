@@ -174,11 +174,15 @@ public final class Bilder implements FabricClientGameTest {
                 bild(21, 40, BANNER)), Map.of("orte/oben/satz.json", SATZ.getBytes(StandardCharsets.UTF_8),
                 "orte/oben/suedreich.png", bild(SPRITE_BREITE, SPRITE_HOEHE, OHNE_KRONE),
                 "orte/oben/krone/suedreich.png", bild(SPRITE_BREITE, SPRITE_HOEHE, MIT_KRONE)));
+        // Der Server im Test hört den Kanal nicht: Der Test lässt die Frage nach dem geheimen Banner als gesendet gelten.
+        List<Geheimbanner.Schluessel> geheimGefragt = new ArrayList<>();
+        Geheimbanner.fragen = geheimGefragt::add;
         try {
             context.runOnClient(mc -> {
                 Ebenen.INSTANZ.empfange(JsonParser.parseString("""
                         {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:orte","name":{"de":"Orte","en":"Places"},
-                          "visible":true,"order":1,"version":"1"}]}""").getAsJsonObject());
+                          "visible":true,"order":1,"version":"1"},{"id":"test:geheim","name":{"de":"Geheim","en":"Secret"},
+                          "visible":true,"order":2,"version":"1","secret":true}]}""").getAsJsonObject());
                 Symbole.INSTANZ.basis(JsonParser.parseString("{\"url\":\"http://127.0.0.1:" + bilder.getAddress().getPort() + "/tiles\"}")
                         .getAsJsonObject(), InetAddress.getLoopbackAddress());
                 Ebenen.Teil t = Ebenen.Teil.lies(ORTE);
@@ -186,6 +190,7 @@ public final class Bilder implements FabricClientGameTest {
                     throw new AssertionError("Teil der Orte nicht lesbar");
                 }
                 Ebenen.INSTANZ.teil(t);
+                Ebenen.INSTANZ.teil(Ebenen.Teil.lies(GEHEIM));
                 // Ein altes Rechteck links unten, wie es bis 0.2.15 das Menü setzte (docs/wegpunkte.md, „Regionen“).
                 Wegpunkte.INSTANZ.setze(Ebenen.UEBERWELT, -14, 2, -5, 8);
                 Minimap.INSTANZ.setzeScale(4);
@@ -208,10 +213,17 @@ public final class Bilder implements FabricClientGameTest {
             context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - 0.5) < 0.1 && Minimap.INSTANZ.fertig(), 600);
             Path baum = testsatz();
             context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
-            context.waitTicks(40);
+            context.waitTicks(20);
+            // Das geheime Banner fragte beim Zeichnen; die Antwort des Plugins legt der Test selbst ab.
+            if (!context.computeOnClient(mc -> geheimGefragt.contains(new Geheimbanner.Schluessel("test:geheim", "1", "geheimreich", false)))) {
+                throw new AssertionError("Das geheime Banner fragte nicht über den Kanal: " + geheimGefragt);
+            }
+            context.runOnClient(mc -> Geheimbanner.INSTANZ.antwort(Geheimbanner.Antwort.lies(geheimeAntwort())));
+            context.waitTicks(20);
             Path karte = context.takeScreenshot(TestScreenshotOptions.of("orte-karte").disableCounterPrefix());
             nameImBogen(context, karte);
             spriteUmDenFuss(context, karte);
+            geheimUmDenFuss(context, karte);
             gleichGrossAufZweiStufen(context, karte);
             // Die Option tauscht die Schriften ohne Neuladen; die gespeicherte Kartenschrift baut neu.
             int vorher = context.computeOnClient(mc -> Formen.generation);
@@ -246,6 +258,8 @@ public final class Bilder implements FabricClientGameTest {
             });
         } finally {
             bilder.stop(0);
+            Geheimbanner.fragen = Kanal::frageBanner;
+            context.runOnClient(mc -> Geheimbanner.INSTANZ.leeren());
         }
     }
 
@@ -398,6 +412,55 @@ public final class Bilder implements FabricClientGameTest {
             throw new AssertionError("Name im Bogen nicht mittig unter dem Fuss: Mitte " + mitte + " Einheiten neben ihm, der tiefste Punkt "
                     + tief + " darunter, die Enden bei y " + linksY / (float) gs + " und " + rechtsY / (float) gs + " gegen " + unten / (float) gs);
         }
+    }
+
+    /** Eine geheime Ebene mit einem Banner, dessen Sprite über den Kanal kommt; die Ebene hat keine Bilder auf dem Server. */
+    private static final String GEHEIM = """
+            {"v":1,"typ":"ebene","id":"test:geheim","version":"1","teil":1,"teile":1,"objects":[
+              {"type":"banner","id":"wacht","at":[18,8],"name":"Wacht","design":"geheimreich"}
+            ]}""";
+    /** Das Sprite von „Wacht“: 16 × 30, der Fuss bei (8, 30) wie unten mittig, in einer eigenen Farbe. */
+    private static final int GEHEIM_BREITE = 16, GEHEIM_HOEHE = 30, GEHEIM_FARBE = 0xD9A01F;
+
+    /** Die Antwort des Plugins auf die Frage nach dem Sprite von „Wacht“, wie in seiner Doku. */
+    private static String geheimeAntwort() {
+        return "{\"v\":1,\"typ\":\"banner\",\"jetzt\":1,\"ebene\":\"test:geheim\",\"version\":\"1\",\"entwurf\":\"geheimreich\","
+                + "\"krone\":false,\"satz\":{\"foot\":[8,30],\"angle\":0.0},\"png\":\""
+                + java.util.Base64.getEncoder().encodeToString(bild(GEHEIM_BREITE, GEHEIM_HOEHE, GEHEIM_FARBE)) + "\"}";
+    }
+
+    /** Am Bildschirmfoto: Das Sprite von „Wacht“ steht um seinen Fuss, wie das von „Südburg“. Siehe docs/ebenen.md, „Geheime Banner“. */
+    private static void geheimUmDenFuss(ClientGameTestContext context, Path bild) {
+        int gs = context.computeOnClient(mc -> mc.getWindow().getGuiScale()), f = Ebenen.faktor(GEHEIM_BREITE, GEHEIM_HOEHE, gs);
+        float[] fuss = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).fuss(Ebenen.INSTANZ.nadeln("test:geheim").getFirst()));
+        int[] k = kastenDerFarbe(bild, Math.round(fuss[0] * gs), Math.round(fuss[1] * gs), gs, GEHEIM_FARBE);
+        int sollLinks = Math.round(fuss[0] * gs) - 8 * f + f, sollOben = Math.round(fuss[1] * gs) - 30 * f + f;
+        if (k == null || Math.abs(k[0] - sollLinks) > 1 || Math.abs(k[1] - sollOben) > 1) {
+            throw new AssertionError("Geheimes Banner nicht um seinen Fuss: " + (k == null ? "kein Pixel" : "links oben bei " + k[0] + "," + k[1])
+                    + " statt " + sollLinks + "," + sollOben);
+        }
+    }
+
+    /** Der Kasten {links, oben, rechts, unten} der Pixel genau in {@code farbe} um (fx, fy), oder null ohne solche Pixel. */
+    private static int[] kastenDerFarbe(Path bild, int fx, int fy, int gs, int farbe) {
+        BufferedImage b;
+        try {
+            b = ImageIO.read(bild.toFile());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        int[] k = {Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE};
+        for (int y = Math.max(0, fy - 70 * gs); y <= Math.min(b.getHeight() - 1, fy + 40 * gs); y++) {
+            for (int x = Math.max(0, fx - 40 * gs); x <= Math.min(b.getWidth() - 1, fx + 40 * gs); x++) {
+                if ((b.getRGB(x, y) & 0xFFFFFF) == farbe) {
+                    k[0] = Math.min(k[0], x);
+                    k[1] = Math.min(k[1], y);
+                    k[2] = Math.max(k[2], x);
+                    k[3] = Math.max(k[3], y);
+                }
+            }
+        }
+        return k[0] == Integer.MAX_VALUE ? null : k;
     }
 
     /** Das Sprite von „Südburg“, 20 × 46 wie der Satz oben, mit dem Fuss nicht unten mittig; ohne Krone eine andere Farbe. */

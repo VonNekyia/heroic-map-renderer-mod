@@ -949,7 +949,7 @@ final class Karte extends Screen {
             return null;
         }
         double[] jetzt = {mx, my, blick.mx, blick.mz, blick.zoom, blick.lupe, width, height, minecraft.getWindow().getGuiScale(),
-            Ebenen.INSTANZ.stand(), Symbole.INSTANZ.stand(), Formen.generation};
+            Ebenen.INSTANZ.stand(), Symbole.INSTANZ.stand(), Geheimbanner.INSTANZ.stand(), Formen.generation};
         if (!Arrays.equals(jetzt, suche)) {
             suche = jetzt;
             gefunden = tafelUnter(mx, my);
