@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +26,7 @@ import org.slf4j.Logger;
 
 /**
  * Die Wegpunkte und eigenen Regionen des Spielers und was er auf der Minimap angeheftet hat,
- * Wegpunkte, Mitspieler, eigene Regionen und Flächen und Kreise vom Server. Je Welt in
+ * Wegpunkte, Mitspieler, eigene Regionen und Flächen, Kreise, Nadeln und Banner vom Server. Je Welt in
  * {@code wegpunkte.json} im Ordner der Welt; im Einzelspieler nur im Speicher. Nur der
  * Render-Thread liest und ändert sie. Siehe docs/wegpunkte.md.
  */
@@ -51,7 +52,7 @@ final class Wegpunkte {
         }
     }
 
-    /** Eine angeheftete Fläche oder ein Kreis vom Server, über die Kennungen von Ebene und Objekt; hält so über neue {@code version}s. */
+    /** Ein angeheftetes Objekt vom Server, über die Kennungen von Ebene und Objekt; hält so über neue {@code version}s. */
     record Anheftung(String ebene, String id) {
     }
 
@@ -59,6 +60,8 @@ final class Wegpunkte {
     static final int MAX_REGIONEN = 256;
     /** So viele Regionen und Kreise je Welt angeheftet, eigene und vom Server zusammen; darüber heftet der Mod keine an. */
     static final int MAX_ANGEHEFTET = 64;
+    /** So viele Nadeln und Banner je Welt angeheftet, eine eigene Grenze; darüber heftet der Mod keine an. */
+    static final int MAX_NADELN_ANGEHEFTET = 64;
     /** So viele Einheiten breiter ist auf der Vollbildkarte der Rand angehefteter Regionen und Kreise. */
     static final float BREITER = 2;
 
@@ -71,12 +74,17 @@ final class Wegpunkte {
     private final Set<UUID> spieler = new LinkedHashSet<>();
     /** Die angehefteten Flächen und Kreise vom Server. */
     private final Set<Anheftung> formen = new LinkedHashSet<>();
+    /** Die angehefteten Nadeln und Banner vom Server. */
+    private final Set<Anheftung> nadeln = new LinkedHashSet<>();
     /** Zählt jede Änderung; die Listen für Karte und Minimap baut der Mod danach neu. */
     private int stand;
     /** Die Listen für Karte und Minimap und woraus sie gebaut sind. */
     private Ebenen gebautAus;
     private int gebautEbenen, gebautStand;
     private List<List<Ebenen.Form>> fuerKarte = List.of(), fuerMinimap = List.of();
+    private List<Ebenen.Ort> fuerNadeln = List.of();
+    /** Dieselben Nadeln und Banner nach Identität, so prüft die Vollbildkarte je Nadel ohne Allokation. */
+    private Set<Ebenen.Ort> angeheftetOrte = Set.of();
     /** Die Datei, oder null im Einzelspieler. */
     private Path datei;
     /** Ist gelesen, seit dem letzten Leeren? */
@@ -158,6 +166,17 @@ final class Wegpunkte {
                 // Nur dieser Eintrag fällt weg.
             }
         }
+        // Eine Datei von vor mod#71 hat keine Liste; dann ist keine Nadel angeheftet.
+        for (JsonElement element : liste(json, "nadeln")) {
+            try {
+                JsonObject o = element.getAsJsonObject();
+                if (nadeln.size() < MAX_NADELN_ANGEHEFTET) {
+                    nadeln.add(new Anheftung(o.get("ebene").getAsString(), o.get("id").getAsString()));
+                }
+            } catch (RuntimeException kaputt) {
+                // Nur dieser Eintrag fällt weg.
+            }
+        }
     }
 
     private static JsonArray liste(JsonObject json, String name) {
@@ -189,19 +208,24 @@ final class Wegpunkte {
         }
         JsonArray uuids = new JsonArray();
         spieler.forEach(u -> uuids.add(u.toString()));
-        JsonArray server = new JsonArray();
-        for (Anheftung a : formen) {
-            JsonObject o = new JsonObject();
-            o.addProperty("ebene", a.ebene());
-            o.addProperty("id", a.id());
-            server.add(o);
-        }
         JsonObject json = new JsonObject();
         json.add("wegpunkte", liste);
         json.add("regionen", rechtecke);
         json.add("spieler", uuids);
-        json.add("formen", server);
+        json.add("formen", json(formen));
+        json.add("nadeln", json(nadeln));
         return json;
+    }
+
+    private static JsonArray json(Set<Anheftung> anheftungen) {
+        JsonArray liste = new JsonArray();
+        for (Anheftung a : anheftungen) {
+            JsonObject o = new JsonObject();
+            o.addProperty("ebene", a.ebene());
+            o.addProperty("id", a.id());
+            liste.add(o);
+        }
+        return liste;
     }
 
     void leeren() {
@@ -209,6 +233,7 @@ final class Wegpunkte {
         regionen.clear();
         spieler.clear();
         formen.clear();
+        nadeln.clear();
         stand++;
         datei = null;
         geladen = false;
@@ -352,6 +377,23 @@ final class Wegpunkte {
         return formen.contains(new Anheftung(ebene, id));
     }
 
+    /** Heftet die Nadel oder das Banner {@code id} der Ebene {@code ebene} an die Minimap oder löst es; false, wenn schon {@link #MAX_NADELN_ANGEHEFTET} angeheftet sind. */
+    boolean umschaltenNadel(String ebene, String id) {
+        Anheftung a = new Anheftung(ebene, id);
+        if (!nadeln.remove(a)) {
+            if (nadeln.size() >= MAX_NADELN_ANGEHEFTET) {
+                return false;
+            }
+            nadeln.add(a);
+        }
+        schreibe();
+        return true;
+    }
+
+    boolean nadelAngeheftet(String ebene, String id) {
+        return nadeln.contains(new Anheftung(ebene, id));
+    }
+
     /** Wie viele Regionen und Kreise angeheftet sind, eigene und vom Server. */
     int angeheftet() {
         int n = formen.size();
@@ -368,7 +410,9 @@ final class Wegpunkte {
      */
     void pruefe(Ebenen e, String ebene) {
         Set<String> ids = e.formen(ebene).stream().map(Ebenen::id).filter(Objects::nonNull).collect(Collectors.toSet());
-        if (formen.removeIf(a -> a.ebene().equals(ebene) && !ids.contains(a.id()))) {
+        Set<String> orte = e.nadeln(ebene).stream().map(Ebenen.Ort::id).filter(Objects::nonNull).collect(Collectors.toSet());
+        boolean weg = formen.removeIf(a -> a.ebene().equals(ebene) && !ids.contains(a.id()));
+        if (nadeln.removeIf(a -> a.ebene().equals(ebene) && !orte.contains(a.id())) || weg) {
             schreibe();
         }
     }
@@ -390,6 +434,18 @@ final class Wegpunkte {
     List<List<Ebenen.Form>> minimap(Ebenen e) {
         baue(e);
         return fuerMinimap;
+    }
+
+    /** Die angehefteten Nadeln und Banner der sichtbaren Ebenen für die Minimap, unten zuerst; dieselbe Liste wie oben. */
+    List<Ebenen.Ort> nadeln(Ebenen e) {
+        baue(e);
+        return fuerNadeln;
+    }
+
+    /** Ist die Nadel oder das Banner {@code o} einer sichtbaren Ebene angeheftet? Ohne Allokation. */
+    boolean angeheftet(Ebenen e, Ebenen.Ort o) {
+        baue(e);
+        return angeheftetOrte.contains(o);
     }
 
     private void baue(Ebenen e) {
@@ -419,6 +475,17 @@ final class Wegpunkte {
                 minimap.add(List.copyOf(an));
             }
         }
+        List<Ebenen.Ort> orte = new ArrayList<>();
+        for (Ebenen.Eintrag eintrag : e.sichtbar()) {
+            for (Ebenen.Ort o : e.nadeln(eintrag.id())) {
+                if (o.id() != null && nadeln.contains(new Anheftung(eintrag.id(), o.id()))) {
+                    orte.add(o);
+                }
+            }
+        }
+        fuerNadeln = List.copyOf(orte);
+        angeheftetOrte = Collections.newSetFromMap(new IdentityHashMap<>());
+        angeheftetOrte.addAll(orte);
         List<Ebenen.Form> eigene = regionen.stream().filter(Region::angeheftet).<Ebenen.Form>map(Wegpunkte::flaeche).toList();
         if (!eigene.isEmpty()) {
             minimap.add(eigene);

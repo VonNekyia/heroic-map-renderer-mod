@@ -366,6 +366,16 @@ class MinimapTest {
     }
 
     @Test
+    void bannerNahDurchsichtig() {
+        // Ab 24 Blöcken deckend, darunter linear bis 35 % bei 8, näher bleibt es dabei.
+        assertEquals(1f, Minimap.deckung(30));
+        assertEquals(1f, Minimap.deckung(24));
+        assertEquals(0.675f, Minimap.deckung(16), 1e-6f);
+        assertEquals(0.35f, Minimap.deckung(8));
+        assertEquals(0.35f, Minimap.deckung(0));
+    }
+
+    @Test
     void ohneDateiDieVorgabe(@TempDir Path ordner) {
         Minimap minimap = new Minimap();
         minimap.lies(ordner.resolve("fehlt.properties"));

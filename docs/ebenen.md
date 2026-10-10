@@ -118,15 +118,19 @@ die Nachrichten das Plugin:
   [0097](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entscheidungen/0097-banner-feste-groesse-tafel-beim-zeigen.md).
   Bis zur Version 0.2.7 wurde sie beim Hinauszoomen kleiner und fiel
   zuletzt weg.
-- **Minimap:** Gezeichnet wird eine Nadel, deren Fuss auf
-  der sichtbaren Karte liegt, mit Rahmen innerhalb seiner Bänder, auch
-  gedreht (`Minimap.marke`). Die Nadeln kommen nach Karte und Linien und
+- **Minimap:** nur angeheftete Nadeln und Banner, so will es der User
+  (mod#71); angeheftet wird mit einem Doppelklick auf der Vollbildkarte,
+  siehe [Wegpunkte](wegpunkte.md), „Anheften“. Gezeichnet wird eine
+  angeheftete Nadel, deren Fuss auf der sichtbaren Karte liegt, mit Rahmen
+  innerhalb seiner Bänder, auch gedreht (`Minimap.marke`). Die Nadeln kommen nach Karte und Linien und
   vor Ring und Rahmen: Was am Rand über sie ragt, decken diese. Schild und
   Name bleiben im Quadrat der Minimap. Rund steht ein Schild am Rand so
   auch in den Ecken des Quadrats ausserhalb des Kreises; so ist es gewollt,
   sonst verschwände eine Stadt am Rand.
-- **Vollbildkarte:** der Fuss auf dem Raster der Kacheln wie die
-  Wegpunkte. Gezeichnet wird, was den Schirm berühren kann: 16 Einheiten
+- **Vollbildkarte:** alle Nadeln und Banner, der Fuss auf dem Raster der
+  Kacheln wie die Wegpunkte. Unter dem Fuss einer angehefteten Nadel steht
+  ein Punkt, 4 Einheiten breit und 2 hoch, zwischen Fuss und Name, in der
+  wechselnden Farbe des Rings der Wegpunkte (`Karte.PUNKT`). Gezeichnet wird, was den Schirm berühren kann: 16 Einheiten
   zur Seite und 64 nach oben, so viel wie das grösste Banner, der Name 13
   nach unten und halb so weit zur Seite, wie er samt Kontur breit ist.
 - **Reihenfolge:** über allen Formen und aller Kartenschrift jeder Ebene,
@@ -153,16 +157,40 @@ Ein Ort als Bild (`banner`), etwa eine Stadt mit dem Banner ihrer Nation
   (`Ebenen.Ort`).
 - **Bild** vom Server wie ein Symbol, siehe „Symbole“, aber höchstens
   32 × 64 Pixel statt genau einer Seite (`Symbole.banner`).
-- **Gezeichnet** Pixel auf Pixel in der Grösse des Bilds, in Einheiten der
-  Oberfläche, nie skaliert, auf jeder Stufe gleich. Der Fuss liegt in der
-  Mitte der Unterkante, ⌊Breite / 2⌋ rechts der linken Kante, wie bei der
-  Nadel. Darunter der Name wie bei der Nadel. Solange das Bild lädt oder
-  wenn es fehlt, fehlt das Banner samt Namen.
+- **Gezeichnet** auf ganzen Pixeln des Schirms, auf jeder Stufe gleich
+  gross (`Ebenen.banner`): je Pixel des Bilds so viele ganze Pixel des
+  Schirms, wie in höchstens 32 Einheiten Höhe und 16 Breite passen
+  (`Ebenen.BANNER_HOEHE`, `Ebenen.faktor`), mindestens einer. Kleiner wird
+  ein Bild nie, denn dann wären die Pixel nicht mehr sauber. Bei
+  GUI-Massstab 1 steht ein Bild über 32 Pixel Höhe darum grösser als
+  32 Einheiten, höchstens 64.
+  - Ein Bild von 21 × 40 Pixeln steht bei GS 2 mit einem Pixel je Pixel
+    des Bilds, 20 Einheiten hoch; bei GS 3 mit zwei, 26,7 Einheiten; bei
+    GS 4 mit drei, 30 Einheiten. Bis 0.2.12 war es ein Pixel des Bilds je
+    Einheit, also 40 Einheiten hoch. Der User fand das zu gross (mod#71).
+  - Der Fuss liegt in der Mitte der Unterkante, ⌊Breite / 2⌋ Pixel des
+    Schirms rechts der linken Kante, wie bei der Nadel. Darunter der Name
+    wie bei der Nadel. Solange das Bild lädt oder wenn es fehlt, fehlt das
+    Banner samt Namen.
+  - **Grösse zur Wahl:** 32 ist die Vorgabe, bis der User wählt; 24 steht
+    daneben. Bei GS 2 zeigen beide ein Bild von 40 Pixeln gleich gross,
+    denn zwischen 40 und 80 Pixeln gibt es keine saubere Grösse; ab GS 3
+    sind sie verschieden.
+
+  ![Das Banner des Gametests wie bis 0.2.12, höchstens 32 und höchstens 24 Einheiten hoch, links bei GUI-Massstab 2, rechts bei 3](bilder/banner-groessen.png)
+- **Nah durchsichtig** auf der Minimap: Ein angeheftetes Banner ist ab 24
+  Blöcken waagrechtem Abstand vom Spieler deckend und wird darunter linear
+  durchsichtiger, bis 35 % bei 8 Blöcken und näher (`Minimap.NAH_AB`,
+  `Minimap.NAH_BIS`, `Minimap.NAH_DECKUNG`, `Minimap.deckung`). So sieht
+  man, was darunter liegt, wie es der User will (mod#71). Nur das Bild,
+  der Name bleibt deckend: Seine Kontur besteht aus acht versetzten
+  Kopien, die mit Alpha fleckig würden. Auf der Vollbildkarte bleibt es
+  deckend.
 - **Minimap, Vollbildkarte, Reihenfolge:** wie die Nadeln, siehe dort.
 
-![Nadeln in drei Grössen und ein Banner mit ihren Namen in der Kartenschrift auf der Minimap; Szene `orte` des Gametests](bilder/orte.png)
+![Die Minimap bei Zoom 2: ohne Angeheftetes, mit angehefteter Nadel und angeheftetem Banner, und nah am Banner, das dort durchsichtig wird; Szene `orte` des Gametests](bilder/orte.png)
 
-![Dieselben Orte auf der Vollbildkarte, in derselben Grösse](bilder/orte-karte.png)
+![Alle Orte auf der Vollbildkarte, die angehefteten mit dem Punkt unter dem Fuss](bilder/orte-karte.png)
 
 ## Symbole
 

@@ -628,13 +628,16 @@ ein Feld. Gras, Blumen und Weizen stehen senkrecht und fehlen von oben.
 Danach die Ebenen (siehe [ebenen.md](ebenen.md)): Flächen, Kreis, Linie und
 Kartenschrift, der Kreis und eine eigene Region angeheftet (`formen.png`,
 `formen-karte.png`), dann Nadeln in drei
-Grössen, ein Banner und ihre Namen, dazu eine eigene Region (`orte.png`,
-`orte-karte.png`), auf
+Grössen, ein Banner und ihre Namen, dazu eine eigene Region; die Minimap
+ohne Angeheftetes, mit angehefteter Nadel und angeheftetem Banner und nah am
+Banner (`orte.png`), die Vollbildkarte (`orte-karte.png`), auf
 der Vollbildkarte noch einmal mit „Unicode-Schrift erzwingen“
 (`orte-unicode.png`). Die Bilder der Nadeln und des Banners holt der Mod
-von einem Server, den der Test auf 127.0.0.1 startet. Zuletzt die Tafel
+von einem Server, den der Test auf 127.0.0.1 startet. Dann die Tafel
 einer Nadel beim Zeigen und per Klick gehalten (`tafel-zeigen.png`,
 `tafel-gehalten.png`); die Antwort des Plugins legt der Test selbst ab.
+Zuletzt das Banner in drei Grössen bei GUI-Massstab 2 und 3
+(`banner-groessen.png`).
 
 ## Was anders ist als top-north
 
