@@ -194,7 +194,7 @@ final class Tafeln {
      */
     static final class Zeigen {
 
-        static final long RUHE_MS = 150, NACHLAUF_MS = 300;
+        static final long RUHE_MS = 50, NACHLAUF_MS = 300;
         /** Das Ziel unter dem Zeiger, das offene und das unter dem Zeiger, als die Tafel von Hand zuging. */
         private Ziel unter, offen, gesperrt;
         private long seit, weg = -1;

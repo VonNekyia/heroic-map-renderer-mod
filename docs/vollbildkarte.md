@@ -33,7 +33,7 @@ sagt sie das und zeigt nichts.
 | Taste `.` | öffnet die Karte, schliesst sie wieder; frei belegbar unter „Heroic Map“, die einzige vorbelegte Taste des Mods |
 | Ziehen mit links | verschiebt die Karte, der Inhalt folgt der Maus |
 | Mausrad | zoomt, siehe „Stufen und Lupe“; über einer Tafel, die höher ist als ihr Platz, scrollt es sie |
-| Zeigen auf eine Nadel, ein Banner, eine Fläche oder einen Kreis | öffnet nach 150 ms dessen Tafel, siehe [Ebenen](ebenen.md), „Infotafel“ |
+| Zeigen auf eine Nadel, ein Banner, eine Fläche oder einen Kreis | öffnet nach 50 ms dessen Tafel, siehe [Ebenen](ebenen.md), „Infotafel“ |
 | Klick auf eine Nadel, ein Banner, eine Fläche oder einen Kreis | hält dessen Tafel offen, bis zum Knopf ×, `Esc` oder einem Klick daneben |
 | Rechtsklick | öffnet ein kleines Menü für den Block unter der Maus, wie die Anzeige unten links: „Hierher teleportieren (x, z)“, siehe unten, darunter „Wegpunkt setzen“, auf einem Wegpunkt „Wegpunkt löschen“, siehe [Wegpunkte](wegpunkte.md); erst ein Klick auf einen Eintrag tut etwas, mit der linken oder rechten Taste, jeder Klick daneben schliesst es, ein Rechtsklick öffnet es dort neu |
 | Klick, Doppelklick auf eine Marke | legt beim Loslassen einen Wegpunkt, Mitspieler oder den eigenen Spieler in die Mitte; ein Doppelklick heftet einen Wegpunkt oder Mitspieler an die Minimap; wer auf einer Marke zieht, zieht nur die Karte; siehe [Wegpunkte](wegpunkte.md) |

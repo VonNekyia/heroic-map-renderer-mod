@@ -396,8 +396,9 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
     merkt; hört der Server später, fragt er dann.
   - Kommt nach 5 s keine Antwort, fragt er einmal neu; bleibt auch die
     ohne Antwort, gilt das Objekt nach weiteren 5 s als ohne Tafel, so
-    hat es der Reviewer entschieden. Wartet er länger als 200 ms, steht
-    eine kleine Tafel „lädt …“; vorher nichts, so blitzt sie bei einem
+    hat es der Reviewer entschieden. Wartet er länger als 200 ms nach dem
+    Aufgehen, also 250 ms nach dem Zeigen, steht eine kleine Tafel
+    „lädt …“; vorher nichts, so blitzt sie bei einem
     Objekt ohne Tafel nicht auf, auch das entschieden.
   - Er behält höchstens 256 Tafeln, die zuletzt gezeigten; eine Antwort
     ohne `panel`, mit einem unlesbaren oder einem ohne gültige Bausteine
@@ -416,8 +417,9 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   die oberste Fläche nach gerade/ungerade oder der oberste Kreis
   (`Tafeln.trifft`). Ein Objekt braucht eine `id`. Linien und Schrift
   haben keine Tafel.
-- **Zeigen** (`Tafeln.Zeigen`): Ruht der Zeiger 150 ms auf dem Ziel, geht
-  die Tafel auf. Verlässt er Ziel und Tafel, geht sie nach 300 ms zu;
+- **Zeigen** (`Tafeln.Zeigen`): Ruht der Zeiger 50 ms auf dem Ziel, geht
+  die Tafel auf, wie auf der Webkarte; so will es der User, bis 0.2.9
+  waren es 150 ms. Verlässt er Ziel und Tafel, geht sie nach 300 ms zu;
   dazwischen kann er in die Tafel wandern. Beim Ziehen der Karte geht
   keine auf.
 - **Lage:** wie die Tooltips des Spiels rechts unter der Stelle, an der
@@ -449,6 +451,10 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   6 Innenabstand, 4 zwischen Bausteinen, 6 vor einem Abschnitt, siehe
   [0010](entscheidungen/0010-tafel-200-einheiten.md). Rechts eine eigene
   Spalte von 8 Einheiten für den Knopf ×. Titel fett, Zeilen umbrochen.
+  Ein Titel mit eigener `color` unter 3:1 Kontrast gegen den Grund
+  `#101014` (WCAG) steht im selben Farbton heller: Der Mod mischt in
+  Schritten von 10 % Weiss bei, bis 3:1 erreicht ist, das Alpha bleibt
+  (`Tafel.lesbar`), wie die Webkarte; aus Schwarz wird so `#666666`.
   Ein Abschnitt ohne Überschrift beginnt ohne Abstand. Bilder in ihrer
   Grösse, breiter als der Inhalt mit gleichem Seitenverhältnis
   verkleinert; ohne Bild steht `alt`, umbrochen und gekappt auf die Höhe
