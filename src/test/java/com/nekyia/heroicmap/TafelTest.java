@@ -122,7 +122,8 @@ class TafelTest {
         assertEquals(4, punkte.size());
         assertEquals(0xFFE5C33F, punkte.get(2).farbe());
         assertEquals(0x40E5C33F, punkte.get(3).farbe());
-        assertEquals(Tafel.LABEL + 3 * (Tafel.PUNKT + 1), punkte.get(3).x());
+        // Die Spalte der Labels: „Bergbau“ 7 · 6 und die Lücke.
+        assertEquals(7 * 6 + Tafel.LUECKE + 3 * (Tafel.PUNKT + 1), punkte.get(3).x());
         assertTrue(w.breite() <= Tafel.BREITE);
     }
 
