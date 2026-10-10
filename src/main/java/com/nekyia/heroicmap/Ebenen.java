@@ -16,12 +16,14 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Pattern;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -38,7 +40,7 @@ import org.slf4j.LoggerFactory;
  * liest schon der Thread des Netzes ({@link Teil#lies}), alles andere läuft auf dem Render-Thread.
  * Siehe docs/ebenen.md.
  */
-final class Ebenen {
+public final class Ebenen {
 
     static final Ebenen INSTANZ = new Ebenen();
     /** Grenzen aus dem Format, siehe docs/ebenen.md, „Grenzen“. */
@@ -259,6 +261,14 @@ final class Ebenen {
     }
 
     private List<Eintrag> liste = List.of();
+    /** Die Liste vom Server und die Ebenen der Client-Mods mit ihrem Teil; {@link #liste} mischt beide. Siehe docs/api.md. */
+    private List<Eintrag> vomServer = List.of();
+    private final Map<String, Eintrag> vonMods = new LinkedHashMap<>();
+    private final Map<String, Teil> teileVonMods = new HashMap<>();
+    /** Zählt die Ebenen der Mods hoch, ihre version; „mod-“ davor, damit sie nie die einer Ebene vom Server ist. */
+    private int modVersion;
+    /** Ebenen der Mods, die nicht zu sehen sind, verdeckt vom Server oder über {@link #MAX_EBENEN}; jede steht einmal im Log. */
+    private final Set<String> verdeckt = new HashSet<>();
     /** Je Ebene die {@code version} der Daten, die gezeichnet werden; die Liste kann schon eine neuere nennen. */
     private final Map<String, String> versionen = new HashMap<>();
     /** Zählt jede Änderung an Liste, Daten oder Wahl; die Vollbildkarte sucht ihr Ziel nur danach neu. */
@@ -297,7 +307,6 @@ final class Ebenen {
                 break;
             }
             JsonObject o = e.getAsJsonObject();
-            JsonObject name = o.has("name") ? o.getAsJsonObject("name") : new JsonObject();
             String id = text(o, "id", MAX_KENNUNG), version = text(o, "version", MAX_KENNUNG);
             if (id == null || version == null) {
                 throw new IllegalArgumentException("id oder version");
@@ -306,13 +315,43 @@ final class Ebenen {
                 // Eine Kennung zweimal: Es gilt der erste Eintrag.
                 continue;
             }
-            neu.add(new Eintrag(id, text(name, "de", MAX_TEXT), text(name, "en", MAX_TEXT),
-                    !o.has("visible") || o.get("visible").getAsBoolean(), o.has("order") ? o.get("order").getAsInt() : 0, version));
+            neu.add(eintrag(o, id, version));
             if (o.has("secret") && o.get("secret").getAsBoolean()) {
                 geheimNeu.add(id);
             }
         }
         geheim = Set.copyOf(geheimNeu);
+        vomServer = List.copyOf(neu);
+        mische();
+    }
+
+    private static Eintrag eintrag(JsonObject o, String id, String version) {
+        JsonObject name = o.has("name") ? o.getAsJsonObject("name") : new JsonObject();
+        return new Eintrag(id, text(name, "de", MAX_TEXT), text(name, "en", MAX_TEXT),
+                !o.has("visible") || o.get("visible").getAsBoolean(), o.has("order") ? o.get("order").getAsInt() : 0, version);
+    }
+
+    /**
+     * Mischt die Liste vom Server mit den Ebenen der Mods; bei gleicher Kennung gilt die vom Server. Was fehlt, ist weg,
+     * samt seinen Nadeln und halben Teilen; eine Ebene eines Mods, die wieder zu sehen ist, bekommt ihren Teil wieder.
+     */
+    private void mische() {
+        Set<String> server = new HashSet<>(vomServer.stream().map(Eintrag::id).toList());
+        List<Eintrag> neu = new ArrayList<>(vomServer);
+        for (Eintrag e : vonMods.values()) {
+            if (!server.contains(e.id()) && neu.size() >= MAX_EBENEN) {
+                // Dieselbe Grenze wie für den Server, über alle Ebenen; die zuletzt angelegten fehlen.
+                if (verdeckt.add(e.id())) {
+                    LOGGER.warn("Heroic Map: mehr als {} Ebenen, die Ebene {} eines Mods fehlt", MAX_EBENEN, e.id());
+                }
+            } else if (!server.contains(e.id())) {
+                neu.add(e);
+            } else if (verdeckt.add(e.id())) {
+                LOGGER.warn("Heroic Map: Der Server hat eine Ebene {}, sie verdeckt die gleichnamige eines Mods", e.id());
+            }
+        }
+        // Wieder zu sehen oder weg: Ein neues Verdecken meldet das Log wieder.
+        verdeckt.removeIf(id -> !vonMods.containsKey(id) || neu.contains(vonMods.get(id)));
         // Oben liegt, was später gezeichnet wird: aufsteigend nach order, bei Gleichstand nach id absteigend.
         neu.sort(Comparator.comparingInt(Eintrag::order).thenComparing(Eintrag::id, Comparator.reverseOrder()));
         liste = List.copyOf(neu);
@@ -324,6 +363,91 @@ final class Ebenen {
         verworfen.entrySet().removeIf(v -> liste.stream().noneMatch(e -> e.id().equals(v.getKey()) && e.version().equals(v.getValue())));
         // Halbe Teile gelten nur, solange die Liste ihre version nennt.
         sammlungen.entrySet().removeIf(s -> liste.stream().noneMatch(e -> e.id().equals(s.getKey()) && e.version().equals(s.getValue().version)));
+        // Daten eines Mods unter einer Kennung, die jetzt der Server hat, gehen; bis zu seinem Teil steht dort nichts.
+        for (Eintrag e : vomServer) {
+            Teil vomMod = teileVonMods.get(e.id());
+            if (vomMod != null && vomMod.version().equals(versionen.get(e.id()))) {
+                versionen.remove(e.id());
+                nadeln.remove(e.id());
+                formen.remove(e.id());
+                punkte.remove(e.id());
+            }
+        }
+        for (Eintrag e : liste) {
+            Teil t = teileVonMods.get(e.id());
+            if (t != null && t.version().equals(e.version()) && !t.version().equals(versionen.get(e.id()))) {
+                teil(t);
+            }
+        }
+    }
+
+    /**
+     * Legt die Ebene eines Client-Mods an oder ersetzt sie: {@code eintrag} wie ein Eintrag der Liste,
+     * {@code objekte} wie {@code objects} eines Teils. Gelesen auf dem Thread des Aufrufs, übernommen auf dem
+     * Render-Thread. False, wenn nicht lesbar oder die Kennung nicht taugt. Nur für {@code HeroicMapClientApi}.
+     */
+    public static boolean vonMod(String eintrag, String objekte) {
+        Eintrag e;
+        Teil t;
+        try {
+            JsonObject o = JsonParser.parseString(eintrag).getAsJsonObject();
+            String id = text(o, "id", MAX_KENNUNG);
+            if (!kennungEinesMods(id)) {
+                return false;
+            }
+            String version;
+            synchronized (INSTANZ) {
+                version = "mod-" + ++INSTANZ.modVersion;
+            }
+            // Bilder von Bannern und Symbolen kommen nur vom Server; eine Ebene eines Mods fragte ihn sonst vergeblich (v1).
+            JsonArray ohneBilder = new JsonArray();
+            for (JsonElement x : JsonParser.parseString(objekte).getAsJsonArray()) {
+                if (x.isJsonObject() && "banner".equals(text(x.getAsJsonObject(), "type", MAX_TEXT))) {
+                    continue;
+                }
+                if (x.isJsonObject()) {
+                    x = x.deepCopy();
+                    x.getAsJsonObject().remove("symbol");
+                }
+                ohneBilder.add(x);
+            }
+            JsonObject teil = new JsonObject();
+            teil.addProperty("v", 1);
+            teil.addProperty("typ", "ebene");
+            teil.addProperty("id", id);
+            teil.addProperty("version", version);
+            teil.addProperty("teil", 1);
+            teil.addProperty("teile", 1);
+            teil.add("objects", ohneBilder);
+            t = Teil.lies(teil.toString());
+            e = eintrag(o, id, version);
+        } catch (RuntimeException kaputt) {
+            return false;
+        }
+        if (t == null) {
+            return false;
+        }
+        Minecraft.getInstance().execute(() -> {
+            INSTANZ.vonMods.put(e.id(), e);
+            INSTANZ.teileVonMods.put(e.id(), t);
+            INSTANZ.mische();
+        });
+        return true;
+    }
+
+    /** Nimmt die Ebene eines Client-Mods weg; eine vom Server mit derselben Kennung bleibt. Nur für {@code HeroicMapClientApi}. */
+    public static void ohneMod(String id) {
+        Minecraft.getInstance().execute(() -> {
+            if (INSTANZ.vonMods.remove(id) != null) {
+                INSTANZ.teileVonMods.remove(id);
+                INSTANZ.mische();
+            }
+        });
+    }
+
+    /** Taugt {@code id} für die Ebene eines Mods? Mit Namensraum wie ein Identifier, nicht {@code heroicmap:}. Siehe docs/api.md, „Kennungen“. */
+    static boolean kennungEinesMods(String id) {
+        return id != null && id.indexOf(':') > 0 && !id.startsWith(HeroicMap.ID + ":") && Identifier.tryParse(id) != null;
     }
 
     /**
@@ -711,15 +835,16 @@ final class Ebenen {
 
     /** Beim Trennen und bei einem neuen Login: Der Server schickt danach alles neu. */
     void leeren() {
-        liste = List.of();
+        vomServer = List.of();
         geheim = Set.of();
-        stand++;
         versionen.clear();
         nadeln.clear();
         formen.clear();
         punkte.clear();
         verworfen.clear();
         sammlungen.clear();
+        // Die Ebenen der Mods hängen am Client, nicht am Server; sie bleiben.
+        mische();
     }
 
     /** Die Ebenen, die gezeichnet werden, unten zuerst. */

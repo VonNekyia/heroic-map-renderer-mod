@@ -683,7 +683,8 @@ public final class Bilder implements FabricClientGameTest {
             Ebenen.INSTANZ.empfange(JsonParser.parseString("""
                     {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:formen","name":{"de":"Formen","en":"Shapes"},
                       "visible":true,"order":1,"version":"1"},{"id":"test:grenzen","name":{"de":"Grenzen","en":"Borders"},
-                      "visible":false,"order":2,"version":"1"}]}""").getAsJsonObject());
+                      "visible":false,"order":2,"version":"1"},{"id":"test:lang","name":{"de":"Grenzen der alten Königreiche",
+                      "en":"Borders of the old kingdoms"},"visible":true,"order":3,"version":"1"}]}""").getAsJsonObject());
             Ebenen.Teil t = Ebenen.Teil.lies(FORMEN);
             if (t == null || t.formen().size() != 5) {
                 throw new AssertionError("Teil der Formen nicht lesbar");
@@ -720,7 +721,8 @@ public final class Bilder implements FabricClientGameTest {
         context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
         context.waitTicks(40);
         Path karte = context.takeScreenshot(TestScreenshotOptions.of("formen-karte").disableCounterPrefix());
-        // Dieselbe Karte mit offener Liste der Ebenen: „Formen“ an und ganz angeheftet, „Grenzen“ aus (docs/vollbildkarte.md, „Ebenen“).
+        // Dieselbe Karte mit offener Liste der Ebenen: „Formen“ an und ganz angeheftet, „Grenzen“ aus, dazu ein langer Name,
+        // der nach links über die Karte ragt (docs/vollbildkarte.md, „Ebenen“).
         context.runOnClient(mc -> {
             Kartenlage.ebenenOffen(Downloads.weltOrdner(), true);
             mc.gui.setScreen(new Karte(Satz.lies(baum)));
@@ -828,8 +830,18 @@ public final class Bilder implements FabricClientGameTest {
         });
         context.waitTicks(5);
         Path menue = context.takeScreenshot(TestScreenshotOptions.of("rahmen-menue").disableCounterPrefix());
+        // Mit Verzierungen aus stehen die Marken im Menü halb; die Maus auf N macht sie hell und zeigt den Tooltip.
+        int gs = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+        Minimap.Rahmen r = context.computeOnClient(mc -> Minimap.INSTANZ.rahmen(mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight()));
+        int baender = context.computeOnClient(mc -> Minimap.INSTANZ.skinJetzt().baender());
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeVerzierungen(false));
+        context.getInput().setCursorPos((r.x() + r.seite() / 2.0) * gs, (r.y() + baender / 2.0) * gs);
+        context.waitTicks(5);
+        Path halb = context.takeScreenshot(TestScreenshotOptions.of("rahmen-menue-halb").disableCounterPrefix());
+        context.getInput().setCursorPos(0, 0);
         context.runOnClient(mc -> {
             mc.gui.setScreen(null);
+            Minimap.INSTANZ.setzeVerzierungen(true);
             Minimap.INSTANZ.setzeSkin(Skin.OHNE);
         });
         try {
@@ -837,6 +849,7 @@ public final class Bilder implements FabricClientGameTest {
             Files.deleteIfExists(HeroicMap.einstellungen());
             if (!AUSGABE.isEmpty()) {
                 Files.copy(menue, Path.of(AUSGABE, "rahmen-menue.png"), StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(halb, Path.of(AUSGABE, "rahmen-menue-halb.png"), StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);

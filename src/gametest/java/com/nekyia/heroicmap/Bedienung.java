@@ -19,7 +19,7 @@ import net.minecraft.util.Mth;
 
 /**
  * Das Menü und die Vollbildkarte mit echten Eingaben der Maus: Ziehen mit der linken wie der
- * rechten Taste verschiebt die ganze Minimap; auf der Karte verschiebt links ziehen den Inhalt,
+ * rechten Taste verschiebt die ganze Minimap; ein Klick auf Spieler oder Marke stellt ihr Aussehen ein; auf der Karte verschiebt links ziehen den Inhalt,
  * rechts klicken öffnet das Menü mit Teleport und Wegpunkt; auf einer Marke am Rand ziehen zieht
  * die Karte, ein Klick zentriert sie, ein Doppelklick heftet sie an, ebenso einen Kreis vom Server und
  * ein altes Rechteck; Formen aus Wegpunkten bauen, anheften und löschen. Siehe docs/minimap.md, „Bedienung“, und docs/wegpunkte.md.
@@ -41,6 +41,8 @@ public final class Bedienung implements FabricClientGameTest {
             int k = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
             TestInput maus = context.getInput();
 
+            // Gegriffen in der Mitte, auf dem Spieler: Wer zieht, verschiebt, statt die Darstellung zu schalten.
+            Minimap.Darstellung darstellung = context.computeOnClient(mc -> Minimap.INSTANZ.darstellung());
             Minimap.Rahmen vorher = rahmen(context);
             ziehe(context, maus, LINKS, vorher, -10 * k, 5 * k);
             Minimap.Rahmen nachher = rahmen(context);
@@ -54,6 +56,10 @@ public final class Bedienung implements FabricClientGameTest {
             if (Math.abs(rechts.x() - (nachher.x() + 80)) > 1 || rechts.y() != nachher.y()) {
                 throw new AssertionError("Rechts ziehen: " + nachher + " → " + rechts);
             }
+            if (context.computeOnClient(mc -> Minimap.INSTANZ.darstellung()) != darstellung) {
+                throw new AssertionError("Ziehen vom Spieler aus schaltete die Darstellung");
+            }
+            aussehen(context, maus, k);
             context.runOnClient(mc -> mc.gui.setScreen(null));
 
             karte(context, maus, k);
@@ -561,9 +567,10 @@ public final class Bedienung implements FabricClientGameTest {
 
     /**
      * Die Liste der Ebenen wie ein Spieler: Kommen Ebenen, während die Karte offen ist, erscheint der Knopf
-     * „Ebenen“; ein Klick klappt die Liste auf. Ein Klick auf einen Schalter schaltet die Ebene aus, ein
-     * zweiter wieder an; ein Doppelklick lässt sie an und heftet alles mit id an, ein zweiter löst es.
-     * Zuletzt klappt der Knopf die Liste wieder zu. Siehe docs/vollbildkarte.md, „Ebenen“.
+     * „Ebenen“; ein Klick klappt die Liste auf. Ein Klick auf „An“/„Aus“ schaltet die Ebene aus, ein zweiter
+     * wieder an, und ein Doppelklick darauf schaltet nur zweimal; angeheftet wird dabei nichts. Ein Doppelklick
+     * auf die Überschrift heftet alles mit id an, ein zweiter löst es; die Ebene bleibt an. Zuletzt klappt der
+     * Knopf die Liste wieder zu. Siehe docs/vollbildkarte.md, „Ebenen“ (mod#103).
      */
     private static void ebenen(ClientGameTestContext context, TestInput maus, int k) {
         context.runOnClient(mc -> {
@@ -581,29 +588,30 @@ public final class Bedienung implements FabricClientGameTest {
         if (!context.computeOnClient(mc -> Kartenlage.ebenenOffen(Downloads.weltOrdner()))) {
             throw new AssertionError("Der Knopf „Ebenen“ merkte die offene Liste nicht");
         }
-        double[] s = context.computeOnClient(mc -> {
-            for (Object kind : mc.gui.screen().children()) {
-                if (kind instanceof AbstractWidget w && w.getMessage().getString().startsWith("Liste")) {
-                    return new double[] {w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0};
-                }
-            }
-            throw new AssertionError("Kein Schalter der Ebene in der Liste");
-        });
+        double[] zeile = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zeile("test:liste"));
+        if (zeile == null) {
+            throw new AssertionError("Keine Zeile der Ebene in der Liste");
+        }
+        double[] knopf = {zeile[0], zeile[1]}, ueberschrift = {zeile[2], zeile[3]};
         for (boolean an : new boolean[] {false, true}) {
-            klicke(context, maus, k, s, false);
-            if (ebeneAn(context) != an) {
-                throw new AssertionError("Ein Klick auf den Schalter: Ebene an " + !an + " statt " + an);
+            klicke(context, maus, k, knopf, false);
+            if (ebeneAn(context) != an || !keinsAngeheftet(context)) {
+                throw new AssertionError("Ein Klick auf „An/Aus“: Ebene an " + ebeneAn(context) + " statt " + an
+                        + ", nichts angeheftet " + keinsAngeheftet(context));
             }
         }
+        // Ein Doppelklick auf den Knopf schaltet nur, aus und wieder an; er heftet nichts an (mod#103).
+        klicke(context, maus, k, knopf, true);
+        if (!ebeneAn(context) || !keinsAngeheftet(context)) {
+            throw new AssertionError("Doppelklick auf „An/Aus“: Ebene an " + ebeneAn(context) + ", nichts angeheftet " + keinsAngeheftet(context));
+        }
         for (boolean ganz : new boolean[] {true, false}) {
-            klicke(context, maus, k, s, true);
-            boolean jetzt = context.computeOnClient(mc -> Wegpunkte.INSTANZ.angeheftet("test:liste", "see")
+            klicke(context, maus, k, ueberschrift, true);
+            boolean alles = context.computeOnClient(mc -> Wegpunkte.INSTANZ.angeheftet("test:liste", "see")
                     && Wegpunkte.INSTANZ.nadelAngeheftet("test:liste", "hafen"));
-            boolean keins = context.computeOnClient(mc -> !Wegpunkte.INSTANZ.angeheftet("test:liste", "see")
-                    && !Wegpunkte.INSTANZ.nadelAngeheftet("test:liste", "hafen"));
-            if (!ebeneAn(context) || (ganz ? !jetzt : !keins)) {
-                throw new AssertionError("Doppelklick auf den Schalter: an " + ebeneAn(context) + ", Kreis und Nadel angeheftet "
-                        + jetzt + " statt " + ganz);
+            if (!ebeneAn(context) || (ganz ? !alles : !keinsAngeheftet(context))) {
+                throw new AssertionError("Doppelklick auf die Überschrift: an " + ebeneAn(context) + ", Kreis und Nadel angeheftet "
+                        + alles + " statt " + ganz);
             }
         }
         klicke(context, maus, k, knopf(context, "heroicmap.karte.ebenen_zu"), false);
@@ -612,6 +620,11 @@ public final class Bedienung implements FabricClientGameTest {
         }
         context.runOnClient(mc -> Ebenen.INSTANZ.leeren());
         context.waitTicks(2);
+    }
+
+    private static boolean keinsAngeheftet(ClientGameTestContext context) {
+        return context.computeOnClient(mc -> !Wegpunkte.INSTANZ.angeheftet("test:liste", "see")
+                && !Wegpunkte.INSTANZ.nadelAngeheftet("test:liste", "hafen"));
     }
 
     private static boolean ebeneAn(ClientGameTestContext context) {
@@ -795,6 +808,132 @@ public final class Bedienung implements FabricClientGameTest {
                 .anyMatch(p -> p.x() == punkt.x() && p.z() == punkt.z() && p.angeheftet()));
     }
 
+    /**
+     * Das Aussehen an der Minimap im Menü, mit Handklicks: Ein Klick auf den Spieler schaltet die Darstellung, einer auf
+     * eine Marke den Rahmen, auch gedreht, mit Verzierungen aus und ohne Rahmen; ein Klick daneben nichts. Ziehen von
+     * einer Marke verschiebt nur, der Griff ändert nur die Grösse, der Zoom nur den Zoom. Im Untermenü dasselbe.
+     * Siehe docs/minimap.md, „Aussehen an der Minimap“.
+     */
+    private static void aussehen(ClientGameTestContext context, TestInput maus, int k) {
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeDrehen(false);
+            Minimap.INSTANZ.setzeVerzierungen(true);
+            Minimap.INSTANZ.setzeSkin("holz");
+            Minimap.INSTANZ.setzeDarstellung(Minimap.Darstellung.KOPF);
+        });
+        context.waitTicks(2);
+        Minimap.Rahmen r = rahmen(context);
+        double cx = r.x() + r.seite() / 2.0, cy = r.y() + r.seite() / 2.0;
+        spielerKlick(context, maus, k, cx, cy);
+        aussehenIst(context, Minimap.Darstellung.PFEIL, "holz", "Klick auf den Spieler");
+        if (!rahmen(context).equals(r)) {
+            throw new AssertionError("Der Klick auf den Spieler verschob die Minimap: " + r + " → " + rahmen(context));
+        }
+        // Zwischen Spieler und Marke liegt nur die Karte.
+        spielerKlick(context, maus, k, cx, r.y() + r.seite() / 4.0);
+        aussehenIst(context, Minimap.Darstellung.PFEIL, "holz", "Klick auf die Karte daneben");
+        // N oben auf der Mitte der Bänder.
+        spielerKlick(context, maus, k, cx, r.y() + baender(context) / 2.0);
+        aussehenIst(context, Minimap.Darstellung.PFEIL, "papier", "Klick auf N");
+
+        // Gedreht, mit Blick nach Süden: Oben steht S.
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeDrehen(true);
+            mc.player.setYRot(0);
+            mc.player.yRotO = 0;
+        });
+        context.waitTicks(2);
+        Minimap.Rahmen g = rahmen(context);
+        double[] oben = {g.x() + g.seite() / 2.0, g.y() + baender(context) / 2.0};
+        int ziel = context.computeOnClient(mc -> Minimap.INSTANZ.ziel(oben[0], oben[1]));
+        if (ziel != 2) {
+            throw new AssertionError("Gedreht mit Blick nach Süden ist oben nicht S, sondern " + ziel);
+        }
+        spielerKlick(context, maus, k, oben[0], oben[1]);
+        aussehenIst(context, Minimap.Darstellung.PFEIL, "kompass", "Klick auf S, gedreht");
+
+        // Verzierungen aus: Das Menü zeigt die Marken halb, W links.
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeDrehen(false);
+            Minimap.INSTANZ.setzeVerzierungen(false);
+        });
+        context.waitTicks(2);
+        Minimap.Rahmen v = rahmen(context);
+        spielerKlick(context, maus, k, v.x() + baender(context) / 2.0, v.y() + v.seite() / 2.0);
+        aussehenIst(context, Minimap.Darstellung.PFEIL, "uhr", "Klick auf die halbe Marke W, Verzierungen aus");
+
+        // Ohne Rahmen: die Marken von „grau“ halb auf dem Umriss, 1,5 Einheiten ausserhalb; O rechts.
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeSkin(Skin.OHNE));
+        context.waitTicks(2);
+        Minimap.Rahmen o = rahmen(context);
+        spielerKlick(context, maus, k, o.x() + o.seite() + 1.5, o.y() + o.seite() / 2.0);
+        aussehenIst(context, Minimap.Darstellung.PFEIL, Skin.BIOM, "Klick auf die halbe Marke O, ohne Rahmen");
+
+        // Von N aus gezogen: Die Minimap folgt um 20 Einheiten, der Rahmen bleibt.
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeVerzierungen(true));
+        context.waitTicks(2);
+        Minimap.Rahmen z = rahmen(context);
+        warte250();
+        ziehe(context, maus, LINKS, z.x() + z.seite() / 2.0, z.y() + baender(context) / 2.0, 0, 2 * k);
+        Minimap.Rahmen gezogen = rahmen(context);
+        aussehenIst(context, Minimap.Darstellung.PFEIL, Skin.BIOM, "Von N aus gezogen");
+        if (gezogen.x() != z.x() || Math.abs(gezogen.y() - (z.y() + 20)) > 1) {
+            throw new AssertionError("Von N aus gezogen: " + z + " → " + gezogen);
+        }
+
+        // Der Griff ändert nur die Grösse.
+        int[] schirm = context.computeOnClient(mc -> new int[] {mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight()});
+        int ecke = Minimap.griffEcke(gezogen, schirm[0], schirm[1]);
+        double[] griff = context.computeOnClient(mc -> Minimap.INSTANZ.ecken(Minimap.INSTANZ.skinJetzt(), gezogen)[ecke]);
+        warte250();
+        ziehe(context, maus, LINKS, griff[0], griff[1], (ecke & 1) == 0 ? -k : k, (ecke & 2) == 0 ? -k : k);
+        Minimap.Rahmen groesser = rahmen(context);
+        aussehenIst(context, Minimap.Darstellung.PFEIL, Skin.BIOM, "Am Griff gezogen");
+        if (Math.abs(groesser.seite() - (gezogen.seite() + 10)) > 1) {
+            throw new AssertionError("Am Griff gezogen: " + gezogen + " → " + groesser);
+        }
+
+        // Der Zoom schaltet nur den Zoom.
+        int zoom = context.computeOnClient(mc -> Minimap.INSTANZ.zoom());
+        double[] knopf = context.computeOnClient(mc -> {
+            String text = Component.translatable("heroicmap.menue.zoom").getString();
+            for (Object kind : mc.gui.screen().children()) {
+                if (kind instanceof AbstractWidget w && w.getMessage().getString().startsWith(text)) {
+                    return new double[] {w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0};
+                }
+            }
+            throw new AssertionError("Kein Knopf „Zoom“ im Menü");
+        });
+        spielerKlick(context, maus, k, knopf[0], knopf[1]);
+        aussehenIst(context, Minimap.Darstellung.PFEIL, Skin.BIOM, "Klick auf Zoom");
+        if (context.computeOnClient(mc -> Minimap.INSTANZ.zoom()) == zoom) {
+            throw new AssertionError("Der Klick auf Zoom schaltete den Zoom nicht");
+        }
+
+        // Im Untermenü „Einstellungen …“ ebenso, ohne die Knöpfe „Spieler“ und „Rahmen“.
+        context.runOnClient(mc -> mc.gui.setScreen(new Anzeige(mc.gui.screen())));
+        context.waitTicks(2);
+        Minimap.Rahmen u = rahmen(context);
+        spielerKlick(context, maus, k, u.x() + u.seite() / 2.0, u.y() + u.seite() / 2.0);
+        aussehenIst(context, Minimap.Darstellung.DURCHSICHTIG, Skin.BIOM, "Untermenü, Klick auf den Spieler");
+        spielerKlick(context, maus, k, u.x() + u.seite() / 2.0, u.y() + u.seite() - baender(context) / 2.0);
+        aussehenIst(context, Minimap.Darstellung.DURCHSICHTIG, "grau", "Untermenü, Klick auf S");
+        warte250();
+    }
+
+    /** Darstellung und Rahmen wie erwartet, sonst ein Fehler mit {@code was}. */
+    private static void aussehenIst(ClientGameTestContext context, Minimap.Darstellung darstellung, String skin, String was) {
+        Object[] ist = context.computeOnClient(mc -> new Object[] {Minimap.INSTANZ.darstellung(), Minimap.INSTANZ.skin()});
+        if (ist[0] != darstellung || !skin.equals(ist[1])) {
+            throw new AssertionError(was + ": " + ist[0] + ", " + ist[1] + " statt " + darstellung + ", " + skin);
+        }
+    }
+
+    /** Die Breite der Bänder des Rahmens, den die Minimap gerade zeichnet. */
+    private static int baender(ClientGameTestContext context) {
+        return context.computeOnClient(mc -> Minimap.INSTANZ.skinJetzt().baender());
+    }
+
     /** Das Spiel zählt einen Klick bis 250 ms nach dem letzten als Doppelklick, nach der Uhr, nicht nach Ticks. */
     private static void warte250() {
         try {
@@ -868,8 +1007,13 @@ public final class Bedienung implements FabricClientGameTest {
 
     /** Greift die Minimap in ihrer Mitte und zieht sie zehnmal um (dx, dy) Pixel des Fensters. */
     private static void ziehe(ClientGameTestContext context, TestInput maus, int taste, Minimap.Rahmen r, int dx, int dy) {
+        ziehe(context, maus, taste, r.x() + r.seite() / 2.0, r.y() + r.seite() / 2.0, dx, dy);
+    }
+
+    /** Greift bei (x, y) in Einheiten des GUI und zieht zehnmal um (dx, dy) Pixel des Fensters. */
+    private static void ziehe(ClientGameTestContext context, TestInput maus, int taste, double x, double y, int dx, int dy) {
         int k = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
-        maus.setCursorPos((r.x() + r.seite() / 2.0) * k, (r.y() + r.seite() / 2.0) * k);
+        maus.setCursorPos(x * k, y * k);
         context.waitTick();
         maus.holdMouse(taste);
         context.waitTick();
