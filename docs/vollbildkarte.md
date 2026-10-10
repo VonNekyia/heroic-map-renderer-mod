@@ -41,6 +41,7 @@ sagt sie das und zeigt nichts.
 | Knopf „Karte laden …“ | zeigt die Karten des Servers, je Baum der Name und darunter ein Knopf je Massstab mit seiner Grösse (`Auswahl`), darüber die Wahl „Selbst“, siehe [Selbst gezeichnete Karte](selbst.md); die Knöpfe teilen sich die Breite des Schirms, höchstens 90 Einheiten je Knopf, so passen sie auch bei grossem GUI-Massstab; den Massstab, den der Spieler schon ganz hat (`Downloads.vollstaendig`: ein vollständiger Satz, und das Plugin misst den Abgleich an demselben Massstab), zeigt der Knopf als „Abgleich“ und gleicht ab wie der Knopf „Abgleich“, nach einer Ablehnung mit `wieder` bis dahin aus; ein Klick fragt wie `/hmap laden` erst im Dialog nach |
 | Knopf „Abgleich“ | fragt einen Abgleich des gezeigten Satzes an, wie `/hmap abgleich`; nur mit einem Satz vom Server, nicht auf der selbst gezeichneten Karte. Lehnt der Server mit `wieder` ab, ist der Knopf bis dahin aus und nennt die Uhrzeit |
 | Knopf „Zum Spieler“ | legt den eigenen Spieler in die Mitte, für den Fall, dass man sich verirrt hat, wie auf der Webkarte; Stufe und Lupe bleiben (mod#75) |
+| Knopf „Optionen …“ unten rechts | öffnet das Menü von `/hmap`, siehe [Minimap](minimap.md), „Bedienung“; „Fertig“ und `Esc` führen von dort zurück auf die Karte, an dieselbe Stelle (mod#75) |
 | `Esc` | bricht zuerst eine Region ab, die der Spieler setzt, sonst schliesst es die Karte |
 
 - **Das Spiel läuft weiter,** die Karte hält es nicht an (`isPauseScreen`).

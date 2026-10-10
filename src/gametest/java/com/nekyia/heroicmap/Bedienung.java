@@ -109,6 +109,7 @@ public final class Bedienung implements FabricClientGameTest {
         anheften(context, maus, k);
         region(context, maus, k);
         zumSpieler(context, maus, k);
+        optionen(context, maus, k);
         maus.setCursorPos(x * k, y * k);
         context.waitTick();
 
@@ -459,6 +460,36 @@ public final class Bedienung implements FabricClientGameTest {
         });
         if (Math.abs(mitte[0] - soll[0]) > 1e-6 || Math.abs(mitte[1] - soll[1]) > 1e-6) {
             throw new AssertionError("„Zum Spieler“: Mitte " + mitte[0] + "," + mitte[1] + " statt " + soll[0] + "," + soll[1]);
+        }
+    }
+
+    /** „Optionen …“ öffnet das Menü von /hmap, „Fertig“ führt zurück auf die Karte an dieselbe Stelle. */
+    private static void optionen(ClientGameTestContext context, TestInput maus, int k) {
+        double[] vorher = mitte(context);
+        warte250();
+        double[] o = knopf(context, "heroicmap.karte.optionen");
+        maus.setCursorPos(o[0] * k, o[1] * k);
+        context.waitTick();
+        maus.pressMouse(LINKS);
+        context.waitTicks(2);
+        if (!context.computeOnClient(mc -> mc.gui.screen() instanceof Einstellungen)) {
+            throw new AssertionError("„Optionen …“ öffnete das Menü nicht");
+        }
+        double[] fertig = context.computeOnClient(mc -> {
+            String text = net.minecraft.network.chat.CommonComponents.GUI_DONE.getString();
+            for (Object kind : mc.gui.screen().children()) {
+                if (kind instanceof AbstractWidget w && w.getMessage().getString().equals(text)) {
+                    return new double[] {w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0};
+                }
+            }
+            throw new AssertionError("Kein Knopf „Fertig“ im Menü");
+        });
+        maus.setCursorPos(fertig[0] * k, fertig[1] * k);
+        context.waitTick();
+        maus.pressMouse(LINKS);
+        context.waitTicks(2);
+        if (!context.computeOnClient(mc -> mc.gui.screen() instanceof Karte) || !Arrays.equals(mitte(context), vorher)) {
+            throw new AssertionError("„Fertig“ führte nicht an dieselbe Stelle der Karte zurück");
         }
     }
 

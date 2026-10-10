@@ -43,6 +43,7 @@
   "heroicmap.karte.laden": "Karte laden …",
   "heroicmap.karte.abgleich": "Abgleich",
   "heroicmap.karte.zum_spieler": "Zum Spieler",
+  "heroicmap.karte.optionen": "Optionen …",
   "heroicmap.karte.teleport": "Hierher teleportieren (%s, %s)",
   "heroicmap.karte.wegpunkt": "Wegpunkt setzen",
   "heroicmap.karte.wegpunkt_loeschen": "Wegpunkt löschen",

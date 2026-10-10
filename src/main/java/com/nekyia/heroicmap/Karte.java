@@ -162,6 +162,9 @@ final class Karte extends Screen {
         }
         knopfX = x;
         knopfUnten = unterster.getY() + unterster.getHeight();
+        // Unten rechts das Menü von /hmap; „Fertig“ dort führt zurück auf die Karte. Siehe docs/vollbildkarte.md, „Bedienung“.
+        addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.optionen"),
+                b -> minecraft.gui.setScreen(new Einstellungen(this))).bounds(x, height - 24, KNOPF, 20).build());
     }
 
     @Override

@@ -48,8 +48,21 @@ final class Einstellungen extends Screen {
     /** Linker Rand, Oberkante und Breite der Knöpfe. */
     private int spalte, oben, breite;
 
+    /** Wohin „Fertig“ und Escape führen: die Vollbildkarte, von der das Menü kam, oder null fürs Spiel. */
+    private final Screen zurueck;
+
     Einstellungen() {
+        this(null);
+    }
+
+    Einstellungen(Screen zurueck) {
         super(Component.translatable("heroicmap.menue.titel"));
+        this.zurueck = zurueck;
+    }
+
+    @Override
+    public void onClose() {
+        minecraft.gui.setScreen(zurueck);
     }
 
     @Override
