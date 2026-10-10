@@ -6,13 +6,18 @@
   "environment": "client",
   "entrypoints": {
     "fabric-client-gametest": [
+      "com.nekyia.heroicmap.Api",
       "com.nekyia.heroicmap.Anmeldung",
       "com.nekyia.heroicmap.Bilder",
       "com.nekyia.heroicmap.Messung",
       "com.nekyia.heroicmap.Uebernahme",
       "com.nekyia.heroicmap.Server",
       "com.nekyia.heroicmap.Bedienung",
-      "com.nekyia.heroicmap.Blockentities"
+      "com.nekyia.heroicmap.Blockentities",
+      "com.nekyia.heroicmap.Spieler"
+    ],
+    "heroicmap": [
+      "com.nekyia.heroicmap.ProbeEbene"
     ]
   },
   "depends": {

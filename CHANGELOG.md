@@ -4,13 +4,30 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
-## 0.2.27
+## 0.2.31
 
 - **Veils along pinned regions:** the edge of each pinned region and circle shows a soft veil in its colour, standing on the ground and fading out over four blocks. "World effects" in the settings switches it off together with the beams.
 
-## 0.2.26
+## 0.2.30
 
 - **Beams above pinned waypoints:** each pinned waypoint in view distance shows a beacon beam in its colour in the world. Switch it off with "World effects" in the settings.
+
+## 0.2.29
+
+- **An API for other client mods:** a Fabric mod can add its own layers with pins, map text, areas, circles and lines, in the same JSON as server layers; they show on the minimap and the full map with their own switch. See docs/api.md.
+
+## 0.2.28
+
+- **Change the look right on the minimap.** In the `/hmap` menu and under "Settings …", click yourself on the minimap to switch between head, arrow and half see-through, and click one of the marks N, E, S, W to switch the frame. The buttons "Player" and "Frame" are gone. With ornaments off or without a frame, the menu shows the marks half see-through so you can still click them. Dragging still moves the minimap.
+
+## 0.2.27
+
+- **Layers on the full map: the name is a heading, the button only switches.** Each layer shows its name with an "On"/"Off" button next to it. A click on the button turns the layer on or off and does nothing else; a double click on the name pins everything of the layer to the minimap, another one unpins it. Before, the double click went on the switch and made it flicker.
+
+## 0.2.26
+
+- **The arrow sits centred above your head** on the minimap and the full map; before, it stood about half a head pixel to the right.
+- **Choose how you show:** under "Settings …" a switch "Player" picks head with arrow, the arrow alone, or the head half see-through with arrow.
 
 ## 0.2.25
 

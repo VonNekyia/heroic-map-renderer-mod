@@ -16,10 +16,11 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [Download](download.md): wie der Mod die Karte vom Plugin lädt, Kanal, Befehle, Zustimmung und Grösse, Sicherheit, Manifest, harte Grenzen, Ablage je Welt nach dem Hash des Seeds, Kartenliste mit Löschen, Fortsetzen und Abgleich.
 - [Vollbildkarte](vollbildkarte.md): Bedienung, welcher Satz, Stufen und Lupe, Kacheln lesen und behalten, Farbindex hinter der Palette, Spieler und Koordinaten, das Bild aus dem Gametest und was fehlt.
 - [Ebenen](ebenen.md): Ebenen vom Plugin empfangen, in Teilen je `version`, ihre Nadeln als Wappenschild mit Symbol und Namen, ihre Banner und ihre Flächen, Kreise, Linien und Kartenschrift auf Minimap und Vollbildkarte zeichnen, Grenzen und Kosten, und je Ebene im Menü umschalten.
+- [API für Client-Mods](api.md): wie ein anderer Fabric-Mod eigene Ebenen anlegt, im Format der Ebenen vom Server, über den Entrypoint `heroicmap` und `HeroicMapClientApi`; Kennungen, Grenzen, Version, was v1 nicht kann.
 - [Wegpunkte](wegpunkte.md): Wegpunkte setzen und löschen, eigene Linien und Regionen aus Wegpunkten, Marken am Rand der Vollbildkarte, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen und Kreise vom Server, Grösse der Köpfe und Ablage in `wegpunkte.json`.
 - [Selbst gezeichnete Karte](selbst.md): die Wahl „Selbst“, wie der Mod die geladenen Chunks in eine eigene Karte zeichnet, auch im Einzelspieler, Wahl und Beenden, Massstab 1, 2 oder 4 px, wann gezeichnet wird, Kacheln als PNG und Pyramide.
-- [Rahmen](rahmen.md): die Rahmen der Minimap als umschaltbare Skins, die Vorgabe „biom“ nach dem Biom unter dem Spieler, Dateien und Quellen, Bänder eckig und rund, die Marken N, O, S, W, genordet fest und gedreht mitdrehend, ihr Schalter, der Griff im Menü, Abstand zum Rand.
-- [Minimap](minimap.md): Bedienung mit Untermenü „Einstellungen …“, Chunklinien, Drehen mit der Blickrichtung, Bewegung zwischen zwei Ticks, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, Neu zeichnen im Worker, Kosten, Bilder und was anders ist als `top-north`.
+- [Rahmen](rahmen.md): die Rahmen der Minimap als umschaltbare Skins, die Vorgabe „biom“ nach dem Biom unter dem Spieler, Dateien und Quellen, Bänder eckig und rund, die Marken N, O, S, W, genordet fest und gedreht mitdrehend, ihr Schalter, halbe Marken und der Griff im Menü, Abstand zum Rand.
+- [Minimap](minimap.md): Bedienung mit Untermenü „Einstellungen …“, Aussehen per Klick auf Spieler und Marken, Chunklinien, Drehen mit der Blickrichtung, Bewegung zwischen zwei Ticks, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, Neu zeichnen im Worker, Kosten, Bilder und was anders ist als `top-north`.
 
 ## Entwicklung
 
@@ -41,6 +42,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [0012](entscheidungen/0012-marken-statt-verzierungen.md): Der Rahmen zeigt nur die Marken N, O, S, W, genordet fest, gedreht starr mitdrehend, ohne zier; ein Schalter stellt sie ab, der Abstand zum Rand mit der halben Diagonale; löst 0005 in Ornamenten und Marken ab.
 - [0013](entscheidungen/0013-groesse-als-anteil-des-schirms.md): Die Seite der Minimap als Anteil der kürzeren Seite des Schirms, sie folgt dem Fenster; alte Einstellungen ohne Sprung.
 - [0016](entscheidungen/0016-zweiter-haken-an-der-welt.md): Ein zweiter Haken an `ClientLevel` neben dem an `LevelExtractor.setSectionDirty`, weil Sodium jenen umgeht; gesetzte Truhen erscheinen sofort.
+- [0018](entscheidungen/0018-api-fuer-client-mods.md): Ebenen anderer Fabric-Mods über `HeroicMapClientApi`, im JSON der Ebenen vom Server, englische Namen, Entrypoint `heroicmap` und Modrinth Maven; bei gleicher Kennung gilt der Server.
 - [0014](entscheidungen/0014-eigene-karte-mit-massstab.md): Die eigene Karte mit 1, 2 oder 4 Pixeln je Block, fest bis zum Löschen, der Baum wie ein Download; löst 0004 im Massstab ab.
 - [0015](entscheidungen/0015-ordner-fuer-einzelspielerwelten.md): Ein Ordner der Welt auch im Einzelspieler, unter heroicmap/ nach Speicherordner und Hash, nicht im Speicherordner der Welt; löst 0004 im Einzelspieler ab.
 

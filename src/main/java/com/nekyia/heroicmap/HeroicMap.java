@@ -5,6 +5,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.logging.LogUtils;
+import com.nekyia.heroicmap.api.HeroicMapClientApi;
 import java.io.IOException;
 import java.nio.file.Path;
 import net.fabricmc.api.ClientModInitializer;
@@ -12,6 +13,7 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallba
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLevelEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
@@ -65,6 +67,9 @@ public final class HeroicMap implements ClientModInitializer {
                 LOGGER.warn("Heroic Map: alter Ordner overlay nicht gelöscht", e);
             }
         });
+        // Client-Mods mit Entrypoint heroicmap legen ihre Ebenen an, sobald der Client läuft. Siehe docs/api.md.
+        ClientLifecycleEvents.CLIENT_STARTED.register(client -> FabricLoader.getInstance()
+                .getEntrypoints(ID, HeroicMapClientApi.Listener.class).forEach(HeroicMapClientApi.Listener::ready));
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             boolean geaendert = false;
             while (zeigen.consumeClick()) {
