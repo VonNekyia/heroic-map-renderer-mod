@@ -684,7 +684,8 @@ class EbenenTest {
         // Ungerade Breite: links ⌊21 / 2⌋ wie beim Zeichnen, also -10 bis 11, nicht ±10,5.
         assertArrayEquals(new float[] {-10, -40, 11, 0}, Ebenen.kasten(21, 40, 0));
         // Ein Name breiter als das Bild: Er zählt zum Kasten, NAME_UNTEN unter dem Fuss, halb so breit aufgerundet.
-        assertEquals(18, Ebenen.NAME_UNTEN);
+        // 10 Einheiten je Geviert: 2 bis zur Oberkante, ein Geviert, die Kontur von rund 0,81.
+        assertEquals(13, Ebenen.NAME_UNTEN);
         assertArrayEquals(new float[] {-26, -40, 26, Ebenen.NAME_UNTEN}, Ebenen.kasten(21, 40, 51));
         // Ein schmaler Name ändert die Seiten nicht.
         assertArrayEquals(new float[] {-10, -40, 11, Ebenen.NAME_UNTEN}, Ebenen.kasten(21, 40, 8));
