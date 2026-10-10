@@ -177,16 +177,17 @@ public final class Bilder implements FabricClientGameTest {
             });
             context.waitFor(mc -> Symbole.INSTANZ.banner("test:orte", "1", "images/banner.png") != null
                     && Symbole.INSTANZ.symbol("test:orte", "1", "images/anker.png", 16) != null && Minimap.INSTANZ.fertig(), 600);
-            // Ohne Angeheftetes, dann mit, beide fern vom Banner bei (10, -9); zuletzt nah an ihm. Siehe docs/ebenen.md, „Banner“.
+            // Ohne Angeheftetes, dann mit, beide 24,7 Blöcke vom Banner bei (10, -9), so steht es noch ganz auf der Minimap;
+            // zuletzt nah an ihm. Siehe docs/ebenen.md, „Banner“.
             BufferedImage[] teile = new BufferedImage[3];
-            teile[0] = minimapBei(context, server, -14.5, 14.5, "orte-ohne");
+            teile[0] = minimapBei(context, server, -7.5, 8.5, "orte-ohne");
             context.runOnClient(mc -> {
                 Wegpunkte.INSTANZ.umschaltenNadel("test:orte", "nordhafen");
                 Wegpunkte.INSTANZ.umschaltenNadel("test:orte", "westmark");
             });
-            teile[1] = minimapBei(context, server, -14.5, 14.5, "orte-angeheftet");
+            teile[1] = minimapBei(context, server, -7.5, 8.5, "orte-angeheftet");
             teile[2] = minimapBei(context, server, 7.5, -6.5, "orte-nah");
-            BufferedImage minimap = nebeneinander(teile);
+            BufferedImage minimap = nebeneinander(0, teile);
             server.runCommand("tp @a 0.5 -30 0.5 0 90");
             context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - 0.5) < 0.1 && Minimap.INSTANZ.fertig(), 600);
             Path baum = testsatz();
@@ -239,13 +240,18 @@ public final class Bilder implements FabricClientGameTest {
         return mitRand(context, context.takeScreenshot(TestScreenshotOptions.of(name).disableCounterPrefix()));
     }
 
-    private static BufferedImage nebeneinander(BufferedImage... teile) {
+    /** Die Bilder oben bündig nebeneinander; was ein niedrigeres frei lässt, in der Farbe {@code grund}. */
+    private static BufferedImage nebeneinander(int grund, BufferedImage... teile) {
         int breite = 0, hoehe = 0;
         for (BufferedImage t : teile) {
             breite += t.getWidth();
             hoehe = Math.max(hoehe, t.getHeight());
         }
         BufferedImage alle = new BufferedImage(breite, hoehe, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = alle.createGraphics();
+        g.setColor(new Color(grund));
+        g.fillRect(0, 0, breite, hoehe);
+        g.dispose();
         int x = 0;
         for (BufferedImage t : teile) {
             alle.getGraphics().drawImage(t, x, 0, null);
@@ -290,13 +296,13 @@ public final class Bilder implements FabricClientGameTest {
             mc.resizeGui();
         });
         context.waitTicks(2);
-        return nebeneinander(teile);
+        return nebeneinander(Groessen.GRUND, teile);
     }
 
     /** Ein Schirm nur für das Bild der Grössen: alt, 32, 24, je mit dem Fuss auf derselben Linie. */
     private static final class Groessen extends Screen {
 
-        static final int BREITE = 160, HOEHE = 100;
+        static final int BREITE = 160, HOEHE = 100, GRUND = 0x6D8F4A;
         private final Symbole.Textur bild;
 
         Groessen(Symbole.Textur bild) {
@@ -311,7 +317,7 @@ public final class Bilder implements FabricClientGameTest {
         @Override
         public void extractRenderState(GuiGraphicsExtractor g, int mausX, int mausY, float delta) {
             int gs = minecraft.getWindow().getGuiScale();
-            g.fill(0, 0, BREITE, HOEHE, 0xFF6D8F4A);
+            g.fill(0, 0, BREITE, HOEHE, 0xFF000000 | GRUND);
             String[] namen = {"alt", "32", "24"};
             for (int i = 0; i < namen.length; i++) {
                 int x = 30 + 50 * i;
