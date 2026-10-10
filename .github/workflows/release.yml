@@ -51,7 +51,8 @@ jobs:
         timeout-minutes: 20
         run: ./gradlew build --console=plain
 
-      # Das Jar nennt in fabric.mod.json dieselbe Version und trägt LICENSE und NOTICE unter META-INF.
+      # Das Jar nennt in fabric.mod.json dieselbe Version und trägt LICENSE und NOTICE unter META-INF. Jede Datei
+      # unter assets/ liegt darin, Byte für Byte, so fehlt keinem Rahmen palette.txt, info.txt oder zier.png (mod#60).
       - name: Prüfen
         run: |
           jar=build/libs/heroic-map-renderer-mod-$VERSION.jar
@@ -61,6 +62,13 @@ jobs:
           for datei in LICENSE NOTICE; do
             unzip -Z1 "$jar" | grep -qx "META-INF/$datei" || { echo "::error::$jar trägt kein META-INF/$datei"; exit 1; }
           done
+          anzahl=0
+          while IFS= read -r datei; do
+            unzip -p "$jar" "$datei" | cmp -s - "src/main/resources/$datei" \
+              || { echo "::error::$datei fehlt im Jar oder ist anders"; exit 1; }
+            anzahl=$((anzahl + 1))
+          done < <(cd src/main/resources && find assets -type f | sort)
+          echo "$anzahl Dateien unter assets/ im Jar"
 
       - uses: actions/upload-artifact@v7
         with:

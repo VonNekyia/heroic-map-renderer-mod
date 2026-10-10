@@ -176,7 +176,8 @@ Ein Release geht auf GitHub und Modrinth, siehe
 2. **Tag** `vX.Y.Z` auf `main` nach dem Merge. `release.yml` baut das
    Jar und prüft: Der Tag passt zu `gradle.properties`, das Jar nennt die
    Version in `fabric.mod.json` und trägt `META-INF/LICENSE` und
-   `META-INF/NOTICE`. Dann legt er einen Entwurf an, mit Jar, `SHA256SUMS`
+   `META-INF/NOTICE`, und jede Datei unter `assets/` liegt Byte für Byte im
+   Jar. Dann legt er einen Entwurf an, mit Jar, `SHA256SUMS`
    und den Notizen aus `.github/notizen.sh`. Eine PR, die diese Dateien
    ändert, baut zur Probe ohne Entwurf.
 3. **Veröffentlichen** von Hand auf GitHub. Das veröffentlichte Release
