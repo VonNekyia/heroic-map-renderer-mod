@@ -12,10 +12,10 @@ import net.minecraft.resources.Identifier;
 
 /**
  * Der Kanal {@code heroicmap:karte} zum Plugin: UTF-8-JSON ohne Längenpräfix, in beide
- * Richtungen. Einen Teil {@code ebene} liest schon der Thread des Netzes ({@code teil}), alles
- * andere geht als Text weiter. Siehe docs/download.md, „Kanal“.
+ * Richtungen. Einen Teil {@code ebene} und eine Antwort {@code tafel} liest schon der Thread des
+ * Netzes ({@code teil}, {@code tafel}), alles andere geht als Text weiter. Siehe docs/download.md, „Kanal“.
  */
-record Kanal(String json, Ebenen.Teil teil) implements CustomPacketPayload {
+record Kanal(String json, Ebenen.Teil teil, Tafeln.Antwort tafel) implements CustomPacketPayload {
 
     static final Type<Kanal> TYPE = new Type<>(Identifier.fromNamespaceAndPath(HeroicMap.ID, "karte"));
     /** Ein Teil einer Ebene hat bis 1 MiB, wenn ein Objekt allein so gross ist; mehr liest der Mod nicht. */
@@ -23,7 +23,7 @@ record Kanal(String json, Ebenen.Teil teil) implements CustomPacketPayload {
     static final StreamCodec<FriendlyByteBuf, Kanal> CODEC = CustomPacketPayload.codec(Kanal::schreibe, Kanal::lies);
 
     Kanal(String json) {
-        this(json, null);
+        this(json, null, null);
     }
 
     private void schreibe(FriendlyByteBuf puffer) {
@@ -39,9 +39,13 @@ record Kanal(String json, Ebenen.Teil teil) implements CustomPacketPayload {
         byte[] daten = new byte[n];
         puffer.readBytes(daten);
         String text = new String(daten, StandardCharsets.UTF_8);
-        // Bis 1 MiB JSON nicht auf dem Render-Thread; dorthin gehen nur die Nadeln.
+        // Bis 1 MiB JSON nicht auf dem Render-Thread; dorthin gehen nur Nadeln, Formen und Tafeln.
         Ebenen.Teil teil = Ebenen.Teil.lies(text);
-        return teil != null ? new Kanal("", teil) : new Kanal(text);
+        if (teil != null) {
+            return new Kanal("", teil, null);
+        }
+        Tafeln.Antwort tafel = Tafeln.Antwort.lies(text);
+        return tafel != null ? new Kanal("", null, tafel) : new Kanal(text);
     }
 
     @Override
@@ -56,6 +60,8 @@ record Kanal(String json, Ebenen.Teil teil) implements CustomPacketPayload {
         ClientPlayNetworking.registerGlobalReceiver(TYPE, (nachricht, kontext) -> {
             if (nachricht.teil() != null) {
                 Ebenen.INSTANZ.teil(nachricht.teil());
+            } else if (nachricht.tafel() != null) {
+                Tafeln.INSTANZ.antwort(nachricht.tafel());
             } else {
                 Downloads.INSTANZ.empfange(nachricht.json());
             }
@@ -81,6 +87,24 @@ record Kanal(String json, Ebenen.Teil teil) implements CustomPacketPayload {
         json.addProperty("v", 1);
         json.addProperty("typ", "show");
         json.addProperty("show", an ? "simplevoicechat" : "hidden");
+        return json.toString();
+    }
+
+    /** Fragt die Tafel eines Objekts, wenn der Server den Kanal hört. Siehe docs/ebenen.md, „Infotafel“. */
+    static void frageTafel(Tafeln.Ziel z) {
+        if (offen()) {
+            ClientPlayNetworking.send(new Kanal(tafel(z)));
+        }
+    }
+
+    /** Die Frage {@code tafel}: Ebene, version und Kennung des Objekts. */
+    static String tafel(Tafeln.Ziel z) {
+        JsonObject json = new JsonObject();
+        json.addProperty("v", 1);
+        json.addProperty("typ", "tafel");
+        json.addProperty("ebene", z.ebene());
+        json.addProperty("version", z.version());
+        json.addProperty("id", z.id());
         return json.toString();
     }
 

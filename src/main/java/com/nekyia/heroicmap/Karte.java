@@ -3,7 +3,10 @@ package com.nekyia.heroicmap;
 import com.mojang.blaze3d.platform.InputConstants;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
@@ -13,8 +16,11 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FormattedText;
+import net.minecraft.network.chat.Style;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
+import net.minecraft.util.Util;
 import org.joml.Matrix3x2f;
 
 /**
@@ -42,6 +48,13 @@ final class Karte extends Screen {
     private final Kacheln kacheln;
     private final Kartenblick blick;
     private final Formen.Speicher formenSpeicher = new Formen.Speicher();
+    private final Tafeln.Zeigen zeigen = new Tafeln.Zeigen();
+    /** Die offene Tafel: ihr Ziel, wo sie aufging, wie weit sie gescrollt ist, und wo sie und ihr Knopf zuletzt lagen. */
+    private Tafeln.Ziel tafelOffen;
+    private int tafelX, tafelY, tafelScroll;
+    private int[] tafelKasten, tafelKnopf;
+    /** Der Klick schloss oder traf die Tafel; sein Loslassen hält keine neue. */
+    private boolean klickVerbraucht;
     /** Was beim letzten Knopf schiefging, oder null. */
     private Component hinweis;
     /** Wo die Knöpfe rechts oben beginnen und enden; Marken und Namen weichen ihnen aus. */
@@ -148,6 +161,7 @@ final class Karte extends Screen {
                     : Component.translatable("heroicmap.karte.abgleich_ab", Downloads.uhr(ab)));
         }
         super.extractRenderState(g, mausX, mausY, delta);
+        tafel(g, mausX, mausY);
         if (ziel != null) {
             int b = menueBreite();
             g.fill(menueX, menueY, menueX + b, menueY + eintraege.size() * ZEILE, 0xE0000000);
@@ -340,6 +354,18 @@ final class Karte extends Screen {
                 return true;
             }
         }
+        // Ein Klick in die Tafel wirkt nicht auf die Karte; ein Klick daneben schliesst zuerst nur die gehaltene Tafel.
+        if (drin(tafelKasten, e.x(), e.y())) {
+            if (drin(tafelKnopf, e.x(), e.y())) {
+                zeigen.schliesse();
+            }
+            klickVerbraucht = true;
+            return true;
+        }
+        if (zeigen.gehalten() && zeigen.schliesse()) {
+            klickVerbraucht = true;
+            return true;
+        }
         if (super.mouseClicked(e, doppelt)) {
             return true;
         }
@@ -368,6 +394,19 @@ final class Karte extends Screen {
         boolean knopf = super.mouseReleased(e);
         Marke m = gedrueckt;
         gedrueckt = null;
+        if (klickVerbraucht) {
+            klickVerbraucht = false;
+            return true;
+        }
+        // Ein Klick ohne Zug auf ein Ziel ohne Marke hält seine Tafel.
+        if (m == null && e.button() == InputConstants.MOUSE_BUTTON_LEFT && gezogen <= ZUG && ziel == null && blick != null
+                && !drin(tafelKasten, e.x(), e.y())) {
+            Tafeln.Ziel z = tafelUnter(e.x(), e.y());
+            if (z != null) {
+                zeigen.halte(z);
+                return true;
+            }
+        }
         if (m == null || e.button() != InputConstants.MOUSE_BUTTON_LEFT) {
             return knopf;
         }
@@ -380,6 +419,137 @@ final class Karte extends Screen {
             Wegpunkte.INSTANZ.umschalten(m.spieler());
         }
         return true;
+    }
+
+    /**
+     * Die Tafel des Ziels unter dem Zeiger: Zeigen je Frame, dann, wenn eine offen und da ist, die
+     * Tafel neben der Stelle, an der sie aufging, ganz auf dem Schirm. Siehe docs/ebenen.md, „Infotafel“.
+     */
+    private void tafel(GuiGraphicsExtractor g, int mausX, int mausY) {
+        boolean ueber = drin(tafelKasten, mausX, mausY);
+        zeigen.zeiger(ziel == null && !ueber ? tafelUnter(mausX, mausY) : null, ueber, Util.getMillis());
+        Tafeln.Ziel offen = zeigen.offen();
+        if (!Objects.equals(offen, tafelOffen)) {
+            tafelOffen = offen;
+            tafelX = mausX + 12;
+            tafelY = mausY + 12;
+            tafelScroll = 0;
+        }
+        tafelKasten = null;
+        tafelKnopf = null;
+        Optional<Tafel> t = offen == null ? null : Tafeln.INSTANZ.tafel(offen);
+        if (t == null || t.isEmpty()) {
+            return;
+        }
+        Tafel.Satz s = Tafel.setze(t.get(), masse());
+        int w = s.breite() + 2 * Tafel.INNEN, h = Math.min(s.hoehe() + 2 * Tafel.INNEN, height - 8);
+        int x = Math.max(4, Math.min(tafelX, width - w - 4)), y = Math.max(4, Math.min(tafelY, height - h - 4));
+        tafelScroll = Math.max(0, Math.min(tafelScroll, s.hoehe() + 2 * Tafel.INNEN - h));
+        g.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.fromNamespaceAndPath(HeroicMap.ID, "rahmen/" + tafelSkin() + "/tafel"), x, y, w, h);
+        g.enableScissor(x + Tafel.INNEN, y + Tafel.INNEN, x + w - Tafel.INNEN, y + h - Tafel.INNEN);
+        for (Tafel.Stueck stueck : s.stuecke()) {
+            switch (stueck) {
+                case Tafel.Text text -> g.text(font, stil(text.text(), text.fett()), x + Tafel.INNEN + text.x(),
+                        y + Tafel.INNEN + text.y() - tafelScroll, text.farbe(), false);
+                case Tafel.Punkt p -> {
+                    int px = x + Tafel.INNEN + p.x(), py = y + Tafel.INNEN + p.y() - tafelScroll;
+                    g.fill(px, py, px + p.seite(), py + p.seite(), p.farbe());
+                }
+                case Tafel.Bildstueck b -> {
+                    int bx = x + Tafel.INNEN + b.x(), by = y + Tafel.INNEN + b.y() - tafelScroll;
+                    Symbole.Textur bild = Symbole.INSTANZ.tafelBild(offen.ebene(), offen.version(), b.bild().feld());
+                    if (bild != null) {
+                        g.blit(RenderPipelines.GUI_TEXTURED, bild.id(), bx, by, 0, 0, b.breite(), b.hoehe(), bild.breite(), bild.hoehe(),
+                                bild.breite(), bild.hoehe());
+                    } else if (b.bild().alt() != null) {
+                        g.text(font, b.bild().alt(), bx, by, Tafel.SCHRIFT, false);
+                    }
+                }
+            }
+        }
+        g.disableScissor();
+        if (zeigen.gehalten()) {
+            // Der Knopf zum Schliessen in der Ecke oben rechts, im Innenabstand.
+            tafelKnopf = new int[] {x + w - Tafel.INNEN - 4, y, Tafel.INNEN + 4, Tafel.INNEN + 4};
+            g.text(font, "×", tafelKnopf[0], y + 1, Tafel.SCHRIFT, false);
+        }
+        tafelKasten = new int[] {x, y, w, h};
+    }
+
+    /** Das Ziel unter dem Zeiger: eine Nadel oder ein Banner, die spätere über der früheren, sonst die oberste Fläche oder der oberste Kreis. */
+    private Tafeln.Ziel tafelUnter(double mx, double my) {
+        if (minecraft.player == null || satz == null) {
+            return null;
+        }
+        String dimension = minecraft.player.level().dimension().identifier().toString();
+        int scale = satz.scale();
+        Tafeln.Ziel treffer = null;
+        for (Ebenen.Eintrag e : Ebenen.INSTANZ.sichtbar()) {
+            for (Ebenen.Ort o : Ebenen.INSTANZ.nadeln(e.id())) {
+                int[] m = o.id() == null || !o.dimension().equals(dimension) ? null : Ebenen.masse(o);
+                if (m != null) {
+                    double x = blick.rasterX(Projektion.zuPixel(o.x(), scale), width), y = blick.rasterY(Projektion.zuPixel(o.z(), scale), height);
+                    if (mx >= x - m[0] / 2.0 && mx < x + m[0] / 2.0 && my >= y - m[1] && my < y) {
+                        treffer = new Tafeln.Ziel(e.id(), e.version(), o.id());
+                    }
+                }
+            }
+        }
+        if (treffer != null) {
+            return treffer;
+        }
+        double wx = blick.basisRasterX(mx, width) / scale, wz = blick.basisRasterZ(my, height) / scale;
+        List<Ebenen.Eintrag> ebenen = Ebenen.INSTANZ.sichtbar();
+        for (int i = ebenen.size() - 1; i >= 0; i--) {
+            List<Ebenen.Form> formen = Ebenen.INSTANZ.formen(ebenen.get(i).id());
+            for (int j = formen.size() - 1; j >= 0; j--) {
+                Ebenen.Form f = formen.get(j);
+                String id = switch (f) {
+                    case Ebenen.Flaeche fl -> fl.id();
+                    case Ebenen.Kreis k -> k.id();
+                    default -> null;
+                };
+                if (id != null && f.dimension().equals(dimension) && Tafeln.trifft(f, wx, wz)) {
+                    return new Tafeln.Ziel(ebenen.get(i).id(), ebenen.get(i).version(), id);
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Der 9-Slice der Tafel zum Rahmen der Minimap; „biom“ und „ohne“ nehmen den schlichten. */
+    private static String tafelSkin() {
+        String skin = Minimap.INSTANZ.skin();
+        return Skin.ORDNER.contains(skin) && !skin.contains("/") ? skin : Skin.OHNE;
+    }
+
+    private static Component stil(String text, boolean fett) {
+        return fett ? Component.literal(text).withStyle(ChatFormatting.BOLD) : Component.literal(text);
+    }
+
+    /** Die Masse der Schrift des Spiels für {@link Tafel#setze}. */
+    private Tafel.Masse masse() {
+        return new Tafel.Masse() {
+            @Override
+            public int breite(String text, boolean fett) {
+                return font.width(stil(text, fett));
+            }
+
+            @Override
+            public List<String> umbruch(String text, int breite, boolean fett) {
+                return font.getSplitter().splitLines(text, breite, fett ? Style.EMPTY.withBold(true) : Style.EMPTY).stream()
+                        .map(FormattedText::getString).toList();
+            }
+
+            @Override
+            public int zeile() {
+                return font.lineHeight + 1;
+            }
+        };
+    }
+
+    private static boolean drin(int[] kasten, double x, double y) {
+        return kasten != null && x >= kasten[0] && x < kasten[0] + kasten[2] && y >= kasten[1] && y < kasten[1] + kasten[3];
     }
 
     /** Öffnet das Menü an (x, y) für den Block dort, oder für den Wegpunkt {@code punkt}. */
@@ -439,6 +609,10 @@ final class Karte extends Screen {
 
     @Override
     public boolean mouseScrolled(double x, double y, double weitX, double weitY) {
+        if (drin(tafelKasten, x, y)) {
+            tafelScroll -= (int) Math.round(weitY * 10);
+            return true;
+        }
         if (blick == null) {
             return false;
         }
@@ -452,6 +626,10 @@ final class Karte extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent ereignis) {
+        // Escape schliesst zuerst nur die Tafel.
+        if (ereignis.key() == InputConstants.KEY_ESCAPE && zeigen.schliesse()) {
+            return true;
+        }
         if (HeroicMap.karte != null && HeroicMap.karte.matches(ereignis)) {
             onClose();
             return true;

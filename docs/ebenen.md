@@ -1,12 +1,14 @@
 ---
 title: Ebenen
-description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Symbol und Namen und ihre Banner auf Minimap und Vollbildkarte zeichnet, in fester Grösse, Symbole und Bilder vom Server holt, Flächen, Kreise und Linien flach zeichnet, Kartenschrift entlang ihres Pfads, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
+description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Symbol und Namen und ihre Banner auf Minimap und Vollbildkarte zeichnet, in fester Grösse, Symbole und Bilder vom Server holt, Flächen, Kreise und Linien flach zeichnet, Kartenschrift entlang ihres Pfads, die Infotafel beim Zeigen auf der Vollbildkarte, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Ebenen.java
   - src/main/java/com/nekyia/heroicmap/EbenenMenue.java
   - src/main/java/com/nekyia/heroicmap/Symbole.java
   - src/main/java/com/nekyia/heroicmap/Formen.java
   - src/main/java/com/nekyia/heroicmap/Trapeze.java
+  - src/main/java/com/nekyia/heroicmap/Tafel.java
+  - src/main/java/com/nekyia/heroicmap/Tafeln.java
   - src/main/resources/assets/heroicmap/font/karte.json
   - src/main/java/com/nekyia/heroicmap/Kartenblick.java
   - src/main/java/com/nekyia/heroicmap/Minimap.java
@@ -16,6 +18,8 @@ code:
   - src/test/java/com/nekyia/heroicmap/SymboleTest.java
   - src/test/java/com/nekyia/heroicmap/FormenTest.java
   - src/test/java/com/nekyia/heroicmap/TrapezeTest.java
+  - src/test/java/com/nekyia/heroicmap/TafelTest.java
+  - src/test/java/com/nekyia/heroicmap/TafelnTest.java
   - src/test/java/com/nekyia/heroicmap/DrehungTest.java
 ---
 
@@ -303,6 +307,61 @@ in der Schrift IM Fell English SC (`Formen.schriften`).
   Zeichen ein Text, mit Kontur neun. Eine Ebene mit vielen Namen kostet so
   mehr als ihre Flächen; gemessen ist das noch nicht.
 
+## Infotafel
+
+Ruht der Zeiger auf der Vollbildkarte auf einer Nadel, einem Banner,
+einer Fläche oder einem Kreis, zeigt der Mod dessen Tafel, wenn es eine
+hat. Auf der Minimap gibt es keine Tafel, wie im Format.
+
+- **Geholt** über den Kanal (`Tafeln`, `Kanal.frageTafel`): Der Mod
+  schickt `tafel` mit `ebene`, `version` und `id`, das Plugin antwortet
+  mit `panel` oder ohne, wenn das Objekt keine Tafel hat oder die
+  `version` alt ist. Felder und Rechte stehen beim Plugin,
+  [Ebenen](https://github.com/VonNekyia/heroic-map-renderer-plugin/blob/main/docs/ebenen.md),
+  „Tafeln“.
+  - Der Mod fragt erst, wenn die Tafel aufgehen soll, und je Objekt und
+    `version` einmal, auch wenn keine Antwort kommt.
+  - Er behält höchstens 256 Tafeln, die zuletzt gezeigten; eine Antwort
+    ohne `panel` merkt er sich als „keine Tafel“.
+  - Eine neue `version` einer Ebene leert ihre Tafeln.
+  - Eine Antwort, um die er nicht bat, gilt nicht.
+  - Gelesen auf dem Thread des Netzes wie die Teile (`Tafeln.Antwort`).
+- **Ziel** (`Karte.tafelUnter`): oben liegen Nadeln und Banner, die
+  spätere über der früheren, gemessen an ihrem Bild über dem Fuss; sonst
+  die oberste Fläche nach gerade/ungerade oder der oberste Kreis
+  (`Tafeln.trifft`). Ein Objekt braucht eine `id`. Linien und Schrift
+  haben keine Tafel.
+- **Zeigen** (`Tafeln.Zeigen`): Ruht der Zeiger 150 ms auf dem Ziel, geht
+  die Tafel auf, neben der Stelle, ganz auf dem Schirm. Verlässt er Ziel
+  und Tafel, geht sie nach 300 ms zu; dazwischen kann er in die Tafel
+  wandern. Ein Klick ohne Zug auf das Ziel hält sie offen, bis zum Knopf ×
+  oben rechts, Escape oder einem Klick daneben. Escape und ein Klick
+  daneben schliessen zuerst nur die Tafel; erst der nächste wirkt auf die
+  Karte. Ein Klick in die Tafel wirkt nie auf die Karte.
+- **Gelesen** (`Tafel.lies`): die Bausteine des Formats, `title`, `lines`,
+  `image`, `section`, `rating` und `columns`; unbekannte fallen weg.
+  Höchstens 64 Bausteine, zwei Ebenen tief: `columns` und `section` nur
+  oben. Titel und Labels höchstens 64 Zeichen, Zeilen 120, Bilder 512 × 512,
+  Wertungen 20 Punkte; dazu eigene Grenzen, 64 Zeilen je Baustein und 20
+  Reihen je Wertung. Texte schlicht, Codes mit `§` gestrichen.
+- **Gesetzt** (`Tafel.setze`) in Einheiten der Oberfläche, mit der Schrift
+  des Spiels in ihrer Grösse: Der Inhalt ist so breit wie sein breitester
+  Baustein, höchstens 200 Einheiten; 6 Innenabstand, 4 zwischen
+  Bausteinen, 6 vor einem Abschnitt. Titel fett, Zeilen umbrochen. Bilder
+  in ihrer Grösse, breiter als der Inhalt mit gleichem Seitenverhältnis
+  verkleinert, nie vergrössert; ohne Bild steht `alt`. Wertungen mit dem
+  Label links in 70 Einheiten, die Punkte 5 gross, die über dem Wert in der
+  Farbe zu 25 % deckend. Spalten oben bündig, die rechte so breit wie ihr
+  Inhalt, höchstens die Hälfte.
+- **Gezeichnet** über allem auf der Karte, unter dem Menü der rechten
+  Taste. Der Grund ist der 9-Slice des Rahmens der Minimap,
+  `rahmen/<skin>/tafel.png`, 16 × 16 mit 5 Rand; „ohne“ und „biom“ nehmen
+  den schlichten unter `rahmen/ohne/`. Die Schrift ist hell, `#D9D9D9`,
+  denn die Fläche ist überall dunkel. Höher als der Schirm, scrollt das
+  Mausrad über der Tafel sie statt die Karte zu zoomen.
+- **Bilder** holt der Mod wie die Symbole, siehe „Symbole“, höchstens
+  512 × 512 (`Symbole.tafelBild`).
+
 ## Umschalten
 
 - **Untermenü „Ebenen …“** im Untermenü „Einstellungen …“, siehe
@@ -377,5 +436,4 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 
 ## Was noch fehlt
 
-- **Infotafel** beim Zeigen und Anklicken.
 - **Anheften** an Regionen (#36).

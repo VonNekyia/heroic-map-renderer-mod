@@ -129,10 +129,10 @@ class EbenenTest {
                 + "]").getAsJsonArray();
         List<Ebenen.Ort> n = Ebenen.nadeln("b:staedte", "v1", objekte);
         assertEquals(3, n.size());
-        assertEquals(new Ebenen.Nadel(120.5, -340.5, Ebenen.UEBERWELT, null, 1, Ebenen.FARBE, "b:staedte", "v1", null, null), n.get(0));
+        assertEquals(new Ebenen.Nadel(120.5, -340.5, Ebenen.UEBERWELT, null, 1, Ebenen.FARBE, "b:staedte", "v1", null, null, "a"), n.get(0));
         // Das Alpha wirkt am Schild nicht; unbekannte Felder übergeht der Mod.
-        assertEquals(new Ebenen.Nadel(1, 2, "minecraft:the_nether", null, 0, 0xFF40E53F, "b:staedte", "v1", "images/burg_16.png", null), n.get(1));
-        assertEquals(new Ebenen.Nadel(3, 4, Ebenen.UEBERWELT, null, 2, Ebenen.FARBE, "b:staedte", "v1", null, null), n.get(2));
+        assertEquals(new Ebenen.Nadel(1, 2, "minecraft:the_nether", null, 0, 0xFF40E53F, "b:staedte", "v1", "images/burg_16.png", null, "c"), n.get(1));
+        assertEquals(new Ebenen.Nadel(3, 4, Ebenen.UEBERWELT, null, 2, Ebenen.FARBE, "b:staedte", "v1", null, null, "e"), n.get(2));
     }
 
     @Test
@@ -575,8 +575,8 @@ class EbenenTest {
         List<Ebenen.Ort> n = Ebenen.nadeln("b:staedte", "v1", objekte);
         // Ohne gültiges Bild fällt ein Banner weg; Nadeln und Banner stehen in ihrer Reihenfolge.
         assertEquals(3, n.size());
-        assertEquals(new Ebenen.Banner(120.5, -340.5, Ebenen.UEBERWELT, "Hafenstadt", "images/banner-nord.png", "b:staedte", "v1"), n.get(0));
-        assertEquals(new Ebenen.Banner(3, 4, "minecraft:the_nether", null, "images/weiss.webp", "b:staedte", "v1"), n.get(1));
+        assertEquals(new Ebenen.Banner(120.5, -340.5, Ebenen.UEBERWELT, "Hafenstadt", "images/banner-nord.png", "b:staedte", "v1", "s"), n.get(0));
+        assertEquals(new Ebenen.Banner(3, 4, "minecraft:the_nether", null, "images/weiss.webp", "b:staedte", "v1", "w"), n.get(1));
         assertTrue(n.get(2) instanceof Ebenen.Nadel);
     }
 

@@ -162,6 +162,11 @@ final class Symbole {
     record Textur(Identifier id, int breite, int hoehe) {
     }
 
+    /** Ein Bild einer Tafel, höchstens {@link Tafel#MAX_BILD} im Quadrat; sonst wie {@link #symbol}. */
+    Textur tafelBild(String ebene, String version, String feld) {
+        return textur(ebene, version, feld, feld + "@tafel", Tafel.MAX_BILD, Tafel.MAX_BILD, true);
+    }
+
     /** Das Bild eines Banners, höchstens {@link #BANNER_BREITE} × {@link #BANNER_HOEHE}; sonst wie {@link #symbol}. */
     Textur banner(String ebene, String version, String feld) {
         return textur(ebene, version, feld, feld + "@banner", BANNER_BREITE, BANNER_HOEHE, true);

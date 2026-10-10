@@ -96,14 +96,17 @@ final class Ebenen {
         String dimension();
 
         String name();
+
+        /** Die Kennung in der Ebene, für die Tafel; null ohne. */
+        String id();
     }
 
     record Nadel(double x, double z, String dimension, String name, int groesse, int farbe, String ebene, String version,
-            String symbolGross, String symbolMittel) implements Ort {
+            String symbolGross, String symbolMittel, String id) implements Ort {
     }
 
     /** Ein Banner: das Bild {@code bild} der Ebene, Pixel auf Pixel, der Fuss unten mittig auf dem Ort; darunter der Name. */
-    record Banner(double x, double z, String dimension, String name, String bild, String ebene, String version) implements Ort {
+    record Banner(double x, double z, String dimension, String name, String bild, String ebene, String version, String id) implements Ort {
     }
 
     /** Ein Rand in Einheiten des GUI: Farbe mit Alpha, Breite, gestrichelt Strich und Lücke, sonst beide 0. */
@@ -120,11 +123,11 @@ final class Ebenen {
      * Eine Region: die Füllung mit Alpha als Trapeze aus {@link Trapeze}, null ohne Füllung oder wenn sie
      * zu aufwendig ist; der Rand (null ohne) um alle Ringe {x0, z0, …}; {@code box} {x0, z0, x1, z1}.
      */
-    record Flaeche(String dimension, int fuellung, double[] trapeze, Rand rand, List<double[]> ringe, double[] box) implements Form {
+    record Flaeche(String dimension, int fuellung, double[] trapeze, Rand rand, List<double[]> ringe, double[] box, String id) implements Form {
     }
 
     /** Ein Kreis um (x, z) mit {@code radius} Blöcken, Füllung mit Alpha (Alpha 0 ohne) und Rand (null ohne). */
-    record Kreis(String dimension, double x, double z, double radius, int fuellung, Rand rand) implements Form {
+    record Kreis(String dimension, double x, double z, double radius, int fuellung, Rand rand, String id) implements Form {
     }
 
     /** Eine Linie durch {@code punkte} {x0, z0, …}; {@code box} {x0, z0, x1, z1}. */
@@ -335,7 +338,7 @@ final class Ebenen {
         String dimension = o.has("dimension") ? text(o, "dimension", MAX_KENNUNG) : UEBERWELT;
         return dimension == null ? null : new Nadel(at.get(0).getAsDouble(), at.get(1).getAsDouble(), dimension,
                 text(o, "name", MAX_TEXT), groesse, o.has("color") ? farbe(o.get("color").getAsString()) : FARBE, ebene, version,
-                feld(symbol, "large"), feld(symbol, "medium"));
+                feld(symbol, "large"), feld(symbol, "medium"), text(o, "id", MAX_TEXT));
     }
 
     /** Das Feld eines Symbols wie es steht, oder null, wenn es fehlt oder länger als {@link #MAX_FELD} ist; prüfen tut {@link Symbole#uri}. */
@@ -345,7 +348,8 @@ final class Ebenen {
         String dimension = o.has("dimension") ? text(o, "dimension", MAX_KENNUNG) : UEBERWELT;
         String bild = feld(o, "image");
         return dimension == null || bild == null || !Symbole.FELD.matcher(bild).matches() ? null
-                : new Banner(at.get(0).getAsDouble(), at.get(1).getAsDouble(), dimension, text(o, "name", MAX_TEXT), bild, ebene, version);
+                : new Banner(at.get(0).getAsDouble(), at.get(1).getAsDouble(), dimension, text(o, "name", MAX_TEXT), bild, ebene, version,
+                        text(o, "id", MAX_TEXT));
     }
 
     private static String feld(JsonObject symbol, String groesse) {
@@ -427,7 +431,7 @@ final class Ebenen {
                 if (!(r > 0 && r <= MAX_RADIUS)) {
                     throw new IllegalArgumentException("Radius " + r);
                 }
-                return new Kreis(dimension, x, z, r, fuellung, rand);
+                return new Kreis(dimension, x, z, r, fuellung, rand, text(o, "id", MAX_TEXT));
             }
             case "line" -> {
                 double[] p = ring(o.getAsJsonArray("points"), 2);
@@ -459,7 +463,7 @@ final class Ebenen {
                     throw new IllegalArgumentException("Grenze");
                 }
                 double[] trapeze = sichtbar(fuellung) ? Trapeze.von(ringe) : null;
-                return new Flaeche(dimension, fuellung, trapeze, rand, List.copyOf(ringe), box(ringe));
+                return new Flaeche(dimension, fuellung, trapeze, rand, List.copyOf(ringe), box(ringe), text(o, "id", MAX_TEXT));
             }
         }
     }
@@ -582,7 +586,7 @@ final class Ebenen {
      * Ein Text vom Server als schlichter Text, Codes mit § gestrichen; null, wenn er fehlt oder länger
      * als {@code hoechstens} Zeichen ist.
      */
-    private static String text(JsonObject o, String feld, int hoechstens) {
+    static String text(JsonObject o, String feld, int hoechstens) {
         if (!o.has(feld)) {
             return null;
         }
@@ -690,6 +694,20 @@ final class Ebenen {
             g.centeredText(font, o.name(), 0, 2, TEXT);
         }
         pose.popMatrix();
+    }
+
+    /**
+     * Breite und Höhe des Orts in Einheiten des GUI über seinem Fuss, ohne Namen, für den Treffer
+     * unter dem Zeiger; null bei einem Banner, dessen Bild noch fehlt.
+     */
+    static int[] masse(Ort o) {
+        return switch (o) {
+            case Nadel n -> new int[] {SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe()};
+            case Banner b -> {
+                Symbole.Textur t = Symbole.INSTANZ.banner(b.ebene(), b.version(), b.bild());
+                yield t == null ? null : new int[] {t.breite(), t.hoehe()};
+            }
+        };
     }
 
     /** Feld, Symbol und Rahmen der Nadel in ihrer Grösse, der Fuss im Ursprung. */

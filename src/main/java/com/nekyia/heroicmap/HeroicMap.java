@@ -86,6 +86,7 @@ public final class HeroicMap implements ClientModInitializer {
             Downloads.INSTANZ.neueSitzung();
             Ebenen.INSTANZ.leeren();
             Symbole.INSTANZ.leeren();
+            Tafeln.INSTANZ.leeren();
         }));
         ClientPlayConnectionEvents.DISCONNECT.register((listener, client) -> client.execute(() -> {
             Minimap.INSTANZ.leeren();
@@ -93,6 +94,7 @@ public final class HeroicMap implements ClientModInitializer {
             Mitspieler.INSTANZ.leeren();
             Ebenen.INSTANZ.leeren();
             Symbole.INSTANZ.leeren();
+            Tafeln.INSTANZ.leeren();
             Wegpunkte.INSTANZ.leeren();
             Selbst.INSTANZ.leeren();
         }));
