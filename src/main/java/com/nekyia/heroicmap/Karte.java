@@ -257,9 +257,9 @@ final class Karte extends Screen {
             for (Ebenen.Ort n : Ebenen.INSTANZ.nadeln(e.id())) {
                 double x = blick.rasterX(Projektion.zuPixel(n.x(), satz.scale()), width);
                 double y = blick.rasterY(Projektion.zuPixel(n.z(), satz.scale()), height);
-                // Erst die Höhe: Unter dem Fuss reicht der Name 17 Einheiten, über ihm höchstens ein Banner 64. Dann der
-                // Kasten ohne Holen; er misst den Namen, holt aber kein Bild.
-                if (!n.dimension().equals(dimension) || y <= -18 || y >= height + 65) {
+                // Erst die Höhe: Unter dem Fuss reicht der Name NAME_UNTEN Einheiten, über ihm höchstens ein Banner 64. Dann
+                // der Kasten ohne Holen; er misst den Namen, holt aber kein Bild.
+                if (!n.dimension().equals(dimension) || y <= -Ebenen.NAME_UNTEN || y >= height + 65) {
                     continue;
                 }
                 float[] r = Ebenen.kastenOhneHolen(font, n);

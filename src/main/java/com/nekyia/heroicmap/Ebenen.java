@@ -71,10 +71,13 @@ final class Ebenen {
     static final String UEBERWELT = "minecraft:overworld";
     /** Die Farbe des Schilds ohne {@code color}. */
     static final int FARBE = 0xFFD9443A;
-    /** Der Name unter dem Fuss: Kartenschrift mit 12 Einheiten je Geviert, Zeilenhöhe 1,4, 3 Einheiten Rand zur Seite. */
-    static final float NAME_GROESSE = 12, NAME_ZEILE = 1.4f * NAME_GROESSE, NAME_RAND = 3;
-    /** Die Farben der UI wie auf der Webkarte: Grund weiss mit Alpha 0,8, Schrift schwarz, ohne Kontur. */
-    private static final int NAME_GRUND = 0xCCFFFFFF, NAME_SCHRIFT = 0xFF000000;
+    /**
+     * Der Name unter dem Fuss wie die Kartenschrift, in ihren Vorgaben {@link #SCHRIFTFARBE} mit Kontur
+     * {@link #KONTURFARBE}: Grossbuchstaben 10 Einheiten hoch, ihre Oberkante 2 unter dem Fuss, 1 Kontur.
+     */
+    static final float NAME_KAPPE = 10, NAME_OBEN = 2, NAME_KONTUR = 1;
+    /** So weit reicht der Name unter den Fuss: Oberkante, ein Geviert der Schrift, die Kontur. */
+    static final int NAME_UNTEN = (int) Math.ceil(NAME_OBEN + 16 * NAME_KAPPE / Formen.KAPPE + NAME_KONTUR);
     private static final Logger LOGGER = LoggerFactory.getLogger(HeroicMap.ID);
 
     /** Ein Eintrag der Liste; {@code order} höher liegt oben. */
@@ -796,30 +799,33 @@ final class Ebenen {
             return new float[] {links, -hoehe, rechts, 0};
         }
         float halb = (float) Math.ceil(name / 2);
-        return new float[] {Math.min(links, -halb), -hoehe, Math.max(rechts, halb), Math.round(NAME_ZEILE)};
+        return new float[] {Math.min(links, -halb), -hoehe, Math.max(rechts, halb), NAME_UNTEN};
     }
 
-    /** Wie breit der Kasten um den Namen ist, in Einheiten des GUI. */
+    /** Wie breit der Name samt Kontur ist, in Einheiten des GUI. */
     static float nameBreite(Font font, String name) {
-        return font.width(Component.literal(name).withStyle(Formen.STIL)) * NAME_GROESSE / 16 + 2 * NAME_RAND;
+        return font.width(Component.literal(name).withStyle(Formen.STIL)) * NAME_KAPPE / Formen.KAPPE + 2 * NAME_KONTUR;
     }
 
     /**
-     * Der Name im Kasten direkt unter dem Fuss, mittig, die Grossbuchstaben mittig im Kasten.
-     * Siehe docs/ebenen.md, „Nadeln“.
+     * Der Name mittig unter dem Fuss, wie die Kartenschrift: erst die Kontur als acht versetzte Kopien,
+     * dann die Schrift. Siehe docs/ebenen.md, „Nadeln“.
      */
     private static void name(GuiGraphicsExtractor g, Font font, String name) {
         Component c = Component.literal(name).withStyle(Formen.STIL);
-        float m = NAME_GROESSE / 16, breite = font.width(c) * m;
-        // Wie kasten: halb so breit wie der Kasten um den Namen, aufgerundet.
-        int halb = (int) Math.ceil(breite / 2 + NAME_RAND);
-        g.fill(-halb, 0, halb, Math.round(NAME_ZEILE), NAME_GRUND);
+        float m = NAME_KAPPE / Formen.KAPPE, breite = font.width(c) * m, r = NAME_KONTUR / m;
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         // Die Oberkante der Grossbuchstaben liegt KAPPE − GRUNDLINIE Einheiten der Schrift über dem y des Texts.
-        pose.translate(-breite / 2, (Math.round(NAME_ZEILE) - Formen.KAPPE * m) / 2 + (Formen.KAPPE - Formen.GRUNDLINIE) * m);
+        pose.translate(-breite / 2, NAME_OBEN + (Formen.KAPPE - Formen.GRUNDLINIE) * m);
         pose.scale(m);
-        g.text(font, c, 0, 0, NAME_SCHRIFT, false);
+        for (int k = 0; k < 8; k++) {
+            pose.pushMatrix();
+            pose.translate((float) (r * Math.cos(k * Math.PI / 4)), (float) (r * Math.sin(k * Math.PI / 4)));
+            g.text(font, c, 0, 0, KONTURFARBE, false);
+            pose.popMatrix();
+        }
+        g.text(font, c, 0, 0, SCHRIFTFARBE, false);
         pose.popMatrix();
     }
 

@@ -27,6 +27,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.LongSupplier;
 import java.util.zip.CRC32;
 import javax.imageio.ImageIO;
 import net.minecraft.resources.Identifier;
@@ -272,13 +273,18 @@ class SymboleTest {
     private record Aufbau(Symbole symbole, List<Identifier> abgelegt, List<Identifier> frei) {
     }
 
+    /** Mit einer Uhr, die stillsteht: Ein Bild, das nicht kam, holt er dann nie neu, wie vor dem Wiederholen. */
     private Aufbau aufbau() {
+        return aufbau(() -> 0);
+    }
+
+    private Aufbau aufbau(LongSupplier uhr) {
         List<Identifier> abgelegt = new CopyOnWriteArrayList<>(), freigegeben = new CopyOnWriteArrayList<>();
         Symbole s = new Symbole(Symbole.CLIENT, Executors.newSingleThreadExecutor(), Runnable::run, (uri, bild) -> {
             Identifier id = Identifier.fromNamespaceAndPath("test", "symbol_" + abgelegt.size());
             abgelegt.add(id);
             return id;
-        }, freigegeben::add);
+        }, freigegeben::add, uhr);
         JsonObject liste = new JsonObject();
         liste.addProperty("url", basis.toString());
         s.basis(liste, InetAddress.getLoopbackAddress());
@@ -315,6 +321,38 @@ class SymboleTest {
         }
         s.warte();
         assertEquals(Symbole.MAX_BILDER, anfragen.size());
+    }
+
+    @Test
+    void fehlendesBildNachEinerMinuteNeuHoechstensDreimal() throws Exception {
+        // Wie mod#58: Das Banner fehlt erst (404), etwa weil der Server es nach der Ebene schreibt oder ein Proxy es nicht
+        // durchreicht. Nach 60 s holt der Mod es neu und zeigt es, ohne neue version und ohne neues Login.
+        long[] jetzt = {0};
+        Aufbau a = aufbau(() -> jetzt[0]);
+        Symbole s = a.symbole();
+        assertNull(s.banner("beispiel:staedte", "v1", "images/spaet.png"));
+        s.warte();
+        dateien.put(PFAD + "spaet.png", png(22, 40));
+        jetzt[0] = Symbole.NEU_MS - 1;
+        assertNull(s.banner("beispiel:staedte", "v1", "images/spaet.png"));
+        s.warte();
+        assertEquals(1, anfragen.size());
+        jetzt[0] = Symbole.NEU_MS;
+        assertNull(s.banner("beispiel:staedte", "v1", "images/spaet.png"));
+        s.warte();
+        assertEquals(2, anfragen.size());
+        assertEquals(22, s.banner("beispiel:staedte", "v1", "images/spaet.png").breite());
+        // Ein Bild, das nie kommt: drei Versuche je version, dann keiner mehr.
+        for (int i = 0; i < 6; i++) {
+            jetzt[0] += Symbole.NEU_MS;
+            s.banner("beispiel:staedte", "v1", "images/nie.png");
+            s.warte();
+        }
+        assertEquals(2 + Symbole.VERSUCHE, anfragen.size());
+        // Eine neue version fängt von vorn an.
+        s.banner("beispiel:staedte", "v2", "images/nie.png");
+        s.warte();
+        assertEquals(3 + Symbole.VERSUCHE, anfragen.size());
     }
 
     @Test

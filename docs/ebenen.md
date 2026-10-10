@@ -97,15 +97,16 @@ die Nachrichten das Plugin:
   abzuschneiden wie die Webkarte; ein Kanal weicht so um höchstens eine
   Stufe ab, siehe
   [0007](entscheidungen/0007-toenung-auf-der-grafikkarte.md).
-- **Name** immer, in der Kartenschrift mit 12 Einheiten je Geviert, also
-  Grossbuchstaben rund 8 hoch, wie die Webkarte (`Ebenen.name`). Das
+- **Name** immer, mittig unter dem Fuss, so wie die Kartenschrift
+  aussieht, wie der User es will (`Ebenen.name`): in ihrer Schrift und
+  ihren Vorgaben, `#2B2B2B` mit einer Kontur `#F2E8D0` von 1 Einheit, ohne
+  Kasten. Die Grossbuchstaben sind 10 Einheiten hoch, ihre Oberkante liegt
+  2 unter dem Fuss; der Name reicht 18 Einheiten nach unten
+  (`Ebenen.NAME_UNTEN`). Die Webkarte zeichnet ihn gleich, mit 16 px. Das
   Format sagt: unter dem Fuss, Kartenschrift, feste Grösse, siehe
   [Ebenen](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/ebenen.md)
   und
-  [0097](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entscheidungen/0097-banner-feste-groesse-tafel-beim-zeigen.md). Er steht mittig in einem Kasten direkt unter
-  dem Fuss, 17 Einheiten hoch (Zeilenhöhe 1,4), mit 3 Einheiten Rand zur
-  Seite. Die Grossbuchstaben stehen mittig im Kasten. Farben der UI wie auf
-  der Webkarte: Grund weiss mit Alpha 0,8, Schrift schwarz, ohne Kontur.
+  [0097](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entscheidungen/0097-banner-feste-groesse-tafel-beim-zeigen.md).
 - **Grösse:** fest, auf jeder Stufe gleich, die Nadel in ihrer `size`, in
   Einheiten der Oberfläche des Mods wie die Wegpunkte, siehe
   [0097](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entscheidungen/0097-banner-feste-groesse-tafel-beim-zeigen.md).
@@ -120,8 +121,8 @@ die Nachrichten das Plugin:
   sonst verschwände eine Stadt am Rand.
 - **Vollbildkarte:** der Fuss auf dem Raster der Kacheln wie die
   Wegpunkte. Gezeichnet wird, was den Schirm berühren kann: 16 Einheiten
-  zur Seite und 64 nach oben, so viel wie das grösste Banner, der Name 17
-  nach unten und halb so weit zur Seite, wie sein Kasten breit ist.
+  zur Seite und 64 nach oben, so viel wie das grösste Banner, der Name 18
+  nach unten und halb so weit zur Seite, wie er samt Kontur breit ist.
 - **Reihenfolge:** über allen Formen und aller Kartenschrift jeder Ebene,
   unter Wegpunkten, Mitspielern und dem eigenen Kopf; die Ebenen nach
   `order`, die höhere oben, bei Gleichstand die kleinere `id` oben; in
@@ -180,7 +181,14 @@ Ein Ort als Bild (`banner`), etwa eine Stadt mit dem Banner ihrer Nation
   PNG oder WebP nur als einfaches `VP8L`, genau in seiner Grösse, ein
   Banner höchstens 32 × 64, geprüft am Kopf vor dem Dekodieren
   (`Symbole.hole`). Ein Fehler steht im Log, das Schild bleibt leer, das
-  Banner fehlt.
+  Banner fehlt samt Namen.
+- **Neu geholt** wird ein Bild, das nicht kam, nach 60 s, höchstens dreimal
+  je `version` (`Symbole.NEU_MS`, `Symbole.VERSUCHE`). So kommt ein Bild,
+  das der Server erst nach der Ebene schreibt oder das ein Proxy kurz
+  nicht durchreicht, ohne neues Login. Den Anlass gab mod#58: Ein Proxy
+  vor dem Server reichte `/tiles/` nicht durch, siehe
+  [Ebenen](https://github.com/VonNekyia/heroic-map-renderer-plugin/blob/main/docs/ebenen.md)
+  des Plugins, „Bilder im Mod“.
 - **Freigegeben** wird ein Symbol, wenn seine Ebene eine neue `version`
   bekommt oder aus der Liste fällt, und alle beim Trennen, bei einem neuen
   Login und mit einer neuen Adresse. Danach fragt ein Auftrag für sie, der

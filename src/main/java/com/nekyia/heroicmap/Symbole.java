@@ -26,6 +26,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 import java.util.regex.Pattern;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -76,13 +77,23 @@ final class Symbole {
         Thread t = new Thread(r, "heroicmap-symbole");
         t.setDaemon(true);
         return t;
-    }), r -> Minecraft.getInstance().execute(r), Symbole::lege, t -> Minecraft.getInstance().getTextureManager().release(t));
+    }), r -> Minecraft.getInstance().execute(r), Symbole::lege, t -> Minecraft.getInstance().getTextureManager().release(t),
+            System::currentTimeMillis);
+    /**
+     * Ein Symbol oder Banner, das nicht kam, holt der Mod nach so langer Zeit neu, höchstens so oft je
+     * {@code version}; so kommt ein Bild, das der Server erst nach der Ebene schreibt oder das ein Proxy
+     * kurz nicht durchreicht, ohne neues Login. Siehe docs/ebenen.md, „Symbole“.
+     */
+    static final long NEU_MS = 60_000;
+    static final int VERSUCHE = 3;
 
     /** Die Symbole einer Ebene in einer {@code version}: je Feld und Seite die Textur, null solange sie lädt oder nach einem Fehler. */
     private static final class Felder {
 
         final String version;
         final Map<String, Textur> texturen = new HashMap<>();
+        /** Je Schlüssel, der nicht kam: {wann zuletzt gefragt, wie oft schon}. */
+        final Map<String, long[]> versuche = new HashMap<>();
         boolean voll;
         /** Gesetzt, sobald die Felder frei sind; ein wartender Auftrag für sie fragt dann nicht mehr. */
         volatile boolean frei;
@@ -97,6 +108,7 @@ final class Symbole {
     private final Executor renderThread;
     private final BiFunction<URI, Kacheln.Bild, Identifier> ablage;
     private final Consumer<Identifier> freigabe;
+    private final LongSupplier uhr;
     private final Map<String, Felder> ebenen = new HashMap<>();
     /** Zählt bei jedem Leeren weiter; ein Auftrag aus einer älteren Runde fragt nicht mehr und legt nichts ab. */
     private final AtomicInteger runde = new AtomicInteger();
@@ -116,12 +128,13 @@ final class Symbole {
     private long tafelbilderByte;
 
     Symbole(HttpClient client, ExecutorService holer, Executor renderThread, BiFunction<URI, Kacheln.Bild, Identifier> ablage,
-            Consumer<Identifier> freigabe) {
+            Consumer<Identifier> freigabe, LongSupplier uhr) {
         this.client = client;
         this.holer = holer;
         this.renderThread = renderThread;
         this.ablage = ablage;
         this.freigabe = freigabe;
+        this.uhr = uhr;
     }
 
     /** Die Adresse aus einer gültigen Liste {@code ebenen}: {@code url}, sonst {@code port} an der IP der Verbindung. */
@@ -273,8 +286,16 @@ final class Symbole {
             f = new Felder(version);
             ebenen.put(ebene, f);
         }
+        long jetzt = uhr.getAsLong();
         if (f.texturen.containsKey(schluessel)) {
-            return f.texturen.get(schluessel);
+            Textur t = f.texturen.get(schluessel);
+            long[] v = f.versuche.get(schluessel);
+            // Da, lädt noch, oder nicht gekommen und noch nicht dran oder schon zu oft: so lassen.
+            if (t != null || v == null || v[1] >= VERSUCHE || jetzt - v[0] < NEU_MS) {
+                return t;
+            }
+            v[0] = jetzt;
+            return hole(f, ebene, feld, schluessel, breite, hoehe, hoechstens);
         }
         if (f.texturen.size() >= MAX_BILDER) {
             if (!f.voll) {
@@ -291,27 +312,37 @@ final class Symbole {
             return null;
         }
         f.texturen.put(schluessel, null);
+        return hole(f, ebene, feld, schluessel, breite, hoehe, hoechstens);
+    }
+
+    /** Holt das Bild im eigenen Thread; kommt es nicht, zählt der Versuch mit seiner Zeit. Gibt null, es lädt. */
+    private Textur hole(Felder ziel, String ebene, String feld, String schluessel, int breite, int hoehe, boolean hoechstens) {
         URI uri = uri(basis, ebene, feld);
         if (uri == null) {
             return null;
         }
         int r = runde.get();
         InetAddress server = spielserver;
-        Felder ziel = f;
         holer.execute(() -> {
             // Nach dem Trennen, mit einer neuen Adresse, einer neuen version oder ohne die Ebene fragt ein alter Auftrag nicht mehr.
             if (r != runde.get() || ziel.frei) {
                 return;
             }
             Kacheln.Bild bild = hole(client, uri, server, breite, hoehe, hoechstens, FRIST);
-            if (bild != null) {
-                renderThread.execute(() -> {
-                    if (r == runde.get() && !ziel.frei && ebenen.get(ebene) == ziel && ziel.texturen.containsKey(schluessel)) {
-                        ziel.texturen.put(schluessel, new Textur(ablage.apply(uri, bild), bild.breite(), bild.hoehe()));
-                        stand++;
-                    }
-                });
-            }
+            renderThread.execute(() -> {
+                if (r != runde.get() || ziel.frei || ebenen.get(ebene) != ziel || !ziel.texturen.containsKey(schluessel)) {
+                    return;
+                }
+                if (bild != null) {
+                    ziel.texturen.put(schluessel, new Textur(ablage.apply(uri, bild), bild.breite(), bild.hoehe()));
+                    ziel.versuche.remove(schluessel);
+                    stand++;
+                } else {
+                    long[] v = ziel.versuche.computeIfAbsent(schluessel, k -> new long[2]);
+                    v[0] = uhr.getAsLong();
+                    v[1]++;
+                }
+            });
         });
         return null;
     }
