@@ -139,5 +139,7 @@
   "heroicmap.rahmen.kartograph": "Kartograph",
   "heroicmap.rahmen.kartograph.beschreibung": "Feine Tintenlinie mit Federkielen in den Ecken.",
   "heroicmap.menue.drehen": "Drehen",
+  "heroicmap.menue.verzierungen": "Verzierungen",
+  "heroicmap.menue.verzierungen.beschreibung": "Die Verzierungen in den Ecken und, wenn die Minimap dreht, die Marken N, O, S, W; sie drehen mit. Aus: nur Bänder oder Ring.",
   "heroicmap.menue.chunklinien": "Chunklinien"
 }

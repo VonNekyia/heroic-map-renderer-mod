@@ -18,6 +18,10 @@ mit derselben Rechnung wie der Ring.
 Teilweise abgelöst durch [0008](0008-biom-rahmen-als-vorgabe.md): Die
 Vorgabe ist der Rahmen „biom“, nicht ohne Rahmen.
 
+Teilweise abgelöst durch [0012](0012-verzierungen-drehen-mit.md): Gedreht
+drehen zier und Marken starr mit, die Marken mit festem Bild je Richtung;
+ein Schalter stellt sie ab.
+
 ## Anlass
 
 Der User wünscht sich am 09.10. einen schlanken Rahmen um die Karte mit

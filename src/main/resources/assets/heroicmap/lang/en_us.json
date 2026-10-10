@@ -139,5 +139,7 @@
   "heroicmap.rahmen.kartograph": "Cartographer",
   "heroicmap.rahmen.kartograph.beschreibung": "Fine ink line with quills in the corners.",
   "heroicmap.menue.drehen": "Rotate",
+  "heroicmap.menue.verzierungen": "Ornaments",
+  "heroicmap.menue.verzierungen.beschreibung": "Corner ornaments and, while the minimap rotates, the N, E, S, W marks; they rotate with it. Off: bands or ring only.",
   "heroicmap.menue.chunklinien": "Chunk lines"
 }

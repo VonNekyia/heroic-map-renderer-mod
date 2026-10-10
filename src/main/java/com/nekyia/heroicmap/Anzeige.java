@@ -11,7 +11,7 @@ import net.minecraft.network.chat.Component;
 
 /**
  * Das Untermenü „Einstellungen …“ für Vorlieben der Anzeige: Form, Auflösung, Chunklinien, Drehen,
- * Rahmen, die Ablage der Karten, die Koordinaten unter der Minimap und das Untermenü „Ebenen …“. Die Minimap im HUD bleibt sichtbar, jede Wahl wirkt gleich. Gespeichert wird
+ * Verzierungen, Rahmen, die Ablage der Karten, die Koordinaten unter der Minimap und das Untermenü „Ebenen …“. Die Minimap im HUD bleibt sichtbar, jede Wahl wirkt gleich. Gespeichert wird
  * beim Schliessen. Siehe docs/minimap.md, „Bedienung“.
  */
 final class Anzeige extends Screen {
@@ -38,8 +38,14 @@ final class Anzeige extends Screen {
                 .create(x, y + 24, breite, 20, Component.translatable("heroicmap.menue.massstab"), (b, px) -> m.setzeScale(px)));
         addRenderableWidget(CycleButton.onOffBuilder(m.chunklinien())
                 .create(x, y + 48, breite, 20, Component.translatable("heroicmap.menue.chunklinien"), (b, an) -> m.setzeChunklinien(an)));
+        // Drehen und Verzierungen teilen sich eine Zeile, wie Koordinaten und Ebenen unten.
+        int halb = (breite - 4) / 2;
         addRenderableWidget(CycleButton.onOffBuilder(m.drehen())
-                .create(x, y + 72, breite, 20, Component.translatable("heroicmap.menue.drehen"), (b, an) -> m.setzeDrehen(an)));
+                .create(x, y + 72, halb, 20, Component.translatable("heroicmap.menue.drehen"), (b, an) -> m.setzeDrehen(an)));
+        addRenderableWidget(CycleButton.onOffBuilder(m.verzierungen())
+                .withTooltip(an -> Tooltip.create(Component.translatable("heroicmap.menue.verzierungen.beschreibung")))
+                .create(x + breite - halb, y + 72, halb, 20, Component.translatable("heroicmap.menue.verzierungen"),
+                        (b, an) -> m.setzeVerzierungen(an)));
         addRenderableWidget(CycleButton.builder((String skin) -> Component.translatable("heroicmap.rahmen." + skin), m.skin())
                 .withValues(Skin.NAMEN)
                 .withTooltip(skin -> Tooltip.create(Component.translatable("heroicmap.rahmen." + skin + ".beschreibung")))
@@ -49,7 +55,6 @@ final class Anzeige extends Screen {
                 .withValues(Downloads.Ablage.values())
                 .create(x, y + 120, breite, 20, Component.translatable("heroicmap.menue.ablage"), (b, a) -> m.setzeAblage(a)));
         // Koordinaten und Ebenen teilen sich eine Zeile, so passt das Untermenü auch bei 240 Einheiten Höhe.
-        int halb = (breite - 4) / 2;
         addRenderableWidget(CycleButton.builder((Minimap.Koordinaten k) -> Component.translatable(
                         "heroicmap.menue.koordinaten." + k.name().toLowerCase(Locale.ROOT)), m.koordinaten())
                 .withValues(Minimap.Koordinaten.values())

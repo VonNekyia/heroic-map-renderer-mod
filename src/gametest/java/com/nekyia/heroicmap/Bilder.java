@@ -695,20 +695,22 @@ public final class Bilder implements FabricClientGameTest {
 
     /**
      * Die drehende Minimap bei Gier 30, mit Chunklinien: eckig ohne Rahmen, rund mit „uhr“, eckig mit
-     * „kompass“, nebeneinander. Siehe docs/minimap.md, „Drehen“.
+     * „kompass“, die Verzierungen gedreht, zuletzt „kompass“ ohne Verzierungen, nebeneinander. Siehe
+     * docs/minimap.md, „Drehen“.
      */
     private static void drehen(ClientGameTestContext context, TestServerContext server) {
         server.runCommand("tp @a 0.5 -30 0.5 30 90");
-        String[][] arten = {{Skin.OHNE, "eckig"}, {"uhr", "rund"}, {"kompass", "eckig"}};
+        String[][] arten = {{Skin.OHNE, "eckig", "an"}, {"uhr", "rund", "an"}, {"kompass", "eckig", "an"}, {"kompass", "eckig", "aus"}};
         BufferedImage[] teile = new BufferedImage[arten.length];
         for (int i = 0; i < arten.length; i++) {
             String skin = arten[i][0];
-            boolean rund = arten[i][1].equals("rund");
+            boolean rund = arten[i][1].equals("rund"), verzierungen = arten[i][2].equals("an");
             context.runOnClient(mc -> {
                 Minimap.INSTANZ.setzeDrehen(true);
                 Minimap.INSTANZ.setzeChunklinien(true);
                 Minimap.INSTANZ.setzeSkin(skin);
                 Minimap.INSTANZ.setzeRund(rund);
+                Minimap.INSTANZ.setzeVerzierungen(verzierungen);
             });
             context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getYRot() - 30) < 0.1f && Minimap.INSTANZ.fertig(), 1200);
             context.waitTicks(2);
@@ -738,6 +740,7 @@ public final class Bilder implements FabricClientGameTest {
             Minimap.INSTANZ.setzeChunklinien(false);
             Minimap.INSTANZ.setzeSkin(Skin.OHNE);
             Minimap.INSTANZ.setzeRund(false);
+            Minimap.INSTANZ.setzeVerzierungen(true);
         });
         context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getYRot()) < 0.1f && Minimap.INSTANZ.fertig(), 1200);
     }

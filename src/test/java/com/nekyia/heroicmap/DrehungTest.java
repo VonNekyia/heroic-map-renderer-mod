@@ -265,10 +265,36 @@ class DrehungTest {
         assertEquals(63, Math.hypot(rund[0] - 74, rund[1] - 84), 1e-9);
         double[] eckig = Skin.marke(10, 20, 128, 2, false, ux, uy);
         assertEquals(63, Math.max(Math.abs(eckig[0] - 74), Math.abs(eckig[1] - 84)), 1e-9);
-        assertEquals(Skin.NORDEN, Skin.markeFuer(true, 1, 0));
-        assertEquals(Skin.MARKE, Skin.markeFuer(false, 0, 1));
-        assertEquals(Skin.MARKE_QUER, Skin.markeFuer(false, 1, 0));
-        assertEquals(Skin.MARKE, Skin.markeFuer(false, 1, 1));
+        // Das Bild je Richtung steht fest und dreht mit: N norden, S marke, O und W marke_quer.
+        assertArrayEquals(new int[] {Skin.NORDEN, Skin.MARKE_QUER, Skin.MARKE, Skin.MARKE_QUER}, Skin.MARKE_JE_RICHTUNG);
+    }
+
+    @Test
+    void verzierungenDrehenStarrMit() {
+        Minimap.Rahmen r = new Minimap.Rahmen(10, 20, 128);
+        double[][] diagonalen = {{-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
+        // Ungedreht treffen die Diagonalen die Ecken wie Skin.ecken, eckig wie rund.
+        Drehung.Lage ungedreht = Drehung.Lage.von(0, 0, 0, 0, 0);
+        for (boolean rund : new boolean[] {false, true}) {
+            double[][] ecken = Skin.ecken(10, 20, 128, 128, 2, rund);
+            for (int e = 0; e < 4; e++) {
+                double[] p = Minimap.verzierung(r, 2, rund, ungedreht, diagonalen[e], 2);
+                assertEquals(ecken[e][0], p[0], 0.25, "x " + e);
+                assertEquals(ecken[e][1], p[1], 0.25, "y " + e);
+            }
+        }
+        // Um 30° gedreht: rund auf dem Kreis durch die Mitte der Bänder, bei 45° + 30°; das Bild dreht um denselben Winkel.
+        Drehung.Lage lage = Drehung.Lage.von(Math.toRadians(30), 0, 0, 0, 0);
+        assertEquals(Math.toRadians(30), lage.winkel(), 1e-12);
+        double[] p = Minimap.verzierung(r, 2, true, lage, diagonalen[3], 3);
+        assertEquals(63, Math.hypot(p[0] - 74, p[1] - 84), 0.5);
+        assertEquals(Math.toRadians(75), Math.atan2(p[1] - 84, p[0] - 74), 0.01);
+        // Die Mitte auf ganzen Pixeln, hier bei GUI-Massstab 3.
+        assertEquals(Math.round(p[0] * 3), p[0] * 3, 1e-9);
+        assertEquals(Math.round(p[1] * 3), p[1] * 3, 1e-9);
+        // Eckig auf dem Quadrat durch die Mitte der Bänder.
+        double[] q = Minimap.verzierung(r, 2, false, lage, diagonalen[3], 1);
+        assertEquals(63, Math.max(Math.abs(q[0] - 74), Math.abs(q[1] - 84)), 0.5);
     }
 
     @Test

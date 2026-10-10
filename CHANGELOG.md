@@ -6,6 +6,7 @@ The release notes on GitHub and Modrinth come from here
 
 ## 0.2.19
 
+- **Frame ornaments rotate with the minimap:** while it rotates, the corner ornaments and the N, E, S, W marks turn with the map instead of standing still. A new switch, Ornaments, in Settings turns them off. With a frame the minimap keeps a little more distance from the screen edge, so turned ornaments stay on screen.
 - **Minimap size follows the window:** the minimap keeps its share of the window's shorter side, so a smaller window gives a smaller minimap. At most 256 GUI units, as before.
 
 

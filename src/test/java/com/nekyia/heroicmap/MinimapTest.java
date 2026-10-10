@@ -83,8 +83,8 @@ class MinimapTest {
         assertEquals(new Minimap.Rahmen(4, 360 - 128 - 4, 128), Minimap.rahmen(640, 360, 128, 0, 1, Minimap.RAND));
         // Ein kleiner Schirm kappt die Seite.
         assertEquals(200 - 8, Minimap.rahmen(300, 200, 256, 1, 0, Minimap.RAND).seite());
-        // Mit Rahmen rückt sie um dessen Einrückung vom Rand, etwa 8 bei „uhr“.
-        assertEquals(new Minimap.Rahmen(640 - 128 - 8, 8, 128), Minimap.rahmen(640, 360, 128, 1, 0, 8));
+        // Mit Rahmen rückt sie um dessen Einrückung vom Rand, etwa 11 bei „uhr“.
+        assertEquals(new Minimap.Rahmen(640 - 128 - 11, 11, 128), Minimap.rahmen(640, 360, 128, 1, 0, 11));
     }
 
     @Test
@@ -158,11 +158,14 @@ class MinimapTest {
         vorher.setzeAblage(Downloads.Ablage.HASH);
         vorher.setzeChunklinien(true);
         vorher.setzeDrehen(true);
+        vorher.setzeVerzierungen(false);
         vorher.stelle(20, 30, 200, 640, 360);
         vorher.schreibe(datei);
 
         Minimap nachher = new Minimap();
+        assertTrue(nachher.verzierungen(), "Vorgabe an");
         nachher.lies(datei);
+        assertFalse(nachher.verzierungen());
         assertFalse(nachher.sichtbar());
         assertEquals(4, nachher.aufloesung());
         assertEquals(1, nachher.zoom());

@@ -1,6 +1,6 @@
 ---
 title: Rahmen
-description: Die Rahmen der Minimap als umschaltbare Skins - Wahl im Untermenü, die Vorgabe „biom“ nach dem Biom unter dem Spieler, die sechs festen Skins, ihre Dateien und Quellen, Bänder eckig und rund, Ornamente und Griff im Menü, die wandernden Marken beim Drehen, Abstand zum Rand, Kosten und Bilder.
+description: Die Rahmen der Minimap als umschaltbare Skins - Wahl im Untermenü, die Vorgabe „biom“ nach dem Biom unter dem Spieler, die sechs festen Skins, ihre Dateien und Quellen, Bänder eckig und rund, Ornamente und Griff im Menü, die Marken beim Drehen, Verzierungen, die mitdrehen, und ihr Schalter, Abstand zum Rand, Kosten und Bilder.
 code:
   - src/main/java/com/nekyia/heroicmap/Skin.java
   - src/main/java/com/nekyia/heroicmap/Biom.java
@@ -8,6 +8,8 @@ code:
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/Einstellungen.java
   - src/main/java/com/nekyia/heroicmap/Anzeige.java
+  - src/main/java/com/nekyia/heroicmap/Drehung.java
+  - src/test/java/com/nekyia/heroicmap/DrehungTest.java
   - src/main/resources/heroicmap.accesswidener
   - src/test/java/com/nekyia/heroicmap/SkinTest.java
   - src/gametest/java/com/nekyia/heroicmap/Bilder.java
@@ -41,15 +43,15 @@ wie bisher. Die Vollbildkarte bekommt keinen Rahmen. Warum so:
 
 ## Skins
 
-| Skin | Bänder | Schatten | zier |
-|---|---|---|---|
-| `biom` | 2 | ja | 9 × 9 bis 12 × 12, siehe „Biom“ |
-| `grau` | 3 | nein | 7 × 7 |
-| `holz` | 4 | nein | 7 × 7 |
-| `papier` | 5 | nein | 7 × 7 |
-| `kompass` | 2 | ja | 13 × 13 |
-| `uhr` | 2 | ja | 15 × 15 |
-| `kartograph` | 2 | ja | 13 × 13 |
+| Skin | Bänder | Schatten | zier | `norden` | Abstand zum Rand |
+|---|---|---|---|---|---|
+| `biom` | 2 | ja | 9 × 9 bis 12 × 12, siehe „Biom“ | 15 × 15 | 11 |
+| `grau` | 3 | nein | 7 × 7 | 6 × 7 | 5 |
+| `holz` | 4 | nein | 7 × 7 | 6 × 7 | 5 |
+| `papier` | 5 | nein | 7 × 7 | 6 × 7 | 5 |
+| `kompass` | 2 | ja | 13 × 13 | 17 × 17 | 13 |
+| `uhr` | 2 | ja | 15 × 15 | 17 × 17 | 13 |
+| `kartograph` | 2 | ja | 13 × 13 | 17 × 17 | 13 |
 
 ![Der Rahmen „uhr“ eckig und rund](bilder/rahmen-uhr.png)
 
@@ -114,8 +116,8 @@ Vorgabe.
   in allen acht gleich gebaut, darum liegen die alten zu 1 und die neuen zu
   t darüber; nur die alten Ornamente blenden zu 1 − t aus. So sinkt die
   Deckung der Bänder nie.
-- **Abstand zum Rand:** der grösste aller acht, 6 Einheiten, denn die zier
-  ist 9 bis 12 Pixel gross (`Minimap.rand`). So springt die Minimap beim
+- **Abstand zum Rand:** der grösste aller acht, 11 Einheiten, denn `norden`
+  ist in allen 15 × 15 Pixel gross (`Minimap.rand`). So springt die Minimap beim
   Wechsel nicht; ebenso die Koordinaten darunter.
 - **Kosten:** Das Biom unter dem Spieler liest die Minimap je Frame; die
   Kategorie rechnet sie nur neu, wenn sich das Biom ändert. Während der
@@ -169,7 +171,8 @@ im Atlas des GUI; F3+T und Ressourcenpakete laden ihn neu:
 
 - **Wo:** die Mitte des Bilds auf der Mitte der Bänder, eckig in jeder
   Ecke, rund bei 45° (`Skin.ecken`); die linke obere Ecke bei
-  `⌊p − w / 2 + 0,5⌋` (`Skin.lage`). Nie gedreht.
+  `⌊p − w / 2 + 0,5⌋` (`Skin.lage`). Dreht die Minimap, drehen sie mit,
+  siehe „Drehen“.
 - **Gespiegelt** für die anderen Ecken, oben rechts waagrecht, unten links
   senkrecht, unten rechts beides (`Skin.spiegeltX`, `Skin.spiegeltY`): über
   vertauschte Koordinaten im Atlas, u0 > u1 oder v0 > v1. Die Ecken des
@@ -184,9 +187,10 @@ im Atlas des GUI; F3+T und Ressourcenpakete laden ihn neu:
 - **Im Menü** (`/hmap`) stehen die zier als `zier_aktiv`. An der Ecke zur
   Mitte des Schirms (`Minimap.griffEcke`) steht statt der zier der Griff,
   unter der Maus oder beim Ziehen als `griff_aktiv`; greifen lässt er sich
-  9 × 9 Einheiten um seine Mitte (`Minimap.imGriff`). Der weisse Umriss
-  entfällt mit Rahmen; ohne Rahmen bleiben Umriss und weisser Griff wie
-  bisher.
+  9 × 9 Einheiten um seine Mitte (`Minimap.imGriff`). Der Griff steht
+  immer fest, auch gedreht und mit dem Schalter „Verzierungen“ aus; gedreht
+  liegt er über den mitdrehenden zier. Der weisse Umriss entfällt mit
+  Rahmen; ohne Rahmen bleiben Umriss und weisser Griff wie bisher.
 
 ![Das Menü mit dem Rahmen „uhr“, unten links der Griff](bilder/rahmen-menue.png)
 
@@ -198,17 +202,55 @@ im Atlas des GUI; F3+T und Ressourcenpakete laden ihn neu:
 - **Wo:** von der Mitte der Minimap in die Himmelsrichtung, auf der Mitte
   der Bänder, rund auf dem Kreis, eckig auf dem Quadrat (`Skin.marke`).
   So wandern sie beim Drehen am Rahmen entlang.
-- **Bild:** Norden `norden`, die anderen oben und unten `marke`, links und
-  rechts `marke_quer`, je nachdem, ob die Richtung mehr nach oben oder mehr
-  zur Seite zeigt (`Skin.markeFuer`); im Menü `_aktiv`. Nie gedreht.
-- **Reihenfolge:** Bänder, zier, die Marken, `norden` zuoberst.
+- **Bild:** fest je Richtung, N `norden`, S `marke`, O und W `marke_quer`
+  (`Skin.MARKE_JE_RICHTUNG`); im Menü `_aktiv`. Es dreht mit, siehe
+  „Drehen“.
+- **Reihenfolge:** Bänder, zier, die Marken, `norden` zuoberst, im Menü
+  zuletzt der Griff.
+
+## Drehen
+
+Dreht die Minimap, siehe [Minimap](minimap.md), „Drehen“, drehen zier und
+Marken starr mit der Karte, Lage und Bild; nichts steht fest ausser dem
+Griff im Menü. So hat es der User gewünscht, siehe
+[0012](entscheidungen/0012-verzierungen-drehen-mit.md).
+
+- **Lage:** die zier auf den Diagonalen des Kartenbilds, die Marken auf N,
+  O, S, W, gedreht wie die Karte, auf der Mitte der Bänder; rund auf dem
+  Kreis, eckig auf dem Quadrat, das selbst achsparallel bleibt
+  (`Minimap.verzierung`, `Skin.marke`). Ungedreht trifft die Diagonale
+  genau die Ecke wie `Skin.ecken`.
+- **Bild:** um seine Mitte um denselben Winkel gedreht, über die Pose
+  (`Skin.ornament`); gespiegelt wird weiter über die Koordinaten im Atlas.
+  Der Schatten bleibt auf dem Schirm um (+1, +1).
+- **Pixel:** Die Mitte liegt auf ganzen Pixeln des Schirms, sonst zitterte
+  sie beim Laufen. Gedreht ist die Pixelkunst nicht pixelgenau: Das Spiel
+  rastert sie mit Nearest, die Kanten werden treppig, und beim Drehen
+  flimmern Texel am Rand, wie bei der gedrehten Karte. Ungedreht liegt
+  alles auf ganzen Einheiten wie bisher.
+
+## Verzierungen
+
+Der Schalter „Verzierungen“ im Untermenü „Einstellungen …“, in der Zeile
+von „Drehen“, stellt zier und Marken an oder aus; gespeichert als
+`verzierungen` in `heroicmap.properties`, Vorgabe an. Aus zeigt der Rahmen
+nur seine Bänder oder den Ring, gedreht wie ungedreht. Der Griff im Menü
+bleibt, der Abstand zum Rand auch.
 
 ## Abstand zum Rand
 
 Die Minimap hält 4 Einheiten Abstand zum Rand des Schirms, mit Rahmen
-mindestens die halbe zier, aufgerundet (`Minimap.rand`,
-`Skin.einrueckung`), bei `uhr` 8, bei `biom` 6; so bleibt die zier ganz
-auf dem Schirm.
+mindestens die halbe Diagonale der grössten Verzierung, zier oder Marke,
+aufgerundet (`Minimap.rand`, `Skin.einrueckung`), siehe die Tabelle unter
+„Skins“: bei `uhr` 13, bei `biom` 11. So bleibt jede Verzierung in jeder
+Drehung ganz auf dem Schirm, auch ihr Schatten, denn ihre Mitte liegt auf
+der Mitte der Bänder. Das gilt immer, auch ungedreht und mit dem Schalter
+„Verzierungen“ aus; so springt die Minimap beim Umschalten nicht, siehe
+[0012](entscheidungen/0012-verzierungen-drehen-mit.md). Vorher war es die
+halbe zier, bei `uhr` 8, bei `biom` 6.
+
+![Die rechte obere Ecke des Fensters bei GUI-Massstab 2, links vorher, rechts nachher; oben „biom“, 6 und 11 Einheiten vom Rand, unten „uhr“, 8 und 13](bilder/rahmen-abstand.png)
+
 Der schwarze Umriss entfällt mit Rahmen.
 
 ## Kosten
@@ -217,6 +259,9 @@ Geschätzt, nicht gemessen:
 
 - **Eckig** je Frame höchstens 20 Rechtecke für 5 Bänder und 4 Ornamente,
   mit Schatten 8 Bilder.
+- **Gedreht** wie vorher 4 zier und 4 Marken, mit Schatten 16 Bilder; neu
+  ist je Bild eine gedrehte Pose, und die Minimap rechnet die 8 Punkte je
+  Frame neu (`Minimap.verzierung`).
 - **Rund** je Frame ein Bild für den Ring. Den Ring rechnet der Mod nur,
   wenn sich die Seite ändert, und behält je Skin nur den letzten
   (`Skin.ring`); bei 256 Einheiten sind das 256 × 256 Texel, 256 KiB, und
@@ -235,6 +280,9 @@ Geschätzt, nicht gemessen:
 Der Gametest `Bilder` nimmt jeden Rahmen eckig und rund bei 4 px auf,
 `rahmen-<skin>.png`, und das Menü mit `uhr`, siehe [Minimap](minimap.md),
 „Bilder“.
+`rahmen-abstand.png` setzt die Bildschirmfotos `rahmen-biom-0` und
+`rahmen-uhr-0` dieses Gametests zusammen, aus einem Lauf auf `feef6a5` und
+einem mit 0012, je die rechte obere Ecke.
 
 ![Der Rahmen „grau“](bilder/rahmen-grau.png)
 

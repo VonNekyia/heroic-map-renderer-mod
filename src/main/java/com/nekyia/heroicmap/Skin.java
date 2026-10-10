@@ -20,6 +20,7 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.data.AtlasIds;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
+import org.joml.Matrix3x2fStack;
 import org.slf4j.Logger;
 
 /**
@@ -41,6 +42,8 @@ final class Skin {
     static final int SCHATTEN = 0x80000000;
     /** Die Ornamente: zier, griff und die Marken beim Drehen, je mit {@code _aktiv} eins dahinter. */
     static final int ZIER = 0, GRIFF = 2, NORDEN = 4, MARKE = 6, MARKE_QUER = 8;
+    /** Das Bild der Marke je Richtung N, O, S, W, fest; gedreht dreht es mit. Siehe docs/rahmen.md, „Marken“. */
+    static final int[] MARKE_JE_RICHTUNG = {NORDEN, MARKE_QUER, MARKE, MARKE_QUER};
     private static final String[] TEILE = {"zier", "zier_aktiv", "griff", "griff_aktiv", "norden", "norden_aktiv",
         "marke", "marke_aktiv", "marke_quer", "marke_quer_aktiv"};
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -57,7 +60,7 @@ final class Skin {
     /** Je Band von aussen nach innen: die Farbe oben und links, die unten und rechts. */
     final int[] licht, schatten;
     final boolean mitSchatten;
-    /** Die längere Seite der zier, in Pixeln. */
+    /** Die längere Seite der grössten Verzierung, zier oder Marke, in Pixeln. */
     final int zier;
     private final Identifier[] sprites = new Identifier[TEILE.length];
     private Identifier ring;
@@ -103,9 +106,12 @@ final class Skin {
 
     private static Skin laden(String name) {
         try {
-            TextureAtlasSprite zier = gui().getSprite(sprite(name, "zier"));
-            return lies(name, text(name, "palette.txt"), text(name, "info.txt"),
-                    Math.max(zier.contents().width(), zier.contents().height()));
+            int groesste = 0;
+            for (String teil : new String[] {"zier", "norden", "marke", "marke_quer"}) {
+                TextureAtlasSprite s = gui().getSprite(sprite(name, teil));
+                groesste = Math.max(groesste, Math.max(s.contents().width(), s.contents().height()));
+            }
+            return lies(name, text(name, "palette.txt"), text(name, "info.txt"), groesste);
         } catch (IOException | RuntimeException e) {
             LOGGER.warn("Heroic Map: Rahmen {} unlesbar", name, e);
             return null;
@@ -130,7 +136,7 @@ final class Skin {
     /**
      * Liest {@code palette.txt}: eine Zeile je Band von aussen nach innen, eine Farbe oder zwei,
      * Licht und Schatten; {@code //} beginnt einen Kommentar. Aus {@code info.txt} nur {@code schatten}.
-     * {@code zier} ist die längere Seite der zier in Pixeln. Mindestens zwei Bänder, siehe
+     * {@code zier} ist die längere Seite der grössten Verzierung in Pixeln. Mindestens zwei Bänder, siehe
      * docs/minimap.md, „Form“.
      */
     static Skin lies(String name, String palette, String info, int zier) {
@@ -170,9 +176,12 @@ final class Skin {
         return einrueckung(zier);
     }
 
-    /** Die halbe Seite der zier, aufgerundet: So bleibt die zier in der Ecke ganz auf dem Schirm. */
+    /**
+     * Die halbe Diagonale der grössten Verzierung, aufgerundet: So bleibt sie in jeder Drehung ganz
+     * auf dem Schirm, und die Minimap springt beim Umschalten nicht. Siehe docs/rahmen.md, „Abstand zum Rand“.
+     */
     static int einrueckung(int zier) {
-        return (zier + 1) / 2;
+        return (int) Math.ceil(zier * Math.sqrt(2) / 2);
     }
 
     /** Das Band des Pixels (x, y) im Rechteck w × h, von aussen gezählt. */
@@ -260,18 +269,14 @@ final class Skin {
     }
 
     /**
-     * Wo eine Marke beim Drehen sitzt, in Einheiten des GUI: von der Mitte der Minimap (x, y, Seite
-     * s) in Richtung (ux, uy), auf der Mitte der Bänder; rund auf dem Kreis, eckig auf dem Quadrat.
+     * Wo eine Verzierung beim Drehen sitzt, in Einheiten des GUI: von der Mitte der Minimap (x, y,
+     * Seite s) in Richtung (ux, uy), auf der Mitte der Bänder; rund auf dem Kreis, eckig auf dem
+     * Quadrat. Die Diagonale (±1, ±1) trifft ungedreht genau {@link #ecken}.
      */
     static double[] marke(double x, double y, double s, int baender, boolean rund, double ux, double uy) {
         double h = s / 2 - baender / 2.0, laenge = Math.hypot(ux, uy);
         double t = rund ? h / laenge : h / Math.max(Math.abs(ux), Math.abs(uy));
         return new double[] {x + s / 2 + ux * t, y + s / 2 + uy * t};
-    }
-
-    /** Welches Bild eine Marke nimmt: N die Nordmarke, sonst oben und unten marke, links und rechts marke_quer. */
-    static int markeFuer(boolean norden, double ux, double uy) {
-        return norden ? NORDEN : Math.abs(uy) >= Math.abs(ux) ? MARKE : MARKE_QUER;
     }
 
     /** Die linke obere Ecke eines Bilds der Breite w, dessen Mitte auf p liegen soll. */
@@ -289,20 +294,37 @@ final class Skin {
     }
 
     /**
-     * Zeichnet das Ornament {@code teil} ({@link #ZIER} oder {@link #GRIFF}, plus 1 für aktiv) der
-     * Ecke e mit der Mitte auf (px, py), zu {@code deckung} deckend, mit Schatten, wenn der Skin ihn will. Gespiegelt über
+     * Zeichnet das Ornament {@code teil} (etwa {@link #ZIER} oder {@link #GRIFF}, plus 1 für aktiv) der
+     * Ecke e mit der Mitte auf (px, py), um {@code winkel} gedreht, zu {@code deckung} deckend, mit
+     * Schatten, wenn der Skin ihn will; der Schatten bleibt auf dem Schirm um (+1, +1). Gespiegelt über
      * vertauschte UV: Die Ecken des Quads bleiben in derselben Reihenfolge, das GUI verwirft es nicht.
      */
-    void ornament(GuiGraphicsExtractor g, int teil, int e, double px, double py, float deckung) {
+    void ornament(GuiGraphicsExtractor g, int teil, int e, double px, double py, float deckung, double winkel) {
         TextureAtlasSprite s = gui().getSprite(sprites[teil]);
-        int w = s.contents().width(), h = s.contents().height(), x = lage(px, w), y = lage(py, h);
         boolean griff = teil == GRIFF || teil == GRIFF + 1, sx = spiegeltX(e, griff), sy = spiegeltY(e, griff);
         float u0 = sx ? s.getU1() : s.getU0(), u1 = sx ? s.getU0() : s.getU1();
         float v0 = sy ? s.getV1() : s.getV0(), v1 = sy ? s.getV0() : s.getV1();
         if (mitSchatten) {
-            g.innerBlit(RenderPipelines.GUI_TEXTURED, s.atlasLocation(), x + 1, x + 1 + w, y + 1, y + 1 + h, u0, u1, v0, v1,
-                    ARGB.multiplyAlpha(SCHATTEN, deckung));
+            blit(g, s, px + 1, py + 1, winkel, u0, u1, v0, v1, ARGB.multiplyAlpha(SCHATTEN, deckung));
         }
-        g.innerBlit(RenderPipelines.GUI_TEXTURED, s.atlasLocation(), x, x + w, y, y + h, u0, u1, v0, v1, ARGB.multiplyAlpha(-1, deckung));
+        blit(g, s, px, py, winkel, u0, u1, v0, v1, ARGB.multiplyAlpha(-1, deckung));
+    }
+
+    /**
+     * Das Bild mit der Mitte auf (px, py): ungedreht auf ganzen Einheiten ({@link #lage}), gedreht
+     * starr um seine Mitte; dann werden die Kanten treppig wie die der gedrehten Karte.
+     */
+    private static void blit(GuiGraphicsExtractor g, TextureAtlasSprite s, double px, double py, double winkel,
+            float u0, float u1, float v0, float v1, int farbe) {
+        int w = s.contents().width(), h = s.contents().height();
+        Matrix3x2fStack pose = g.pose();
+        pose.pushMatrix();
+        if (winkel == 0) {
+            pose.translate(lage(px, w), lage(py, h));
+        } else {
+            pose.translate((float) px, (float) py).rotate((float) winkel).translate(-w / 2f, -h / 2f);
+        }
+        g.innerBlit(RenderPipelines.GUI_TEXTURED, s.atlasLocation(), 0, w, 0, h, u0, u1, v0, v1, farbe);
+        pose.popMatrix();
     }
 }
