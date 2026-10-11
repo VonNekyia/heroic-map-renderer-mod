@@ -25,6 +25,7 @@ import net.minecraft.client.MouseHandler;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 
@@ -965,7 +966,7 @@ public final class Bedienung implements FabricClientGameTest {
     }
 
     /**
-     * „Hierher teleportieren“ mit fester Höhe, siehe docs/vollbildkarte.md, „Teleport“: über Wasser in einem Chunk, den
+     * „Hierher teleportieren“ mit fester Höhe, siehe docs/vollbildkarte.md, „Teleportieren“: über Wasser in einem Chunk, den
      * der Client hat, auf die Oberfläche, nicht auf den Grund; und in einen Chunk, den weder Client noch Server geladen
      * haben, mit dem Boden der Karte, den der Mod genau einmal per HTTP holt, auf den Boden der flachen Welt.
      */
@@ -1022,11 +1023,19 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Teleport über Wasser: y " + wasser + " statt rund -54, der Oberfläche");
             }
             // In die Ferne: Den Chunk hat der Client nicht, die Höhe kommt aus der Karte.
-            if (context.computeOnClient(mc -> Teleport.chunk(mc.level, 2000, 2000) != null)) {
+            // Den Cache direkt, nicht Teleport.chunk: Die Probe soll nicht am geprüften Code hängen.
+            if (context.computeOnClient(mc -> mc.level.getChunkSource().getChunk(2000 >> 4, 2000 >> 4, ChunkStatus.FULL, false) != null)) {
                 throw new AssertionError("Der Chunk bei (2000, 2000) ist schon geladen; der Test braucht einen fremden");
             }
             teleportiere(context, maus, k, baum, 2000, 2000);
-            context.waitFor(mc -> Math.abs(mc.player.getX() - 2000.5) < 0.01 && Teleport.chunk(mc.level, 2000, 2000) != null, 600);
+            for (int i = 0; !context.computeOnClient(mc -> Math.abs(mc.player.getX() - 2000.5) < 0.01
+                    && mc.level.getChunkSource().getChunk(2000 >> 4, 2000 >> 4, ChunkStatus.FULL, false) != null); i++) {
+                if (i == 600) {
+                    throw new AssertionError("Teleport in die Ferne: nicht angekommen, der Spieler steht bei "
+                            + context.computeOnClient(mc -> mc.player.position()));
+                }
+                context.waitTick();
+            }
             context.waitTicks(20);
             double y = context.computeOnClient(mc -> mc.player.getY());
             boolean steht = context.computeOnClient(mc -> mc.player.onGround() && mc.level.getBlockState(new BlockPos(2000, -60, 2000)).isAir()

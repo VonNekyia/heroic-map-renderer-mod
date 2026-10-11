@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 /**
  * „Hierher teleportieren“ auf der Vollbildkarte: der Befehl mit fester Höhe, woher die Höhe kommt, und ob der Server
  * den Befehl dem Spieler erlaubt. Der Mod umgeht keine Rechte; die prüft der Server.
- * Siehe docs/vollbildkarte.md, „Teleport“.
+ * Siehe docs/vollbildkarte.md, „Teleportieren“.
  */
 final class Teleport {
 

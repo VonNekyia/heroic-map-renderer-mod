@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.Deflater;
 import org.junit.jupiter.api.Test;
 
-/** Der Befehl zum Teleportieren, woher die Höhe kommt und wann es ihn gibt. Siehe docs/vollbildkarte.md, „Teleport“. */
+/** Der Befehl zum Teleportieren, woher die Höhe kommt und wann es ihn gibt. Siehe docs/vollbildkarte.md, „Teleportieren“. */
 class TeleportTest {
 
     private static final Teleport.Quelle BODEN = new Teleport.Quelle("ground", 1, -64, 319);
