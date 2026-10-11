@@ -6,6 +6,7 @@ code:
   - src/gametest/resources/fabric.mod.json
   - src/gametest/java/com/nekyia/heroicmap/Bedienung.java
   - src/gametest/java/com/nekyia/heroicmap/Wache.java
+  - src/gametest/java/com/nekyia/heroicmap/Abschluss.java
   - gradle/libs.versions.toml
   - gradle/wrapper/gradle-wrapper.properties
   - .github/workflows/ci.yml
@@ -128,6 +129,49 @@ eines Debuggers greift sie genauso.
 | `Messung` | nur mit `-Pmessung=<datei>`: Zeit je Chunk und Frametime mit und ohne Minimap, siehe [Minimap](minimap.md), „Kosten“ |
 | `Server` | nur mit `-Pserver=<adresse>`: von Ende zu Ende gegen einen echten Paper-Server mit dem Plugin, Angebot, voller Download des kleinsten Massstabs des ersten Baums, jeder Dialog mit Ja, die Vollbildkarte als Bild `server-karte`; siehe unten |
 | `Uebernahme` | nur mit `-Puebernahme=<datei>`: was eine Kachel der Vollbildkarte den Render-Thread kostet, siehe [Vollbildkarte](vollbildkarte.md), „Kacheln“ |
+
+### Schliessen der Welt
+
+Jede Einzelspielerwelt der Gametests schliesst mit
+dem Schritt `Abschluss.langsamerTakt`, im `try` hinter der Welt: `tick rate
+1`, dann 2 Ticks warten, dann `close`. Das umgeht einen Hänger der
+Gametest-API, der in der CI einmal den Job „Gametests (sodium)“ anhielt
+(Lauf 38137337377 zu mod#119). Belegt per javap am Client 26.3 und an
+`fabric-client-gametest-api-v1` 6.0.7:
+
+- **Client:** `close` ruft `mc.disconnect` in einer Aufgabe des Tests. Die
+  Fabric API verschiebt das (`MinecraftMixin.deferDisconnect`) und führt es
+  in `postRunTasks` erst nach `enterPhase(TICK)` aus. Darin wartet
+  `IntegratedServer.halt` über `executeBlocking` ohne Frist auf eine
+  Aufgabe des Servers.
+- **Server:** `runServer` setzt das Fenster für Aufgaben,
+  `delayedTasksMaxNextTickTimeNanos = max(jetzt + nanosecondsPerTick,
+  nextTickTimeNanos)`, direkt vor `waitUntilNextTick`. Genau dort hängt die
+  Fabric API ihr `postRunTasks` mit dem Phaser ein; das Warten dort frisst
+  das Fenster. `waitUntilNextTick` führt danach eine Aufgabe nur aus,
+  solange Zeit bleibt (`shouldRun`: Tick der Aufgabe + 3 < `tickCount` oder
+  `haveTime`).
+- **Der Hänger:** Kommt die Aufgabe von `halt` nach dem Fenster, bei 20
+  Ticks je Sekunde 50 ms, geht der Server zum nächsten `enterPhase(TEST)`
+  und wartet auf den Client, der Client in `join` auf ihn. Mit Sodium
+  dauert das Aufräumen vor `halt` länger. Die Wache zeigte genau das: den
+  Render-Thread in `executeBlocking`, den Server in `enterPhase` aus
+  `postRunTasks`, den Test in `close`.
+- **Kein Update hilft:** Die neueste Fabric API für 26.3, 0.162.0, bringt
+  `fabric-client-gametest-api-v1` 6.0.8+4be74c3f5d, dasselbe Commit wie
+  6.0.7, die Klassen bytegleich.
+- **Der Schritt** gibt dem Server mit 1 Tick je Sekunde, dem kleinsten
+  Takt von `/tick rate`, ein Fenster von 1 s statt 50 ms. Das kostet je
+  Welt gut 1 s.
+- **Die Grenze:** Das mildert nur. Dauert das Aufräumen vor `halt` länger
+  als das Fenster, hängt es doch; dann meldet es die Wache. Ein Fix gehört
+  in die Gametest-API; ob wir ihn dort vorschlagen, entscheidet der User.
+- **Gegenprobe**, ein Versuch nur auf dem Rechner: Ein Mixin im Testmod
+  schläft 300 ms am Kopf von `IntegratedServer.halt` auf dem Render-Thread,
+  wie ein langsames Aufräumen. Ohne den Schritt hängt das Schliessen, die
+  Wache meldet es nach 120 s mit demselben Stapel wie in der CI; mit dem
+  Schritt schliesst die Welt, und alle Gametests sind grün. Der Mixin kommt
+  nicht nach main.
 
 ### Maustasten
 

@@ -21,7 +21,7 @@ public final class Api implements FabricClientGameTest {
             throw new AssertionError("Der Entrypoint heroicmap lief nicht oder put nahm die Ebene nicht an: " + ProbeEbene.angenommen);
         }
         pruefe(context, "nach dem Start", true);
-        try (TestSingleplayerContext spiel = context.worldBuilder().create()) {
+        try (TestSingleplayerContext spiel = context.worldBuilder().create(); var _ = Abschluss.langsamerTakt(context, spiel)) {
             spiel.getConnection().waitForChunksRender();
             // In der Liste der Vollbildkarte, mit Schalter wie eine Ebene vom Server.
             Path baum = Bilder.testsatz();

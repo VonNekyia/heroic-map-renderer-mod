@@ -21,7 +21,7 @@ public final class Anmeldung implements FabricClientGameTest {
                 "Spieler " + (client.player != null) + ", Verbindung über den Spieler " + (client.getConnection() != null)
                         + ", Verbindung des Levels " + (level.connection != null)
                         + ", Server gleich " + (Downloads.server() == level.connection.getServerData())));
-        try (TestSingleplayerContext spiel = context.worldBuilder().create()) {
+        try (TestSingleplayerContext spiel = context.worldBuilder().create(); var _ = Abschluss.langsamerTakt(context, spiel)) {
             spiel.getConnection().waitForChunksRender();
         }
         String soll = "Spieler false, Verbindung über den Spieler false, Verbindung des Levels true, Server gleich true";

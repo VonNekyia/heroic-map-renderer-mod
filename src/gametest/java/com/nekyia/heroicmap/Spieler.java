@@ -39,7 +39,7 @@ public final class Spieler implements FabricClientGameTest {
 
     @Override
     public void runTest(ClientGameTestContext context) {
-        try (TestSingleplayerContext spiel = context.worldBuilder().create()) {
+        try (TestSingleplayerContext spiel = context.worldBuilder().create(); var _ = Abschluss.langsamerTakt(context, spiel)) {
             spiel.getConnection().waitForChunksRender();
             spiel.getServer().runCommand("time set noon");
             spiel.getServer().runCommand("weather clear");
