@@ -136,12 +136,48 @@ auf den Namen heftet die ganze Ebene an (mod#103).
 
 ### Teleportieren
 
-- **Befehl** (`Teleport.befehl`): `execute in <dimension> positioned <x+0,5>
-  0 <z+0,5> positioned over motion_blocking_no_leaves run tp @s ~ ~ ~`. Der
-  Server liest die Höhe selbst und setzt den Spieler auf den obersten
-  Block, der Bewegung aufhält, ohne Laub, auch in Chunks, die der Client
-  nicht hat. Der Mod schickt ihn mit `sendCommand`; darin stehen nur die
-  Dimension des Spielers und die beiden Zahlen, kein Text vom Server.
+- **Befehl** (`Teleport.befehl`): `execute in <dimension> run tp @s
+  <x+0,5> <y> <z+0,5>`, mit fester Höhe, so geht er auch in Chunks, die
+  weder Client noch Server geladen haben. So hat es der User gewünscht
+  (mod#111), siehe [0019](entscheidungen/0019-teleport-mit-fester-hoehe.md).
+  Der Mod schickt ihn mit `sendCommand`; darin stehen nur die Dimension des
+  Spielers und die drei Zahlen, kein Text vom Server.
+- **Die Höhe,** in dieser Reihenfolge (`Teleport.los`):
+  1. **Beim Client:** Hat er den Chunk, aus dessen Heightmap
+     `MOTION_BLOCKING_NO_LEAVES`: der erste freie Block über dem obersten,
+     der Bewegung oder Flüssigkeit hält, ohne Laub; über Wasser also die
+     Oberfläche. Belegt per javap in 26.3: das Prädikat
+     `is(BLOCKS_MOTION_IN_HEIGHTMAP_NO_LEAVES) || !getFluidState().isEmpty()`,
+     und der Server schickt diese Heightmap mit jedem Chunk
+     (`Heightmap.Usage.CLIENT`). Ob der Client den Chunk hat, fragt der Mod
+     den Cache (`Teleport.chunk`), denn `ClientLevel.hasChunk` sagt immer
+     ja (per javap).
+  2. **Aus der Karte:** sonst der Boden ohne Laub (`ground`, je Block), sonst
+     die Höhen (`heights`, je 4 × 4) aus `map.json` des Satzes, wie der
+     Renderer sie ab 0.9.0 schreibt, der oberste Block plus 1 (`Teleport.quelle`,
+     `Teleport.stehen`).
+     - **Nur in der Ablage einer Wurzel,** `../ground/{x}.{z}.bin`; dann
+       liegt die Datei auf dem Server unter `/tiles/ground/<rx>.<rz>.bin`,
+       neben den Ebenen und mit derselben Basis wie sie, aus der letzten
+       gültigen Liste. Ein anderes Muster nimmt der Mod nicht.
+     - **Je Klick höchstens eine Region,** per HTTP, mit denselben Grenzen
+       wie die Bilder der Ebenen, siehe [Ebenen](ebenen.md), „Symbole“:
+       Adresse geprüft, ohne Weiterleitung, höchstens 1 MiB gepackt
+       (`Teleport.MAX_GEPACKT`) in 10 s, entpackt genau 512 KiB beim Boden
+       und 32 KiB bei den Höhen (`Teleport.hole`, `Teleport.entpacke`). Der
+       Download legt die Dateien nicht ab.
+     - **Keine Höhe** sind −32768, ein Wert ausserhalb von `minY` bis `maxY`
+       und jeder Fehler beim Holen.
+     - **Über einem Stamm** von 1 × 1 nennt der Boden durch seinen Median
+       die Erde darunter; dort landet der Spieler im Stamm. Selten, darum
+       so gelassen.
+  3. **Ohne Höhe,** etwa auf der selbst gezeichneten Karte oder ohne
+     Webserver, der alte Befehl `execute in <dimension> positioned <x+0,5>
+     0 <z+0,5> positioned over motion_blocking_no_leaves run tp @s ~ ~ ~`,
+     und der Chat sagt „Höhe unbekannt …“. Der Server liest dann die Höhe
+     selbst. Hat er den Chunk nicht geladen, weist er den Befehl ab, „That
+     position is not loaded“, und nichts geschieht; so in der Gegenprobe des
+     Gametests `Bedienung`. Bis 0.2.35 galt dieser Befehl immer.
 - **Nur mit Recht:** Den Eintrag „Hierher teleportieren“ gibt es nur, wenn der Befehlsbaum des
   Servers `execute` und `tp` enthält (`Teleport.erlaubt`); der Server
   schickt nur Befehle, die der Spieler nutzen darf. Die Rechte prüft er
@@ -150,7 +186,8 @@ auf den Namen heftet die ganze Ebene an (mod#103).
   (`dimensionType().hasCeiling()`), etwa dem Nether, fehlt der Eintrag. Der
   oberste Block wäre dort das Dach aus Grundgestein.
 - **Das Menü** bleibt ganz auf dem Schirm, auch bei grossem GUI-Massstab.
-- Nach dem Klick schliesst sich die Karte.
+- **Nach dem Klick** schliesst sich die Karte. Holt der Mod die Höhe, geht
+  der Befehl ab, sobald sie da ist, höchstens 10 s später.
 
 ## Welcher Satz
 

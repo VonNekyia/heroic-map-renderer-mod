@@ -1,19 +1,31 @@
 package com.nekyia.heroicmap;
 
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.blaze3d.platform.InputConstants;
+import com.sun.net.httpserver.HttpServer;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.zip.Deflater;
 import net.fabricmc.fabric.api.client.gametest.v1.TestInput;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.minecraft.client.MouseHandler;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 
@@ -65,6 +77,7 @@ public final class Bedienung implements FabricClientGameTest {
             context.runOnClient(mc -> mc.gui.setScreen(null));
 
             karte(context, maus, k);
+            teleport(context, spiel.getServer(), maus, k);
         } finally {
             context.runOnClient(mc -> Wegpunkte.INSTANZ.leeren());
             // Das Menü speichert beim Schliessen; danach wieder die Vorgabe.
@@ -950,6 +963,127 @@ public final class Bedienung implements FabricClientGameTest {
     /** Die Breite der Bänder des Rahmens, den die Minimap gerade zeichnet. */
     private static int baender(ClientGameTestContext context) {
         return context.computeOnClient(mc -> Minimap.INSTANZ.skinJetzt().baender());
+    }
+
+    /**
+     * „Hierher teleportieren“ mit fester Höhe, siehe docs/vollbildkarte.md, „Teleportieren“: über Wasser in einem Chunk, den
+     * der Client hat, auf die Oberfläche, nicht auf den Grund; und in einen Chunk, den weder Client noch Server geladen
+     * haben, mit dem Boden der Karte, den der Mod genau einmal per HTTP holt, auf den Boden der flachen Welt.
+     */
+    private static void teleport(ClientGameTestContext context, TestServerContext server, TestInput maus, int k) {
+        // Ein Becken aus Glas, das Wasser darin 6 hoch: der Grund bei y = -61, die Oberfläche im Block -55.
+        server.runCommand("fill 20 -60 20 26 -55 26 glass");
+        server.runCommand("fill 21 -60 21 25 -55 25 water");
+        context.waitTicks(5);
+        // Der Boden der Karte: überall -61, der oberste Block der flachen Welt, für die Region um (2000, 2000).
+        byte[] werte = new byte[2 * 512 * 512];
+        for (int i = 0; i < werte.length; i += 2) {
+            werte[i] = (byte) -61;
+            werte[i + 1] = (byte) (-61 >> 8);
+        }
+        byte[] gepackt = pack(werte);
+        AtomicInteger abrufe = new AtomicInteger();
+        HttpServer http;
+        try {
+            http = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        http.createContext("/tiles/", austausch -> {
+            abrufe.incrementAndGet();
+            boolean da = austausch.getRequestURI().getPath().equals("/tiles/ground/3.3.bin");
+            austausch.sendResponseHeaders(da ? 200 : 404, da ? gepackt.length : -1);
+            if (da) {
+                austausch.getResponseBody().write(gepackt);
+            }
+            austausch.close();
+        });
+        http.start();
+        Path baum = Bilder.testsatz();
+        try {
+            // Der Testsatz nennt den Boden in der Ablage einer Wurzel, wie der Renderer ab 0.9.0.
+            Path datei = baum.resolve("4").resolve("map.json");
+            JsonObject karte = JsonParser.parseString(Files.readString(datei, StandardCharsets.UTF_8)).getAsJsonObject();
+            karte.addProperty("ground", "../ground/{x}.{z}.bin");
+            karte.addProperty("groundCell", 1);
+            karte.addProperty("minY", -64);
+            karte.addProperty("maxY", 319);
+            Files.writeString(datei, karte.toString(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        try {
+            context.runOnClient(mc -> Symbole.INSTANZ.basis(JsonParser.parseString("{\"url\":\"http://127.0.0.1:" + http.getAddress().getPort()
+                    + "/tiles\"}").getAsJsonObject(), InetAddress.getLoopbackAddress()));
+            // Über Wasser: der erste freie Block über der Oberfläche, -54, nicht über dem Grund, -60.
+            teleportiere(context, maus, k, baum, 23, 23);
+            context.waitFor(mc -> Math.abs(mc.player.getX() - 23.5) < 0.01 && Math.abs(mc.player.getZ() - 23.5) < 0.01, 200);
+            double wasser = context.computeOnClient(mc -> mc.player.getY());
+            if (Math.abs(wasser - -54) > 0.5) {
+                throw new AssertionError("Teleport über Wasser: y " + wasser + " statt rund -54, der Oberfläche");
+            }
+            // In die Ferne: Den Chunk hat der Client nicht, die Höhe kommt aus der Karte.
+            // Den Cache direkt, nicht Teleport.chunk: Die Probe soll nicht am geprüften Code hängen.
+            if (context.computeOnClient(mc -> mc.level.getChunkSource().getChunk(2000 >> 4, 2000 >> 4, ChunkStatus.FULL, false) != null)) {
+                throw new AssertionError("Der Chunk bei (2000, 2000) ist schon geladen; der Test braucht einen fremden");
+            }
+            teleportiere(context, maus, k, baum, 2000, 2000);
+            for (int i = 0; !context.computeOnClient(mc -> Math.abs(mc.player.getX() - 2000.5) < 0.01
+                    && mc.level.getChunkSource().getChunk(2000 >> 4, 2000 >> 4, ChunkStatus.FULL, false) != null); i++) {
+                if (i == 600) {
+                    throw new AssertionError("Teleport in die Ferne: nicht angekommen, der Spieler steht bei "
+                            + context.computeOnClient(mc -> mc.player.position()));
+                }
+                context.waitTick();
+            }
+            context.waitTicks(20);
+            double y = context.computeOnClient(mc -> mc.player.getY());
+            boolean steht = context.computeOnClient(mc -> mc.player.onGround() && mc.level.getBlockState(new BlockPos(2000, -60, 2000)).isAir()
+                    && mc.level.getBlockState(new BlockPos(2000, -61, 2000)).is(Blocks.GRASS_BLOCK));
+            if (Math.abs(y - -60) > 0.01 || !steht || abrufe.get() != 1) {
+                throw new AssertionError("Teleport in die Ferne: y " + y + " statt -60, auf dem Gras mit Luft an den Füssen " + steht
+                        + ", Abrufe " + abrufe.get() + " statt 1");
+            }
+        } finally {
+            http.stop(0);
+            context.runOnClient(mc -> mc.gui.setScreen(null));
+        }
+    }
+
+    /** Öffnet die Karte über (x, z), Rechtsklick in die Mitte, ein Klick auf „Hierher teleportieren“; sie schliesst sich. */
+    private static void teleportiere(ClientGameTestContext context, TestInput maus, int k, Path baum, int x, int z) {
+        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
+        context.waitTicks(5);
+        context.runOnClient(mc -> ((Karte) mc.gui.screen()).zeige(x, z));
+        context.waitTicks(2);
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+        warte250();
+        fahre(context, maus, k, breite / 2.0, hoehe / 2.0);
+        maus.pressMouse(RECHTS);
+        context.waitTicks(2);
+        int[] ziel = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).ziel());
+        if (ziel == null || ziel[0] != x || ziel[1] != z) {
+            throw new AssertionError("Das Menü steht nicht über (" + x + ", " + z + "): " + Arrays.toString(ziel));
+        }
+        // Das Menü steht an der Maus; der erste Eintrag liegt wenige Einheiten rechts unter ihr.
+        maus.moveCursor(6 * k, 6 * k);
+        context.waitTick();
+        maus.pressMouse(LINKS);
+        context.waitFor(mc -> mc.gui.screen() == null, 40);
+    }
+
+    private static byte[] pack(byte[] daten) {
+        Deflater deflater = new Deflater();
+        deflater.setInput(daten);
+        deflater.finish();
+        ByteArrayOutputStream aus = new ByteArrayOutputStream();
+        byte[] puffer = new byte[8192];
+        while (!deflater.finished()) {
+            aus.write(puffer, 0, deflater.deflate(puffer));
+        }
+        deflater.end();
+        return aus.toByteArray();
     }
 
     /** Das Spiel zählt einen Klick bis 250 ms nach dem letzten als Doppelklick, nach der Uhr, nicht nach Ticks. */

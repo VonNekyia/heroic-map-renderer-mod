@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.36
+
+- **"Teleport here" works in places no one has loaded yet.** The mod now picks the height itself: from the chunk if your game has it, otherwise from the ground of the server's map, one region fetched on demand. Before, the server looked for the ground itself and refused where its chunks were not loaded. Without a known height, the old way stays, with a note in the chat.
+
 ## 0.2.35
 
 - **Maps are stored under the server's name,** such as play.example.net, when the server reports one, whatever address you typed; existing maps move there once, without a new download.
