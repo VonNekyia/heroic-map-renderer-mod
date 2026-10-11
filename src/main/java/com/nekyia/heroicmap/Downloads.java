@@ -90,6 +90,15 @@ final class Downloads {
         switch (json.has("typ") ? json.get("typ").getAsString() : "") {
             case "angebot" -> {
                 angebot = json;
+                // Der Name gilt ab dem nächsten Betreten einer Welt, nicht mitten in dieser. Siehe docs/download.md, „Ablage“.
+                ServerData server = server();
+                if (server != null) {
+                    String name = json.has("server") && json.get("server").isJsonPrimitive() ? json.get("server").getAsString() : null;
+                    if (name != null && Servername.gueltig(name) == null) {
+                        LOGGER.warn("Heroic Map: Name des Servers kein Hostname, übergangen");
+                    }
+                    Servername.merke(wurzel(), server.ip, Servername.gueltig(name));
+                }
                 baeume().forEach(b -> zieheUm(b.id()));
             }
             case "freigabe" -> freigabe(json);
@@ -129,6 +138,8 @@ final class Downloads {
 
     /** Zählt jeden Login mit; ein Download merkt sich die Sitzung, aus der er stammt. */
     private int sitzung;
+    /** Der Name vom Server für die Welt, in der der Spieler steht, gelesen beim Betreten; null ohne. */
+    private static volatile String servername;
 
     /** Hält eine freigabe, bis der Hash ihrer Dimension bekannt ist. */
     void warte(String baum, JsonObject json) {
@@ -459,13 +470,13 @@ final class Downloads {
         ServerData server = server();
         String dimension = text(eintrag(baum), "dimension");
         return server == null || dimension == null ? null
-                : ordner(wurzel(), Minimap.INSTANZ.ablage(), server.ip, welten(), dimension, baum);
+                : ordner(wurzel(), Minimap.INSTANZ.ablage(), server.ip, servername, welten(), dimension, baum);
     }
 
     /** Der Ordner des Baums {@code baum} der Dimension, oder null, solange ihr Hash unbekannt ist. */
-    static Path ordner(Path wurzel, Ablage ablage, String adresse, Welten welten, String dimension, String baum) {
+    static Path ordner(Path wurzel, Ablage ablage, String adresse, String name, Welten welten, String dimension, String baum) {
         Long hash = welten.hash(Welten.server(adresse), dimension);
-        return hash == null || !Freigabe.baum(baum) ? null : wurzel.resolve(weltOrdner(ablage, adresse, hash)).resolve(baum);
+        return hash == null || !Freigabe.baum(baum) ? null : wurzel.resolve(weltOrdner(ablage, adresse, name, hash)).resolve(baum);
     }
 
     /** Der Fehler, wenn der Spieler die Dimension des Baums auf diesem Backend noch nicht betreten hat, sonst null. */
@@ -508,6 +519,20 @@ final class Downloads {
         if (server == null || level == null) {
             return;
         }
+        // Der Name vom Server gilt ab hier; der Ordner nach der Adresse zieht einmal zu ihm um, nicht mitten in einem Download.
+        servername = Servername.lies(wurzel(), server.ip);
+        long seed = level.getBiomeManager().biomeZoomSeed;
+        Path alt = wurzel().resolve(weltOrdner(Minimap.INSTANZ.ablage(), server.ip, null, seed));
+        Path neu = wurzel().resolve(weltOrdner(Minimap.INSTANZ.ablage(), server.ip, servername, seed));
+        if (!reihe.belegtUnter(alt.toString())) {
+            try {
+                if (Servername.zieheUm(alt, neu)) {
+                    LOGGER.info("Heroic Map: {} nach {} umgezogen", alt, neu);
+                }
+            } catch (IOException e) {
+                LOGGER.warn("Heroic Map: {} nicht nach {} umgezogen", alt, neu, e);
+            }
+        }
         welten().merke(Welten.server(server.ip), level.dimension().identifier().toString(), level.getBiomeManager().biomeZoomSeed);
         baeume().forEach(b -> zieheUm(b.id()));
         for (String baum : List.copyOf(wartend.keySet())) {
@@ -530,7 +555,7 @@ final class Downloads {
             return null;
         }
         long seed = level.getBiomeManager().biomeZoomSeed;
-        return wurzel().resolve(server != null ? weltOrdner(Minimap.INSTANZ.ablage(), server.ip, seed)
+        return wurzel().resolve(server != null ? weltOrdner(Minimap.INSTANZ.ablage(), server.ip, servername, seed)
                 : einzelspieler(intern.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize().getFileName().toString(), seed));
     }
 
@@ -542,17 +567,24 @@ final class Downloads {
         return name("einzelspieler_" + speicherordner) + "/welt-" + HexFormat.of().toHexDigits(seed);
     }
 
+    /** Wie {@link #weltOrdner(Ablage, String, String, long)}, ohne Namen vom Server. */
+    static String weltOrdner(Ablage ablage, String adresse, long seed) {
+        return weltOrdner(ablage, adresse, null, seed);
+    }
+
     /**
      * Der Pfad einer Welt unter {@code heroicmap/}: {@code welt-<hash>}, davor der Host oder Host
-     * und Port. {@code seed} ist der Hash des Seeds, den der Server dem Client schickt.
+     * und Port; meldet der Server einen {@code name}, steht er statt des Hosts. {@code seed} ist der
+     * Hash des Seeds, den der Server dem Client schickt.
      */
-    static String weltOrdner(Ablage ablage, String adresse, long seed) {
+    static String weltOrdner(Ablage ablage, String adresse, String name, long seed) {
         String welt = "welt-" + HexFormat.of().toHexDigits(seed);
         ServerAddress a = ServerAddress.parseString(adresse);
+        String host = name != null ? name : a.getHost();
         return switch (ablage) {
             case HASH -> welt;
-            case IP -> name(a.getHost()) + "/" + welt;
-            case IP_PORT -> name(a.getHost() + "_" + a.getPort()) + "/" + welt;
+            case IP -> name(host) + "/" + welt;
+            case IP_PORT -> name(host + "_" + a.getPort()) + "/" + welt;
         };
     }
 

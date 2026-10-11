@@ -6,6 +6,8 @@ code:
   - src/main/java/com/nekyia/heroicmap/Downloads.java
   - src/main/java/com/nekyia/heroicmap/Freigabe.java
   - src/main/java/com/nekyia/heroicmap/Reihe.java
+  - src/main/java/com/nekyia/heroicmap/Servername.java
+  - src/test/java/com/nekyia/heroicmap/ServernameTest.java
   - src/main/java/com/nekyia/heroicmap/Laden.java
   - src/main/java/com/nekyia/heroicmap/Adresse.java
   - src/test/java/com/nekyia/heroicmap/LadenTest.java
@@ -39,6 +41,15 @@ der Mod mit den Kacheln zeigt, steht unter [Vollbildkarte](vollbildkarte.md).
   (`Kanal`). Der Mod meldet ihn für beide Richtungen an; Fabric sagt es dem
   Server mit `minecraft:register`, und das Plugin schickt dann sein
   `angebot`.
+- **Name des Servers:** Das `angebot` kann oben ein Feld `server` tragen,
+  etwa `"server": "play.example.net"`, den Namen, den der Server in seiner
+  Konfiguration hat (heroic-map-renderer-plugin#67). Nur ein echter
+  Hostname, wie das Plugin ihn schickt: Teile aus `a–z`, `0–9` und
+  Bindestrich, nicht am Rand, je höchstens 63 Zeichen, durch einzelne Punkte
+  getrennt, zusammen höchstens 253; nie `.`, `..` oder `a..b`
+  (`Servername.gueltig`). Sonst übergeht der Mod ihn mit einer Zeile im
+  Log; ein Server ohne das Plugin könnte so etwas schicken. Ohne Konfiguration fehlt das
+  Feld. Wofür, steht unter „Ablage“.
 - **Empfangen:** `angebot` merkt sich der Mod, `freigabe` reiht einen
   Download ein, `abgelehnt` zeigt er dem Spieler, mit `wieder` als
   Uhrzeit. `spieler` nennt die Mitspieler, siehe [Minimap](minimap.md),
@@ -165,6 +176,15 @@ Ohne Unterbefehl öffnet `/hmap` das Menü, siehe [Minimap](minimap.md), „Bedi
   nicht abgesichert, und ohne HTTPS kann ein Lauscher das Token mitlesen;
   der Deckel der Bytes je Token begrenzt, was er damit lädt.
 - **Kacheln** prüft der Mod über ihre Grösse, nicht ihren Inhalt.
+- **Name des Servers** (`server` im `angebot`): Durch die erlaubten Zeichen
+  und die Bereinigung wie bei einer Adresse wird er genau ein Ordner unter
+  `heroicmap/`, darunter nur `welt-<hash>`; mehr kann ein Server so nicht
+  anlegen. Ein Server kann einen fremden Namen melden. Den Ordner einer Welt
+  teilte er mit dem echten Server aber nur bei gleichem Hash des Seeds, und
+  auch dann könnte er nur Kacheln vorlegen, die der echte Server beim
+  nächsten Abgleich über ihr ETag ersetzt. Eine Sperre, die einen Namen nur
+  einer Adresse zugesteht, gibt es nicht: Sie bräche genau den Fall, dass
+  Domain, IP und `0` im selben Ordner landen sollen (mod#113).
 
 ## Ablauf
 
@@ -240,6 +260,29 @@ Einzelheiten stehen im Log.
   | Hash | `hash` | `welt-<hash>` |
   | IP + Hash, die Vorgabe | `ip` | `<host>/welt-<hash>` |
   | IP:Port + Hash | `ip_port` | `<host>_<port>/welt-<hash>` |
+
+  Meldet der Server einen Namen, siehe „Kanal“, steht er bei `ip` und
+  `ip_port` statt `<host>`; der Port kommt weiter aus der eingetippten
+  Adresse. So landet derselbe Server immer im selben Ordner, ob jemand
+  `play.example.net`, die IP oder `0` eintippt, und die Kartenliste zeigt
+  den Namen. So will es der User (mod#113).
+  - **Gedächtnis:** `heroicmap/namen.txt`, je Zeile die eingetippte Adresse,
+    klein, und der Name (`Servername`). Ein `angebot` mit Namen trägt ihn
+    ein, eines ohne nimmt ihn heraus. Ohne `angebot`, etwa auf einem Server
+    ohne Baum zum Download, bleibt der gemerkte Name.
+  - **Ab dem nächsten Betreten einer Welt,** nicht mitten in einer
+    (`Downloads.weltBetreten`): Wegpunkte, Ebenen, eigene Karte und ein
+    laufender Download hängen am Ordner. Die erste Sitzung mit einem Namen
+    bleibt im Ordner der Adresse.
+  - **Umzug:** Beim Betreten zieht der Ordner der Welt nach der Adresse
+    einmal zum Namen um, mit allem darin, als ein Umbenennen
+    (`Servername.zieheUm`, `ATOMIC_MOVE`), ohne neuen Download. Nur, wenn
+    der neue Ordner noch fehlt und kein Download in den alten läuft
+    (`Reihe.belegtUnter`); sonst beim nächsten Betreten wieder. Ein leerer
+    Ordner der Adresse, etwa `heroicmap/0/`, geht mit. Gibt es den neuen
+    schon, etwa weil derselbe Server unter zwei Adressen eingetragen ist,
+    bleibt der alte in der Kartenliste zum Löschen; zusammengeführt wird
+    nicht.
 
   Im Einzelspieler gilt die Wahl nicht, dort ist `<welt>`
   `einzelspieler_<speicherordner>/welt-<hash>`, `<speicherordner>` der
