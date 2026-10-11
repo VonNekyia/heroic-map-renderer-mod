@@ -42,6 +42,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [0012](entscheidungen/0012-marken-statt-verzierungen.md): Der Rahmen zeigt nur die Marken N, O, S, W, genordet fest, gedreht starr mitdrehend, ohne zier; ein Schalter stellt sie ab, der Abstand zum Rand mit der halben Diagonale; löst 0005 in Ornamenten und Marken ab.
 - [0013](entscheidungen/0013-groesse-als-anteil-des-schirms.md): Die Seite der Minimap als Anteil der kürzeren Seite des Schirms, sie folgt dem Fenster; alte Einstellungen ohne Sprung.
 - [0016](entscheidungen/0016-zweiter-haken-an-der-welt.md): Ein zweiter Haken an `ClientLevel` neben dem an `LevelExtractor.setSectionDirty`, weil Sodium jenen umgeht; gesetzte Truhen erscheinen sofort.
+- [0017](entscheidungen/0017-gametests-in-der-ci-auch-mit-sodium.md): Die Gametests laufen in der CI unter Xvfb, ohne und mit Sodium in der Version des Modpacks, fest mit Prüfsumme und nur für die Gametests.
 - [0018](entscheidungen/0018-api-fuer-client-mods.md): Ebenen anderer Fabric-Mods über `HeroicMapClientApi`, im JSON der Ebenen vom Server, englische Namen, Entrypoint `heroicmap` und Modrinth Maven; bei gleicher Kennung gilt der Server.
 - [0014](entscheidungen/0014-eigene-karte-mit-massstab.md): Die eigene Karte mit 1, 2 oder 4 Pixeln je Block, fest bis zum Löschen, der Baum wie ein Download; löst 0004 im Massstab ab.
 - [0015](entscheidungen/0015-ordner-fuer-einzelspielerwelten.md): Ein Ordner der Welt auch im Einzelspieler, unter heroicmap/ nach Speicherordner und Hash, nicht im Speicherordner der Welt; löst 0004 im Einzelspieler ab.
@@ -54,6 +55,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [2026-10-09, Minimap, Drehen](messungen/2026-10-09-minimap-drehen.md): was die drehende Minimap je Frame kostet, eckig und rund, im Stand und im Flug; rund gedreht ist billiger als ungedreht.
 - [2026-10-09, Minimap, Vieleck auch ungedreht](messungen/2026-10-09-minimap-vieleck.md): was die Minimap je Frame kostet, seit sie auch ungedreht mit dem Vieleck zeichnet, gegen main; rund so billig wie eckig.
 - [2026-10-10, Minimap, Verzierungen drehen mit](messungen/2026-10-10-minimap-verzierungen.md): was die Minimap mit dem Rahmen „kompass“ je Frame kostet, seit die Verzierungen mitdrehen, gegen main im Wechsel A B A B unter Grundlast; unverändert.
+- [2026-10-11, Strahl über angehefteten Wegpunkten](messungen/2026-10-11-strahl.md): was 64 Strahlen je Frame kosten, mit und ohne „Effekte in der Welt“, drei Läufe im Wechsel mit dem Schleier.
 - [2026-10-09, Selbst gezeichnete Karte, Schreiben der Kacheln](messungen/2026-10-09-selbst-schreiben.md): was `Kachelwerk.schreibe` je Durchlauf kostet und wie viele PNG es je Stunde schreibt, für eine Farm und einen Flug.
 - [2026-10-10, Selbst gezeichnete Karte, Platz je Massstab](messungen/2026-10-10-selbst-platz-je-massstab.md): wie viele PNG die eigene Karte je Stunde schreibt und wie viel Platz sie braucht, bei 1, 2 und 4 px; Zeiten folgen.
 - [2026-10-06, Vollbildkarte, Übernahme der Kacheln](messungen/2026-10-06-vollbildkarte-uebernahme.md): was eine Kachel den Render-Thread kostet, mit und ohne Kopieren der Pixel dort, und wie schnell der Dekoder liefert.

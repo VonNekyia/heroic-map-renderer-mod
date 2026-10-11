@@ -145,6 +145,9 @@ Leuchtfeuers in seiner Farbe, so wünscht es der Maintainer (mod#36).
 - **Schalter** „Effekte in der Welt“ im Untermenü „Einstellungen …“, Vorgabe
   an, siehe [Minimap](minimap.md), „Bedienung“. Aus zeichnet der Mod
   keinen Strahl und keinen Schleier.
+- **Kosten:** 64 Strahlen, die Grenze, kosten je Frame im Median 0,05 bis
+  0,06 ms und im p95 0,07 bis 0,12 ms, gemessen am 11.10., siehe
+  [Strahl, Kosten je Frame](messungen/2026-10-11-strahl.md).
 - **Ohne Allokation im Mod je Frame:** Die Indizes der Gewählten liegen in
   einem festen Feld, die Liste der Wegpunkte ist eine feste Sicht, und den
   Namen der Dimension rechnet `Strahlen` nur beim Wechsel. Der Strahl des
