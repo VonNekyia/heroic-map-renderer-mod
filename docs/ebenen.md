@@ -726,4 +726,3 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 
 ## Was noch fehlt
 
-- **Strahl und Schleier** für Angeheftetes in der Welt (#36, PR 2 und 3).

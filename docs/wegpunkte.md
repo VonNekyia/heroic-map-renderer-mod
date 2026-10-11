@@ -1,6 +1,6 @@
 ---
 title: Wegpunkte
-description: Wegpunkte auf der Vollbildkarte setzen und löschen, eigene Linien und Regionen aus Wegpunkten, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
+description: Wegpunkte auf der Vollbildkarte setzen und löschen, eigene Linien und Regionen aus Wegpunkten, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Wegpunkte.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
@@ -8,6 +8,8 @@ code:
   - src/main/java/com/nekyia/heroicmap/Mitspieler.java
   - src/main/java/com/nekyia/heroicmap/Kanal.java
   - src/main/java/com/nekyia/heroicmap/Strahlen.java
+  - src/main/java/com/nekyia/heroicmap/Schleier.java
+  - src/test/java/com/nekyia/heroicmap/SchleierTest.java
   - src/test/java/com/nekyia/heroicmap/StrahlenTest.java
   - src/gametest/java/com/nekyia/heroicmap/Messung.java
   - src/main/java/com/nekyia/heroicmap/Tafeln.java
@@ -142,7 +144,7 @@ Leuchtfeuers in seiner Farbe, so wünscht es der Maintainer (mod#36).
   (`Strahlen.MAX_STRAHLEN`), die ersten in der Reihe der Wegpunkte.
 - **Schalter** „Effekte in der Welt“ im Untermenü „Einstellungen …“, Vorgabe
   an, siehe [Minimap](minimap.md), „Bedienung“. Aus zeichnet der Mod
-  keinen Strahl. Derselbe Schalter gilt später für den Schleier.
+  keinen Strahl und keinen Schleier.
 - **Kosten:** 64 Strahlen, die Grenze, kosten je Frame im Median 0,05 bis
   0,06 ms und im p95 0,07 bis 0,12 ms, gemessen am 11.10., siehe
   [Strahl, Kosten je Frame](messungen/2026-10-11-strahl.md).
@@ -151,6 +153,76 @@ Leuchtfeuers in seiner Farbe, so wünscht es der Maintainer (mod#36).
   Namen der Dimension rechnet `Strahlen` nur beim Wechsel. Der Strahl des
   Spiels selbst legt je Aufruf zwei kleine Objekte an, wie bei jedem
   Leuchtfeuer.
+
+## Schleier
+
+Am Rand angehefteter Regionen und Kreise steht in der Welt ein Schleier in
+ihrer Farbe, so wünscht es der Maintainer (mod#36): unten auf dem Gelände,
+nach oben immer durchsichtiger.
+
+![Der Schleier einer angehefteten Region am Hang und der Strahl eines angehefteten Wegpunkts; Szene `schleier` des Gametests](bilder/schleier.png)
+
+- **Welche:** dieselben Formen wie auf der Minimap, siehe „Anheften“:
+  angeheftete Flächen und Kreise der sichtbaren Ebenen, angeheftete eigene
+  Regionen aus Wegpunkten und alte Rechtecke, in der Dimension des Spielers
+  (`Wegpunkte.minimap`). Linien bekommen keinen Schleier, auch eigene
+  nicht, entschieden vom Reviewer (mod#79).
+- **Farbe:** der Rand der Form, ohne sichtbaren Rand ihre Füllung ohne
+  Alpha; eine eigene Region in ihrer Farbe (`Schleier.farbe`).
+- **Form:** je Stück der Kante ein senkrechtes Viereck. Die Kanten teilt
+  der Mod, wo sie eine ganze Zahl in x oder z kreuzen, so liegt jedes Stück
+  in einem Block (`Schleier.teile`). Ein Kreis wird ein Vieleck mit Sehnen
+  von höchstens einem Block, nur über den Bogen beim Spieler
+  (`Schleier.bogen`); so kostet ein Kreis von 100 000 Blöcken nur sein
+  Stück in Sichtweite.
+- **Höhe:** 4 Blöcke (`Schleier.HOEHE`). Unten ist der Schleier zur Hälfte
+  so deckend wie seine Farbe (`Schleier.DECKUNG`), oben ganz durchsichtig,
+  dazwischen linear.
+- **Gelände:** Die Ecken unten stehen auf der Heightmap
+  `MOTION_BLOCKING_NO_LEAVES` des Clients, also unter dem Laub und auf der
+  Oberfläche von Wasser, wie der Strahl. Der Client hat `WORLD_SURFACE`,
+  `MOTION_BLOCKING` und `MOTION_BLOCKING_NO_LEAVES`, die drei Heightmaps
+  mit `Heightmap.Usage.CLIENT` (`Heightmap.Types.sendToClient`, belegt per
+  javap am Client 26.3). Liegt eine Ecke auf der Grenze mehrerer Blöcke,
+  nimmt der Mod den höchsten, so taucht der Schleier an keiner Stufe ein
+  (`Schleier.hoehe`). So folgt er dem Hang.
+- **Gezeichnet** mit `RenderTypes.debugQuads` aus
+  `LevelRenderEvents.COLLECT_SUBMITS`: Ecken mit Farbe, gemischt wie
+  Durchsichtiges, mit Tiefentest, aber ohne in die Tiefe zu schreiben, und
+  ohne Culling, also von beiden Seiten zu sehen
+  (`RenderPipelines.DEBUG_FILLED_SNIPPET`: `DepthStencilState` mit
+  `GREATER_THAN_OR_EQUAL` und ohne Schreiben, `withCull(false)`; belegt per
+  javap).
+- **Gebaut** nur bei einer Änderung (`Schleier.baue`): andere Ebenen oder
+  Wegpunkte (`Ebenen.stand`, `Wegpunkte.stand`), andere Dimension oder
+  Sichtweite, der Spieler mehr als 16 Blöcke vom Ursprung des letzten Baus
+  (`Schleier.NEU_AB`), oder ein Chunk unter dem Schleier ändert sich, über
+  denselben Haken `setSectionDirty` wie die Minimap. Neu gebaut wird
+  höchstens alle 500 ms (`Schleier.NEU_FRUEHESTENS_MS`); nur der erste Bau
+  und eine andere Dimension warten nicht. Gebaut wird bis zur Sichtweite
+  und 16 Blöcke darüber, so reicht der Schleier, bis der Spieler so weit
+  gegangen ist. Über einem Chunk, der nicht geladen ist, fehlt er, bis der
+  Chunk kommt.
+- **Je Frame** reicht der Mod nur die fertigen Ecken weiter, relativ zum
+  Ursprung des Baus; das Objekt, das sie schreibt, legt er einmal an.
+- **Grenze:** höchstens 5 000 Vierecke (`Schleier.MAX_VIERECKE`), die
+  nächsten zuerst, gemessen an der Mitte des Stücks. Darüber warnt das Log
+  einmal, bis ein Bau wieder darunter liegt.
+- **Kosten,** gemessen am 11.10., siehe
+  [Schleier, Kosten je Frame](messungen/2026-10-11-schleier.md):
+
+  | Fall | je Frame, Median | ein Bau, Median |
+  |---|---|---|
+  | 3 Regionen, 2 220 Vierecke | +0,16 bis +0,24 ms | 1,3 bis 1,4 ms |
+  | 47 Regionen, an der Grenze von 5 000 | +0,32 bis +0,47 ms | 4,4 bis 4,7 ms |
+
+  Je Frame mit 64 Strahlen. Ein Bau liest vor allem Höhen aus der Welt,
+  70 bis 80 % seiner Zeit. Darum hat der Reviewer nach dem Profil die
+  Grenze von 20 000 auf 5 000 gesenkt und den Bau auf höchstens alle
+  500 ms gesetzt; bei 20 000 waren es 0,8 bis 2,1 ms je Frame und 5,2 ms je
+  Bau. Sammeln und Sortieren gehen über alle Stücke in Reichweite, nicht
+  nur die nächsten 5 000; bei 47 Regionen sind das rund 2 ms des Baus.
+- **Schalter** „Effekte in der Welt“, siehe „Strahl“.
 
 ## Grösse
 
@@ -239,8 +311,8 @@ Ebenen vom Server. Linien vom Server nicht, entschieden vom Reviewer; eigene
 Linien schon (mod#79). Ebenso Nadeln und Banner,
 so will es der User (mod#71); auf der Minimap stehen sie nur angeheftet,
 siehe [Ebenen](ebenen.md), „Nadeln“. Angeheftete Wegpunkte bekommen in der
-Welt einen Strahl, siehe „Strahl“; der Schleier an Regionen kommt in einem
-eigenen PR.
+Welt einen Strahl, siehe „Strahl“, angeheftete Regionen und Kreise einen
+Schleier am Rand, siehe „Schleier“.
 
 ![Minimap genordet und gedreht: nur der angeheftete Kreis und die angeheftete eigene Region, die übrigen Formen fehlen; Szene `formen` des Gametests](bilder/formen.png)
 
@@ -341,6 +413,10 @@ eigenen PR.
   Zur ganzen Ebene: `ganzeEbeneAnheftenUndLoesen` und
   `ganzeEbeneHaeltDieGrenzen`. Zu Formen aus Wegpunkten: `festeIdsAuchAusAltenDateien`,
   `formenAusWegpunktenGehenMitUndBleiben` und `formenGrenzenUndAlteDatei`.
+- `SchleierTest`: Teilen an jeder ganzen Zahl, auch rückwärts und durch
+  eine Ecke; ein Rechteck ein Stück je Block, nur im Kasten; ein Kreis in
+  Sehnen über den Bogen, ein Kreis von 100 000 Blöcken nur beim Kasten;
+  die Höhe vom höchsten berührten Block; die nächsten zuerst; die Farbe.
 - `StrahlenTest`: nur angeheftete Wegpunkte dieser Dimension in Sichtweite,
   genau an der Grenze, höchstens 64, die ersten der Reihe nach; breiter in
   der Ferne, durchs Fernrohr nicht.
@@ -382,9 +458,11 @@ eigenen PR.
   drei Wegpunkten
   auf Minimap und Vollbildkarte, siehe [Ebenen](ebenen.md), „Flächen,
   Kreise und Linien“; in der Szene `strahl` die Strahlen zweier
-  angehefteter Wegpunkte (`strahl.png`).
-- Gametest `Messung` mit `-PmessungEffekte=true`: was die Strahlen je Frame
-  kosten, siehe „Strahl“, „Kosten“.
+  angehefteter Wegpunkte (`strahl.png`); in der Szene `schleier` der
+  Schleier einer angehefteten Region an einem Hang aus Stufen und ein Strahl
+  (`schleier.png`).
+- Gametest `Messung` mit `-PmessungEffekte=true`: was Strahlen und
+  Schleier je Frame kosten und wie lange ein Bau des Schleiers dauert.
 
 ## Was fehlt
 

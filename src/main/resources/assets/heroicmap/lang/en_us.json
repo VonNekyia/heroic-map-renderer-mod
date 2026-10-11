@@ -150,5 +150,5 @@
   "heroicmap.menue.spieler.durchsichtig": "Faded",
   "heroicmap.menue.spieler.beschreibung": "How you show on the minimap and the full map: head with arrow, the arrow alone, or the head half see-through with arrow.",
   "heroicmap.menue.effekte": "World effects",
-  "heroicmap.menue.effekte.beschreibung": "A beacon beam above each pinned waypoint in view distance"
+  "heroicmap.menue.effekte.beschreibung": "A beacon beam above each pinned waypoint and a veil along the edge of pinned regions"
 }

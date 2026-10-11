@@ -126,6 +126,7 @@ public final class Bilder implements FabricClientGameTest {
             formen(context, server);
             orte(context, server);
             strahl(context, server);
+            schleier(context, server);
             selbst(context);
             tueren(context, server);
         }
@@ -1063,6 +1064,52 @@ public final class Bilder implements FabricClientGameTest {
                 throw new UncheckedIOException(e);
             }
         }
+        server.runCommand("tp @a 0.5 -30 0.5 0 90");
+        context.runOnClient(mc -> {
+            Wegpunkte.INSTANZ.leeren();
+            Minimap.INSTANZ.setzeSichtbar(true);
+        });
+        context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - 0.5) < 0.1 && Minimap.INSTANZ.fertig(), 1200);
+    }
+
+    /**
+     * Der Schleier einer angehefteten eigenen Region aus Wegpunkten am Hang, dazu der Strahl eines angehefteten
+     * Wegpunkts, im Blick von Südwesten; die Minimap aus. Der Hang steht östlich der Szene und geht danach
+     * wieder weg. Siehe docs/wegpunkte.md, „Schleier“.
+     */
+    private static void schleier(ClientGameTestContext context, TestServerContext server) {
+        // Eine Treppe aus Gras nach Osten, je zwei Blöcke eine Stufe höher.
+        for (int i = 0; i < 8; i++) {
+            server.runCommand("fill " + (44 + 2 * i) + " -60 -8 60 " + (-60 + i) + " 8 grass_block");
+        }
+        context.runOnClient(mc -> {
+            // Eine eigene Region aus vier Wegpunkten (docs/wegpunkte.md, „Formen aus Wegpunkten“).
+            List<Integer> ids = new ArrayList<>();
+            for (int[] e : new int[][] {{38, -4}, {56, -4}, {56, 4}, {38, 4}}) {
+                Wegpunkte.INSTANZ.setze(Ebenen.UEBERWELT, e[0], e[1]);
+                ids.add(Wegpunkte.INSTANZ.punkte().stream().filter(q -> q.x() == e[0] && q.z() == e[1]).findFirst().orElseThrow().id());
+            }
+            if (!Wegpunkte.INSTANZ.setzeForm(ids)) {
+                throw new AssertionError("Region aus vier Wegpunkten nicht gesetzt");
+            }
+            Wegpunkte.INSTANZ.umschalten(Wegpunkte.INSTANZ.eigeneFormen().getLast());
+            Wegpunkte.INSTANZ.setze(Ebenen.UEBERWELT, 50, 0);
+            Wegpunkte.INSTANZ.umschalten(Wegpunkte.INSTANZ.punkte().getLast());
+            Minimap.INSTANZ.setzeSichtbar(false);
+        });
+        server.runCommand("tp @a 30.5 -50 16.5 -125 22");
+        context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - 30.5) < 0.1, 200);
+        context.waitFor(mc -> Schleier.INSTANZ.vierecke() > 0, 200);
+        context.waitTicks(20);
+        Path bild = context.takeScreenshot(TestScreenshotOptions.of("schleier").disableCounterPrefix());
+        if (!AUSGABE.isEmpty()) {
+            try {
+                Files.copy(bild, Path.of(AUSGABE, "schleier.png"), StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        server.runCommand("fill 44 -60 -8 60 -53 8 air");
         server.runCommand("tp @a 0.5 -30 0.5 0 90");
         context.runOnClient(mc -> {
             Wegpunkte.INSTANZ.leeren();

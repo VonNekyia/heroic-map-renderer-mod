@@ -44,6 +44,8 @@ public final class Messung implements FabricClientGameTest {
     private static final String RAHMEN = System.getProperty("heroicmap.messung.rahmen", Skin.OHNE);
     /** Mit {@code -PmessungEffekte=true} nur die Läufe zu den Effekten in der Welt, siehe docs/wegpunkte.md, „Strahl“. */
     private static final boolean NUR_EFFEKTE = Boolean.getBoolean("heroicmap.messung.effekte");
+    /** Mit {@code -PmessungRegionen=<n>} so viele angeheftete Regionen für den Schleier, gleich verteilt bis 188 Blöcke halbe Seite. */
+    private static final int REGIONEN = Integer.getInteger("heroicmap.messung.regionen", 47);
     private static final int SICHTWEITE = 12;
     private static final int RUNDEN = 3;
     private static final int STAND_TICKS = 100;
@@ -240,9 +242,12 @@ public final class Messung implements FabricClientGameTest {
     }
 
     /**
-     * Was die Strahlen je Frame kosten: {@link Strahlen#MAX_STRAHLEN} angeheftete Wegpunkte auf einer
-     * Spirale um den Spieler, 16 bis 142 Blöcke weit, also alle in Sichtweite; 4 px, Zoom 4, freie
-     * Bildrate, im Stand; Frametime ohne und mit Effekten in der Welt, im Wechsel.
+     * Was die Effekte in der Welt je Frame kosten: erst {@link Strahlen#MAX_STRAHLEN} angeheftete
+     * Wegpunkte auf einer Spirale um den Spieler, 16 bis 142 Blöcke weit, also alle in Sichtweite; dann
+     * dazu 47 angeheftete eigene Regionen als Quadrate um den Spieler, halbe Seite 4 bis 188 Blöcke, so
+     * hat der Schleier mehr als {@link Schleier#MAX_VIERECKE} Stücke, die Spitze. 4 px, Zoom 4, freie
+     * Bildrate, im Stand; Frametime ohne und mit Effekten im Wechsel, und wie lange ein Bau des Schleiers
+     * dauert.
      */
     private void effekte(ClientGameTestContext context) {
         context.runOnClient(mc -> {
@@ -268,6 +273,40 @@ public final class Messung implements FabricClientGameTest {
             for (boolean an : new boolean[] {false, true}) {
                 context.runOnClient(mc -> Minimap.INSTANZ.setzeEffekte(an));
                 frames(context, art + " effekte=" + (an ? "an" : "aus") + " stand", true, runde, () -> context.waitTicks(STAND_TICKS));
+            }
+        }
+
+        context.runOnClient(mc -> {
+            String welt = mc.level.dimension().identifier().toString();
+            // Bei 47 halbe Seiten 4, 8, … 188 Blöcke: mehr Stücke als die Grenze des Schleiers, die Spitze.
+            for (int i = 1; i <= REGIONEN; i++) {
+                int s = Math.round(188f * i / REGIONEN);
+                Wegpunkte.INSTANZ.setze(welt, -s, -s, s - 1, s - 1);
+                Wegpunkte.INSTANZ.umschalten(Wegpunkte.INSTANZ.regionen().getLast());
+            }
+            Minimap.INSTANZ.setzeEffekte(true);
+        });
+        context.waitTicks(20);
+        int vierecke = context.computeOnClient(mc -> Schleier.INSTANZ.vierecke());
+        // Der Bau allein, zehnmal hintereinander auf dem Render-Thread.
+        long[] bau = context.computeOnClient(mc -> {
+            long[] z = new long[10];
+            int weit = mc.options.getEffectiveRenderDistance() * 16;
+            for (int i = 0; i < z.length; i++) {
+                long t0 = System.nanoTime();
+                Schleier.INSTANZ.baue(mc.level, mc.player.getBlockX(), mc.player.getBlockZ(), weit, System.currentTimeMillis());
+                z[i] = System.nanoTime() - t0;
+            }
+            return z;
+        });
+        Arrays.sort(bau);
+        zeile("schleier regionen=%d vierecke=%d bau n=%d median=%.3f ms max=%.3f ms", REGIONEN, vierecke, bau.length, ms(quantil(bau, 0.5)),
+                ms(bau[bau.length - 1]));
+        String mitSchleier = art + " schleier=" + vierecke;
+        for (int runde = 1; runde <= RUNDEN; runde++) {
+            for (boolean an : new boolean[] {false, true}) {
+                context.runOnClient(mc -> Minimap.INSTANZ.setzeEffekte(an));
+                frames(context, mitSchleier + " effekte=" + (an ? "an" : "aus") + " stand", true, runde, () -> context.waitTicks(STAND_TICKS));
             }
         }
         context.runOnClient(mc -> {
