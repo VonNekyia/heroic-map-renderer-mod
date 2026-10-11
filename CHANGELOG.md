@@ -7,7 +7,7 @@ The release notes on GitHub and Modrinth come from here
 ## 0.2.39
 
 - **"Finish shape" says so when it cannot save.** If the shape you were adding corners to was deleted in the meantime, the new corners were dropped silently; now a note at the bottom left tells you.
-- **The info panel on the full map keeps a sensible size at large GUI scales.** It now has its own whole-number scale, at most about a fifth of the window wide; at 1920 × 1080 it looks the same with GUI scale Auto (4) as with 2. In small windows it is smaller than before.
+- **The info panel on the full map keeps a sensible size at large GUI scales.** It now has its own whole-number scale, at most about a fifth of the window wide; at 1920 × 1080 it looks the same with GUI scale Auto (4) as with 2, and it never gets smaller than at GUI scale 2 unless you chose 1.
 
 ## 0.2.38
 

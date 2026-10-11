@@ -593,7 +593,8 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   Einheit der Tafel (`Tafel.massstab`). Er ist der grösste bis zum
   GUI-Massstab, bei dem die breiteste Tafel, 200 Inhalt und 2 × 6 Rand, also
   212 Einheiten, höchstens 23 % der Breite des Fensters und 212 Einheiten
-  höchstens die Hälfte seiner Höhe einnehmen; mindestens 1. Gezeichnet mit der
+  höchstens die Hälfte seiner Höhe einnehmen; nie unter 2, ausser der
+  GUI-Massstab selbst ist 1. Gezeichnet mit der
   Pose g'/GUI-Massstab, so liegen die Pixel der Schrift ganz und scharf.
   So hat es der Reviewer entschieden, siehe
   [0020](entscheidungen/0020-tafel-mit-eigenem-massstab.md): Bei Auto,
@@ -601,9 +602,11 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   der Breite ein (mod#121).
   - **Geeicht** auf 1920 × 1080 bei GUI-Massstab 2: dort bleibt g' = 2,
     die Tafel wie bisher. 23 % statt 22 %, sonst fiele das auf 1.
+  - **Untergrenze 2,** vom Reviewer: Mit 1 wäre die Tafel in kleinen
+    Fenstern zu klein, ihre Schrift kleiner als die der Knöpfe. Kleiner als
+    bei GUI-Massstab 2 wird sie nur, wenn der Spieler selbst 1 gewählt hat.
   - **Werte:** 1920 × 1080 und 2560 × 1440 geben höchstens 2, 3840 × 2160
-    höchstens 4, 1280 × 720 und 854 × 480 geben 1. In kleinen Fenstern ist
-    die Schrift der Tafel so kleiner als die der Knöpfe.
+    höchstens 4, 854 × 480 und 1280 × 720 geben 2, wie bisher bei GS 2.
   - **Lage und Abstände** rechnen in Einheiten der Tafel; Treffer der Maus,
     Scrollen und Klicks rechnen ihren Kasten zurück in Einheiten des GUI.
 - **Gesetzt** (`Tafel.setze`) in Einheiten der Tafel, mit der Schrift

@@ -23,10 +23,15 @@ und 3; das war das Problem, kein Fehler im Zeichnen.
 
 - **Ein eigener, ganzer Massstab** g' bis zum GUI-Massstab: der grösste, bei
   dem die breiteste Tafel höchstens etwa 22 % der Breite und die Hälfte der
-  Höhe des Fensters in Pixeln einnimmt, mindestens 1. Gezeichnet mit der
+  Höhe des Fensters in Pixeln einnimmt. Gezeichnet mit der
   Pose g'/GUI-Massstab, so bleiben die Pixel der Schrift ganz und scharf.
 - **Geeicht** so, dass 1920 × 1080 bei GUI-Massstab 2 unverändert bleibt;
   dafür steht im Code 23 % statt 22 %.
+- **Untergrenze** g' ≥ min(GUI-Massstab, 2): Kleiner als bei GUI-Massstab 2
+  wird die Tafel nur, wenn der Spieler selbst 1 gewählt hat. Ohne sie wäre
+  die Tafel in Fenstern bis 1280 × 720 mit g' = 1 zu klein gewesen, die
+  Schrift kleiner als auf den Knöpfen; nachgezogen vom Reviewer nach den
+  Bildern.
 - **Bilder** bleiben bei der Regel der Infotafel, in Pixeln von g' statt
   des GUI-Massstabs.
 - **Treffer der Maus** auf die Tafel rechnen ihren Kasten zurück in
@@ -46,6 +51,6 @@ Entschieden vom Reviewer am 11.10.
 
 ## Folgen
 
-- In kleinen Fenstern, 1280 × 720 und kleiner, ist g' = 1 und die Schrift
-  der Tafel kleiner als die der Knöpfe.
+- In kleinen Fenstern bleibt die Tafel wie bei GUI-Massstab 2, auch wenn
+  sie dann mehr als ein Fünftel der Breite einnimmt.
 - Siehe [Ebenen](../ebenen.md), „Infotafel“.
