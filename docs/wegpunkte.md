@@ -310,7 +310,10 @@ sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
   Region ist die erste die nächste; an der letzten einer Linie hängt sie
   hinten an. „Form fertig“ speichert an derselben Stelle, mit Farbe und
   Anheften (`Wegpunkte.ersetze`); „Form abbrechen“ oder `Esc` lässt die Form,
-  wie sie war.
+  wie sie war. Gibt es sie beim Speichern so nicht mehr, etwa weil sie im
+  Bau über „Form löschen“ ging, speichert „Form fertig“ nichts und sagt
+  unten links „Die Form gibt es so nicht mehr; die neuen Ecken sind nicht
+  gespeichert“, statt sie still zu verwerfen (Review von #122).
 - **Eckpunkt löschen** auf einer Ecke nimmt sie heraus, die Form bleibt.
   Aus einer Region mit drei Ecken wird eine Linie; eine Linie mit zwei Ecken
   fällt weg, eine Ecke allein ist keine Form.
@@ -534,7 +537,8 @@ Schleier am Rand, siehe „Schleier“.
   löscht die zweite; „Eckpunkt hinzufügen“ an der ersten setzt die neue an
   die zweite Stelle; 700 ms gehalten hängt eine Ecke an der Maus und liegt
   nach dem Loslassen 2 bis 3 Blöcke weiter; eine Linie mit zwei Ecken fällt
-  beim Löschen einer weg.
+  beim Löschen einer weg; im Bau gelöscht, speichert „Form fertig“ nichts
+  und zeigt den Hinweis.
 - `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
   [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und

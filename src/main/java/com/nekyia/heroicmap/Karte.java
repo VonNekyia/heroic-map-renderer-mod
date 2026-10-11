@@ -609,6 +609,11 @@ final class Karte extends Screen {
         return zug == null ? null : List.copyOf(zug);
     }
 
+    /** Für den Gametest: der Hinweis unten links, oder null. */
+    Component hinweis() {
+        return hinweis;
+    }
+
     /** Für den Gametest: die Ecke an der Maus, oder null. */
     EckeAn eckeHaengt() {
         return eckeHaengt;
@@ -782,12 +787,15 @@ final class Karte extends Screen {
 
     /**
      * Speichert die Form im Bau: zwei Ecken eine Linie, drei und mehr eine Region; eine geänderte an ihrer Stelle.
-     * Sagt es, wenn keine mehr passt.
+     * Sagt es, wenn keine mehr passt oder es die geänderte so nicht mehr gibt.
      */
     private void fertig() {
         if (zug != null && zug.size() >= 2) {
             if (zugAus != null) {
-                Wegpunkte.INSTANZ.ersetze(zugAus, zug);
+                // Im Bau gelöscht oder sonst geändert: Dann findet ersetze sie nicht, und die neuen Ecken gingen still verloren.
+                if (!Wegpunkte.INSTANZ.ersetze(zugAus, zug)) {
+                    hinweis = Component.translatable("heroicmap.karte.form_weg");
+                }
             } else if (!Wegpunkte.INSTANZ.setzeForm(zugDimension, zug)) {
                 hinweis = Component.translatable("heroicmap.karte.formen_voll", Wegpunkte.MAX_EIGENE_FORMEN);
             }
