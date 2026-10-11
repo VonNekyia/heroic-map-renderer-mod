@@ -178,8 +178,11 @@ Ohne Unterbefehl öffnet `/hmap` das Menü, siehe [Minimap](minimap.md), „Bedi
    einmal neu an und bekommt dasselbe Token mit dem neuen Manifest.
 4. **Entpacken** und die Zeilen bis zur Stufe des Massstabs nehmen.
 5. **Löschen,** was lokal liegt und nicht mehr im Manifest steht.
-6. **Laden,** was fehlt oder ein anderes ETag hat, über 4 Verbindungen mit
-   Keep-Alive (`java.net.http.HttpClient`, HTTP/1.1). Gespeichert wird das
+6. **Laden,** was fehlt oder ein anderes ETag hat, über 8 Verbindungen mit
+   Keep-Alive (`java.net.http.HttpClient`, HTTP/1.1, `Laden.VERBINDUNGEN`).
+   Jede holt eine Kachel nach der anderen und wartet je Kachel einen Umlauf
+   ab; bei 30 ms Ping deckelten 4 Verbindungen den Download rechnerisch bei
+   rund 7,7 MB/s, 8 bei rund dem Doppelten (mod#114). Gespeichert wird das
    ETag aus der Antwort, denn eine Kachel kann neuer sein als das Manifest.
    Scheitert eine Kachel, bricht der Mod die laufenden Abrufe der anderen
    Verbindungen sofort ab.

@@ -44,7 +44,7 @@ Das baut das Jar nach `build/libs/` und lässt die Tests laufen.
 | Test | prüft |
 |---|---|
 | `ProjektionTest` | die Projektion gegen `projektion.json` des Renderers, braucht Netz, siehe [Projektion](projektion.md) |
-| `LadenTest` | den Download gegen einen kleinen Server auf loopback: Fortsetzen, geänderte und gelöschte Kacheln, Stufen, Prüfsumme, Token, Budget, Stand zum Fortsetzen, Heimnetz, alle harten Grenzen, Fristen, keine Weiterleitung, den Index während des Downloads, den alten Ordner `overlay` beim Start löschen, siehe [Download](download.md) |
+| `LadenTest` | den Download gegen einen kleinen Server auf loopback: 8 Verbindungen zugleich, Fortsetzen, geänderte und gelöschte Kacheln, Stufen, Prüfsumme, Token, Budget, Stand zum Fortsetzen, Heimnetz, alle harten Grenzen, Fristen, keine Weiterleitung, den Index während des Downloads, den alten Ordner `overlay` beim Start löschen, siehe [Download](download.md) |
 | `FreigabeTest` | die `freigabe` lesen, auch mit `port` statt `url`, reservierte Namen, das Präfix der eigenen Karte, und wann der Mod fragt, siehe [Download](download.md), „Zustimmung und Grösse“ |
 | `ReiheTest` | Downloads nacheinander, je Baum höchstens einer, auch nach einem `Error`, ein gehaltener Schlüssel beim Löschen, siehe [Download](download.md), „Reihe“ |
 | `AblageTest` | der Ordner der Welt je Wahl und je Dimension, Backends hinter einem Proxy, ein neuer Login ohne wartende `freigabe`n, gleiche Hashes, Umzug ins Leere ohne `overlay/`, die Kartenliste über alle Ablagen, unlesbare Ordner, Abbruch, Symlinks und Junctions, siehe [Download](download.md), „Ablage“ |

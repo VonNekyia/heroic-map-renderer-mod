@@ -57,6 +57,9 @@ class LadenTest {
     /** Antwortet der Server auf Kacheln mit 429, wie über dem Deckel des Tokens? */
     private volatile boolean erschoepft;
     private final AtomicInteger abrufe = new AtomicInteger();
+    /** Hält Kacheln zurück, bis so viele zugleich laufen; null heisst nicht. */
+    private volatile CountDownLatch zugleich;
+    private final AtomicInteger laufen = new AtomicInteger(), hoechstens = new AtomicInteger();
     private final AtomicInteger fremd = new AtomicInteger();
 
     @BeforeEach
@@ -115,6 +118,17 @@ class LadenTest {
                 String zxy = pfad.replace(".webp", "");
                 if (zxy.equals(haelt)) {
                     warte();
+                }
+                CountDownLatch z = zugleich;
+                if (z != null) {
+                    hoechstens.accumulateAndGet(laufen.incrementAndGet(), Math::max);
+                    z.countDown();
+                    try {
+                        z.await(5, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    laufen.decrementAndGet();
                 }
                 if (erschoepft) {
                     sende(t, 429, new byte[0], null);
@@ -319,6 +333,19 @@ class LadenTest {
         Laden.Fehler f = assertThrows(Laden.Fehler.class, () -> new Laden().lade(a, ziel));
         assertEquals(Laden.Grund.NETZ, f.grund);
         assertTrue(f.getCause() instanceof IOException);
+    }
+
+    @Test
+    void achtVerbindungenZugleich() throws Exception {
+        // 32 Kacheln; der Server hält jede zurück, bis 8 zugleich laufen. Mit weniger Verbindungen kämen nie 8. Siehe docs/download.md, „Ablauf“.
+        for (int i = 0; i < 32; i++) {
+            setze("2/" + i + "/9", ("bild " + i).getBytes(StandardCharsets.UTF_8), "\"z" + i + "\"");
+        }
+        manifest = baueManifest();
+        zugleich = new CountDownLatch(8);
+        Laden.Ergebnis e = new Laden().lade(auftrag(4, 1 << 30), ziel);
+        assertEquals(kacheln.size(), e.geladen());
+        assertEquals(8, hoechstens.get());
     }
 
     @Test
