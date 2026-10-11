@@ -207,6 +207,10 @@ nach oben immer durchsichtiger.
 - **Grenze:** höchstens 20 000 Vierecke (`Schleier.MAX_VIERECKE`), die
   nächsten zuerst, gemessen an der Mitte des Stücks. Darüber warnt das Log
   einmal, bis ein Bau wieder darunter liegt.
+- **Kosten:** An der Grenze von 20 000 Vierecken kosten Schleier und 64
+  Strahlen je Frame im Median 0,82 bis 1,11 ms, im p95 1,14 bis 1,74 ms;
+  ein Bau dauert 5,2 bis 5,7 ms, gemessen am 11.10., siehe
+  [Schleier, Kosten je Frame](messungen/2026-10-11-schleier.md).
 - **Schalter** „Effekte in der Welt“, siehe „Strahl“.
 
 ## Grösse
