@@ -71,7 +71,8 @@ final class Laden {
     static final long KACHEL_MAX = 4L << 20;
     /** So viel zählt eine Zeile des Manifests mindestens gegen die Grösse des Satzes, ein Cluster der Platte. */
     static final long ZEILE_MIN = 4L << 10;
-    static final int VERBINDUNGEN = 4;
+    /** So viele Kacheln lädt der Mod zugleich, je über eine eigene Verbindung. Siehe docs/download.md, „Ablauf“. */
+    static final int VERBINDUNGEN = 8;
     /** Eine Koordinate einer Kachel: nur eine ganze Zahl, denn sie wird ein Dateiname. */
     private static final Pattern ZAHL = Pattern.compile("-?\\d{1,9}");
     private static final Pattern GROESSE = Pattern.compile("\\d{1,10}");

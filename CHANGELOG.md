@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.33
+
+- **Map downloads use 8 connections instead of 4,** so they go about twice as fast for players far from the server.
+
 ## 0.2.32
 
 - **Veils build faster** around many pinned regions: the mod picks the nearest pieces without sorting all of them and only splits edges within reach.
