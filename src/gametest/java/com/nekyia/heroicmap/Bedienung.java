@@ -1022,18 +1022,17 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Teleport über Wasser: y " + wasser + " statt rund -54, der Oberfläche");
             }
             // In die Ferne: Den Chunk hat der Client nicht, die Höhe kommt aus der Karte.
-            if (context.computeOnClient(mc -> mc.level.hasChunk(2000 >> 4, 2000 >> 4))) {
+            if (context.computeOnClient(mc -> Teleport.chunk(mc.level, 2000, 2000) != null)) {
                 throw new AssertionError("Der Chunk bei (2000, 2000) ist schon geladen; der Test braucht einen fremden");
             }
             teleportiere(context, maus, k, baum, 2000, 2000);
-            context.waitFor(mc -> Math.abs(mc.player.getX() - 2000.5) < 0.01 && mc.level.hasChunk(2000 >> 4, 2000 >> 4)
-                    && mc.player.onGround(), 600);
-            context.waitTicks(10);
+            context.waitFor(mc -> Math.abs(mc.player.getX() - 2000.5) < 0.01 && Teleport.chunk(mc.level, 2000, 2000) != null, 600);
+            context.waitTicks(20);
             double y = context.computeOnClient(mc -> mc.player.getY());
-            boolean luft = context.computeOnClient(mc -> mc.level.getBlockState(new BlockPos(2000, -60, 2000)).isAir()
+            boolean steht = context.computeOnClient(mc -> mc.player.onGround() && mc.level.getBlockState(new BlockPos(2000, -60, 2000)).isAir()
                     && mc.level.getBlockState(new BlockPos(2000, -61, 2000)).is(Blocks.GRASS_BLOCK));
-            if (Math.abs(y - -60) > 0.01 || !luft || abrufe.get() != 1) {
-                throw new AssertionError("Teleport in die Ferne: y " + y + " statt -60 auf dem Gras, Luft an den Füssen " + luft
+            if (Math.abs(y - -60) > 0.01 || !steht || abrufe.get() != 1) {
+                throw new AssertionError("Teleport in die Ferne: y " + y + " statt -60, auf dem Gras mit Luft an den Füssen " + steht
                         + ", Abrufe " + abrufe.get() + " statt 1");
             }
         } finally {

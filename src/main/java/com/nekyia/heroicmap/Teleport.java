@@ -20,6 +20,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,9 +79,10 @@ final class Teleport {
     static void los(Minecraft mc, Satz satz, String dimension, int x, int z) {
         ClientPacketListener verbindung = mc.getConnection();
         ClientLevel level = mc.level;
-        if (level.hasChunk(x >> 4, z >> 4)) {
+        LevelChunk chunk = chunk(level, x, z);
+        if (chunk != null) {
             // Der erste freie Block über dem obersten, der Bewegung oder Flüssigkeit hält, ohne Laub: über Wasser die Oberfläche.
-            verbindung.sendCommand(befehl(dimension, x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z));
+            verbindung.sendCommand(befehl(dimension, x, chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15) + 1, z));
             return;
         }
         Quelle q = satz != null && dimension.equals(satz.dimension()) ? quelle(satz) : null;
@@ -99,6 +102,11 @@ final class Teleport {
                 ohneHoehe(mc, verbindung, dimension, x, z);
             }
         }));
+    }
+
+    /** Der Chunk um (x, z), wenn der Client ihn hat, sonst null; {@code ClientLevel.hasChunk} sagt immer ja (per javap). */
+    static LevelChunk chunk(ClientLevel level, int x, int z) {
+        return level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.FULL, false);
     }
 
     private static void ohneHoehe(Minecraft mc, ClientPacketListener verbindung, String dimension, int x, int z) {
