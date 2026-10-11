@@ -47,7 +47,7 @@ public final class Bedienung implements FabricClientGameTest {
     @Override
     public void runTest(ClientGameTestContext context) {
         // Mit Befehlen, sonst schickt der Server execute und tp nicht, und das Teleport-Menü fehlt.
-        try (TestSingleplayerContext spiel = context.worldBuilder().adjustSettings(s -> s.setAllowCommands(true)).create()) {
+        try (TestSingleplayerContext spiel = context.worldBuilder().adjustSettings(s -> s.setAllowCommands(true)).create(); var _ = Abschluss.langsamerTakt(context, spiel)) {
             spiel.getConnection().waitForChunksRender();
             Bilder.leereWelt(context);
             kleinerSchirm(context);

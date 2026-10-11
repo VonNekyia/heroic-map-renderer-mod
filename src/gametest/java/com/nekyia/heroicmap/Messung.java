@@ -95,7 +95,7 @@ public final class Messung implements FabricClientGameTest {
                 .adjustSettings(s -> s.setWorldType(new WorldCreationUiState.WorldTypeEntry(
                         s.getSettings().worldgenLoadContext().lookupOrThrow(Registries.WORLD_PRESET)
                                 .getOrThrow(WorldPresets.NORMAL))))
-                .create()) {
+                .create(); var _ = Abschluss.langsamerTakt(context, spiel)) {
             TestServerContext server = spiel.getServer();
             server.runCommand("time set noon");
             server.runCommand("weather clear");

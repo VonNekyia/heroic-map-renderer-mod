@@ -43,7 +43,7 @@ public final class Blockentities implements FabricClientGameTest {
 
     @Override
     public void runTest(ClientGameTestContext context) {
-        try (TestSingleplayerContext spiel = context.worldBuilder().adjustSettings(s -> s.setAllowCommands(true)).create()) {
+        try (TestSingleplayerContext spiel = context.worldBuilder().adjustSettings(s -> s.setAllowCommands(true)).create(); var _ = Abschluss.langsamerTakt(context, spiel)) {
             spiel.getConnection().waitForChunksRender();
             alle(context, spiel.getServer(), "einzelspieler");
         }
