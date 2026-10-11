@@ -1,12 +1,15 @@
 ---
 title: Wegpunkte
-description: Wegpunkte auf der Vollbildkarte setzen und löschen, eigene Linien und Regionen aus Wegpunkten, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
+description: Wegpunkte auf der Vollbildkarte setzen und löschen, eigene Linien und Regionen aus Wegpunkten, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Wegpunkte.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/Mitspieler.java
   - src/main/java/com/nekyia/heroicmap/Kanal.java
+  - src/main/java/com/nekyia/heroicmap/Strahlen.java
+  - src/test/java/com/nekyia/heroicmap/StrahlenTest.java
+  - src/gametest/java/com/nekyia/heroicmap/Messung.java
   - src/main/java/com/nekyia/heroicmap/Tafeln.java
   - src/test/java/com/nekyia/heroicmap/WegpunkteTest.java
   - src/test/java/com/nekyia/heroicmap/MinimapTest.java
@@ -110,6 +113,45 @@ Wegpunkten“ (mod#79).
   keinen Ring. Gewünscht hat der User den Ring für Mitspieler; Wegpunkte
   haben ihn ebenso, sonst sähe man nicht, welche angeheftet sind.
 
+## Strahl
+
+Über jedem angehefteten Wegpunkt steht in der Welt der Strahl eines
+Leuchtfeuers in seiner Farbe, so wünscht es der Maintainer (mod#36).
+
+![Die Strahlen zweier angehefteter Wegpunkte über der Szene des Gametests, rot und blau](bilder/strahl.png)
+
+- **Gezeichnet** mit dem Strahl des Spiels, `BeaconRenderer.submitBeaconBeam`,
+  aus `LevelRenderEvents.COLLECT_SUBMITS` von Fabric (`Strahlen.zeichne`).
+  Er sieht aus wie der eines Leuchtfeuers: dieselbe Textur, derselbe Lauf
+  in 40 Ticks, innen 0,2 und aussen 0,25 Blöcke Radius. Ab 96 Blöcken
+  waagrechtem Abstand wird er mit dem Abstand breiter, durchs Fernrohr
+  nicht, wie beim Leuchtfeuer (`BeaconRenderer.extract`, belegt per javap am
+  Client 26.3).
+- **Unten** steht er auf dem Boden unter dem Laub, auf Wasser auf seiner
+  Oberfläche: der Heightmap `MOTION_BLOCKING_NO_LEAVES` des Clients
+  (`Level.getHeight`). Der Client bekommt `WORLD_SURFACE`, `MOTION_BLOCKING`
+  und `MOTION_BLOCKING_NO_LEAVES` vom Server (`Heightmap.Types.sendToClient`,
+  per javap). Ist der Chunk nicht geladen, beginnt der Strahl am Boden der
+  Welt.
+- **Oben** reicht er 2048 Blöcke hoch (`BeaconRenderer.MAX_RENDER_Y`), wie
+  der Strahl eines Leuchtfeuers. Der Plan nannte die Bauhöhe; über ihr
+  sähe man aber das Ende, wenn man höher fliegt.
+- **Welche:** angeheftete Wegpunkte dieser Dimension, deren Block waagrecht
+  höchstens die Sichtweite entfernt liegt, also Sichtweite × 16 Blöcke wie
+  beim Leuchtfeuer (`Strahlen.waehle`). Höchstens 64 je Frame
+  (`Strahlen.MAX_STRAHLEN`), die ersten in der Reihe der Wegpunkte.
+- **Schalter** „Effekte in der Welt“ im Untermenü „Einstellungen …“, Vorgabe
+  an, siehe [Minimap](minimap.md), „Bedienung“. Aus zeichnet der Mod
+  keinen Strahl. Derselbe Schalter gilt später für den Schleier.
+- **Kosten:** 64 Strahlen, die Grenze, kosten je Frame im Median 0,05 bis
+  0,06 ms und im p95 0,07 bis 0,12 ms, gemessen am 11.10., siehe
+  [Strahl, Kosten je Frame](messungen/2026-10-11-strahl.md).
+- **Ohne Allokation im Mod je Frame:** Die Indizes der Gewählten liegen in
+  einem festen Feld, die Liste der Wegpunkte ist eine feste Sicht, und den
+  Namen der Dimension rechnet `Strahlen` nur beim Wechsel. Der Strahl des
+  Spiels selbst legt je Aufruf zwei kleine Objekte an, wie bei jedem
+  Leuchtfeuer.
+
 ## Grösse
 
 - **Köpfe und Wegpunkte** sind 6 Einheiten des GUI gross (`Minimap.KOPF`),
@@ -196,8 +238,9 @@ Maintainer (mod#36): eigene Formen und Rechtecke und Flächen und Kreise der
 Ebenen vom Server. Linien vom Server nicht, entschieden vom Reviewer; eigene
 Linien schon (mod#79). Ebenso Nadeln und Banner,
 so will es der User (mod#71); auf der Minimap stehen sie nur angeheftet,
-siehe [Ebenen](ebenen.md), „Nadeln“. Strahl und Schleier in der
-Welt kommen in eigenen PRs.
+siehe [Ebenen](ebenen.md), „Nadeln“. Angeheftete Wegpunkte bekommen in der
+Welt einen Strahl, siehe „Strahl“; der Schleier an Regionen kommt in einem
+eigenen PR.
 
 ![Minimap genordet und gedreht: nur der angeheftete Kreis und die angeheftete eigene Region, die übrigen Formen fehlen; Szene `formen` des Gametests](bilder/formen.png)
 
@@ -298,8 +341,12 @@ Welt kommen in eigenen PRs.
   Zur ganzen Ebene: `ganzeEbeneAnheftenUndLoesen` und
   `ganzeEbeneHaeltDieGrenzen`. Zu Formen aus Wegpunkten: `festeIdsAuchAusAltenDateien`,
   `formenAusWegpunktenGehenMitUndBleiben` und `formenGrenzenUndAlteDatei`.
+- `StrahlenTest`: nur angeheftete Wegpunkte dieser Dimension in Sichtweite,
+  genau an der Grenze, höchstens 64, die ersten der Reihe nach; breiter in
+  der Ferne, durchs Fernrohr nicht.
 - `MinimapTest`: `kopfWaechstMitDerSeite`, `amRandInSeinerRichtung` und
-  `markeAufDemPixelDerKarte`.
+  `markeAufDemPixelDerKarte`; der Schalter „Effekte in der Welt“, Vorgabe
+  an, gespeichert.
 - `KartenblickTest`: `markenAufDemRasterDerKacheln`,
   `klickTrifftDenGezeichnetenBlock` (Lupe 1, 2, 4, grobe Stufe, links des
   Ursprungs, genau auf der Kante), `kachelnRasterUndKlickAufEinerKante`,
@@ -334,7 +381,10 @@ Welt kommen in eigenen PRs.
   Szene `formen` ein angehefteter Kreis und eine angeheftete Region aus
   drei Wegpunkten
   auf Minimap und Vollbildkarte, siehe [Ebenen](ebenen.md), „Flächen,
-  Kreise und Linien“.
+  Kreise und Linien“; in der Szene `strahl` die Strahlen zweier
+  angehefteter Wegpunkte (`strahl.png`).
+- Gametest `Messung` mit `-PmessungEffekte=true`: was die Strahlen je Frame
+  kosten, siehe „Strahl“, „Kosten“.
 
 ## Was fehlt
 

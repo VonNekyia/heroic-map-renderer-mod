@@ -87,6 +87,9 @@ final class Wegpunkte {
 
     private final List<Punkt> punkte = new ArrayList<>();
     private final List<Region> regionen = new ArrayList<>();
+    /** Die Sicht von aussen, einmal angelegt: Der Strahl liest sie je Frame ohne Allokation. */
+    private final List<Punkt> punkteSicht = Collections.unmodifiableList(punkte);
+    private final List<Region> regionenSicht = Collections.unmodifiableList(regionen);
     private final List<EigeneForm> eigene = new ArrayList<>();
     /** Die nächste freie id eines Wegpunkts. */
     private int naechsteId = 1;
@@ -294,7 +297,7 @@ final class Wegpunkte {
     }
 
     List<Punkt> punkte() {
-        return Collections.unmodifiableList(punkte);
+        return punkteSicht;
     }
 
     /** Setzt einen Wegpunkt auf den Block; steht dort schon einer, bleibt er. */
@@ -306,7 +309,7 @@ final class Wegpunkte {
     }
 
     List<Region> regionen() {
-        return Collections.unmodifiableList(regionen);
+        return regionenSicht;
     }
 
     /** Die oberste eigene Region, die den Block enthält, die zuletzt gesetzte; sonst null. */

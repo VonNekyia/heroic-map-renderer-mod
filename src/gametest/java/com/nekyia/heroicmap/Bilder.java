@@ -125,6 +125,7 @@ public final class Bilder implements FabricClientGameTest {
             vollbildkarte(context);
             formen(context, server);
             orte(context, server);
+            strahl(context, server);
             selbst(context);
             tueren(context, server);
         }
@@ -1017,11 +1018,6 @@ public final class Bilder implements FabricClientGameTest {
         return baum;
     }
 
-    /**
-     * Öffnet die Vollbildkarte mit einem kleinen Satz gemalter Testkacheln um den Ursprung,
-     * scale 4, Stufen 0 bis 2, und nimmt sie auf der feinsten Stufe auf; dazu ein angehefteter
-     * Wegpunkt auf der Karte und einer am Rand. Siehe docs/wegpunkte.md.
-     */
     /** Türen in vier Richtungen, offen, aus Eisen; Truhen einzeln und doppelt, Ender- und Fallentruhe, ein Fass als Gegenprobe. */
     private static final String[] TUEREN = {
         "setblock -40 -60 0 oak_door[facing=north,half=lower]", "setblock -40 -59 0 oak_door[facing=north,half=upper]",
@@ -1042,6 +1038,38 @@ public final class Bilder implements FabricClientGameTest {
         "setblock -35 -60 14 oak_trapdoor[facing=north,half=bottom,open=false]",
         "setblock -33 -60 14 oak_trapdoor[facing=north,half=bottom,open=true]",
     };
+
+    /**
+     * Die Strahlen zweier angehefteter Wegpunkte in der Welt, im Blick von Osten über die Szene; die
+     * Minimap aus. Siehe docs/wegpunkte.md, „Strahl“.
+     */
+    private static void strahl(ClientGameTestContext context, TestServerContext server) {
+        context.runOnClient(mc -> {
+            Wegpunkte.INSTANZ.setze(Ebenen.UEBERWELT, 6, -3);
+            Wegpunkte.INSTANZ.setze(Ebenen.UEBERWELT, -8, 3);
+            for (Wegpunkte.Punkt p : List.copyOf(Wegpunkte.INSTANZ.punkte())) {
+                Wegpunkte.INSTANZ.umschalten(p);
+            }
+            Minimap.INSTANZ.setzeSichtbar(false);
+        });
+        server.runCommand("tp @a 22.5 -56 -1.5 90 8");
+        context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - 22.5) < 0.1, 200);
+        context.waitTicks(20);
+        Path bild = context.takeScreenshot(TestScreenshotOptions.of("strahl").disableCounterPrefix());
+        if (!AUSGABE.isEmpty()) {
+            try {
+                Files.copy(bild, Path.of(AUSGABE, "strahl.png"), StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        server.runCommand("tp @a 0.5 -30 0.5 0 90");
+        context.runOnClient(mc -> {
+            Wegpunkte.INSTANZ.leeren();
+            Minimap.INSTANZ.setzeSichtbar(true);
+        });
+        context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - 0.5) < 0.1 && Minimap.INSTANZ.fertig(), 1200);
+    }
 
     /**
      * Türen, Truhen und ein Stück Dorf westlich der Szene auf der Minimap bei 1, 2 und 4 px, je Zoom 4,
@@ -1086,6 +1114,11 @@ public final class Bilder implements FabricClientGameTest {
         server.runCommand("tp @a 0.5 -30 0.5 0 90");
     }
 
+    /**
+     * Öffnet die Vollbildkarte mit einem kleinen Satz gemalter Testkacheln um den Ursprung,
+     * scale 4, Stufen 0 bis 2, und nimmt sie auf der feinsten Stufe auf; dazu ein angehefteter
+     * Wegpunkt auf der Karte und einer am Rand. Siehe docs/wegpunkte.md.
+     */
     private static void vollbildkarte(ClientGameTestContext context) {
         Path baum = testsatz();
         context.runOnClient(mc -> {

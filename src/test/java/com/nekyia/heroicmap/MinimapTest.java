@@ -157,6 +157,7 @@ class MinimapTest {
         vorher.setzeShow(false);
         vorher.setzeAblage(Downloads.Ablage.HASH);
         vorher.setzeChunklinien(true);
+        vorher.setzeEffekte(false);
         vorher.setzeDrehen(true);
         vorher.setzeVerzierungen(false);
         vorher.stelle(20, 30, 200, 640, 360);
@@ -173,6 +174,7 @@ class MinimapTest {
         assertFalse(nachher.show());
         assertEquals(Downloads.Ablage.HASH, nachher.ablage());
         assertTrue(nachher.chunklinien());
+        assertFalse(nachher.effekte());
         assertTrue(nachher.drehen());
         assertEquals(vorher.rahmen(640, 360), nachher.rahmen(640, 360));
     }
@@ -432,6 +434,8 @@ class MinimapTest {
         // Ablage: Vorgabe IP und Hash, die Wahl des Users.
         assertEquals(Downloads.Ablage.IP, minimap.ablage());
         assertFalse(minimap.chunklinien());
+        // Effekte in der Welt: Vorgabe an, die Wahl des Reviewers (mod#36).
+        assertTrue(minimap.effekte());
         assertEquals(Minimap.Koordinaten.XZ, minimap.koordinaten());
         // Drehen: Vorgabe an, der Wunsch des Users.
         assertTrue(minimap.drehen());
