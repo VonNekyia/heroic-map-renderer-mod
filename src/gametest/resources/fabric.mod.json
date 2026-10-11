@@ -18,6 +18,9 @@
     ],
     "heroicmap": [
       "com.nekyia.heroicmap.ProbeEbene"
+    ],
+    "client": [
+      "com.nekyia.heroicmap.Wache"
     ]
   },
   "depends": {

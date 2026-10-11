@@ -71,7 +71,8 @@ jobs:
             fi
             sleep 5
           done
-          wait "$lauf"
+          # Die Meldung der Wache, siehe docs/entwicklung.md, „Gametests“, als Fehler an der PR.
+          wait "$lauf" || { grep -m1 -o 'Gametest h[^ ]*ngt: .*Alle Threads' build/run/clientGameTest/logs/latest.log | sed 's/^/::error::/'; exit 1; }
 
       - name: Log und Bildschirmfotos
         if: failure()
