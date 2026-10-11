@@ -5,6 +5,7 @@ code:
   - build.gradle.kts
   - src/gametest/resources/fabric.mod.json
   - src/gametest/java/com/nekyia/heroicmap/Bedienung.java
+  - src/gametest/java/com/nekyia/heroicmap/Wache.java
   - gradle/libs.versions.toml
   - gradle/wrapper/gradle-wrapper.properties
   - .github/workflows/ci.yml
@@ -105,6 +106,17 @@ der Test kopiert sie nur unverändert in den Arbeitsordner, den Loom vor
 jedem Lauf leert, und schreibt nie selbst eine. Ohne `-Peula` überspringt
 er den Server-Fall mit einer Zeile im Log, so auch in der CI.
 
+**Frist:** Im Gametest tickt der Client nur im Takt mit dem Thread des
+Tests und dem Server (`ThreadingImpl.PHASER` der Fabric API, per javap in
+`fabric-client-gametest-api-v1` 6.0.7). Hängt einer der drei, steht alles,
+und die Fabric API wartet ohne Frist. Die `Wache` (Entrypoint `client` des
+Testmods) misst die Zeit seit dem letzten Tick des Clients, ab dem ersten.
+Nach 120 s ohne Tick schreibt sie eine Zeile „Gametest hängt“ mit der
+Stelle im Test ins Log, danach alle Threads mit Zustand, Lock und ganzem
+Stapel, und beendet das Spiel mit Code 1. Ein Hänger kostet so gut 2 min
+statt des Limits am Schritt, und das Log zeigt, wer wartet. Am Haltepunkt
+eines Debuggers greift sie genauso.
+
 | Gametest | tut |
 |---|---|
 | `Api` | läuft als erster: die Ebene, die `ProbeEbene` über den Entrypoint `heroicmap` beim Start anlegt, in der Liste der Vollbildkarte, mit Nadel und Formen, ohne Banner; sie übersteht eine Liste vom Server und das Trennen, eine Ebene vom Server mit derselben Kennung verdeckt sie, `remove` nimmt sie weg; siehe [API für Client-Mods](api.md) |
@@ -195,6 +207,8 @@ aus Pixeln. Bis 0.2.14 war es die Insel aus dem Banner des Hauptrepositorys.
     Klick, der unter Xvfb nie kommt. Steht `Failed to create backend`
     zweimal im Log, für OpenGL und Vulkan, beendet der Schritt das Spiel
     und wird rot, statt bis zum Limit zu hängen.
+  - **Hänger** beendet die Wache, siehe „Gametests“. Ihre Zeile
+    „Gametest hängt“ hängt der Schritt als Fehler an die PR.
   - **Dauer,** Stand 11.10., Lauf von `e6c0706`: der Schritt 3 min 35 s
     ohne, 3 min 20 s mit Sodium; lokal sind es gut 2 min. Davon rund 55 s
     bis zur ersten Welt, `Bilder` rund 52 s, `Bedienung` rund 60 s, die
@@ -204,7 +218,8 @@ aus Pixeln. Bis 0.2.14 war es die Insel aus dem Banner des Hauptrepositorys.
   - **In Software** riss keine Prüfung am Bildschirmfoto; keine Schwelle
     ist dafür gelockert.
   - Scheitert ein Lauf, lädt er Log und Bildschirmfotos als Artefakt hoch.
-    Noch kein Pflicht-Check für den Merge.
+    Beide Gametests sind Pflicht-Checks für den Merge, mit „Basis aktuell“
+    im Ruleset von `main`.
   `gradle/actions/setup-gradle` prüft dabei auch, dass `gradle-wrapper.jar`
   ein Wrapper von Gradle ist.
 - **Doku:** `pruefe-doku.sh` vom Branch `master` des Hauptrepositorys,
