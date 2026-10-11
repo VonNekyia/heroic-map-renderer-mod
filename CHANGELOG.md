@@ -4,6 +4,11 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.37
+
+- **Holding a waypoint to move it takes 0.5 s** instead of 2 s.
+- **A quick click on a second waypoint is no longer a double click on the first.** Clicking B right after A pinned A instead of centering B; a double click now only counts near the first click.
+
 ## 0.2.36
 
 - **"Teleport here" works in places no one has loaded yet.** The mod now picks the height itself: from the chunk if your game has it, otherwise from the ground of the server's map, one region fetched on demand. Before, the server looked for the ground itself and refused where its chunks were not loaded. Without a known height, the old way stays, with a note in the chat.
