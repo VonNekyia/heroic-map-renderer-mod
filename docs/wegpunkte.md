@@ -39,8 +39,8 @@ Wegpunkten“ (mod#79).
 | Rechtsklick, „Wegpunkt setzen“ | der Eintrag unter „Hierher teleportieren“; setzt einen Wegpunkt auf den Block unter der Maus, in der ersten der 8 Farben (`Wegpunkte.FARBEN`), die in der Dimension noch frei ist, sind alle vergeben, reihum. Steht dort schon einer, bleibt es einer. Den Eintrag gibt es auch ohne Recht zum Teleportieren und unter einer Decke |
 | Rechtsklick auf einen Wegpunkt | das Menü für seinen Block: „Hierher teleportieren“, wenn erlaubt, und „Wegpunkt löschen“ |
 | Klick auf eine Marke | legt sie in die Mitte, sobald kein zweiter Klick mehr folgen kann, 250 ms nach dem Loslassen: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück. Wer auf einer Marke zu ziehen beginnt und sich weiter als 3 Einheiten vom Druckpunkt entfernt (`Karte.ZUG`), zieht nur die Karte |
-| Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder; die Karte bewegt sich dabei nicht. Ein Doppelklick ist ein zweiter Klick mit derselben Taste bis 250 ms nach dem ersten, so meldet ihn das Spiel, nach Zeit und Taste, nicht nach dem Ort (`MouseHandler.onButton`, per javap in 26.3). Die Karte zählt ihn nur, wenn er höchstens 3 Einheiten vom vorigen Druckpunkt weg ist (`Karte.ZUG`), für jedes Ziel, auch Flächen und Überschriften der Ebenen. Bis 0.2.35 heftete ein schneller Klick auf B kurz nach einem auf A den Wegpunkt A an, statt B in die Mitte zu legen (mod#112) |
-| Linke Taste 0,5 s still auf einem Wegpunkt halten | er hängt an der Maus, die Karte zieht nicht mit; beim Loslassen liegt er auf dem Block darunter, mit Farbe und Anheften (`Wegpunkte.verschiebe`). Liegt dort schon einer, bleibt er, wo er war; `Esc` bricht ab. Still heisst: nie weiter als 3 Einheiten vom Druckpunkt weg (`Karte.ZUG`); das Zittern der Hand hin und her zählt nicht, nur der Abstand. Bis 0.2.32 zählte der ganze Weg der Maus: Mit 1 bis 2 Pixeln Zittern fügte ein Linksklick in einer Form im Bau oft nichts an, und Halten ging kaum (mod#112). Unter 0,5 s ist es ein Klick oder ein Zug wie sonst (`Karte.HALTEN_MS`, mod#75). Bis 0.2.35 waren es 2 s, dem User zu lang; 0,5 s hat der Reviewer entschieden (mod#112). Ein Klick dauert kürzer. Nur Wegpunkte, nicht die Rauten eigener Regionen |
+| Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder; die Karte bewegt sich dabei nicht, siehe „Doppelklick“ unten |
+| Linke Taste 0,5 s still auf einem Wegpunkt halten | er hängt an der Maus, die Karte zieht nicht mit; beim Loslassen liegt er auf dem Block darunter, mit Farbe und Anheften (`Wegpunkte.verschiebe`). Liegt dort schon einer, bleibt er, wo er war; `Esc` bricht ab. Still heisst: nie weiter als 3 Einheiten vom Druckpunkt weg (`Karte.ZUG`); das Zittern der Hand hin und her zählt nicht, nur der Abstand. Bis 0.2.32 zählte der ganze Weg der Maus: Mit 1 bis 2 Pixeln Zittern fügte ein Linksklick in einer Form im Bau oft nichts an, und Halten ging kaum (mod#112). Unter 0,5 s ist es ein Klick oder ein Zug wie sonst (`Karte.HALTEN_MS`, mod#75). Bis 0.2.36 waren es 2 s, dem User zu lang; 0,5 s hat der Reviewer entschieden (mod#112). Ein Klick dauert kürzer. Nur Wegpunkte, nicht die Rauten eigener Regionen |
 | Doppelklick in eine eigene Region, auf eine eigene Linie, auf die Raute eines alten Rechtecks, auf eine Fläche, einen Kreis, eine Nadel oder ein Banner vom Server | heftet sie an die Minimap oder löst sie wieder, siehe „Anheften“ |
 | Rechtsklick auf einen Wegpunkt, „Punkt hinzufügen“ | beginnt eine Form mit ihm oder fügt ihn an die Form im Bau an, siehe „Formen aus Wegpunkten“ |
 | Linksklick auf einen Wegpunkt, solange eine Form im Bau ist | fügt ihn an, statt ihn in die Mitte zu legen; auf den ersten Punkt schliesst er bei drei und mehr Punkten die Region. Ziehen verschiebt die Karte wie sonst |
@@ -53,8 +53,12 @@ Wegpunkten“ (mod#79).
   Knopf im selben Schirm weniger als 250 ms nach dem letzten kommt, gleich
   wo, und nur, wenn der Schirm den letzten Klick angenommen hat
   (`mouseClicked` gab `true`; `MouseHandler.onButton`, belegt per javap am
-  Client 26.3). Die Karte nimmt jeden Linksklick an, auch einen auf
-  freie Karte, sonst zählte ein Doppelklick auf eine Fläche nie. Der erste
+  Client 26.3). Die Karte zählt ihn nur, wenn der zweite Druck höchstens
+  3 Einheiten vom ersten weg ist (`Karte.ZUG`), für jedes Ziel, auch
+  Flächen und Überschriften der Ebenen. Bis 0.2.36 heftete ein schneller
+  Klick auf B kurz nach einem auf A den Wegpunkt A an, statt B in die
+  Mitte zu legen (mod#112). Die Karte nimmt jeden Linksklick an, auch
+  einen auf freie Karte, sonst zählte ein Doppelklick auf eine Fläche nie. Der erste
   Klick auf eine Marke legt sie erst in die Mitte, wenn 250 ms lang kein
   zweiter kam (`MouseHandler.DOUBLE_CLICK_THRESHOLD_MS`, `Karte.wartend`);
   so bewegt ein Doppelklick die Karte nicht, wie der User es will (mod#75).
