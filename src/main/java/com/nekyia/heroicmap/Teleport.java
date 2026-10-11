@@ -58,7 +58,7 @@ final class Teleport {
 
     /**
      * Ohne bekannte Höhe: auf den obersten Block, der Bewegung aufhält, ohne Laub. Die Höhe liest der Server selbst;
-     * hat er den Chunk nicht geladen, nimmt er den untersten Block der Welt ({@code Level.getHeight}, per javap).
+     * hat er den Chunk nicht geladen, weist er den Befehl ab („That position is not loaded“).
      */
     static String befehl(String dimension, int x, int z) {
         return String.format(Locale.ROOT,

@@ -175,9 +175,9 @@ auf den Namen heftet die ganze Ebene an (mod#103).
      Webserver, der alte Befehl `execute in <dimension> positioned <x+0,5>
      0 <z+0,5> positioned over motion_blocking_no_leaves run tp @s ~ ~ ~`,
      und der Chat sagt „Höhe unbekannt …“. Der Server liest dann die Höhe
-     selbst. Hat er den Chunk nicht geladen, gibt `Level.getHeight` den
-     untersten Block der Welt zurück (per javap), und der Spieler landet im
-     Grundgestein. Bis 0.2.35 galt dieser Befehl immer.
+     selbst. Hat er den Chunk nicht geladen, weist er den Befehl ab, „That
+     position is not loaded“, und nichts geschieht; so in der Gegenprobe des
+     Gametests `Bedienung`. Bis 0.2.35 galt dieser Befehl immer.
 - **Nur mit Recht:** Den Eintrag „Hierher teleportieren“ gibt es nur, wenn der Befehlsbaum des
   Servers `execute` und `tp` enthält (`Teleport.erlaubt`); der Server
   schickt nur Befehle, die der Spieler nutzen darf. Die Rechte prüft er

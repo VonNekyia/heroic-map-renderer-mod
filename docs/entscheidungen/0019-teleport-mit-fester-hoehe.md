@@ -16,8 +16,8 @@ code:
 „Hierher teleportieren“ ging nur dort, wo Chunks geladen waren (Rückmeldung
 des Users, 11.10.). Der Befehl liess den Server die Höhe lesen
 (`positioned over motion_blocking_no_leaves`). Hat er den Chunk nicht
-geladen, gibt `Level.getHeight` den untersten Block der Welt zurück (per
-javap in 26.3), und der Spieler landet im Grundgestein.
+geladen, weist er den Befehl ab, „That position is not loaded“, und nichts
+geschieht; so in der Gegenprobe des Gametests `Bedienung`.
 
 ## Entscheidung
 
