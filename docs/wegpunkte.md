@@ -197,20 +197,31 @@ nach oben immer durchsichtiger.
   Wegpunkte (`Ebenen.stand`, `Wegpunkte.stand`), andere Dimension oder
   Sichtweite, der Spieler mehr als 16 Blöcke vom Ursprung des letzten Baus
   (`Schleier.NEU_AB`), oder ein Chunk unter dem Schleier ändert sich, über
-  denselben Haken `setSectionDirty` wie die Minimap, dann höchstens alle
-  250 ms (`Schleier.NEU_FRUEHESTENS_MS`). Gebaut wird bis zur Sichtweite
+  denselben Haken `setSectionDirty` wie die Minimap. Neu gebaut wird
+  höchstens alle 500 ms (`Schleier.NEU_FRUEHESTENS_MS`); nur der erste Bau
+  und eine andere Dimension warten nicht. Gebaut wird bis zur Sichtweite
   und 16 Blöcke darüber, so reicht der Schleier, bis der Spieler so weit
   gegangen ist. Über einem Chunk, der nicht geladen ist, fehlt er, bis der
   Chunk kommt.
 - **Je Frame** reicht der Mod nur die fertigen Ecken weiter, relativ zum
   Ursprung des Baus; das Objekt, das sie schreibt, legt er einmal an.
-- **Grenze:** höchstens 20 000 Vierecke (`Schleier.MAX_VIERECKE`), die
+- **Grenze:** höchstens 5 000 Vierecke (`Schleier.MAX_VIERECKE`), die
   nächsten zuerst, gemessen an der Mitte des Stücks. Darüber warnt das Log
   einmal, bis ein Bau wieder darunter liegt.
-- **Kosten:** An der Grenze von 20 000 Vierecken kosten Schleier und 64
-  Strahlen je Frame im Median 0,82 bis 1,11 ms, im p95 1,14 bis 1,74 ms;
-  ein Bau dauert 5,2 bis 5,7 ms, gemessen am 11.10., siehe
-  [Schleier, Kosten je Frame](messungen/2026-10-11-schleier.md).
+- **Kosten,** gemessen am 11.10., siehe
+  [Schleier, Kosten je Frame](messungen/2026-10-11-schleier.md):
+
+  | Fall | je Frame, Median | ein Bau, Median |
+  |---|---|---|
+  | 3 Regionen, 2 220 Vierecke | +0,16 bis +0,24 ms | 1,3 bis 1,4 ms |
+  | 47 Regionen, an der Grenze von 5 000 | +0,32 bis +0,47 ms | 4,4 bis 4,7 ms |
+
+  Je Frame mit 64 Strahlen. Ein Bau liest vor allem Höhen aus der Welt,
+  70 bis 80 % seiner Zeit. Darum hat der Reviewer nach dem Profil die
+  Grenze von 20 000 auf 5 000 gesenkt und den Bau auf höchstens alle
+  500 ms gesetzt; bei 20 000 waren es 0,8 bis 2,1 ms je Frame und 5,2 ms je
+  Bau. Sammeln und Sortieren gehen über alle Stücke in Reichweite, nicht
+  nur die nächsten 5 000; bei 47 Regionen sind das rund 2 ms des Baus.
 - **Schalter** „Effekte in der Welt“, siehe „Strahl“.
 
 ## Grösse

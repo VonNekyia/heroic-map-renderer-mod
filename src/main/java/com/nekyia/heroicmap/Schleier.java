@@ -34,7 +34,7 @@ public final class Schleier {
     static final float HOEHE = 4;
     /** So deckend ist er unten am Gelände, als Anteil vom Alpha seiner Farbe. */
     static final float DECKUNG = 0.5f;
-    /** So viele Vierecke höchstens; darüber die nächsten zuerst. Siehe docs/wegpunkte.md, „Schleier“, „Kosten“. */
+    /** So viele Vierecke höchstens; darüber die nächsten zuerst. Siehe docs/wegpunkte.md, „Schleier“. */
     static final int MAX_VIERECKE = 5_000;
     /** So weit, in Blöcken, geht der Spieler, bis der Mod neu baut; so weit reicht der Schleier über die Sichtweite hinaus. */
     static final int NEU_AB = 16;
