@@ -99,6 +99,77 @@ class SchleierTest {
         assertArrayEquals(new int[] {3, 1, 2, 0, 4}, Schleier.naechste(abstand, 5, 100));
     }
 
+    /** Die alte Auswahl: alles sortieren, die ersten nehmen. */
+    private static int[] vollSortiert(double[] abstand, int n, int max) {
+        long[] schluessel = new long[n];
+        for (int i = 0; i < n; i++) {
+            schluessel[i] = (long) Float.floatToIntBits((float) abstand[i]) << 32 | i;
+        }
+        java.util.Arrays.sort(schluessel);
+        int[] aus = new int[Math.min(n, max)];
+        for (int i = 0; i < aus.length; i++) {
+            aus[i] = (int) schluessel[i];
+        }
+        return aus;
+    }
+
+    @Test
+    void auswahlGibtDasselbeWieVollesSortieren() {
+        // Viele gleiche Abstände, wie Stücke auf einem Ring um den Spieler; dieselben in derselben Reihe.
+        java.util.Random zufall = new java.util.Random(36);
+        for (int n : new int[] {0, 1, 7, 5_000, 40_000}) {
+            double[] abstand = new double[n];
+            for (int i = 0; i < n; i++) {
+                abstand[i] = zufall.nextInt(2_000) * 3.0;
+            }
+            for (int max : new int[] {0, 1, 4_999, 5_000, 5_001, 40_000}) {
+                assertArrayEquals(vollSortiert(abstand, n, max), Schleier.naechste(abstand, n, max), "n " + n + ", max " + max);
+            }
+        }
+        // Schon sortiert und rückwärts, gegen einen schlechten Teiler.
+        double[] auf = new double[20_000], ab = new double[20_000];
+        for (int i = 0; i < auf.length; i++) {
+            auf[i] = i;
+            ab[i] = auf.length - i;
+        }
+        assertArrayEquals(vollSortiert(auf, auf.length, 5_000), Schleier.naechste(auf, auf.length, 5_000));
+        assertArrayEquals(vollSortiert(ab, ab.length, 5_000), Schleier.naechste(ab, ab.length, 5_000));
+    }
+
+    /** Die Stücke, deren Mitte höchstens {@code r} von (mx, mz) liegt, wie der Bau sie behält. */
+    private static List<double[]> behalten(List<double[]> stuecke, double mx, double mz, double r) {
+        return stuecke.stream().filter(s -> {
+            double dx = (s[0] + s[2]) / 2 - mx, dz = (s[1] + s[3]) / 2 - mz;
+            return dx * dx + dz * dz <= r * r;
+        }).toList();
+    }
+
+    @Test
+    void imKreisFehltKeinStueckDasDerBauBehaelt() {
+        // Ein Block mehr als die Reichweite: Was der Bau behält, ist mit und ohne Kreis dasselbe; ohne Kreis entstehen mehr Stücke.
+        java.util.Random zufall = new java.util.Random(91);
+        double mx = 0.5, mz = 0.5, r = 60;
+        double[] kasten = {mx - r, mz - r, mx + r, mz + r};
+        for (int versuch = 0; versuch < 200; versuch++) {
+            double[] ring = new double[2 * (3 + zufall.nextInt(6))];
+            for (int i = 0; i < ring.length; i++) {
+                ring[i] = zufall.nextDouble() * 200 - 100;
+            }
+            Ebenen.Form f = versuch % 2 == 0
+                    ? new Ebenen.Flaeche(WELT, 0x80FF0000, null, null, List.of(ring), new double[] {-100, -100, 100, 100}, "f")
+                    : new Ebenen.Kreis(WELT, ring[0], ring[1], 1 + zufall.nextDouble() * 90, 0x80FF0000, null, "k");
+            List<double[]> ohne = new ArrayList<>(), mit = new ArrayList<>();
+            Schleier.kanten(f, kasten, (x0, z0, x1, z1) -> ohne.add(new double[] {x0, z0, x1, z1}));
+            Schleier.kanten(f, kasten, mx, mz, r + 1, (x0, z0, x1, z1) -> mit.add(new double[] {x0, z0, x1, z1}));
+            List<double[]> a = behalten(ohne, mx, mz, r), b = behalten(mit, mx, mz, r);
+            assertEquals(a.size(), b.size(), "Versuch " + versuch);
+            for (int i = 0; i < a.size(); i++) {
+                assertArrayEquals(a.get(i), b.get(i), 1e-9, "Versuch " + versuch + ", Stück " + i);
+            }
+            assertTrue(mit.size() <= ohne.size());
+        }
+    }
+
     @Test
     void farbeVomRandSonstDieFuellung() {
         Ebenen.Rand rand = new Ebenen.Rand(0xFF112233, 2, 0, 0);

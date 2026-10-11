@@ -220,8 +220,22 @@ nach oben immer durchsichtiger.
   70 bis 80 % seiner Zeit. Darum hat der Reviewer nach dem Profil die
   Grenze von 20 000 auf 5 000 gesenkt und den Bau auf höchstens alle
   500 ms gesetzt; bei 20 000 waren es 0,8 bis 2,1 ms je Frame und 5,2 ms je
-  Bau. Sammeln und Sortieren gehen über alle Stücke in Reichweite, nicht
-  nur die nächsten 5 000; bei 47 Regionen sind das rund 2 ms des Baus.
+  Bau. Sammeln und Sortieren gingen dabei über alle Stücke in Reichweite,
+  nicht nur die nächsten 5 000; bei 47 Regionen waren das rund 2 ms des
+  Baus.
+- **Auswahl statt Sortieren:** Von allen Stücken in Reichweite wählt der
+  Bau die 5 000 nächsten aus, ohne alle zu sortieren (`Schleier.waehle`),
+  und sortiert nur diese (`Schleier.naechste`). Das ergibt dieselben in
+  derselben Reihe wie volles Sortieren, denn jeder Schlüssel trägt seinen
+  Index.
+- **Nur im Kreis geteilt:** Eine Kante teilt der Bau nur, soweit sie im
+  Kreis um den Spieler liegt, einen Block weiter als die Reichweite
+  (`Schleier.imKreis`). Ein Stück mit der Mitte in der Reichweite liegt ganz
+  darin, so fehlt keins; was ausserhalb liegt, entsteht gar nicht erst.
+- **Geschätzt, noch nicht gemessen:** Beides nimmt von den rund 2 ms für
+  Sammeln und Sortieren an der Spitze den grössten Teil; ein Bau mit
+  47 Regionen läge dann eher bei 3 als bei 4,5 ms. Die Messung folgt in
+  der nächsten Nacht.
 - **Schalter** „Effekte in der Welt“, siehe „Strahl“.
 
 ## Grösse
