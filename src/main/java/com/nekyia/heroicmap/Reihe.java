@@ -66,6 +66,11 @@ final class Reihe {
         return belegt.contains(schluessel);
     }
 
+    /** Wartet oder läuft ein Download in einen Ordner, dessen Schlüssel mit {@code praefix} beginnt? */
+    boolean belegtUnter(String praefix) {
+        return belegt.stream().anyMatch(s -> s.startsWith(praefix));
+    }
+
     /** Unterbricht die laufende Arbeit und verwirft, was wartet, etwa beim Trennen. */
     synchronized void abbrechen() {
         runde++;

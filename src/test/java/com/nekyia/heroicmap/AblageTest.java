@@ -36,6 +36,20 @@ class AblageTest {
     }
 
     @Test
+    void nameVomServerStattDerAdresse() {
+        // Domain, IP und „0“ landen im selben Ordner; der Port bleibt bei IP:Port. Siehe docs/download.md, „Ablage“ (mod#113).
+        for (String adresse : new String[] {"play.example.net", "203.0.113.7", "0"}) {
+            assertEquals("play.example.net/welt-0123456789abcdef", Downloads.weltOrdner(Downloads.Ablage.IP, adresse, "play.example.net", SEED));
+        }
+        assertEquals("play.example.net_25566/welt-0123456789abcdef",
+                Downloads.weltOrdner(Downloads.Ablage.IP_PORT, "0:25566", "play.example.net", SEED));
+        assertEquals("welt-0123456789abcdef", Downloads.weltOrdner(Downloads.Ablage.HASH, "0", "play.example.net", SEED));
+        // Ohne Namen wie bisher; bereinigt wie jede Adresse, auch ein reservierter Name.
+        assertEquals("0/welt-0123456789abcdef", Downloads.weltOrdner(Downloads.Ablage.IP, "0", null, SEED));
+        assertEquals(Downloads.weltOrdner(Downloads.Ablage.IP, "con", SEED), Downloads.weltOrdner(Downloads.Ablage.IP, "x", "con", SEED));
+    }
+
+    @Test
     void einzelspielerNachSpeicherordnerUndHash() {
         // So tief wie eine Welt hinter einer Adresse, damit die Kartenliste sie findet; bereinigt wie ein Host.
         assertEquals("einzelspieler_neue_welt__2_/welt-0123456789abcdef", Downloads.einzelspieler("Neue Welt (2)", SEED));
@@ -52,9 +66,9 @@ class AblageTest {
         welten.merke(server, "minecraft:overworld", 1);
         welten.merke(server, "plugin:farmwelt", 2);
         assertEquals(wurzel.resolve("mc.example.com/welt-0000000000000001/survival"),
-                Downloads.ordner(wurzel, Downloads.Ablage.IP, "mc.example.com", welten, "minecraft:overworld", "survival"));
+                Downloads.ordner(wurzel, Downloads.Ablage.IP, "mc.example.com", null, welten, "minecraft:overworld", "survival"));
         // Eine Dimension, die der Spieler nie betreten hat: kein Ordner, der Download wartet.
-        assertNull(Downloads.ordner(wurzel, Downloads.Ablage.IP, "mc.example.com", welten, "minecraft:the_end", "ende"));
+        assertNull(Downloads.ordner(wurzel, Downloads.Ablage.IP, "mc.example.com", null, welten, "minecraft:the_end", "ende"));
         // Gespeichert: Nach einem Neustart wählt das erste Level die Gruppe, dann ist die Farmwelt wieder bekannt.
         Welten nachher = new Welten(wurzel.resolve("welten.properties"));
         assertNull(nachher.hash(server, "plugin:farmwelt"));
