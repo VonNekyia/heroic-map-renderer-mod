@@ -544,6 +544,9 @@ public final class Bilder implements FabricClientGameTest {
         context.runOnClient(mc -> Tafeln.INSTANZ.antwort(Tafeln.Antwort.lies(TAFEL)));
         context.waitTicks(10);
         Path zeigen = context.takeScreenshot(TestScreenshotOptions.of("tafel-zeigen").disableCounterPrefix());
+        tafelMassstab(context);
+        context.getInput().setCursorPos(breite / 2.0 * k, (hoehe / 2.0 - 24) * k);
+        context.waitTicks(10);
         // Ein Klick hält die Tafel nicht (mod#75): Geht der Zeiger weg, ist sie nach dem Nachlauf zu.
         context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
         context.getInput().setCursorPos(10 * k, (hoehe - 10) * k);
@@ -566,6 +569,80 @@ public final class Bilder implements FabricClientGameTest {
                 throw new UncheckedIOException(e);
             }
         }
+    }
+
+    /** Die innere Linie des Rahmens der Tafel im Skin „ohne“, 1 Einheit der Tafel breit. */
+    private static final int TAFEL_LINIE = 0x3A3A44;
+
+    /**
+     * Die Tafel von „Nordhafen“ bei 1920 × 1080: bei GUI-Massstab 2 wie bisher, bei 4, dem Wert von Auto dort, gleich
+     * gross in Pixeln wie bei 2. Gemessen an der inneren Linie ihres Rahmens im Bildschirmfoto. Siehe docs/ebenen.md, „Infotafel“.
+     */
+    private static void tafelMassstab(ClientGameTestContext context) {
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        int[][] rahmen = new int[2][];
+        int[] einheiten = null;
+        try {
+            context.getInput().resizeWindow(1920, 1080);
+            for (int i = 0; i < 2; i++) {
+                int gs = 2 + 2 * i;
+                context.runOnClient(mc -> {
+                    mc.options.guiScale().set(gs);
+                    mc.resizeGui();
+                });
+                context.waitTicks(5);
+                int echt = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+                int b = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth()), h = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+                if (echt != gs) {
+                    throw new AssertionError("GUI-Massstab " + echt + " statt " + gs);
+                }
+                context.getInput().setCursorPos(10.0 * gs, 10.0 * gs);
+                context.waitTicks(10);
+                context.getInput().setCursorPos(b / 2.0 * gs, (h / 2.0 - 24) * gs);
+                context.waitTicks(12);
+                Path bild = context.takeScreenshot(TestScreenshotOptions.of("tafel-1080-gs" + gs).disableCounterPrefix());
+                rahmen[i] = kastenDerFarbe(bild, TAFEL_LINIE);
+                if (gs == 2) {
+                    einheiten = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelKasten());
+                }
+            }
+        } finally {
+            context.getInput().resizeWindow(vorher[0], vorher[1]);
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(vorher[2]);
+                mc.resizeGui();
+            });
+            context.waitTicks(5);
+        }
+        // Bei GS 2 wie bisher: Die innere Linie liegt 1 Einheit innen, je Einheit 2 Pixel.
+        int breite2 = rahmen[0] == null ? -1 : rahmen[0][2] - rahmen[0][0] + 1, breite4 = rahmen[1] == null ? -1 : rahmen[1][2] - rahmen[1][0] + 1;
+        int hoehe2 = rahmen[0] == null ? -1 : rahmen[0][3] - rahmen[0][1] + 1, hoehe4 = rahmen[1] == null ? -1 : rahmen[1][3] - rahmen[1][1] + 1;
+        if (einheiten == null || Math.abs(breite2 - (einheiten[2] - 2) * 2) > 1 || Math.abs(breite4 - breite2) > 1 || Math.abs(hoehe4 - hoehe2) > 1) {
+            throw new AssertionError("Tafel bei 1920 × 1080: GS 2 " + breite2 + " × " + hoehe2 + " Pixel, GS 4 " + breite4 + " × " + hoehe4
+                    + " Pixel, erwartet beide gleich und bei GS 2 " + (einheiten == null ? "?" : (einheiten[2] - 2) * 2) + " breit");
+        }
+    }
+
+    /** Der Kasten {links, oben, rechts, unten} aller Pixel genau in {@code farbe} im ganzen Bild, oder null. */
+    private static int[] kastenDerFarbe(Path bild, int farbe) {
+        BufferedImage b;
+        try {
+            b = ImageIO.read(bild.toFile());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        int[] k = {Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE};
+        for (int y = 0; y < b.getHeight(); y++) {
+            for (int x = 0; x < b.getWidth(); x++) {
+                if ((b.getRGB(x, y) & 0xFFFFFF) == farbe) {
+                    k[0] = Math.min(k[0], x);
+                    k[1] = Math.min(k[1], y);
+                    k[2] = Math.max(k[2], x);
+                    k[3] = Math.max(k[3], y);
+                }
+            }
+        }
+        return k[0] == Integer.MAX_VALUE ? null : k;
     }
 
     /** Die Farben der Bilder im Test; das Banner hat eine eigene, so findet es der Test im Bild. */

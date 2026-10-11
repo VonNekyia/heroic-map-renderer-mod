@@ -37,7 +37,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [0007](entscheidungen/0007-toenung-auf-der-grafikkarte.md): Die Nadeln auf der Grafikkarte tönen, je Kanal höchstens eine Stufe anders als die Webkarte.
 - [0008](entscheidungen/0008-biom-rahmen-als-vorgabe.md): Der Rahmen „biom“ als Vorgabe, Zuordnung über Tags und Namen in fester Rangfolge, Wechsel nach 2 s; löst 0005 in der Vorgabe ab.
 - [0009](entscheidungen/0009-formen-als-trapeze.md): Füllungen als Trapeze statt Blöcken, ein Budget an Ecken je Neubau statt an Zeit je Frame.
-- [0010](entscheidungen/0010-tafel-200-einheiten.md): Die Infotafel im Mod höchstens 200 Einheiten breit mit 6 Rand, nicht 320 wie auf der Webkarte.
+- [0010](entscheidungen/0010-tafel-200-einheiten.md): Die Infotafel im Mod höchstens 200 Einheiten breit mit 6 Rand, nicht 320 wie auf der Webkarte; die Einheit ist seit 0020 die der Tafel.
 - [0011](entscheidungen/0011-modrinth-mit-curl.md): Releases per Workflow mit curl auf Modrinth, ohne fremde Action mit dem Token.
 - [0012](entscheidungen/0012-marken-statt-verzierungen.md): Der Rahmen zeigt nur die Marken N, O, S, W, genordet fest, gedreht starr mitdrehend, ohne zier; ein Schalter stellt sie ab, der Abstand zum Rand mit der halben Diagonale; löst 0005 in Ornamenten und Marken ab.
 - [0013](entscheidungen/0013-groesse-als-anteil-des-schirms.md): Die Seite der Minimap als Anteil der kürzeren Seite des Schirms, sie folgt dem Fenster; alte Einstellungen ohne Sprung.
@@ -45,6 +45,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [0017](entscheidungen/0017-gametests-in-der-ci-auch-mit-sodium.md): Die Gametests laufen in der CI unter Xvfb, ohne und mit Sodium in der Version des Modpacks, fest mit Prüfsumme und nur für die Gametests.
 - [0018](entscheidungen/0018-api-fuer-client-mods.md): Ebenen anderer Fabric-Mods über `HeroicMapClientApi`, im JSON der Ebenen vom Server, englische Namen, Entrypoint `heroicmap` und Modrinth Maven; bei gleicher Kennung gilt der Server.
 - [0019](entscheidungen/0019-teleport-mit-fester-hoehe.md): „Hierher teleportieren“ mit fester Höhe, aus dem Chunk beim Client, sonst aus Boden oder Höhen der Karte per HTTP, sonst der alte Befehl mit Hinweis; nur die Ablage einer Wurzel, eine Region je Klick.
+- [0020](entscheidungen/0020-tafel-mit-eigenem-massstab.md): Die Infotafel mit eigenem ganzem Massstab bis zum GUI-Massstab, höchstens etwa ein Fünftel der Fensterbreite, geeicht auf 1920 × 1080 bei GS 2.
 - [0014](entscheidungen/0014-eigene-karte-mit-massstab.md): Die eigene Karte mit 1, 2 oder 4 Pixeln je Block, fest bis zum Löschen, der Baum wie ein Download; löst 0004 im Massstab ab.
 - [0015](entscheidungen/0015-ordner-fuer-einzelspielerwelten.md): Ein Ordner der Welt auch im Einzelspieler, unter heroicmap/ nach Speicherordner und Hash, nicht im Speicherordner der Welt; löst 0004 im Einzelspieler ab.
 

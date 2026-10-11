@@ -589,7 +589,27 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   oben. Titel und Labels höchstens 64 Zeichen, Zeilen 120, Bilder 512 × 512,
   Wertungen 20 Punkte; dazu eigene Grenzen, 64 Zeilen je Baustein und 20
   Reihen je Wertung. Texte schlicht, Codes mit `§` gestrichen.
-- **Gesetzt** (`Tafel.setze`) in Einheiten der Oberfläche, mit der Schrift
+- **Massstab:** Die Tafel hat einen eigenen, ganzen Massstab g', Pixel je
+  Einheit der Tafel (`Tafel.massstab`). Er ist der grösste bis zum
+  GUI-Massstab, bei dem die breiteste Tafel, 200 Inhalt und 2 × 6 Rand, also
+  212 Einheiten, höchstens 23 % der Breite des Fensters und 212 Einheiten
+  höchstens die Hälfte seiner Höhe einnehmen; nie unter 2, ausser der
+  GUI-Massstab selbst ist 1. Gezeichnet mit der
+  Pose g'/GUI-Massstab, so liegen die Pixel der Schrift ganz und scharf.
+  So hat es der Reviewer entschieden, siehe
+  [0020](entscheidungen/0020-tafel-mit-eigenem-massstab.md): Bei Auto,
+  auf 1920 × 1080 also GUI-Massstab 4, nahm die Tafel bis 0.2.38 gut 40 %
+  der Breite ein (mod#121).
+  - **Geeicht** auf 1920 × 1080 bei GUI-Massstab 2: dort bleibt g' = 2,
+    die Tafel wie bisher. 23 % statt 22 %, sonst fiele das auf 1.
+  - **Untergrenze 2,** vom Reviewer: Mit 1 wäre die Tafel in kleinen
+    Fenstern zu klein, ihre Schrift kleiner als die der Knöpfe. Kleiner als
+    bei GUI-Massstab 2 wird sie nur, wenn der Spieler selbst 1 gewählt hat.
+  - **Werte:** 1920 × 1080 und 2560 × 1440 geben höchstens 2, 3840 × 2160
+    höchstens 4, 854 × 480 und 1280 × 720 geben 2, wie bisher bei GS 2.
+  - **Lage und Abstände** rechnen in Einheiten der Tafel; Treffer der Maus,
+    Scrollen und Klicks rechnen ihren Kasten zurück in Einheiten des GUI.
+- **Gesetzt** (`Tafel.setze`) in Einheiten der Tafel, mit der Schrift
   des Spiels in ihrer Grösse: Der Inhalt ist so breit wie sein breitester
   Baustein, höchstens 200 Einheiten, und nicht 320 wie auf der Webkarte;
   6 Innenabstand, 4 zwischen Bausteinen, 6 vor einem Abschnitt, siehe
@@ -622,7 +642,7 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   an Pixeln und 1024 Einträge, darüber gibt er die am längsten nicht
   gezeigten frei; so hat es der Reviewer entschieden. Die Deckel der
   Symbole und Banner gelten für sie nicht. Gerechnet in Pixeln des
-  Schirms: Grösser als auf der Tafel mal GUI-Massstab verkleinert der
+  Schirms: Grösser als auf der Tafel mal g' verkleinert der
   Mod ein Bild vorab im eigenen Thread geglättet auf genau diese Grösse
   und zeichnet es Pixel auf Pixel; so bleibt bei grossem Massstab das
   Detail. Kleiner vergrössert er es um einen ganzen Faktor, abgerundet,

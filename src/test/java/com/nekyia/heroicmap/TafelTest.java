@@ -201,4 +201,21 @@ class TafelTest {
         assertEquals(0, Tafel.setze(t, MASSE).hoehe());
         assertNull(Tafeln.Antwort.lies("kein json"));
     }
+
+    /** Der Massstab der Tafel: 1920 × 1080 bei GS 2 bleibt 2, Auto (4) dort auch 2, nie unter 2 ausser bei GS 1, nie über GS. */
+    @Test
+    void eigenerMassstab() {
+        assertEquals(2, Tafel.massstab(1920, 1080, 2));
+        assertEquals(2, Tafel.massstab(1920, 1080, 4));
+        assertEquals(1, Tafel.massstab(1920, 1080, 1));
+        assertEquals(2, Tafel.massstab(1280, 720, 3));
+        assertEquals(2, Tafel.massstab(854, 480, 2));
+        assertEquals(1, Tafel.massstab(854, 480, 1));
+        assertEquals(2, Tafel.massstab(2560, 1440, 4));
+        assertEquals(4, Tafel.massstab(3840, 2160, 4));
+        // Die Höhe zählt mit; in einem flachen oder winzigen Fenster bleibt die Untergrenze 2.
+        assertEquals(2, Tafel.massstab(3840, 800, 4));
+        assertEquals(3, Tafel.massstab(3840, 1300, 4));
+        assertEquals(2, Tafel.massstab(100, 100, 4));
+    }
 }
