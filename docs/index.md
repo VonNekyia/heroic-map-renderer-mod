@@ -42,6 +42,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [0012](entscheidungen/0012-marken-statt-verzierungen.md): Der Rahmen zeigt nur die Marken N, O, S, W, genordet fest, gedreht starr mitdrehend, ohne zier; ein Schalter stellt sie ab, der Abstand zum Rand mit der halben Diagonale; löst 0005 in Ornamenten und Marken ab.
 - [0013](entscheidungen/0013-groesse-als-anteil-des-schirms.md): Die Seite der Minimap als Anteil der kürzeren Seite des Schirms, sie folgt dem Fenster; alte Einstellungen ohne Sprung.
 - [0016](entscheidungen/0016-zweiter-haken-an-der-welt.md): Ein zweiter Haken an `ClientLevel` neben dem an `LevelExtractor.setSectionDirty`, weil Sodium jenen umgeht; gesetzte Truhen erscheinen sofort.
+- [0017](entscheidungen/0017-gametests-in-der-ci-auch-mit-sodium.md): Die Gametests laufen in der CI unter Xvfb, ohne und mit Sodium in der Version des Modpacks, fest mit Prüfsumme und nur für die Gametests.
 - [0018](entscheidungen/0018-api-fuer-client-mods.md): Ebenen anderer Fabric-Mods über `HeroicMapClientApi`, im JSON der Ebenen vom Server, englische Namen, Entrypoint `heroicmap` und Modrinth Maven; bei gleicher Kennung gilt der Server.
 - [0014](entscheidungen/0014-eigene-karte-mit-massstab.md): Die eigene Karte mit 1, 2 oder 4 Pixeln je Block, fest bis zum Löschen, der Baum wie ein Download; löst 0004 im Massstab ab.
 - [0015](entscheidungen/0015-ordner-fuer-einzelspielerwelten.md): Ein Ordner der Welt auch im Einzelspieler, unter heroicmap/ nach Speicherordner und Hash, nicht im Speicherordner der Welt; löst 0004 im Einzelspieler ab.
