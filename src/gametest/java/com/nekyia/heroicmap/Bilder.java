@@ -693,14 +693,14 @@ public final class Bilder implements FabricClientGameTest {
             }
             Ebenen.INSTANZ.teil(t);
             Wegpunkte.INSTANZ.umschalten("test:formen", "see");
-            // Eine eigene Region aus drei Wegpunkten (docs/wegpunkte.md, „Formen aus Wegpunkten“).
-            List<Integer> ids = new ArrayList<>();
+            // Eine eigene Region mit drei Ecken, auf jeder ein Wegpunkt (docs/wegpunkte.md, „Eigene Formen“).
+            List<Wegpunkte.Ecke> ecken = new ArrayList<>();
             for (int[] e : DREIECK) {
                 Wegpunkte.INSTANZ.setze(Ebenen.UEBERWELT, e[0], e[1]);
-                ids.add(Wegpunkte.INSTANZ.punkte().stream().filter(q -> q.x() == e[0] && q.z() == e[1]).findFirst().orElseThrow().id());
+                ecken.add(new Wegpunkte.Ecke(e[0], e[1]));
             }
-            if (!Wegpunkte.INSTANZ.setzeForm(ids)) {
-                throw new AssertionError("Region aus drei Wegpunkten nicht gesetzt");
+            if (!Wegpunkte.INSTANZ.setzeForm(Ebenen.UEBERWELT, ecken)) {
+                throw new AssertionError("Region mit drei Ecken nicht gesetzt");
             }
             Wegpunkte.INSTANZ.umschalten(Wegpunkte.INSTANZ.eigeneFormen().getLast());
             Minimap.INSTANZ.setzeScale(4);
@@ -1083,14 +1083,14 @@ public final class Bilder implements FabricClientGameTest {
             server.runCommand("fill " + (44 + 2 * i) + " -60 -8 60 " + (-60 + i) + " 8 grass_block");
         }
         context.runOnClient(mc -> {
-            // Eine eigene Region aus vier Wegpunkten (docs/wegpunkte.md, „Formen aus Wegpunkten“).
-            List<Integer> ids = new ArrayList<>();
+            // Eine eigene Region mit vier Ecken, auf jeder ein Wegpunkt (docs/wegpunkte.md, „Eigene Formen“).
+            List<Wegpunkte.Ecke> ecken = new ArrayList<>();
             for (int[] e : new int[][] {{38, -4}, {56, -4}, {56, 4}, {38, 4}}) {
                 Wegpunkte.INSTANZ.setze(Ebenen.UEBERWELT, e[0], e[1]);
-                ids.add(Wegpunkte.INSTANZ.punkte().stream().filter(q -> q.x() == e[0] && q.z() == e[1]).findFirst().orElseThrow().id());
+                ecken.add(new Wegpunkte.Ecke(e[0], e[1]));
             }
-            if (!Wegpunkte.INSTANZ.setzeForm(ids)) {
-                throw new AssertionError("Region aus vier Wegpunkten nicht gesetzt");
+            if (!Wegpunkte.INSTANZ.setzeForm(Ebenen.UEBERWELT, ecken)) {
+                throw new AssertionError("Region mit vier Ecken nicht gesetzt");
             }
             Wegpunkte.INSTANZ.umschalten(Wegpunkte.INSTANZ.eigeneFormen().getLast());
             Wegpunkte.INSTANZ.setze(Ebenen.UEBERWELT, 50, 0);

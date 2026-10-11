@@ -1,5 +1,6 @@
 package com.nekyia.heroicmap;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -130,58 +131,97 @@ class WegpunkteTest {
         assertEquals(10, w.punkte().getLast().id());
     }
 
+    private static Wegpunkte.Ecke e(int x, int z) {
+        return new Wegpunkte.Ecke(x, z);
+    }
+
     @Test
-    void formenAusWegpunktenGehenMitUndBleiben(@TempDir Path ordner) {
+    void formenMitEigenenEckenBleiben(@TempDir Path ordner) {
         Wegpunkte w = new Wegpunkte();
         w.lies(ordner);
         w.setze(WELT, 0, 0);
-        w.setze(WELT, 10, 0);
-        w.setze(WELT, 10, 10);
-        w.setze("minecraft:the_nether", 5, 5);
-        List<Integer> ids = w.punkte().stream().map(Wegpunkte.Punkt::id).toList();
-        // Zwei sind eine Linie, drei eine Region; der erste am Ende schliesst nur; eine andere Dimension nicht.
-        assertTrue(w.setzeForm(List.of(ids.get(0), ids.get(1))));
-        assertTrue(w.setzeForm(List.of(ids.get(0), ids.get(1), ids.get(2), ids.get(0))));
-        assertFalse(w.setzeForm(List.of(ids.get(0), ids.get(3))));
-        assertFalse(w.setzeForm(List.of(ids.get(0))));
+        // Zwei Ecken sind eine Linie, drei eine Region; die erste am Ende schliesst nur; eine allein ist keine Form.
+        assertTrue(w.setzeForm(WELT, List.of(e(0, 0), e(10, 0))));
+        assertTrue(w.setzeForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10), e(0, 0))));
+        assertFalse(w.setzeForm(WELT, List.of(e(3, 3))));
+        assertFalse(w.setzeForm(WELT, List.of(e(3, 3), e(3, 3))));
         assertFalse(w.eigeneFormen().get(0).region());
         assertTrue(w.eigeneFormen().get(1).region());
-        assertEquals(List.of(ids.get(0), ids.get(1), ids.get(2)), w.eigeneFormen().get(1).punkte());
-        // Verschoben geht die Region mit.
-        w.verschiebe(w.punkte().get(2), 20, 20);
+        assertEquals(List.of(e(0, 0), e(10, 0), e(10, 10)), w.eigeneFormen().get(1).ecken());
         Ebenen.Flaeche f = (Ebenen.Flaeche) w.form(w.eigeneFormen().get(1));
-        org.junit.jupiter.api.Assertions.assertArrayEquals(new double[] {0.5, 0.5, 20.5, 20.5}, f.box());
-        // Angeheftet zählt in die gemeinsamen 64; über den Neustart bleibt alles.
+        assertArrayEquals(new double[] {0.5, 0.5, 10.5, 10.5}, f.box());
+        // Ein Wegpunkt auf einer Ecke: verschoben oder gelöscht, die Form bleibt, wie sie ist.
+        w.verschiebe(w.punkte().getFirst(), 20, 20);
+        w.loesche(w.punkte().getFirst());
+        assertEquals(List.of(e(0, 0), e(10, 0), e(10, 10)), w.eigeneFormen().get(1).ecken());
+        // Angeheftet zählt in die gemeinsamen 64; über den Neustart bleibt alles, mit der Dimension.
         assertTrue(w.umschalten(w.eigeneFormen().get(1)));
         assertEquals(1, w.angeheftet());
         Wegpunkte nachher = new Wegpunkte();
         nachher.lies(ordner);
         assertEquals(w.eigeneFormen(), nachher.eigeneFormen());
-        // Ein gelöschter Wegpunkt fällt heraus: Die Region wird zur Linie, die Linie verschwindet.
-        nachher.loesche(nachher.punkte().getFirst());
-        assertEquals(1, nachher.eigeneFormen().size());
-        assertEquals(List.of(ids.get(1), ids.get(2)), nachher.eigeneFormen().getFirst().punkte());
-        assertFalse(nachher.eigeneFormen().getFirst().region());
+        assertEquals(WELT, nachher.eigeneFormen().get(1).dimension());
+    }
+
+    @Test
+    void eckeLoeschenUndEinfuegen() {
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        w.setzeForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10)));
+        w.setzeForm(WELT, List.of(e(0, 20), e(10, 20)));
+        Wegpunkte.EigeneForm region = w.eigeneFormen().get(0), linie = w.eigeneFormen().get(1);
+        assertTrue(w.umschalten(region));
+        region = w.eigeneFormen().get(0);
+        // Eine Ecke zwischen der zweiten und dritten; Farbe, Anheften und Stelle bleiben.
+        assertTrue(w.ersetze(region, List.of(e(0, 0), e(10, 0), e(15, 5), e(10, 10))));
+        Wegpunkte.EigeneForm vier = w.eigeneFormen().get(0);
+        assertEquals(List.of(e(0, 0), e(10, 0), e(15, 5), e(10, 10)), vier.ecken());
+        assertEquals(region.farbe(), vier.farbe());
+        assertTrue(vier.angeheftet());
+        // Aus der Region mit drei Ecken wird beim Löschen einer Ecke eine Linie.
+        assertTrue(w.ersetze(vier, List.of(e(0, 0), e(10, 0), e(10, 10))));
+        assertTrue(w.ersetze(w.eigeneFormen().get(0), List.of(e(0, 0), e(10, 10))));
+        assertFalse(w.eigeneFormen().get(0).region());
+        // Die Linie mit zwei Ecken fällt beim Löschen einer Ecke weg.
+        assertTrue(w.ersetze(linie, List.of(e(0, 20))));
+        assertEquals(1, w.eigeneFormen().size());
+        // Über 64 Ecken nimmt sie nicht; eine Form, die es nicht mehr gibt, ändert nichts.
+        List<Wegpunkte.Ecke> viele = new java.util.ArrayList<>();
+        for (int i = 0; i <= Wegpunkte.MAX_PUNKTE_FORM; i++) {
+            viele.add(e(i, 0));
+        }
+        assertFalse(w.ersetze(w.eigeneFormen().get(0), viele));
+        assertFalse(w.ersetze(linie, List.of(e(1, 1), e(2, 2))));
+        assertEquals(List.of(e(0, 0), e(10, 10)), w.eigeneFormen().get(0).ecken());
     }
 
     @Test
     void formenGrenzenUndAlteDatei() {
         Wegpunkte w = new Wegpunkte();
         w.lies((Path) null);
+        List<Wegpunkte.Ecke> viele = new java.util.ArrayList<>();
         for (int i = 0; i <= Wegpunkte.MAX_PUNKTE_FORM; i++) {
-            w.setze(WELT, i, 0);
+            viele.add(e(i, 0));
         }
-        List<Integer> alle = w.punkte().stream().map(Wegpunkte.Punkt::id).toList();
-        assertFalse(w.setzeForm(alle));
-        assertTrue(w.setzeForm(alle.subList(0, Wegpunkte.MAX_PUNKTE_FORM)));
-        // Eine Datei von vor mod#79 ohne „eigene_formen“ liest der Mod ohne Fehler; Verweise ins Leere fallen weg.
+        assertFalse(w.setzeForm(WELT, viele));
+        assertTrue(w.setzeForm(WELT, viele.subList(0, Wegpunkte.MAX_PUNKTE_FORM)));
+        // Eine Datei von vor mod#112 nennt die ids von Wegpunkten: Sie werden zu Ecken auf deren Blöcken, Verweise ins
+        // Leere und Punkte einer anderen Dimension fallen weg, unter zwei Ecken die Form.
         Wegpunkte alt = new Wegpunkte();
         alt.lies(JsonParser.parseString("""
                 {"wegpunkte":[{"id":1,"dimension":"minecraft:overworld","x":1,"z":1,"farbe":0,"minimap":false},
-                  {"id":2,"dimension":"minecraft:overworld","x":2,"z":2,"farbe":0,"minimap":false}],
-                 "eigene_formen":[{"punkte":[1,99,2],"farbe":1,"minimap":false},{"punkte":[99],"farbe":1,"minimap":false}]}
+                  {"id":2,"dimension":"minecraft:overworld","x":2,"z":2,"farbe":0,"minimap":false},
+                  {"id":3,"dimension":"minecraft:the_nether","x":3,"z":3,"farbe":0,"minimap":false}],
+                 "eigene_formen":[{"punkte":[1,99,3,2],"farbe":1,"minimap":true},{"punkte":[99,1],"farbe":1,"minimap":false}]}
                 """).getAsJsonObject());
-        assertEquals(List.of(new Wegpunkte.EigeneForm(List.of(1, 2), 1, false)), alt.eigeneFormen());
+        assertEquals(List.of(new Wegpunkte.EigeneForm(WELT, List.of(e(1, 1), e(2, 2)), 1, true)), alt.eigeneFormen());
+        // Geschrieben wird nur das neue Format, und so liest es sich zurück.
+        String json = alt.json().toString();
+        assertFalse(json.contains("\"punkte\""), json);
+        Wegpunkte zurueck = new Wegpunkte();
+        zurueck.lies(JsonParser.parseString(json).getAsJsonObject());
+        assertEquals(alt.eigeneFormen(), zurueck.eigeneFormen());
+        // Eine Datei von vor mod#79 ohne „eigene_formen“ liest der Mod ohne Fehler.
         Wegpunkte ohne = new Wegpunkte();
         ohne.lies(JsonParser.parseString("{\"wegpunkte\":[]}").getAsJsonObject());
         assertTrue(ohne.eigeneFormen().isEmpty());

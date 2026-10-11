@@ -54,6 +54,8 @@ final class Karte extends Screen {
     private static final int PUNKT = 2;
     /** Die Vorschau einer Region, die der Spieler setzt. */
     private static final int VORSCHAU = 0xCCFFFFFF;
+    /** So weit von der Mitte einer Ecke trifft ein Klick sie noch, in Einheiten des GUI; von zweien die nähere. */
+    private static final double ECKE_TREFFER = 3;
 
     private final Satz satz;
     private final Kacheln kacheln;
@@ -91,6 +93,8 @@ final class Karte extends Screen {
     private int menueX, menueY;
     /** Die Marken des letzten Frames, in der Reihenfolge, in der sie gezeichnet sind. */
     private final List<Marke> marken = new ArrayList<>();
+    /** Die Ecken der eigenen Formen im letzten Frame. */
+    private final List<EckeAn> ecken = new ArrayList<>();
     /** Die Marke des letzten Klicks, wenn es einer auf eine Marke war; ein Doppelklick heftet sie an. */
     private Marke letzte;
     /** Die Marke unter dem Drücken der linken Taste, oder null; ein Zug macht daraus keinen Klick. */
@@ -126,11 +130,24 @@ final class Karte extends Screen {
     record Marke(float x, float y, float halb, double weltX, double weltZ, UUID spieler, Wegpunkte.Punkt punkt, Wegpunkte.Region region) {
     }
 
+    /** Die Ecke {@code index} der eigenen Form {@code form}, auf dem Schirm bei (x, y) in Einheiten des GUI. */
+    record EckeAn(Wegpunkte.EigeneForm form, int index, float x, float y) {
+    }
+
     /** Ist die Lage beim Öffnen gestellt? {@code init} läuft bei jeder Grösse des Fensters und nach jedem Untermenü neu. */
     private boolean gestellt;
-    /** Die Wegpunkte einer Form, die der Spieler gerade baut, als ids in Reihenfolge, und ihre Dimension; sonst null. */
-    private List<Integer> zug;
+    /**
+     * Die Ecken einer Form, die der Spieler gerade baut oder ändert, in Reihenfolge, und ihre Dimension; sonst null.
+     * {@code zugAus} ist die eigene Form, die sie ändert, null für eine neue; die nächste Ecke kommt an {@code zugStelle}.
+     */
+    private List<Wegpunkte.Ecke> zug;
     private String zugDimension;
+    private Wegpunkte.EigeneForm zugAus;
+    private int zugStelle;
+    /** Galt das letzte Drücken der linken Taste der Karte selbst, nicht einem Knopf, dem Menü oder der Tafel? */
+    private boolean aufKarte;
+    /** Die Ecke einer eigenen Form unter dem Drücken der linken Taste, oder null; und die, die an der Maus hängt. */
+    private EckeAn eckeGedrueckt, eckeHaengt;
     /** Die eigene Form unter dem letzten Klick ohne Marke; ein Doppelklick darauf heftet sie an. */
     private Wegpunkte.EigeneForm letzteEigene;
     /** Ist die Liste der Ebenen unter dem Knopf „Ebenen“ offen? Siehe docs/vollbildkarte.md, „Ebenen“. */
@@ -311,6 +328,11 @@ final class Karte extends Screen {
             haengt = gedrueckt.punkt();
             wartend = null;
         }
+        // Ebenso eine Ecke einer eigenen Form. Siehe docs/wegpunkte.md, „Eigene Formen“.
+        if (eckeHaengt == null && taste && eckeGedrueckt != null && !doppelklick && gezogen <= ZUG
+                && Util.getMillis() - gedruecktSeit >= HALTEN_MS) {
+            eckeHaengt = eckeGedrueckt;
+        }
         // Ein Klick auf eine Marke zentriert erst, wenn kein zweiter folgt; so bewegt ein Doppelklick die Karte nicht.
         if (wartend != null && Util.getMillis() - wartendSeit >= MouseHandler.DOUBLE_CLICK_THRESHOLD_MS) {
             zentriere(wartend.weltX(), wartend.weltZ());
@@ -336,6 +358,7 @@ final class Karte extends Screen {
         }
         formen(g);
         regionen(g, mausX, mausY);
+        ecken(g);
         marken(g);
         int[] block = block(mausX, mausY);
         g.text(font, Component.literal(satz.name() + "   ").append(Component.translatable("heroicmap.koordinaten", block[0], block[1])),
@@ -358,6 +381,9 @@ final class Karte extends Screen {
         if (haengt != null) {
             // Der Wegpunkt, der an der Maus hängt, unter dem Zeiger.
             Minimap.wegpunkt(g, mausX, mausY, Minimap.KOPF, Wegpunkte.FARBEN[haengt.farbe()], 0);
+        }
+        if (eckeHaengt != null) {
+            raute(g, mausX, mausY, Wegpunkte.FARBEN[eckeHaengt.form().farbe()]);
         }
         tafel(g, mausX, mausY);
         if (ziel != null) {
@@ -566,6 +592,11 @@ final class Karte extends Screen {
         return ziel;
     }
 
+    /** Für den Gametest: die linke obere Ecke des offenen Menüs, das am Rand des Schirms nach innen rückt. */
+    int[] menueLage() {
+        return new int[] {menueX, menueY};
+    }
+
     /** Für den Gametest: der Fuss eines Orts auf dem Schirm, in Einheiten des GUI, wie gezeichnet. */
     float[] fuss(Ebenen.Ort o) {
         int k = minecraft.getWindow().getGuiScale();
@@ -573,9 +604,19 @@ final class Karte extends Screen {
             aufPixel(blick.rasterY(Projektion.zuPixel(o.z(), satz.scale()), height), k)};
     }
 
-    /** Für den Gametest: die ids der Form im Bau, oder null. */
-    List<Integer> zug() {
+    /** Für den Gametest: die Ecken der Form im Bau, oder null. */
+    List<Wegpunkte.Ecke> zug() {
         return zug == null ? null : List.copyOf(zug);
+    }
+
+    /** Für den Gametest: die Ecke an der Maus, oder null. */
+    EckeAn eckeHaengt() {
+        return eckeHaengt;
+    }
+
+    /** Für den Gametest: die Ecken der eigenen Formen auf dem Schirm, wie gezeichnet. */
+    List<EckeAn> ecken() {
+        return List.copyOf(ecken);
     }
 
     Satz satz() {
@@ -595,7 +636,7 @@ final class Karte extends Screen {
      * angeheftet {@link Wegpunkte#BREITER} breiter, auf ganzen Pixeln wie die Kacheln; dazu die Vorschau
      * einer Form, die der Spieler baut, gepunktet von Wegpunkt zu Wegpunkt und vom letzten zur Maus.
      * Siehe docs/wegpunkte.md, „Regionen“,
-     * und docs/wegpunkte.md, „Formen aus Wegpunkten“.
+     * und docs/wegpunkte.md, „Eigene Formen“.
      */
     private void regionen(GuiGraphicsExtractor g, int mausX, int mausY) {
         if (minecraft.player == null) {
@@ -621,20 +662,72 @@ final class Karte extends Screen {
         }
         g.pose().popMatrix();
         if (zug != null) {
-            // Punkte alle 3 Einheiten, in Weiss, das auf jeder Karte zu sehen ist; zuletzt bis zur Maus.
-            float[] vorher = null;
-            for (int id : zug) {
-                Wegpunkte.Punkt p = Wegpunkte.INSTANZ.punkt(id);
-                float[] jetzt = p == null ? null : schirm(p.x() + 0.5, p.z() + 0.5);
-                if (vorher != null && jetzt != null) {
-                    gepunktet(g, vorher, jetzt);
+            // Punkte alle 3 Einheiten, in Weiss, das auf jeder Karte zu sehen ist; von der Ecke vor der Stelle zur Maus und
+            // von dort zur Ecke danach, wo die nächste hinkommt.
+            float[] maus = {mausX, mausY};
+            for (int i = 0; i < zug.size(); i++) {
+                float[] a = schirm(zug.get(i).x() + 0.5, zug.get(i).z() + 0.5);
+                if (i + 1 < zug.size() && i + 1 != zugStelle) {
+                    gepunktet(g, a, schirm(zug.get(i + 1).x() + 0.5, zug.get(i + 1).z() + 0.5));
                 }
-                vorher = jetzt != null ? jetzt : vorher;
-            }
-            if (vorher != null) {
-                gepunktet(g, vorher, new float[] {mausX, mausY});
+                if (i + 1 == zugStelle) {
+                    gepunktet(g, a, maus);
+                }
+                if (i == zugStelle) {
+                    gepunktet(g, maus, a);
+                }
+                raute(g, a[0], a[1], VORSCHAU);
             }
         }
+    }
+
+    /**
+     * Die Ecken der eigenen Formen dieser Dimension als kleine Rauten in ihrer Farbe, auch die der Form, die gerade
+     * geändert wird; gemerkt für Treffer und Gametests. Siehe docs/wegpunkte.md, „Eigene Formen“.
+     */
+    private void ecken(GuiGraphicsExtractor g) {
+        ecken.clear();
+        if (minecraft.player == null) {
+            return;
+        }
+        String dimension = minecraft.player.level().dimension().identifier().toString();
+        for (Wegpunkte.EigeneForm f : Wegpunkte.INSTANZ.eigeneFormen()) {
+            if (!f.dimension().equals(dimension)) {
+                continue;
+            }
+            for (int i = 0; i < f.ecken().size(); i++) {
+                Wegpunkte.Ecke e = f.ecken().get(i);
+                float[] s = schirm(e.x() + 0.5, e.z() + 0.5);
+                ecken.add(new EckeAn(f, i, s[0], s[1]));
+                if (eckeHaengt == null || eckeHaengt.form() != f || eckeHaengt.index() != i) {
+                    raute(g, s[0], s[1], Wegpunkte.FARBEN[f.farbe()]);
+                }
+            }
+        }
+    }
+
+    /** Eine kleine Raute bei (x, y) in {@code farbe}, mit dunklem Rand, der sie auf jeder Karte zeigt. */
+    private static void raute(GuiGraphicsExtractor g, float x, float y, int farbe) {
+        g.pose().pushMatrix();
+        g.pose().translate(x, y);
+        g.pose().rotate((float) (Math.PI / 4));
+        g.fill(-2, -2, 2, 2, 0xFF000000);
+        g.fill(-1, -1, 1, 1, farbe | 0xFF000000);
+        g.pose().popMatrix();
+    }
+
+    /** Die Ecke einer eigenen Form unter (x, y): die nächste, höchstens {@link #ECKE_TREFFER} weg, oder null. */
+    private EckeAn eckeUnter(double x, double y) {
+        EckeAn beste = null;
+        double abstand = ECKE_TREFFER;
+        for (EckeAn e : ecken) {
+            double d = Math.hypot(x - e.x(), y - e.y());
+            if (d <= abstand) {
+                beste = e;
+                abstand = d;
+            }
+        }
+        return beste;
     }
 
     /** Der Ort (x, z) der Welt auf dem Schirm, in Einheiten des GUI. */
@@ -653,32 +746,69 @@ final class Karte extends Screen {
         }
     }
 
+    /** Beginnt eine neue Form mit einer Ecke auf dem Block (x, z) der Dimension des Spielers. */
+    private void beginne(int x, int z) {
+        zug = new ArrayList<>(List.of(new Wegpunkte.Ecke(x, z)));
+        zugDimension = minecraft.player.level().dimension().identifier().toString();
+        zugAus = null;
+        zugStelle = 1;
+    }
+
+    /** Nimmt die eigene Form der Ecke {@code e} in den Bau; neue Ecken kommen zwischen sie und die nächste. */
+    private void bearbeite(EckeAn e) {
+        zug = new ArrayList<>(e.form().ecken());
+        zugDimension = e.form().dimension();
+        zugAus = e.form();
+        zugStelle = e.index() + 1;
+    }
+
     /**
-     * Fügt den Wegpunkt der Form im Bau an, die damit beginnt, wenn keine im Bau ist. Der erste Punkt
-     * schliesst bei drei und mehr zur Region; ein Punkt einer anderen Dimension, einer, der schon dabei
-     * ist, oder einer über {@link Wegpunkte#MAX_PUNKTE_FORM} kommt nicht dazu.
+     * Setzt eine Ecke auf den Block (x, z) an die Stelle der Form im Bau; ohne Form im Bau beginnt eine. Die erste Ecke
+     * schliesst eine neue Form bei drei und mehr zur Region; eine Ecke, die schon dabei ist, oder eine über
+     * {@link Wegpunkte#MAX_PUNKTE_FORM} kommt nicht dazu.
      */
-    private void hinzu(Wegpunkte.Punkt p) {
+    private void hinzu(int x, int z) {
         if (zug == null) {
-            zug = new ArrayList<>();
-            zugDimension = p.dimension();
-        }
-        if (!p.dimension().equals(zugDimension)) {
+            beginne(x, z);
             return;
         }
-        if (zug.size() >= 3 && zug.getFirst() == p.id()) {
+        Wegpunkte.Ecke e = new Wegpunkte.Ecke(x, z);
+        if (zugAus == null && zug.size() >= 3 && zug.getFirst().equals(e)) {
             fertig();
-        } else if (!zug.contains(p.id()) && zug.size() < Wegpunkte.MAX_PUNKTE_FORM) {
-            zug.add(p.id());
+        } else if (!zug.contains(e) && zug.size() < Wegpunkte.MAX_PUNKTE_FORM) {
+            zug.add(zugStelle++, e);
         }
     }
 
-    /** Speichert die Form im Bau: zwei Punkte eine Linie, drei und mehr eine Region; sagt es, wenn keine mehr passt. */
+    /**
+     * Speichert die Form im Bau: zwei Ecken eine Linie, drei und mehr eine Region; eine geänderte an ihrer Stelle.
+     * Sagt es, wenn keine mehr passt.
+     */
     private void fertig() {
-        if (zug != null && zug.size() >= 2 && !Wegpunkte.INSTANZ.setzeForm(zug)) {
-            hinweis = Component.translatable("heroicmap.karte.formen_voll", Wegpunkte.MAX_EIGENE_FORMEN);
+        if (zug != null && zug.size() >= 2) {
+            if (zugAus != null) {
+                Wegpunkte.INSTANZ.ersetze(zugAus, zug);
+            } else if (!Wegpunkte.INSTANZ.setzeForm(zugDimension, zug)) {
+                hinweis = Component.translatable("heroicmap.karte.formen_voll", Wegpunkte.MAX_EIGENE_FORMEN);
+            }
         }
         zug = null;
+    }
+
+    /** Der Block für eine Ecke unter (x, y): der eines Wegpunkts dort, sonst der einer Ecke im Bau in Reichweite, sonst der darunter. */
+    private int[] eckBlock(double x, double y, Marke m) {
+        if (m != null && m.punkt() != null) {
+            return new int[] {m.punkt().x(), m.punkt().z()};
+        }
+        if (zug != null) {
+            for (Wegpunkte.Ecke e : zug) {
+                float[] s = schirm(e.x() + 0.5, e.z() + 0.5);
+                if (Math.hypot(x - s[0], y - s[1]) <= ECKE_TREFFER) {
+                    return new int[] {e.x(), e.z()};
+                }
+            }
+        }
+        return block(x, y);
     }
 
     /** Die oberste eigene Form dieser Dimension unter (mx, my): in einer Region, oder höchstens 3 Einheiten neben einer Linie. */
@@ -750,6 +880,8 @@ final class Karte extends Screen {
         letzteEigene = null;
         letzterSchalter = null;
         gedrueckt = null;
+        eckeGedrueckt = null;
+        aufKarte = false;
         taste = e.button() == InputConstants.MOUSE_BUTTON_LEFT;
         gezogen = 0;
         druckX = e.x();
@@ -783,7 +915,7 @@ final class Karte extends Screen {
             klickVerbraucht = true;
             return true;
         }
-        // Ebenso auf eine eigene Form aus Wegpunkten. Siehe docs/wegpunkte.md, „Formen aus Wegpunkten“.
+        // Ebenso auf eine eigene Form. Siehe docs/wegpunkte.md, „Eigene Formen“.
         if (doppelt && vorigeEigene != null && taste && getChildAt(e.x(), e.y()).isEmpty() && vorigeEigene.equals(eigeneUnter(e.x(), e.y()))) {
             anheften(Wegpunkte.INSTANZ.umschalten(vorigeEigene), "heroicmap.karte.angeheftet_voll", Wegpunkte.MAX_ANGEHEFTET);
             klickVerbraucht = true;
@@ -816,6 +948,9 @@ final class Karte extends Screen {
             doppelklick = doppelt && vorige != null;
             gedrueckt = doppelklick ? vorige : m;
             gedruecktSeit = Util.getMillis();
+            aufKarte = true;
+            // Eine Ecke lässt sich nur ohne Form im Bau halten, und nur, wo keine Marke liegt.
+            eckeGedrueckt = zug == null && m == null ? eckeUnter(e.x(), e.y()) : null;
             if (doppelklick) {
                 wartend = null;
             }
@@ -840,6 +975,8 @@ final class Karte extends Screen {
             klickVerbraucht = false;
             return true;
         }
+        EckeAn ecke = eckeGedrueckt;
+        eckeGedrueckt = null;
         // Der Wegpunkt an der Maus kommt auf den Block unter ihr, mit Farbe und Anheften.
         if (haengt != null) {
             int[] b = block(e.x(), e.y());
@@ -847,9 +984,20 @@ final class Karte extends Screen {
             haengt = null;
             return true;
         }
-        // Solange eine Form im Bau ist, fügt ein Linksklick ohne Zug auf einen Wegpunkt ihn an, statt ihn zu zentrieren.
-        if (zug != null && m != null && m.punkt() != null && e.button() == InputConstants.MOUSE_BUTTON_LEFT && gezogen <= ZUG && !doppelklick) {
-            hinzu(m.punkt());
+        // Ebenso die Ecke an der Maus; liegt sie dann auf dem Block ihrer Nachbarin, werden beide eine.
+        if (eckeHaengt != null) {
+            int[] b = block(e.x(), e.y());
+            List<Wegpunkte.Ecke> neu = new ArrayList<>(eckeHaengt.form().ecken());
+            neu.set(eckeHaengt.index(), new Wegpunkte.Ecke(b[0], b[1]));
+            Wegpunkte.INSTANZ.ersetze(eckeHaengt.form(), neu);
+            eckeHaengt = null;
+            return true;
+        }
+        // Solange eine Form im Bau ist, setzt ein Linksklick ohne Zug auf die Karte eine Ecke: auf einem Wegpunkt auf
+        // dessen Block, statt ihn zu zentrieren, sonst auf den Block darunter.
+        if (zug != null && aufKarte && e.button() == InputConstants.MOUSE_BUTTON_LEFT && gezogen <= ZUG && !doppelklick) {
+            int[] b = eckBlock(e.x(), e.y(), m);
+            hinzu(b[0], b[1]);
             return true;
         }
         // Ein Klick ohne Zug auf ein Ziel ohne Marke merkt es für einen Doppelklick; eine Tafel hält er nicht. Wie gezeichnet:
@@ -892,7 +1040,7 @@ final class Karte extends Screen {
     private void tafel(GuiGraphicsExtractor g, int mausX, int mausY) {
         long ms = Util.getMillis();
         // Solange eine Form im Bau ist, geht keine Tafel auf: Sie ginge dort auf, wo das Menü war, und läge über
-        // den Wegpunkten, die der Spieler anklickt. Siehe docs/wegpunkte.md, „Formen aus Wegpunkten“.
+        // den Stellen, die der Spieler anklickt. Siehe docs/wegpunkte.md, „Eigene Formen“.
         if (zug != null && zeigen.offen() != null) {
             zeigen.zu();
         }
@@ -1113,15 +1261,26 @@ final class Karte extends Screen {
         neu.add(punkt != null
                 ? new Eintrag(Component.translatable("heroicmap.karte.wegpunkt_loeschen"), () -> Wegpunkte.INSTANZ.loesche(punkt))
                 : new Eintrag(Component.translatable("heroicmap.karte.wegpunkt"), () -> Wegpunkte.INSTANZ.setze(dimension, z[0], z[1])));
-        // Formen aus Wegpunkten: „Punkt hinzufügen“ auf einem Wegpunkt; solange eine im Bau ist, „Form fertig“ und „Form abbrechen“.
-        if (punkt != null) {
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.punkt_hinzu"), () -> hinzu(punkt)));
-        }
-        if (zug != null) {
+        // Eigene Formen: ohne Form im Bau beginnt hier eine, auf einer Ecke kommen neue danach oder sie geht; im Bau eine
+        // Ecke hier, „Form fertig“ und „Form abbrechen“. Siehe docs/wegpunkte.md, „Eigene Formen“.
+        EckeAn ecke = zug == null ? eckeUnter(x, y) : null;
+        if (zug == null) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_von_hier"), () -> beginne(z[0], z[1])));
+        } else {
+            int[] b = punkt != null ? z : eckBlock(x, y, null);
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> hinzu(b[0], b[1])));
             if (zug.size() >= 2) {
                 neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_fertig"), this::fertig));
             }
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_abbrechen"), () -> zug = null));
+        }
+        if (ecke != null) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> bearbeite(ecke)));
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_loeschen"), () -> {
+                List<Wegpunkte.Ecke> rest = new ArrayList<>(ecke.form().ecken());
+                rest.remove(ecke.index());
+                Wegpunkte.INSTANZ.ersetze(ecke.form(), rest);
+            }));
         }
         Wegpunkte.EigeneForm eigen = punkt == null ? eigeneUnter(x, y) : null;
         if (eigen != null) {
@@ -1159,7 +1318,7 @@ final class Karte extends Screen {
     @Override
     public boolean mouseDragged(MouseButtonEvent ereignis, double dx, double dy) {
         // Ein Zug, der in der Tafel beginnt, oder einer mit einem Wegpunkt an der Maus schiebt die Karte nicht.
-        if (klickVerbraucht || haengt != null) {
+        if (klickVerbraucht || haengt != null || eckeHaengt != null) {
             return true;
         }
         // Die Tasten zählen wie in SDL, links ist 1. Siehe docs/entwicklung.md, „Maustasten“.
@@ -1167,6 +1326,7 @@ final class Karte extends Screen {
             gezogen = Math.max(gezogen, Math.hypot(ereignis.x() - druckX, ereignis.y() - druckY));
             if (gezogen > ZUG) {
                 gedrueckt = null;
+                eckeGedrueckt = null;
             }
             blick.schiebe(dx, dy);
             return true;
@@ -1194,8 +1354,9 @@ final class Karte extends Screen {
     @Override
     public boolean keyPressed(KeyEvent ereignis) {
         // Escape lässt zuerst einen Wegpunkt an der Maus, wo er war; das Loslassen danach tut nichts.
-        if (ereignis.key() == InputConstants.KEY_ESCAPE && haengt != null) {
+        if (ereignis.key() == InputConstants.KEY_ESCAPE && (haengt != null || eckeHaengt != null)) {
             haengt = null;
+            eckeHaengt = null;
             klickVerbraucht = true;
             return true;
         }

@@ -1,6 +1,6 @@
 ---
 title: Wegpunkte
-description: Wegpunkte auf der Vollbildkarte setzen und löschen, eigene Linien und Regionen aus Wegpunkten, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
+description: Wegpunkte auf der Vollbildkarte setzen und löschen, eigene Linien und Regionen mit eigenen Ecken, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Wegpunkte.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
@@ -29,8 +29,8 @@ Klick legt eine Marke in die Mitte, ein Doppelklick heftet einen Wegpunkt
 oder Mitspieler an die [Minimap](minimap.md). So hat es der User am 08.10.
 gewünscht. Ebenso heftet ein Doppelklick eine eigene Form oder eine
 Fläche oder einen Kreis vom Server an, siehe „Anheften“ (mod#36). Aus
-Wegpunkten baut der Spieler eigene Linien und Regionen, siehe „Formen aus
-Wegpunkten“ (mod#79).
+Wegpunkten baut der Spieler eigene Linien und Regionen, siehe „Eigene
+Formen“ (mod#79, mod#112).
 
 ## Bedienung
 
@@ -42,11 +42,14 @@ Wegpunkten“ (mod#79).
 | Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder; die Karte bewegt sich dabei nicht, siehe „Doppelklick“ unten |
 | Linke Taste 0,5 s still auf einem Wegpunkt halten | er hängt an der Maus, die Karte zieht nicht mit; beim Loslassen liegt er auf dem Block darunter, mit Farbe und Anheften (`Wegpunkte.verschiebe`). Liegt dort schon einer, bleibt er, wo er war; `Esc` bricht ab. Still heisst: nie weiter als 3 Einheiten vom Druckpunkt weg (`Karte.ZUG`); das Zittern der Hand hin und her zählt nicht, nur der Abstand. Bis 0.2.32 zählte der ganze Weg der Maus: Mit 1 bis 2 Pixeln Zittern fügte ein Linksklick in einer Form im Bau oft nichts an, und Halten ging kaum (mod#112). Unter 0,5 s ist es ein Klick oder ein Zug wie sonst (`Karte.HALTEN_MS`, mod#75). Bis 0.2.36 waren es 2 s, dem User zu lang; 0,5 s hat der Reviewer entschieden (mod#112). Ein Klick dauert kürzer. Nur Wegpunkte, nicht die Rauten eigener Regionen |
 | Doppelklick in eine eigene Region, auf eine eigene Linie, auf die Raute eines alten Rechtecks, auf eine Fläche, einen Kreis, eine Nadel oder ein Banner vom Server | heftet sie an die Minimap oder löst sie wieder, siehe „Anheften“ |
-| Rechtsklick auf einen Wegpunkt, „Punkt hinzufügen“ | beginnt eine Form mit ihm oder fügt ihn an die Form im Bau an, siehe „Formen aus Wegpunkten“ |
-| Linksklick auf einen Wegpunkt, solange eine Form im Bau ist | fügt ihn an, statt ihn in die Mitte zu legen; auf den ersten Punkt schliesst er bei drei und mehr Punkten die Region. Ziehen verschiebt die Karte wie sonst |
-| Rechtsklick, „Form fertig“ | speichert die Form im Bau, mit zwei Punkten eine Linie, mit mehr eine Region; den Eintrag gibt es ab zwei Punkten |
-| Rechtsklick, „Form abbrechen“, oder `Esc` | verwirft die Form im Bau; die Wegpunkte bleiben |
-| Rechtsklick in eine eigene Region oder auf eine eigene Linie | „Form löschen“; die Wegpunkte bleiben |
+| Rechtsklick, „Linie/Region von hier“ | beginnt eine eigene Form mit einer Ecke auf dem Block unter der Maus, auf einem Wegpunkt auf dessen Block, siehe „Eigene Formen“ |
+| Linksklick auf die Karte, solange eine Form im Bau ist | setzt eine Ecke, auf einem Wegpunkt auf dessen Block, statt ihn in die Mitte zu legen, sonst auf den Block darunter; auf die erste Ecke schliesst er bei drei und mehr die Region. Ziehen verschiebt die Karte wie sonst |
+| Rechtsklick, „Eckpunkt hinzufügen“ | im Bau: eine Ecke hier, wie ein Linksklick; auf einer Ecke einer fertigen Form: neue Ecken zwischen ihr und der nächsten |
+| Rechtsklick auf eine Ecke, „Eckpunkt löschen“ | nimmt sie aus der Form; aus einer Region mit drei Ecken wird eine Linie, eine Linie mit zwei fällt weg |
+| Linke Taste 0,5 s still auf einer Ecke halten | sie hängt an der Maus und liegt beim Loslassen auf dem Block darunter; `Esc` bricht ab |
+| Rechtsklick, „Form fertig“ | speichert die Form im Bau, mit zwei Ecken eine Linie, mit mehr eine Region; den Eintrag gibt es ab zwei Ecken |
+| Rechtsklick, „Form abbrechen“, oder `Esc` | verwirft die Form im Bau; eine geänderte bleibt, wie sie war |
+| Rechtsklick in eine eigene Region oder auf eine eigene Linie | „Form löschen“ |
 | Rechtsklick in ein altes Rechteck oder auf seine Raute | „Region löschen“ |
 
 - **Doppelklick:** Das Spiel meldet einen Klick als doppelt, wenn derselbe
@@ -257,34 +260,68 @@ nach oben immer durchsichtiger.
   GUI-Massstab 2 sind es 12 Pixel, die Texel also abwechselnd 1 und 2
   Pixel breit. Ob 6 Einheiten gut aussehen, sieht der User im Spiel.
 
-## Formen aus Wegpunkten
+## Eigene Formen
 
-Eigene Linien und Regionen baut der Spieler aus seinen Wegpunkten, statt
-„Region von hier“, so will es der User (mod#79). Zwei Punkte sind eine
-Linie, drei und mehr eine Region, ein Vieleck in der Folge der Punkte.
+Eigene Linien und Regionen baut der Spieler aus eigenen Ecken, je ein
+Marker wie ein Wegpunkt (mod#79, mod#112). Zwei Ecken sind eine Linie,
+drei und mehr eine Region, ein Vieleck in der Folge der Ecken. Eine Ecke
+ist ein Block (x, z), kein Wegpunkt; so will es der User: „eine Linie
+sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
 
-- **Bauen:** Rechtsklick auf einen Wegpunkt, „Punkt hinzufügen“ beginnt die
-  Form. Danach fügt ein Linksklick ohne Zug auf einen Wegpunkt ihn an, oder
-  wieder „Punkt hinzufügen“ (`Karte.hinzu`). Ein Linksklick auf den ersten
-  Punkt schliesst die Region, sobald drei dabei sind; „Form fertig“ speichert
-  die Form, wie sie ist (`Karte.fertig`, `Wegpunkte.setzeForm`). Solange sie
-  im Bau ist, verbindet eine gepunktete weisse Vorschau die Punkte und den
-  letzten mit der Maus, und unten links steht der Hinweis „Linksklick auf
-  Wegpunkte: Punkt dazu, auf den ersten: Region; Rechtsklick: Form fertig;
-  Esc bricht ab“.
+- **Beginnen:** Rechtsklick, „Linie/Region von hier“ beginnt eine Form mit
+  einer Ecke auf dem Block unter der Maus, auf einem Wegpunkt auf dessen
+  Block (`Karte.beginne`). Den Eintrag gibt es nur, solange keine Form im
+  Bau ist.
+- **Bauen:** Solange eine Form im Bau ist, setzt ein Linksklick ohne Zug
+  auf die Karte eine Ecke (`Karte.hinzu`): auf einem Wegpunkt auf dessen
+  Block, statt ihn in die Mitte zu legen, sonst auf den Block darunter, und
+  höchstens 3 Einheiten neben einer Ecke im Bau auf deren Block
+  (`Karte.eckBlock`). Ebenso Rechtsklick, „Eckpunkt hinzufügen“. Ziehen
+  über `Karte.ZUG` verschiebt die Karte wie sonst. Ein Wegpunkt entsteht
+  dabei nicht. Ein Linksklick auf die erste Ecke schliesst eine neue Form
+  ab drei Ecken zur Region; „Form fertig“ speichert sie, wie sie ist
+  (`Karte.fertig`, `Wegpunkte.setzeForm`).
+- **Im Bau** verbindet eine gepunktete weisse Vorschau die Ecken, mit
+  einer weissen Raute auf jeder, und die Stelle der nächsten Ecke mit der
+  Maus. Unten links steht „Linksklick: Eckpunkt hier oder auf einem
+  Wegpunkt, auf den ersten: Region; Rechtsklick: Menü mit „Form fertig“;
+  Esc bricht ab“. Ein Rechtsklick schliesst nie sofort ab; das Menü hat
+  dann: „Hierher teleportieren“, wenn erlaubt; „Wegpunkt setzen“, auf einem
+  Wegpunkt „Wegpunkt löschen“; „Eckpunkt hinzufügen“; „Form fertig“ ab zwei
+  Ecken; „Form abbrechen“; „Form löschen“ oder „Region löschen“, wenn dort
+  eine liegt.
 - **Keine Tafel,** solange die Form im Bau ist (`Karte.tafel`). Sonst ging
-  die Tafel einer Region vom Server dort auf, wo das Menü „Punkt
-  hinzufügen“ war, rechts unter ihm, lag über den nächsten Wegpunkten und
-  nahm deren Klick; so fügte ein Linksklick bis 0.2.17 auf einem Server
-  mit Ländern oft nichts an (Test des Users am 10.10.).
-- **Nicht dazu** kommt ein Punkt, der schon dabei ist, einer aus einer
-  anderen Dimension oder einer über 64 (`Wegpunkte.MAX_PUNKTE_FORM`). Wer
-  die Dimension wechselt, verliert die Form im Bau.
-- **Verweise:** Jeder Wegpunkt hat eine feste `id`; die Form nennt die ids
-  ihrer Punkte in Reihenfolge (`Wegpunkte.EigeneForm`). Wer einen Wegpunkt
-  verschiebt, verschiebt die Form mit. Wer ihn löscht, nimmt ihn aus jeder
-  Form; bleiben weniger als zwei Punkte, fällt die Form weg. Aus einer
-  Region mit drei Punkten wird so eine Linie.
+  die Tafel einer Region vom Server dort auf, wo das Menü war, lag über den
+  Stellen, die der Spieler anklickt, und nahm deren Klick; so fügte ein
+  Linksklick bis 0.2.17 auf einem Server mit Ländern oft nichts an (Test
+  des Users am 10.10.).
+- **Nicht dazu** kommt eine Ecke, die schon dabei ist, ausser der ersten
+  zum Schliessen, und keine über 64 (`Wegpunkte.MAX_PUNKTE_FORM`). Wer die
+  Dimension wechselt, verliert die Form im Bau.
+- **Ecken** stehen auf der Vollbildkarte als kleine Rauten in der Farbe
+  ihrer Form, mit dunklem Rand, immer, unter den Marken (`Karte.ecken`).
+  Ein Klick trifft die Ecke, deren Mitte am nächsten liegt, höchstens 3
+  Einheiten weg (`Karte.eckeUnter`); liegen zwei eng, die nähere, nicht die
+  zuletzt gezeichnete. Ein Wegpunkt auf derselben Stelle geht beim
+  Linksklick vor; der Rechtsklick dort zeigt die Einträge für beide.
+- **Eckpunkt hinzufügen** auf einer Ecke einer fertigen Form: Die Form kommt
+  in den Bau (`Karte.bearbeite`), neue Ecken kommen zwischen diese und die
+  nächste, jede weitere hinter die vorige neue. Nach der letzten Ecke einer
+  Region ist die erste die nächste; an der letzten einer Linie hängt sie
+  hinten an. „Form fertig“ speichert an derselben Stelle, mit Farbe und
+  Anheften (`Wegpunkte.ersetze`); „Form abbrechen“ oder `Esc` lässt die Form,
+  wie sie war.
+- **Eckpunkt löschen** auf einer Ecke nimmt sie heraus, die Form bleibt.
+  Aus einer Region mit drei Ecken wird eine Linie; eine Linie mit zwei Ecken
+  fällt weg, eine Ecke allein ist keine Form.
+- **Verschieben:** Linke Taste 0,5 s still auf einer Ecke halten, wie bei
+  einem Wegpunkt: Sie hängt an der Maus, beim Loslassen liegt sie auf dem
+  Block darunter; `Esc` bricht ab. Liegt sie dann auf dem Block ihrer
+  Nachbarin, werden beide eine.
+- **Wegpunkte** und Formen sind getrennt. Wer einen Wegpunkt verschiebt
+  oder löscht, ändert keine Form. Bis 0.2.37 nannte eine Form die ids ihrer
+  Wegpunkte und ging mit ihnen; eine alte Datei zieht beim Lesen um, siehe
+  „Ablage“.
 - **Höchstens 256** Formen je Welt (`Wegpunkte.MAX_EIGENE_FORMEN`);
   darüber speichert „Form fertig“ nichts, und unten links steht „Höchstens
   256 eigene Formen“.
@@ -293,13 +330,16 @@ Linie, drei und mehr eine Region, ein Vieleck in der Folge der Punkte.
 - **Gezeichnet** auf der Vollbildkarte über den Formen der Ebenen
   (`Wegpunkte.form`, `Wegpunkte.karte`): eine Region als Fläche in ihrer
   Farbe zu 25 % mit 1 Einheit Rand, eine Linie 2 Einheiten breit, beide
-  durch die Mitten der Blöcke ihrer Wegpunkte. Die Wegpunkte selbst stehen
-  darüber wie sonst.
+  durch die Mitten der Blöcke ihrer Ecken.
+- **Höhe:** Eine Ecke hat nur x und z. Der Schleier einer angehefteten
+  Region nimmt die Höhe je Stück aus der Höhenkarte des Spiels und lässt
+  Stücke in Chunks aus, die nicht geladen sind, bis sie es sind; siehe
+  „Schleier“. Strahlen stehen nur über Wegpunkten.
 - **Treffer:** in einer Region, oder höchstens 3 Einheiten des GUI neben
   einer Linie (`Karte.eigeneUnter`, `Tafeln.abstand`); überlappen zwei, die
   zuletzt gebaute. Ein Wegpunkt geht vor.
 - **Löschen:** Rechtsklick in die Region oder auf die Linie, „Form
-  löschen“. Die Wegpunkte bleiben.
+  löschen“.
 - **Anheften:** Doppelklick, siehe „Anheften“. Auch Linien, entschieden
   vom Reviewer; den Schleier in der Welt bekommen nur Regionen.
 
@@ -393,7 +433,7 @@ Schleier am Rand, siehe „Schleier“.
 
   ```json
   {"wegpunkte":[{"id":1,"dimension":"minecraft:overworld","x":12,"z":-40,"farbe":0,"minimap":true}],
-   "eigene_formen":[{"punkte":[1,2,3],"farbe":2,"minimap":false}],
+   "eigene_formen":[{"dimension":"minecraft:overworld","ecken":[[12,-40],[30,-40],[30,-20]],"farbe":2,"minimap":false}],
    "regionen":[{"dimension":"minecraft:overworld","x0":2,"z0":-5,"x1":10,"z1":3,"farbe":1,"minimap":false}],
    "spieler":["00000000-0000-0000-0000-000000000001"],
    "formen":[{"ebene":"b:staedte","id":"westmark"}],
@@ -401,15 +441,20 @@ Schleier am Rand, siehe „Schleier“.
   ```
 
   `farbe` ist ein Index in `Wegpunkte.FARBEN`, `minimap` heisst angeheftet,
-  `eigene_formen` nennt die ids ihrer Wegpunkte in Reihenfolge,
+  `eigene_formen` nennt ihre Dimension und die Blöcke ihrer Ecken in Reihenfolge,
   `spieler` sind die angehefteten Mitspieler, `formen` die angehefteten
   Flächen und Kreise vom Server, `nadeln` die angehefteten Nadeln und
   Banner. Eine Region nennt die Blöcke ihrer Ecken,
   `x0` ≤ `x1` und `z0` ≤ `z1`, beide samt. Eine Datei von vor mod#36 ohne
   `formen` oder von vor mod#71 ohne `nadeln` liest der Mod ohne Fehler.
   Wegpunkte von vor mod#79 ohne `id`, oder mit einer doppelten, bekommen
-  beim Lesen eine neue (`Wegpunkte.vergibIds`); einer Form, deren Punkte
-  fehlen, fallen sie heraus wie beim Löschen.
+  beim Lesen eine neue (`Wegpunkte.vergibIds`). Eine Form von vor mod#112
+  nennt statt `ecken` in `punkte` die ids von Wegpunkten: Beim Lesen werden
+  sie zu Ecken auf den Blöcken, auf denen die Wegpunkte jetzt liegen, die
+  Dimension die des ersten; fehlende ids und Wegpunkte einer anderen
+  Dimension fallen weg, unter zwei Ecken die Form. Die Wegpunkte bleiben.
+  Geschrieben wird nur das neue Format. Eine ältere Version des Mods liest
+  Formen ohne `punkte` nicht und verliert sie beim nächsten Speichern.
 - **Schreiben** nach jeder Änderung, über `wegpunkte.json.tmp`, dann
   verschieben; nie liegt eine halbe Datei da.
 - **Lesen:** Ein unlesbarer Eintrag fällt weg, die übrigen bleiben. Ist die
@@ -429,8 +474,11 @@ Schleier am Rand, siehe „Schleier“.
   `breiterOhneRandNimmtDieFuellung`. Zu Nadeln: `nadelnAnheftenUndBehalten`,
   `hoechstens64NadelnEigeneGrenze` und `nadelnAufDerMinimapNurAngeheftet`.
   Zur ganzen Ebene: `ganzeEbeneAnheftenUndLoesen` und
-  `ganzeEbeneHaeltDieGrenzen`. Zu Formen aus Wegpunkten: `festeIdsAuchAusAltenDateien`,
-  `formenAusWegpunktenGehenMitUndBleiben` und `formenGrenzenUndAlteDatei`.
+  `ganzeEbeneHaeltDieGrenzen`. Zu eigenen Formen: `festeIdsAuchAusAltenDateien`,
+  `formenMitEigenenEckenBleiben` (auch: Wegpunkte verschieben oder löschen
+  ändert keine Form), `eckeLoeschenUndEinfuegen` (Region mit drei Ecken wird
+  Linie, Linie mit zwei fällt weg, über 64 nicht) und
+  `formenGrenzenUndAlteDatei` (Umzug von `punkte` zu `ecken`).
 - `SchleierTest`: Teilen an jeder ganzen Zahl, auch rückwärts und durch
   eine Ecke; ein Rechteck ein Stück je Block, nur im Kasten; ein Kreis in
   Sehnen über den Bogen, ein Kreis von 100 000 Blöcken nur beim Kasten;
@@ -463,21 +511,30 @@ Schleier am Rand, siehe „Schleier“.
   ruhen, drücken, zwei Ticks halten und eine halbe Einheit zittern,
   loslassen (`Bedienung.spielerKlick`); zwei Ticks bleiben auch auf einem
   langsamen Runner unter den 0,5 s des Haltens. Fünf Wegpunkte über „Wegpunkt
-  setzen“; auf dem ersten „Punkt hinzufügen“, die Tafel der Region geht
+  setzen“; auf dem ersten „Linie/Region von hier“, die Tafel der Region geht
   auf, wo das Menü war; Linksklicks auf den dritten, rechts unter dem
-  Menü, den zweiten und den ersten schliessen eine Region; „Punkt
-  hinzufügen“, ein Linksklick und „Form fertig“ geben eine Linie; ein
+  Menü, den zweiten und den ersten schliessen eine Region; „Linie/Region
+  von hier“, ein Linksklick und „Form fertig“ geben eine Linie; ein
   Doppelklick in die Region heftet sie an und nicht die Region vom Server;
   ein Doppelklick von Hand auf einen Wegpunkt in ihr heftet ihn an, und
   die Karte bleibt stehen; „Form löschen“ löscht die Region. Im Tempo
   eines Spielers (mod#112, `Bedienung.tempoKlick`: der Zeiger kommt einen
   Tick vor dem Drücken an, Drücken und Loslassen im selben Frame, die
-  Pause nach der Uhr): auf einem Wegpunkt „Punkt hinzufügen“, dann
+  Pause nach der Uhr; kommt der Zeiger auf einem langsamen Rechner später an, drückt er gleich): auf einem Wegpunkt „Linie/Region von hier“, dann
   Linksklicks auf drei weitere, 300, 220 und 200 ms nach dem vorigen
   Drücken, der erste 12 Einheiten neben dem ersten Punkt; alle drei fügen
   an, auch die zwei, die das Spiel als Doppelklick meldet
   (`formImTempo`). Ein Klick auf B 220 ms nach einem auf A legt B in die
-  Mitte und heftet A nicht an (`zweiMarkenImTempo`).
+  Mitte und heftet A nicht an (`zweiMarkenImTempo`). Der Weg des Users
+  (`formAufLeererKarte`): „Linie/Region von hier“ auf leerer Karte, drei
+  Linksklicks auf leere Stellen, 300, 220 und 200 ms nach dem vorigen, und
+  einer nah an der ersten Ecke geben eine Region mit vier Ecken, ohne
+  neuen Wegpunkt. Ecken bearbeiten (`eckenBearbeiten`): zwei Ecken 4
+  Einheiten auseinander, ein Rechtsklick eine Einheit neben der zweiten
+  löscht die zweite; „Eckpunkt hinzufügen“ an der ersten setzt die neue an
+  die zweite Stelle; 700 ms gehalten hängt eine Ecke an der Maus und liegt
+  nach dem Loslassen 2 bis 3 Blöcke weiter; eine Linie mit zwei Ecken fällt
+  beim Löschen einer weg.
 - `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
   [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und
