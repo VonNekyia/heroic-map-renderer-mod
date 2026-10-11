@@ -1,8 +1,21 @@
+import java.security.MessageDigest
+
 plugins {
     alias(libs.plugins.fabric.loom)
 }
 
+// Sodium nur für die Gametests mit -Psodium, aus dem Maven von Modrinth und von dort nichts sonst.
+// Siehe docs/entscheidungen/0017-gametests-in-der-ci-auch-mit-sodium.md.
+repositories {
+    exclusiveContent {
+        forRepository { maven("https://api.modrinth.com/maven") { name = "Modrinth" } }
+        filter { includeGroup("maven.modrinth") }
+    }
+}
+val sodium = configurations.create("sodium") { isTransitive = false }
+
 dependencies {
+    sodium(libs.sodium)
     minecraft(libs.minecraft)
     implementation(libs.fabric.loader)
     implementation(libs.fabric.api)
@@ -56,6 +69,9 @@ val bilder = providers.gradleProperty("bilder").map { file(it).absolutePath }.or
 val messung = providers.gradleProperty("messung").map { file(it).absolutePath }.orElse("")
 val uebernahme = providers.gradleProperty("uebernahme").map { file(it).absolutePath }.orElse("")
 val server = providers.gradleProperty("server").orElse("")
+val mitSodium = providers.gradleProperty("sodium").isPresent
+val sodiumJar = files(sodium)
+val sodiumSha256 = libs.versions.sodium.sha256.get()
 tasks.matching { it.name == "runClientGameTest" }.configureEach {
     (this as JavaExec).systemProperty("heroicmap.bilder", bilder.get())
     systemProperty("heroicmap.messung", messung.get())
@@ -63,7 +79,20 @@ tasks.matching { it.name == "runClientGameTest" }.configureEach {
     systemProperty("heroicmap.messung.rahmen", providers.gradleProperty("messungRahmen").orElse("ohne").get())
     systemProperty("heroicmap.uebernahme", uebernahme.get())
     systemProperty("heroicmap.server", server.get())
-    providers.gradleProperty("zusatzmods").orNull?.let { systemProperty("fabric.addMods", file(it).absolutePath) }
+    val zusatz = providers.gradleProperty("zusatzmods").orNull?.let { file(it).absolutePath }
+    zusatz?.let { systemProperty("fabric.addMods", it) }
+    if (mitSodium) {
+        // Lokale Kopien: Die Aktion darf das Skript nicht festhalten, sonst geht der Configuration Cache nicht.
+        val jars = sodiumJar
+        val soll = sodiumSha256
+        // Erst die Prüfsumme, dann ins Spiel: Ein anderes Jar unter derselben Version bricht den Lauf ab.
+        doFirst {
+            val jar = jars.singleFile
+            val sha = MessageDigest.getInstance("SHA-256").digest(jar.readBytes()).joinToString("") { "%02x".format(it) }
+            check(sha == soll) { "${jar.name}: SHA-256 $sha statt $soll" }
+            (this as JavaExec).systemProperty("fabric.addMods", listOfNotNull(zusatz, jar.absolutePath).joinToString(File.pathSeparator))
+        }
+    }
     // Der Server-Fall von Blockentities nur mit einer eula.txt, die ein Mensch angenommen hat; der Test kopiert sie unverändert.
     systemProperty("heroicmap.eula", providers.gradleProperty("eula").map { file(it).absolutePath }.orElse("").get())
 }

@@ -75,8 +75,8 @@ Das baut das Jar nach `build/libs/` und lässt die Tests laufen.
 
 ## Gametests
 
-Die Client-Gametests starten das Spiel mit einem Fenster und laufen nicht
-in der CI:
+Die Client-Gametests starten das Spiel mit einem Fenster, in der CI unter
+Xvfb, siehe „CI“:
 
 ```bash
 ./gradlew runClientGameTest
@@ -86,8 +86,14 @@ Mit `-Pzusatzmods=<ordner>` lädt das Spiel im Gametest zusätzlich die
 Mods aus diesem Ordner (`fabric.addMods`), etwa die eines Modpacks ohne
 Fabric API und ohne diesen Mod. So lässt sich prüfen, ob eine andere Mod
 stört; seit 26.x sind die Namen im Spiel nicht mehr verschleiert, fertige
-Mods laufen deshalb auch hier. Für `Blockentities` reicht ein Ordner mit
-`sodium-fabric-0.9.2+mc26.3.jar`.
+Mods laufen deshalb auch hier.
+
+Mit `-Psodium` lädt das Spiel zusätzlich Sodium in der Version des
+Modpacks, heute `sodium-fabric-0.9.2+mc26.3`, aus dem Maven von Modrinth
+(Configuration `sodium`). Vor dem Lauf prüft der Build die SHA-256 aus
+`gradle/libs.versions.toml` und bricht bei Abweichung ab. So läuft auch
+die CI, siehe [0017](entscheidungen/0017-gametests-in-der-ci-auch-mit-sodium.md).
+Beide Schalter lassen sich verbinden.
 
 Mit `-Peula=<datei>` startet `Blockentities` zusätzlich einen Server des
 Tests (`createServer`), mit dem sich der Client übers Netz verbindet. Der
@@ -102,7 +108,7 @@ er den Server-Fall mit einer Zeile im Log, so auch in der CI.
 | `Anmeldung` | die Reihenfolge beim Login: Beim ersten Level gibt es den Spieler noch nicht, wohl aber die Verbindung des Levels, aus der `Downloads.server` liest, siehe [Download](download.md), „Ablage“ |
 | `Bilder` | baut eine Szene und nimmt die Minimap auf, danach das Menü und die Vollbildkarte aus einem Testsatz mit zwei Wegpunkten, das Untermenü „Einstellungen …“, jeden Rahmen eckig und rund und das Menü mit Rahmen, auch mit halben Marken und dem Tooltip, die drehende Minimap, das ganze Fenster bei 854 × 480 und 1280 × 720 mit der Seite im Verhältnis, die Szene `formen` mit Flächen, Kreis, Linie und Kartenschrift und der offenen Liste der Ebenen, die Szene `orte` mit Nadeln, einem Banner und ihren Namen, gleich gross auf zwei Stufen der Vollbildkarte, und „Unicode-Schrift erzwingen“, das die Generation der Kartenschrift hebt, zuletzt die selbst gezeichnete Karte der Szene, in der Einzelspielerwelt mit 2 px gewählt über die Knöpfe und den Umschalter, neben der Minimap, die als beschäftigt gilt, auch mit Chunklinien; mit `-Pbilder=<ordner>` landen die Bilder dort, siehe [Minimap](minimap.md), „Bilder“, und [Vollbildkarte](vollbildkarte.md), „Bild“; ein Banner mit Entwurf und Krone als Sprite um seinen Fuss, am Bildschirmfoto geprüft; ein Banner einer geheimen Ebene, dessen Sprite über den Kanal kommt, am Bildschirmfoto um seinen Fuss |
 | `Bedienung` | leert zu Beginn den Ordner der Einzelspielerwelt (`Bilder.leereWelt`), wie `Bilder`; das Menü und die Vollbildkarte mit echten Eingaben der Maus (`TestInput`): im Menü verschiebt Ziehen mit der linken wie der rechten Taste die ganze Minimap, auch vom Spieler aus; ein Klick auf den Spieler schaltet die Darstellung, einer auf eine Marke den Rahmen, auch gedreht, mit Verzierungen aus und ohne Rahmen auf den halben Marken, im Untermenü ebenso; ein Klick auf die Karte daneben schaltet nichts, Ziehen von einer Marke verschiebt nur, der Griff ändert nur die Grösse, der Zoom nur den Zoom; auf der Karte verschiebt links ziehen den Inhalt, ein Linksklick öffnet kein Menü, ein Rechtsklick öffnet „Hierher teleportieren“, ein Klick darauf teleportiert; Wegpunkte setzen, ziehen und klicken auf Marken am Rand, Doppelklick, Wegpunkt am eigenen Standort, einen Kreis und eine Nadel vom Server und ein altes Rechteck anheften; eine Region und eine Linie aus Wegpunkten bauen, die Region per Doppelklick anheften und löschen; die Liste der Ebenen aufklappen, eine Ebene mit „An/Aus“ aus- und anschalten, auch per Doppelklick, ohne dass etwas angeheftet wird, per Doppelklick auf den Namen ganz anheften und lösen, zuklappen; Menü und Untermenü bei 1280 × 720 und GUI-Massstab 3; siehe [Minimap](minimap.md), „Bedienung“, [Vollbildkarte](vollbildkarte.md), „Bedienung“, und [Wegpunkte](wegpunkte.md), „Tests“ |
-| `Blockentities` | Truhe, Tür, Schild und Kopf, im Einzelspieler und mit `-Peula` auf einem Server des Tests gesetzt und abgebaut wie ein Spieler, mit Rechts- und Linksklick; die Minimap zeigt sie ohne weiteres Zutun, verglichen am Bildschirmfoto an der Stelle des Blocks. Mit Sodium über `-Pzusatzmods`; siehe [Minimap](minimap.md), „Neu zeichnen“ |
+| `Blockentities` | Truhe, Tür, Schild und Kopf, im Einzelspieler und mit `-Peula` auf einem Server des Tests gesetzt und abgebaut wie ein Spieler, mit Rechts- und Linksklick; die Minimap zeigt sie ohne weiteres Zutun, verglichen am Bildschirmfoto an der Stelle des Blocks. Mit Sodium über `-Psodium`; siehe [Minimap](minimap.md), „Neu zeichnen“ |
 | `Spieler` | der eigene Spieler auf der Minimap als Kopf mit Pfeil, nur Pfeil und Kopf halb durchsichtig, je bei GUI-Massstab 1, 2 und 3, gedreht und ungedreht: der Pfeil waagrecht mittig, höchstens 0,5 px daneben, am Bildschirmfoto; mit `-Pbilder=<ordner>` die drei Darstellungen als Bild, siehe [Minimap](minimap.md), „Spieler“ |
 | `Messung` | nur mit `-Pmessung=<datei>`: Zeit je Chunk und Frametime mit und ohne Minimap, siehe [Minimap](minimap.md), „Kosten“ |
 | `Server` | nur mit `-Pserver=<adresse>`: von Ende zu Ende gegen einen echten Paper-Server mit dem Plugin, Angebot, voller Download des kleinsten Massstabs des ersten Baums, jeder Dialog mit Ja, die Vollbildkarte als Bild `server-karte`; siehe unten |
@@ -166,11 +172,36 @@ aus Pixeln. Bis 0.2.14 war es die Insel aus dem Banner des Hauptrepositorys.
 
 ## CI
 
-`.github/workflows/ci.yml` hat zwei Jobs:
+`.github/workflows/ci.yml` hat drei Jobs:
 
 - **Gradle:** `./gradlew build compileGametestJava` unter Ubuntu mit
-  Java 25. Die Gametests kompiliert er nur; laufen lassen kann er sie
-  nicht, sie brauchen ein Fenster des Spiels.
+  Java 25. Die Gametests kompiliert er nur, laufen tun sie im nächsten Job.
+- **Gametests:** `./gradlew runClientGameTest` unter `xvfb-run`, ein
+  Fenster ohne Bildschirm mit 24 Bit Farbtiefe und OpenGL in Software über
+  Mesa (llvmpipe). Als Matrix zweimal nebeneinander: `ohne` und `sodium` mit
+  `-Psodium`, siehe „Gametests“ und
+  [0017](entscheidungen/0017-gametests-in-der-ci-auch-mit-sodium.md).
+  - **EGL statt GLX** (`SDL_VIDEO_FORCE_EGL=1`): Über GLX fand SDL3 unter
+    Xvfb kein Visual für das Fenster des Spiels, obwohl `glxinfo` OpenGL
+    4.5 meldete. Das Spiel verlangt einen Core-Kontext 3.3 mit
+    sRGB-fähigem Framebuffer (`GlBackend.createWindow`, per javap in
+    26.3); woran GLX scheiterte, ist nicht belegt. Über EGL nimmt das
+    Spiel sein OpenGL-Backend, 4.5 Core auf llvmpipe, mit und ohne Sodium.
+  - **Ohne Backend** zeigt das Spiel einen Dialog mit dem Fehler
+    (`MessageBox.error` in `Minecraft`, per javap) und wartet auf einen
+    Klick, der unter Xvfb nie kommt. Steht `Failed to create backend`
+    zweimal im Log, für OpenGL und Vulkan, beendet der Schritt das Spiel
+    und wird rot, statt bis zum Limit zu hängen.
+  - **Dauer,** Stand 11.10., Lauf von `e6c0706`: der Schritt 3 min 35 s
+    ohne, 3 min 20 s mit Sodium; lokal sind es gut 2 min. Davon rund 55 s
+    bis zur ersten Welt, `Bilder` rund 52 s, `Bedienung` rund 60 s, die
+    übrigen Gametests je 5 bis 15 s. Zugeordnet nach den Welten im Log in
+    der Reihenfolge der Einträge in `fabric.mod.json`. Das Limit am Schritt
+    sind 10 min.
+  - **In Software** riss keine Prüfung am Bildschirmfoto; keine Schwelle
+    ist dafür gelockert.
+  - Scheitert ein Lauf, lädt er Log und Bildschirmfotos als Artefakt hoch.
+    Noch kein Pflicht-Check für den Merge.
   `gradle/actions/setup-gradle` prüft dabei auch, dass `gradle-wrapper.jar`
   ein Wrapper von Gradle ist.
 - **Doku:** `pruefe-doku.sh` vom Branch `master` des Hauptrepositorys,
