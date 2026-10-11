@@ -87,6 +87,30 @@ final class Servername {
         return true;
     }
 
+    /**
+     * Gilt der Name für eine Welt in dieser Sitzung? Nur, wenn ihr Ordner nach der Adresse {@code alt} fehlt oder jetzt
+     * nach {@code neu} umzieht. Läuft ein Download in {@code alt}, gibt es {@code neu} schon oder scheitert der Umzug,
+     * nein; dann versucht es das nächste Betreten wieder.
+     */
+    static boolean gilt(Path alt, Path neu, boolean belegt) {
+        if (alt.equals(neu) || !Files.isDirectory(alt)) {
+            return true;
+        }
+        if (belegt) {
+            return false;
+        }
+        try {
+            boolean umgezogen = zieheUm(alt, neu);
+            if (umgezogen) {
+                LOGGER.info("Heroic Map: {} nach {} umgezogen", alt, neu);
+            }
+            return umgezogen;
+        } catch (IOException e) {
+            LOGGER.warn("Heroic Map: {} nicht nach {} umgezogen", alt, neu, e);
+            return false;
+        }
+    }
+
     /** Die Adresse, wie der Spieler sie eingetippt hat, ohne Gross und Klein und ohne Leerzeichen. */
     private static String schluessel(String adresse) {
         return adresse.trim().toLowerCase(Locale.ROOT).replace(' ', '_');

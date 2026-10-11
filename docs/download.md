@@ -270,19 +270,26 @@ Einzelheiten stehen im Log.
     klein, und der Name (`Servername`). Ein `angebot` mit Namen trägt ihn
     ein, eines ohne nimmt ihn heraus. Ohne `angebot`, etwa auf einem Server
     ohne Baum zum Download, bleibt der gemerkte Name.
-  - **Ab dem nächsten Betreten einer Welt,** nicht mitten in einer
-    (`Downloads.weltBetreten`): Wegpunkte, Ebenen, eigene Karte und ein
-    laufender Download hängen am Ordner. Die erste Sitzung mit einem Namen
-    bleibt im Ordner der Adresse.
-  - **Umzug:** Beim Betreten zieht der Ordner der Welt nach der Adresse
-    einmal zum Namen um, mit allem darin, als ein Umbenennen
-    (`Servername.zieheUm`, `ATOMIC_MOVE`), ohne neuen Download. Nur, wenn
-    der neue Ordner noch fehlt und kein Download in den alten läuft
-    (`Reihe.belegtUnter`); sonst beim nächsten Betreten wieder. Ein leerer
-    Ordner der Adresse, etwa `heroicmap/0/`, geht mit. Gibt es den neuen
-    schon, etwa weil derselbe Server unter zwei Adressen eingetragen ist,
-    bleibt der alte in der Kartenliste zum Löschen; zusammengeführt wird
-    nicht.
+  - **Einmal je Sitzung:** Den Namen liest der Mod beim ersten Betreten
+    nach einem Login (`Downloads.weltBetreten` nach `neueSitzung`), nicht
+    bei jedem Wechsel der Dimension und nicht beim Respawn. Wegpunkte,
+    Ebenen, eigene Karte und ein laufender Download hängen am Ordner. Die
+    erste Sitzung mit einem Namen bleibt deshalb im Ordner der Adresse.
+  - **Je Welt fest bis zur nächsten Sitzung:** Beim ersten Betreten einer
+    Welt in der Sitzung, je Hash, entscheidet `Servername.gilt`, ob der
+    Name dort gilt. Ja, wenn es ihren Ordner nach der Adresse nicht gibt
+    oder er jetzt umzieht. Nein, wenn ein Download in den alten läuft
+    (`Reihe.belegtUnter`), wenn es den neuen schon gibt oder wenn der Umzug
+    scheitert, etwa an einem offenen Handle unter Windows. Dann bleibt die
+    Welt in dieser Sitzung im Ordner der Adresse, und das nächste Betreten
+    nach einem Login versucht es wieder. So liegen Karte, Wegpunkte und
+    Ebenen einer Welt nie in zwei Ordnern.
+  - **Umzug:** Der Ordner der Welt nach der Adresse zieht mit allem darin
+    zum Namen um, als ein Umbenennen (`Servername.zieheUm`,
+    `ATOMIC_MOVE`), ohne neuen Download. Ein leerer Ordner der Adresse,
+    etwa `heroicmap/0/`, geht mit. Gibt es den neuen schon, etwa weil
+    derselbe Server unter zwei Adressen eingetragen ist, bleibt der alte
+    in der Kartenliste zum Löschen; zusammengeführt wird nicht.
 
   Im Einzelspieler gilt die Wahl nicht, dort ist `<welt>`
   `einzelspieler_<speicherordner>/welt-<hash>`, `<speicherordner>` der

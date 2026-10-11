@@ -90,6 +90,32 @@ class ServernameTest {
     }
 
     @Test
+    void nameGiltNurOhneAltenOrdnerOderNachDemUmzug(@TempDir Path wurzel) throws Exception {
+        Path alt = wurzel.resolve("0").resolve("welt-1"), neu = wurzel.resolve("play.example.net").resolve("welt-1");
+        // Kein Ordner nach der Adresse: nichts umzuziehen, der Name gilt.
+        assertTrue(Servername.gilt(alt, neu, false));
+        // Gleicher Pfad, ohne Namen oder in der Ablage Hash.
+        Files.createDirectories(alt);
+        assertTrue(Servername.gilt(alt, alt, true));
+        // Ein Download läuft in den alten: kein Name, der alte bleibt.
+        assertFalse(Servername.gilt(alt, neu, true));
+        assertTrue(Files.isDirectory(alt));
+        // Der Umzug scheitert, hier weil an der Stelle des Ordners für den Namen eine Datei liegt: kein Name.
+        Files.writeString(neu.getParent(), "");
+        assertFalse(Servername.gilt(alt, neu, false));
+        assertTrue(Files.isDirectory(alt));
+        // Den neuen gibt es schon: kein Name, nicht zusammengeführt.
+        Files.delete(neu.getParent());
+        Files.createDirectories(neu);
+        assertFalse(Servername.gilt(alt, neu, false));
+        // Der Umzug klappt: der Name gilt.
+        Files.delete(neu);
+        assertTrue(Servername.gilt(alt, neu, false));
+        assertTrue(Files.isDirectory(neu));
+        assertFalse(Files.exists(alt));
+    }
+
+    @Test
     void reiheKenntDownloadsUnterEinemOrdner() {
         Reihe reihe = new Reihe();
         assertTrue(reihe.halte(Path.of("heroicmap", "0", "welt-1", "survival").toString()));

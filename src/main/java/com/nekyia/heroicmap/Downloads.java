@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConfirmScreen;
@@ -90,7 +91,7 @@ final class Downloads {
         switch (json.has("typ") ? json.get("typ").getAsString() : "") {
             case "angebot" -> {
                 angebot = json;
-                // Der Name gilt ab dem nächsten Betreten einer Welt, nicht mitten in dieser. Siehe docs/download.md, „Ablage“.
+                // Der Name gilt erst ab der nächsten Sitzung. Siehe docs/download.md, „Ablage“.
                 ServerData server = server();
                 if (server != null) {
                     String name = json.has("server") && json.get("server").isJsonPrimitive() ? json.get("server").getAsString() : null;
@@ -134,12 +135,18 @@ final class Downloads {
         if (welten != null) {
             welten.neueSitzung();
         }
+        nameGelesen = false;
+        servername = null;
+        nameGilt.clear();
     }
 
     /** Zählt jeden Login mit; ein Download merkt sich die Sitzung, aus der er stammt. */
     private int sitzung;
-    /** Der Name vom Server für die Welt, in der der Spieler steht, gelesen beim Betreten; null ohne. */
+    /** Der Name vom Server, einmal je Sitzung gelesen beim ersten Betreten; null ohne. */
     private static volatile String servername;
+    private static volatile boolean nameGelesen;
+    /** Je Hash einer Welt, ob der Name dort gilt: entschieden beim ersten Betreten der Sitzung, fest bis zur nächsten. */
+    private static final Map<Long, Boolean> nameGilt = new ConcurrentHashMap<>();
 
     /** Hält eine freigabe, bis der Hash ihrer Dimension bekannt ist. */
     void warte(String baum, JsonObject json) {
@@ -469,8 +476,13 @@ final class Downloads {
     private Path ordner(String baum) {
         ServerData server = server();
         String dimension = text(eintrag(baum), "dimension");
-        return server == null || dimension == null ? null
-                : ordner(wurzel(), Minimap.INSTANZ.ablage(), server.ip, servername, welten(), dimension, baum);
+        Long hash = server == null || dimension == null ? null : welten().hash(Welten.server(server.ip), dimension);
+        return hash == null ? null : ordner(wurzel(), Minimap.INSTANZ.ablage(), server.ip, name(hash), welten(), dimension, baum);
+    }
+
+    /** Der Name vom Server für die Welt mit diesem Hash, wenn er dort in dieser Sitzung gilt; sonst null, also die Adresse. */
+    private static String name(long hash) {
+        return Boolean.TRUE.equals(nameGilt.get(hash)) ? servername : null;
     }
 
     /** Der Ordner des Baums {@code baum} der Dimension, oder null, solange ihr Hash unbekannt ist. */
@@ -519,19 +531,16 @@ final class Downloads {
         if (server == null || level == null) {
             return;
         }
-        // Der Name vom Server gilt ab hier; der Ordner nach der Adresse zieht einmal zu ihm um, nicht mitten in einem Download.
-        servername = Servername.lies(wurzel(), server.ip);
+        // Nicht bei jedem Wechsel der Dimension: Mitten in der Sitzung bliebe sonst die Karte im Ordner der Adresse liegen.
+        if (!nameGelesen) {
+            nameGelesen = true;
+            servername = Servername.lies(wurzel(), server.ip);
+        }
         long seed = level.getBiomeManager().biomeZoomSeed;
-        Path alt = wurzel().resolve(weltOrdner(Minimap.INSTANZ.ablage(), server.ip, null, seed));
-        Path neu = wurzel().resolve(weltOrdner(Minimap.INSTANZ.ablage(), server.ip, servername, seed));
-        if (!reihe.belegtUnter(alt.toString())) {
-            try {
-                if (Servername.zieheUm(alt, neu)) {
-                    LOGGER.info("Heroic Map: {} nach {} umgezogen", alt, neu);
-                }
-            } catch (IOException e) {
-                LOGGER.warn("Heroic Map: {} nicht nach {} umgezogen", alt, neu, e);
-            }
+        if (!nameGilt.containsKey(seed)) {
+            Path alt = wurzel().resolve(weltOrdner(Minimap.INSTANZ.ablage(), server.ip, null, seed));
+            Path neu = wurzel().resolve(weltOrdner(Minimap.INSTANZ.ablage(), server.ip, servername, seed));
+            nameGilt.put(seed, Servername.gilt(alt, neu, reihe.belegtUnter(alt.toString())));
         }
         welten().merke(Welten.server(server.ip), level.dimension().identifier().toString(), level.getBiomeManager().biomeZoomSeed);
         baeume().forEach(b -> zieheUm(b.id()));
@@ -555,7 +564,7 @@ final class Downloads {
             return null;
         }
         long seed = level.getBiomeManager().biomeZoomSeed;
-        return wurzel().resolve(server != null ? weltOrdner(Minimap.INSTANZ.ablage(), server.ip, servername, seed)
+        return wurzel().resolve(server != null ? weltOrdner(Minimap.INSTANZ.ablage(), server.ip, name(seed), seed)
                 : einzelspieler(intern.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize().getFileName().toString(), seed));
     }
 
