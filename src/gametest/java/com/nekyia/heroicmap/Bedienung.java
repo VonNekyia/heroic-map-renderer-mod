@@ -28,6 +28,8 @@ public final class Bedienung implements FabricClientGameTest {
 
     /** Die Tasten, wie das Spiel sie zählt; TestInput reicht die Zahl unverändert durch. Siehe docs/entwicklung.md, „Maustasten“. */
     private static final int LINKS = InputConstants.MOUSE_BUTTON_LEFT, RECHTS = InputConstants.MOUSE_BUTTON_RIGHT;
+    /** Das Zittern einer Hand, die die Taste hält: Versatz vom Druckpunkt in Pixeln des Fensters, je 1 bis 2. */
+    private static final int[][] ZITTERN = {{1, 0}, {2, 1}, {1, 2}, {0, 1}, {1, 1}, {2, 0}};
 
     @Override
     public void runTest(ClientGameTestContext context) {
@@ -193,6 +195,11 @@ public final class Bedienung implements FabricClientGameTest {
         // Stufe 2 von 2, Lupe 1: eine Einheit des GUI ist ein Pixel der Basis.
         if (Math.abs(nachZug[0] - vorZug[0] - 50) > 1 || Math.abs(nachZug[1] - vorZug[1]) > 1) {
             throw new AssertionError("Ziehen auf der Marke: Mitte " + vorZug[0] + "," + vorZug[1] + " → " + nachZug[0] + "," + nachZug[1]);
+        }
+        warte250();
+        context.waitTicks(2);
+        if (!Arrays.equals(mitte(context), nachZug)) {
+            throw new AssertionError("Das Ziehen auf der Marke zählte als Klick und legte sie in die Mitte");
         }
 
         warte250();
@@ -530,20 +537,30 @@ public final class Bedienung implements FabricClientGameTest {
     }
 
     /**
-     * Ein Linksklick wie von Hand: hinfahren, ruhen, drücken, drei Ticks halten und dabei eine halbe Einheit
-     * zittern, loslassen; danach eine Pause, die keinen Doppelklick mit dem nächsten zulässt.
+     * Ein Linksklick wie von Hand: hinfahren, ruhen, drücken, drei Ticks halten und dabei 1 bis 2 Pixel
+     * zittern ({@link #zittere}), loslassen; danach eine Pause, die keinen Doppelklick mit dem nächsten zulässt.
      */
     private static void spielerKlick(ClientGameTestContext context, TestInput maus, int k, double x, double y) {
         warte250();
         fahre(context, maus, k, x, y);
         maus.holdMouse(LINKS);
-        context.waitTick();
-        maus.moveCursor(0.5 * k, 0);
-        context.waitTick();
-        maus.moveCursor(-0.5 * k, 0);
-        context.waitTick();
+        zittere(context, maus, x * k, y * k, 3);
         maus.releaseMouse(LINKS);
         context.waitTicks(2);
+    }
+
+    /**
+     * Zittert {@code ticks} Ticks lang um (px, py) in Pixeln des Fensters, zwei Bewegungen je Tick, nie weiter als
+     * 2 Pixel weg ({@link #ZITTERN}): Der Weg summiert sich, der Abstand zum Druckpunkt nicht. Siehe docs/wegpunkte.md, „Bedienung“.
+     */
+    private static void zittere(ClientGameTestContext context, TestInput maus, double px, double py, int ticks) {
+        for (int i = 0; i < 2 * ticks; i++) {
+            int[] z = ZITTERN[i % ZITTERN.length];
+            maus.setCursorPos(px + z[0], py + z[1]);
+            if (i % 2 == 1) {
+                context.waitTick();
+            }
+        }
     }
 
     /** Rechtsklick bei (x, y), dann ein Klick auf den Eintrag mit diesem Text; die Einträge stehen 14 Einheiten untereinander. */
@@ -718,8 +735,9 @@ public final class Bedienung implements FabricClientGameTest {
     }
 
     /**
-     * Linke Taste 2 s still auf einem Wegpunkt: Er hängt an der Maus und liegt nach dem Loslassen auf dem
-     * Block darunter; ein zweites Mal mit Escape bleibt er, wo er war. Siehe docs/wegpunkte.md, „Bedienung“.
+     * Linke Taste 2 s auf einem Wegpunkt, mit einer Hand, die 1 bis 2 Pixel zittert: Er hängt an der Maus und
+     * liegt nach dem Loslassen auf dem Block darunter; ein zweites Mal mit Escape bleibt er, wo er war. Siehe
+     * docs/wegpunkte.md, „Bedienung“.
      */
     private static void verschieben(ClientGameTestContext context, TestInput maus, int k) {
         // Ein Wegpunkt links über der Mitte, wo nichts anderes liegt: 40 und 32 Einheiten, bei scale 4 also 10 und 8 Blöcke.
@@ -735,10 +753,10 @@ public final class Bedienung implements FabricClientGameTest {
         maus.setCursorPos(m.x() * k, m.y() * k);
         context.waitTick();
         maus.holdMouse(LINKS);
-        context.waitTicks(50);
+        zittere(context, maus, m.x() * k, m.y() * k, 50);
         if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).haengt()) == null) {
             maus.releaseMouse(LINKS);
-            throw new AssertionError("Nach 2,5 s still gehalten hängt der Wegpunkt nicht an der Maus");
+            throw new AssertionError("Nach 2,5 s gehalten, mit 1 bis 2 Pixeln Zittern, hängt der Wegpunkt nicht an der Maus");
         }
         for (int i = 0; i < 4; i++) {
             maus.moveCursor(10 * k, 0);
@@ -756,7 +774,7 @@ public final class Bedienung implements FabricClientGameTest {
         maus.setCursorPos(n.x() * k, n.y() * k);
         context.waitTick();
         maus.holdMouse(LINKS);
-        context.waitTicks(50);
+        zittere(context, maus, n.x() * k, n.y() * k, 50);
         maus.moveCursor(0, 30 * k);
         context.waitTick();
         maus.pressKey(InputConstants.KEY_ESCAPE);
