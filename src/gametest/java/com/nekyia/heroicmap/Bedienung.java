@@ -27,6 +27,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Util;
 import net.minecraft.util.Mth;
 
 /**
@@ -131,6 +132,8 @@ public final class Bedienung implements FabricClientGameTest {
         wegpunkt(context, maus, k, x, y);
         anheften(context, maus, k);
         form(context, maus, k);
+        formImTempo(context, maus, k);
+        zweiMarkenImTempo(context, maus, k);
         ebenen(context, maus, k);
         zumSpieler(context, maus, k);
         optionen(context, maus, k);
@@ -532,6 +535,109 @@ public final class Bedienung implements FabricClientGameTest {
         warte250();
     }
 
+    /**
+     * Punkte im Tempo eines Spielers (mod#112): „Punkt hinzufügen“ auf dem ersten Wegpunkt, dann Linksklicks auf drei
+     * weitere, je 150 bis 300 ms nach dem vorigen Drücken, der erste davon nah am vorigen Punkt. Das Spiel meldet einen
+     * Doppelklick nach Zeit und Taste, nicht nach dem Ort; jeder Klick muss trotzdem anfügen. Siehe docs/wegpunkte.md,
+     * „Formen aus Wegpunkten“.
+     */
+    private static void formImTempo(ClientGameTestContext context, TestInput maus, int k) {
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+        double mx = breite / 2.0, my = hoehe / 2.0;
+        // Der zweite 12 Einheiten neben dem ersten, die Marken berühren sich fast.
+        double[][] orte = {{mx - 110, my + 60}, {mx - 98, my + 60}, {mx - 70, my + 80}, {mx - 40, my + 60}};
+        for (double[] o : orte) {
+            boolean frei = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).marken().stream()
+                    .noneMatch(m -> Math.abs(m.x() - o[0]) < 10 && Math.abs(m.y() - o[1]) < 10));
+            if (!frei) {
+                throw new AssertionError("Eine Marke liegt bei " + o[0] + "," + o[1] + "; der Test braucht dort freie Karte");
+            }
+        }
+        int vorher = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        for (double[] o : orte) {
+            eintrag(context, maus, k, o[0], o[1], "heroicmap.karte.wegpunkt");
+        }
+        List<Wegpunkte.Punkt> neu = context.computeOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.punkte().subList(vorher, vorher + 4)));
+        try {
+            List<Karte.Marke> marken = neu.stream().map(p -> marke(context, p)).toList();
+            long druck = eintrag(context, maus, k, marken.get(0).x(), marken.get(0).y(), "heroicmap.karte.punkt_hinzu");
+            // Der erste nach dem Klick auf den Eintrag, dem zwei Ticks folgen; die nächsten schneller.
+            long[] pausen = {300, 220, 200};
+            for (int i = 1; i < 4; i++) {
+                Karte.Marke m = marken.get(i);
+                long jetzt = tempoKlick(context, maus, k, m.x(), m.y(), druck, pausen[i - 1]);
+                List<Integer> zug = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug());
+                if (zug == null || zug.size() != i + 1) {
+                    throw new AssertionError("Linksklick " + (jetzt - druck) + " ms nach dem vorigen fügte Punkt " + (i + 1)
+                            + " nicht an: im Bau " + zug + ", angeheftet " + neu.stream().filter(p -> angeheftet(context, p)).count());
+                }
+                druck = jetzt;
+            }
+        } finally {
+            warte250();
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTick();
+            context.runOnClient(mc -> neu.forEach(Wegpunkte.INSTANZ::loesche));
+            context.waitTicks(2);
+        }
+    }
+
+    /**
+     * Zwei Wegpunkte im Tempo eines Spielers (mod#112): ein Klick auf A, 220 ms später einer auf B. Das Spiel meldet den
+     * zweiten als Doppelklick, nach Zeit und Taste; die Karte zählt ihn nur nah am vorigen Druckpunkt. So kommt B in
+     * die Mitte, und A wird nicht angeheftet. Siehe docs/wegpunkte.md, „Bedienung“.
+     */
+    private static void zweiMarkenImTempo(ClientGameTestContext context, TestInput maus, int k) {
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+        double mx = breite / 2.0, my = hoehe / 2.0;
+        double[][] orte = {{mx - 110, my + 60}, {mx - 50, my + 60}};
+        int vorher = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        for (double[] o : orte) {
+            eintrag(context, maus, k, o[0], o[1], "heroicmap.karte.wegpunkt");
+        }
+        List<Wegpunkte.Punkt> neu = context.computeOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.punkte().subList(vorher, vorher + 2)));
+        try {
+            warte250();
+            Karte.Marke a = marke(context, neu.get(0)), b = marke(context, neu.get(1));
+            long druck = tempoKlick(context, maus, k, a.x(), a.y(), 0, 0);
+            long zweiter = tempoKlick(context, maus, k, b.x(), b.y(), druck, 220);
+            warte250();
+            context.waitTicks(2);
+            Karte.Marke mitte = marke(context, neu.get(1));
+            if (angeheftet(context, neu.get(0)) || Math.abs(mitte.x() - mx) > 1 || Math.abs(mitte.y() - my) > 1) {
+                throw new AssertionError("Klick auf B " + (zweiter - druck) + " ms nach A: A angeheftet " + angeheftet(context, neu.get(0))
+                        + ", B bei " + mitte.x() + "," + mitte.y() + " statt in der Mitte " + mx + "," + my);
+            }
+        } finally {
+            context.runOnClient(mc -> neu.forEach(Wegpunkte.INSTANZ::loesche));
+            context.waitTicks(2);
+        }
+    }
+
+    /**
+     * Ein schneller Linksklick im Tempo eines Spielers auf (x, y): hinfahren, {@code pauseMs} nach dem vorigen Drücken
+     * {@code vorig} drücken, 1 bis 2 Pixel zittern und im selben Frame loslassen. Gibt die Zeit des Drückens. Der Zeiger
+     * kommt einen Tick vor dem Drücken an: Die Bewegung verbucht das Spiel erst im nächsten Frame, mit gedrückter Taste
+     * als Ziehen. Nur dieser eine Tick liegt zwischen zwei Klicks, so reicht die Zeit auch auf einem langsamen Runner.
+     * Mit {@code pauseMs} 0 drückt er gleich nach dem Ankommen.
+     */
+    private static long tempoKlick(ClientGameTestContext context, TestInput maus, int k, double x, double y, long vorig, long pauseMs) {
+        maus.setCursorPos(x * k, y * k);
+        context.waitTick();
+        long jetzt = Util.getMillis();
+        if (pauseMs > 0 && jetzt - vorig > pauseMs) {
+            throw new AssertionError("Für das Tempo eines Spielers zu spät: " + (jetzt - vorig) + " ms statt " + pauseMs + " ms");
+        }
+        schlafe(Math.max(0, vorig + pauseMs - jetzt));
+        long druck = Util.getMillis();
+        maus.holdMouse(LINKS);
+        maus.setCursorPos(x * k + ZITTERN[1][0], y * k + ZITTERN[1][1]);
+        maus.releaseMouse(LINKS);
+        return druck;
+    }
+
     /** Lässt die Tafel der grossen Region aufgehen, wo der Zeiger steht: Frage als gesendet, Antwort abgelegt. */
     private static void tafelDerRegion(ClientGameTestContext context) {
         context.waitTicks(3);
@@ -550,16 +656,24 @@ public final class Bedienung implements FabricClientGameTest {
     }
 
     /**
-     * Ein Linksklick wie von Hand: hinfahren, ruhen, drücken, drei Ticks halten und dabei 1 bis 2 Pixel
+     * Ein Linksklick wie von Hand: hinfahren, ruhen, drücken, zwei Ticks halten und dabei 1 bis 2 Pixel
      * zittern ({@link #zittere}), loslassen; danach eine Pause, die keinen Doppelklick mit dem nächsten zulässt.
+     * Zwei Ticks bleiben auch auf einem langsamen Runner unter den 500 ms, ab denen ein Wegpunkt an der Maus hängt.
      */
     private static void spielerKlick(ClientGameTestContext context, TestInput maus, int k, double x, double y) {
         warte250();
         fahre(context, maus, k, x, y);
         maus.holdMouse(LINKS);
-        zittere(context, maus, x * k, y * k, 3);
+        zittere(context, maus, x * k, y * k, 2);
         maus.releaseMouse(LINKS);
         context.waitTicks(2);
+    }
+
+    /** Zittert wie {@link #zittere} um (px, py), Tick um Tick, bis die Uhr {@code bis} zeigt, in ms von {@code Util.getMillis}. */
+    private static void zittereBis(ClientGameTestContext context, TestInput maus, double px, double py, long bis) {
+        while (Util.getMillis() < bis) {
+            zittere(context, maus, px, py, 1);
+        }
     }
 
     /**
@@ -576,8 +690,11 @@ public final class Bedienung implements FabricClientGameTest {
         }
     }
 
-    /** Rechtsklick bei (x, y), dann ein Klick auf den Eintrag mit diesem Text; die Einträge stehen 14 Einheiten untereinander. */
-    private static void eintrag(ClientGameTestContext context, TestInput maus, int k, double x, double y, String schluessel) {
+    /**
+     * Rechtsklick bei (x, y), dann ein Klick auf den Eintrag mit diesem Text; die Einträge stehen 14 Einheiten untereinander.
+     * Gibt die Zeit des Klicks auf den Eintrag.
+     */
+    private static long eintrag(ClientGameTestContext context, TestInput maus, int k, double x, double y, String schluessel) {
         warte250();
         maus.setCursorPos(x * k, y * k);
         context.waitTick();
@@ -591,8 +708,10 @@ public final class Bedienung implements FabricClientGameTest {
         }
         maus.moveCursor(6 * k, (zeile * 14 + 6) * k);
         context.waitTick();
+        long druck = Util.getMillis();
         maus.pressMouse(LINKS);
         context.waitTicks(2);
+        return druck;
     }
 
     /**
@@ -748,9 +867,9 @@ public final class Bedienung implements FabricClientGameTest {
     }
 
     /**
-     * Linke Taste 2 s auf einem Wegpunkt, mit einer Hand, die 1 bis 2 Pixel zittert: Er hängt an der Maus und
-     * liegt nach dem Loslassen auf dem Block darunter; ein zweites Mal mit Escape bleibt er, wo er war. Siehe
-     * docs/wegpunkte.md, „Bedienung“.
+     * Linke Taste auf einem Wegpunkt, mit einer Hand, die 1 bis 2 Pixel zittert: Nach 250 ms hängt er noch nicht, nach
+     * 700 ms an der Maus, nach der Uhr gemessen; nach dem Loslassen liegt er auf dem Block darunter. Ein zweites Mal mit
+     * Escape bleibt er, wo er war. Siehe docs/wegpunkte.md, „Bedienung“.
      */
     private static void verschieben(ClientGameTestContext context, TestInput maus, int k) {
         // Ein Wegpunkt links über der Mitte, wo nichts anderes liegt: 40 und 32 Einheiten, bei scale 4 also 10 und 8 Blöcke.
@@ -765,11 +884,17 @@ public final class Bedienung implements FabricClientGameTest {
         Karte.Marke m = marke(context, punkt);
         maus.setCursorPos(m.x() * k, m.y() * k);
         context.waitTick();
+        long druck = Util.getMillis();
         maus.holdMouse(LINKS);
-        zittere(context, maus, m.x() * k, m.y() * k, 50);
+        zittereBis(context, maus, m.x() * k, m.y() * k, druck + 250);
+        if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).haengt()) != null) {
+            maus.releaseMouse(LINKS);
+            throw new AssertionError("Nach " + (Util.getMillis() - druck) + " ms gehalten hängt der Wegpunkt schon an der Maus");
+        }
+        zittereBis(context, maus, m.x() * k, m.y() * k, druck + 700);
         if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).haengt()) == null) {
             maus.releaseMouse(LINKS);
-            throw new AssertionError("Nach 2,5 s gehalten, mit 1 bis 2 Pixeln Zittern, hängt der Wegpunkt nicht an der Maus");
+            throw new AssertionError("Nach " + (Util.getMillis() - druck) + " ms gehalten, mit 1 bis 2 Pixeln Zittern, hängt der Wegpunkt nicht an der Maus");
         }
         for (int i = 0; i < 4; i++) {
             maus.moveCursor(10 * k, 0);
@@ -786,8 +911,9 @@ public final class Bedienung implements FabricClientGameTest {
         Karte.Marke n = marke(context, neu);
         maus.setCursorPos(n.x() * k, n.y() * k);
         context.waitTick();
+        long zweiter = Util.getMillis();
         maus.holdMouse(LINKS);
-        zittere(context, maus, n.x() * k, n.y() * k, 50);
+        zittereBis(context, maus, n.x() * k, n.y() * k, zweiter + 700);
         maus.moveCursor(0, 30 * k);
         context.waitTick();
         maus.pressKey(InputConstants.KEY_ESCAPE);
@@ -1088,8 +1214,13 @@ public final class Bedienung implements FabricClientGameTest {
 
     /** Das Spiel zählt einen Klick bis 250 ms nach dem letzten als Doppelklick, nach der Uhr, nicht nach Ticks. */
     private static void warte250() {
+        schlafe(300);
+    }
+
+    /** Wartet {@code ms} nach der Uhr; der Client steht solange, er tickt nur im Takt mit dem Test. */
+    private static void schlafe(long ms) {
         try {
-            Thread.sleep(300);
+            Thread.sleep(ms);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new AssertionError(e);

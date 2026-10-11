@@ -48,7 +48,7 @@ final class Karte extends Screen {
     private static final int RAND = 14;
     /** So lange dauert ein Durchlauf der Farben um angeheftete Marken, in ms. */
     private static final long BUNT_MS = 2000;
-    /** Weiter vom Druckpunkt weg, in Einheiten des GUI, ist es kein Klick auf eine Marke und kein Halten mehr. */
+    /** Weiter vom Druckpunkt weg, in Einheiten des GUI, ist es kein Klick auf eine Marke, kein Halten und kein Doppelklick mehr. */
     private static final double ZUG = 3;
     /** Die halbe Breite des Punkts unter einer angehefteten Nadel, in Einheiten des GUI. */
     private static final int PUNKT = 2;
@@ -98,7 +98,7 @@ final class Karte extends Screen {
     /** War das Drücken der zweite Klick eines Doppelklicks? */
     private boolean doppelklick;
     /** So lange hält der Spieler die linke Taste still auf einem Wegpunkt, bis er an der Maus hängt, in ms. */
-    private static final long HALTEN_MS = 2000;
+    private static final long HALTEN_MS = 500;
     /** Seit wann die linke Taste gedrückt ist, und der Wegpunkt, der an der Maus hängt, oder null. */
     private long gedruecktSeit;
     private Wegpunkte.Punkt haengt;
@@ -736,7 +736,10 @@ final class Karte extends Screen {
      * Marken: siehe docs/wegpunkte.md, „Bedienung“.
      */
     @Override
-    public boolean mouseClicked(MouseButtonEvent e, boolean doppelt) {
+    public boolean mouseClicked(MouseButtonEvent e, boolean doppeltNachZeit) {
+        // Das Spiel meldet einen Doppelklick nach Zeit und Taste, nicht nach dem Ort; er zählt nur nah am vorigen Druckpunkt.
+        // Siehe docs/wegpunkte.md, „Bedienung“.
+        boolean doppelt = doppeltNachZeit && Math.hypot(e.x() - druckX, e.y() - druckY) <= ZUG;
         // Jeder Klick, der true gibt, zählt für den nächsten Doppelklick; gemerkt bleibt nur ein Klick auf eine Marke oder ein Ziel mit id.
         Marke vorige = letzte;
         Tafeln.Ziel voriges = letztesZiel;

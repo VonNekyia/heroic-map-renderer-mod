@@ -39,8 +39,8 @@ Wegpunkten“ (mod#79).
 | Rechtsklick, „Wegpunkt setzen“ | der Eintrag unter „Hierher teleportieren“; setzt einen Wegpunkt auf den Block unter der Maus, in der ersten der 8 Farben (`Wegpunkte.FARBEN`), die in der Dimension noch frei ist, sind alle vergeben, reihum. Steht dort schon einer, bleibt es einer. Den Eintrag gibt es auch ohne Recht zum Teleportieren und unter einer Decke |
 | Rechtsklick auf einen Wegpunkt | das Menü für seinen Block: „Hierher teleportieren“, wenn erlaubt, und „Wegpunkt löschen“ |
 | Klick auf eine Marke | legt sie in die Mitte, sobald kein zweiter Klick mehr folgen kann, 250 ms nach dem Loslassen: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück. Wer auf einer Marke zu ziehen beginnt und sich weiter als 3 Einheiten vom Druckpunkt entfernt (`Karte.ZUG`), zieht nur die Karte |
-| Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder; die Karte bewegt sich dabei nicht |
-| Linke Taste 2 s still auf einem Wegpunkt halten | er hängt an der Maus, die Karte zieht nicht mit; beim Loslassen liegt er auf dem Block darunter, mit Farbe und Anheften (`Wegpunkte.verschiebe`). Liegt dort schon einer, bleibt er, wo er war; `Esc` bricht ab. Still heisst: nie weiter als 3 Einheiten vom Druckpunkt weg (`Karte.ZUG`); das Zittern der Hand hin und her zählt nicht, nur der Abstand. Bis 0.2.32 zählte der ganze Weg der Maus: Mit 1 bis 2 Pixeln Zittern fügte ein Linksklick in einer Form im Bau oft nichts an, und Halten ging kaum (mod#112). Unter 2 s ist es ein Klick oder ein Zug wie sonst (`Karte.HALTEN_MS`, mod#75). Nur Wegpunkte, nicht die Rauten eigener Regionen |
+| Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder; die Karte bewegt sich dabei nicht. Ein Doppelklick ist ein zweiter Klick mit derselben Taste bis 250 ms nach dem ersten, so meldet ihn das Spiel, nach Zeit und Taste, nicht nach dem Ort (`MouseHandler.onButton`, per javap in 26.3). Die Karte zählt ihn nur, wenn er höchstens 3 Einheiten vom vorigen Druckpunkt weg ist (`Karte.ZUG`), für jedes Ziel, auch Flächen und Überschriften der Ebenen. Bis 0.2.35 heftete ein schneller Klick auf B kurz nach einem auf A den Wegpunkt A an, statt B in die Mitte zu legen (mod#112) |
+| Linke Taste 0,5 s still auf einem Wegpunkt halten | er hängt an der Maus, die Karte zieht nicht mit; beim Loslassen liegt er auf dem Block darunter, mit Farbe und Anheften (`Wegpunkte.verschiebe`). Liegt dort schon einer, bleibt er, wo er war; `Esc` bricht ab. Still heisst: nie weiter als 3 Einheiten vom Druckpunkt weg (`Karte.ZUG`); das Zittern der Hand hin und her zählt nicht, nur der Abstand. Bis 0.2.32 zählte der ganze Weg der Maus: Mit 1 bis 2 Pixeln Zittern fügte ein Linksklick in einer Form im Bau oft nichts an, und Halten ging kaum (mod#112). Unter 0,5 s ist es ein Klick oder ein Zug wie sonst (`Karte.HALTEN_MS`, mod#75). Bis 0.2.35 waren es 2 s, dem User zu lang; 0,5 s hat der Reviewer entschieden (mod#112). Ein Klick dauert kürzer. Nur Wegpunkte, nicht die Rauten eigener Regionen |
 | Doppelklick in eine eigene Region, auf eine eigene Linie, auf die Raute eines alten Rechtecks, auf eine Fläche, einen Kreis, eine Nadel oder ein Banner vom Server | heftet sie an die Minimap oder löst sie wieder, siehe „Anheften“ |
 | Rechtsklick auf einen Wegpunkt, „Punkt hinzufügen“ | beginnt eine Form mit ihm oder fügt ihn an die Form im Bau an, siehe „Formen aus Wegpunkten“ |
 | Linksklick auf einen Wegpunkt, solange eine Form im Bau ist | fügt ihn an, statt ihn in die Mitte zu legen; auf den ersten Punkt schliesst er bei drei und mehr Punkten die Region. Ziehen verschiebt die Karte wie sonst |
@@ -451,19 +451,29 @@ Schleier am Rand, siehe „Schleier“.
   vom Server: Ein Klick heftet nichts an, ein Doppelklick heftet an, ein
   zweiter löst; ein Doppelklick auf eine Nadel und einer auf die Raute
   einer eigenen Region heften sie an. Dazu „Zum Spieler“, „Optionen …“ und
-  zurück, und ein Wegpunkt, 2,5 s still gehalten, an der Maus verschoben,
-  ein zweites Mal mit Escape abgebrochen (mod#75). Formen wie ein Spieler
+  zurück, und ein Wegpunkt, nach 250 ms gehalten noch nicht, nach 700 ms
+  an der Maus, nach der Uhr gemessen, verschoben, ein zweites Mal mit
+  Escape abgebrochen (mod#75, mod#112). Formen wie ein Spieler
   (mod#79), über einer grossen Region vom Server mit Tafel, wie auf einem
   Server mit Ländern, jeder Klick von Hand: in acht Schritten hinfahren,
-  ruhen, drücken, drei Ticks halten und eine halbe Einheit zittern,
-  loslassen (`Bedienung.spielerKlick`). Fünf Wegpunkte über „Wegpunkt
+  ruhen, drücken, zwei Ticks halten und eine halbe Einheit zittern,
+  loslassen (`Bedienung.spielerKlick`); zwei Ticks bleiben auch auf einem
+  langsamen Runner unter den 0,5 s des Haltens. Fünf Wegpunkte über „Wegpunkt
   setzen“; auf dem ersten „Punkt hinzufügen“, die Tafel der Region geht
   auf, wo das Menü war; Linksklicks auf den dritten, rechts unter dem
   Menü, den zweiten und den ersten schliessen eine Region; „Punkt
   hinzufügen“, ein Linksklick und „Form fertig“ geben eine Linie; ein
   Doppelklick in die Region heftet sie an und nicht die Region vom Server;
   ein Doppelklick von Hand auf einen Wegpunkt in ihr heftet ihn an, und
-  die Karte bleibt stehen; „Form löschen“ löscht die Region.
+  die Karte bleibt stehen; „Form löschen“ löscht die Region. Im Tempo
+  eines Spielers (mod#112, `Bedienung.tempoKlick`: der Zeiger kommt einen
+  Tick vor dem Drücken an, Drücken und Loslassen im selben Frame, die
+  Pause nach der Uhr): auf einem Wegpunkt „Punkt hinzufügen“, dann
+  Linksklicks auf drei weitere, 300, 220 und 200 ms nach dem vorigen
+  Drücken, der erste 12 Einheiten neben dem ersten Punkt; alle drei fügen
+  an, auch die zwei, die das Spiel als Doppelklick meldet
+  (`formImTempo`). Ein Klick auf B 220 ms nach einem auf A legt B in die
+  Mitte und heftet A nicht an (`zweiMarkenImTempo`).
 - `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
   [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und
