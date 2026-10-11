@@ -78,6 +78,7 @@ tasks.matching { it.name == "runClientGameTest" }.configureEach {
     systemProperty("heroicmap.messung.drehen", providers.gradleProperty("messungDrehen").orElse("false").get())
     systemProperty("heroicmap.messung.rahmen", providers.gradleProperty("messungRahmen").orElse("ohne").get())
     systemProperty("heroicmap.messung.effekte", providers.gradleProperty("messungEffekte").orElse("false").get())
+    systemProperty("heroicmap.messung.regionen", providers.gradleProperty("messungRegionen").orElse("47").get())
     systemProperty("heroicmap.uebernahme", uebernahme.get())
     systemProperty("heroicmap.server", server.get())
     val zusatz = providers.gradleProperty("zusatzmods").orNull?.let { file(it).absolutePath }

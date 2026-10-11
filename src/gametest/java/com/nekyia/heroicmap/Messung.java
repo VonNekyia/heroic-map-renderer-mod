@@ -44,6 +44,8 @@ public final class Messung implements FabricClientGameTest {
     private static final String RAHMEN = System.getProperty("heroicmap.messung.rahmen", Skin.OHNE);
     /** Mit {@code -PmessungEffekte=true} nur die Läufe zu den Effekten in der Welt, siehe docs/wegpunkte.md, „Strahl“. */
     private static final boolean NUR_EFFEKTE = Boolean.getBoolean("heroicmap.messung.effekte");
+    /** Mit {@code -PmessungRegionen=<n>} so viele angeheftete Regionen für den Schleier, gleich verteilt bis 188 Blöcke halbe Seite. */
+    private static final int REGIONEN = Integer.getInteger("heroicmap.messung.regionen", 47);
     private static final int SICHTWEITE = 12;
     private static final int RUNDEN = 3;
     private static final int STAND_TICKS = 100;
@@ -276,7 +278,9 @@ public final class Messung implements FabricClientGameTest {
 
         context.runOnClient(mc -> {
             String welt = mc.level.dimension().identifier().toString();
-            for (int s = 4; s <= 188; s += 4) {
+            // Bei 47 halbe Seiten 4, 8, … 188 Blöcke: mehr Stücke als die Grenze des Schleiers, die Spitze.
+            for (int i = 1; i <= REGIONEN; i++) {
+                int s = Math.round(188f * i / REGIONEN);
                 Wegpunkte.INSTANZ.setze(welt, -s, -s, s - 1, s - 1);
                 Wegpunkte.INSTANZ.umschalten(Wegpunkte.INSTANZ.regionen().getLast());
             }
@@ -296,7 +300,8 @@ public final class Messung implements FabricClientGameTest {
             return z;
         });
         Arrays.sort(bau);
-        zeile("schleier vierecke=%d bau n=%d median=%.3f ms max=%.3f ms", vierecke, bau.length, ms(quantil(bau, 0.5)), ms(bau[bau.length - 1]));
+        zeile("schleier regionen=%d vierecke=%d bau n=%d median=%.3f ms max=%.3f ms", REGIONEN, vierecke, bau.length, ms(quantil(bau, 0.5)),
+                ms(bau[bau.length - 1]));
         String mitSchleier = art + " schleier=" + vierecke;
         for (int runde = 1; runde <= RUNDEN; runde++) {
             for (boolean an : new boolean[] {false, true}) {
