@@ -42,6 +42,8 @@ public final class Messung implements FabricClientGameTest {
     private static final boolean NUR_DREHEN = Boolean.getBoolean("heroicmap.messung.drehen");
     /** Mit {@code -PmessungRahmen=<skin>} misst sie mit diesem Rahmen, sonst ohne, siehe docs/rahmen.md, „Kosten“. */
     private static final String RAHMEN = System.getProperty("heroicmap.messung.rahmen", Skin.OHNE);
+    /** Mit {@code -PmessungEffekte=true} nur die Läufe zu den Effekten in der Welt, siehe docs/wegpunkte.md, „Strahl“. */
+    private static final boolean NUR_EFFEKTE = Boolean.getBoolean("heroicmap.messung.effekte");
     private static final int SICHTWEITE = 12;
     private static final int RUNDEN = 3;
     private static final int STAND_TICKS = 100;
@@ -101,6 +103,11 @@ public final class Messung implements FabricClientGameTest {
 
             if (NUR_DREHEN) {
                 drehen(context, server);
+                schreibe();
+                return;
+            }
+            if (NUR_EFFEKTE) {
+                effekte(context);
                 schreibe();
                 return;
             }
@@ -230,6 +237,43 @@ public final class Messung implements FabricClientGameTest {
             }
         }
         context.runOnClient(mc -> Minimap.INSTANZ.setzeDrehen(false));
+    }
+
+    /**
+     * Was die Strahlen je Frame kosten: {@link Strahlen#MAX_STRAHLEN} angeheftete Wegpunkte auf einer
+     * Spirale um den Spieler, 16 bis 142 Blöcke weit, also alle in Sichtweite; 4 px, Zoom 4, freie
+     * Bildrate, im Stand; Frametime ohne und mit Effekten in der Welt, im Wechsel.
+     */
+    private void effekte(ClientGameTestContext context) {
+        context.runOnClient(mc -> {
+            String welt = mc.level.dimension().identifier().toString();
+            for (int i = 0; i < Strahlen.MAX_STRAHLEN; i++) {
+                double w = 2 * Math.PI * i / Strahlen.MAX_STRAHLEN, r = 16 + 2 * i;
+                Wegpunkte.INSTANZ.setze(welt, (int) Math.round(r * Math.cos(w)), (int) Math.round(r * Math.sin(w)));
+            }
+            for (Wegpunkte.Punkt p : java.util.List.copyOf(Wegpunkte.INSTANZ.punkte())) {
+                Wegpunkte.INSTANZ.umschalten(p);
+            }
+            Minimap.INSTANZ.setzeScale(4);
+            Minimap.INSTANZ.setzeZoom(4);
+            Minimap.INSTANZ.setzeRund(false);
+            Minimap.INSTANZ.setzeDrehen(false);
+        });
+        int n = context.computeOnClient(mc -> (int) Wegpunkte.INSTANZ.punkte().stream().filter(Wegpunkte.Punkt::angeheftet).count());
+        zeile("strahlen angeheftet=%d", n);
+        zeige(context, true);
+        String art = "fps=frei scale=4 zoom=4 strahlen=" + n;
+        warteAufFreieFrames(context, art);
+        for (int runde = 1; runde <= RUNDEN; runde++) {
+            for (boolean an : new boolean[] {false, true}) {
+                context.runOnClient(mc -> Minimap.INSTANZ.setzeEffekte(an));
+                frames(context, art + " effekte=" + (an ? "an" : "aus") + " stand", true, runde, () -> context.waitTicks(STAND_TICKS));
+            }
+        }
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeEffekte(true);
+            Wegpunkte.INSTANZ.leeren();
+        });
     }
 
     /** Fliegt 20 Blöcke/s über die Strecke x = 0 bis FLUG_TICKS, hin nach Osten oder zurück. */

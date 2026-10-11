@@ -148,5 +148,7 @@
   "heroicmap.menue.spieler.kopf": "Kopf",
   "heroicmap.menue.spieler.pfeil": "Pfeil",
   "heroicmap.menue.spieler.durchsichtig": "Halb",
-  "heroicmap.menue.spieler.beschreibung": "Wie du auf Minimap und Vollbildkarte aussiehst: Kopf mit Pfeil, nur der Pfeil oder der Kopf halb durchsichtig mit Pfeil."
+  "heroicmap.menue.spieler.beschreibung": "Wie du auf Minimap und Vollbildkarte aussiehst: Kopf mit Pfeil, nur der Pfeil oder der Kopf halb durchsichtig mit Pfeil.",
+  "heroicmap.menue.effekte": "Effekte in der Welt",
+  "heroicmap.menue.effekte.beschreibung": "Ein Strahl wie vom Leuchtfeuer über jedem angehefteten Wegpunkt in Sichtweite"
 }

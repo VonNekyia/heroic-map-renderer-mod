@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.30
+
+- **Beams above pinned waypoints:** each pinned waypoint in view distance shows a beacon beam in its colour in the world. Switch it off with "World effects" in the settings.
+
 ## 0.2.29
 
 - **An API for other client mods:** a Fabric mod can add its own layers with pins, map text, areas, circles and lines, in the same JSON as server layers; they show on the minimap and the full map with their own switch. See docs/api.md.
