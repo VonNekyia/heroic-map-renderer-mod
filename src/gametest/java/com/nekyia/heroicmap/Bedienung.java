@@ -638,7 +638,8 @@ public final class Bedienung implements FabricClientGameTest {
      * Ecken einer eigenen Form bearbeiten (mod#112): Zwei Ecken einen Block, also 4 Einheiten, auseinander; ein Rechtsklick
      * zwischen ihnen, eine Einheit von der zweiten, trifft die zweite, nicht die erste, und „Eckpunkt löschen“ nimmt sie heraus. „Eckpunkt
      * hinzufügen“ an der ersten und ein Linksklick setzen die neue Ecke zwischen die erste und die nächste. 700 ms gehalten
-     * hängt eine Ecke an der Maus und liegt nach dem Loslassen dort. Eine Linie mit zwei Ecken fällt beim Löschen einer weg.
+     * hängt eine Ecke an der Maus und liegt nach dem Loslassen dort. Wird die Form im Bau gelöscht, speichert „Form fertig“
+     * nichts und sagt es unten links. Eine Linie mit zwei Ecken fällt beim Löschen einer weg.
      * Siehe docs/wegpunkte.md, „Eigene Formen“.
      */
     private static void eckenBearbeiten(ClientGameTestContext context, TestInput maus, int k) {
@@ -707,12 +708,31 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Gehaltene Ecke verschoben nach " + verschoben + " statt 2 bis 3 Blöcke östlich von " + c);
             }
 
-            // Eine Linie mit zwei Ecken fällt beim Löschen einer weg.
+            // Im Bau gelöscht: „Form fertig“ speichert nichts und sagt es, statt die neuen Ecken still zu verwerfen.
+            double[] start = ecke(context, formen, 0);
+            eintrag(context, maus, k, start[0], start[1], "heroicmap.karte.ecke_hinzu");
+            tempoKlick(context, maus, k, neuOrt[0], neuOrt[1] + 20, 0, 0);
+            // „Form löschen“ in der Region, an der Mitte ihrer drei Ecken.
+            double[] e1 = ecke(context, formen, 1), e2 = ecke(context, formen, 2);
+            eintrag(context, maus, k, (start[0] + e1[0] + e2[0]) / 3, (start[1] + e1[1] + e2[1]) / 3, "heroicmap.karte.form_loeschen");
+            eintrag(context, maus, k, neuOrt[0] + 30, neuOrt[1], "heroicmap.karte.form_fertig");
+            context.waitTicks(2);
+            String hinweis = context.computeOnClient(mc -> {
+                Component h = ((Karte) mc.gui.screen()).hinweis();
+                return h == null ? null : h.getString();
+            });
+            if (!Component.translatable("heroicmap.karte.form_weg").getString().equals(hinweis)
+                    || context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size()) != formen + 1) {
+                throw new AssertionError("„Form fertig“ nach „Form löschen“ im Bau: Hinweis „" + hinweis + "“, Formen "
+                        + context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size()) + " statt " + (formen + 1));
+            }
+
+            // Eine Linie mit zwei Ecken fällt beim Löschen einer weg; sie ist jetzt die erste neue Form.
             warte250();
-            double[] linie = ecke(context, formen + 1, 0);
+            double[] linie = ecke(context, formen, 0);
             eintrag(context, maus, k, linie[0], linie[1], "heroicmap.karte.ecke_loeschen");
             context.waitTicks(2);
-            if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size()) != formen + 1) {
+            if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size()) != formen) {
                 throw new AssertionError("Die Linie mit zwei Ecken blieb nach „Eckpunkt löschen“");
             }
         } finally {

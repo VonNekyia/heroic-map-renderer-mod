@@ -60,6 +60,7 @@
   "heroicmap.karte.form_abbrechen": "Form abbrechen",
   "heroicmap.karte.form_loeschen": "Form löschen",
   "heroicmap.karte.formen_voll": "Höchstens %s eigene Formen",
+  "heroicmap.karte.form_weg": "Die Form gibt es so nicht mehr; die neuen Ecken sind nicht gespeichert",
   "heroicmap.karte.form_hinweis": "Linksklick: Eckpunkt hier oder auf einem Wegpunkt, auf den ersten: Region; Rechtsklick: Menü mit „Form fertig“; Esc bricht ab",
   "heroicmap.karte.angeheftet_voll": "Höchstens %s Regionen angeheftet; erst eine lösen",
   "heroicmap.karte.nadeln_voll": "Höchstens %s Nadeln und Banner angeheftet; erst eins lösen",

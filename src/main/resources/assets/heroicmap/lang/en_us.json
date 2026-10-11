@@ -60,6 +60,7 @@
   "heroicmap.karte.form_abbrechen": "Cancel shape",
   "heroicmap.karte.form_loeschen": "Delete shape",
   "heroicmap.karte.formen_voll": "At most %s own shapes",
+  "heroicmap.karte.form_weg": "This shape has changed or is gone; the new corners were not saved",
   "heroicmap.karte.form_hinweis": "Left-click: corner here or on a waypoint, on the first one: region; right-click: menu with “Finish shape”; Esc cancels",
   "heroicmap.karte.angeheftet_voll": "At most %s regions pinned; unpin one first",
   "heroicmap.karte.nadeln_voll": "At most %s pins and banners pinned; unpin one first",
