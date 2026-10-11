@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.34
+
+- **Clicks and holds on the full map work with a shaky hand.** Adding a waypoint to a shape with a left click and holding a waypoint for 2 s to move it failed when the mouse trembled by a pixel or two: the map added up every tiny movement and took it for dragging. Now only the distance from where you pressed counts.
+
 ## 0.2.33
 
 - **Map downloads use 8 connections instead of 4,** so they go about twice as fast for players far from the server.

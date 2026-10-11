@@ -48,7 +48,7 @@ final class Karte extends Screen {
     private static final int RAND = 14;
     /** So lange dauert ein Durchlauf der Farben um angeheftete Marken, in ms. */
     private static final long BUNT_MS = 2000;
-    /** Weiter gezogen, in Einheiten des GUI, ist es kein Klick auf eine Marke mehr. */
+    /** Weiter vom Druckpunkt weg, in Einheiten des GUI, ist es kein Klick auf eine Marke und kein Halten mehr. */
     private static final double ZUG = 3;
     /** Die halbe Breite des Punkts unter einer angehefteten Nadel, in Einheiten des GUI. */
     private static final int PUNKT = 2;
@@ -107,8 +107,12 @@ final class Karte extends Screen {
     private long wartendSeit;
     /** Die Nadel, die Fläche oder der Kreis unter dem letzten Klick ohne Marke; ein Doppelklick darauf heftet an. */
     private Tafeln.Ziel letztesZiel;
-    /** Wie weit seit dem Drücken gezogen ist, in Einheiten des GUI. */
+    /**
+     * Wie weit die Maus seit dem Drücken höchstens vom Druckpunkt weg war, in Einheiten des GUI; nicht der Weg,
+     * sonst summierte sich das Zittern der Hand. Siehe docs/wegpunkte.md, „Bedienung“.
+     */
     private double gezogen;
+    private double druckX, druckY;
 
     /** Ein Eintrag im Menü nach Rechtsklick. */
     private record Eintrag(Component text, Runnable tut) {
@@ -740,6 +744,8 @@ final class Karte extends Screen {
         gedrueckt = null;
         taste = e.button() == InputConstants.MOUSE_BUTTON_LEFT;
         gezogen = 0;
+        druckX = e.x();
+        druckY = e.y();
         if (ziel != null) {
             // Mit der linken wie der rechten Taste: Wer rechts klickt, um zu öffnen, klickt oft auch rechts darauf.
             int zeile = Mth.floor((e.y() - menueY) / ZEILE);
@@ -1150,7 +1156,7 @@ final class Karte extends Screen {
         }
         // Die Tasten zählen wie in SDL, links ist 1. Siehe docs/entwicklung.md, „Maustasten“.
         if (blick != null && ereignis.button() == InputConstants.MOUSE_BUTTON_LEFT) {
-            gezogen += Math.abs(dx) + Math.abs(dy);
+            gezogen = Math.max(gezogen, Math.hypot(ereignis.x() - druckX, ereignis.y() - druckY));
             if (gezogen > ZUG) {
                 gedrueckt = null;
             }
