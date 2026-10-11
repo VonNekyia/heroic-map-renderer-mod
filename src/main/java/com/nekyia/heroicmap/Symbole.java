@@ -171,6 +171,16 @@ final class Symbole {
         spielserver = verbindung;
     }
 
+    /** Die Basis unter {@code /tiles} aus der letzten gültigen Liste der Ebenen, oder null; nur der Render-Thread. */
+    URI basis() {
+        return basis;
+    }
+
+    /** Die Adresse der Verbindung zum Spielserver, gegen die {@link Adresse#pruefe} die Basis prüft. */
+    InetAddress spielserver() {
+        return spielserver;
+    }
+
     /**
      * {@code url} wie sie ist, oder {@code http://<ip>:<port>/tiles} mit der IP der Verbindung, IPv6 in
      * eckigen Klammern, wie bei der {@code freigabe}; null, wenn beides fehlt oder nicht taugt.

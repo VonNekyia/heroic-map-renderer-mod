@@ -557,6 +557,11 @@ final class Karte extends Screen {
         return blick == null ? null : new double[] {blick.mx, blick.mz};
     }
 
+    /** Für die Gametests: legt die Mitte des Blicks auf die Mitte des Blocks (x, z); Stufe und Lupe bleiben. */
+    void zeige(int x, int z) {
+        blick.stelle((x + 0.5) * satz.scale(), (z + 0.5) * satz.scale(), blick.zoom, blick.lupe);
+    }
+
     int[] ziel() {
         return ziel;
     }
@@ -1098,7 +1103,7 @@ final class Karte extends Screen {
         if (minecraft.getConnection() != null && !minecraft.level.dimensionType().hasCeiling()
                 && Teleport.erlaubt(minecraft.getConnection().getCommands())) {
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.teleport", z[0], z[1]), () -> {
-                minecraft.getConnection().sendCommand(Teleport.befehl(dimension, z[0], z[1]));
+                Teleport.los(minecraft, satz, dimension, z[0], z[1]);
                 onClose();
             }));
         }
