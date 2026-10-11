@@ -34,12 +34,12 @@ public final class Schleier {
     static final float HOEHE = 4;
     /** So deckend ist er unten am Gelände, als Anteil vom Alpha seiner Farbe. */
     static final float DECKUNG = 0.5f;
-    /** So viele Vierecke höchstens; darüber die nächsten zuerst. */
-    static final int MAX_VIERECKE = 20_000;
+    /** So viele Vierecke höchstens; darüber die nächsten zuerst. Siehe docs/wegpunkte.md, „Schleier“, „Kosten“. */
+    static final int MAX_VIERECKE = 5_000;
     /** So weit, in Blöcken, geht der Spieler, bis der Mod neu baut; so weit reicht der Schleier über die Sichtweite hinaus. */
     static final int NEU_AB = 16;
-    /** Ändert sich ein Chunk unter dem Schleier, baut der Mod höchstens so oft neu, in ms. */
-    static final long NEU_FRUEHESTENS_MS = 250;
+    /** So oft baut der Mod höchstens neu, in ms; nur der erste Bau und eine andere Dimension warten nicht. */
+    static final long NEU_FRUEHESTENS_MS = 500;
 
     /** Ein Stück einer Kante von (x0, z0) bis (x1, z1). */
     interface Stueck {
@@ -71,9 +71,10 @@ public final class Schleier {
         }
         int weit = mc.options.getEffectiveRenderDistance() * 16, bx = mc.player.getBlockX(), bz = mc.player.getBlockZ();
         long jetzt = Util.getMillis();
-        if (!gebaut || gebautAus != Ebenen.INSTANZ || ebenenStand != Ebenen.INSTANZ.stand() || wegpunkteStand != Wegpunkte.INSTANZ.stand()
-                || dimension != level.dimension() || weite != weit || Math.abs(bx - ursprungX) > NEU_AB || Math.abs(bz - ursprungZ) > NEU_AB
-                || schmutzig && jetzt - gebautUm >= NEU_FRUEHESTENS_MS) {
+        // Ein Bau liest die Höhen aus der Welt und kostet bis zu einigen ms auf dem Render-Thread; darum höchstens alle 500 ms.
+        boolean noetig = gebautAus != Ebenen.INSTANZ || ebenenStand != Ebenen.INSTANZ.stand() || wegpunkteStand != Wegpunkte.INSTANZ.stand()
+                || weite != weit || Math.abs(bx - ursprungX) > NEU_AB || Math.abs(bz - ursprungZ) > NEU_AB || schmutzig;
+        if (!gebaut || dimension != level.dimension() || noetig && jetzt - gebautUm >= NEU_FRUEHESTENS_MS) {
             baue(level, bx, bz, weit, jetzt);
         }
         if (vierecke == 0) {
