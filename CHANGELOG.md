@@ -4,6 +4,13 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.40
+
+- **The first download of a map is one stream and takes minutes, not twenty.** With a map server that offers it, the mod fetches the whole map over a single connection; later updates still come tile by tile. Older map servers keep the old way.
+- **The full map shows the download's progress** in a box next to "Download map …": percent, bytes, speed and time left. The map appears as soon as its coarsest zoom level is in, before the download is complete.
+- **An interrupted first download continues where it stopped,** right away and on its own, instead of starting over.
+- **A stopped download names the HTTP status,** such as 502, which tells a proxy error from a network error.
+
 ## 0.2.39
 
 - **"Finish shape" says so when it cannot save.** If the shape you were adding corners to was deleted in the meantime, the new corners were dropped silently; now a note at the bottom left tells you.

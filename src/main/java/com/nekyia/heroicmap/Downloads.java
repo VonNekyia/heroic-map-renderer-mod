@@ -52,6 +52,10 @@ final class Downloads {
     private final Reihe reihe = new Reihe();
     /** Nur im Thread der Reihe; der HttpClient entsteht mit dem ersten Download, beim Trennen wäre es zu früh. */
     private Laden laden;
+    /** Der laufende Strom, oder null; der Thread der Reihe schreibt, der Render-Thread liest. */
+    private volatile Laden.Fortschritt fortschritt;
+    /** Nur der Thread der Reihe zählt hoch, siehe {@link #stufen()}. */
+    private volatile int stufen;
     /** Das letzte Angebot des Servers, oder null. */
     private JsonObject angebot;
     /** Je Baum, was der Spieler vor einer {@code anfrage} mit {@code voll} bestätigt hat; die {@code freigabe} verbraucht es. */
@@ -206,7 +210,7 @@ final class Downloads {
     int vollstaendig(String baum) {
         Path ordner = ordner(baum);
         Satz satz = ordner == null ? null : Satz.lies(ordner);
-        return satz != null && satz.massstab() == aktiv(baum) ? satz.massstab() : 0;
+        return satz != null && satz.massstab() == aktiv(baum) && !Laden.imStrom(satz.ordner()) ? satz.massstab() : 0;
     }
 
     /** Der gespeicherte Stand des Baums auf diesem Server, oder null. */
@@ -318,11 +322,12 @@ final class Downloads {
     /**
      * Lädt der Mod statt eines Abgleichs voll? Ja, wenn er im Ordner des Massstabs keinen Stand hat,
      * etwa nach dem Löschen der Karte: Ein Abgleich brächte je Tag nur ein Zehntel. Dann fragt er wie
-     * vor dem ersten Download und schickt {@code anfrage voll} mit {@code neu: true}. Siehe
-     * docs/download.md, „Zustimmung und Grösse“.
+     * vor dem ersten Download und schickt {@code anfrage voll} mit {@code neu: true}. Ebenso, solange
+     * ein Strom nicht fertig ist; der volle Download setzt ihn fort. Siehe docs/download.md,
+     * „Zustimmung und Grösse“.
      */
     static boolean vollStattAbgleich(boolean abgleich, Path massstabOrdner) {
-        return abgleich && !Laden.hatStand(massstabOrdner);
+        return abgleich && (!Laden.hatStand(massstabOrdner) || Laden.imStrom(massstabOrdner));
     }
 
     private void abgelehnt(JsonObject json) {
@@ -388,7 +393,11 @@ final class Downloads {
             return;
         }
         JsonObject eintrag = eintrag(f.baum());
-        String name = text(eintrag, "name"), dimension = text(eintrag, "dimension");
+        reiheEin(f, auftrag, ordner, text(eintrag, "name"), text(eintrag, "dimension"));
+    }
+
+    /** Reiht den Download in den Ordner des Baums ein und meldet den Beginn. Auf dem Render-Thread; der Gametest ruft es direkt. */
+    void reiheEin(Freigabe f, Laden.Auftrag auftrag, Path ordner, String name, String dimension) {
         int meine = sitzung;
         if (!reihe.reihe(ordner.toString(), () -> lade(f, auftrag, ordner, name, dimension, meine))) {
             melde(Component.translatable("heroicmap.download.verfaellt_belegt", f.baum()));
@@ -405,23 +414,57 @@ final class Downloads {
             if (laden == null) {
                 laden = new Laden();
             }
+            Path ziel = ordner.resolve(String.valueOf(f.massstab()));
             if (!f.abgleich()) {
                 // Das Plugin speichert den Massstab, sobald es das Token ausstellt; der Abgleich misst an diesem Stand.
                 new Freigabe.Stand(f.massstab(), auftrag.satzBytes(), auftrag.kacheln()).schreibe(ordner.resolve(STAND));
+                // Voll als ein Strom; kennt der Renderer ihn nicht, einzeln. Siehe docs/download.md, „Strom“.
+                fortschritt = new Laden.Fortschritt(f.bytes());
+                boolean[] gezeigt = {false};
+                ergebnis = laden.strom(auftrag, ziel, fortschritt, stufe -> {
+                    if (!gezeigt[0] && name != null && dimension != null) {
+                        gezeigt[0] = true;
+                        // Ab der gröbsten Stufe zeigt die Vollbildkarte den Satz, siehe docs/vollbildkarte.md, „Welcher Satz“;
+                        // ein vollständiger alter Satz in einem anderen Massstab bleibt bis zum Ende.
+                        try {
+                            if (Satz.lies(ordner) == null) {
+                                Satz.schreibe(ordner, name, dimension, f.massstab());
+                            }
+                        } catch (IOException e) {
+                            LOGGER.warn("Heroic Map: satz.json nicht geschrieben", e);
+                        }
+                    }
+                    stufen++;
+                    Minecraft.getInstance().execute(Kacheln::satzGeladen);
+                });
+                fortschritt = null;
             }
-            ergebnis = laden.lade(auftrag, ordner.resolve(String.valueOf(f.massstab())));
+            if (ergebnis == null) {
+                ergebnis = laden.lade(auftrag, ziel);
+            }
             if (!ergebnis.gekappt()) {
                 Laden.behalteNur(ordner, f.massstab());
                 if (name != null && dimension != null) {
-                    // Erst jetzt zeigt die Vollbildkarte den Satz, siehe docs/vollbildkarte.md, „Welcher Satz“.
+                    // Spätestens jetzt zeigt die Vollbildkarte den Satz, siehe docs/vollbildkarte.md, „Welcher Satz“.
                     Satz.schreibe(ordner, name, dimension, f.massstab());
                 }
             }
         } catch (Exception e) {
             fehler = e;
         } finally {
+            fortschritt = null;
             zurueck(f, auftrag, ergebnis, fehler, meine);
         }
+    }
+
+    /** Der laufende Strom für die Anzeige auf der Vollbildkarte, oder null. */
+    Laden.Fortschritt fortschritt() {
+        return fortschritt;
+    }
+
+    /** Zählt jede Stufe, die ein Strom ganz abgelegt hat; die Vollbildkarte ohne Satz sieht dann nach. */
+    int stufen() {
+        return stufen;
     }
 
     private void zurueck(Freigabe f, Laden.Auftrag auftrag, Laden.Ergebnis ergebnis, Exception fehler, int meine) {
@@ -452,7 +495,12 @@ final class Downloads {
         }
         LOGGER.warn("Heroic Map: Download abgebrochen", fehler);
         String grund = fehler instanceof Laden.Fehler lf ? lf.grund.name().toLowerCase(Locale.ROOT) : "anderer";
-        melde(Component.translatable("heroicmap.download.abbruch", Component.translatable("heroicmap.download.grund." + grund)));
+        Component warum = Component.translatable("heroicmap.download.grund." + grund);
+        if (fehler instanceof Laden.Fehler lf && lf.status > 0) {
+            // Der Status trennt einen Fehler des Proxys von einem des Netzes.
+            warum = Component.translatable("heroicmap.download.grund_status", warum, lf.status);
+        }
+        melde(Component.translatable("heroicmap.download.abbruch", warum));
     }
 
     /** Die Adresse der echten Verbindung zum Spielserver, oder null. */
@@ -708,6 +756,18 @@ final class Downloads {
             return String.format(Locale.ROOT, "%.1f GB", bytes / 1e9);
         }
         return String.format(Locale.ROOT, "%.1f MB", bytes / 1e6);
+    }
+
+    /** Bytes als Zahl in der Einheit, die {@link #groesse} für {@code einheit} nimmt: „2.0“ von „4.8 GB“. */
+    static String zahl(long bytes, long einheit) {
+        return String.format(Locale.ROOT, "%.1f", bytes / (einheit >= 1_000_000_000L ? 1e9 : 1e6));
+    }
+
+    /** Eine Dauer in Sekunden als m:ss, ab einer Stunde als h:mm:ss. */
+    static String dauer(long sekunden) {
+        return sekunden >= 3600
+                ? String.format(Locale.ROOT, "%d:%02d:%02d", sekunden / 3600, sekunden / 60 % 60, sekunden % 60)
+                : String.format(Locale.ROOT, "%d:%02d", sekunden / 60, sekunden % 60);
     }
 
     /** Die Summe der Kartenliste immer in GB, wie der User es will. */

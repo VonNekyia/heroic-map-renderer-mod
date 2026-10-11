@@ -1,6 +1,6 @@
 ---
 title: Vollbildkarte
-description: Die Karte über den ganzen Schirm aus den geladenen Kacheln, mit Bedienung samt Menü nach Rechtsklick, Liste der Ebenen mit Anheften der ganzen Ebene, welchem Satz sie zeigt, Stufen und Lupe, wie Kacheln gelesen und behalten werden, Spieler und Koordinaten, dem Bild aus dem Gametest und was fehlt.
+description: Die Karte über den ganzen Schirm aus den geladenen Kacheln, mit Bedienung samt Menü nach Rechtsklick, Liste der Ebenen mit Anheften der ganzen Ebene, welchem Satz sie zeigt, dem Fortschritt eines Downloads, Stufen und Lupe, wie Kacheln gelesen und behalten werden, Spieler und Koordinaten, dem Bild aus dem Gametest und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Karte.java
   - src/main/java/com/nekyia/heroicmap/Kartenblick.java
@@ -193,7 +193,10 @@ auf den Namen heftet die ganze Ebene an (mod#103).
 
 - **Je Baum** schreibt der Mod nach einem vollständigen Download
   `satz.json` neben die Massstäbe: Name und Dimension aus dem `angebot`,
-  dazu der Massstab. Ein gekappter Download schreibt sie nicht.
+  dazu der Massstab. Ein gekappter Download schreibt sie nicht. Beim Strom
+  steht sie schon, sobald die gröbste Stufe daliegt, wenn noch kein Satz
+  dasteht; die Karte zeigt ihn dann, bevor er vollständig ist. Siehe
+  [Download](download.md), „Strom“.
 - **Die Karte** nimmt unter dem Ordner der Welt den Baum, dessen
   Dimension die des Spielers ist (`Satz.fuer`), siehe
   [Download](download.md), „Ablage“; einen selbst gezeichneten vor jedem
@@ -214,6 +217,36 @@ auf den Namen heftet die ganze Ebene an (mod#103).
   verletzter Grenze** zählt nicht und verdeckt keinen anderen.
 - **Bietet ein Server zwei Bäume derselben Dimension an,** nimmt die Karte
   den ersten nach dem Namen, Zeichen für Zeichen (`welt_alt` vor `weltneu`).
+
+## Fortschritt
+
+Solange ein Strom läuft, siehe [Download](download.md), „Strom“, steht
+links neben „Karte laden …“ ein Kasten (`Karte.fortschritt`). So hat es der
+Reviewer nach einem Entwurf entschieden.
+
+- **Lage:** 200 × 38 Einheiten, oben bündig mit dem Knopf, 4 Einheiten
+  links davon, dunkel durchscheinend.
+- **Zeile 1:** „Karte wird geladen“, rechts die Prozent, abgerundet.
+- **Balken:** wie der Ladebalken des Spiels, weisser Rand, weiss gefüllt.
+- **Zeile 2, grau:** links die Bytes, empfangen von gesamt in der Einheit
+  des Gesamten, etwa „2.0 von 4.8 GB“; rechts Tempo und Restzeit, etwa
+  „38.0 MB/s, noch 1:16“, ab einer Stunde h:mm:ss.
+- **Nur aus Bytes** (`Laden.Fortschritt`): Empfangen zählt jedes Byte des
+  Körpers, gesamt ist `X-Heroic-Bytes`, ohne den Header die `bytes` der
+  `freigabe`, höchstens die Grenze des Stroms. Über 100 % geht der Anteil
+  nicht. Dateien zählen nicht.
+- **Tempo** über die letzten 5 s (`Laden.Fortschritt.FENSTER_MS`), die
+  Restzeit ist der Rest durch das Tempo. Vor der ersten Sekunde und
+  solange nichts kommt, steht „…“.
+- **Ohne Satz** steht während des Downloads kein Hinweis mitten auf der
+  Karte; der Kasten sagt, was los ist.
+- **Sobald eine Stufe ganz daliegt,** öffnet sich eine Karte ohne Satz
+  neu mit dem Satz (`Karte.tick`, `Downloads.stufen`), und die offene
+  Karte fragt fehlende Kacheln neu an (`Kacheln.satzGeladen`). Bis eine
+  Stufe da ist, zeigt sie den Ausschnitt der gröberen.
+- **Sonst:** Der Chat meldet Beginn und Ende wie bisher, die Minimap
+  zeigt nichts. Der einzelne Download, wenn der Renderer den Strom nicht
+  kennt, zeigt keinen Kasten.
 
 ## Stufen und Lupe
 
@@ -245,7 +278,11 @@ auf den Namen heftet die ganze Ebene an (mod#103).
   aus der nächsten gröberen Stufe, die schon geladen ist, vergrössert
   (`Karte.platzhalter`, `Kartenblick.grob`). Angefragt wird dafür nichts;
   beim Hineinzoomen liegt die gröbere Kachel meist schon da. Sonst bleibt
-  der Platz dunkel.
+  der Platz dunkel. Fehlt die Kachel aber auf der Platte (`Kacheln.fehlt`),
+  etwa weil ein Strom erst die gröberen Stufen brachte, fragt die Karte die
+  gröberen an, bis eine da ist; jede kostet einmal Dekodieren. Ohne das
+  bliebe die Karte während des Stroms bis zur feinsten Stufe dunkel, denn
+  sie öffnet auf der feinsten.
 - **Kosten** ([Messung](messungen/2026-10-06-vollbildkarte-uebernahme.md)):
   Eine Kachel 256² dekodiert in rund 2,8 ms, der Thread liefert also rund
   350 je Sekunde, etwa 6 je Frame bei 60 fps. Das Hochladen kostet den

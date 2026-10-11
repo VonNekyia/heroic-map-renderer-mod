@@ -1,6 +1,6 @@
 ---
 title: Download
-description: Wie der Mod die Karte vom Plugin lädt, mit dem Kanal heroicmap:karte, den Befehlen, Zustimmung und Grösse, der Prüfung der Adresse, Manifest und Prüfsumme, Fristen, den harten Grenzen, der Reihe der Downloads, der Ablage je Welt nach dem Hash des Seeds, Baum und Massstab, der Kartenliste mit Löschen, Fortsetzen und Abgleich, und was der Offline-Modus heisst.
+description: Wie der Mod die Karte vom Plugin lädt, beim ersten Mal als ein Strom, mit dem Kanal heroicmap:karte, den Befehlen, Zustimmung und Grösse, der Prüfung der Adresse, Manifest und Prüfsumme, Fristen, den harten Grenzen, der Reihe der Downloads, der Ablage je Welt nach dem Hash des Seeds, Baum und Massstab, der Kartenliste mit Löschen, Fortsetzen und Abgleich, und was der Offline-Modus heisst.
 code:
   - src/main/java/com/nekyia/heroicmap/Kanal.java
   - src/main/java/com/nekyia/heroicmap/Downloads.java
@@ -19,13 +19,15 @@ code:
   - src/test/java/com/nekyia/heroicmap/AblageTest.java
   - src/main/resources/heroicmap.accesswidener
   - src/gametest/java/com/nekyia/heroicmap/Anmeldung.java
+  - src/gametest/java/com/nekyia/heroicmap/Strom.java
   - src/main/java/com/nekyia/heroicmap/Welten.java
 ---
 
 # Download
 
-Der Mod lädt die Karte, die das Plugin eines Servers anbietet, als einzelne
-Kacheln auf die Platte. Das Protokoll steht an einer Stelle, in
+Der Mod lädt die Karte, die das Plugin eines Servers anbietet, auf die
+Platte: beim ersten Mal als einen Strom, siehe „Strom“, danach Kachel für
+Kachel. Das Protokoll steht an einer Stelle, in
 [`docs/download.md` des Plugins](https://github.com/VonNekyia/heroic-map-renderer-plugin/blob/main/docs/download.md),
 Plan und Entscheidungen an
 [heroic-map-renderer#154](https://github.com/VonNekyia/heroic-map-renderer/issues/154).
@@ -140,7 +142,9 @@ Ohne Unterbefehl öffnet `/hmap` das Menü, siehe [Minimap](minimap.md), „Bedi
   (`Downloads.vollStattAbgleich`). Er fragt wie vor dem ersten Download
   und schickt dann `anfrage voll` mit `neu: true`. Sonst brächte der
   Abgleich je Tag nur ein Zehntel der Karte, denn sein Deckel ist 10 %
-  des Satzes. Den Abgleich dieses Tages verbraucht das trotzdem.
+  des Satzes. Den Abgleich dieses Tages verbraucht das trotzdem. Ebenso,
+  solange ein Strom nicht fertig ist; dann geht die `anfrage` ohne `neu`,
+  siehe „Strom“.
 - **Im Einzelspieler** gibt es keinen Server und keinen Download, aber einen
   Ordner der Welt, siehe „Ablage“.
 
@@ -176,6 +180,8 @@ Ohne Unterbefehl öffnet `/hmap` das Menü, siehe [Minimap](minimap.md), „Bedi
   nicht abgesichert, und ohne HTTPS kann ein Lauscher das Token mitlesen;
   der Deckel der Bytes je Token begrenzt, was er damit lädt.
 - **Kacheln** prüft der Mod über ihre Grösse, nicht ihren Inhalt.
+- **Namen im Strom** werden Pfade; welche der Mod nimmt, steht unter
+  „Strom“.
 - **Name des Servers** (`server` im `angebot`): Durch die erlaubten Zeichen
   und die Bereinigung wie bei einer Adresse wird er genau ein Ordner unter
   `heroicmap/`, darunter nur `welt-<hash>`; mehr kann ein Server so nicht
@@ -186,9 +192,105 @@ Ohne Unterbefehl öffnet `/hmap` das Menü, siehe [Minimap](minimap.md), „Bedi
   einer Adresse zugesteht, gibt es nicht: Sie bräche genau den Fall, dass
   Domain, IP und `0` im selben Ordner landen sollen (mod#113).
 
+## Strom
+
+Den vollen Download eines Satzes holt der Mod als einen Strom statt Kachel
+für Kachel (heroic-map-renderer#289). Ein Baum mit 192 796 Kacheln und
+4,8 GB brauchte einzeln rund 20 min, und hinter einem Proxy brachen die
+vielen kurzen Verbindungen ab. Der Abgleich bleibt einzeln über das ETag,
+siehe „Ablauf“. So hat es der Reviewer entschieden, siehe
+[0021](entscheidungen/0021-erster-download-als-strom.md). Das Format
+beschreibt der Renderer in seiner `docs/benutzung/server.md`, „Download
+als Strom“; hier steht, was der Mod tut.
+
+- **Wann:** jede `freigabe` mit `art` `voll` (`Downloads.lade`,
+  `Laden.strom`). Antwortet der Kartenserver mit 404, ist es ein Renderer
+  vor dem Strom; dann lädt der Mod einzeln wie unter „Ablauf“, mit
+  demselben Token.
+- **Anfrage:** `GET <url>.zip` mit demselben Header `Authorization:
+  Bearer`. Nach einem Abbruch hängt der Mod `?nach=<z>/<x>/<y>` an, den
+  letzten abgelegten Pfad aus `strom.txt`.
+- **Antwort:**
+
+  | Status | Mod |
+  |---|---|
+  | 200 | liest den Strom; `X-Heroic-Bytes` ist die erwartete Grösse für den Fortschritt |
+  | 404 | einzeln, siehe oben |
+  | 401, 403 | abgelehnt |
+  | 429 | fragt nach 1,5 s neu an, höchstens dreimal (`Laden.VERSUCHE_429`), denn den Platz eines eben abgebrochenen Stroms gibt der Server erst frei, wenn er den Abbruch merkt; dann Budget erschöpft |
+  | anderer | Abbruch mit dem Status |
+
+- **Inhalt:** ein ZIP ohne Kompression, je Datei nur der lokale Kopf,
+  ohne zentrales Verzeichnis. Der Mod liest es mit
+  `java.util.zip.ZipInputStream`, das die CRC-32 jedes Eintrags prüft.
+  Reihenfolge: `map.json`, `manifest`, die Kacheln von grob nach fein,
+  zuletzt `ende` mit Grösse 0.
+- **Prüfung:** Jeder Verstoss bricht ab, mit dem Grund `STROM`, ausser wo
+  anders genannt.
+
+  | Was | Regel |
+  |---|---|
+  | erster und zweiter Eintrag | `map.json`, dann `manifest`, mit den Grenzen und der Prüfsumme wie unter „Ablauf“ |
+  | Name einer Kachel | `z/x/y.webp` aus ganzen Zahlen (`Laden.KACHEL`): nie `..`, nie absolut, kein `\`, kein anderer Typ; doppelt zählt nach den Zahlen |
+  | Kachel | steht im Manifest bis zur Stufe des Massstabs, kommt nur einmal, laut Kopf höchstens 4 MiB (`KACHEL`) |
+  | Methode | nur ohne Kompression, mit der Grösse im Kopf |
+  | Summe | `bytes` plus 10 %, dazu je Zeile des Manifests 1 KiB für Kopf und Name (`Laden.KOPF_MAX`), dazu `map.json` und Manifest |
+  | Ende | `ende` als letzter Eintrag, danach kein Byte; ohne `ende` ist der Strom abgebrochen, siehe „Abbruch“ |
+
+  Links kennt ein ZIP ohne zentrales Verzeichnis nicht; der Mod legt jede
+  Datei selbst als normale Datei an.
+- **Ablegen:** Kachel für Kachel, ganz in den Speicher, ein `write` in die
+  feste Zwischendatei `tmp/strom.tmp`, dann verschieben (`ATOMIC_MOVE`),
+  ohne fsync; nie liegt eine halbe Kachel da. Danach eine Zeile
+  `z/x/y etag` im Index, mit dem ETag aus dem Manifest im Strom. Was mit
+  gleichem ETag schon daliegt, liest der Mod und schreibt es nicht neu. Hat
+  sich eine Kachel während des Stroms geändert, holt sie der nächste
+  Abgleich.
+- **Früh sichtbar:** Eine Stufe liegt ganz da, sobald die erste Kachel der
+  nächsten kommt, die letzte am Ende des Stroms. Mit der ersten schreibt der
+  Mod `satz.json`, wenn noch kein Satz dasteht; ein vollständiger Satz in
+  einem anderen Massstab bleibt bis zum Ende. Siehe
+  [Vollbildkarte](vollbildkarte.md), „Welcher Satz“ und „Fortschritt“.
+- **Unvollständig:** Solange `strom.txt` im Ordner des Massstabs liegt
+  (`Laden.imStrom`), ist der Satz nicht vollständig: kein Abgleich, eine
+  `freigabe` für einen Abgleich wird ein voller Download
+  (`Downloads.vollStattAbgleich`), und der setzt den Strom fort. In
+  `strom.txt` steht der letzte abgelegte Pfad; nach einem vollständigen
+  Strom geht die Datei.
+- **Fortsetzen:** Mit `nach` überspringt der Server alles bis einschliesslich
+  dieser Kachel in derselben Reihenfolge, und der Deckel des Tokens zählt
+  nur, was geht. Nach einem Abbruch setzt der Mod sofort fort, siehe
+  „Abbruch“; ein späterer voller Download ebenso. Weil dann schon ein Index
+  liegt, geht dessen `anfrage` ohne `neu`, und das Plugin gibt dasselbe
+  Token, solange es gilt. Endet das Spiel hart, steht in `strom.txt` ein
+  älterer Pfad oder keiner; dann kommt mehr noch einmal, geschrieben wird
+  es nicht.
+- **Fristen:** 2 min bis zum Header, danach keine Frist für den ganzen
+  Strom; kommt 30 s lang kein Byte, beendet eine Wache die Verbindung.
+- **Abbruch** (`Laden.Abbruch`): ein Fehler beim Lesen aus dem Netz, eine
+  abgerissene Datei, 30 s ohne Byte, oder ein Körper, der sauber endet,
+  aber ohne `ende`. So endet der Server am Deckel des Tokens oder nach einem
+  Lesefehler. Dann fragt der Mod sofort mit `nach` weiter (`Laden.strom`),
+  solange der letzte Versuch `strom.txt` weiterbrachte, höchstens 100
+  Versuche (`Laden.VERSUCHE_STROM`). Bringen zwei Versuche hintereinander
+  nichts Neues, hört er auf. Endete der Körper dabei sauber, ist es der
+  Deckel; dasselbe Token bringt nichts mehr, und der Mod meldet „Budget
+  erschöpft“ (`BUDGET`). Sonst meldet er den Fehler des Netzes (`NETZ`).
+  Eine neue `freigabe` fragt er dafür nicht an, wie bei einem verbrauchten
+  Token. So hat es der Reviewer entschieden, damit keine Schleife entsteht.
+  Ein Fehler der Platte bleibt einer der Platte und bricht sofort ab.
+- **Daten vor einem harten Abbruch:** Was vor dem Abbruch der Verbindung
+  ankam, aber noch nicht gelesen war, verwirft der `HttpClient` mit dem
+  Fehler; es kommt beim Fortsetzen noch einmal. Darum beendet der Server
+  den Körper am Deckel sauber.
+- **Tests:** `LadenTest` gegen einen Server auf loopback, auch mit einem
+  echten Abriss im chunked-Körper; der Gametest `Strom`, siehe
+  [Entwicklung](entwicklung.md), „Gametests“.
+
 ## Ablauf
 
-`Laden.lade`, im Thread der Reihe:
+Ein Abgleich, und ein voller Download, wenn der Renderer den Strom nicht
+kennt: `Laden.lade`, im Thread der Reihe.
 
 1. **Adresse** prüfen, vor jedem Abruf, siehe „Sicherheit“.
 2. **`map.json`** holen; daraus `minZoom` und `maxZoom`. Die Stufe des
@@ -213,7 +315,8 @@ Ohne Unterbefehl öffnet `/hmap` das Menü, siehe [Minimap](minimap.md), „Bedi
 
 **Fristen:** Eine Anfrage hat 2 min für Header und Körper zusammen; danach
 bricht der Mod sie ab (`sendAsync`, `cancel`). Der Aufbau der Verbindung hat
-10 s. Fehler der Verbindung und abgelaufene Fristen heissen `NETZ`.
+10 s. Fehler der Verbindung und abgelaufene Fristen heissen `NETZ`. Für den
+Strom siehe „Strom“.
 
 ## Reihe
 
@@ -240,17 +343,21 @@ bricht der Mod sie ab (`sendAsync`, `cancel`). Der Aufbau der Verbindung hat
 | Zeilen bis zur Stufe | keine doppelte Kachel; höchstens `kacheln` plus 10 %, und höchstens eine je 4 KiB der Grösse des Satzes plus 10 %, beides aus dem Stand, an dem der Download misst | Abbruch |
 | eine Kachel | 4 MiB; mit dem ETag des Manifests genau die Grösse aus dem Manifest | Abbruch |
 | Summe des Geladenen | bei `voll` `bytes` plus 10 %, beim Abgleich `bytes`, der Deckel des Tokens | der Rest bleibt liegen, „zum Teil geladen“ |
-| Antwort | 200 | 401 und 403 heissen abgelehnt, 429 Budget erschöpft, alles andere Abbruch |
+| Antwort | 200 | 401 und 403 heissen abgelehnt, 429 Budget erschöpft, alles andere Abbruch; beim Strom siehe „Strom“ |
+| Strom | siehe „Strom“, „Prüfung“ | Abbruch |
 
 `z/x/y` wird ein Dateipfad; deshalb nur ganze Zahlen, auch beim Lesen des
 eigenen Index, und doppelt zählt nach den Zahlen, `7/0/0` wie `007/0/0`.
 Ein Abbruch meldet dem Spieler den Grund, übersetzt und ohne Pfad;
-Einzelheiten stehen im Log.
+Einzelheiten stehen im Log. Kam eine Antwort mit einem anderen Status als
+200, steht er dabei, etwa „HTTP-Status 502“; so trennt sich ein Fehler
+eines Proxys von einem des Netzes (`Laden.Fehler.status`).
 
 ## Ablage
 
 - **Ordner:** `heroicmap/<welt>/<baum>/<massstab>/` im Spielordner, darin
-  `map.json`, `etags.txt`, `z/x/y.webp` und `tmp/`. `<welt>` richtet sich
+  `map.json`, `etags.txt`, `z/x/y.webp` und `tmp/`, solange ein Strom
+  nicht fertig ist `strom.txt`. `<welt>` richtet sich
   nach der Wahl „Ablage der Karten“ im Untermenü „Einstellungen …“
   (`Downloads.weltOrdner`),
   gespeichert als `ablage` in `heroicmap.properties`:

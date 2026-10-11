@@ -4,6 +4,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -25,6 +27,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -51,10 +54,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
+import java.util.function.IntConsumer;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
+import java.util.zip.ZipInputStream;
 
 /**
  * Lädt einen Satz Kacheln vom Server: {@code map.json}, das Manifest, dann was fehlt oder
@@ -77,11 +84,24 @@ final class Laden {
     private static final Pattern ZAHL = Pattern.compile("-?\\d{1,9}");
     private static final Pattern GROESSE = Pattern.compile("\\d{1,10}");
     private static final Pattern PFAD = Pattern.compile("-?\\d{1,9}/-?\\d{1,9}/-?\\d{1,9}");
+    /** Der Name einer Kachel im Strom: nur ganze Zahlen, also nie {@code ..}, nie absolut. */
+    private static final Pattern KACHEL = Pattern.compile("(-?\\d{1,9})/(-?\\d{1,9})/(-?\\d{1,9})\\.webp");
+    /** {@code X-Heroic-Bytes}, die erwartete Grösse des Stroms. */
+    private static final Pattern BYTES = Pattern.compile("\\d{1,15}");
     /** Ein ETag ist für den Mod undurchsichtig, aber ohne Leerzeichen und Steuerzeichen. */
     private static final Pattern ETAG = Pattern.compile("[\\x21-\\x7e]{1,256}");
     private static final String INDEX = "etags.txt";
     /** Der Ordner der Zwischendateien im Ziel; was darin liegt, ist halb. */
     private static final String ZWISCHEN = "tmp";
+    /** Liegt im Ordner des Massstabs, solange ein Strom nicht fertig ist; darin der letzte abgelegte Pfad. */
+    static final String STROM = "strom.txt";
+    /** So viel zählt eine Datei im Strom höchstens über ihren Inhalt hinaus, für Kopf und Name. */
+    static final long KOPF_MAX = 1L << 10;
+    /** So oft fragt der Mod den Strom an, solange der Server 429 sagt, mit so vielen ms Pause dazwischen. */
+    static final int VERSUCHE_429 = 3;
+    static final long PAUSE_429_MS = 1500;
+    /** Höchstens so viele Versuche hat ein Strom, auch wenn jeder etwas Neues bringt; so endet er immer. */
+    static final int VERSUCHE_STROM = 100;
 
     /**
      * Was die {@code freigabe} nennt, dazu aus dem {@code angebot} Grösse und Zahl der Kacheln
@@ -129,39 +149,104 @@ final class Laden {
         /** Das Ziel liegt im Heimnetz, der Spielserver nicht. */
         HEIMNETZ,
         /** Der Host lässt sich nicht auflösen. */
-        UNBEKANNT
+        UNBEKANNT,
+        /** Der Strom verletzt eine Regel: Name, Reihenfolge, Methode oder Grösse. */
+        STROM
     }
 
-    static final class Fehler extends Exception {
+    static class Fehler extends Exception {
         final Grund grund;
+        /** Der Status der Antwort, oder 0, wenn keine kam. */
+        final int status;
 
         Fehler(Grund grund, String text) {
             this(grund, text, null);
         }
 
         Fehler(Grund grund, String text, Throwable ursache) {
+            this(grund, 0, text, ursache);
+        }
+
+        Fehler(Grund grund, int status, String text, Throwable ursache) {
             super(grund + ": " + text, ursache);
             this.grund = grund;
+            this.status = status;
         }
     }
 
-    private final HttpClient client = HttpClient.newBuilder()
-            .version(HttpClient.Version.HTTP_1_1)
-            // Kein dritter Host bekommt das Token.
-            .followRedirects(HttpClient.Redirect.NEVER)
-            .connectTimeout(Duration.ofSeconds(10))
-            // Ein Proxy des Systems ginge an der Prüfung der Adresse vorbei.
-            .proxy(HttpClient.Builder.NO_PROXY)
-            .build();
-    /** So lange darf eine Anfrage dauern, Header und Körper zusammen. */
+    /** Ein Strom brach nach der Antwort 200 im Körper ab; {@link #strom} setzt dann fort. */
+    static final class Abbruch extends Fehler {
+        /** Endete der Körper sauber, nur ohne {@code ende}: am Deckel des Tokens oder nach einem Lesefehler des Servers. */
+        final boolean sauber;
+
+        Abbruch(boolean sauber, String text, Throwable ursache) {
+            super(Grund.NETZ, text, ursache);
+            this.sauber = sauber;
+        }
+    }
+
+    /**
+     * Bytes empfangen und erwartet, für die Anzeige auf der Vollbildkarte. Der Download zählt,
+     * ein anderer Thread liest. Siehe docs/vollbildkarte.md, „Fortschritt“.
+     */
+    static final class Fortschritt {
+        /** Über so viele ms mittelt das Tempo. */
+        static final long FENSTER_MS = 5000;
+        final AtomicLong empfangen = new AtomicLong();
+        volatile long gesamt;
+        /** Je Aufruf von {@link #tempo} die Zeit in ms und die Bytes bis dahin; nur der lesende Thread. */
+        private final ArrayDeque<long[]> proben = new ArrayDeque<>();
+
+        Fortschritt(long gesamt) {
+            this.gesamt = gesamt;
+        }
+
+        /** Der Anteil von 0 bis 1. */
+        double anteil() {
+            long g = gesamt;
+            return g <= 0 ? 0 : Math.min(1, empfangen.get() / (double) g);
+        }
+
+        /** Bytes je Sekunde über die letzten {@link #FENSTER_MS}, oder -1, solange keine Sekunde gemessen ist. */
+        double tempo(long jetztMs) {
+            long bytes = empfangen.get();
+            proben.addLast(new long[] {jetztMs, bytes});
+            while (jetztMs - proben.getFirst()[0] > FENSTER_MS) {
+                proben.removeFirst();
+            }
+            long dauer = jetztMs - proben.getFirst()[0];
+            return dauer < 1000 ? -1 : (bytes - proben.getFirst()[1]) * 1000.0 / dauer;
+        }
+    }
+
+    private final HttpClient client = client();
+    /** So lange darf eine Anfrage dauern, Header und Körper zusammen; beim Strom nur bis zum Header. */
     private final Duration zeit;
+    /** So lange darf im Strom kein Byte kommen. */
+    private final Duration leerlauf;
 
     Laden() {
         this(Duration.ofMinutes(2));
     }
 
     Laden(Duration zeit) {
+        this(zeit, Duration.ofSeconds(30));
+    }
+
+    Laden(Duration zeit, Duration leerlauf) {
         this.zeit = zeit;
+        this.leerlauf = leerlauf;
+    }
+
+    private static HttpClient client() {
+        return HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                // Kein dritter Host bekommt das Token.
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .connectTimeout(Duration.ofSeconds(10))
+                // Ein Proxy des Systems ginge an der Prüfung der Adresse vorbei.
+                .proxy(HttpClient.Builder.NO_PROXY)
+                .build();
     }
 
     /** Lädt den Satz nach {@code ziel}: {@code map.json}, {@code etags.txt} und {@code z/x/y.webp}. */
@@ -171,41 +256,12 @@ final class Laden {
         loesche(zwischen);
         Files.createDirectories(zwischen);
         byte[] karte = hole(a, "map.json", KARTE_MAX, Grund.MANIFEST).body();
-        int minZoom, maxZoom;
-        try {
-            JsonObject json = JsonParser.parseString(new String(karte, StandardCharsets.UTF_8)).getAsJsonObject();
-            minZoom = json.get("minZoom").getAsInt();
-            maxZoom = json.get("maxZoom").getAsInt();
-        } catch (RuntimeException e) {
-            throw new Fehler(Grund.MANIFEST, "map.json nicht lesbar");
-        }
-        int stufe = maxZoom - switch (a.massstab()) {
-            case 4 -> 0;
-            case 2 -> 1;
-            case 1 -> 2;
-            default -> throw new Fehler(Grund.MANIFEST, "Massstab " + a.massstab());
-        };
-        if (stufe < minZoom) {
-            throw new Fehler(Grund.MANIFEST, "keine Stufe für " + a.massstab() + " px");
-        }
+        int[] zoom = zoom(karte, a.massstab());
         byte[] gz = hole(a, "manifest", MANIFEST_MAX, Grund.MANIFEST).body();
-        if (!sha256(gz).equals(a.manifestSha256().toLowerCase(Locale.ROOT))) {
-            throw new Fehler(Grund.PRUEFSUMME, "manifest_sha256");
-        }
-        List<Eintrag> soll = lies(entpacke(gz), minZoom, maxZoom, stufe, a.zeilen());
-        schreibe(zwischen, ziel.resolve("map.json"), karte);
-
-        Map<String, String> ist = new ConcurrentHashMap<>(liesIndex(ziel));
-        Set<String> pfade = new HashSet<>();
-        soll.forEach(e -> pfade.add(e.pfad()));
-        int geloescht = 0;
-        for (String pfad : List.copyOf(ist.keySet())) {
-            if (!pfade.contains(pfad)) {
-                Files.deleteIfExists(datei(ziel, pfad));
-                ist.remove(pfad);
-                geloescht++;
-            }
-        }
+        Plan plan = plane(a, karte, zoom, gz, ziel, zwischen);
+        List<Eintrag> soll = plan.soll();
+        Map<String, String> ist = plan.ist();
+        int geloescht = plan.geloescht();
         ConcurrentLinkedQueue<Eintrag> fehlt = new ConcurrentLinkedQueue<>();
         for (Eintrag e : soll) {
             if (!e.etag().equals(ist.get(e.pfad())) || !Files.exists(datei(ziel, e.pfad()))) {
@@ -273,7 +329,359 @@ final class Laden {
             protokoll.close();
             schreibeIndex(zwischen, ziel, ist);
         }
+        if (!gekappt.get()) {
+            // Ein früherer Strom ist so auch fertig.
+            Files.deleteIfExists(ziel.resolve(STROM));
+        }
         return new Ergebnis(geladen.get(), gleich, geloescht, geladenBytes.get(), gekappt.get());
+    }
+
+    /** minZoom, maxZoom und die Stufe des Massstabs aus {@code map.json}. */
+    private static int[] zoom(byte[] karte, int massstab) throws Fehler {
+        int minZoom, maxZoom;
+        try {
+            JsonObject json = JsonParser.parseString(new String(karte, StandardCharsets.UTF_8)).getAsJsonObject();
+            minZoom = json.get("minZoom").getAsInt();
+            maxZoom = json.get("maxZoom").getAsInt();
+        } catch (RuntimeException e) {
+            throw new Fehler(Grund.MANIFEST, "map.json nicht lesbar");
+        }
+        int stufe = maxZoom - switch (massstab) {
+            case 4 -> 0;
+            case 2 -> 1;
+            case 1 -> 2;
+            default -> throw new Fehler(Grund.MANIFEST, "Massstab " + massstab);
+        };
+        if (stufe < minZoom) {
+            throw new Fehler(Grund.MANIFEST, "keine Stufe für " + massstab + " px");
+        }
+        return new int[] {minZoom, maxZoom, stufe};
+    }
+
+    /** Die Kacheln laut Manifest, der Index, wie er nach dem Löschen ist, und wie viele gelöscht sind. */
+    private record Plan(List<Eintrag> soll, Map<String, String> ist, int geloescht) {
+    }
+
+    /** Prüft und liest das Manifest, legt {@code map.json} ab und löscht, was nicht mehr im Manifest steht. */
+    private static Plan plane(Auftrag a, byte[] karte, int[] zoom, byte[] gz, Path ziel, Path zwischen) throws Fehler, IOException {
+        if (!sha256(gz).equals(a.manifestSha256().toLowerCase(Locale.ROOT))) {
+            throw new Fehler(Grund.PRUEFSUMME, "manifest_sha256");
+        }
+        List<Eintrag> soll = lies(entpacke(gz), zoom[0], zoom[1], zoom[2], a.zeilen());
+        schreibe(zwischen, ziel.resolve("map.json"), karte);
+
+        Map<String, String> ist = new ConcurrentHashMap<>(liesIndex(ziel));
+        Set<String> pfade = new HashSet<>();
+        soll.forEach(e -> pfade.add(e.pfad()));
+        int geloescht = 0;
+        for (String pfad : List.copyOf(ist.keySet())) {
+            if (!pfade.contains(pfad)) {
+                Files.deleteIfExists(datei(ziel, pfad));
+                ist.remove(pfad);
+                geloescht++;
+            }
+        }
+        return new Plan(soll, ist, geloescht);
+    }
+
+    /**
+     * Lädt den Satz als einen Strom nach {@code ziel}: ein ZIP ohne Kompression mit
+     * {@code map.json}, {@code manifest}, den Kacheln von grob nach fein und zuletzt {@code ende}.
+     * Legt jede Datei einzeln ab; {@code stufe} bekommt jede Stufe, die ganz daliegt. Nach einem
+     * Abbruch setzt der nächste Strom hinter dem letzten abgelegten Pfad fort. Gibt null, wenn der
+     * Server den Strom nicht kennt (404). Siehe docs/download.md, „Strom“.
+     */
+    Ergebnis strom(Auftrag a, Path ziel, Fortschritt fortschritt, IntConsumer stufe) throws Fehler, IOException, InterruptedException {
+        Summe summe = new Summe();
+        // Nach einem Abbruch weiter, solange der letzte Versuch eine neue Datei brachte; zweimal ohne, dann Schluss.
+        for (int versuch = 1, ohneNeues = 0; ; versuch++) {
+            String vorher = marke(ziel);
+            try {
+                return einStrom(a, ziel, fortschritt, stufe, summe)
+                        ? new Ergebnis(summe.geladen, summe.gleich, summe.geloescht, summe.bytes, false) : null;
+            } catch (Abbruch f) {
+                ohneNeues = marke(ziel).equals(vorher) ? ohneNeues + 1 : 0;
+                if (ohneNeues >= 2 || versuch >= VERSUCHE_STROM) {
+                    // Sauber ohne ende und ohne neue Datei: der Deckel des Tokens; dasselbe Token bringt nichts mehr.
+                    throw f.sauber ? new Fehler(Grund.BUDGET, "Strom: zweimal ohne neue Datei", f) : f;
+                }
+            }
+        }
+    }
+
+    /** Der letzte abgelegte Pfad aus {@code strom.txt}, oder leer. */
+    private static String marke(Path ziel) throws IOException {
+        Path marke = ziel.resolve(STROM);
+        return Files.exists(marke) ? Files.readString(marke, StandardCharsets.UTF_8).strip() : "";
+    }
+
+    /** Was die Versuche eines Stroms zusammen abgelegt haben. */
+    private static final class Summe {
+        int geladen, gleich, geloescht;
+        long bytes;
+    }
+
+    /** Ein Versuch des Stroms, hinter {@code strom.txt}; false, wenn der Server ihn nicht kennt (404). */
+    private boolean einStrom(Auftrag a, Path ziel, Fortschritt fortschritt, IntConsumer stufe, Summe summe)
+            throws Fehler, IOException, InterruptedException {
+        pruefe(a);
+        String nach = marke(ziel);
+        String basis = a.url().toString().replaceAll("/+$", "");
+        URI uri = URI.create(basis + ".zip" + (PFAD.matcher(nach).matches() ? "?nach=" + nach : ""));
+        HttpRequest anfrage = HttpRequest.newBuilder(uri)
+                .header("Authorization", "Bearer " + a.token())
+                .timeout(zeit)
+                .GET()
+                .build();
+        for (int versuch = 1; ; versuch++) {
+            if (versuch > 1) {
+                Thread.sleep(PAUSE_429_MS);
+            }
+            // Ein eigener Client: Bleibt der Strom stehen, beendet ihn die Wache samt Verbindung.
+            HttpClient strom = client();
+            try {
+                HttpResponse<InputStream> antwort;
+                try {
+                    antwort = strom.sendAsync(anfrage, HttpResponse.BodyHandlers.ofInputStream()).get(zeit.toMillis(), TimeUnit.MILLISECONDS);
+                } catch (TimeoutException e) {
+                    throw new Fehler(Grund.NETZ, "Strom: keine Antwort in " + zeit.toSeconds() + " s");
+                } catch (ExecutionException e) {
+                    throw new Fehler(Grund.NETZ, "Strom", e.getCause());
+                }
+                try (InputStream koerper = antwort.body()) {
+                    int status = antwort.statusCode();
+                    if (status == 404) {
+                        return false;
+                    }
+                    // Den Platz eines abgebrochenen Stroms gibt der Server erst frei, wenn er den Abbruch merkt.
+                    if (status == 429 && versuch < VERSUCHE_429) {
+                        continue;
+                    }
+                    if (status != 200) {
+                        throw new Fehler(grund(status), status, "Strom: " + status, null);
+                    }
+                    // Beim Fortsetzen nennt der Header den Rest; gesamt zählt das schon Empfangene mit.
+                    long schon = fortschritt.empfangen.get();
+                    antwort.headers().firstValue("X-Heroic-Bytes").filter(b -> BYTES.matcher(b).matches())
+                            .ifPresent(b -> fortschritt.gesamt = schon + Long.parseLong(b));
+                    entpackeStrom(a, ziel, new Zaehler(koerper, fortschritt), strom, stufe, summe, schon);
+                    return true;
+                }
+            } finally {
+                strom.shutdownNow();
+            }
+        }
+    }
+
+    /** Liest einen Versuch des Stroms ab dem ersten Eintrag und zählt in {@code summe}; siehe {@link #strom}. */
+    private void entpackeStrom(Auftrag a, Path ziel, Zaehler zaehler, HttpClient strom, IntConsumer stufe, Summe summe, long schon)
+            throws Fehler, IOException, InterruptedException {
+        Path zwischen = ziel.resolve(ZWISCHEN), marke = ziel.resolve(STROM);
+        loesche(zwischen);
+        Files.createDirectories(zwischen);
+        AtomicBoolean still = new AtomicBoolean();
+        Thread wache = Thread.ofPlatform().daemon().name("Heroic Map Strom").start(() -> {
+            try {
+                while (System.nanoTime() - zaehler.letztes <= leerlauf.toNanos()) {
+                    Thread.sleep(Math.min(1000, leerlauf.toMillis()));
+                }
+                still.set(true);
+                strom.shutdownNow();
+                zaehler.close();
+            } catch (InterruptedException | IOException e) {
+                // Der Strom ist zu Ende.
+            }
+        });
+        ZipInputStream zip = new ZipInputStream(zaehler);
+        Plan plan = null;
+        String letzte = null;
+        boolean fertig = false;
+        OutputStream protokoll = null;
+        try {
+            byte[] karte = erster(zip, "map.json", KARTE_MAX);
+            int[] zoom = zoom(karte, a.massstab());
+            byte[] gz = erster(zip, "manifest", MANIFEST_MAX);
+            plan = plane(a, karte, zoom, gz, ziel, zwischen);
+            summe.geloescht += plan.geloescht();
+            Map<String, Eintrag> erwartet = new HashMap<>();
+            plan.soll().forEach(e -> erwartet.put(e.pfad(), e));
+            long max = a.grenze() + (plan.soll().size() + 3) * KOPF_MAX + karte.length + gz.length;
+            zaehler.fortschritt.gesamt = Math.min(zaehler.fortschritt.gesamt, schon + max);
+            if (!Files.exists(marke)) {
+                Files.writeString(marke, "", StandardCharsets.UTF_8);
+            }
+            protokoll = Files.newOutputStream(ziel.resolve(INDEX), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            Set<String> gesehen = new HashSet<>();
+            Set<Path> ordner = new HashSet<>();
+            Path tmp = zwischen.resolve("strom.tmp");
+            int z = -1;
+            boolean ende = false;
+            for (ZipEntry e; (e = zip.getNextEntry()) != null; ) {
+                if (ende) {
+                    throw new Fehler(Grund.STROM, "nach ende: " + e.getName());
+                }
+                if (e.getName().equals("ende")) {
+                    inhalt(zip, e, 0, Grund.STROM);
+                    ende = true;
+                    continue;
+                }
+                Matcher m = KACHEL.matcher(e.getName());
+                if (!m.matches()) {
+                    throw new Fehler(Grund.STROM, "Name " + e.getName().substring(0, Math.min(e.getName().length(), 80)));
+                }
+                // Über den Pfad aus ganzen Zahlen, wie im Manifest: 07/0/0 ist 7/0/0.
+                String pfad = Integer.parseInt(m.group(1)) + "/" + Integer.parseInt(m.group(2)) + "/" + Integer.parseInt(m.group(3));
+                Eintrag soll = erwartet.get(pfad);
+                if (soll == null) {
+                    throw new Fehler(Grund.STROM, pfad + " nicht im Manifest bis zur Stufe");
+                }
+                if (!gesehen.add(pfad)) {
+                    throw new Fehler(Grund.STROM, "doppelt: " + pfad);
+                }
+                byte[] bild = inhalt(zip, e, KACHEL_MAX, Grund.KACHEL);
+                if (zaehler.anzahl > max) {
+                    throw new Fehler(Grund.STROM, "mehr als " + max + " Byte");
+                }
+                if (soll.z() != z) {
+                    if (z >= 0) {
+                        stufe.accept(z);
+                    }
+                    z = soll.z();
+                }
+                Path datei = datei(ziel, pfad);
+                if (soll.etag().equals(plan.ist().get(pfad)) && Files.exists(datei)) {
+                    summe.gleich++;
+                } else {
+                    if (ordner.add(datei.getParent())) {
+                        Files.createDirectories(datei.getParent());
+                    }
+                    // Über die Zwischendatei, ohne fsync: Nie liegt eine halbe Kachel da.
+                    Files.write(tmp, bild);
+                    Files.move(tmp, datei, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                    // Das ETag des Manifests; ist die Kachel neuer, holt sie der nächste Abgleich.
+                    zeile(protokoll, pfad + " " + soll.etag());
+                    plan.ist().put(pfad, soll.etag());
+                    summe.geladen++;
+                    summe.bytes += bild.length;
+                }
+                letzte = pfad;
+            }
+            if (!ende) {
+                throw new Abbruch(true, "Strom ohne ende", null);
+            }
+            if (zaehler.read() != -1) {
+                throw new Fehler(Grund.STROM, "Bytes nach ende");
+            }
+            if (z >= 0) {
+                stufe.accept(z);
+            }
+            fertig = true;
+        } catch (ZipException | EOFException | Abriss f) {
+            if (still.get()) {
+                throw new Abbruch(false, "Strom: " + leerlauf.toSeconds() + " s ohne Byte", f);
+            }
+            if (Thread.currentThread().isInterrupted()) {
+                throw new InterruptedException();
+            }
+            throw new Abbruch(false, "Strom", f);
+        } catch (IllegalArgumentException f) {
+            // ZipInputStream: ein Name, der kein UTF-8 ist.
+            throw new Fehler(Grund.STROM, "Name nicht lesbar", f);
+        } finally {
+            wache.interrupt();
+            if (protokoll != null) {
+                protokoll.close();
+            }
+            if (plan != null) {
+                schreibeIndex(zwischen, ziel, plan.ist());
+                if (fertig) {
+                    Files.deleteIfExists(marke);
+                } else if (letzte != null) {
+                    Files.writeString(marke, letzte, StandardCharsets.UTF_8);
+                }
+            }
+        }
+    }
+
+    /** Der nächste Eintrag des Stroms, der {@code name} heissen muss, und sein Inhalt. */
+    private static byte[] erster(ZipInputStream zip, String name, long max) throws Fehler, IOException {
+        ZipEntry e = zip.getNextEntry();
+        if (e == null || !e.getName().equals(name)) {
+            throw new Fehler(Grund.STROM, name + " fehlt am Anfang");
+        }
+        return inhalt(zip, e, max, Grund.MANIFEST);
+    }
+
+    /** Der Inhalt eines Eintrags: nur ohne Kompression und mit der Grösse im Kopf, höchstens {@code max} Byte. */
+    private static byte[] inhalt(ZipInputStream zip, ZipEntry e, long max, Grund grund) throws Fehler, IOException {
+        if (e.getMethod() != ZipEntry.STORED || e.getSize() < 0) {
+            throw new Fehler(Grund.STROM, e.getName() + ": gepackt oder ohne Grösse");
+        }
+        if (e.getSize() > max) {
+            throw new Fehler(grund, e.getName() + " hat " + e.getSize() + " Byte");
+        }
+        byte[] inhalt = zip.readNBytes((int) e.getSize());
+        if (inhalt.length != e.getSize()) {
+            throw new EOFException(e.getName());
+        }
+        return inhalt;
+    }
+
+    /**
+     * Zählt die Bytes des Körpers für Fortschritt, Grenze und Wache. Ein Fehler darunter wird
+     * ein {@link Abriss}, damit er sich von Fehlern der Platte trennen lässt.
+     */
+    private static final class Zaehler extends FilterInputStream {
+        final Fortschritt fortschritt;
+        /** System.nanoTime des letzten Bytes, oder des Anfangs. */
+        volatile long letztes = System.nanoTime();
+        long anzahl;
+
+        Zaehler(InputStream koerper, Fortschritt fortschritt) {
+            super(koerper);
+            this.fortschritt = fortschritt;
+        }
+
+        @Override
+        public int read() throws IOException {
+            int b;
+            try {
+                b = super.read();
+            } catch (IOException e) {
+                throw new Abriss(e);
+            }
+            if (b >= 0) {
+                zaehle(1);
+            }
+            return b;
+        }
+
+        @Override
+        public int read(byte[] puffer, int ab, int laenge) throws IOException {
+            int n;
+            try {
+                n = super.read(puffer, ab, laenge);
+            } catch (IOException e) {
+                throw new Abriss(e);
+            }
+            if (n > 0) {
+                zaehle(n);
+            }
+            return n;
+        }
+
+        private void zaehle(int n) {
+            anzahl += n;
+            fortschritt.empfangen.addAndGet(n);
+            letztes = System.nanoTime();
+        }
+    }
+
+    /** Ein Fehler beim Lesen des Stroms aus dem Netz. */
+    private static final class Abriss extends IOException {
+        Abriss(IOException ursache) {
+            super(ursache);
+        }
     }
 
     private static void zeile(OutputStream protokoll, String text) throws IOException {
@@ -342,13 +750,7 @@ final class Laden {
      * {@link #zeit}. Prüft vorher die Adresse, denn jede neue Verbindung löst den Namen neu auf.
      */
     private HttpResponse<byte[]> hole(Auftrag a, String pfad, long max, Grund grund) throws Fehler, InterruptedException {
-        switch (Adresse.pruefe(a.url(), a.spielserver())) {
-            case SCHEMA -> throw new Fehler(Grund.NETZ, "Adresse");
-            case HEIMNETZ -> throw new Fehler(Grund.HEIMNETZ, a.url().getHost());
-            case UNBEKANNT -> throw new Fehler(Grund.UNBEKANNT, a.url().getHost());
-            case GUT -> {
-            }
-        }
+        pruefe(a);
         String basis = a.url().toString();
         URI uri = URI.create(basis.endsWith("/") ? basis + pfad : basis + "/" + pfad);
         HttpRequest anfrage = HttpRequest.newBuilder(uri)
@@ -359,14 +761,29 @@ final class Laden {
         HttpResponse<byte[]> fertig = sende(client, anfrage, max, grund, zeit, pfad);
         int status = fertig.statusCode();
         if (status != 200) {
-            Grund warum = switch (status) {
-                case 401, 403 -> Grund.ABGELEHNT;
-                case 429 -> Grund.BUDGET;
-                default -> Grund.NETZ;
-            };
-            throw new Fehler(warum, pfad + ": " + status);
+            throw new Fehler(grund(status), status, pfad + ": " + status, null);
         }
         return fertig;
+    }
+
+    /** Warum eine Antwort mit diesem Status, nicht 200, scheitert. */
+    private static Grund grund(int status) {
+        return switch (status) {
+            case 401, 403 -> Grund.ABGELEHNT;
+            case 429 -> Grund.BUDGET;
+            default -> Grund.NETZ;
+        };
+    }
+
+    /** Prüft die Adresse vor jeder Verbindung, denn jede löst den Namen neu auf. */
+    private static void pruefe(Auftrag a) throws Fehler {
+        switch (Adresse.pruefe(a.url(), a.spielserver())) {
+            case SCHEMA -> throw new Fehler(Grund.NETZ, "Adresse");
+            case HEIMNETZ -> throw new Fehler(Grund.HEIMNETZ, a.url().getHost());
+            case UNBEKANNT -> throw new Fehler(Grund.UNBEKANNT, a.url().getHost());
+            case GUT -> {
+            }
+        }
     }
 
     /**
@@ -486,6 +903,11 @@ final class Laden {
     /** Gibt es im Ziel einen Stand zum Fortsetzen? Den gibt es, sobald eine Kachel im Index steht. */
     static boolean hatStand(Path ziel) {
         return Files.exists(ziel.resolve(INDEX));
+    }
+
+    /** Ist im Ziel ein Strom nicht fertig? Dann ist der Satz unvollständig, auch wenn die Karte ihn schon zeigt. */
+    static boolean imStrom(Path ziel) {
+        return Files.exists(ziel.resolve(STROM));
     }
 
     /** Liest den Index; die letzte Zeile je Kachel gilt, eine ohne ETag heisst: neu laden. */

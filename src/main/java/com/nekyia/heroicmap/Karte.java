@@ -38,6 +38,8 @@ final class Karte extends Screen {
 
     private static final int HINTERGRUND = 0xFF101010;
     private static final int TEXT = 0xFFFFFFFF;
+    /** Die zweite Zeile im Kasten des Downloads. */
+    private static final int GRAU = 0xFFC0C0C0;
     /** Breite der Knöpfe in Einheiten des GUI. */
     private static final int KNOPF = 90;
     /** Breite des Knopfs „An“/„Aus“ einer Ebene; ihr Name steht links daneben. */
@@ -84,6 +86,8 @@ final class Karte extends Screen {
     private Component hinweis;
     /** Wo die Knöpfe rechts oben beginnen und enden; Marken und Namen weichen ihnen aus. */
     private int knopfX, knopfUnten;
+    /** {@link Downloads#stufen()} beim letzten Nachsehen; ohne Satz sieht die Karte nach, wenn es sich ändert. */
+    private int stufen = Downloads.INSTANZ.stufen();
     /** Der Knopf für den Abgleich, oder null ohne Satz vom Server; er ist aus, bis ein Abgleich wieder geht. */
     private Button abgleich;
     private String baum;
@@ -262,6 +266,15 @@ final class Karte extends Screen {
     /** Kommen andere Ebenen vom Server, während die Karte offen ist, baut sie die Liste neu. */
     @Override
     public void tick() {
+        // Ohne Satz während eines Stroms: Sobald die gröbste Stufe daliegt, zeigt sich die Karte. Siehe docs/vollbildkarte.md, „Fortschritt“.
+        if (satz == null && Downloads.INSTANZ.stufen() != stufen && minecraft.level != null) {
+            stufen = Downloads.INSTANZ.stufen();
+            Satz neu = Satz.fuer(Downloads.weltOrdner(), minecraft.level.dimension().identifier().toString());
+            if (neu != null) {
+                minecraft.gui.setScreen(new Karte(neu));
+                return;
+            }
+        }
         if (Ebenen.INSTANZ.stand() != ebenenStand) {
             ebenenStand = Ebenen.INSTANZ.stand();
             if (!Ebenen.INSTANZ.kennungen().equals(gebauteEbenen)) {
@@ -297,6 +310,28 @@ final class Karte extends Screen {
         }
     }
 
+    /**
+     * Der Kasten des laufenden Stroms links neben „Karte laden …“: Anteil, Bytes, Tempo und
+     * Restzeit, nur aus Bytes empfangen und erwartet. Siehe docs/vollbildkarte.md, „Fortschritt“.
+     */
+    private void fortschritt(GuiGraphicsExtractor g, Laden.Fortschritt f) {
+        int b = 200, x = knopfX - 4 - b, y = 4;
+        long gesamt = f.gesamt, empfangen = Math.min(f.empfangen.get(), gesamt);
+        double anteil = f.anteil(), tempo = f.tempo(Util.getMillis());
+        g.fill(x, y, x + b, y + 38, 0xB0000000);
+        g.text(font, Component.translatable("heroicmap.download.laeuft"), x + 5, y + 5, TEXT);
+        Component prozent = Component.literal((int) (anteil * 100) + " %");
+        g.text(font, prozent, x + b - 4 - font.width(prozent), y + 5, TEXT);
+        // Wie der Ladebalken des Spiels: weisser Rand, weiss gefüllt.
+        g.outline(x + 5, y + 16, b - 10, 7, TEXT);
+        g.fill(x + 7, y + 18, x + 7 + (int) Math.round((b - 14) * anteil), y + 21, TEXT);
+        g.text(font, Component.translatable("heroicmap.download.stand", Downloads.zahl(empfangen, gesamt), Downloads.groesse(gesamt)),
+                x + 5, y + 27, GRAU);
+        Component rest = tempo <= 0 ? Component.literal("…") : Component.translatable("heroicmap.download.tempo",
+                Downloads.groesse((long) tempo), Downloads.dauer((long) Math.ceil((gesamt - empfangen) / tempo)));
+        g.text(font, rest, x + b - 4 - font.width(rest), y + 27, GRAU);
+    }
+
     /** Wo die Überschrift einer Zeile liegt, samt Platz für den Punkt davor: x, y, Breite, Höhe. */
     private int[] ueberschrift(Schalter s) {
         CycleButton<Boolean> k = s.knopf();
@@ -317,9 +352,16 @@ final class Karte extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mausX, int mausY, float delta) {
         g.fill(0, 0, width, height, HINTERGRUND);
+        Laden.Fortschritt laeuft = Downloads.INSTANZ.fortschritt();
         if (satz == null) {
-            g.centeredText(font, Component.translatable("heroicmap.karte.keine"), width / 2, height / 2, TEXT);
+            // Während eines Downloads sagt der Kasten oben, was los ist.
+            if (laeuft == null) {
+                g.centeredText(font, Component.translatable("heroicmap.karte.keine"), width / 2, height / 2, TEXT);
+            }
             super.extractRenderState(g, mausX, mausY, delta);
+            if (laeuft != null) {
+                fortschritt(g, laeuft);
+            }
             return;
         }
         // Still gehalten auf einem Wegpunkt hängt er nach HALTEN_MS an der Maus. Siehe docs/wegpunkte.md, „Bedienung“.
@@ -378,6 +420,9 @@ final class Karte extends Screen {
         }
         super.extractRenderState(g, mausX, mausY, delta);
         ueberschriften(g);
+        if (laeuft != null) {
+            fortschritt(g, laeuft);
+        }
         if (haengt != null) {
             // Der Wegpunkt, der an der Maus hängt, unter dem Zeiger.
             Minimap.wegpunkt(g, mausX, mausY, Minimap.KOPF, Wegpunkte.FARBEN[haengt.farbe()], 0);
@@ -1319,15 +1364,17 @@ final class Karte extends Screen {
 
     /**
      * Solange eine Kachel lädt, ihr Ausschnitt aus der nächsten gröberen Stufe, die schon geladen
-     * ist, vergrössert; nichts wird dafür angefragt. Siehe docs/vollbildkarte.md, „Kacheln“.
+     * ist, vergrössert; angefragt wird dafür nur, wenn die Kachel auf der Platte fehlt. Siehe
+     * docs/vollbildkarte.md, „Kacheln“.
      */
     private void platzhalter(GuiGraphicsExtractor g, int tx, int ty, int sx, int sy, int seite) {
+        boolean fehlt = kacheln.fehlt(blick.zoom, tx, ty);
         for (int k = 1; blick.zoom - k >= satz.minZoom(); k++) {
             int[] grob = Kartenblick.grob(tx, ty, k, satz.kachel());
             if (grob == null) {
                 return;
             }
-            Identifier id = kacheln.vorhanden(blick.zoom - k, grob[0], grob[1]);
+            Identifier id = fehlt ? kacheln.textur(blick.zoom - k, grob[0], grob[1]) : kacheln.vorhanden(blick.zoom - k, grob[0], grob[1]);
             if (id != null) {
                 g.blit(RenderPipelines.GUI_TEXTURED, id, sx, sy, grob[2], grob[3], seite, seite, grob[4], grob[4],
                         satz.kachel(), satz.kachel());

@@ -15,20 +15,29 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.net.Socket;
 import java.net.URI;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.zip.CRC32;
 import java.util.zip.GZIPOutputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,6 +70,10 @@ class LadenTest {
     private volatile CountDownLatch zugleich;
     private final AtomicInteger laufen = new AtomicInteger(), hoechstens = new AtomicInteger();
     private final AtomicInteger fremd = new AtomicInteger();
+    /** Was der Server statt des Stroms des Baums schickt, oder null. */
+    private volatile byte[] zip;
+    /** Die Anfragen an den Strom, je ihr Query oder „“. */
+    private final List<String> fragen = new CopyOnWriteArrayList<>();
 
     @BeforeEach
     void starte() throws IOException {
@@ -68,6 +81,21 @@ class LadenTest {
         threads = Executors.newCachedThreadPool();
         server.setExecutor(threads);
         server.createContext("/baum/", this::antworte);
+        server.createContext("/baum.zip", t -> {
+            if (!("Bearer " + TOKEN).equals(t.getRequestHeaders().getFirst("Authorization"))) {
+                sende(t, 401, new byte[0], null);
+                return;
+            }
+            String query = t.getRequestURI().getQuery();
+            fragen.add(query == null ? "" : query);
+            byte[] inhalt = zip != null ? zip : strom(query == null ? null : query.substring("nach=".length()), true);
+            t.getResponseHeaders().add("X-Heroic-Bytes", String.valueOf(inhalt.length));
+            // Ohne Länge, also chunked wie beim Renderer.
+            t.sendResponseHeaders(200, 0);
+            try (OutputStream aus = t.getResponseBody()) {
+                aus.write(inhalt);
+            }
+        });
         server.createContext("/fremd/", t -> {
             fremd.incrementAndGet();
             sende(t, 200, new byte[] {1}, null);
@@ -103,6 +131,44 @@ class LadenTest {
             gz.write(roh);
         }
         return aus.toByteArray();
+    }
+
+    /** Ein Eintrag des Stroms wie vom Renderer: nur der lokale Kopf, ohne Data Descriptor. */
+    private static void eintrag(ByteArrayOutputStream aus, String name, byte[] inhalt, int methode) {
+        CRC32 crc = new CRC32();
+        crc.update(inhalt);
+        byte[] n = name.getBytes(StandardCharsets.UTF_8);
+        ByteBuffer kopf = ByteBuffer.allocate(30).order(ByteOrder.LITTLE_ENDIAN)
+                .putInt(0x04034b50).putShort((short) 10).putShort((short) 0).putShort((short) methode)
+                // 1980-01-01 00:00
+                .putShort((short) 0).putShort((short) 0x21)
+                .putInt((int) crc.getValue()).putInt(inhalt.length).putInt(inhalt.length)
+                .putShort((short) n.length).putShort((short) 0);
+        aus.writeBytes(kopf.array());
+        aus.writeBytes(n);
+        aus.writeBytes(inhalt);
+    }
+
+    /** Der Strom des Baums: map.json, manifest, die Kacheln von grob nach fein, hinter {@code nach}, und ende. */
+    private byte[] strom(String nach, boolean ende) {
+        ByteArrayOutputStream aus = new ByteArrayOutputStream();
+        eintrag(aus, "map.json", karte.getBytes(StandardCharsets.UTF_8), 0);
+        eintrag(aus, "manifest", manifest, 0);
+        boolean senden = nach == null;
+        for (String pfad : grobNachFein()) {
+            if (senden) {
+                eintrag(aus, pfad + ".webp", kacheln.get(pfad), 0);
+            }
+            senden |= pfad.equals(nach);
+        }
+        if (ende) {
+            eintrag(aus, "ende", new byte[0], 0);
+        }
+        return aus.toByteArray();
+    }
+
+    private List<String> grobNachFein() {
+        return kacheln.keySet().stream().sorted(Comparator.comparingInt(p -> Integer.parseInt(p.split("/")[0]))).toList();
     }
 
     private void antworte(HttpExchange t) throws IOException {
@@ -505,5 +571,298 @@ class LadenTest {
         assertTrue(Files.exists(baum.resolve("4").resolve("map.json")));
         // Ein zweiter Start findet nichts mehr und scheitert nicht.
         Laden.loescheOverlays(ziel);
+    }
+
+    private Laden.Ergebnis strome(Laden.Auftrag a) throws Exception {
+        return new Laden().strom(a, ziel, new Laden.Fortschritt(1), z -> {
+        });
+    }
+
+    private void alleKachelnDa() throws IOException {
+        for (Map.Entry<String, byte[]> k : kacheln.entrySet()) {
+            assertArrayEquals(k.getValue(), Files.readAllBytes(datei(k.getKey())), k.getKey());
+        }
+        assertEquals(etags, new TreeMap<>(Laden.liesIndex(ziel)));
+    }
+
+    @Test
+    void stromLaedtAllesInEinemAbruf() throws Exception {
+        List<Integer> stufen = new ArrayList<>();
+        Laden.Fortschritt f = new Laden.Fortschritt(1);
+        Laden.Ergebnis e = new Laden().strom(auftrag(4, summe()), ziel, f, stufen::add);
+        assertEquals(5, e.geladen());
+        alleKachelnDa();
+        assertTrue(Files.exists(ziel.resolve("map.json")));
+        assertEquals(0, abrufe.get());
+        assertFalse(Laden.imStrom(ziel));
+        // Jede Stufe meldet sich, sobald sie ganz daliegt, die gröbste zuerst.
+        assertEquals(List.of(0, 1, 2), stufen);
+        // Der Fortschritt nur aus Bytes: am Ende so viele, wie X-Heroic-Bytes ankündigte.
+        assertEquals(strom(null, true).length, f.gesamt);
+        assertEquals(f.gesamt, f.empfangen.get());
+        assertEquals(1.0, f.anteil());
+
+        Laden.Ergebnis dann = strome(auftrag(4, summe()));
+        assertEquals(0, dann.geladen());
+        assertEquals(5, dann.gleich());
+    }
+
+    @Test
+    void ohneStromEinzeln() throws Exception {
+        // Ein Renderer vor dem Strom antwortet 404; dann lädt Downloads einzeln.
+        server.removeContext("/baum.zip");
+        assertEquals(null, strome(auftrag(4, summe())));
+        assertFalse(Files.exists(ziel.resolve("map.json")));
+    }
+
+    /** Ein Strom mit {@code map.json}, {@code manifest}, dann was {@code mitte} schreibt, und {@code ende}. */
+    private byte[] stromMit(java.util.function.Consumer<ByteArrayOutputStream> mitte) {
+        ByteArrayOutputStream aus = new ByteArrayOutputStream();
+        eintrag(aus, "map.json", karte.getBytes(StandardCharsets.UTF_8), 0);
+        eintrag(aus, "manifest", manifest, 0);
+        mitte.accept(aus);
+        eintrag(aus, "ende", new byte[0], 0);
+        return aus.toByteArray();
+    }
+
+    @Test
+    void stromNurRelativePfadeAusZahlen() throws Exception {
+        byte[] boese = "boese".getBytes(StandardCharsets.UTF_8);
+        // Zwei Ebenen unter dem Ordner des Tests: Was mit .. hinaus wollte, landete noch darin.
+        Path innen = ziel.resolve("welt").resolve("baum");
+        for (String name : new String[] {"../x.webp", "0/0/../../../x.webp", "../../x/0/0.webp", "/0/0/0.webp", "0\\0\\0.webp",
+            "C:/0/0.webp", "0/0/0.png", "0/0/0.webp/", "0/0/", "0/0/0.webp\u0000"}) {
+            zip = stromMit(aus -> eintrag(aus, name, boese, 0));
+            assertEquals(Laden.Grund.STROM, assertThrows(Laden.Fehler.class,
+                    () -> new Laden().strom(auftrag(4, summe()), innen, new Laden.Fortschritt(1), z -> {
+                    })).grund, name);
+        }
+        try (var alle = Files.walk(ziel)) {
+            assertEquals(List.of(), alle.filter(p -> p.getFileName().toString().startsWith("x") || p.toString().endsWith(".webp")).toList());
+        }
+    }
+
+    @Test
+    void stromRegeln() throws Exception {
+        byte[] bild = kacheln.get("0/0/0");
+        ByteArrayOutputStream nachEnde = new ByteArrayOutputStream(), manifestZuerst = new ByteArrayOutputStream();
+        nachEnde.writeBytes(strom(null, true));
+        eintrag(nachEnde, "0/0/0.webp", bild, 0);
+        eintrag(manifestZuerst, "manifest", manifest, 0);
+        eintrag(manifestZuerst, "map.json", karte.getBytes(StandardCharsets.UTF_8), 0);
+        Map<String, byte[]> faelle = Map.of(
+                "gepackt", stromMit(aus -> eintrag(aus, "0/0/0.webp", bild, 8)),
+                "doppelt", stromMit(aus -> {
+                    eintrag(aus, "0/0/0.webp", bild, 0);
+                    eintrag(aus, "0/0/0.webp", bild, 0);
+                }),
+                "nicht im Manifest", stromMit(aus -> eintrag(aus, "0/9/9.webp", bild, 0)),
+                "nach ende", nachEnde.toByteArray(),
+                "manifest zuerst", manifestZuerst.toByteArray());
+        for (Map.Entry<String, byte[]> fall : faelle.entrySet()) {
+            zip = fall.getValue();
+            assertEquals(Laden.Grund.STROM, assertThrows(Laden.Fehler.class, () -> strome(auftrag(4, summe()))).grund, fall.getKey());
+        }
+    }
+
+    @Test
+    void stromHoechstensSeineGrenze() throws IOException {
+        // Der Satz plus 10 %, dazu je Datei 1 KiB für Kopf und Name: Ein Strom für zwei Kacheln bringt nicht fünf.
+        int eine = 8 << 10;
+        for (String pfad : List.copyOf(kacheln.keySet())) {
+            setze(pfad, new byte[eine], etags.get(pfad));
+        }
+        manifest = baueManifest();
+        assertEquals(Laden.Grund.STROM, assertThrows(Laden.Fehler.class, () -> strome(auftrag(4, 2L * eine))).grund);
+    }
+
+    @Test
+    void stromOhneEndeIstAbgebrochen() throws Exception {
+        // Der Körper endet sauber, aber ohne ende, und der Server bringt beim Fortsetzen nichts Neues, wie am Deckel des Tokens.
+        zip = strom(null, false);
+        assertEquals(Laden.Grund.BUDGET, assertThrows(Laden.Fehler.class, () -> strome(auftrag(4, summe()))).grund);
+        // Der erste Versuch brachte alle Kacheln, die zwei danach nichts Neues: dann Schluss.
+        assertEquals(3, fragen.size());
+        // Die Kacheln liegen ganz da, der Satz gilt trotzdem als unvollständig.
+        assertTrue(Laden.imStrom(ziel));
+        assertEquals("2/1/1", Files.readString(ziel.resolve(Laden.STROM)));
+    }
+
+    @Test
+    void stromOhneFortschrittKeineSchleife() {
+        // Nur map.json und manifest, ohne Kachel und ohne ende, bei jedem Versuch.
+        ByteArrayOutputStream aus = new ByteArrayOutputStream();
+        eintrag(aus, "map.json", karte.getBytes(StandardCharsets.UTF_8), 0);
+        eintrag(aus, "manifest", manifest, 0);
+        zip = aus.toByteArray();
+        Laden.Fehler f = assertTimeoutPreemptively(Duration.ofSeconds(10),
+                () -> assertThrows(Laden.Fehler.class, () -> strome(auftrag(4, summe()))));
+        assertEquals(Laden.Grund.BUDGET, f.grund);
+        assertEquals(2, fragen.size());
+    }
+
+    @Test
+    void stromSetztVonSelbstFort() throws Exception {
+        // Der Server bricht nach jeder Kachel ab, sauber und ohne ende; erst wenn keine mehr fehlt, kommt ende.
+        server.removeContext("/baum.zip");
+        server.createContext("/baum.zip", t -> {
+            String query = t.getRequestURI().getQuery();
+            fragen.add(query == null ? "" : query);
+            String nach = query == null ? null : query.substring("nach=".length());
+            List<String> reihe = grobNachFein();
+            ByteArrayOutputStream aus = new ByteArrayOutputStream();
+            eintrag(aus, "map.json", karte.getBytes(StandardCharsets.UTF_8), 0);
+            eintrag(aus, "manifest", manifest, 0);
+            int naechste = nach == null ? 0 : reihe.indexOf(nach) + 1;
+            if (naechste < reihe.size()) {
+                eintrag(aus, reihe.get(naechste) + ".webp", kacheln.get(reihe.get(naechste)), 0);
+            } else {
+                eintrag(aus, "ende", new byte[0], 0);
+            }
+            t.getResponseHeaders().add("X-Heroic-Bytes", String.valueOf(aus.size()));
+            t.sendResponseHeaders(200, 0);
+            try (OutputStream o = t.getResponseBody()) {
+                o.write(aus.toByteArray());
+            }
+        });
+        Laden.Fortschritt f = new Laden.Fortschritt(1);
+        Laden.Ergebnis e = new Laden().strom(auftrag(4, summe()), ziel, f, z -> {
+        });
+        assertEquals(5, e.geladen());
+        alleKachelnDa();
+        assertFalse(Laden.imStrom(ziel));
+        assertEquals(6, fragen.size());
+        assertEquals("nach=2/1/1", fragen.getLast());
+        // Über alle Versuche zählt der Fortschritt bis 100 %.
+        assertEquals(f.gesamt, f.empfangen.get());
+    }
+
+    /**
+     * Ein Server, der den Kopf und {@code teil} chunked schickt und dann die Verbindung schliesst,
+     * ohne das letzte Stück; so reisst ein Strom im Netz ab.
+     */
+    private URI reisstAb(byte[] teil, long gesamt) throws IOException {
+        ServerSocket s = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
+        threads.execute(() -> {
+            try (s; Socket c = s.accept()) {
+                // Die Anfrage bis zur leeren Zeile.
+                int gelesen = 0;
+                for (int b; gelesen != 0x0d0a0d0a && (b = c.getInputStream().read()) >= 0; ) {
+                    gelesen = gelesen << 8 | b;
+                }
+                OutputStream aus = c.getOutputStream();
+                aus.write(("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nX-Heroic-Bytes: " + gesamt + "\r\n\r\n"
+                        + Integer.toHexString(teil.length) + "\r\n").getBytes(StandardCharsets.US_ASCII));
+                aus.write(teil);
+                aus.write("\r\n".getBytes(StandardCharsets.US_ASCII));
+                aus.flush();
+            } catch (IOException e) {
+                // Der Test sieht es am Ergebnis.
+            }
+        });
+        return URI.create("http://127.0.0.1:" + s.getLocalPort() + "/baum");
+    }
+
+    @Test
+    void abgerissenerStromHinterlaesstNichtsHalbes() throws Exception {
+        byte[] ganz = strom(null, true);
+        ByteArrayOutputStream bis = new ByteArrayOutputStream();
+        eintrag(bis, "map.json", karte.getBytes(StandardCharsets.UTF_8), 0);
+        eintrag(bis, "manifest", manifest, 0);
+        eintrag(bis, "0/0/0.webp", kacheln.get("0/0/0"), 0);
+        eintrag(bis, "1/-1/0.webp", kacheln.get("1/-1/0"), 0);
+        // Mitten im Inhalt der dritten Kachel, 1/0/0.
+        int schnitt = bis.size() + 30 + "1/0/0.webp".length() + 3;
+        Laden.Auftrag a = new Laden.Auftrag(reisstAb(Arrays.copyOf(ganz, schnitt), ganz.length), TOKEN, Laden.sha256(manifest),
+                summe(), 4, false, 1L << 30, kacheln.size(), InetAddress.getLoopbackAddress());
+        assertEquals(Laden.Grund.NETZ, assertThrows(Laden.Fehler.class, () -> strome(a)).grund);
+        // Was vor dem Abbruch ankam, aber noch nicht gelesen war, verwirft der Client mit dem Fehler: Ganz da liegen die
+        // ersten k der zwei Kacheln davor, keine halbe, die abgerissene gar nicht, und keine Zwischendatei bleibt.
+        List<String> reihe = grobNachFein();
+        int ganze = 0;
+        while (ganze < 2 && Files.exists(datei(reihe.get(ganze)))) {
+            assertArrayEquals(kacheln.get(reihe.get(ganze)), Files.readAllBytes(datei(reihe.get(ganze))));
+            ganze++;
+        }
+        for (int i = ganze; i < kacheln.size(); i++) {
+            assertFalse(Files.exists(datei(reihe.get(i))), reihe.get(i));
+        }
+        try (var tmp = Files.list(ziel.resolve("tmp"))) {
+            assertEquals(0, tmp.count());
+        }
+        String nach = ganze == 0 ? "" : reihe.get(ganze - 1);
+        assertEquals(nach, Files.readString(ziel.resolve(Laden.STROM)));
+
+        // Der nächste Strom setzt hinter der letzten Kachel fort und macht den Satz fertig.
+        Laden.Ergebnis rest = strome(auftrag(4, summe()));
+        assertEquals(List.of(ganze == 0 ? "" : "nach=" + nach), fragen);
+        assertEquals(5 - ganze, rest.geladen());
+        alleKachelnDa();
+        assertFalse(Laden.imStrom(ziel));
+    }
+
+    @Test
+    void stromDerStehenBleibt() {
+        server.removeContext("/baum.zip");
+        server.createContext("/baum.zip", t -> {
+            // Header und 100 Bytes, dann nichts mehr.
+            t.sendResponseHeaders(200, 0);
+            t.getResponseBody().write(strom(null, true), 0, 100);
+            t.getResponseBody().flush();
+            warte();
+        });
+        Laden laden = new Laden(Duration.ofSeconds(5), Duration.ofSeconds(1));
+        Laden.Fehler f = assertTimeoutPreemptively(Duration.ofSeconds(10), () -> assertThrows(Laden.Fehler.class,
+                () -> laden.strom(auftrag(4, summe()), ziel, new Laden.Fortschritt(1), z -> {
+                })));
+        assertEquals(Laden.Grund.NETZ, f.grund);
+        assertTrue(f.getMessage().contains("ohne Byte"), f.getMessage());
+    }
+
+    @Test
+    void stromStatusSteht() {
+        for (int[] fall : new int[][] {{502, 0}, {429, 1}, {401, 2}}) {
+            server.removeContext("/baum.zip");
+            server.createContext("/baum.zip", t -> sende(t, fall[0], new byte[0], null));
+            Laden.Fehler f = assertThrows(Laden.Fehler.class, () -> strome(auftrag(4, summe())));
+            assertEquals(new Laden.Grund[] {Laden.Grund.NETZ, Laden.Grund.BUDGET, Laden.Grund.ABGELEHNT}[fall[1]], f.grund);
+            assertEquals(fall[0], f.status);
+        }
+    }
+
+    @Test
+    void stromNach429NeuVersucht() throws Exception {
+        // Der Platz eines abgebrochenen Stroms ist beim Server noch belegt: erst 429, dann der Strom.
+        AtomicInteger anfragen = new AtomicInteger();
+        server.removeContext("/baum.zip");
+        server.createContext("/baum.zip", t -> {
+            if (anfragen.incrementAndGet() == 1) {
+                sende(t, 429, new byte[0], null);
+                return;
+            }
+            byte[] inhalt = strom(null, true);
+            t.sendResponseHeaders(200, 0);
+            try (OutputStream aus = t.getResponseBody()) {
+                aus.write(inhalt);
+            }
+        });
+        assertEquals(5, strome(auftrag(4, summe())).geladen());
+        assertEquals(2, anfragen.get());
+    }
+
+    @Test
+    void tempoUeberFuenfSekunden() {
+        Laden.Fortschritt f = new Laden.Fortschritt(1000);
+        assertEquals(-1, f.tempo(0));
+        f.empfangen.set(100);
+        // Vor der ersten Sekunde kein Tempo.
+        assertEquals(-1, f.tempo(500));
+        f.empfangen.set(200);
+        assertEquals(200.0, f.tempo(1000));
+        f.empfangen.set(1200);
+        // Gemessen ab der Probe vor 5 s: 1000 Byte in 5 s.
+        assertEquals(200.0, f.tempo(6000));
+        // Über 100 % geht der Anteil nicht.
+        assertEquals(1.0, f.anteil());
     }
 }
