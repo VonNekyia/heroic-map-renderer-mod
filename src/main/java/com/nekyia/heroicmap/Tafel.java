@@ -323,6 +323,16 @@ record Tafel(List<Baustein> bausteine) {
     }
 
     /**
+     * Pixel je Einheit der Tafel: der grösste ganze Massstab bis zum GUI-Massstab {@code gs}, bei dem die breiteste
+     * Tafel ({@link #BREITE} und zweimal {@link #INNEN}) höchstens 23 % der Breite und die Hälfte der Höhe des Fensters
+     * einnimmt, mindestens 1. Siehe docs/ebenen.md, „Infotafel“.
+     */
+    static int massstab(int fensterBreite, int fensterHoehe, int gs) {
+        int seite = BREITE + 2 * INNEN;
+        return Math.max(1, Math.min(gs, Math.min(fensterBreite * 23 / (100 * seite), fensterHoehe / (2 * seite))));
+    }
+
+    /**
      * Um wie viel ein Bild von {@code w} × {@code h} Pixeln in einem Kasten von {@code kw} × {@code kh}
      * Pixeln vergrössert steht: ein ganzer Faktor, abgerundet, mindestens 1; so bleibt es im Kasten.
      */

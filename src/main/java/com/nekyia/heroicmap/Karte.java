@@ -578,6 +578,11 @@ final class Karte extends Screen {
         return tafelKasten != null;
     }
 
+    /** Für die Gametests: der Kasten der Tafel {x, y, Breite, Höhe} in Einheiten des GUI, oder null. */
+    int[] tafelKasten() {
+        return tafelKasten == null ? null : tafelKasten.clone();
+    }
+
     /** Für den Gametest Bedienung: die Mitte des Blicks in Pixeln der Basis, das offene Menü, oder null, und die Marken. */
     double[] blickMitte() {
         return blick == null ? null : new double[] {blick.mx, blick.mz};
@@ -1074,14 +1079,20 @@ final class Karte extends Screen {
             return;
         }
         Tafel.Satz s = t == null ? laedt() : satz(t.get());
-        int w = s.breite() + 2 * Tafel.INNEN, voll = s.hoehe() + 2 * Tafel.INNEN, h = Math.min(voll, height - 8);
+        // In Einheiten der Tafel, gt Pixel je Einheit: ein ganzer Massstab bis zum GUI-Massstab, so bleibt die Schrift scharf.
+        int gs = minecraft.getWindow().getGuiScale(), gt = Tafel.massstab(minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight(), gs);
+        float m = gt / (float) gs;
+        int breite = (int) (width / m), hoehe = (int) (height / m), ax = (int) (tafelX / m), ay = (int) (tafelY / m);
+        int w = s.breite() + 2 * Tafel.INNEN, voll = s.hoehe() + 2 * Tafel.INNEN, h = Math.min(voll, hoehe - 8);
         // Rechts unter dem Zeiger; ist dort kein Platz, links von ihm oder über ihm, so rutscht sie nicht unter ihn.
-        int x = tafelX + 12 + w > width - 4 ? tafelX - 12 - w : tafelX + 12;
-        int y = tafelY + 12 + h > height - 4 ? tafelY - 12 - h : tafelY + 12;
-        x = Math.max(4, Math.min(x, width - w - 4));
-        y = Math.max(4, Math.min(y, height - h - 4));
+        int x = ax + 12 + w > breite - 4 ? ax - 12 - w : ax + 12;
+        int y = ay + 12 + h > hoehe - 4 ? ay - 12 - h : ay + 12;
+        x = Math.max(4, Math.min(x, breite - w - 4));
+        y = Math.max(4, Math.min(y, hoehe - h - 4));
         tafelZuHoch = voll > h;
         tafelScroll = Math.max(0, Math.min(tafelScroll, voll - h));
+        g.pose().pushMatrix();
+        g.pose().scale(m);
         g.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.fromNamespaceAndPath(HeroicMap.ID, "rahmen/" + tafelSkin() + "/tafel"), x, y, w, h);
         g.enableScissor(x + Tafel.INNEN, y + Tafel.INNEN, x + w - Tafel.INNEN, y + h - Tafel.INNEN);
         for (Tafel.Stueck stueck : s.stuecke()) {
@@ -1096,13 +1107,13 @@ final class Karte extends Screen {
                     int bx = x + Tafel.INNEN + b.x(), by = y + Tafel.INNEN + b.y() - tafelScroll;
                     // In Pixeln des Schirms: Grösser als sein Kasten ist das Bild schon auf ihn verkleinert, Pixel auf Pixel;
                     // kleiner vergrössert der Mod es um einen ganzen Faktor, abgerundet, so bleibt es im Kasten.
-                    int gs = minecraft.getWindow().getGuiScale(), pw = b.breite() * gs, ph = b.hoehe() * gs;
+                    int pw = b.breite() * gt, ph = b.hoehe() * gt;
                     Symbole.Textur bild = Symbole.INSTANZ.tafelBild(offen.ebene(), offen.version(), b.bild().feld(), pw, ph);
                     if (bild != null) {
                         int f = Tafel.faktor(bild.breite(), bild.hoehe(), pw, ph);
                         g.pose().pushMatrix();
                         g.pose().translate(bx, by);
-                        g.pose().scale(1f / gs);
+                        g.pose().scale(1f / gt);
                         g.blit(RenderPipelines.GUI_TEXTURED, bild.id(), 0, 0, 0, 0, bild.breite() * f, bild.hoehe() * f, bild.breite(),
                                 bild.hoehe(), bild.breite(), bild.hoehe());
                         g.pose().popMatrix();
@@ -1121,7 +1132,9 @@ final class Karte extends Screen {
             }
         }
         g.disableScissor();
-        tafelKasten = new int[] {x, y, w, h};
+        g.pose().popMatrix();
+        // In Einheiten des GUI, wie die Maus: Treffer, Scrollen und Klicks in die Tafel.
+        tafelKasten = new int[] {Math.round(x * m), Math.round(y * m), Math.round(w * m), Math.round(h * m)};
     }
 
     /** Die kleine Tafel, solange die Antwort des Plugins aussteht. */
