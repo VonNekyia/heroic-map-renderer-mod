@@ -136,7 +136,7 @@ public final class Schleier {
             for (Ebenen.Form f : formen) {
                 int farbe = farbe(f);
                 if (f.dimension().equals(name) && Ebenen.sichtbar(farbe)) {
-                    kanten(f, kasten, (x0, z0, x1, z1) -> {
+                    kanten(f, kasten, mx, mz, r + 1, (x0, z0, x1, z1) -> {
                         double dx = (x0 + x1) / 2 - mx, dz = (z0 + z1) / 2 - mz;
                         if (dx * dx + dz * dz <= r * r) {
                             s.add(x0, z0, x1, z1, dx * dx + dz * dz, farbe);
@@ -193,12 +193,18 @@ public final class Schleier {
         return rand != null && Ebenen.sichtbar(rand.farbe()) ? rand.farbe() : Ebenen.sichtbar(fuellung) ? 0xFF000000 | fuellung : 0;
     }
 
-    /**
-     * Die Kanten einer Fläche oder eines Kreises im Kasten {x0, z0, x1, z1}, in Stücken, die je in einem
-     * Block liegen. Ein Kreis wird dafür ein Vieleck mit Sehnen von höchstens einem Block, nur über den
-     * Bogen, der den Kasten treffen kann.
-     */
+    /** Wie {@link #kanten(Ebenen.Form, double[], double, double, double, Stueck)}, ohne Kreis. */
     static void kanten(Ebenen.Form f, double[] kasten, Stueck aus) {
+        kanten(f, kasten, 0, 0, Double.POSITIVE_INFINITY, aus);
+    }
+
+    /**
+     * Die Kanten einer Fläche oder eines Kreises im Kasten {x0, z0, x1, z1} und im Kreis um (mx, mz) mit Radius
+     * {@code r}, in Stücken, die je in einem Block liegen. Ein Kreis wird dafür ein Vieleck mit Sehnen von
+     * höchstens einem Block, nur über den Bogen, der den Kasten treffen kann. Der Bau nimmt einen Block mehr
+     * als seine Reichweite: Ein Stück mit der Mitte in der Reichweite liegt ganz darin, so fehlt keins.
+     */
+    static void kanten(Ebenen.Form f, double[] kasten, double mx, double mz, double r, Stueck aus) {
         double[] t = new double[2];
         switch (f) {
             case Ebenen.Flaeche fl -> {
@@ -206,8 +212,8 @@ public final class Schleier {
                     int n = ring.length / 2;
                     for (int i = 0; i < n; i++) {
                         int j = (i + 1) % n;
-                        if (Formen.imKasten(ring, i, j, kasten, t)) {
-                            double dx = ring[2 * j] - ring[2 * i], dz = ring[2 * j + 1] - ring[2 * i + 1];
+                        double dx = ring[2 * j] - ring[2 * i], dz = ring[2 * j + 1] - ring[2 * i + 1];
+                        if (Formen.imKasten(ring, i, j, kasten, t) && imKreis(ring[2 * i], ring[2 * i + 1], dx, dz, mx, mz, r, t)) {
                             teile(ring[2 * i] + dx * t[0], ring[2 * i + 1] + dz * t[0], ring[2 * i] + dx * t[1], ring[2 * i + 1] + dz * t[1], aus);
                         }
                     }
@@ -226,8 +232,8 @@ public final class Schleier {
                     p[1] = k.z() + k.radius() * Math.sin(w0);
                     p[2] = k.x() + k.radius() * Math.cos(w1);
                     p[3] = k.z() + k.radius() * Math.sin(w1);
-                    if (Formen.imKasten(p, 0, 1, kasten, t)) {
-                        double dx = p[2] - p[0], dz = p[3] - p[1];
+                    double dx = p[2] - p[0], dz = p[3] - p[1];
+                    if (Formen.imKasten(p, 0, 1, kasten, t) && imKreis(p[0], p[1], dx, dz, mx, mz, r, t)) {
                         teile(p[0] + dx * t[0], p[1] + dz * t[0], p[0] + dx * t[1], p[1] + dz * t[1], aus);
                     }
                 }
@@ -254,6 +260,28 @@ public final class Schleier {
         }
         double mitte = Math.atan2(kz - z, kx - x), halb = Math.acos(Math.min(1, c));
         return new double[] {mitte - halb, mitte + halb};
+    }
+
+    /**
+     * Engt {t0, t1} der Strecke (ax, az) + t · (dx, dz) auf den Teil im Kreis um (mx, mz) mit Radius {@code r} ein;
+     * false, wenn nichts bleibt. So teilt der Bau nur, was er behalten kann.
+     */
+    static boolean imKreis(double ax, double az, double dx, double dz, double mx, double mz, double r, double[] t) {
+        if (r == Double.POSITIVE_INFINITY) {
+            return true;
+        }
+        double ex = ax - mx, ez = az - mz, a = dx * dx + dz * dz, b = ex * dx + ez * dz, c = ex * ex + ez * ez - r * r;
+        if (a == 0) {
+            return c <= 0;
+        }
+        double d = b * b - a * c;
+        if (d < 0) {
+            return false;
+        }
+        double w = Math.sqrt(d);
+        t[0] = Math.max(t[0], (-b - w) / a);
+        t[1] = Math.min(t[1], (-b + w) / a);
+        return t[0] < t[1];
     }
 
     /** Die Strecke von a nach b in Stücken, die je in einem Block liegen: geteilt, wo sie eine ganze Zahl in x oder z kreuzt. */
@@ -297,19 +325,57 @@ public final class Schleier {
         return h;
     }
 
-    /** Die Indizes der höchstens {@code max} kleinsten Abstände, die nächsten zuerst. */
+    /**
+     * Die Indizes der höchstens {@code max} kleinsten Abstände, die nächsten zuerst. Erst ausgewählt, dann nur die
+     * gewählten sortiert: dasselbe wie alles zu sortieren, denn jeder Schlüssel trägt seinen Index und ist einzig.
+     */
     static int[] naechste(double[] abstand, int n, int max) {
         long[] schluessel = new long[n];
         for (int i = 0; i < n; i++) {
             // Positive Floats sortieren als Bits wie als Zahlen.
             schluessel[i] = (long) Float.floatToIntBits((float) abstand[i]) << 32 | i;
         }
-        Arrays.sort(schluessel);
-        int[] aus = new int[Math.min(n, max)];
+        int k = Math.min(n, max);
+        if (k < n) {
+            waehle(schluessel, k);
+        }
+        Arrays.sort(schluessel, 0, k);
+        int[] aus = new int[k];
         for (int i = 0; i < aus.length; i++) {
             aus[i] = (int) schluessel[i];
         }
         return aus;
+    }
+
+    /** Ordnet {@code a} so, dass die {@code k} kleinsten Schlüssel vorn liegen, in beliebiger Reihe; erwartet einzige Schlüssel. */
+    static void waehle(long[] a, int k) {
+        int links = 0, rechts = a.length - 1;
+        while (links < rechts) {
+            long x = a[links], y = a[(links + rechts) >>> 1], z = a[rechts];
+            // Der mittlere der drei als Teiler, gegen sortierte Eingaben.
+            long teiler = Math.max(Math.min(x, y), Math.min(Math.max(x, y), z));
+            int i = links, j = rechts;
+            while (i <= j) {
+                while (a[i] < teiler) {
+                    i++;
+                }
+                while (a[j] > teiler) {
+                    j--;
+                }
+                if (i <= j) {
+                    long tausch = a[i];
+                    a[i++] = a[j];
+                    a[j--] = tausch;
+                }
+            }
+            if (k - 1 <= j) {
+                rechts = j;
+            } else if (k - 1 >= i) {
+                links = i;
+            } else {
+                return;
+            }
+        }
     }
 
     /** Die gesammelten Stücke eines Baus, wachsend. */

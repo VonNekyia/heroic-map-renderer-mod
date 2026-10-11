@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.32
+
+- **Veils build faster** around many pinned regions: the mod picks the nearest pieces without sorting all of them and only splits edges within reach.
+
 ## 0.2.31
 
 - **Veils along pinned regions:** the edge of each pinned region and circle shows a soft veil in its colour, standing on the ground and fading out over four blocks. "World effects" in the settings switches it off together with the beams.
