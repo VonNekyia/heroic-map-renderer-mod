@@ -393,7 +393,11 @@ final class Downloads {
             return;
         }
         JsonObject eintrag = eintrag(f.baum());
-        String name = text(eintrag, "name"), dimension = text(eintrag, "dimension");
+        reiheEin(f, auftrag, ordner, text(eintrag, "name"), text(eintrag, "dimension"));
+    }
+
+    /** Reiht den Download in den Ordner des Baums ein und meldet den Beginn. Auf dem Render-Thread; der Gametest ruft es direkt. */
+    void reiheEin(Freigabe f, Laden.Auftrag auftrag, Path ordner, String name, String dimension) {
         int meine = sitzung;
         if (!reihe.reihe(ordner.toString(), () -> lade(f, auftrag, ordner, name, dimension, meine))) {
             melde(Component.translatable("heroicmap.download.verfaellt_belegt", f.baum()));
@@ -420,9 +424,12 @@ final class Downloads {
                 ergebnis = laden.strom(auftrag, ziel, fortschritt, stufe -> {
                     if (!gezeigt[0] && name != null && dimension != null) {
                         gezeigt[0] = true;
-                        // Ab der gröbsten Stufe zeigt die Vollbildkarte den Satz, siehe docs/vollbildkarte.md, „Welcher Satz“.
+                        // Ab der gröbsten Stufe zeigt die Vollbildkarte den Satz, siehe docs/vollbildkarte.md, „Welcher Satz“;
+                        // ein vollständiger alter Satz in einem anderen Massstab bleibt bis zum Ende.
                         try {
-                            Satz.schreibe(ordner, name, dimension, f.massstab());
+                            if (Satz.lies(ordner) == null) {
+                                Satz.schreibe(ordner, name, dimension, f.massstab());
+                            }
                         } catch (IOException e) {
                             LOGGER.warn("Heroic Map: satz.json nicht geschrieben", e);
                         }
@@ -438,7 +445,7 @@ final class Downloads {
             if (!ergebnis.gekappt()) {
                 Laden.behalteNur(ordner, f.massstab());
                 if (name != null && dimension != null) {
-                    // Erst jetzt zeigt die Vollbildkarte den Satz, siehe docs/vollbildkarte.md, „Welcher Satz“.
+                    // Spätestens jetzt zeigt die Vollbildkarte den Satz, siehe docs/vollbildkarte.md, „Welcher Satz“.
                     Satz.schreibe(ordner, name, dimension, f.massstab());
                 }
             }

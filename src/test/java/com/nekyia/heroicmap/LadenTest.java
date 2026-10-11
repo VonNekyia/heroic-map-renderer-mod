@@ -678,11 +678,63 @@ class LadenTest {
 
     @Test
     void stromOhneEndeIstAbgebrochen() throws Exception {
+        // Der Körper endet sauber, aber ohne ende, und der Server bringt beim Fortsetzen nichts Neues, wie am Deckel des Tokens.
         zip = strom(null, false);
-        assertEquals(Laden.Grund.NETZ, assertThrows(Laden.Fehler.class, () -> strome(auftrag(4, summe()))).grund);
+        assertEquals(Laden.Grund.BUDGET, assertThrows(Laden.Fehler.class, () -> strome(auftrag(4, summe()))).grund);
+        // Der erste Versuch brachte alle Kacheln, die zwei danach nichts Neues: dann Schluss.
+        assertEquals(3, fragen.size());
         // Die Kacheln liegen ganz da, der Satz gilt trotzdem als unvollständig.
         assertTrue(Laden.imStrom(ziel));
         assertEquals("2/1/1", Files.readString(ziel.resolve(Laden.STROM)));
+    }
+
+    @Test
+    void stromOhneFortschrittKeineSchleife() {
+        // Nur map.json und manifest, ohne Kachel und ohne ende, bei jedem Versuch.
+        ByteArrayOutputStream aus = new ByteArrayOutputStream();
+        eintrag(aus, "map.json", karte.getBytes(StandardCharsets.UTF_8), 0);
+        eintrag(aus, "manifest", manifest, 0);
+        zip = aus.toByteArray();
+        Laden.Fehler f = assertTimeoutPreemptively(Duration.ofSeconds(10),
+                () -> assertThrows(Laden.Fehler.class, () -> strome(auftrag(4, summe()))));
+        assertEquals(Laden.Grund.BUDGET, f.grund);
+        assertEquals(2, fragen.size());
+    }
+
+    @Test
+    void stromSetztVonSelbstFort() throws Exception {
+        // Der Server bricht nach jeder Kachel ab, sauber und ohne ende; erst wenn keine mehr fehlt, kommt ende.
+        server.removeContext("/baum.zip");
+        server.createContext("/baum.zip", t -> {
+            String query = t.getRequestURI().getQuery();
+            fragen.add(query == null ? "" : query);
+            String nach = query == null ? null : query.substring("nach=".length());
+            List<String> reihe = grobNachFein();
+            ByteArrayOutputStream aus = new ByteArrayOutputStream();
+            eintrag(aus, "map.json", karte.getBytes(StandardCharsets.UTF_8), 0);
+            eintrag(aus, "manifest", manifest, 0);
+            int naechste = nach == null ? 0 : reihe.indexOf(nach) + 1;
+            if (naechste < reihe.size()) {
+                eintrag(aus, reihe.get(naechste) + ".webp", kacheln.get(reihe.get(naechste)), 0);
+            } else {
+                eintrag(aus, "ende", new byte[0], 0);
+            }
+            t.getResponseHeaders().add("X-Heroic-Bytes", String.valueOf(aus.size()));
+            t.sendResponseHeaders(200, 0);
+            try (OutputStream o = t.getResponseBody()) {
+                o.write(aus.toByteArray());
+            }
+        });
+        Laden.Fortschritt f = new Laden.Fortschritt(1);
+        Laden.Ergebnis e = new Laden().strom(auftrag(4, summe()), ziel, f, z -> {
+        });
+        assertEquals(5, e.geladen());
+        alleKachelnDa();
+        assertFalse(Laden.imStrom(ziel));
+        assertEquals(6, fragen.size());
+        assertEquals("nach=2/1/1", fragen.getLast());
+        // Über alle Versuche zählt der Fortschritt bis 100 %.
+        assertEquals(f.gesamt, f.empfangen.get());
     }
 
     /**
@@ -724,19 +776,27 @@ class LadenTest {
         Laden.Auftrag a = new Laden.Auftrag(reisstAb(Arrays.copyOf(ganz, schnitt), ganz.length), TOKEN, Laden.sha256(manifest),
                 summe(), 4, false, 1L << 30, kacheln.size(), InetAddress.getLoopbackAddress());
         assertEquals(Laden.Grund.NETZ, assertThrows(Laden.Fehler.class, () -> strome(a)).grund);
-        // Die zwei Kacheln davor liegen ganz da, die abgerissene gar nicht, und keine Zwischendatei bleibt.
-        assertArrayEquals(kacheln.get("0/0/0"), Files.readAllBytes(datei("0/0/0")));
-        assertArrayEquals(kacheln.get("1/-1/0"), Files.readAllBytes(datei("1/-1/0")));
-        assertFalse(Files.exists(datei("1/0/0")));
+        // Was vor dem Abbruch ankam, aber noch nicht gelesen war, verwirft der Client mit dem Fehler: Ganz da liegen die
+        // ersten k der zwei Kacheln davor, keine halbe, die abgerissene gar nicht, und keine Zwischendatei bleibt.
+        List<String> reihe = grobNachFein();
+        int ganze = 0;
+        while (ganze < 2 && Files.exists(datei(reihe.get(ganze)))) {
+            assertArrayEquals(kacheln.get(reihe.get(ganze)), Files.readAllBytes(datei(reihe.get(ganze))));
+            ganze++;
+        }
+        for (int i = ganze; i < kacheln.size(); i++) {
+            assertFalse(Files.exists(datei(reihe.get(i))), reihe.get(i));
+        }
         try (var tmp = Files.list(ziel.resolve("tmp"))) {
             assertEquals(0, tmp.count());
         }
-        assertEquals("1/-1/0", Files.readString(ziel.resolve(Laden.STROM)));
+        String nach = ganze == 0 ? "" : reihe.get(ganze - 1);
+        assertEquals(nach, Files.readString(ziel.resolve(Laden.STROM)));
 
         // Der nächste Strom setzt hinter der letzten Kachel fort und macht den Satz fertig.
         Laden.Ergebnis rest = strome(auftrag(4, summe()));
-        assertEquals(List.of("nach=1/-1/0"), fragen);
-        assertEquals(3, rest.geladen());
+        assertEquals(List.of(ganze == 0 ? "" : "nach=" + nach), fragen);
+        assertEquals(5 - ganze, rest.geladen());
         alleKachelnDa();
         assertFalse(Laden.imStrom(ziel));
     }
@@ -768,6 +828,26 @@ class LadenTest {
             assertEquals(new Laden.Grund[] {Laden.Grund.NETZ, Laden.Grund.BUDGET, Laden.Grund.ABGELEHNT}[fall[1]], f.grund);
             assertEquals(fall[0], f.status);
         }
+    }
+
+    @Test
+    void stromNach429NeuVersucht() throws Exception {
+        // Der Platz eines abgebrochenen Stroms ist beim Server noch belegt: erst 429, dann der Strom.
+        AtomicInteger anfragen = new AtomicInteger();
+        server.removeContext("/baum.zip");
+        server.createContext("/baum.zip", t -> {
+            if (anfragen.incrementAndGet() == 1) {
+                sende(t, 429, new byte[0], null);
+                return;
+            }
+            byte[] inhalt = strom(null, true);
+            t.sendResponseHeaders(200, 0);
+            try (OutputStream aus = t.getResponseBody()) {
+                aus.write(inhalt);
+            }
+        });
+        assertEquals(5, strome(auftrag(4, summe())).geladen());
+        assertEquals(2, anfragen.get());
     }
 
     @Test

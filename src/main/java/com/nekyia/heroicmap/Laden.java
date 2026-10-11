@@ -97,6 +97,11 @@ final class Laden {
     static final String STROM = "strom.txt";
     /** So viel zählt eine Datei im Strom höchstens über ihren Inhalt hinaus, für Kopf und Name. */
     static final long KOPF_MAX = 1L << 10;
+    /** So oft fragt der Mod den Strom an, solange der Server 429 sagt, mit so vielen ms Pause dazwischen. */
+    static final int VERSUCHE_429 = 3;
+    static final long PAUSE_429_MS = 1500;
+    /** Höchstens so viele Versuche hat ein Strom, auch wenn jeder etwas Neues bringt; so endet er immer. */
+    static final int VERSUCHE_STROM = 100;
 
     /**
      * Was die {@code freigabe} nennt, dazu aus dem {@code angebot} Grösse und Zahl der Kacheln
@@ -149,7 +154,7 @@ final class Laden {
         STROM
     }
 
-    static final class Fehler extends Exception {
+    static class Fehler extends Exception {
         final Grund grund;
         /** Der Status der Antwort, oder 0, wenn keine kam. */
         final int status;
@@ -169,9 +174,20 @@ final class Laden {
         }
     }
 
+    /** Ein Strom brach nach der Antwort 200 im Körper ab; {@link #strom} setzt dann fort. */
+    static final class Abbruch extends Fehler {
+        /** Endete der Körper sauber, nur ohne {@code ende}: am Deckel des Tokens oder nach einem Lesefehler des Servers. */
+        final boolean sauber;
+
+        Abbruch(boolean sauber, String text, Throwable ursache) {
+            super(Grund.NETZ, text, ursache);
+            this.sauber = sauber;
+        }
+    }
+
     /**
      * Bytes empfangen und erwartet, für die Anzeige auf der Vollbildkarte. Der Download zählt,
-     * ein anderer Thread liest. Siehe docs/download.md, „Fortschritt“.
+     * ein anderer Thread liest. Siehe docs/vollbildkarte.md, „Fortschritt“.
      */
     static final class Fortschritt {
         /** Über so viele ms mittelt das Tempo. */
@@ -376,9 +392,40 @@ final class Laden {
      * Server den Strom nicht kennt (404). Siehe docs/download.md, „Strom“.
      */
     Ergebnis strom(Auftrag a, Path ziel, Fortschritt fortschritt, IntConsumer stufe) throws Fehler, IOException, InterruptedException {
-        pruefe(a);
+        Summe summe = new Summe();
+        // Nach einem Abbruch weiter, solange der letzte Versuch eine neue Datei brachte; zweimal ohne, dann Schluss.
+        for (int versuch = 1, ohneNeues = 0; ; versuch++) {
+            String vorher = marke(ziel);
+            try {
+                return einStrom(a, ziel, fortschritt, stufe, summe)
+                        ? new Ergebnis(summe.geladen, summe.gleich, summe.geloescht, summe.bytes, false) : null;
+            } catch (Abbruch f) {
+                ohneNeues = marke(ziel).equals(vorher) ? ohneNeues + 1 : 0;
+                if (ohneNeues >= 2 || versuch >= VERSUCHE_STROM) {
+                    // Sauber ohne ende und ohne neue Datei: der Deckel des Tokens; dasselbe Token bringt nichts mehr.
+                    throw f.sauber ? new Fehler(Grund.BUDGET, "Strom: zweimal ohne neue Datei", f) : f;
+                }
+            }
+        }
+    }
+
+    /** Der letzte abgelegte Pfad aus {@code strom.txt}, oder leer. */
+    private static String marke(Path ziel) throws IOException {
         Path marke = ziel.resolve(STROM);
-        String nach = Files.exists(marke) ? Files.readString(marke, StandardCharsets.UTF_8).strip() : "";
+        return Files.exists(marke) ? Files.readString(marke, StandardCharsets.UTF_8).strip() : "";
+    }
+
+    /** Was die Versuche eines Stroms zusammen abgelegt haben. */
+    private static final class Summe {
+        int geladen, gleich, geloescht;
+        long bytes;
+    }
+
+    /** Ein Versuch des Stroms, hinter {@code strom.txt}; false, wenn der Server ihn nicht kennt (404). */
+    private boolean einStrom(Auftrag a, Path ziel, Fortschritt fortschritt, IntConsumer stufe, Summe summe)
+            throws Fehler, IOException, InterruptedException {
+        pruefe(a);
+        String nach = marke(ziel);
         String basis = a.url().toString().replaceAll("/+$", "");
         URI uri = URI.create(basis + ".zip" + (PFAD.matcher(nach).matches() ? "?nach=" + nach : ""));
         HttpRequest anfrage = HttpRequest.newBuilder(uri)
@@ -386,36 +433,48 @@ final class Laden {
                 .timeout(zeit)
                 .GET()
                 .build();
-        // Ein eigener Client: Bleibt der Strom stehen, beendet ihn die Wache samt Verbindung.
-        HttpClient strom = client();
-        try {
-            HttpResponse<InputStream> antwort;
+        for (int versuch = 1; ; versuch++) {
+            if (versuch > 1) {
+                Thread.sleep(PAUSE_429_MS);
+            }
+            // Ein eigener Client: Bleibt der Strom stehen, beendet ihn die Wache samt Verbindung.
+            HttpClient strom = client();
             try {
-                antwort = strom.sendAsync(anfrage, HttpResponse.BodyHandlers.ofInputStream()).get(zeit.toMillis(), TimeUnit.MILLISECONDS);
-            } catch (TimeoutException e) {
-                throw new Fehler(Grund.NETZ, "Strom: keine Antwort in " + zeit.toSeconds() + " s");
-            } catch (ExecutionException e) {
-                throw new Fehler(Grund.NETZ, "Strom", e.getCause());
-            }
-            try (InputStream koerper = antwort.body()) {
-                int status = antwort.statusCode();
-                if (status == 404) {
-                    return null;
+                HttpResponse<InputStream> antwort;
+                try {
+                    antwort = strom.sendAsync(anfrage, HttpResponse.BodyHandlers.ofInputStream()).get(zeit.toMillis(), TimeUnit.MILLISECONDS);
+                } catch (TimeoutException e) {
+                    throw new Fehler(Grund.NETZ, "Strom: keine Antwort in " + zeit.toSeconds() + " s");
+                } catch (ExecutionException e) {
+                    throw new Fehler(Grund.NETZ, "Strom", e.getCause());
                 }
-                if (status != 200) {
-                    throw new Fehler(grund(status), status, "Strom: " + status, null);
+                try (InputStream koerper = antwort.body()) {
+                    int status = antwort.statusCode();
+                    if (status == 404) {
+                        return false;
+                    }
+                    // Den Platz eines abgebrochenen Stroms gibt der Server erst frei, wenn er den Abbruch merkt.
+                    if (status == 429 && versuch < VERSUCHE_429) {
+                        continue;
+                    }
+                    if (status != 200) {
+                        throw new Fehler(grund(status), status, "Strom: " + status, null);
+                    }
+                    // Beim Fortsetzen nennt der Header den Rest; gesamt zählt das schon Empfangene mit.
+                    long schon = fortschritt.empfangen.get();
+                    antwort.headers().firstValue("X-Heroic-Bytes").filter(b -> BYTES.matcher(b).matches())
+                            .ifPresent(b -> fortschritt.gesamt = schon + Long.parseLong(b));
+                    entpackeStrom(a, ziel, new Zaehler(koerper, fortschritt), strom, stufe, summe, schon);
+                    return true;
                 }
-                antwort.headers().firstValue("X-Heroic-Bytes").filter(b -> BYTES.matcher(b).matches())
-                        .ifPresent(b -> fortschritt.gesamt = Long.parseLong(b));
-                return entpackeStrom(a, ziel, new Zaehler(koerper, fortschritt), strom, stufe);
+            } finally {
+                strom.shutdownNow();
             }
-        } finally {
-            strom.shutdownNow();
         }
     }
 
-    /** Liest den Strom ab dem ersten Eintrag; siehe {@link #strom}. */
-    private Ergebnis entpackeStrom(Auftrag a, Path ziel, Zaehler zaehler, HttpClient strom, IntConsumer stufe)
+    /** Liest einen Versuch des Stroms ab dem ersten Eintrag und zählt in {@code summe}; siehe {@link #strom}. */
+    private void entpackeStrom(Auftrag a, Path ziel, Zaehler zaehler, HttpClient strom, IntConsumer stufe, Summe summe, long schon)
             throws Fehler, IOException, InterruptedException {
         Path zwischen = ziel.resolve(ZWISCHEN), marke = ziel.resolve(STROM);
         loesche(zwischen);
@@ -437,18 +496,17 @@ final class Laden {
         Plan plan = null;
         String letzte = null;
         boolean fertig = false;
-        int geladen = 0, gleich = 0;
-        long bytes = 0;
         OutputStream protokoll = null;
         try {
             byte[] karte = erster(zip, "map.json", KARTE_MAX);
             int[] zoom = zoom(karte, a.massstab());
             byte[] gz = erster(zip, "manifest", MANIFEST_MAX);
             plan = plane(a, karte, zoom, gz, ziel, zwischen);
+            summe.geloescht += plan.geloescht();
             Map<String, Eintrag> erwartet = new HashMap<>();
             plan.soll().forEach(e -> erwartet.put(e.pfad(), e));
             long max = a.grenze() + (plan.soll().size() + 3) * KOPF_MAX + karte.length + gz.length;
-            zaehler.fortschritt.gesamt = Math.min(zaehler.fortschritt.gesamt, max);
+            zaehler.fortschritt.gesamt = Math.min(zaehler.fortschritt.gesamt, schon + max);
             if (!Files.exists(marke)) {
                 Files.writeString(marke, "", StandardCharsets.UTF_8);
             }
@@ -492,7 +550,7 @@ final class Laden {
                 }
                 Path datei = datei(ziel, pfad);
                 if (soll.etag().equals(plan.ist().get(pfad)) && Files.exists(datei)) {
-                    gleich++;
+                    summe.gleich++;
                 } else {
                     if (ordner.add(datei.getParent())) {
                         Files.createDirectories(datei.getParent());
@@ -503,13 +561,16 @@ final class Laden {
                     // Das ETag des Manifests; ist die Kachel neuer, holt sie der nächste Abgleich.
                     zeile(protokoll, pfad + " " + soll.etag());
                     plan.ist().put(pfad, soll.etag());
-                    geladen++;
-                    bytes += bild.length;
+                    summe.geladen++;
+                    summe.bytes += bild.length;
                 }
                 letzte = pfad;
             }
-            if (!ende || zaehler.read() != -1) {
-                throw new Fehler(Grund.NETZ, ende ? "Strom: Bytes nach ende" : "Strom ohne ende");
+            if (!ende) {
+                throw new Abbruch(true, "Strom ohne ende", null);
+            }
+            if (zaehler.read() != -1) {
+                throw new Fehler(Grund.STROM, "Bytes nach ende");
             }
             if (z >= 0) {
                 stufe.accept(z);
@@ -517,12 +578,12 @@ final class Laden {
             fertig = true;
         } catch (ZipException | EOFException | Abriss f) {
             if (still.get()) {
-                throw new Fehler(Grund.NETZ, "Strom: " + leerlauf.toSeconds() + " s ohne Byte");
+                throw new Abbruch(false, "Strom: " + leerlauf.toSeconds() + " s ohne Byte", f);
             }
             if (Thread.currentThread().isInterrupted()) {
                 throw new InterruptedException();
             }
-            throw new Fehler(Grund.NETZ, "Strom", f);
+            throw new Abbruch(false, "Strom", f);
         } catch (IllegalArgumentException f) {
             // ZipInputStream: ein Name, der kein UTF-8 ist.
             throw new Fehler(Grund.STROM, "Name nicht lesbar", f);
@@ -540,7 +601,6 @@ final class Laden {
                 }
             }
         }
-        return new Ergebnis(geladen, gleich, plan.geloescht(), bytes, false);
     }
 
     /** Der nächste Eintrag des Stroms, der {@code name} heissen muss, und sein Inhalt. */

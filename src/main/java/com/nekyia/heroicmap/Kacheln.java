@@ -105,6 +105,11 @@ final class Kacheln implements AutoCloseable {
         }
     }
 
+    /** Fehlt die Kachel auf der Platte oder liess sie sich nicht lesen, etwa weil ein Strom sie noch nicht brachte? */
+    boolean fehlt(int z, int x, int y) {
+        return leer.contains(z + "/" + x + "/" + y);
+    }
+
     /** Die Textur der Kachel, wenn sie schon geladen ist, ohne sie anzufragen; sonst null. */
     Identifier vorhanden(int z, int x, int y) {
         return texturen.get(z + "/" + x + "/" + y);

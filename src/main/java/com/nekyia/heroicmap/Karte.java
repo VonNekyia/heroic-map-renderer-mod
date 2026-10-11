@@ -1364,15 +1364,17 @@ final class Karte extends Screen {
 
     /**
      * Solange eine Kachel lädt, ihr Ausschnitt aus der nächsten gröberen Stufe, die schon geladen
-     * ist, vergrössert; nichts wird dafür angefragt. Siehe docs/vollbildkarte.md, „Kacheln“.
+     * ist, vergrössert; angefragt wird dafür nur, wenn die Kachel auf der Platte fehlt. Siehe
+     * docs/vollbildkarte.md, „Kacheln“.
      */
     private void platzhalter(GuiGraphicsExtractor g, int tx, int ty, int sx, int sy, int seite) {
+        boolean fehlt = kacheln.fehlt(blick.zoom, tx, ty);
         for (int k = 1; blick.zoom - k >= satz.minZoom(); k++) {
             int[] grob = Kartenblick.grob(tx, ty, k, satz.kachel());
             if (grob == null) {
                 return;
             }
-            Identifier id = kacheln.vorhanden(blick.zoom - k, grob[0], grob[1]);
+            Identifier id = fehlt ? kacheln.textur(blick.zoom - k, grob[0], grob[1]) : kacheln.vorhanden(blick.zoom - k, grob[0], grob[1]);
             if (id != null) {
                 g.blit(RenderPipelines.GUI_TEXTURED, id, sx, sy, grob[2], grob[3], seite, seite, grob[4], grob[4],
                         satz.kachel(), satz.kachel());
