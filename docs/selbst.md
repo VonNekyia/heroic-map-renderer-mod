@@ -188,9 +188,19 @@ hat es der User gewünscht, siehe
   | 2 px | 7 366 | 477 MiB |
   | 4 px | 16 306 | 1 877 MiB |
 
-  Die Zeiten zum Schreiben bei 1 und 2 px misst die nächste Messung in
-  Ruhe; die Tabelle unter „Schreiben“ gilt für 4 px. Beide laufen ohne
-  Minecraft mit
+- **Schreiben je Massstab,** im Flug, gemessen am 11.10. in Ruhe, siehe
+  [Selbst gezeichnete Karte, Schreiben je Massstab](messungen/2026-10-11-selbst-schreiben-je-massstab.md):
+
+  | Massstab | feine Stufen alle 5 s, Median | alle Stufen alle 60 s, Median |
+  |---|---|---|
+  | 1 px | 40 ms | 104 ms |
+  | 2 px | 100 ms | 210 ms |
+  | 4 px | 276 ms | 517 ms |
+
+  Der Chunk dieser Messung ist je Pixel verrauscht und packt in PNG
+  schwerer als der vom 09.10. unter „Schreiben“; bei 4 px sind es dort
+  105 ms, hier 276 ms. Echtes Gelände liegt dazwischen. Beide Messungen
+  laufen ohne Minecraft mit
   `./gradlew test --tests '*KachelwerkMessung*' -Pkachelwerk=<datei>`.
 
 ## Bild
