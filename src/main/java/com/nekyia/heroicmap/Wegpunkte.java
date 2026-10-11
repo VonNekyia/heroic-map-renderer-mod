@@ -37,25 +37,26 @@ final class Wegpunkte {
     /** Die Farben der Wegpunkte, der Reihe nach. */
     static final int[] FARBEN = {0xFFE04040, 0xFF4090F0, 0xFF40C040, 0xFFF0C020, 0xFFC050F0, 0xFFF08020, 0xFF40D0D0, 0xFFF070B0};
 
-    /**
-     * Ein Wegpunkt auf dem Block (x, z), mit einer festen {@code id}, auf die eigene Formen verweisen;
-     * {@code farbe} ist ein Index in {@link #FARBEN}.
-     */
+    /** Ein Wegpunkt auf dem Block (x, z), mit einer festen {@code id}; {@code farbe} ist ein Index in {@link #FARBEN}. */
     record Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet) {
     }
 
+    /** Eine Ecke einer eigenen Form auf dem Block (x, z). */
+    record Ecke(int x, int z) {
+    }
+
     /**
-     * Eine eigene Form aus Wegpunkten, über ihre ids in Reihenfolge: zwei sind eine Linie, drei und mehr
-     * eine Region. Verschiebt der Spieler einen Wegpunkt, geht die Form mit. Siehe docs/wegpunkte.md, „Formen aus Wegpunkten“.
+     * Eine eigene Form, ein Marker mit eigenen Ecken in Reihenfolge: zwei sind eine Linie, drei und mehr eine
+     * Region. Sie verweist auf keinen Wegpunkt. Siehe docs/wegpunkte.md, „Eigene Formen“.
      */
-    record EigeneForm(List<Integer> punkte, int farbe, boolean angeheftet) {
+    record EigeneForm(String dimension, List<Ecke> ecken, int farbe, boolean angeheftet) {
 
         EigeneForm {
-            punkte = List.copyOf(punkte);
+            ecken = List.copyOf(ecken);
         }
 
         boolean region() {
-            return punkte.size() >= 3;
+            return ecken.size() >= 3;
         }
     }
 
@@ -76,7 +77,7 @@ final class Wegpunkte {
 
     /** So viele alte Rechtecke je Welt liest der Mod. */
     static final int MAX_REGIONEN = 256;
-    /** So viele eigene Formen aus Wegpunkten je Welt, und so viele Punkte je Form. */
+    /** So viele eigene Formen je Welt, und so viele Ecken je Form. */
     static final int MAX_EIGENE_FORMEN = 256, MAX_PUNKTE_FORM = 64;
     /** So viele Regionen und Kreise je Welt angeheftet, eigene und vom Server zusammen; darüber heftet der Mod keine an. */
     static final int MAX_ANGEHEFTET = 64;
@@ -192,17 +193,29 @@ final class Wegpunkte {
                 // Nur dieser Eintrag fällt weg.
             }
         }
-        // Eine Datei von vor mod#79 hat keine eigenen Formen. Verweise auf Wegpunkte, die es nicht gibt, fallen weg.
+        // Eine Datei von vor mod#79 hat keine eigenen Formen. Eine von vor mod#112 nennt statt Ecken die ids von
+        // Wegpunkten; sie werden zu Ecken auf deren Blöcken, fehlende fallen weg.
         for (JsonElement element : liste(json, "eigene_formen")) {
             try {
                 JsonObject o = element.getAsJsonObject();
-                List<Integer> ids = new ArrayList<>();
-                for (JsonElement id : o.getAsJsonArray("punkte")) {
-                    ids.add(id.getAsInt());
+                String dimension = o.has("dimension") ? o.get("dimension").getAsString() : null;
+                List<Ecke> ecken = new ArrayList<>();
+                if (o.has("ecken")) {
+                    for (JsonElement e : o.getAsJsonArray("ecken")) {
+                        ecken.add(new Ecke(e.getAsJsonArray().get(0).getAsInt(), e.getAsJsonArray().get(1).getAsInt()));
+                    }
+                } else {
+                    for (JsonElement id : o.getAsJsonArray("punkte")) {
+                        Punkt q = punkt(id.getAsInt());
+                        if (q != null && (dimension == null || dimension.equals(q.dimension()))) {
+                            dimension = q.dimension();
+                            ecken.add(new Ecke(q.x(), q.z()));
+                        }
+                    }
                 }
-                List<Integer> gueltig = gueltig(ids);
-                if (gueltig != null && eigene.size() < MAX_EIGENE_FORMEN) {
-                    eigene.add(new EigeneForm(gueltig, Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length),
+                List<Ecke> gueltig = gueltig(ecken);
+                if (dimension != null && gueltig != null && eigene.size() < MAX_EIGENE_FORMEN) {
+                    eigene.add(new EigeneForm(dimension, gueltig, Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length),
                             o.get("minimap").getAsBoolean() && angeheftet() < MAX_ANGEHEFTET));
                 }
             } catch (RuntimeException kaputt) {
@@ -261,9 +274,15 @@ final class Wegpunkte {
         JsonArray zuege = new JsonArray();
         for (EigeneForm f : eigene) {
             JsonObject o = new JsonObject();
-            JsonArray ids = new JsonArray();
-            f.punkte().forEach(ids::add);
-            o.add("punkte", ids);
+            o.addProperty("dimension", f.dimension());
+            JsonArray ecken = new JsonArray();
+            for (Ecke e : f.ecken()) {
+                JsonArray xz = new JsonArray();
+                xz.add(e.x());
+                xz.add(e.z());
+                ecken.add(xz);
+            }
+            o.add("ecken", ecken);
             o.addProperty("farbe", f.farbe());
             o.addProperty("minimap", f.angeheftet());
             zuege.add(o);
@@ -325,7 +344,7 @@ final class Wegpunkte {
     /**
      * Setzt eine Region über die Blöcke von (ax, az) bis (bx, bz) samt beiden, gleich in welcher Folge
      * die Ecken kamen; gibt es sie schon oder schon {@link #MAX_REGIONEN}, bleibt es, wie es ist.
-     * Nur noch Tests setzen so ein altes Rechteck; der Spieler baut Formen aus Wegpunkten.
+     * Nur noch Tests setzen so ein altes Rechteck; der Spieler baut eigene Formen.
      */
     void setze(String dimension, int ax, int az, int bx, int bz) {
         Region r = region(dimension, ax, az, bx, bz, farbe(dimension), false);
@@ -375,7 +394,7 @@ final class Wegpunkte {
             }
         }
         for (EigeneForm e : eigene) {
-            if (dimension.equals(dimension(e))) {
+            if (dimension.equals(e.dimension())) {
                 belegt[e.farbe()] = true;
                 anzahl++;
             }
@@ -388,22 +407,11 @@ final class Wegpunkte {
         return anzahl % FARBEN.length;
     }
 
-    /** Löscht den Wegpunkt; aus eigenen Formen fällt er heraus, eine Form mit weniger als zwei Punkten verschwindet. */
+    /** Löscht den Wegpunkt; eigene Formen bleiben, wie sie sind. */
     void loesche(Punkt p) {
         int i = finde(p.dimension(), p.x(), p.z());
         if (i >= 0) {
-            int id = punkte.remove(i).id();
-            for (int k = eigene.size() - 1; k >= 0; k--) {
-                EigeneForm f = eigene.get(k);
-                if (f.punkte().contains(id)) {
-                    List<Integer> rest = gueltig(f.punkte().stream().filter(x -> x != id).toList());
-                    if (rest == null) {
-                        eigene.remove(k);
-                    } else {
-                        eigene.set(k, new EigeneForm(rest, f.farbe(), f.angeheftet()));
-                    }
-                }
-            }
+            punkte.remove(i);
             schreibe();
         }
     }
@@ -422,25 +430,35 @@ final class Wegpunkte {
         return null;
     }
 
-    /** Die Dimension einer eigenen Form, die ihres ersten Punkts. */
-    String dimension(EigeneForm f) {
-        Punkt p = punkt(f.punkte().getFirst());
-        return p == null ? null : p.dimension();
+    /**
+     * Setzt eine eigene Form in {@code dimension} mit diesen Ecken in Reihenfolge; false, wenn weniger als zwei
+     * bleiben, es mehr als {@link #MAX_PUNKTE_FORM} sind oder es schon {@link #MAX_EIGENE_FORMEN} gibt.
+     */
+    boolean setzeForm(String dimension, List<Ecke> ecken) {
+        List<Ecke> gueltig = gueltig(ecken);
+        if (gueltig == null || eigene.size() >= MAX_EIGENE_FORMEN) {
+            return false;
+        }
+        eigene.add(new EigeneForm(dimension, gueltig, farbe(dimension), false));
+        schreibe();
+        return true;
     }
 
     /**
-     * Setzt eine eigene Form aus den Wegpunkten {@code ids} in dieser Reihenfolge; false, wenn es weniger
-     * als zwei verschiedene sind, mehr als {@link #MAX_PUNKTE_FORM}, sie nicht in einer Dimension liegen oder
-     * es schon {@link #MAX_EIGENE_FORMEN} gibt.
+     * Gibt der eigenen Form {@code f} neue Ecken, an ihrer Stelle, mit Farbe und Anheften. Bleiben weniger als zwei,
+     * fällt die Form weg; mehr als {@link #MAX_PUNKTE_FORM} nimmt sie nicht. False, wenn sich nichts änderte.
      */
-    boolean setzeForm(List<Integer> ids) {
-        // Der erste Punkt am Ende schliesst nur die Region.
-        List<Integer> wunsch = ids.size() > 2 && ids.getLast().equals(ids.getFirst()) ? ids.subList(0, ids.size() - 1) : ids;
-        List<Integer> gueltig = gueltig(wunsch);
-        if (gueltig == null || gueltig.size() != wunsch.size() || eigene.size() >= MAX_EIGENE_FORMEN) {
+    boolean ersetze(EigeneForm f, List<Ecke> ecken) {
+        int i = eigene.indexOf(f);
+        if (i < 0 || ecken.size() > MAX_PUNKTE_FORM) {
             return false;
         }
-        eigene.add(new EigeneForm(gueltig, farbe(punkt(gueltig.getFirst()).dimension()), false));
+        List<Ecke> gueltig = gueltig(ecken);
+        if (gueltig == null) {
+            eigene.remove(i);
+        } else {
+            eigene.set(i, new EigeneForm(f.dimension(), gueltig, f.farbe(), f.angeheftet()));
+        }
         schreibe();
         return true;
     }
@@ -460,27 +478,23 @@ final class Wegpunkte {
         if (!f.angeheftet() && angeheftet() >= MAX_ANGEHEFTET) {
             return false;
         }
-        eigene.set(i, new EigeneForm(f.punkte(), f.farbe(), !f.angeheftet()));
+        eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), !f.angeheftet()));
         schreibe();
         return true;
     }
 
     /**
-     * Die ids, die es als Wegpunkte gibt, alle in einer Dimension, ohne einen Punkt zweimal hintereinander
-     * und höchstens {@link #MAX_PUNKTE_FORM}; null, wenn weniger als zwei bleiben.
+     * Die Ecken ohne einen Block zweimal hintereinander; null, wenn weniger als zwei bleiben oder es mehr als
+     * {@link #MAX_PUNKTE_FORM} sind.
      */
-    private List<Integer> gueltig(List<Integer> ids) {
-        List<Integer> aus = new ArrayList<>();
-        String dimension = null;
-        for (int id : ids) {
-            Punkt p = punkt(id);
-            if (p == null || dimension != null && !dimension.equals(p.dimension()) || !aus.isEmpty() && aus.getLast() == id) {
-                continue;
+    static List<Ecke> gueltig(List<Ecke> ecken) {
+        List<Ecke> aus = new ArrayList<>();
+        for (Ecke e : ecken) {
+            if (aus.isEmpty() || !aus.getLast().equals(e)) {
+                aus.add(e);
             }
-            dimension = p.dimension();
-            aus.add(id);
         }
-        // Ein letzter Punkt gleich dem ersten schliesst nur, er zählt nicht doppelt.
+        // Eine letzte Ecke gleich der ersten schliesst nur, sie zählt nicht doppelt.
         if (aus.size() > 2 && aus.getLast().equals(aus.getFirst())) {
             aus.removeLast();
         }
@@ -752,11 +766,9 @@ final class Wegpunkte {
         regionen.stream().filter(Region::angeheftet).map(Wegpunkte::flaeche).forEach(aufMinimap::add);
         for (EigeneForm f : this.eigene) {
             Ebenen.Form form = form(f);
-            if (form != null) {
-                aufKarte.add(f.angeheftet() ? breiter(form) : form);
-                if (f.angeheftet()) {
-                    aufMinimap.add(form);
-                }
+            aufKarte.add(f.angeheftet() ? breiter(form) : form);
+            if (f.angeheftet()) {
+                aufMinimap.add(form);
             }
         }
         if (!aufKarte.isEmpty()) {
@@ -770,21 +782,16 @@ final class Wegpunkte {
     }
 
     /**
-     * Die eigene Form als Form zum Zeichnen, an der Mitte ihrer Wegpunkte: eine Region als Fläche in ihrer
-     * Farbe zu 25 % mit 1 Einheit Rand, eine Linie 2 Einheiten breit; null, wenn ihre Punkte fehlen.
+     * Die eigene Form als Form zum Zeichnen, durch die Mitten der Blöcke ihrer Ecken: eine Region als Fläche in ihrer
+     * Farbe zu 25 % mit 1 Einheit Rand, eine Linie 2 Einheiten breit.
      */
     Ebenen.Form form(EigeneForm f) {
-        double[] p = new double[2 * f.punkte().size()];
-        String dimension = null;
-        for (int i = 0; i < f.punkte().size(); i++) {
-            Punkt q = punkt(f.punkte().get(i));
-            if (q == null) {
-                return null;
-            }
-            dimension = q.dimension();
-            p[2 * i] = q.x() + 0.5;
-            p[2 * i + 1] = q.z() + 0.5;
+        double[] p = new double[2 * f.ecken().size()];
+        for (int i = 0; i < f.ecken().size(); i++) {
+            p[2 * i] = f.ecken().get(i).x() + 0.5;
+            p[2 * i + 1] = f.ecken().get(i).z() + 0.5;
         }
+        String dimension = f.dimension();
         int farbe = FARBEN[f.farbe()];
         double[] box = box(p);
         if (!f.region()) {

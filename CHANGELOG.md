@@ -4,6 +4,11 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.38
+
+- **Lines and regions have their own corners.** Right-click, "Line/region from here", then left-click anywhere on the full map to set the next corner, on a waypoint or on empty ground; click the first corner to close a region. Corners show as small diamonds: right-click one to add corners after it or to delete it, hold it for 0.5 s to move it. No waypoints are created for corners.
+- **Existing lines and regions keep their shape:** their waypoints become corners once. Waypoints and shapes are now separate, so moving or deleting a waypoint no longer changes a shape. An older version of the mod cannot read the new shapes.
+
 ## 0.2.37
 
 - **Holding a waypoint to move it takes 0.5 s** instead of 2 s.

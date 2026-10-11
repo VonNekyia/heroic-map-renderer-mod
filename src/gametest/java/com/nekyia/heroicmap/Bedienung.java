@@ -35,7 +35,7 @@ import net.minecraft.util.Mth;
  * rechten Taste verschiebt die ganze Minimap; ein Klick auf Spieler oder Marke stellt ihr Aussehen ein; auf der Karte verschiebt links ziehen den Inhalt,
  * rechts klicken öffnet das Menü mit Teleport und Wegpunkt; auf einer Marke am Rand ziehen zieht
  * die Karte, ein Klick zentriert sie, ein Doppelklick heftet sie an, ebenso einen Kreis vom Server und
- * ein altes Rechteck; Formen aus Wegpunkten bauen, anheften und löschen. Siehe docs/minimap.md, „Bedienung“, und docs/wegpunkte.md.
+ * ein altes Rechteck; eigene Formen bauen, auch auf leerer Karte, ihre Ecken treffen, löschen, einfügen und verschieben, anheften und löschen. Siehe docs/minimap.md, „Bedienung“, und docs/wegpunkte.md.
  */
 public final class Bedienung implements FabricClientGameTest {
 
@@ -134,6 +134,8 @@ public final class Bedienung implements FabricClientGameTest {
         form(context, maus, k);
         formImTempo(context, maus, k);
         zweiMarkenImTempo(context, maus, k);
+        formAufLeererKarte(context, maus, k);
+        eckenBearbeiten(context, maus, k);
         ebenen(context, maus, k);
         zumSpieler(context, maus, k);
         optionen(context, maus, k);
@@ -406,13 +408,13 @@ public final class Bedienung implements FabricClientGameTest {
             ]}}""";
 
     /**
-     * Formen aus Wegpunkten wie ein Spieler, über einer grossen Region vom Server mit Tafel, wie auf einem
-     * Server mit Ländern: drei Wegpunkte über „Wegpunkt setzen“, auf dem ersten „Punkt hinzufügen“, dann
+     * Eigene Formen auf Wegpunkten wie ein Spieler, über einer grossen Region vom Server mit Tafel, wie auf einem
+     * Server mit Ländern: drei Wegpunkte über „Wegpunkt setzen“, auf dem ersten „Linie/Region von hier“, dann
      * Linksklicks auf den dritten, den zweiten und den ersten: eine Region. Zwei weitere, „Punkt
-     * hinzufügen“, Linksklick, „Form fertig“: eine Linie. Ein Doppelklick in die Region heftet sie an, nicht
+     * von hier“, Linksklick, „Form fertig“: eine Linie. Ein Doppelklick in die Region heftet sie an, nicht
      * die Region vom Server darunter; „Form löschen“ löscht sie. Jeder Klick fährt wie die Hand in
-     * Schritten hin, ruht, drückt, hält und lässt los (`spielerKlick`); so geht nach „Punkt hinzufügen“ die
-     * Tafel der Region auf, wo das Menü war. Siehe docs/wegpunkte.md, „Formen aus Wegpunkten“.
+     * Schritten hin, ruht, drückt, hält und lässt los (`spielerKlick`); so geht nach „Linie/Region von hier“ die
+     * Tafel der Region auf, wo das Menü war. Siehe docs/wegpunkte.md, „Eigene Formen“.
      */
     private static void form(ClientGameTestContext context, TestInput maus, int k) {
         Tafeln.fragen = z -> true;
@@ -459,16 +461,16 @@ public final class Bedienung implements FabricClientGameTest {
         }
         int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
 
-        // Region aus drei Punkten: auf dem ersten „Punkt hinzufügen“; die Tafel der Region geht auf, wo das Menü war.
+        // Region aus drei Punkten: auf dem ersten „Linie/Region von hier“; die Tafel der Region geht auf, wo das Menü war.
         // Dann Linksklicks auf den dritten, rechts unter dem Menü, den zweiten und den ersten.
         Karte.Marke a = marke(context, neu.get(0));
-        eintrag(context, maus, k, a.x(), a.y(), "heroicmap.karte.punkt_hinzu");
+        eintrag(context, maus, k, a.x(), a.y(), "heroicmap.karte.form_von_hier");
         tafelDerRegion(context);
         int[] reihe = {2, 1, 0};
         for (int j = 0; j < reihe.length; j++) {
             Karte.Marke m = marke(context, neu.get(reihe[j]));
             spielerKlick(context, maus, k, m.x(), m.y());
-            List<Integer> zug = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug());
+            List<Wegpunkte.Ecke> zug = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug());
             if (j < 2 && (zug == null || zug.size() != j + 2)) {
                 throw new AssertionError("Linksklick auf einen Wegpunkt fügte ihn nicht an: im Bau " + zug + ", Tafel offen "
                         + context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelOffen()));
@@ -476,22 +478,22 @@ public final class Bedienung implements FabricClientGameTest {
         }
         Wegpunkte.EigeneForm region = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size() == formen + 1
                 ? Wegpunkte.INSTANZ.eigeneFormen().getLast() : null);
-        if (region == null || !region.region() || region.punkte().size() != 3
+        if (region == null || !region.region() || region.ecken().size() != 3
                 || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug()) != null) {
             throw new AssertionError("Linksklick auf den ersten Punkt schloss keine Region: " + region);
         }
 
-        // Linie aus zwei Punkten: „Punkt hinzufügen“, Linksklick auf den zweiten, dann „Form fertig“.
+        // Linie aus zwei Punkten: „Linie/Region von hier“, Linksklick auf den zweiten, dann „Form fertig“.
         warte250();
         Karte.Marke d = marke(context, neu.get(3));
-        eintrag(context, maus, k, d.x(), d.y(), "heroicmap.karte.punkt_hinzu");
+        eintrag(context, maus, k, d.x(), d.y(), "heroicmap.karte.form_von_hier");
         warte250();
         tafelDerRegion(context);
         Karte.Marke e = marke(context, neu.get(4));
         spielerKlick(context, maus, k, e.x(), e.y());
         eintrag(context, maus, k, mx + 60, my + 40, "heroicmap.karte.form_fertig");
         Wegpunkte.EigeneForm linie = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().getLast());
-        if (linie.region() || linie.punkte().size() != 2) {
+        if (linie.region() || linie.ecken().size() != 2) {
             throw new AssertionError("„Form fertig“ mit zwei Punkten gab keine Linie: " + linie);
         }
 
@@ -536,10 +538,10 @@ public final class Bedienung implements FabricClientGameTest {
     }
 
     /**
-     * Punkte im Tempo eines Spielers (mod#112): „Punkt hinzufügen“ auf dem ersten Wegpunkt, dann Linksklicks auf drei
+     * Punkte im Tempo eines Spielers (mod#112): „Linie/Region von hier“ auf dem ersten Wegpunkt, dann Linksklicks auf drei
      * weitere, je 150 bis 300 ms nach dem vorigen Drücken, der erste davon nah am vorigen Punkt. Das Spiel meldet einen
      * Doppelklick nach Zeit und Taste, nicht nach dem Ort; jeder Klick muss trotzdem anfügen. Siehe docs/wegpunkte.md,
-     * „Formen aus Wegpunkten“.
+     * „Eigene Formen“.
      */
     private static void formImTempo(ClientGameTestContext context, TestInput maus, int k) {
         int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
@@ -561,13 +563,13 @@ public final class Bedienung implements FabricClientGameTest {
         List<Wegpunkte.Punkt> neu = context.computeOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.punkte().subList(vorher, vorher + 4)));
         try {
             List<Karte.Marke> marken = neu.stream().map(p -> marke(context, p)).toList();
-            long druck = eintrag(context, maus, k, marken.get(0).x(), marken.get(0).y(), "heroicmap.karte.punkt_hinzu");
+            long druck = eintrag(context, maus, k, marken.get(0).x(), marken.get(0).y(), "heroicmap.karte.form_von_hier");
             // Der erste nach dem Klick auf den Eintrag, dem zwei Ticks folgen; die nächsten schneller.
             long[] pausen = {300, 220, 200};
             for (int i = 1; i < 4; i++) {
                 Karte.Marke m = marken.get(i);
                 long jetzt = tempoKlick(context, maus, k, m.x(), m.y(), druck, pausen[i - 1]);
-                List<Integer> zug = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug());
+                List<Wegpunkte.Ecke> zug = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug());
                 if (zug == null || zug.size() != i + 1) {
                     throw new AssertionError("Linksklick " + (jetzt - druck) + " ms nach dem vorigen fügte Punkt " + (i + 1)
                             + " nicht an: im Bau " + zug + ", angeheftet " + neu.stream().filter(p -> angeheftet(context, p)).count());
@@ -580,6 +582,165 @@ public final class Bedienung implements FabricClientGameTest {
             context.waitTick();
             context.runOnClient(mc -> neu.forEach(Wegpunkte.INSTANZ::loesche));
             context.waitTicks(2);
+        }
+    }
+
+    /**
+     * Der Weg des Users (mod#112): „Linie/Region von hier“ auf leerer Karte, dann drei Linksklicks auf leere Stellen im
+     * Tempo eines Spielers, 300, 220 und 200 ms nach dem vorigen Drücken, und einer auf die erste Ecke: eine Region mit
+     * vier eigenen Ecken, ohne neuen Wegpunkt. Siehe docs/wegpunkte.md, „Eigene Formen“.
+     */
+    private static void formAufLeererKarte(ClientGameTestContext context, TestInput maus, int k) {
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+        double mx = breite / 2.0, my = hoehe / 2.0;
+        double[][] orte = {{mx - 120, my + 40}, {mx - 60, my + 40}, {mx - 60, my + 90}, {mx - 120, my + 90}};
+        frei(context, orte);
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        try {
+            long druck = eintrag(context, maus, k, orte[0][0], orte[0][1], "heroicmap.karte.form_von_hier");
+            long[] pausen = {300, 220, 200};
+            for (int i = 1; i < 4; i++) {
+                long jetzt = tempoKlick(context, maus, k, orte[i][0], orte[i][1], druck, pausen[i - 1]);
+                List<Wegpunkte.Ecke> zug = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug());
+                if (zug == null || zug.size() != i + 1) {
+                    throw new AssertionError("Linksklick auf leere Karte " + (jetzt - druck) + " ms nach dem vorigen setzte Ecke " + (i + 1)
+                            + " nicht: im Bau " + zug);
+                }
+                druck = jetzt;
+            }
+            // Ein Klick nah an der ersten Ecke schliesst die Region.
+            tempoKlick(context, maus, k, orte[0][0] + 1, orte[0][1] + 1, druck, 300);
+            context.waitTicks(2);
+            List<Wegpunkte.EigeneForm> alle = context.computeOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()));
+            if (alle.size() != formen + 1 || !alle.getLast().region() || alle.getLast().ecken().size() != 4
+                    || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug()) != null) {
+                throw new AssertionError("Vier Klicks auf leere Karte gaben keine Region mit vier Ecken: " + (alle.size() > formen ? alle.getLast() : null));
+            }
+            if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size()) != punkte) {
+                throw new AssertionError("Ecken auf leerer Karte legten Wegpunkte an");
+            }
+        } finally {
+            warte250();
+            // Escape ohne Form im Bau schlösse die Karte.
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug()) != null) {
+                maus.pressKey(InputConstants.KEY_ESCAPE);
+                context.waitTick();
+            }
+            context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size())
+                    .forEach(Wegpunkte.INSTANZ::loesche));
+            context.waitTicks(2);
+        }
+    }
+
+    /**
+     * Ecken einer eigenen Form bearbeiten (mod#112): Zwei Ecken einen Block, also 4 Einheiten, auseinander; ein Rechtsklick
+     * zwischen ihnen, eine Einheit von der zweiten, trifft die zweite, nicht die erste, und „Eckpunkt löschen“ nimmt sie heraus. „Eckpunkt
+     * hinzufügen“ an der ersten und ein Linksklick setzen die neue Ecke zwischen die erste und die nächste. 700 ms gehalten
+     * hängt eine Ecke an der Maus und liegt nach dem Loslassen dort. Eine Linie mit zwei Ecken fällt beim Löschen einer weg.
+     * Siehe docs/wegpunkte.md, „Eigene Formen“.
+     */
+    private static void eckenBearbeiten(ClientGameTestContext context, TestInput maus, int k) {
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        // Links unter der Mitte, wo sonst nichts liegt; ein Block sind 4 Einheiten.
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        int bx = mitte[0] - 30, bz = mitte[1] + 12;
+        Wegpunkte.Ecke a = new Wegpunkte.Ecke(bx, bz), b = new Wegpunkte.Ecke(bx + 1, bz), c = new Wegpunkte.Ecke(bx + 8, bz + 6);
+        try {
+            context.runOnClient(mc -> {
+                String dimension = mc.level.dimension().identifier().toString();
+                Wegpunkte.INSTANZ.setzeForm(dimension, List.of(a, b, c));
+                Wegpunkte.INSTANZ.setzeForm(dimension, List.of(new Wegpunkte.Ecke(bx, bz + 14), new Wegpunkte.Ecke(bx + 10, bz + 14)));
+            });
+            context.waitTicks(2);
+            frei(context, new double[][] {ecke(context, formen, 0), ecke(context, formen, 2)});
+
+            // Zwischen beiden, eine Einheit von der zweiten und drei von der ersten, beide in Reichweite: Die nähere zählt.
+            double[] erste0 = ecke(context, formen, 0), zweite = ecke(context, formen, 1);
+            if (Math.abs(zweite[0] - erste0[0] - 4) > 0.5 || Math.abs(zweite[1] - erste0[1]) > 0.5) {
+                throw new AssertionError("Die Ecken liegen nicht 4 Einheiten nebeneinander: " + Arrays.toString(erste0) + ", " + Arrays.toString(zweite));
+            }
+            eintrag(context, maus, k, zweite[0] - 1, zweite[1], "heroicmap.karte.ecke_loeschen");
+            context.waitTicks(2);
+            List<Wegpunkte.Ecke> nachLoeschen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken());
+            if (!nachLoeschen.equals(List.of(a, c))) {
+                throw new AssertionError("„Eckpunkt löschen“ eine Einheit neben der zweiten Ecke: " + nachLoeschen + " statt " + List.of(a, c));
+            }
+
+            // An der ersten einfügen: Die neue kommt zwischen sie und die nächste, also an die zweite Stelle.
+            double[] erste = ecke(context, formen, 0);
+            eintrag(context, maus, k, erste[0], erste[1], "heroicmap.karte.ecke_hinzu");
+            double[] neuOrt = {erste[0] + 12, erste[1] + 40};
+            frei(context, new double[][] {neuOrt});
+            tempoKlick(context, maus, k, neuOrt[0], neuOrt[1], 0, 0);
+            eintrag(context, maus, k, neuOrt[0] + 30, neuOrt[1], "heroicmap.karte.form_fertig");
+            context.waitTicks(2);
+            List<Wegpunkte.Ecke> nachEinfuegen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken());
+            if (nachEinfuegen.size() != 3 || !nachEinfuegen.get(0).equals(a) || !nachEinfuegen.get(2).equals(c)) {
+                throw new AssertionError("„Eckpunkt hinzufügen“ an der ersten Ecke: " + nachEinfuegen + ", die neue gehört zwischen " + a + " und " + c);
+            }
+
+            // Die letzte Ecke 700 ms halten, 10 Einheiten nach rechts ziehen, loslassen: 2 bis 3 Blöcke nach Osten.
+            warte250();
+            double[] letzte = ecke(context, formen, 2);
+            maus.setCursorPos(letzte[0] * k, letzte[1] * k);
+            context.waitTick();
+            long druck = Util.getMillis();
+            maus.holdMouse(LINKS);
+            zittereBis(context, maus, letzte[0] * k, letzte[1] * k, druck + 700);
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eckeHaengt()) == null) {
+                maus.releaseMouse(LINKS);
+                throw new AssertionError("Nach " + (Util.getMillis() - druck) + " ms gehalten hängt die Ecke nicht an der Maus");
+            }
+            for (int i = 0; i < 4; i++) {
+                maus.moveCursor(2.5 * k, 0);
+                context.waitTick();
+            }
+            maus.releaseMouse(LINKS);
+            context.waitTicks(2);
+            Wegpunkte.Ecke verschoben = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(2));
+            if (verschoben.x() - c.x() < 2 || verschoben.x() - c.x() > 3 || verschoben.z() != c.z()) {
+                throw new AssertionError("Gehaltene Ecke verschoben nach " + verschoben + " statt 2 bis 3 Blöcke östlich von " + c);
+            }
+
+            // Eine Linie mit zwei Ecken fällt beim Löschen einer weg.
+            warte250();
+            double[] linie = ecke(context, formen + 1, 0);
+            eintrag(context, maus, k, linie[0], linie[1], "heroicmap.karte.ecke_loeschen");
+            context.waitTicks(2);
+            if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size()) != formen + 1) {
+                throw new AssertionError("Die Linie mit zwei Ecken blieb nach „Eckpunkt löschen“");
+            }
+        } finally {
+            warte250();
+            context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size())
+                    .forEach(Wegpunkte.INSTANZ::loesche));
+            context.waitTicks(2);
+        }
+    }
+
+    /** Die Ecke {@code index} der eigenen Form Nummer {@code form} auf dem Schirm, wie zuletzt gezeichnet. */
+    private static double[] ecke(ClientGameTestContext context, int form, int index) {
+        return context.computeOnClient(mc -> {
+            Wegpunkte.EigeneForm f = Wegpunkte.INSTANZ.eigeneFormen().get(form);
+            Karte.EckeAn e = ((Karte) mc.gui.screen()).ecken().stream().filter(x -> x.form().equals(f) && x.index() == index).findFirst()
+                    .orElseThrow(() -> new AssertionError("Keine Ecke " + index + " von " + f + " auf dem Schirm"));
+            return new double[] {e.x(), e.y()};
+        });
+    }
+
+    /** Wirft, wenn bei einem der Orte eine Marke liegt; der Test braucht dort freie Karte. */
+    private static void frei(ClientGameTestContext context, double[][] orte) {
+        for (double[] o : orte) {
+            boolean frei = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).marken().stream()
+                    .noneMatch(m -> Math.abs(m.x() - o[0]) < 10 && Math.abs(m.y() - o[1]) < 10));
+            if (!frei) {
+                throw new AssertionError("Eine Marke liegt bei " + o[0] + "," + o[1] + "; der Test braucht dort freie Karte");
+            }
         }
     }
 
@@ -621,15 +782,13 @@ public final class Bedienung implements FabricClientGameTest {
      * {@code vorig} drücken, 1 bis 2 Pixel zittern und im selben Frame loslassen. Gibt die Zeit des Drückens. Der Zeiger
      * kommt einen Tick vor dem Drücken an: Die Bewegung verbucht das Spiel erst im nächsten Frame, mit gedrückter Taste
      * als Ziehen. Nur dieser eine Tick liegt zwischen zwei Klicks, so reicht die Zeit auch auf einem langsamen Runner.
-     * Mit {@code pauseMs} 0 drückt er gleich nach dem Ankommen.
+     * Mit {@code pauseMs} 0, oder wenn die Pause schon um ist, drückt er gleich nach dem Ankommen.
      */
     private static long tempoKlick(ClientGameTestContext context, TestInput maus, int k, double x, double y, long vorig, long pauseMs) {
         maus.setCursorPos(x * k, y * k);
         context.waitTick();
         long jetzt = Util.getMillis();
-        if (pauseMs > 0 && jetzt - vorig > pauseMs) {
-            throw new AssertionError("Für das Tempo eines Spielers zu spät: " + (jetzt - vorig) + " ms statt " + pauseMs + " ms");
-        }
+        // Kommt der Zeiger auf einem langsamen Rechner später an, drückt er gleich; anfügen muss der Klick trotzdem.
         schlafe(Math.max(0, vorig + pauseMs - jetzt));
         long druck = Util.getMillis();
         maus.holdMouse(LINKS);
@@ -706,7 +865,9 @@ public final class Bedienung implements FabricClientGameTest {
         if (zeile < 0) {
             throw new AssertionError("Kein Eintrag „" + text + "“ in " + alle);
         }
-        maus.moveCursor(6 * k, (zeile * 14 + 6) * k);
+        // Am Rand des Schirms rückt das Menü nach innen; geklickt wird, wo es steht.
+        int[] lage = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).menueLage());
+        maus.setCursorPos((lage[0] + 6) * k, (lage[1] + zeile * 14 + 6) * k);
         context.waitTick();
         long druck = Util.getMillis();
         maus.pressMouse(LINKS);
