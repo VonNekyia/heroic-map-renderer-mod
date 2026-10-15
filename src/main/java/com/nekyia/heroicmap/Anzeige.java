@@ -11,7 +11,7 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
 /**
- * Das Untermenü „Einstellungen …“ für Vorlieben der Anzeige: Form, Auflösung, Chunklinien, Drehen, Verzierungen, Effekte in der
+ * Das Untermenü „Einstellungen …“ für Vorlieben der Anzeige: Form, Bei F3, Auflösung, Chunklinien, Drehen, Verzierungen, Effekte in der
  * Welt, die Ablage der Karten, die Koordinaten unter der Minimap und das Untermenü „Ebenen …“. Die Minimap im HUD bleibt sichtbar,
  * jede Wahl wirkt gleich; den Spieler und den Rahmen stellt ein Klick auf die Minimap ein ({@link MinimapKlick}).
  * Gespeichert wird beim Schliessen. Siehe docs/minimap.md, „Bedienung“.
@@ -33,14 +33,19 @@ final class Anzeige extends Screen {
         Minimap m = Minimap.INSTANZ;
         int[] s = Einstellungen.spalte(width, height);
         int x = s[0], breite = s[1], y = oben();
+        // Je zwei Schalter teilen sich eine Zeile, so passt das Untermenü auch bei 240 Einheiten Höhe.
+        int halb = (breite - 4) / 2;
         addRenderableWidget(CycleButton.booleanBuilder(Component.translatable("heroicmap.menue.rund"),
                         Component.translatable("heroicmap.menue.eckig"), m.rund())
-                .create(x, y, breite, 20, Component.translatable("heroicmap.menue.form"), (b, rund) -> m.setzeRund(rund)));
+                .create(x, y, halb, 20, Component.translatable("heroicmap.menue.form"), (b, rund) -> m.setzeRund(rund)));
+        addRenderableWidget(CycleButton.builder((Minimap.BeiF3 f) -> Component.translatable(
+                        "heroicmap.menue.bei_f3." + f.name().toLowerCase(Locale.ROOT)), m.beiF3())
+                .withValues(Minimap.BeiF3.values())
+                .withTooltip(f -> Tooltip.create(Component.translatable("heroicmap.menue.bei_f3.beschreibung")))
+                .create(x + breite - halb, y, halb, 20, Component.translatable("heroicmap.menue.bei_f3"), (b, f) -> m.setzeBeiF3(f)));
         addRenderableWidget(CycleButton.builder((Integer px) -> Component.translatable("heroicmap.menue.px", px), m.aufloesung())
                 .withValues(1, 2, 4, 8, 16)
                 .create(x, y + 24, breite, 20, Component.translatable("heroicmap.menue.massstab"), (b, px) -> m.setzeScale(px)));
-        // Je zwei Schalter teilen sich eine Zeile, so passt das Untermenü auch bei 240 Einheiten Höhe.
-        int halb = (breite - 4) / 2;
         addRenderableWidget(CycleButton.onOffBuilder(m.chunklinien())
                 .create(x, y + 48, halb, 20, Component.translatable("heroicmap.menue.chunklinien"), (b, an) -> m.setzeChunklinien(an)));
         addRenderableWidget(CycleButton.onOffBuilder(m.drehen())

@@ -49,6 +49,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [0021](entscheidungen/0021-erster-download-als-strom.md): Der volle Download als ein Strom, ZIP ohne Kompression vom Renderer, früh sichtbar ab der gröbsten Stufe, Fortsetzen mit `nach`; Abgleich weiter einzeln.
 - [0014](entscheidungen/0014-eigene-karte-mit-massstab.md): Die eigene Karte mit 1, 2 oder 4 Pixeln je Block, fest bis zum Löschen, der Baum wie ein Download; löst 0004 im Massstab ab.
 - [0015](entscheidungen/0015-ordner-fuer-einzelspielerwelten.md): Ein Ordner der Welt auch im Einzelspieler, unter heroicmap/ nach Speicherordner und Hash, nicht im Speicherordner der Welt; löst 0004 im Einzelspieler ab.
+- [0022](entscheidungen/0022-marken-nach-aussen.md): Bei „kompass“ und „biom“ zeigt das Bild jeder Marke von der Mitte weg, genordet wie gedreht; die anderen Skins bleiben starr.
 
 ## Messungen
 

@@ -33,6 +33,9 @@ class SkinTest {
         assertEquals(0xFF4F4D4D, s.schatten[1]);
         assertFalse(s.mitSchatten);
         assertTrue(Skin.lies("t", "#000000\n#111111", "schatten=ja", 7).mitSchatten);
+        // aussen=ja wie bei „kompass“: Die Marken zeigen gedreht nach aussen; ohne den Schalter drehen sie starr mit.
+        assertTrue(Skin.lies("t", "#000000\n#111111", "schatten=ja\naussen=ja\n", 7).nachAussen);
+        assertFalse(Skin.lies("t", "#000000\n#111111", "schatten=ja", 7).nachAussen);
         assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000", "", 7));
         assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000 #111111 #222222", "", 7));
         assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#00000", "", 7));
