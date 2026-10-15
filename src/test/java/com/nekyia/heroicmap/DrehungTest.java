@@ -305,23 +305,30 @@ class DrehungTest {
     }
 
     @Test
-    void kompassMarkenZeigenNachAussen() {
-        // Mit aussen, wie bei „kompass“: um 30° gedreht wandern die Marken wie sonst, eckig steht ihr Bild aber aufrecht,
-        // senkrecht zur Seite; rund zeigt es starr mit der Karte schon nach aussen.
+    void markenZeigenNachAussen() {
+        // Mit aussen, wie bei „kompass“ und „biom“: Jedes Bild zeigt von der Mitte weg. Die Liste ist O, S, W, N; O, S und W
+        // nehmen marke, um 90°, 180° und 270° weiter als N, genordet wie gedreht. Die Lage bleibt dieselbe.
         Minimap.Rahmen r = new Minimap.Rahmen(10, 20, 128);
-        Drehung.Lage lage = Drehung.Lage.von(Math.toRadians(30), 0, 0, 0, 0);
-        List<Minimap.Ornament> starr = Minimap.ornamente(r, 2, false, false, lage, 2, true, -1, false, -1);
-        List<Minimap.Ornament> eckig = Minimap.ornamente(r, 2, false, true, lage, 2, true, -1, false, -1);
-        assertEquals(4, eckig.size());
-        for (int i = 0; i < 4; i++) {
-            assertEquals(starr.get(i).x(), eckig.get(i).x());
-            assertEquals(starr.get(i).y(), eckig.get(i).y());
-            assertEquals(Math.toRadians(30), starr.get(i).winkel(), 1e-12);
-            assertEquals(0, eckig.get(i).winkel());
+        double[] viertel = {Math.PI / 2, Math.PI, 3 * Math.PI / 2, 0};
+        for (boolean rund : new boolean[] {false, true}) {
+            for (Drehung.Lage lage : new Drehung.Lage[] {null, Drehung.Lage.von(Math.toRadians(30), 0, 0, 0, 0)}) {
+                double grund = lage == null ? 0 : Math.toRadians(30);
+                List<Minimap.Ornament> starr = Minimap.ornamente(r, 2, rund, false, lage, 2, true, -1, false, -1);
+                List<Minimap.Ornament> aussen = Minimap.ornamente(r, 2, rund, true, lage, 2, true, -1, false, -1);
+                assertEquals(List.of(Skin.MARKE, Skin.MARKE, Skin.MARKE, Skin.NORDEN), aussen.stream().map(Minimap.Ornament::teil).toList());
+                for (int i = 0; i < 4; i++) {
+                    assertEquals(starr.get(i).x(), aussen.get(i).x());
+                    assertEquals(starr.get(i).y(), aussen.get(i).y());
+                    assertEquals(grund, starr.get(i).winkel(), 1e-12);
+                    assertEquals(grund + viertel[i], aussen.get(i).winkel(), 1e-12, "Marke " + i + ", rund " + rund + ", " + lage);
+                    // Das Bild zeigt dorthin, wo die Marke von der Mitte aus liegt: sein Oben ist die Richtung von der Mitte zu ihr.
+                    double richtung = Math.atan2(aussen.get(i).y() - 84, aussen.get(i).x() - 74) + Math.PI / 2;
+                    assertEquals(0, Math.sin(richtung - aussen.get(i).winkel()), 0.02);
+                }
+            }
         }
-        for (Minimap.Ornament o : Minimap.ornamente(r, 2, true, true, lage, 2, true, -1, false, -1)) {
-            assertEquals(Math.toRadians(30), o.winkel(), 1e-12);
-        }
+        // Die Marke unter der Maus nimmt auch nach aussen ihr Bild _aktiv, hier S.
+        assertEquals(Skin.MARKE + 1, Minimap.ornamente(r, 2, false, true, null, 2, true, -1, false, 2).get(1).teil());
     }
 
     @Test

@@ -60,7 +60,7 @@ final class Skin {
     /** Je Band von aussen nach innen: die Farbe oben und links, die unten und rechts. */
     final int[] licht, schatten;
     final boolean mitSchatten;
-    /** Zeigen die Marken gedreht nach aussen, eckig also aufrecht, statt starr mit der Karte? Siehe docs/rahmen.md, „Drehen“. */
+    /** Zeigt das Bild jeder Marke von der Mitte weg, statt alle gleich mit der Karte nach Norden? Siehe docs/rahmen.md, „Nach aussen“. */
     final boolean nachAussen;
     /** Die längere Seite der grössten Marke, in Pixeln. */
     final int groesste;
@@ -314,16 +314,20 @@ final class Skin {
     }
 
     /**
-     * Das Bild mit der Mitte auf (px, py): ungedreht auf ganzen Einheiten ({@link #lage}), gedreht
-     * starr um seine Mitte; dann werden die Kanten treppig wie die der gedrehten Karte.
+     * Das Bild mit der Mitte auf (px, py): ungedreht und um ganze Vierteldrehungen auf ganzen Einheiten
+     * ({@link #lage}), sonst starr um seine Mitte gedreht; dann werden die Kanten treppig wie die der gedrehten Karte.
      */
     private static void blit(GuiGraphicsExtractor g, TextureAtlasSprite s, double px, double py, double winkel,
             float u0, float u1, float v0, float v1, int farbe) {
         int w = s.contents().width(), h = s.contents().height();
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
-        if (winkel == 0) {
-            pose.translate(lage(px, w), lage(py, h));
+        long viertel = Math.round(winkel / (Math.PI / 2));
+        if (Math.abs(winkel - viertel * Math.PI / 2) < 1e-9) {
+            // Quer gedreht liegt der Kasten des Bildes mit vertauschten Seiten auf ganzen Einheiten, dann dreht es um dessen Mitte.
+            boolean quer = (viertel & 1) != 0;
+            int bw = quer ? h : w, bh = quer ? w : h;
+            pose.translate(lage(px, bw) + bw / 2f, lage(py, bh) + bh / 2f).rotate((float) (viertel * Math.PI / 2)).translate(-w / 2f, -h / 2f);
         } else {
             pose.translate((float) px, (float) py).rotate((float) winkel).translate(-w / 2f, -h / 2f);
         }

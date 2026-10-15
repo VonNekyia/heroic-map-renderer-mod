@@ -1186,18 +1186,19 @@ public final class Minimap {
      * Was der Rahmen über den Bändern zeichnet, in dieser Reihenfolge: mit {@code marken} die Marken
      * O, S, W, N auf der Mitte der Bänder, ungedreht fest rechts, unten, links und oben, gedreht starr
      * mit der Karte, die Marke {@code hervor} (0 bis 3, N, O, S, W) aktiv; im Menü zuletzt der Griff an seiner
-     * Ecke, nie gedreht. In den Ecken sonst nichts. Mit {@code aussen} stehen die Bilder eckig aufrecht,
-     * senkrecht zu ihrer Seite; rund zeigt starr mit der Karte schon nach aussen. Siehe docs/rahmen.md, „Marken“.
+     * Ecke, nie gedreht. In den Ecken sonst nichts. Mit {@code aussen} zeigt jedes Bild von der Mitte weg:
+     * O, S und W nehmen {@code marke}, um eine, zwei und drei Vierteldrehungen weiter. Siehe docs/rahmen.md, „Marken“.
      */
     static List<Ornament> ornamente(Rahmen r, int baender, boolean rund, boolean aussen, Drehung.Lage lage, int k, boolean marken,
             int griffEcke, boolean griffAktiv, int hervor) {
         List<Ornament> aus = new ArrayList<>(5);
         if (marken) {
-            double winkel = lage == null || aussen && !rund ? 0 : lage.winkel();
+            double winkel = lage == null ? 0 : lage.winkel();
             for (int i : MARKEN) {
                 double[] p = lage == null ? Skin.marke(r.x(), r.y(), r.seite(), baender, rund, RICHTUNGEN[i][0], RICHTUNGEN[i][1])
                         : verzierung(r, baender, rund, lage, RICHTUNGEN[i], k);
-                aus.add(new Ornament(Skin.MARKE_JE_RICHTUNG[i] + (i == hervor ? 1 : 0), 0, p[0], p[1], winkel));
+                int teil = aussen && i != 0 ? Skin.MARKE : Skin.MARKE_JE_RICHTUNG[i];
+                aus.add(new Ornament(teil + (i == hervor ? 1 : 0), 0, p[0], p[1], aussen ? winkel + i * Math.PI / 2 : winkel));
             }
         }
         if (griffEcke >= 0) {

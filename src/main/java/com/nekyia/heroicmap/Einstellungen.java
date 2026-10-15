@@ -172,7 +172,7 @@ final class Einstellungen extends Screen {
         klick.zeichne(g, font, mausX, mausY, frei);
     }
 
-    /** Über der Minimap die Koordinaten des Blocks unter der Maus, fest unten links, genau wie gezeichnet. */
+    /** Über der Minimap die Koordinaten des Blocks unter der Maus, fest unten links, genau wie gezeichnet: im Menü immer genordet. */
     private void koordinaten(GuiGraphicsExtractor g, Minimap.Rahmen r, int mausX, int mausY) {
         Minimap m = Minimap.INSTANZ;
         double h = r.seite() / 2.0, dx = mausX - (r.x() + h), dz = mausY - (r.y() + h);
@@ -185,12 +185,6 @@ final class Einstellungen extends Screen {
         int k = minecraft.getWindow().getGuiScale(), n = r.seite() * k, block = m.zoom() * k;
         int links = Minimap.ecke(p.xo, p.getX(), a, m.zoom(), k, n), oben = Minimap.ecke(p.zo, p.getZ(), a, m.zoom(), k, n);
         double ix = (mausX - r.x()) * k, iy = (mausY - r.y()) * k;
-        if (m.drehen()) {
-            // Gedreht zurück ins Bild, wie Minimap.zeichne es dreht. Siehe docs/minimap.md, „Drehen“.
-            Drehung.Lage lage = Minimap.lage(r, Mth.lerp(a, p.xo, p.getX()), Mth.lerp(a, p.zo, p.getZ()), p.getViewYRot(a), m.zoom(), k, links, oben);
-            ix = lage.bildX(mausX * k, mausY * k);
-            iy = lage.bildY(mausX * k, mausY * k);
-        }
         int bx = Mth.floor((links + ix) / block), bz = Mth.floor((oben + iy) / block);
         g.text(font, Component.translatable("heroicmap.koordinaten", bx, bz), 4, height - 12, TEXT);
     }
