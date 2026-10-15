@@ -21,6 +21,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
+import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
 import net.minecraft.client.MouseHandler;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.core.BlockPos;
@@ -76,6 +77,7 @@ public final class Bedienung implements FabricClientGameTest {
             }
             aussehen(context, maus, k);
             context.runOnClient(mc -> mc.gui.setScreen(null));
+            beiF3(context, maus);
 
             karte(context, maus, k);
             teleport(context, spiel.getServer(), maus, k);
@@ -1148,7 +1150,7 @@ public final class Bedienung implements FabricClientGameTest {
 
     /**
      * Das Aussehen an der Minimap im Menü, mit Handklicks: Ein Klick auf den Spieler schaltet die Darstellung, einer auf
-     * eine Marke den Rahmen, auch gedreht, mit Verzierungen aus und ohne Rahmen; ein Klick daneben nichts. Ziehen von
+     * eine Marke den Rahmen, auch mit Drehen an, wo das Menü genordet bleibt, mit Verzierungen aus und ohne Rahmen; ein Klick daneben nichts. Ziehen von
      * einer Marke verschiebt nur, der Griff ändert nur die Grösse, der Zoom nur den Zoom. Im Untermenü dasselbe.
      * Siehe docs/minimap.md, „Aussehen an der Minimap“.
      */
@@ -1174,7 +1176,7 @@ public final class Bedienung implements FabricClientGameTest {
         spielerKlick(context, maus, k, cx, r.y() + baender(context) / 2.0);
         aussehenIst(context, Minimap.Darstellung.PFEIL, "papier", "Klick auf N");
 
-        // Gedreht, mit Blick nach Süden: Oben steht S.
+        // Drehen an, mit Blick nach Süden: Im Menü steht die Minimap genordet still, oben bleibt N. Gedreht wanderten die Marken über den Griff.
         context.runOnClient(mc -> {
             Minimap.INSTANZ.setzeDrehen(true);
             mc.player.setYRot(0);
@@ -1184,11 +1186,11 @@ public final class Bedienung implements FabricClientGameTest {
         Minimap.Rahmen g = rahmen(context);
         double[] oben = {g.x() + g.seite() / 2.0, g.y() + baender(context) / 2.0};
         int ziel = context.computeOnClient(mc -> Minimap.INSTANZ.ziel(oben[0], oben[1]));
-        if (ziel != 2) {
-            throw new AssertionError("Gedreht mit Blick nach Süden ist oben nicht S, sondern " + ziel);
+        if (ziel != 0) {
+            throw new AssertionError("Im Menü dreht die Minimap: Mit Blick nach Süden ist oben nicht N, sondern " + ziel);
         }
         spielerKlick(context, maus, k, oben[0], oben[1]);
-        aussehenIst(context, Minimap.Darstellung.PFEIL, "kompass", "Klick auf S, gedreht");
+        aussehenIst(context, Minimap.Darstellung.PFEIL, "kompass", "Klick auf N, Drehen an, im Menü genordet");
 
         // Verzierungen aus: Das Menü zeigt die Marken halb, W links.
         context.runOnClient(mc -> {
@@ -1462,6 +1464,49 @@ public final class Bedienung implements FabricClientGameTest {
             }
             return null;
         });
+    }
+
+    /**
+     * Mit F3 wie von Hand geöffnet: „Bei F3“ auf Mitte rückt die Minimap waagrecht in die Mitte, weg blendet sie aus,
+     * bleibt lässt sie stehen; F3 noch einmal, und sie steht wieder, wo sie hingehört. Siehe docs/minimap.md, „Bei F3“.
+     */
+    private static void beiF3(ClientGameTestContext context, TestInput maus) {
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeBeiF3(Minimap.BeiF3.MITTE));
+        context.waitTicks(2);
+        Minimap.Rahmen r = rahmen(context);
+        Minimap.Rahmen ohne = context.computeOnClient(mc -> Minimap.INSTANZ.zuletzt());
+        if (!r.equals(ohne)) {
+            throw new AssertionError("Ohne F3 steht die Minimap nicht an ihrem Platz: " + ohne + " statt " + r);
+        }
+        maus.pressKey(InputConstants.KEY_F3);
+        context.waitTicks(2);
+        if (!context.computeOnClient(mc -> mc.debugEntries.isOverlayVisible())) {
+            throw new AssertionError("F3 öffnete den Debug-Bildschirm nicht");
+        }
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        Minimap.Rahmen mitte = context.computeOnClient(mc -> Minimap.INSTANZ.zuletzt());
+        if (!new Minimap.Rahmen((breite - r.seite()) / 2, r.y(), r.seite()).equals(mitte)) {
+            throw new AssertionError("Bei F3 auf Mitte steht die Minimap nicht waagrecht in der Mitte: " + mitte + ", ohne F3 " + r);
+        }
+        context.takeScreenshot(TestScreenshotOptions.of("f3-mitte").disableCounterPrefix());
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeBeiF3(Minimap.BeiF3.AUS));
+        context.waitTicks(2);
+        if (context.computeOnClient(mc -> Minimap.INSTANZ.zuletzt()) != null) {
+            throw new AssertionError("Bei F3 auf weg zeichnet die Minimap noch");
+        }
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeBeiF3(Minimap.BeiF3.BLEIBT));
+        context.waitTicks(2);
+        if (!r.equals(context.computeOnClient(mc -> Minimap.INSTANZ.zuletzt()))) {
+            throw new AssertionError("Bei F3 auf bleibt rückt die Minimap");
+        }
+        // Zu und wieder Mitte: Ohne F3 gilt die Wahl nicht.
+        maus.pressKey(InputConstants.KEY_F3);
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeBeiF3(Minimap.BeiF3.MITTE));
+        context.waitTicks(2);
+        if (context.computeOnClient(mc -> mc.debugEntries.isOverlayVisible()) || !r.equals(context.computeOnClient(mc -> Minimap.INSTANZ.zuletzt()))) {
+            throw new AssertionError("Nach F3 zu steht die Minimap nicht wieder an ihrem Platz");
+        }
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeBeiF3(Minimap.BeiF3.BLEIBT));
     }
 
     private static Minimap.Rahmen rahmen(ClientGameTestContext context) {

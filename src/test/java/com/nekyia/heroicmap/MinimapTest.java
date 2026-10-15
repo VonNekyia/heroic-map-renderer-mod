@@ -219,6 +219,26 @@ class MinimapTest {
     }
 
     @Test
+    void beiF3BleibtWegOderMitteUndGespeichert(@TempDir Path ordner) throws Exception {
+        // Oben rechts auf einem Schirm 427 breit: bleibt, weg, oder waagrecht in die Mitte auf derselben Höhe.
+        Minimap.Rahmen r = new Minimap.Rahmen(427 - 128 - 13, 13, 128);
+        assertEquals(r, Minimap.beiF3(r, Minimap.BeiF3.BLEIBT, 427));
+        assertNull(Minimap.beiF3(r, Minimap.BeiF3.AUS, 427));
+        assertEquals(new Minimap.Rahmen((427 - 128) / 2, 13, 128), Minimap.beiF3(r, Minimap.BeiF3.MITTE, 427));
+        // Vorgabe bleibt, wie bisher; jede Wahl übersteht Schreiben und Lesen.
+        assertEquals(Minimap.BeiF3.BLEIBT, new Minimap().beiF3());
+        Path datei = ordner.resolve("heroicmap.properties");
+        for (Minimap.BeiF3 f : Minimap.BeiF3.values()) {
+            Minimap m = new Minimap();
+            m.setzeBeiF3(f);
+            m.schreibe(datei);
+            Minimap neu = new Minimap();
+            neu.lies(datei);
+            assertEquals(f, neu.beiF3());
+        }
+    }
+
+    @Test
     void koordinatenUnterOderUeberDerMinimap() {
         // Mittig unter der Minimap; ganz unten am Schirm darüber.
         Minimap.Rahmen r = new Minimap.Rahmen(100, 10, 128);

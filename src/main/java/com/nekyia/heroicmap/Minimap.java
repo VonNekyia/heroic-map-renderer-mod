@@ -124,6 +124,12 @@ public final class Minimap {
     enum Koordinaten { AUS, XZ, XYZ }
 
     private Koordinaten koordinaten = Koordinaten.XZ;
+    /** Was die Minimap tut, solange der Debug-Bildschirm offen ist. Siehe docs/minimap.md, „Bei F3“. */
+    enum BeiF3 { BLEIBT, AUS, MITTE }
+
+    private BeiF3 beiF3 = BeiF3.BLEIBT;
+    /** Wo die Minimap im letzten Frame stand, oder null, wenn sie nicht zu sehen war; der Gametest fragt es ab. */
+    private Rahmen zuletzt;
     /** Wie der eigene Spieler aussieht, auf Minimap und Vollbildkarte. Siehe docs/minimap.md, „Spieler“. */
     enum Darstellung { KOPF, PFEIL, DURCHSICHTIG }
 
@@ -321,6 +327,18 @@ public final class Minimap {
 
     Koordinaten koordinaten() {
         return koordinaten;
+    }
+
+    BeiF3 beiF3() {
+        return beiF3;
+    }
+
+    Rahmen zuletzt() {
+        return zuletzt;
+    }
+
+    void setzeBeiF3(BeiF3 beiF3) {
+        this.beiF3 = beiF3;
     }
 
     void setzeKoordinaten(Koordinaten koordinaten) {
@@ -531,6 +549,11 @@ public final class Minimap {
             case "xyz" -> Koordinaten.XYZ;
             default -> Koordinaten.XZ;
         };
+        beiF3 = switch (String.valueOf(p.getProperty("bei_f3")).trim()) {
+            case "aus" -> BeiF3.AUS;
+            case "mitte" -> BeiF3.MITTE;
+            default -> BeiF3.BLEIBT;
+        };
         darstellung = switch (String.valueOf(p.getProperty("spieler")).trim()) {
             case "pfeil" -> Darstellung.PFEIL;
             case "durchsichtig" -> Darstellung.DURCHSICHTIG;
@@ -569,6 +592,7 @@ public final class Minimap {
         p.setProperty("chunklinien", Boolean.toString(chunklinien));
         p.setProperty("effekte", Boolean.toString(effekte));
         p.setProperty("koordinaten", koordinaten.name().toLowerCase(Locale.ROOT));
+        p.setProperty("bei_f3", beiF3.name().toLowerCase(Locale.ROOT));
         p.setProperty("spieler", darstellung.name().toLowerCase(Locale.ROOT));
         if (drehenGewaehlt) {
             p.setProperty("drehen_wahl", Boolean.toString(drehen));
@@ -689,12 +713,23 @@ public final class Minimap {
         menueMarken = List.of();
         menueSkin = null;
         spielerHalb = -1;
+        zuletzt = null;
         if (!sichtbar || spieler == null || level == null) {
             gibUmrissFrei();
             return;
         }
         // Vor arbeite: Die Seite bestimmt die Reichweite.
         Rahmen r = rahmen(g.guiWidth(), g.guiHeight());
+        boolean imMenue = mc.gui.screen() instanceof Einstellungen || mc.gui.screen() instanceof Anzeige;
+        // Im Menü steht sie, wo man sie hinzieht; nur im Spiel weicht sie dem Debug-Bildschirm. Siehe docs/minimap.md, „Bei F3“.
+        if (!imMenue && mc.debugEntries.isOverlayVisible()) {
+            r = beiF3(r, beiF3, g.guiWidth());
+            if (r == null) {
+                gibUmrissFrei();
+                return;
+            }
+        }
+        zuletzt = r;
         arbeite(mc, level, spieler);
 
         float a = anteil(level, spieler, zeit);
@@ -710,7 +745,8 @@ public final class Minimap {
             }
         }
         Skin rahmen = skinJetzt();
-        Drehung.Lage lage = drehen ? lage(r, Mth.lerp(a, spieler.xo, spieler.getX()), Mth.lerp(a, spieler.zo, spieler.getZ()),
+        // Im Menü genordet: Gedreht wanderten die Marken über den Griff. Siehe docs/minimap.md, „Drehen“.
+        Drehung.Lage lage = drehen && !imMenue ? lage(r, Mth.lerp(a, spieler.xo, spieler.getX()), Mth.lerp(a, spieler.zo, spieler.getZ()),
                 spieler.getViewYRot(a), zoom, k, links, oben) : null;
         // Ungedreht liegt das Bild auf dem Raster der Karte, gedreht dreht es um den Spieler; der Weg ist derselbe.
         Drehung.Lage bild = lage != null ? lage : Drehung.Lage.von(0, r.x() * k, r.y() * k, 0, 0);
@@ -754,7 +790,7 @@ public final class Minimap {
         float sx = lage == null ? (r.x() * k + n / 2) / (float) k : (float) (lage.cx() / k);
         float sy = lage == null ? (r.y() * k + n / 2) / (float) k : (float) (lage.cy() / k);
         avatar(g, spieler, sx, sy, a, kopf, lage != null, darstellung);
-        if (mc.gui.screen() instanceof Einstellungen || mc.gui.screen() instanceof Anzeige) {
+        if (imMenue) {
             // Ziele für Klicks im Menü. Ohne Marken am Rahmen zeichnet das Menü sie halb, bei „ohne“ die von „grau“ auf dem Umriss.
             spielerX = sx;
             spielerY = sy;
@@ -763,7 +799,7 @@ public final class Minimap {
             menueSkin = rahmen != null ? rahmen : Skin.von("grau");
             if (menueSkin != null) {
                 menueMarken = ornamente(rahmen != null ? r : new Rahmen(r.x() - 2, r.y() - 2, r.seite() + 4),
-                        rahmen != null ? rahmen.baender() : 1, rund, lage, k, true, -1, false, KEIN_ZIEL);
+                        rahmen != null ? rahmen.baender() : 1, rund, menueSkin.nachAussen, lage, k, true, -1, false, KEIN_ZIEL);
             }
         }
         Object[] werte = werte(koordinaten, spieler.getX(), spieler.getY(), spieler.getZ());
@@ -774,6 +810,18 @@ public final class Minimap {
             int[] wo = koordinatenLage(r, rahmen == null ? 1 : rand(), g.guiHeight(), breite, mc.font.lineHeight);
             g.text(mc.font, text, wo[0], wo[1], TEXT, true);
         }
+    }
+
+    /**
+     * Wo die Minimap steht, solange der Debug-Bildschirm offen ist: wie {@code r}, null für ausgeblendet,
+     * oder waagrecht in der Mitte des Schirms auf ihrer Höhe. Siehe docs/minimap.md, „Bei F3“.
+     */
+    static Rahmen beiF3(Rahmen r, BeiF3 wahl, int breite) {
+        return switch (wahl) {
+            case BLEIBT -> r;
+            case AUS -> null;
+            case MITTE -> new Rahmen((breite - r.seite()) / 2, r.y(), r.seite());
+        };
     }
 
     /** Die Zahlen unter der Minimap, die Blockkoordinaten des Spielers: keine, x und z, oder x, y und z. */
@@ -1125,7 +1173,7 @@ public final class Minimap {
         } else {
             skin.baender(g, r.x(), r.y(), r.seite(), r.seite(), baender);
         }
-        for (Ornament o : ornamente(r, skin.baender(), rund, lage, k, verzierungen, griffEcke, griffAktiv, hervor)) {
+        for (Ornament o : ornamente(r, skin.baender(), rund, skin.nachAussen, lage, k, verzierungen, griffEcke, griffAktiv, hervor)) {
             skin.ornament(g, o.teil(), o.ecke(), o.x(), o.y(), deckung, o.winkel());
         }
     }
@@ -1138,13 +1186,14 @@ public final class Minimap {
      * Was der Rahmen über den Bändern zeichnet, in dieser Reihenfolge: mit {@code marken} die Marken
      * O, S, W, N auf der Mitte der Bänder, ungedreht fest rechts, unten, links und oben, gedreht starr
      * mit der Karte, die Marke {@code hervor} (0 bis 3, N, O, S, W) aktiv; im Menü zuletzt der Griff an seiner
-     * Ecke, nie gedreht. In den Ecken sonst nichts. Siehe docs/rahmen.md, „Marken“.
+     * Ecke, nie gedreht. In den Ecken sonst nichts. Mit {@code aussen} stehen die Bilder eckig aufrecht,
+     * senkrecht zu ihrer Seite; rund zeigt starr mit der Karte schon nach aussen. Siehe docs/rahmen.md, „Marken“.
      */
-    static List<Ornament> ornamente(Rahmen r, int baender, boolean rund, Drehung.Lage lage, int k, boolean marken,
+    static List<Ornament> ornamente(Rahmen r, int baender, boolean rund, boolean aussen, Drehung.Lage lage, int k, boolean marken,
             int griffEcke, boolean griffAktiv, int hervor) {
         List<Ornament> aus = new ArrayList<>(5);
         if (marken) {
-            double winkel = lage == null ? 0 : lage.winkel();
+            double winkel = lage == null || aussen && !rund ? 0 : lage.winkel();
             for (int i : MARKEN) {
                 double[] p = lage == null ? Skin.marke(r.x(), r.y(), r.seite(), baender, rund, RICHTUNGEN[i][0], RICHTUNGEN[i][1])
                         : verzierung(r, baender, rund, lage, RICHTUNGEN[i], k);

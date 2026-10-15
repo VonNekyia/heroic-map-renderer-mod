@@ -60,17 +60,20 @@ final class Skin {
     /** Je Band von aussen nach innen: die Farbe oben und links, die unten und rechts. */
     final int[] licht, schatten;
     final boolean mitSchatten;
+    /** Zeigen die Marken gedreht nach aussen, eckig also aufrecht, statt starr mit der Karte? Siehe docs/rahmen.md, „Drehen“. */
+    final boolean nachAussen;
     /** Die längere Seite der grössten Marke, in Pixeln. */
     final int groesste;
     private final Identifier[] sprites = new Identifier[TEILE.length];
     private Identifier ring;
     private int ringSeite;
 
-    private Skin(String name, int[] licht, int[] schatten, boolean mitSchatten, int groesste) {
+    private Skin(String name, int[] licht, int[] schatten, boolean mitSchatten, boolean nachAussen, int groesste) {
         this.name = name;
         this.licht = licht;
         this.schatten = schatten;
         this.mitSchatten = mitSchatten;
+        this.nachAussen = nachAussen;
         this.groesste = groesste;
         for (int i = 0; i < TEILE.length; i++) {
             sprites[i] = sprite(name, TEILE[i]);
@@ -135,7 +138,7 @@ final class Skin {
 
     /**
      * Liest {@code palette.txt}: eine Zeile je Band von aussen nach innen, eine Farbe oder zwei,
-     * Licht und Schatten; {@code //} beginnt einen Kommentar. Aus {@code info.txt} nur {@code schatten}.
+     * Licht und Schatten; {@code //} beginnt einen Kommentar. Aus {@code info.txt} {@code schatten=ja} und {@code aussen=ja}.
      * {@code groesste} ist die längere Seite der grössten Marke in Pixeln. Mindestens zwei Bänder, siehe
      * docs/minimap.md, „Form“.
      */
@@ -157,7 +160,8 @@ final class Skin {
             throw new IllegalArgumentException("palette.txt mit weniger als 2 Bändern");
         }
         int[] licht = baender.stream().mapToInt(b -> b[0]).toArray(), schatten = baender.stream().mapToInt(b -> b[1]).toArray();
-        return new Skin(name, licht, schatten, info.lines().map(String::trim).anyMatch("schatten=ja"::equals), groesste);
+        List<String> schalter = info.lines().map(String::trim).toList();
+        return new Skin(name, licht, schatten, schalter.contains("schatten=ja"), schalter.contains("aussen=ja"), groesste);
     }
 
     private static int farbe(String text) {
