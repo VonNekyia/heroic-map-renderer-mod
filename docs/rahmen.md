@@ -127,7 +127,7 @@ Vorgabe.
   Kategorie rechnet sie nur neu, wenn sich das Biom ändert. Während der
   Überblendung zeichnet sie zwei Rahmen, siehe „Kosten“.
 
-![Der Rahmen „biom“ eckig und rund in der Szene des Gametests, einer Ebene, also Grasland](bilder/rahmen-biom.png)
+![Der Rahmen „biom“ eckig und rund in der Szene des Gametests, einer Ebene, also Grasland; die Blumen O, S und W zeigen nach aussen](bilder/rahmen-biom.png)
 
 ## Dateien
 
@@ -142,7 +142,9 @@ im Atlas des GUI; F3+T und Ressourcenpakete laden ihn neu:
   `#RRGGBB` oder zwei, Licht und Schatten; `//` beginnt einen Kommentar
   (`Skin.lies`). Der Atlas nimmt nur PNG, die Textdatei liegt daneben.
   Mindestens zwei Bänder, siehe [Minimap](minimap.md), „Form“.
-- **`info.txt`:** nur `schatten=ja` oder `schatten=nein`.
+- **`info.txt`:** `schatten=ja` oder `schatten=nein`; dazu `aussen=ja`,
+  wenn jedes Bild von der Mitte weg zeigen soll, siehe „Nach aussen“
+  (`Skin.lies`).
 - **Namen und Beschreibungen** stehen in `de_de.json` und `en_us.json`
   unter `heroicmap.rahmen.<skin>` und `heroicmap.rahmen.<skin>.beschreibung`.
 - **Ein neuer Skin** ist ein Ordner, ein Eintrag in `Skin.NAMEN` und zwei
@@ -175,8 +177,8 @@ im Atlas des GUI; F3+T und Ressourcenpakete laden ihn neu:
   (`Minimap.griffEcke`) der Griff, auf der Mitte der Bänder, eckig in der
   Ecke, rund bei 45° (`Skin.ecken`), unter der Maus oder beim Ziehen als
   `griff_aktiv`; greifen lässt er sich 9 × 9 Einheiten um seine Mitte
-  (`Minimap.imGriff`). Er steht immer fest, auch gedreht und mit dem
-  Schalter „Verzierungen“ aus, und liegt zuoberst. Der weisse Umriss
+  (`Minimap.imGriff`). Er steht immer fest, auch mit dem Schalter
+  „Verzierungen“ aus, und liegt zuoberst. Der weisse Umriss
   entfällt mit Rahmen; ohne Rahmen bleiben Umriss und weisser Griff wie
   bisher.
 - **Gespiegelt** für die anderen Ecken, gezeichnet ist er für unten rechts
@@ -209,7 +211,8 @@ dann die von „grau“, siehe „Im Menü“.
   gedreht wandern sie am Rahmen entlang, siehe „Drehen“.
 - **Bild:** fest je Richtung, N `norden`, S `marke`, O und W `marke_quer`
   (`Skin.MARKE_JE_RICHTUNG`); im Menü unter der Maus `_aktiv`. Es dreht mit, siehe
-  „Drehen“.
+  „Drehen“. Bei „kompass“ und „biom“ zeigt es von der Mitte weg, siehe
+  „Nach aussen“.
 - **Reihenfolge:** Bänder, die Marken, `norden` zuletzt, im Menü darüber
   der Griff.
 
@@ -231,6 +234,27 @@ Griff im Menü. So hat es der User gewünscht, siehe
   flimmern Texel am Rand, wie bei der gedrehten Karte. Ungedreht liegt
   alles auf ganzen Einheiten wie bisher.
 
+## Nach aussen
+
+Bei „kompass“ und allen Kategorien von „biom“ zeigt das Bild jeder Marke
+von der Mitte der Minimap weg, genordet wie gedreht; sonst zeigten alle
+gleich nach Norden, mit Blick nach Süden etwa alle nach unten. So hat es
+der User am 15.10. gewünscht, siehe
+[0022](entscheidungen/0022-marken-nach-aussen.md).
+
+- **Schalter:** `aussen=ja` in `info.txt` des Skins (`Skin.nachAussen`);
+  bei „biom“ in jeder Kategorie.
+- **Bild:** N `norden` wie bisher; O, S und W nehmen `marke`, gezeichnet
+  für oben, und drehen es um 90°, 180° und 270° weiter
+  (`Minimap.ornamente`). `marke_quer` bleibt bei diesen Skins ungenutzt.
+- **Lage** wie bei den anderen Skins, siehe „Marken“ und „Drehen“.
+- **Pixel:** Um ganze Vierteldrehungen gedreht liegt der Kasten des Bildes
+  mit vertauschten Seiten auf ganzen Einheiten wie ungedreht
+  (`Skin.blit`); genordet bleibt die Pixelkunst so scharf.
+- **Die anderen Skins** behalten ihre Marken starr mit der Karte: ihr
+  `norden` ist ein Buchstabe, `marke` und `marke_quer` sind Balken für
+  ihre Seite.
+
 ## Verzierungen
 
 Der Schalter „Verzierungen“ im Untermenü „Einstellungen …“, in der Zeile
@@ -249,7 +273,10 @@ Ein Klick auf eine Marke wechselt den Rahmen, siehe [Minimap](minimap.md),
   „Verzierungen“ aus oder bei „ohne“, zeichnet das Menü sie zu 50 %
   deckend, nur dort, nicht im HUD sonst (`Minimap.geister`). Mit Rahmen
   dessen Marken an ihrem Ort, bei „ohne“ die von „grau“ auf der Mitte des
-  Umrisses, 1,5 Einheiten ausserhalb der Karte, auch gedreht.
+  Umrisses, 1,5 Einheiten ausserhalb der Karte.
+- **Genordet:** Im Menü dreht die Minimap nicht, auch mit Drehen an, siehe
+  [Minimap](minimap.md), „Drehen“; sonst wanderten die Marken über den
+  Griff.
 - **Über dem Umriss:** Das Menü zeichnet die halben Marken zuletzt, nach dem
   weissen Umriss, der sonst durch sie liefe.
 - **Unter der Maus** nimmt die Marke ihr Bild `_aktiv`, die halbe dazu ganz

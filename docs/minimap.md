@@ -1,6 +1,6 @@
 ---
 title: Minimap
-description: Bedienung über das Menü hinter /hmap und das Untermenü „Einstellungen …“, das Aussehen per Klick auf Spieler und Marken, Chunklinien, Effekte in der Welt, Drehen mit der Blickrichtung, Koordinaten unter der Minimap, der eigene Spieler in drei Darstellungen, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
+description: Bedienung über das Menü hinter /hmap und das Untermenü „Einstellungen …“, das Aussehen per Klick auf Spieler und Marken, Chunklinien, Effekte in der Welt, Drehen mit der Blickrichtung, Koordinaten unter der Minimap, was sie bei F3 tut, der eigene Spieler in drei Darstellungen, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
 code:
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/ChunkMaler.java
@@ -57,11 +57,12 @@ steht unter „Kosten“.
 Das Untermenü „Einstellungen …“ hält, was man selten ändert; das Hauptmenü
 bleibt so kurz. „Fertig“ führt zurück ins Menü:
 
-![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien, halben Marken auf dem Ring und den Koordinaten darunter; „Chunklinien“ neben „Drehen“, unten „Ebenen …“ neben „Fertig“](bilder/anzeige.png)
+![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien, halben Marken auf dem Ring und den Koordinaten darunter; „Form“ neben „Bei F3“, „Chunklinien“ neben „Drehen“, unten „Ebenen …“ neben „Fertig“](bilder/anzeige.png)
 
 | Einstellung | Vorgabe | tut |
 |---|---|---|
 | Form | eckig | eckig oder rund, siehe „Form“ |
+| Bei F3 | bleibt | was die Minimap tut, solange der Debug-Bildschirm offen ist: bleibt, weg oder waagrecht in die Mitte, siehe „Bei F3“ |
 | Auflösung der Minimap | 2 px je Block | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet |
 | Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte, siehe „Chunklinien“ |
 | Drehen | an | die Minimap dreht mit der Blickrichtung, siehe „Drehen“ |
@@ -274,11 +275,15 @@ seit dem 10.10. als Vorgabe.
   mit `lage`), und liegen danach auf ganzen Pixeln, sonst flimmerten ihre
   Texel beim Drehen. Der eigene Kopf liegt auf der Mitte, auf ganzen Pixeln
   wie ungedreht; sein Pfeil zeigt nach oben.
-- **Im Menü** rechnet die Zeile mit den Koordinaten unter der Maus zurück
-  ins Bild.
-- **Mit Rahmen** drehen die Marken N, O, S, W starr mit, Lage und Bild;
-  der Schalter „Verzierungen“ stellt sie ab. Siehe [Rahmen](rahmen.md),
-  „Drehen“.
+- **Im Menü** von `/hmap` und im Untermenü steht die Minimap genordet
+  still, auch mit Drehen an (`Minimap.zeichne`): Gedreht wanderten die
+  Marken über den Griff in der Ecke. Die Zeile mit den Koordinaten unter
+  der Maus rechnet dort ungedreht (`Einstellungen.koordinaten`). So hat es
+  der User am 15.10. gewünscht.
+- **Mit Rahmen** drehen die Marken N, O, S, W mit, Lage und Bild; bei
+  „kompass“ und „biom“ zeigt jedes Bild von der Mitte weg. Der Schalter
+  „Verzierungen“ stellt sie ab. Siehe [Rahmen](rahmen.md), „Drehen“ und
+  „Nach aussen“.
 - **Kosten** je Frame, gemessen am 09.10. bei 4 px und Zoom 4, siehe
   [Minimap, Vieleck auch ungedreht](messungen/2026-10-09-minimap-vieleck.md):
   Drehen kostet im p50 eckig 0,011 ms und rund 0,009 ms Frametime im
@@ -303,6 +308,34 @@ im Debug-Bildschirm des Spiels (`Mth.floor`). So hat es der User gewünscht.
   ebenso über der Minimap (`Minimap.koordinatenLage`).
 - **Nicht gedreht:** Die Zeile bleibt waagrecht, auch wenn die Minimap
   dreht.
+
+## Bei F3
+
+Der Schalter „Bei F3“ im Untermenü „Einstellungen …“, neben „Form“, sagt,
+was die Minimap tut, solange der Debug-Bildschirm des Spiels offen ist;
+dessen Text steht oben links und rechts. So hat es der User am 15.10.
+gewünscht.
+
+| Wahl | gespeichert | tut |
+|---|---|---|
+| bleibt, die Vorgabe | `bleibt` | nichts ändert sich, wie bisher |
+| weg | `aus` | die Minimap ist ausgeblendet, samt Koordinaten |
+| Mitte | `mitte` | die Minimap rückt waagrecht in die Mitte des Schirms, auf ihrer Höhe, samt Koordinaten (`Minimap.beiF3`) |
+
+- **Gespeichert** als `bei_f3` in `heroicmap.properties`; ein anderer Wert
+  gilt als Vorgabe (`Minimap.BeiF3`).
+- **Offen** heisst: F3 hat den Debug-Bildschirm eingeblendet
+  (`DebugScreenEntryList.isOverlayVisible`). Einträge, die der Spieler
+  ohne F3 dauerhaft zeigt, zählen nicht; `DebugScreenOverlay.showDebugScreen`
+  wäre auch für sie wahr, belegt per javap an 26.3.
+- **Mitte** heisst waagrecht: Ganz in der Mitte läge die Minimap über dem
+  Fadenkreuz. Gemerkt wird die Lage nicht; ohne F3 steht sie wieder, wo
+  sie war.
+- **Im Menü** gilt die Wahl nicht; dort steht die Minimap, wo man sie
+  hinzieht.
+- **Weg** zeichnet keine Chunks vor, wie mit der Minimap aus.
+- **Der Gametest** `Bedienung` öffnet F3 mit der Taste und prüft alle drei
+  Wahlen (`Bedienung.beiF3`).
 
 ## Spieler
 

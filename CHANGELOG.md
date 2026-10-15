@@ -4,6 +4,12 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.41
+
+- **The frame ornaments face outward.** With the "Compass" and "Biome" frames, every marker now points away from the middle of the minimap instead of all pointing north, so looking south no longer turns them all upside down.
+- **The minimap stands still in the menu.** With "Rotate" on, it stays north-up while the menu is open, so the markers no longer wander over the resize handle.
+- **"With F3"** in "Settings …": while the debug screen is open, the minimap can stay, hide, or move to the middle of the screen at the same height.
+
 ## 0.2.40
 
 - **The first download of a map is one stream and takes minutes, not twenty.** With a map server that offers it, the mod fetches the whole map over a single connection; later updates still come tile by tile. Older map servers keep the old way.
