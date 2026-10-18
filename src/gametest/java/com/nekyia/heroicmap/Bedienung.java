@@ -1287,8 +1287,11 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("„Todespunkt löschen“ liess ihn stehen");
             }
             context.runOnClient(mc -> mc.gui.setScreen(null));
-            // Mit dem Schalter aus kein Todespunkt.
+            // Mit dem Schalter aus kein Todespunkt. Erst an eine freie Stelle: Am Ort des Respawns kann ein Wegpunkt eines
+            // früheren Schritts liegen, und dort gäbe es auch ohne Schalter keinen.
             context.runOnClient(mc -> Minimap.INSTANZ.setzeTodespunkt(false));
+            server.runCommand("tp @a 44.5 -60 -36.5");
+            context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - 44.5) < 0.1, 200);
             stirb(context, server);
             if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.tod()) != null) {
                 throw new AssertionError("Mit „Todespunkt“ aus setzte ein Tod einen");
