@@ -187,5 +187,7 @@
   "heroicmap.karte.ebene_neu_hinweis": "Enter: Ebene mit diesem Namen anlegen und hineinlegen; Esc bricht ab",
   "heroicmap.ebenen.neu": "Neue Ebene …",
   "heroicmap.ebenen.umbenennen": "Umbenennen",
-  "heroicmap.ebenen.loeschen": "Löschen; was in ihr liegt, kommt nach Base"
+  "heroicmap.ebenen.loeschen": "Löschen; was in ihr liegt, kommt nach Base",
+  "heroicmap.karte.base_aus": "Neues kommt nach Base, und Base ist aus; es steht erst, wenn du sie anschaltest",
+  "heroicmap.karte.wegpunkt_verborgen": "Dort liegt schon ein Wegpunkt, in einer Ebene, die aus ist"
 }

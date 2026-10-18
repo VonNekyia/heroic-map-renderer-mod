@@ -106,11 +106,11 @@ auf den Namen heftet die ganze Ebene an (mod#103).
 ![Vollbildkarte mit offener Liste der Ebenen: „Formen“ an und ganz angeheftet, mit dem bunten Punkt vor dem Namen, „Grenzen“ aus, „Grenzen der alten Königreiche“ an, ragt nach links über die Karte; Szene `formen` des Gametests](bilder/ebenen-liste.png)
 
 - **Knopf „Ebenen +“** unter „Zum Spieler“, nur, wenn der Server Ebenen
-  schickt oder es neben Base eine eigene Ebene gibt (`Karte.ebenen`). Er klappt die Liste auf, „Ebenen -“ klappt sie
+  schickt, es neben Base eine eigene Ebene gibt oder Base aus ist (`Karte.ebenen`). Er klappt die Liste auf, „Ebenen -“ klappt sie
   zu. Beim ersten Öffnen ist sie zu; offen oder zu merkt sich die Karte in
   `karte.properties` unter `ebenen`, siehe „Lage merken“
   (`Kartenlage.ebenenOffen`).
-- **Liste:** zuerst die eigenen Ebenen, Base vorn, wenn es neben Base eine gibt, siehe
+- **Liste:** zuerst die eigenen Ebenen, Base vorn, wenn es neben Base eine gibt oder Base aus ist, siehe
   [Wegpunkte](wegpunkte.md), „Eigene Ebenen“; dann je Ebene vom Server eine
   Zeile, die oberste zuerst, wie im Untermenü
   „Ebenen …“, siehe [Ebenen](ebenen.md), „Umschalten“; dieselbe Wahl.
