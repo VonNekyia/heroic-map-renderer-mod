@@ -37,6 +37,8 @@ final class EbenenMenue extends Screen {
     private boolean neuBauen;
     /** Wo der Hinweis ohne Ebenen vom Server steht: unter „Fertig“. */
     private int hinweisY;
+    /** Was Kopieren oder Einfügen zuletzt meldete, unter „Fertig“, oder null. */
+    private Component meldung;
 
     EbenenMenue(Screen zurueck) {
         super(Component.translatable("heroicmap.ebenen.titel"));
@@ -84,26 +86,48 @@ final class EbenenMenue extends Screen {
             return;
         }
         boolean base = e.id() == Wegpunkte.BASE;
-        int w = base ? breite : breite - 2 * (KLEIN + 4);
+        int w = breite - (base ? 1 : 3) * (KLEIN + 4);
         addRenderableWidget(CycleButton.onOffBuilder(e.an())
                 .create(x, y, w, 20, Component.literal(e.name()), (b, an) -> Wegpunkte.INSTANZ.schalteEbene(e.id(), an)));
+        // Als Code in die Zwischenablage, auch Base. Siehe docs/wegpunkte.md, „Ebenen teilen“.
+        addRenderableWidget(Button.builder(Component.literal("⧉"), b -> {
+            String code = EbenenCode.schreibe(Wegpunkte.INSTANZ, e.id());
+            minecraft.keyboardHandler.setClipboard(code);
+            meldung = Component.translatable("heroicmap.ebenen.kopiert", e.name(), code.length());
+        }).bounds(x + w + 4, y, KLEIN, 20).tooltip(Tooltip.create(Component.translatable("heroicmap.ebenen.kopieren"))).build());
         if (!base) {
-            addRenderableWidget(Button.builder(Component.literal("✎"), b -> bearbeite(e.id())).bounds(x + w + 4, y, KLEIN, 20)
+            addRenderableWidget(Button.builder(Component.literal("✎"), b -> bearbeite(e.id())).bounds(x + w + 8 + KLEIN, y, KLEIN, 20)
                     .tooltip(Tooltip.create(Component.translatable("heroicmap.ebenen.umbenennen"))).build());
             addRenderableWidget(Button.builder(Component.literal("✕"), b -> {
                 Wegpunkte.INSTANZ.loescheEbene(e.id());
                 neuBauen = true;
-            }).bounds(x + w + 8 + KLEIN, y, KLEIN, 20).tooltip(Tooltip.create(Component.translatable("heroicmap.ebenen.loeschen"))).build());
+            }).bounds(x + w + 12 + 2 * KLEIN, y, KLEIN, 20).tooltip(Tooltip.create(Component.translatable("heroicmap.ebenen.loeschen"))).build());
         }
     }
 
-    /** „Neue Ebene …“, beim Anlegen das Feld. */
+    /** „Neue Ebene …“ und „Code einfügen“ nebeneinander, beim Anlegen das Feld. */
     private void neue(int x, int y, int breite) {
         if (bearbeitet == NEU) {
             feld("", x, y, breite);
-        } else {
-            addRenderableWidget(Button.builder(Component.translatable("heroicmap.ebenen.neu"), b -> bearbeite(NEU)).bounds(x, y, breite, 20).build());
+            return;
         }
+        int halb = (breite - 4) / 2;
+        addRenderableWidget(Button.builder(Component.translatable("heroicmap.ebenen.neu"), b -> bearbeite(NEU)).bounds(x, y, halb, 20).build());
+        addRenderableWidget(Button.builder(Component.translatable("heroicmap.ebenen.einfuegen"), b -> einfuegen())
+                .bounds(x + breite - halb, y, halb, 20).build());
+    }
+
+    /** Liest den Code in der Zwischenablage und legt ihn als neue Ebene an; sonst sagt es, warum nicht. */
+    private void einfuegen() {
+        EbenenCode.Gelesen g = EbenenCode.lies(minecraft.keyboardHandler.getClipboard());
+        if (g.fehler() != null) {
+            meldung = Component.translatable("heroicmap.ebenen.code." + g.fehler());
+            return;
+        }
+        Wegpunkte.Eingefuegt r = Wegpunkte.INSTANZ.fuegeEin(g.inhalt());
+        meldung = r.fehler() != null ? Component.translatable("heroicmap.ebenen.code." + r.fehler())
+                : Component.translatable("heroicmap.ebenen.eingefuegt", Wegpunkte.INSTANZ.ebene(r.ebene()).name(), r.punkte(), r.formen());
+        neuBauen = true;
     }
 
     private void feld(String wert, int x, int y, int breite) {
@@ -161,6 +185,11 @@ final class EbenenMenue extends Screen {
         return Math.max(30, height / 2 - 84);
     }
 
+    /** Für den Gametest: die letzte Meldung, oder null. */
+    String meldung() {
+        return meldung == null ? null : meldung.getString();
+    }
+
     /** Für den Gametest: der Text im Feld, oder null, wenn keins offen ist. */
     String feld() {
         return feld == null ? null : feld.getValue();
@@ -176,9 +205,14 @@ final class EbenenMenue extends Screen {
         super.extractRenderState(g, mausX, mausY, delta);
         int[] s = Einstellungen.spalte(width, height);
         g.centeredText(font, title, s[0] + s[1] / 2, oben() - 14, TEXT);
+        int y = hinweisY;
+        if (meldung != null) {
+            g.centeredText(font, meldung, s[0] + s[1] / 2, y, TEXT);
+            y += 12;
+        }
         if (Ebenen.INSTANZ.alle().isEmpty()) {
             // Unter „Fertig“; oben beginnt die Liste mit den eigenen Ebenen.
-            g.centeredText(font, Component.translatable("heroicmap.ebenen.keine"), s[0] + s[1] / 2, hinweisY, TEXT);
+            g.centeredText(font, Component.translatable("heroicmap.ebenen.keine"), s[0] + s[1] / 2, y, TEXT);
         }
     }
 

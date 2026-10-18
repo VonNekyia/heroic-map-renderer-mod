@@ -187,5 +187,16 @@
   "heroicmap.karte.ebene_neu_hinweis": "Enter: create a layer with this name and move it there; Esc cancels",
   "heroicmap.ebenen.neu": "New layer …",
   "heroicmap.ebenen.umbenennen": "Rename",
-  "heroicmap.ebenen.loeschen": "Delete; what is in it goes to Base"
+  "heroicmap.ebenen.loeschen": "Delete; what is in it goes to Base",
+  "heroicmap.ebenen.kopieren": "Copy as code",
+  "heroicmap.ebenen.einfuegen": "Paste code",
+  "heroicmap.ebenen.kopiert": "Copied “%s” as code, %s characters",
+  "heroicmap.ebenen.eingefuegt": "Pasted “%s”: %s waypoints, %s shapes",
+  "heroicmap.ebenen.code.kein_code": "The clipboard holds no Heroic Map code",
+  "heroicmap.ebenen.code.zu_gross": "The code is too large",
+  "heroicmap.ebenen.code.kaputt": "The code is broken or incomplete",
+  "heroicmap.ebenen.code.version": "The code comes from a newer version of the mod",
+  "heroicmap.ebenen.code.zu_viele": "At most 256 waypoints and 256 shapes per code",
+  "heroicmap.ebenen.code.ebenen_voll": "At most 32 layers of your own",
+  "heroicmap.ebenen.code.formen_voll": "That many shapes no longer fit, at most 256 per world"
 }
