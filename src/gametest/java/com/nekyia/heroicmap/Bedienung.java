@@ -1896,7 +1896,7 @@ public final class Bedienung implements FabricClientGameTest {
         }
         maus.pressKey(InputConstants.KEY_F3);
         context.waitTicks(2);
-        if (!context.computeOnClient(mc -> mc.debugEntries.isOverlayVisible())) {
+        if (!context.computeOnClient(mc -> DebugBildschirm.offen(mc))) {
             throw new AssertionError("F3 öffnete den Debug-Bildschirm nicht");
         }
         int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
@@ -1915,11 +1915,11 @@ public final class Bedienung implements FabricClientGameTest {
         if (!r.equals(context.computeOnClient(mc -> Minimap.INSTANZ.zuletzt()))) {
             throw new AssertionError("Bei F3 auf bleibt rückt die Minimap");
         }
-        // Zu und wieder Mitte: Ohne F3 gilt die Wahl nicht.
+        // Zu und wieder Mitte: Ohne F3 gilt die Wahl nicht, gleich nach dem Tastendruck, auch mit BetterF3, das noch ausblendet.
         maus.pressKey(InputConstants.KEY_F3);
         context.runOnClient(mc -> Minimap.INSTANZ.setzeBeiF3(Minimap.BeiF3.MITTE));
         context.waitTicks(2);
-        if (context.computeOnClient(mc -> mc.debugEntries.isOverlayVisible()) || !r.equals(context.computeOnClient(mc -> Minimap.INSTANZ.zuletzt()))) {
+        if (context.computeOnClient(mc -> DebugBildschirm.offen(mc)) || !r.equals(context.computeOnClient(mc -> Minimap.INSTANZ.zuletzt()))) {
             throw new AssertionError("Nach F3 zu steht die Minimap nicht wieder an ihrem Platz");
         }
         context.runOnClient(mc -> Minimap.INSTANZ.setzeBeiF3(Minimap.BeiF3.BLEIBT));

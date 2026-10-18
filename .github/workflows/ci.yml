@@ -59,7 +59,7 @@ jobs:
         env:
           SDL_VIDEO_FORCE_EGL: "1"
         run: |
-          xvfb-run -a -s "-screen 0 1920x1080x24" ./gradlew runClientGameTest ${{ matrix.mods == 'sodium' && '-Psodium' || '' }} &
+          xvfb-run -a -s "-screen 0 1920x1080x24" ./gradlew runClientGameTest ${{ matrix.mods == 'sodium' && '-Psodium -Pbetterf3' || '' }} &
           lauf=$!
           while kill -0 "$lauf" 2>/dev/null; do
             n=$(grep -c 'Failed to create backend' build/run/clientGameTest/logs/latest.log 2>/dev/null) || n=0
