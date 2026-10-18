@@ -64,6 +64,8 @@
   "heroicmap.karte.form_fertig": "Form fertig",
   "heroicmap.karte.form_abbrechen": "Form abbrechen",
   "heroicmap.karte.form_loeschen": "Form löschen",
+  "heroicmap.karte.anheften": "An die Minimap heften",
+  "heroicmap.karte.loesen": "Von der Minimap lösen",
   "heroicmap.karte.formen_voll": "Höchstens %s eigene Formen",
   "heroicmap.karte.form_weg": "Die Form gibt es so nicht mehr; die neuen Ecken sind nicht gespeichert",
   "heroicmap.karte.form_hinweis": "Linksklick: Eckpunkt hier oder auf einem Wegpunkt, auf den ersten: Region; Rechtsklick: Menü mit „Form fertig“; Esc bricht ab",

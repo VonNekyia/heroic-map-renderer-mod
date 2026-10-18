@@ -748,6 +748,13 @@ final class Karte extends Screen {
         return ueberMarke != null ? ueberMarke : ueberEcke != null ? ueberEcke : ueberGriff;
     }
 
+    /** Für den Gametest: die Bedingungen von {@link #schwebe} bei (x, y), zum Lesen im Fehler. */
+    String schwebeGrund(int x, int y) {
+        return "ziel " + (ziel != null) + ", gezogen " + (gezogeneForm() != null) + ", haengt " + (haengt != null) + ", taste " + taste
+                + ", weg " + gezogen + ", Knopf " + getChildAt(x, y).isPresent() + ", Tafel " + drin(tafelKasten, x, y)
+                + ", treffer " + treffer(x, y) + ", Marken " + marken.size();
+    }
+
     /** Für den Gametest: die Griffe der eigenen Formen auf dem Schirm, wie gezeichnet. */
     List<GriffAn> griffe() {
         return List.copyOf(griffe);
@@ -1444,12 +1451,43 @@ final class Karte extends Screen {
         return kasten != null && x >= kasten[0] && x < kasten[0] + kasten[2] && y >= kasten[1] && y < kasten[1] + kasten[3];
     }
 
-    /** Öffnet das Menü an (x, y) für den Block dort, oder für den Wegpunkt {@code punkt}. */
+    /**
+     * Öffnet das Menü an (x, y) für den Block dort, oder für den Wegpunkt {@code punkt}; auf dem Griff einer eigenen Form
+     * nur ihr Menü. Siehe docs/wegpunkte.md, „Eigene Formen“.
+     */
     private void menue(double x, double y, Wegpunkte.Punkt punkt, Wegpunkte.Region marke) {
         int[] z = punkt != null ? new int[] {punkt.x(), punkt.z()} : block(x, y);
         String dimension = minecraft.level.dimension().identifier().toString();
-        Wegpunkte.Region region = marke != null ? marke : Wegpunkte.INSTANZ.region(dimension, z[0], z[1]);
         List<Eintrag> neu = new ArrayList<>();
+        GriffAn griff = punkt == null && marke == null && zug == null && eckeUnter(x, y) == null ? griffUnter(x, y) : null;
+        if (griff != null) {
+            formMenue(griff.form(), neu);
+        } else {
+            allgemein(x, y, z, dimension, punkt, marke, neu);
+        }
+        ziel = z;
+        eintraege = neu;
+        // Das Menü bleibt ganz auf dem Schirm, auch bei grossem GUI-Massstab.
+        menueX = Math.max(0, Math.min(Mth.floor(x), width - menueBreite()));
+        menueY = Math.max(0, Math.min(Mth.floor(y), height - neu.size() * ZEILE));
+    }
+
+    /**
+     * Das Menü einer eigenen Form, am Griff in ihrer Mitte: Anheften oder Lösen, neue Ecken hinter der letzten, Löschen. Eine
+     * Region schliesst danach wieder an die erste an.
+     */
+    private void formMenue(Wegpunkte.EigeneForm f, List<Eintrag> neu) {
+        neu.add(new Eintrag(Component.translatable(f.angeheftet() ? "heroicmap.karte.loesen" : "heroicmap.karte.anheften"),
+                () -> anheften(Wegpunkte.INSTANZ.umschalten(f), "heroicmap.karte.angeheftet_voll", Wegpunkte.MAX_ANGEHEFTET)));
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> bearbeite(new EckeAn(f, f.ecken().size() - 1, 0, 0))));
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_loeschen"), () -> Wegpunkte.INSTANZ.loesche(f)));
+    }
+
+    /**
+     * Das allgemeine Menü an (x, y): Teleport, Wegpunkt, Formen beginnen und bauen, die Einträge einer Ecke dort und eines alten
+     * Rechtecks, wenn seine Raute {@code marke} getroffen ist. Die Fläche einer eigenen Form hat hier keine Einträge mehr.
+     */
+    private void allgemein(double x, double y, int[] z, String dimension, Wegpunkte.Punkt punkt, Wegpunkte.Region region, List<Eintrag> neu) {
         if (minecraft.getConnection() != null && !minecraft.level.dimensionType().hasCeiling()
                 && Teleport.erlaubt(minecraft.getConnection().getCommands())) {
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.teleport", z[0], z[1]), () -> {
@@ -1481,18 +1519,9 @@ final class Karte extends Screen {
                 Wegpunkte.INSTANZ.ersetze(ecke.form(), rest);
             }));
         }
-        Wegpunkte.EigeneForm eigen = punkt == null ? eigeneUnter(x, y) : null;
-        if (eigen != null) {
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_loeschen"), () -> Wegpunkte.INSTANZ.loesche(eigen)));
-        }
         if (region != null) {
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_loeschen"), () -> Wegpunkte.INSTANZ.loesche(region)));
         }
-        ziel = z;
-        eintraege = neu;
-        // Das Menü bleibt ganz auf dem Schirm, auch bei grossem GUI-Massstab.
-        menueX = Math.max(0, Math.min(Mth.floor(x), width - menueBreite()));
-        menueY = Math.max(0, Math.min(Mth.floor(y), height - neu.size() * ZEILE));
     }
 
     /**

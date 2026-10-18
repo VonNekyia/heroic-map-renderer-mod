@@ -535,10 +535,17 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("Doppelklick von Hand auf den Wegpunkt: angeheftet " + angeheftet(context, neu.get(1)) + ", Mitte "
                     + Arrays.toString(stand) + " -> " + Arrays.toString(danach));
         }
-        warte250();
+        // Ein Rechtsklick auf die Fläche, ein Drittel vom Griff zur ersten Ecke, zeigt nur das allgemeine Menü (mod#128);
+        // auf dem Griff in der Mitte, dem Schwerpunkt der drei Ecken, das der Form mit „Form löschen“.
+        double fx = (2 * ix + orte[0][0]) / 3, fy = (2 * iy + orte[0][1]) / 3;
+        List<String> flaeche = eintraegeBei(context, maus, k, fx, fy);
+        String loeschen = context.computeOnClient(mc -> Component.translatable("heroicmap.karte.form_loeschen").getString());
+        if (flaeche.contains(loeschen) || !flaeche.contains(context.computeOnClient(mc -> Component.translatable("heroicmap.karte.wegpunkt").getString()))) {
+            throw new AssertionError("Rechtsklick auf die Fläche der Region zeigt nicht nur das allgemeine Menü: " + flaeche);
+        }
         eintrag(context, maus, k, ix, iy, "heroicmap.karte.form_loeschen");
         if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size()) != formen + 1) {
-            throw new AssertionError("„Form löschen“ löschte die Region nicht");
+            throw new AssertionError("„Form löschen“ am Griff löschte die Region nicht");
         }
         warte250();
     }
@@ -910,7 +917,7 @@ public final class Bedienung implements FabricClientGameTest {
                 context.waitTicks(2);
                 String unter = context.computeOnClient(mc -> {
                     Karte karte = (Karte) mc.gui.screen();
-                    return "hervorgehoben " + karte.schwebt() + ", Tafel " + Arrays.toString(karte.tafelKasten()) + ", Maus "
+                    return "hervorgehoben " + karte.schwebt() + ", " + karte.schwebeGrund((int) z[0], (int) z[1]) + ", Maus "
                             + mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth() + ","
                             + mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
                 });
@@ -1111,6 +1118,25 @@ public final class Bedienung implements FabricClientGameTest {
      * Rechtsklick bei (x, y), dann ein Klick auf den Eintrag mit diesem Text; die Einträge stehen 14 Einheiten untereinander.
      * Gibt die Zeit des Klicks auf den Eintrag.
      */
+    /**
+     * Die Einträge des Menüs nach einem Rechtsklick wie von Hand bei (x, y). Ein Linksklick 10 Einheiten links darüber, ausserhalb
+     * des Menüs, das dort beginnt, schliesst es wieder und tut sonst nichts.
+     */
+    private static List<String> eintraegeBei(ClientGameTestContext context, TestInput maus, int k, double x, double y) {
+        warte250();
+        maus.setCursorPos(x * k, y * k);
+        context.waitTick();
+        maus.pressMouse(RECHTS);
+        context.waitTicks(2);
+        List<String> alle = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eintraege().stream().map(Component::getString).toList());
+        warte250();
+        maus.setCursorPos((x - 10) * k, (y - 10) * k);
+        context.waitTick();
+        maus.pressMouse(LINKS);
+        context.waitTicks(2);
+        return alle;
+    }
+
     private static long eintrag(ClientGameTestContext context, TestInput maus, int k, double x, double y, String schluessel) {
         warte250();
         maus.setCursorPos(x * k, y * k);
