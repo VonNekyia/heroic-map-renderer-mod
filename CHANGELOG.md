@@ -4,6 +4,11 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.48
+
+- **A death point where you died.** When you die, the mod sets a pinned waypoint on that spot, drawn dark with a light cross, so the minimap and the beam lead you back. Only one: the next death moves it. The chat says where; click the message to open the map there. "Death point" in "Settings …" turns it off.
+- **A waypoint at typed coordinates.** Right-click the full map and choose "Waypoint at …": type `x z` (or `x y z`; y does not count) and press Enter.
+
 ## 0.2.47
 
 - **Notes at the bottom left go away.** A note on the full map, such as a shape that could not be saved, now disappears after five seconds or at your next click or key press, instead of staying until you close the map.

@@ -1,6 +1,6 @@
 ---
 title: Wegpunkte
-description: Wegpunkte auf der Vollbildkarte setzen und löschen, eigene Linien und Regionen mit eigenen Ecken, Namen und Farben, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
+description: Wegpunkte auf der Vollbildkarte setzen und löschen, auch an eingetippten Koordinaten, der Todespunkt, eigene Linien und Regionen mit eigenen Ecken, Namen und Farben, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Wegpunkte.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
@@ -37,7 +37,8 @@ Formen“ (mod#79, mod#112).
 | Eingabe auf der Vollbildkarte | tut |
 |---|---|
 | Rechtsklick, „Wegpunkt setzen“ | der Eintrag unter „Hierher teleportieren“; setzt einen Wegpunkt auf den Block unter der Maus, in der ersten der 8 Farben (`Wegpunkte.FARBEN`), die in der Dimension noch frei ist, sind alle vergeben, reihum. Steht dort schon einer, bleibt es einer. Den Eintrag gibt es auch ohne Recht zum Teleportieren und unter einer Decke |
-| Rechtsklick auf einen Wegpunkt | das Menü für seinen Block: „Hierher teleportieren“, wenn erlaubt, und „Wegpunkt löschen“ |
+| Rechtsklick auf einen Wegpunkt | das Menü für seinen Block: „Hierher teleportieren“, wenn erlaubt, und „Wegpunkt löschen“, auf dem Todespunkt „Todespunkt löschen“ |
+| Rechtsklick, „Wegpunkt bei …“ | öffnet an der Stelle des Menüs ein Eingabefeld mit `x z` des Blocks unter der Maus, wie bei „Name…“, siehe „Namen“. Enter nimmt `x z`, `x, z` oder `x y z`, ganze Zahlen aus Ziffern in ASCII, x und z höchstens 30 000 000 weit (`Wegpunkte.koordinaten`); y zählt nicht, ein Wegpunkt hat nur x und z, so sagt es auch der Hinweis unten links. Dann setzt es dort einen Wegpunkt in der jetzigen Dimension wie „Wegpunkt setzen“ und legt ihn in die Mitte. Was keine Koordinaten sind, nimmt Enter nicht; der Text wird rot. Gewünscht vom User am 18.10. (mod#129) |
 | Klick auf eine Marke | legt sie in die Mitte, sobald kein zweiter Klick mehr folgen kann, 250 ms nach dem Loslassen: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück. Wer auf einer Marke zu ziehen beginnt und sich weiter als 3 Einheiten vom Druckpunkt entfernt (`Karte.ZUG`), zieht nur die Karte |
 | Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder; die Karte bewegt sich dabei nicht, siehe „Doppelklick“ unten |
 | Linke Taste 0,5 s still auf einem Wegpunkt halten | er hängt an der Maus, die Karte zieht nicht mit; beim Loslassen liegt er auf dem Block darunter, mit Farbe und Anheften (`Wegpunkte.verschiebe`). Liegt dort schon einer, bleibt er, wo er war; `Esc` bricht ab. Still heisst: nie weiter als 3 Einheiten vom Druckpunkt weg (`Karte.ZUG`); das Zittern der Hand hin und her zählt nicht, nur der Abstand. Bis 0.2.32 zählte der ganze Weg der Maus: Mit 1 bis 2 Pixeln Zittern fügte ein Linksklick in einer Form im Bau oft nichts an, und Halten ging kaum (mod#112). Unter 0,5 s ist es ein Klick oder ein Zug wie sonst (`Karte.HALTEN_MS`, mod#75). Bis 0.2.36 waren es 2 s, dem User zu lang; 0,5 s hat der Reviewer entschieden (mod#112). Ein Klick dauert kürzer. Nur Wegpunkte, nicht die Rauten eigener Regionen |
@@ -283,6 +284,40 @@ nach oben immer durchsichtiger.
   Seite in Pixeln ein Vielfaches von 8 ist. Bei 6 Einheiten und
   GUI-Massstab 2 sind es 12 Pixel, die Texel also abwechselnd 1 und 2
   Pixel breit. Ob 6 Einheiten gut aussehen, sieht der User im Spiel.
+
+## Todespunkt
+
+Stirbt der Spieler, setzt der Mod einen Wegpunkt dort, wo er gestorben
+ist, so findet er zurück. Gewünscht vom User am 18.10. (mod#129); Plan vom
+Reviewer freigegeben.
+
+- **Wann:** im Client-Tick, wenn `isDeadOrDying` von falsch auf wahr
+  wechselt, einmal je Tod (`HeroicMap.gestorben`), auf dem Block des
+  Spielers in seiner Dimension.
+- **Nur einer:** Ein neuer Tod verschiebt ihn (`Wegpunkte.setzeTod`). Liegt
+  auf dem Block schon ein Wegpunkt, gibt es keinen; der Block ist schon
+  markiert.
+- **Angeheftet** beim Setzen, so führen Minimap und Strahl zurück, siehe
+  „Strahl“. Sonst wie ein Wegpunkt: Doppelklick löst oder heftet an,
+  Halten verschiebt, ein Klick legt ihn in die Mitte, am Rand steht er wie
+  die anderen Marken. Ein Rechtsklick auf ihn bietet „Todespunkt löschen“
+  statt „Wegpunkt löschen“.
+- **Gezeichnet** als dunkle Raute mit hellem ✕ (`Minimap.TOD`,
+  `Minimap.TOD_KREUZ`), auf Vollbildkarte und Minimap; sein Strahl ist
+  dunkel. Eine Farbe aus der Liste nimmt er nicht; der nächste Wegpunkt
+  bekommt sie, als gäbe es ihn nicht.
+- **Im Chat** steht „Todespunkt gesetzt bei x z“, unterstrichen. Ein Klick
+  darauf ruft `/hmap karte x z`, siehe [Download](download.md), „Befehle“;
+  das Spiel schickt einen Klick im Chat über `sendUnattendedCommand`, und
+  dort fängt Fabric die Befehle des Clients ab (per javap an 26.3 und am
+  Fabric API). Die Karte öffnet sich in der jetzigen Dimension; wer in
+  einer anderen gestorben ist, sieht den Todespunkt erst dort.
+- **Schalter** „Todespunkt“ im Untermenü „Einstellungen …“, neben
+  „Auflösung“, Vorgabe an (`Minimap.todespunkt`, gespeichert als
+  `todespunkt`). Aus setzt keinen, und ein vorhandener ist weg.
+- **Datei:** eigens als `tod`, nicht in der Liste `wegpunkte`, siehe
+  „Ablage“; so zählt ihn eine ältere Version nicht mit, sie überliest ihn.
+  Eine id bekommt er beim Lesen wie ein Wegpunkt ohne.
 
 ## Eigene Formen
 
@@ -560,6 +595,7 @@ Schleier am Rand, siehe „Schleier“.
 
   ```json
   {"wegpunkte":[{"id":1,"dimension":"minecraft:overworld","x":12,"z":-40,"farbe":0,"minimap":true}],
+   "tod":{"dimension":"minecraft:the_nether","x":3,"z":4,"minimap":true},
    "eigene_formen":[{"dimension":"minecraft:overworld","ecken":[[12,-40],[30,-40],[30,-20]],"farbe":2,"minimap":false,"name":"Mühle","hex":"#3A7FD5"}],
    "regionen":[{"dimension":"minecraft:overworld","x0":2,"z0":-5,"x1":10,"z1":3,"farbe":1,"minimap":false}],
    "spieler":["00000000-0000-0000-0000-000000000001"],
@@ -568,6 +604,7 @@ Schleier am Rand, siehe „Schleier“.
   ```
 
   `farbe` ist ein Index in `Wegpunkte.FARBEN`, `minimap` heisst angeheftet,
+  `tod` ist der Todespunkt, siehe „Todespunkt“, ohne `farbe` und `id`,
   `eigene_formen` nennt ihre Dimension und die Blöcke ihrer Ecken in Reihenfolge,
   dazu `name`, wenn sie einen hat, siehe „Namen“, und `hex`, wenn sie eine
   eigene Farbe hat, siehe „Farbe“; eine ältere Version des Mods überliest
@@ -616,7 +653,11 @@ Schleier am Rand, siehe „Schleier“.
   Namen). Zur Farbe: `hexFarbeLesenSchreibenUndUeberall` (gültig und
   ungültig, auch Ziffern anderer Schriften; Rand und Füllung; über die
   Datei, mit dem Index daneben; weggenommen; eine Farbe, die keine ist).
-  Zum Schleier: `eigeneFormenFuerDenSchleierErkannt`.
+  Zum Schleier: `eigeneFormenFuerDenSchleierErkannt`. Zum Todespunkt:
+  `todespunktNurEinerAngeheftetUndEigensGespeichert` (nur einer, keine
+  Farbe, eigens in der Datei, Lösen und Verschieben, nicht auf einem
+  Wegpunkt, ein kaputter fehlt), `todMeldungOeffnetDieKarteDort`;
+  `koordinatenEingetippt`.
 - `SchleierTest`: Teilen an jeder ganzen Zahl, auch rückwärts und durch
   eine Ecke; ein Rechteck ein Stück je Block, nur im Kasten; ein Kreis in
   Sehnen über den Bogen, ein Kreis von 100 000 Blöcken nur beim Kasten;
@@ -700,7 +741,16 @@ Schleier am Rand, siehe „Schleier“.
   Klicks ans rechte Ende, ans linke und in die Mitte des Reglers geben 16,
   4 und 10 Blöcke, gespeichert beim Schliessen. In der Szene des Schleiers
   (`Bilder`): mit dem Regler auf 16 dieselbe Zahl Vierecke, jedes 16 Blöcke
-  hoch und unten zu 90 % deckend.
+  hoch und unten zu 90 % deckend. Wegpunkt bei (`wegpunktBei`): „Wegpunkt
+  bei …“ auf freier Karte zeigt `x z` des Blocks; „12“ nimmt Enter nicht;
+  `x 64 z` 30 Blöcke weiter setzt dort einen Wegpunkt und legt ihn in die
+  Mitte. Todespunkt (`tod`): `kill @a`, danach steht auf dem Block des
+  Spielers ein angehefteter Todespunkt; nach dem Respawn öffnet
+  `sendUnattendedCommand("hmap karte x z")`, der Weg des Klicks im Chat,
+  die Karte mit ihm als Ziel; die Welt des Tests hat keinen geladenen Satz,
+  also steht er mit dem Testsatz in der Mitte, mitten in ihm das helle ✕, und
+  „Todespunkt löschen“ löscht ihn; mit dem Schalter aus setzt ein zweiter
+  Tod keinen.
 - `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
   [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und
