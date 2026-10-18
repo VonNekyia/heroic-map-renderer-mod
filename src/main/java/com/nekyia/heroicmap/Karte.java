@@ -743,6 +743,11 @@ final class Karte extends Screen {
         return List.copyOf(ecken);
     }
 
+    /** Für den Gametest: was unter der Maus hervorgehoben steht, eine Marke, eine Ecke oder ein Griff, oder null. */
+    Object schwebt() {
+        return ueberMarke != null ? ueberMarke : ueberEcke != null ? ueberEcke : ueberGriff;
+    }
+
     /** Für den Gametest: die Griffe der eigenen Formen auf dem Schirm, wie gezeichnet. */
     List<GriffAn> griffe() {
         return List.copyOf(griffe);

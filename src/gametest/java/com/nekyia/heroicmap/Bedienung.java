@@ -908,12 +908,18 @@ public final class Bedienung implements FabricClientGameTest {
                 frei(context, new double[][] {daneben});
                 maus.setCursorPos(z[0] * k, z[1] * k);
                 context.waitTicks(2);
+                String unter = context.computeOnClient(mc -> {
+                    Karte karte = (Karte) mc.gui.screen();
+                    return "hervorgehoben " + karte.schwebt() + ", Tafel " + Arrays.toString(karte.tafelKasten()) + ", Maus "
+                            + mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth() + ","
+                            + mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
+                });
                 int an = weisse(context.takeScreenshot(TestScreenshotOptions.of("schweben-" + i).disableCounterPrefix()), k, z, 6);
                 maus.setCursorPos(daneben[0] * k, daneben[1] * k);
                 context.waitTicks(2);
                 int aus = weisse(context.takeScreenshot(TestScreenshotOptions.of("schweben-" + i + "-aus").disableCounterPrefix()), k, z, 6);
                 if (an < aus + 8) {
-                    throw new AssertionError(namen[i] + " unter der Maus ohne hellen Rand: " + an + " weisse Pixel, daneben " + aus);
+                    throw new AssertionError(namen[i] + " unter der Maus ohne hellen Rand: " + an + " weisse Pixel, daneben " + aus + "; " + unter);
                 }
             }
         } finally {
