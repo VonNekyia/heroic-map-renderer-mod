@@ -4,6 +4,13 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.42
+
+- **Lines and regions follow while you drag a corner.** Hold a corner for half a second and move it: the shape moves with it right away, instead of jumping into place when you let go.
+- **Move a whole line or region by its handle.** Every shape has a handle in its middle, halfway along a line or at the centre of a region; hold it for half a second and drag to move the whole shape. Esc puts it back.
+- **What you can click lights up.** Waypoints, corners and handles get a bright outline while the mouse is over them on the full map.
+- **Right-click the handle for the shape's menu.** Pin or unpin, add corners, delete. A right-click elsewhere inside a region no longer offers to delete it; old rectangles are deleted from their diamond.
+
 ## 0.2.41
 
 - **The frame ornaments face outward.** With the "Compass" and "Biome" frames, every marker now points away from the middle of the minimap instead of all pointing north, so looking south no longer turns them all upside down.

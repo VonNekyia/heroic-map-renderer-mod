@@ -99,6 +99,15 @@ final class Karte extends Screen {
     private final List<Marke> marken = new ArrayList<>();
     /** Die Ecken der eigenen Formen im letzten Frame. */
     private final List<EckeAn> ecken = new ArrayList<>();
+    private final List<GriffAn> griffe = new ArrayList<>();
+    private GriffAn griffGedrueckt, griffHaengt;
+    /** Was die Maus gerade hervorhebt, höchstens eins davon; siehe {@link #schwebe}. */
+    private Marke ueberMarke;
+    private EckeAn ueberEcke;
+    private GriffAn ueberGriff;
+    /** Der helle Rand von dem, was unter der Maus liegt. */
+    private static final int HELL = 0xFFFFFFFF;
+    private final Formen.Speicher gezogenSpeicher = new Formen.Speicher();
     /** Die Marke des letzten Klicks, wenn es einer auf eine Marke war; ein Doppelklick heftet sie an. */
     private Marke letzte;
     /** Die Marke unter dem Drücken der linken Taste, oder null; ein Zug macht daraus keinen Klick. */
@@ -132,6 +141,10 @@ final class Karte extends Screen {
      * und {@code region} null.
      */
     record Marke(float x, float y, float halb, double weltX, double weltZ, UUID spieler, Wegpunkte.Punkt punkt, Wegpunkte.Region region) {
+    }
+
+    /** Der Griff in der Mitte einer eigenen Form auf dem Schirm, in Einheiten des GUI. */
+    record GriffAn(Wegpunkte.EigeneForm form, float x, float y) {
     }
 
     /** Die Ecke {@code index} der eigenen Form {@code form}, auf dem Schirm bei (x, y) in Einheiten des GUI. */
@@ -370,11 +383,18 @@ final class Karte extends Screen {
             haengt = gedrueckt.punkt();
             wartend = null;
         }
-        // Ebenso eine Ecke einer eigenen Form. Siehe docs/wegpunkte.md, „Eigene Formen“.
+        // Ebenso eine Ecke einer eigenen Form, und am Griff in ihrer Mitte die ganze Form. Siehe docs/wegpunkte.md, „Eigene Formen“.
         if (eckeHaengt == null && taste && eckeGedrueckt != null && !doppelklick && gezogen <= ZUG
                 && Util.getMillis() - gedruecktSeit >= HALTEN_MS) {
             eckeHaengt = eckeGedrueckt;
         }
+        if (griffHaengt == null && taste && griffGedrueckt != null && !doppelklick && gezogen <= ZUG
+                && Util.getMillis() - gedruecktSeit >= HALTEN_MS) {
+            griffHaengt = griffGedrueckt;
+        }
+        // Die gezogene Form zeichnet die Karte selbst an der Maus; an ihrem alten Ort fällt sie solange weg.
+        Wegpunkte.INSTANZ.ziehe(gezogeneForm());
+        schwebe(mausX, mausY);
         // Ein Klick auf eine Marke zentriert erst, wenn kein zweiter folgt; so bewegt ein Doppelklick die Karte nicht.
         if (wartend != null && Util.getMillis() - wartendSeit >= MouseHandler.DOUBLE_CLICK_THRESHOLD_MS) {
             zentriere(wartend.weltX(), wartend.weltZ());
@@ -398,9 +418,9 @@ final class Karte extends Screen {
         if (Minimap.INSTANZ.chunklinien() && blick.chunklinien(satz.scale(), minecraft.getWindow().getGuiScale())) {
             linien(g);
         }
-        formen(g);
+        formen(g, mausX, mausY);
         regionen(g, mausX, mausY);
-        ecken(g);
+        ecken(g, mausX, mausY);
         marken(g);
         int[] block = block(mausX, mausY);
         g.text(font, Component.literal(satz.name() + "   ").append(Component.translatable("heroicmap.koordinaten", block[0], block[1])),
@@ -427,9 +447,6 @@ final class Karte extends Screen {
             // Der Wegpunkt, der an der Maus hängt, unter dem Zeiger.
             Minimap.wegpunkt(g, mausX, mausY, Minimap.KOPF, Wegpunkte.FARBEN[haengt.farbe()], 0);
         }
-        if (eckeHaengt != null) {
-            raute(g, mausX, mausY, Wegpunkte.FARBEN[eckeHaengt.form().farbe()]);
-        }
         tafel(g, mausX, mausY);
         if (ziel != null) {
             int b = menueBreite();
@@ -445,7 +462,7 @@ final class Karte extends Screen {
      * Die Flächen, Kreise und Linien der sichtbaren Ebenen in der Dimension des Spielers, auf dem
      * Raster der Kacheln. Siehe docs/ebenen.md, „Flächen, Kreise und Linien“.
      */
-    private void formen(GuiGraphicsExtractor g) {
+    private void formen(GuiGraphicsExtractor g, int mausX, int mausY) {
         if (minecraft.player == null) {
             return;
         }
@@ -457,6 +474,55 @@ final class Karte extends Screen {
                         blick.basisRasterX(width, width) / scale, blick.basisRasterZ(height, height) / scale},
                 pose, new ScreenRectangle(0, 0, width, height).transformMaxBounds(pose), Double.POSITIVE_INFINITY);
         Formen.zeichne(g, a, dimension, Wegpunkte.INSTANZ.karte(Ebenen.INSTANZ), formenSpeicher, font, true);
+        // Die gezogene Form folgt der Maus in jedem Frame; sie ist eine, ihr Speicher gilt nur bis zur nächsten Bewegung.
+        Wegpunkte.EigeneForm f = gezogeneForm();
+        if (f != null && f.dimension().equals(dimension)) {
+            Formen.zeichne(g, a, dimension, List.of(List.of(Wegpunkte.INSTANZ.aufKarte(f, punkte(f, mausX, mausY)))), gezogenSpeicher, font, true);
+        }
+    }
+
+    /**
+     * Was unter der Maus hervorgehoben steht, so wie ein Klick es träfe: ein Wegpunkt oder die Raute eines alten Rechtecks vor
+     * einer Ecke vor einem Griff, nach den Lagen des letzten Frames. Nichts, solange ein Menü offen ist, etwas gezogen wird
+     * oder die Maus über einem Knopf oder der Tafel steht. Siehe docs/wegpunkte.md, „Bedienung“.
+     */
+    private void schwebe(int mausX, int mausY) {
+        boolean frei = ziel == null && gezogeneForm() == null && haengt == null && !(taste && gezogen > ZUG)
+                && getChildAt(mausX, mausY).isEmpty() && !drin(tafelKasten, mausX, mausY);
+        Marke m = frei ? treffer(mausX, mausY) : null;
+        ueberMarke = m != null && (m.punkt() != null || m.region() != null) ? m : null;
+        ueberEcke = frei && m == null ? eckeUnter(mausX, mausY) : null;
+        ueberGriff = frei && m == null && ueberEcke == null ? griffUnter(mausX, mausY) : null;
+    }
+
+    /** Die eigene Form, die gerade an einer Ecke oder am Griff an der Maus hängt, oder null. */
+    private Wegpunkte.EigeneForm gezogeneForm() {
+        return eckeHaengt != null ? eckeHaengt.form() : griffHaengt != null ? griffHaengt.form() : null;
+    }
+
+    /**
+     * Die Punkte (x, z) der eigenen Form, wie sie gerade steht: die Ecke an der Maus genau unter ihr, am Griff die ganze
+     * Form um den Weg der Maus seit dem Drücken, nicht auf ganze Blöcke gerundet; sonst die Mitten der Blöcke.
+     */
+    private double[] punkte(Wegpunkte.EigeneForm f, double mausX, double mausY) {
+        double[] p = Wegpunkte.mitten(f);
+        if (eckeHaengt != null && eckeHaengt.form() == f) {
+            double[] w = welt(mausX, mausY);
+            p[2 * eckeHaengt.index()] = w[0];
+            p[2 * eckeHaengt.index() + 1] = w[1];
+        } else if (griffHaengt != null && griffHaengt.form() == f) {
+            double[] w = welt(mausX, mausY), d = welt(druckX, druckY);
+            for (int i = 0; i < p.length; i += 2) {
+                p[i] += w[0] - d[0];
+                p[i + 1] += w[1] - d[1];
+            }
+        }
+        return p;
+    }
+
+    /** Der Ort der Welt unter (x, y) in Blöcken, nicht gerundet; {@link #block} rundet ihn ab. */
+    private double[] welt(double x, double y) {
+        return new double[] {blick.basisRasterX(x, width) / satz.scale(), blick.basisRasterZ(y, height) / satz.scale()};
     }
 
     /** Chunklinien je 16 Blöcke als ein Element des GUI. Siehe docs/minimap.md, „Chunklinien“. */
@@ -482,13 +548,16 @@ final class Karte extends Screen {
         for (Wegpunkte.Region r : Wegpunkte.INSTANZ.regionen()) {
             if (r.dimension().equals(dimension)) {
                 Marke m = marke((r.x0() + r.x1() + 1) / 2.0, (r.z0() + r.z1() + 1) / 2.0, null, null, r);
-                Minimap.wegpunkt(g, m.x(), m.y(), Minimap.KOPF, Wegpunkte.FARBEN[r.farbe()], r.angeheftet() ? bunt : 0);
+                boolean hell = ueberMarke != null && r.equals(ueberMarke.region());
+                Minimap.wegpunkt(g, m.x(), m.y(), Minimap.KOPF, Wegpunkte.FARBEN[r.farbe()], hell ? HELL : r.angeheftet() ? bunt : 0);
             }
         }
         for (Wegpunkte.Punkt p : Wegpunkte.INSTANZ.punkte()) {
             if (p.dimension().equals(dimension) && !p.equals(haengt)) {
                 Marke m = marke(p.x() + 0.5, p.z() + 0.5, null, p);
-                Minimap.wegpunkt(g, m.x(), m.y(), Minimap.KOPF, Wegpunkte.FARBEN[p.farbe()], p.angeheftet() ? bunt : 0);
+                // Unter der Maus mit hellem Rand, auch angeheftet: Dann weicht der bunte Rand so lange.
+                boolean hell = ueberMarke != null && p.equals(ueberMarke.punkt());
+                Minimap.wegpunkt(g, m.x(), m.y(), Minimap.KOPF, Wegpunkte.FARBEN[p.farbe()], hell ? HELL : p.angeheftet() ? bunt : 0);
             }
         }
         // Mitspieler mit Namen. Siehe docs/minimap.md, „Mitspieler“.
@@ -674,6 +743,27 @@ final class Karte extends Screen {
         return List.copyOf(ecken);
     }
 
+    /** Für den Gametest: was unter der Maus hervorgehoben steht, eine Marke, eine Ecke oder ein Griff, oder null. */
+    Object schwebt() {
+        return ueberMarke != null ? ueberMarke : ueberEcke != null ? ueberEcke : ueberGriff;
+    }
+
+    /** Für den Gametest: die Bedingungen von {@link #schwebe} bei (x, y), zum Lesen im Fehler. */
+    String schwebeGrund(int x, int y) {
+        return "ziel " + (ziel != null) + ", gezogen " + (gezogeneForm() != null) + ", haengt " + (haengt != null) + ", taste " + taste
+                + ", weg " + gezogen + ", Knopf " + getChildAt(x, y).isPresent() + ", Tafel " + drin(tafelKasten, x, y)
+                + ", treffer " + treffer(x, y) + ", Marken " + marken.size();
+    }
+
+    /** Für den Gametest: die Griffe der eigenen Formen auf dem Schirm, wie gezeichnet. */
+    List<GriffAn> griffe() {
+        return List.copyOf(griffe);
+    }
+
+    GriffAn griffHaengt() {
+        return griffHaengt;
+    }
+
     Satz satz() {
         return satz;
     }
@@ -683,7 +773,8 @@ final class Karte extends Screen {
     }
 
     List<Component> eintraege() {
-        return eintraege.stream().map(Eintrag::text).toList();
+        // Nur, solange ein Menü offen ist: Sonst läse der Test die Einträge des vorigen.
+        return ziel == null ? List.of() : eintraege.stream().map(Eintrag::text).toList();
     }
 
     /**
@@ -738,10 +829,12 @@ final class Karte extends Screen {
 
     /**
      * Die Ecken der eigenen Formen dieser Dimension als kleine Rauten in ihrer Farbe, auch die der Form, die gerade
-     * geändert wird; gemerkt für Treffer und Gametests. Siehe docs/wegpunkte.md, „Eigene Formen“.
+     * geändert wird, dazu je Form ihr Griff in der Mitte; was gezogen wird, dort, wo es an der Maus steht. Gemerkt für
+     * Treffer und Gametests. Siehe docs/wegpunkte.md, „Eigene Formen“.
      */
-    private void ecken(GuiGraphicsExtractor g) {
+    private void ecken(GuiGraphicsExtractor g, int mausX, int mausY) {
         ecken.clear();
+        griffe.clear();
         if (minecraft.player == null) {
             return;
         }
@@ -750,23 +843,58 @@ final class Karte extends Screen {
             if (!f.dimension().equals(dimension)) {
                 continue;
             }
+            int farbe = Wegpunkte.FARBEN[f.farbe()];
+            double[] p = punkte(f, mausX, mausY);
             for (int i = 0; i < f.ecken().size(); i++) {
-                Wegpunkte.Ecke e = f.ecken().get(i);
-                float[] s = schirm(e.x() + 0.5, e.z() + 0.5);
+                float[] s = schirm(p[2 * i], p[2 * i + 1]);
                 ecken.add(new EckeAn(f, i, s[0], s[1]));
-                if (eckeHaengt == null || eckeHaengt.form() != f || eckeHaengt.index() != i) {
-                    raute(g, s[0], s[1], Wegpunkte.FARBEN[f.farbe()]);
-                }
+                raute(g, s[0], s[1], farbe, ueberEcke != null && ueberEcke.form() == f && ueberEcke.index() == i ? HELL : 0xFF000000);
+            }
+            double[] m = Wegpunkte.griff(p, f.region());
+            float[] s = schirm(m[0], m[1]);
+            griffe.add(new GriffAn(f, s[0], s[1]));
+            griff(g, s[0], s[1], farbe, ueberGriff != null && ueberGriff.form() == f ? HELL : 0xFF000000);
+        }
+    }
+
+    /**
+     * Der Griff in der Mitte einer eigenen Form: ein Quadrat in ihrer Farbe mit hellem Kern, grösser als eine Ecke, mit dem
+     * Rand {@code rand}, dunkel oder unter der Maus hell.
+     */
+    private static void griff(GuiGraphicsExtractor g, float x, float y, int farbe, int rand) {
+        g.pose().pushMatrix();
+        g.pose().translate(x, y);
+        g.fill(-3, -3, 3, 3, rand);
+        g.fill(-2, -2, 2, 2, farbe | 0xFF000000);
+        g.fill(-1, -1, 1, 1, 0xFFFFFFFF);
+        g.pose().popMatrix();
+    }
+
+    /** Der Griff einer eigenen Form unter (x, y): der nächste, höchstens {@link #ECKE_TREFFER} weg, oder null. */
+    private GriffAn griffUnter(double x, double y) {
+        GriffAn beste = null;
+        double abstand = ECKE_TREFFER;
+        for (GriffAn gr : griffe) {
+            double d = Math.hypot(x - gr.x(), y - gr.y());
+            if (d <= abstand) {
+                beste = gr;
+                abstand = d;
             }
         }
+        return beste;
     }
 
     /** Eine kleine Raute bei (x, y) in {@code farbe}, mit dunklem Rand, der sie auf jeder Karte zeigt. */
     private static void raute(GuiGraphicsExtractor g, float x, float y, int farbe) {
+        raute(g, x, y, farbe, 0xFF000000);
+    }
+
+    /** Wie {@link #raute(GuiGraphicsExtractor, float, float, int)}, mit dem Rand {@code rand}, unter der Maus hell. */
+    private static void raute(GuiGraphicsExtractor g, float x, float y, int farbe, int rand) {
         g.pose().pushMatrix();
         g.pose().translate(x, y);
         g.pose().rotate((float) (Math.PI / 4));
-        g.fill(-2, -2, 2, 2, 0xFF000000);
+        g.fill(-2, -2, 2, 2, rand);
         g.fill(-1, -1, 1, 1, farbe | 0xFF000000);
         g.pose().popMatrix();
     }
@@ -939,6 +1067,7 @@ final class Karte extends Screen {
         letzterSchalter = null;
         gedrueckt = null;
         eckeGedrueckt = null;
+        griffGedrueckt = null;
         aufKarte = false;
         taste = e.button() == InputConstants.MOUSE_BUTTON_LEFT;
         gezogen = 0;
@@ -1007,8 +1136,9 @@ final class Karte extends Screen {
             gedrueckt = doppelklick ? vorige : m;
             gedruecktSeit = Util.getMillis();
             aufKarte = true;
-            // Eine Ecke lässt sich nur ohne Form im Bau halten, und nur, wo keine Marke liegt.
+            // Eine Ecke lässt sich nur ohne Form im Bau halten, und nur, wo keine Marke liegt; ein Griff nur, wo auch keine Ecke liegt.
             eckeGedrueckt = zug == null && m == null ? eckeUnter(e.x(), e.y()) : null;
+            griffGedrueckt = zug == null && m == null && eckeGedrueckt == null ? griffUnter(e.x(), e.y()) : null;
             if (doppelklick) {
                 wartend = null;
             }
@@ -1035,6 +1165,7 @@ final class Karte extends Screen {
         }
         EckeAn ecke = eckeGedrueckt;
         eckeGedrueckt = null;
+        griffGedrueckt = null;
         // Der Wegpunkt an der Maus kommt auf den Block unter ihr, mit Farbe und Anheften.
         if (haengt != null) {
             int[] b = block(e.x(), e.y());
@@ -1049,6 +1180,15 @@ final class Karte extends Screen {
             neu.set(eckeHaengt.index(), new Wegpunkte.Ecke(b[0], b[1]));
             Wegpunkte.INSTANZ.ersetze(eckeHaengt.form(), neu);
             eckeHaengt = null;
+            return true;
+        }
+        // Am Griff die ganze Form, um den Weg der Maus auf ganze Blöcke gerundet.
+        if (griffHaengt != null) {
+            double[] w = welt(e.x(), e.y()), d = welt(druckX, druckY);
+            int dx = (int) Math.round(w[0] - d[0]), dz = (int) Math.round(w[1] - d[1]);
+            Wegpunkte.INSTANZ.ersetze(griffHaengt.form(), griffHaengt.form().ecken().stream()
+                    .map(c -> new Wegpunkte.Ecke(c.x() + dx, c.z() + dz)).toList());
+            griffHaengt = null;
             return true;
         }
         // Solange eine Form im Bau ist, setzt ein Linksklick ohne Zug auf die Karte eine Ecke: auf einem Wegpunkt auf
@@ -1103,7 +1243,8 @@ final class Karte extends Screen {
             zeigen.zu();
         }
         boolean ueber = zug == null && drin(tafelKasten, mausX, mausY);
-        boolean frei = ziel == null && zug == null && haengt == null && !ueber && !(taste && gezogen > ZUG) && getChildAt(mausX, mausY).isEmpty();
+        boolean frei = ziel == null && zug == null && gezogeneForm() == null && haengt == null && !ueber && !(taste && gezogen > ZUG)
+                && getChildAt(mausX, mausY).isEmpty();
         zeigen.zeiger(frei ? zielUnter(mausX, mausY) : null, ueber, ms);
         if (zeigen.offen() != null && !Tafeln.gilt(Ebenen.INSTANZ, zeigen.offen())) {
             zeigen.zu();
@@ -1311,12 +1452,57 @@ final class Karte extends Screen {
         return kasten != null && x >= kasten[0] && x < kasten[0] + kasten[2] && y >= kasten[1] && y < kasten[1] + kasten[3];
     }
 
-    /** Öffnet das Menü an (x, y) für den Block dort, oder für den Wegpunkt {@code punkt}. */
+    /**
+     * Öffnet das Menü an (x, y) für den Block dort, oder für den Wegpunkt {@code punkt}; auf dem Griff einer eigenen Form
+     * nur ihr Menü. Siehe docs/wegpunkte.md, „Eigene Formen“.
+     */
     private void menue(double x, double y, Wegpunkte.Punkt punkt, Wegpunkte.Region marke) {
         int[] z = punkt != null ? new int[] {punkt.x(), punkt.z()} : block(x, y);
         String dimension = minecraft.level.dimension().identifier().toString();
-        Wegpunkte.Region region = marke != null ? marke : Wegpunkte.INSTANZ.region(dimension, z[0], z[1]);
         List<Eintrag> neu = new ArrayList<>();
+        GriffAn griff = punkt == null && marke == null && eckeUnter(x, y) == null ? griffUnter(x, y) : null;
+        if (griff != null) {
+            formMenue(griff.form(), neu);
+            if (zug != null) {
+                // Im Bau bleibt die Form im Bau zu beenden, auch am Griff einer anderen.
+                bauEnde(neu);
+            }
+        } else {
+            allgemein(x, y, z, dimension, punkt, marke, neu);
+        }
+        ziel = z;
+        eintraege = neu;
+        // Das Menü bleibt ganz auf dem Schirm, auch bei grossem GUI-Massstab.
+        menueX = Math.max(0, Math.min(Mth.floor(x), width - menueBreite()));
+        menueY = Math.max(0, Math.min(Mth.floor(y), height - neu.size() * ZEILE));
+    }
+
+    /**
+     * Das Menü einer eigenen Form, am Griff in ihrer Mitte: Anheften oder Lösen, ohne Form im Bau neue Ecken hinter der letzten,
+     * Löschen. Eine Region schliesst danach wieder an die erste an.
+     */
+    private void formMenue(Wegpunkte.EigeneForm f, List<Eintrag> neu) {
+        neu.add(new Eintrag(Component.translatable(f.angeheftet() ? "heroicmap.karte.loesen" : "heroicmap.karte.anheften"),
+                () -> anheften(Wegpunkte.INSTANZ.umschalten(f), "heroicmap.karte.angeheftet_voll", Wegpunkte.MAX_ANGEHEFTET)));
+        if (zug == null) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> bearbeite(new EckeAn(f, f.ecken().size() - 1, 0, 0))));
+        }
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_loeschen"), () -> Wegpunkte.INSTANZ.loesche(f)));
+    }
+
+    /** „Form fertig“ ab zwei Ecken und „Form abbrechen“ für die Form im Bau. */
+    private void bauEnde(List<Eintrag> neu) {
+        if (zug.size() >= 2) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_fertig"), this::fertig));
+        }
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_abbrechen"), () -> zug = null));
+    }
+
+    /**
+     * Das allgemeine Menü an (x, y): Teleport, Wegpunkt, Formen beginnen und bauen, die Einträge einer Ecke dort und eines alten
+     * Rechtecks, wenn seine Raute {@code marke} getroffen ist. Die Fläche einer eigenen Form hat hier keine Einträge mehr.
+     */
+    private void allgemein(double x, double y, int[] z, String dimension, Wegpunkte.Punkt punkt, Wegpunkte.Region region, List<Eintrag> neu) {
         if (minecraft.getConnection() != null && !minecraft.level.dimensionType().hasCeiling()
                 && Teleport.erlaubt(minecraft.getConnection().getCommands())) {
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.teleport", z[0], z[1]), () -> {
@@ -1335,10 +1521,7 @@ final class Karte extends Screen {
         } else {
             int[] b = punkt != null ? z : eckBlock(x, y, null);
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> hinzu(b[0], b[1])));
-            if (zug.size() >= 2) {
-                neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_fertig"), this::fertig));
-            }
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_abbrechen"), () -> zug = null));
+            bauEnde(neu);
         }
         if (ecke != null) {
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> bearbeite(ecke)));
@@ -1348,18 +1531,9 @@ final class Karte extends Screen {
                 Wegpunkte.INSTANZ.ersetze(ecke.form(), rest);
             }));
         }
-        Wegpunkte.EigeneForm eigen = punkt == null ? eigeneUnter(x, y) : null;
-        if (eigen != null) {
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_loeschen"), () -> Wegpunkte.INSTANZ.loesche(eigen)));
-        }
         if (region != null) {
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_loeschen"), () -> Wegpunkte.INSTANZ.loesche(region)));
         }
-        ziel = z;
-        eintraege = neu;
-        // Das Menü bleibt ganz auf dem Schirm, auch bei grossem GUI-Massstab.
-        menueX = Math.max(0, Math.min(Mth.floor(x), width - menueBreite()));
-        menueY = Math.max(0, Math.min(Mth.floor(y), height - neu.size() * ZEILE));
     }
 
     /**
@@ -1386,7 +1560,7 @@ final class Karte extends Screen {
     @Override
     public boolean mouseDragged(MouseButtonEvent ereignis, double dx, double dy) {
         // Ein Zug, der in der Tafel beginnt, oder einer mit einem Wegpunkt an der Maus schiebt die Karte nicht.
-        if (klickVerbraucht || haengt != null || eckeHaengt != null) {
+        if (klickVerbraucht || haengt != null || eckeHaengt != null || griffHaengt != null) {
             return true;
         }
         // Die Tasten zählen wie in SDL, links ist 1. Siehe docs/entwicklung.md, „Maustasten“.
@@ -1395,6 +1569,7 @@ final class Karte extends Screen {
             if (gezogen > ZUG) {
                 gedrueckt = null;
                 eckeGedrueckt = null;
+                griffGedrueckt = null;
             }
             blick.schiebe(dx, dy);
             return true;
@@ -1422,9 +1597,15 @@ final class Karte extends Screen {
     @Override
     public boolean keyPressed(KeyEvent ereignis) {
         // Escape lässt zuerst einen Wegpunkt an der Maus, wo er war; das Loslassen danach tut nichts.
-        if (ereignis.key() == InputConstants.KEY_ESCAPE && (haengt != null || eckeHaengt != null)) {
+        if (ereignis.key() == InputConstants.KEY_ESCAPE && (haengt != null || eckeHaengt != null || griffHaengt != null)) {
             haengt = null;
             eckeHaengt = null;
+            griffHaengt = null;
+            // Auch, was gedrückt ist: Sonst hinge es bei gehaltener Taste im nächsten Frame wieder an der Maus, und das Loslassen
+            // danach, das hier verbraucht ist, liesse es dort.
+            gedrueckt = null;
+            eckeGedrueckt = null;
+            griffGedrueckt = null;
             klickVerbraucht = true;
             return true;
         }
@@ -1451,6 +1632,8 @@ final class Karte extends Screen {
     /** Beim Schliessen und vor jedem Untermenü: Mitte, Stufe und Lupe merken. */
     @Override
     public void removed() {
+        // Was beim Schliessen noch an der Maus hing, steht wieder an seinem Ort.
+        Wegpunkte.INSTANZ.ziehe(null);
         if (blick != null && gestellt) {
             Kartenlage.schreibe(Downloads.weltOrdner(), satz,
                     new Kartenlage.Lage(blick.mx / satz.scale(), blick.mz / satz.scale(), blick.zoom, blick.lupe));

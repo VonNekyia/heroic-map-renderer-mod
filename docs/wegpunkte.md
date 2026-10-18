@@ -46,12 +46,22 @@ Formen“ (mod#79, mod#112).
 | Linksklick auf die Karte, solange eine Form im Bau ist | setzt eine Ecke, auf einem Wegpunkt auf dessen Block, statt ihn in die Mitte zu legen, sonst auf den Block darunter; auf die erste Ecke schliesst er bei drei und mehr die Region. Ziehen verschiebt die Karte wie sonst |
 | Rechtsklick, „Eckpunkt hinzufügen“ | im Bau: eine Ecke hier, wie ein Linksklick; auf einer Ecke einer fertigen Form: neue Ecken zwischen ihr und der nächsten |
 | Rechtsklick auf eine Ecke, „Eckpunkt löschen“ | nimmt sie aus der Form; aus einer Region mit drei Ecken wird eine Linie, eine Linie mit zwei fällt weg |
-| Linke Taste 0,5 s still auf einer Ecke halten | sie hängt an der Maus und liegt beim Loslassen auf dem Block darunter; `Esc` bricht ab |
+| Linke Taste 0,5 s still auf einer Ecke halten | sie hängt an der Maus, die Form folgt ihr, und sie liegt beim Loslassen auf dem Block darunter; `Esc` bricht ab |
+| Linke Taste 0,5 s still auf dem Griff in der Mitte einer Form halten | die ganze Form hängt an der Maus; beim Loslassen liegt sie um ganze Blöcke verschoben; `Esc` bricht ab, siehe „Eigene Formen“ |
 | Rechtsklick, „Form fertig“ | speichert die Form im Bau, mit zwei Ecken eine Linie, mit mehr eine Region; den Eintrag gibt es ab zwei Ecken |
 | Rechtsklick, „Form abbrechen“, oder `Esc` | verwirft die Form im Bau; eine geänderte bleibt, wie sie war |
-| Rechtsklick in eine eigene Region oder auf eine eigene Linie | „Form löschen“ |
-| Rechtsklick in ein altes Rechteck oder auf seine Raute | „Region löschen“ |
+| Rechtsklick auf den Griff einer eigenen Form | ihr Menü: „An die Minimap heften“ oder „Von der Minimap lösen“, „Eckpunkt hinzufügen“, „Form löschen“; siehe „Eigene Formen“ |
+| Rechtsklick auf die Raute eines alten Rechtecks | „Region löschen“ |
 
+- **Unter der Maus** steht hervorgehoben, was ein Klick dort träfe: ein
+  Wegpunkt oder die Raute eines alten Rechtecks mit hellem statt bunten oder
+  ohne Ring, eine Ecke oder ein Griff mit hellem statt dunklem Rand
+  (`Karte.schwebe`). Eine Marke geht einer Ecke vor, eine Ecke einem Griff,
+  wie beim Klick. Nichts, solange ein Menü offen ist, etwas gezogen wird
+  oder die Maus über einem Knopf oder der Tafel steht. In Einheiten des GUI,
+  im selben Zug wie die Marke gezeichnet; so flackert nichts. Gewünscht vom
+  User am 18.10., „dass man sieht, dass man damit interagieren kann“
+  (mod#128).
 - **Doppelklick:** Das Spiel meldet einen Klick als doppelt, wenn derselbe
   Knopf im selben Schirm weniger als 250 ms nach dem letzten kommt, gleich
   wo, und nur, wenn der Schirm den letzten Klick angenommen hat
@@ -288,8 +298,9 @@ sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
   Esc bricht ab“. Ein Rechtsklick schliesst nie sofort ab; das Menü hat
   dann: „Hierher teleportieren“, wenn erlaubt; „Wegpunkt setzen“, auf einem
   Wegpunkt „Wegpunkt löschen“; „Eckpunkt hinzufügen“; „Form fertig“ ab zwei
-  Ecken; „Form abbrechen“; „Form löschen“ oder „Region löschen“, wenn dort
-  eine liegt.
+  Ecken; „Form abbrechen“; „Region löschen“ auf der Raute eines alten
+  Rechtecks. Auf dem Griff einer Form das Menü der Form, siehe „Griff“, mit
+  „Form fertig“ und „Form abbrechen“ für die Form im Bau.
 - **Keine Tafel,** solange die Form im Bau ist (`Karte.tafel`). Sonst ging
   die Tafel einer Region vom Server dort auf, wo das Menü war, lag über den
   Stellen, die der Spieler anklickt, und nahm deren Klick; so fügte ein
@@ -318,9 +329,38 @@ sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
   Aus einer Region mit drei Ecken wird eine Linie; eine Linie mit zwei Ecken
   fällt weg, eine Ecke allein ist keine Form.
 - **Verschieben:** Linke Taste 0,5 s still auf einer Ecke halten, wie bei
-  einem Wegpunkt: Sie hängt an der Maus, beim Loslassen liegt sie auf dem
-  Block darunter; `Esc` bricht ab. Liegt sie dann auf dem Block ihrer
-  Nachbarin, werden beide eine.
+  einem Wegpunkt: Sie hängt an der Maus und folgt ihr genau, nicht auf
+  ganze Blöcke, und die Form folgt mit (`Karte.punkte`); an ihrem alten Ort
+  fällt die Form solange weg (`Wegpunkte.ziehe`). Beim Loslassen liegt die
+  Ecke auf dem Block darunter; `Esc` bricht ab. Liegt sie dann auf dem
+  Block ihrer Nachbarin, werden beide eine. Bis 0.2.41 hing nur die Ecke an
+  der Maus, und die Form sprang erst beim Loslassen nach; so hat es der User
+  am 18.10. gewünscht (mod#128). Ein Wegpunkt folgt der Maus ebenso; an ihm
+  hängt keine Form.
+- **Griff:** In der Mitte jeder Form steht ein Griff, ein Quadrat in ihrer
+  Farbe mit dunklem Rand und hellem Kern, grösser als eine Ecke
+  (`Karte.griff`): bei einer Linie auf halber Länge, bei einer Region im
+  Schwerpunkt ihrer Fläche, ohne Fläche in der Mitte ihres Kastens
+  (`Wegpunkte.griff`). Linke Taste 0,5 s still darauf halten: Die ganze
+  Form hängt an der Maus und folgt ihr; beim Loslassen liegen alle Ecken um
+  den Weg der Maus verschoben, auf ganze Blöcke gerundet; `Esc` bricht ab.
+  Eine Ecke geht dem Griff vor, eine Marke beiden. Ein kurzer Klick tut,
+  was ein Klick dort sonst tut. Gewünscht vom User am 18.10. (mod#128).
+- **Menü am Griff:** Ein Rechtsklick auf den Griff öffnet nur das Menü der
+  Form (`Karte.formMenue`): „An die Minimap heften“ oder „Von der Minimap
+  lösen“, wie der Doppelklick; „Eckpunkt hinzufügen“, neue Ecken hinter der
+  letzten, bei einer Region zwischen der letzten und der ersten, wie auf
+  einer Ecke; „Form löschen“. Ist eine Form im Bau, fehlt „Eckpunkt
+  hinzufügen“, dafür kommen „Form fertig“ und „Form abbrechen“ dazu
+  (`Karte.bauEnde`). In die Fläche einer Region oder auf eine Linie
+  geklickt, kommt das allgemeine Menü ohne Einträge der Form; so löscht
+  niemand eine Form, der nur einen Wegpunkt in ihr setzen will. Bis 0.2.41
+  stand „Form löschen“ überall in der Form. Gewünscht vom User am 18.10.,
+  Rechtsklick auf die Mitte (mod#128).
+- **`Esc`** lässt eine gedrückte Taste auf Ecke, Griff oder Wegpunkt los,
+  nicht nur das, was schon an der Maus hängt (`Karte.keyPressed`). Sonst
+  hängte das Halten das Ding nach `Esc` wieder an, und das Loslassen ging
+  ins Leere.
 - **Wegpunkte** und Formen sind getrennt. Wer einen Wegpunkt verschiebt
   oder löscht, ändert keine Form. Bis 0.2.37 nannte eine Form die ids ihrer
   Wegpunkte und ging mit ihnen; eine alte Datei zieht beim Lesen um, siehe
@@ -341,8 +381,8 @@ sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
 - **Treffer:** in einer Region, oder höchstens 3 Einheiten des GUI neben
   einer Linie (`Karte.eigeneUnter`, `Tafeln.abstand`); überlappen zwei, die
   zuletzt gebaute. Ein Wegpunkt geht vor.
-- **Löschen:** Rechtsklick in die Region oder auf die Linie, „Form
-  löschen“.
+- **Löschen:** Rechtsklick auf den Griff, „Form löschen“, siehe „Menü am
+  Griff“.
 - **Anheften:** Doppelklick, siehe „Anheften“. Auch Linien, entschieden
   vom Reviewer; den Schleier in der Welt bekommen nur Regionen.
 
@@ -359,8 +399,8 @@ ohne Umwandlung.
   1 Einheit Rand deckend, auf ganzen Pixeln wie die Kacheln. In ihrer Mitte
   die Raute eines Wegpunkts; sie verhält sich wie eine Marke: Ein Klick legt
   sie in die Mitte, ausserhalb des Schirms steht sie am Rand.
-- **Löschen:** Rechtsklick in die Region oder auf ihre Raute, „Region
-  löschen“; überlappen zwei, die zuletzt gesetzte.
+- **Löschen:** Rechtsklick auf ihre Raute, „Region löschen“. Bis 0.2.41
+  ging es überall in der Fläche, wie bei den eigenen Formen (mod#128).
 - **Anheften:** Doppelklick auf die Raute, siehe „Anheften“.
 - **Minimap:** nur angeheftet, siehe „Anheften“.
 
@@ -481,7 +521,8 @@ Schleier am Rand, siehe „Schleier“.
   `formenMitEigenenEckenBleiben` (auch: Wegpunkte verschieben oder löschen
   ändert keine Form), `eckeLoeschenUndEinfuegen` (Region mit drei Ecken wird
   Linie, Linie mit zwei fällt weg, über 64 nicht) und
-  `formenGrenzenUndAlteDatei` (Umzug von `punkte` zu `ecken`).
+  `formenGrenzenUndAlteDatei` (Umzug von `punkte` zu `ecken`),
+  `griffAufHalberLaengeOderImSchwerpunkt`.
 - `SchleierTest`: Teilen an jeder ganzen Zahl, auch rückwärts und durch
   eine Ecke; ein Rechteck ein Stück je Block, nur im Kasten; ein Kreis in
   Sehnen über den Bogen, ein Kreis von 100 000 Blöcken nur beim Kasten;
@@ -520,7 +561,8 @@ Schleier am Rand, siehe „Schleier“.
   von hier“, ein Linksklick und „Form fertig“ geben eine Linie; ein
   Doppelklick in die Region heftet sie an und nicht die Region vom Server;
   ein Doppelklick von Hand auf einen Wegpunkt in ihr heftet ihn an, und
-  die Karte bleibt stehen; „Form löschen“ löscht die Region. Im Tempo
+  die Karte bleibt stehen; ein Rechtsklick in die Fläche bietet kein „Form
+  löschen“, einer auf den Griff löscht die Region. Im Tempo
   eines Spielers (mod#112, `Bedienung.tempoKlick`: der Zeiger kommt einen
   Tick vor dem Drücken an, Drücken und Loslassen im selben Frame, die
   Pause nach der Uhr; kommt der Zeiger auf einem langsamen Rechner später an, drückt er gleich): auf einem Wegpunkt „Linie/Region von hier“, dann
@@ -538,7 +580,15 @@ Schleier am Rand, siehe „Schleier“.
   die zweite Stelle; 700 ms gehalten hängt eine Ecke an der Maus und liegt
   nach dem Loslassen 2 bis 3 Blöcke weiter; eine Linie mit zwei Ecken fällt
   beim Löschen einer weg; im Bau gelöscht, speichert „Form fertig“ nichts
-  und zeigt den Hinweis.
+  und zeigt den Hinweis. Formen ziehen (`formenZiehen`): eine gehaltene
+  Ecke einer Linie folgt der Maus, und im Bildschirmfoto liegt die Farbe der
+  Linie schon vor dem Loslassen mitten auf ihrem neuen Weg und nicht mehr
+  auf dem alten (`form-live`); am Griff einer Region folgt der Griff, und
+  nach dem Loslassen liegen alle Ecken um den Weg der Maus in ganzen Blöcken
+  weiter; `Esc` lässt sie, wo sie war, und danach hängt nichts mehr an der
+  Maus, auch bei noch gedrückter Taste. Unter der Maus (`schweben`): Auf
+  einem Wegpunkt, einer Ecke und einem Griff zählt das Bildschirmfoto um
+  die Stelle mehr weisse Pixel als mit der Maus 20 Einheiten daneben.
 - `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
   [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und

@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.sun.net.httpserver.HttpServer;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -16,6 +17,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.Deflater;
+import javax.imageio.ImageIO;
 import net.fabricmc.fabric.api.client.gametest.v1.TestInput;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -138,6 +140,8 @@ public final class Bedienung implements FabricClientGameTest {
         zweiMarkenImTempo(context, maus, k);
         formAufLeererKarte(context, maus, k);
         eckenBearbeiten(context, maus, k);
+        formenZiehen(context, maus, k);
+        schweben(context, maus, k);
         ebenen(context, maus, k);
         zumSpieler(context, maus, k);
         optionen(context, maus, k);
@@ -531,10 +535,20 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("Doppelklick von Hand auf den Wegpunkt: angeheftet " + angeheftet(context, neu.get(1)) + ", Mitte "
                     + Arrays.toString(stand) + " -> " + Arrays.toString(danach));
         }
-        warte250();
-        eintrag(context, maus, k, ix, iy, "heroicmap.karte.form_loeschen");
+        // Ein Rechtsklick auf die Fläche, ein Drittel vom Griff zur ersten Ecke, zeigt nur das allgemeine Menü (mod#128);
+        // auf dem Griff in der Mitte, wie gezeichnet, das der Form mit „Form löschen“.
+        double[] griff = griff(context, formen), erste = ecke(context, formen, 0);
+        double fx = (2 * griff[0] + erste[0]) / 3, fy = (2 * griff[1] + erste[1]) / 3;
+        List<String> flaeche = eintraegeBei(context, maus, k, fx, fy);
+        String loeschen = context.computeOnClient(mc -> Component.translatable("heroicmap.karte.form_loeschen").getString());
+        if (flaeche.contains(loeschen) || !flaeche.contains(context.computeOnClient(mc -> Component.translatable("heroicmap.karte.wegpunkt").getString()))) {
+            throw new AssertionError("Rechtsklick auf die Fläche der Region zeigt nicht nur das allgemeine Menü: " + flaeche);
+        }
+        // Die Tafel der Region vom Server, die beim Rechtsklick auf die Fläche aufging, läge sonst über dem Griff.
+        tafelZu(context, maus, k);
+        eintrag(context, maus, k, griff[0], griff[1], "heroicmap.karte.form_loeschen");
         if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size()) != formen + 1) {
-            throw new AssertionError("„Form löschen“ löschte die Region nicht");
+            throw new AssertionError("„Form löschen“ am Griff löschte die Region nicht");
         }
         warte250();
     }
@@ -745,6 +759,242 @@ public final class Bedienung implements FabricClientGameTest {
         }
     }
 
+    /**
+     * Formen live ziehen (mod#128): Eine gehaltene Ecke einer Linie folgt der Maus, und die Linie mit ihr, schon vor dem
+     * Loslassen; im Bildschirmfoto liegt die Farbe der Linie mitten auf ihrem neuen Weg, nicht mehr auf dem alten. Am Griff
+     * in der Mitte einer Region hängt nach 700 ms die ganze Form an der Maus, der Griff folgt, und nach dem Loslassen liegen
+     * alle Ecken um ganze Blöcke verschoben. Escape lässt sie, wo sie war. Siehe docs/wegpunkte.md, „Eigene Formen“.
+     */
+    private static void formenZiehen(ClientGameTestContext context, TestInput maus, int k) {
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        // Rechts unter der Mitte, wo sonst nichts liegt; ein Block sind 4 Einheiten.
+        int bx = mitte[0] + 12, bz = mitte[1] + 8;
+        List<Wegpunkte.Ecke> linie = List.of(new Wegpunkte.Ecke(bx, bz), new Wegpunkte.Ecke(bx + 10, bz));
+        List<Wegpunkte.Ecke> region = List.of(new Wegpunkte.Ecke(bx, bz + 12), new Wegpunkte.Ecke(bx + 6, bz + 12),
+                new Wegpunkte.Ecke(bx + 6, bz + 18), new Wegpunkte.Ecke(bx, bz + 18));
+        try {
+            context.runOnClient(mc -> {
+                String dimension = mc.level.dimension().identifier().toString();
+                Wegpunkte.INSTANZ.setzeForm(dimension, linie);
+                Wegpunkte.INSTANZ.setzeForm(dimension, region);
+            });
+            context.waitTicks(2);
+            double[] a = ecke(context, formen, 0), b = ecke(context, formen, 1);
+            frei(context, new double[][] {a, b, griff(context, formen + 1)});
+
+            // Die zweite Ecke der Linie halten und 20 Einheiten nach unten ziehen, ohne loszulassen.
+            warte250();
+            maus.setCursorPos(b[0] * k, b[1] * k);
+            context.waitTick();
+            long druck = Util.getMillis();
+            maus.holdMouse(LINKS);
+            zittereBis(context, maus, b[0] * k, b[1] * k, druck + 700);
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eckeHaengt()) == null) {
+                maus.releaseMouse(LINKS);
+                throw new AssertionError("Nach " + (Util.getMillis() - druck) + " ms gehalten hängt die Ecke der Linie nicht an der Maus");
+            }
+            for (int i = 0; i < 5; i++) {
+                maus.moveCursor(0, 4 * k);
+                context.waitTick();
+            }
+            context.waitTicks(2);
+            double[] an = ecke(context, formen, 1);
+            Path bild = context.takeScreenshot(TestScreenshotOptions.of("form-live").disableCounterPrefix());
+            int farbe = context.computeOnClient(mc -> Wegpunkte.FARBEN[Wegpunkte.INSTANZ.eigeneFormen().get(formen).farbe()]);
+            if (Math.abs(an[0] - b[0]) > 1 || Math.abs(an[1] - (b[1] + 20)) > 1) {
+                maus.releaseMouse(LINKS);
+                throw new AssertionError("Die gehaltene Ecke folgt der Maus nicht: " + Arrays.toString(an) + ", die Maus bei "
+                        + b[0] + "," + (b[1] + 20));
+            }
+            // Auf einem Viertel des Wegs, nicht der Hälfte: Dort sitzt der Griff. Alter und neuer Weg liegen dort 5 Einheiten auseinander.
+            boolean neuDa = linieDa(bild, k, a[0] + (an[0] - a[0]) / 4, a[1] + (an[1] - a[1]) / 4, farbe);
+            boolean altDa = linieDa(bild, k, a[0] + (b[0] - a[0]) / 4, a[1] + (b[1] - a[1]) / 4, farbe);
+            if (!neuDa || altDa) {
+                maus.releaseMouse(LINKS);
+                throw new AssertionError("Die Linie folgt der gehaltenen Ecke nicht vor dem Loslassen: auf dem neuen Weg " + neuDa
+                        + ", auf dem alten " + altDa);
+            }
+            maus.releaseMouse(LINKS);
+            context.waitTicks(2);
+            Wegpunkte.Ecke zweite = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
+            if (zweite.x() != bx + 10 || zweite.z() != bz + 5) {
+                throw new AssertionError("Nach dem Loslassen liegt die Ecke auf " + zweite + " statt " + new Wegpunkte.Ecke(bx + 10, bz + 5));
+            }
+
+            // Am Griff der Region halten und gut 8 Einheiten nach rechts und unten ziehen: Der Griff folgt der Maus, wie das Spiel sie sieht,
+            // samt dem Zittern beim Halten; nach dem Loslassen liegt alles um den Weg der Maus in ganzen Blöcken weiter.
+            warte250();
+            double[] gr = griff(context, formen + 1);
+            maus.setCursorPos(gr[0] * k, gr[1] * k);
+            context.waitTick();
+            druck = Util.getMillis();
+            maus.holdMouse(LINKS);
+            zittereBis(context, maus, gr[0] * k, gr[1] * k, druck + 700);
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).griffHaengt()) == null) {
+                maus.releaseMouse(LINKS);
+                throw new AssertionError("Nach " + (Util.getMillis() - druck) + " ms gehalten hängt die Region nicht am Griff");
+            }
+            for (int i = 0; i < 4; i++) {
+                maus.moveCursor(2 * k, 2 * k);
+                context.waitTick();
+            }
+            context.waitTicks(2);
+            double[] grAn = griff(context, formen + 1), jetzt = mausImGui(context);
+            if (Math.hypot(jetzt[0] - gr[0], jetzt[1] - gr[1]) < 8 || Math.abs(grAn[0] - Math.floor(jetzt[0])) > 1
+                    || Math.abs(grAn[1] - Math.floor(jetzt[1])) > 1) {
+                maus.releaseMouse(LINKS);
+                throw new AssertionError("Der Griff folgt der Maus nicht: " + Arrays.toString(grAn) + ", die Maus bei " + Arrays.toString(jetzt)
+                        + ", gedrückt bei " + Arrays.toString(gr));
+            }
+            maus.releaseMouse(LINKS);
+            context.waitTicks(2);
+            // Ein Block sind 4 Einheiten.
+            int dx = (int) Math.round((jetzt[0] - gr[0]) / 4), dz = (int) Math.round((jetzt[1] - gr[1]) / 4);
+            List<Wegpunkte.Ecke> verschoben = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1).ecken());
+            List<Wegpunkte.Ecke> soll = region.stream().map(c -> new Wegpunkte.Ecke(c.x() + dx, c.z() + dz)).toList();
+            if (!verschoben.equals(soll)) {
+                throw new AssertionError("Am Griff verschoben: " + verschoben + " statt " + soll);
+            }
+
+            // Noch einmal am Griff, aber Escape: Die Region bleibt, wo sie war.
+            warte250();
+            double[] gr2 = griff(context, formen + 1);
+            maus.setCursorPos(gr2[0] * k, gr2[1] * k);
+            context.waitTick();
+            druck = Util.getMillis();
+            maus.holdMouse(LINKS);
+            zittereBis(context, maus, gr2[0] * k, gr2[1] * k, druck + 700);
+            maus.moveCursor(12 * k, 0);
+            context.waitTick();
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTick();
+            maus.releaseMouse(LINKS);
+            context.waitTicks(2);
+            if (!context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1).ecken()).equals(soll)
+                    || !(context.computeOnClient(mc -> mc.gui.screen()) instanceof Karte)) {
+                throw new AssertionError("Escape am Griff liess die Region nicht, wo sie war, oder schloss die Karte");
+            }
+            // Bei noch gehaltener Taste hing sie bis hier im nächsten Frame wieder an der Maus, und das Loslassen liess sie dort.
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).griffHaengt()) != null) {
+                throw new AssertionError("Nach Escape und Loslassen hängt die Region noch am Griff");
+            }
+        } finally {
+            warte250();
+            context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size())
+                    .forEach(Wegpunkte.INSTANZ::loesche));
+            context.waitTicks(2);
+        }
+    }
+
+    /**
+     * Hervorheben unter der Maus (mod#128): Steht die Maus auf einem Wegpunkt, auf einer Ecke oder auf dem Griff einer Form, hat
+     * er einen hellen Rand; steht sie 20 Einheiten daneben, nicht. Gezählt werden im Bildschirmfoto die weissen Pixel um die Stelle.
+     * Siehe docs/wegpunkte.md, „Bedienung“.
+     */
+    private static void schweben(ClientGameTestContext context, TestInput maus, int k) {
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        // Links über der Mitte, wo sonst nichts liegt; ein Block sind 4 Einheiten.
+        int bx = mitte[0] - 30, bz = mitte[1] - 12;
+        try {
+            context.runOnClient(mc -> {
+                String dimension = mc.level.dimension().identifier().toString();
+                Wegpunkte.INSTANZ.setze(dimension, bx, bz);
+                Wegpunkte.INSTANZ.setzeForm(dimension, List.of(new Wegpunkte.Ecke(bx + 6, bz), new Wegpunkte.Ecke(bx + 16, bz)));
+            });
+            context.waitTicks(2);
+            Wegpunkte.Punkt neu = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
+            Karte.Marke wp = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).marken().stream()
+                    .filter(m -> neu.equals(m.punkt())).findFirst().orElseThrow());
+            double[][] ziele = {{wp.x(), wp.y()}, ecke(context, formen, 0), griff(context, formen)};
+            String[] namen = {"Wegpunkt", "Ecke", "Griff"};
+            for (int i = 0; i < ziele.length; i++) {
+                double[] z = ziele[i];
+                double[] daneben = {z[0], z[1] - 20};
+                frei(context, new double[][] {daneben});
+                maus.setCursorPos(z[0] * k, z[1] * k);
+                context.waitTicks(2);
+                String unter = context.computeOnClient(mc -> {
+                    Karte karte = (Karte) mc.gui.screen();
+                    return "hervorgehoben " + karte.schwebt() + ", " + karte.schwebeGrund((int) z[0], (int) z[1]) + ", Maus "
+                            + mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth() + ","
+                            + mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
+                });
+                int an = weisse(context.takeScreenshot(TestScreenshotOptions.of("schweben-" + i).disableCounterPrefix()), k, z, 6);
+                maus.setCursorPos(daneben[0] * k, daneben[1] * k);
+                context.waitTicks(2);
+                int aus = weisse(context.takeScreenshot(TestScreenshotOptions.of("schweben-" + i + "-aus").disableCounterPrefix()), k, z, 6);
+                if (an < aus + 8) {
+                    throw new AssertionError(namen[i] + " unter der Maus ohne hellen Rand: " + an + " weisse Pixel, daneben " + aus + "; " + unter);
+                }
+            }
+        } finally {
+            context.runOnClient(mc -> {
+                List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size())
+                        .forEach(Wegpunkte.INSTANZ::loesche);
+            });
+            context.waitTicks(2);
+        }
+    }
+
+    /** Die fast weissen Pixel im Quadrat ±{@code r} Einheiten um (x, y) im Bildschirmfoto. */
+    private static int weisse(Path bild, int k, double[] mitte, int r) {
+        try {
+            BufferedImage b = ImageIO.read(bild.toFile());
+            int n = 0;
+            for (int y = (int) ((mitte[1] - r) * k); y < (mitte[1] + r) * k; y++) {
+                for (int x = (int) ((mitte[0] - r) * k); x < (mitte[0] + r) * k; x++) {
+                    int p = b.getRGB(x, y);
+                    n += (p >> 16 & 0xFF) >= 0xF0 && (p >> 8 & 0xFF) >= 0xF0 && (p & 0xFF) >= 0xF0 ? 1 : 0;
+                }
+            }
+            return n;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** Wo die Maus für das Spiel steht, in Einheiten des GUI, nicht gerundet. */
+    private static double[] mausImGui(ClientGameTestContext context) {
+        return context.computeOnClient(mc -> new double[] {
+            mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth(),
+            mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight()});
+    }
+
+    /** Der Griff der eigenen Form Nummer {@code form} auf dem Schirm, wie zuletzt gezeichnet. */
+    private static double[] griff(ClientGameTestContext context, int form) {
+        return context.computeOnClient(mc -> {
+            Wegpunkte.EigeneForm f = Wegpunkte.INSTANZ.eigeneFormen().get(form);
+            Karte.GriffAn g = ((Karte) mc.gui.screen()).griffe().stream().filter(x -> x.form().equals(f)).findFirst()
+                    .orElseThrow(() -> new AssertionError("Kein Griff von " + f + " auf dem Schirm"));
+            return new double[] {g.x(), g.y()};
+        });
+    }
+
+    /** Liegt im Bildschirmfoto bei (x, y) in Einheiten des GUI die Farbe einer eigenen Linie, auf 12 je Kanal genau? */
+    private static boolean linieDa(Path bild, int k, double x, double y, int farbe) {
+        try {
+            int p = ImageIO.read(bild.toFile()).getRGB((int) Math.round(x * k), (int) Math.round(y * k));
+            for (int s = 0; s < 24; s += 8) {
+                if (Math.abs((p >> s & 0xFF) - (farbe >> s & 0xFF)) > 12) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     /** Die Ecke {@code index} der eigenen Form Nummer {@code form} auf dem Schirm, wie zuletzt gezeichnet. */
     private static double[] ecke(ClientGameTestContext context, int form, int index) {
         return context.computeOnClient(mc -> {
@@ -820,6 +1070,18 @@ public final class Bedienung implements FabricClientGameTest {
     }
 
     /** Lässt die Tafel der grossen Region aufgehen, wo der Zeiger steht: Frage als gesendet, Antwort abgelegt. */
+    /** Fährt den Zeiger auf „Optionen“ unten rechts, wo er auf kein Ziel zeigt, bis eine offene Tafel zu ist. */
+    private static void tafelZu(ClientGameTestContext context, TestInput maus, int k) {
+        int[] schirm = context.computeOnClient(mc -> new int[] {mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight()});
+        fahre(context, maus, k, schirm[0] - 30, schirm[1] - 14);
+        for (int i = 0; i < 100 && context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelOffen()); i++) {
+            context.waitTick();
+        }
+        if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelOffen())) {
+            throw new AssertionError("Die Tafel ging über „Optionen“ nach 5 s nicht zu");
+        }
+    }
+
     private static void tafelDerRegion(ClientGameTestContext context) {
         context.waitTicks(3);
         context.runOnClient(mc -> Tafeln.INSTANZ.antwort(Tafeln.Antwort.lies(LAND)));
@@ -875,6 +1137,25 @@ public final class Bedienung implements FabricClientGameTest {
      * Rechtsklick bei (x, y), dann ein Klick auf den Eintrag mit diesem Text; die Einträge stehen 14 Einheiten untereinander.
      * Gibt die Zeit des Klicks auf den Eintrag.
      */
+    /**
+     * Die Einträge des Menüs nach einem Rechtsklick wie von Hand bei (x, y). Ein Linksklick 10 Einheiten links darüber, ausserhalb
+     * des Menüs, das dort beginnt, schliesst es wieder und tut sonst nichts.
+     */
+    private static List<String> eintraegeBei(ClientGameTestContext context, TestInput maus, int k, double x, double y) {
+        warte250();
+        maus.setCursorPos(x * k, y * k);
+        context.waitTick();
+        maus.pressMouse(RECHTS);
+        context.waitTicks(2);
+        List<String> alle = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eintraege().stream().map(Component::getString).toList());
+        warte250();
+        maus.setCursorPos((x - 10) * k, (y - 10) * k);
+        context.waitTick();
+        maus.pressMouse(LINKS);
+        context.waitTicks(2);
+        return alle;
+    }
+
     private static long eintrag(ClientGameTestContext context, TestInput maus, int k, double x, double y, String schluessel) {
         warte250();
         maus.setCursorPos(x * k, y * k);
