@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.45
+
+- **The full map stays sharp while changing zoom levels.** Until the tiles of the new level are loaded, it shows the finer level you just saw, scaled down, instead of a dark screen or the coarser level scaled up.
+
 ## 0.2.44
 
 - **Name your lines and regions.** Right-click a shape's handle and choose "Name…": type a name and press Enter. It shows on the full map in the same lettering as the names from the server, sized to the shape and next to the handle, and on the minimap when the shape is pinned. Leave it empty to remove the name; Esc cancels.
