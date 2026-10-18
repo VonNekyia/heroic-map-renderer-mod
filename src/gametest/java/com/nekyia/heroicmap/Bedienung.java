@@ -28,6 +28,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptio
 import net.minecraft.client.MouseHandler;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.network.chat.Component;
@@ -1969,9 +1970,10 @@ public final class Bedienung implements FabricClientGameTest {
     }
 
     /**
-     * „Hierher teleportieren“ mit fester Höhe, siehe docs/vollbildkarte.md, „Teleportieren“: über Wasser in einem Chunk, den
-     * der Client hat, auf die Oberfläche, nicht auf den Grund; und in einen Chunk, den weder Client noch Server geladen
-     * haben, mit dem Boden der Karte, den der Mod genau einmal per HTTP holt, auf den Boden der flachen Welt.
+     * „Hierher teleportieren“, siehe docs/vollbildkarte.md, „Teleportieren“: über Wasser in einem Chunk, den der Client
+     * hat, auf die Oberfläche, nicht auf den Grund; in einen Chunk, den weder Client noch Server geladen haben, mit dem
+     * Boden der Karte, den der Mod genau einmal per HTTP holt, auf den Boden der flachen Welt. Dazu die Korrektur: mit
+     * veralteten Höhen, ohne Daten in einen Chunk, den der Server hat, und einen, den er nicht hat, und im Nether.
      */
     private static void teleport(ClientGameTestContext context, TestServerContext server, TestInput maus, int k) {
         // Ein Becken aus Glas, das Wasser darin 6 hoch: der Grund bei y = -61, die Oberfläche im Block -55.
@@ -1985,6 +1987,12 @@ public final class Bedienung implements FabricClientGameTest {
             werte[i + 1] = (byte) (-61 >> 8);
         }
         byte[] gepackt = pack(werte);
+        // Veraltet für die Region um (4000, 4000): -63 nennt den Boden zwei Blöcke zu tief.
+        for (int i = 0; i < werte.length; i += 2) {
+            werte[i] = (byte) -63;
+            werte[i + 1] = (byte) (-63 >> 8);
+        }
+        byte[] veraltet = pack(werte);
         AtomicInteger abrufe = new AtomicInteger();
         HttpServer http;
         try {
@@ -1994,10 +2002,11 @@ public final class Bedienung implements FabricClientGameTest {
         }
         http.createContext("/tiles/", austausch -> {
             abrufe.incrementAndGet();
-            boolean da = austausch.getRequestURI().getPath().equals("/tiles/ground/3.3.bin");
-            austausch.sendResponseHeaders(da ? 200 : 404, da ? gepackt.length : -1);
-            if (da) {
-                austausch.getResponseBody().write(gepackt);
+            String pfad = austausch.getRequestURI().getPath();
+            byte[] antwort = pfad.equals("/tiles/ground/3.3.bin") ? gepackt : pfad.equals("/tiles/ground/7.7.bin") ? veraltet : null;
+            austausch.sendResponseHeaders(antwort != null ? 200 : 404, antwort != null ? antwort.length : -1);
+            if (antwort != null) {
+                austausch.getResponseBody().write(antwort);
             }
             austausch.close();
         });
@@ -2047,10 +2056,112 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Teleport in die Ferne: y " + y + " statt -60, auf dem Gras mit Luft an den Füssen " + steht
                         + ", Abrufe " + abrufe.get() + " statt 1");
             }
+            korrektur(context, server, maus, k, baum);
+            nether(context, server, maus, k, baum);
         } finally {
             http.stop(0);
             context.runOnClient(mc -> mc.gui.setScreen(null));
         }
+    }
+
+    /**
+     * Die Korrektur nach dem Landen ohne Decke. Der Spieler steht vorher in einem Loch auf dem Grundgestein, bei y = -63;
+     * diese Höhe nimmt der Mod ohne Daten, und dort steckt er am Ziel in der Erde.
+     */
+    private static void korrektur(ClientGameTestContext context, TestServerContext server, TestInput maus, int k, Path baum) {
+        // Veraltete Höhen der Karte: Landung in der Erde, dann auf den Boden.
+        double[] veraltet = landet(context, maus, k, baum, 4000, "Veraltete Höhen");
+        if (veraltet[1] > -61.9) {
+            throw new AssertionError("Veraltete Höhen: nie in der Erde gelandet, tiefstes y " + veraltet[1]);
+        }
+        // Ohne Daten, den Chunk hat der Server: Er sucht den Boden, ohne Schaden und ohne die feste Höhe -63. Bis der Chunk
+        // beim Client ist, fällt der Spieler dort einen Tick, 0,08 Blöcke.
+        server.runCommand("forceload add 1000 1000");
+        server.waitFor(s -> s.overworld().isLoaded(new BlockPos(1000, -60, 1000)), 600);
+        insLoch(context, server);
+        float leben = context.computeOnClient(mc -> mc.player.getHealth());
+        double[] geladen = landet(context, maus, k, baum, 1000, "Ohne Daten, Chunk beim Server");
+        if (geladen[0] < leben || geladen[1] < -61) {
+            throw new AssertionError("Ohne Daten, Chunk beim Server: Leben " + leben + " → " + geladen[0] + ", tiefstes y " + geladen[1]);
+        }
+        server.runCommand("forceload remove all");
+        // Ohne Daten, den Chunk hat der Server nicht: Er lehnt ab, nach 5 Ticks die Höhe des Spielers, dann die Korrektur.
+        insLoch(context, server);
+        leben = context.computeOnClient(mc -> mc.player.getHealth());
+        double[] fremd = landet(context, maus, k, baum, 3000, "Ohne Daten, Chunk nicht beim Server");
+        if (fremd[1] > -62.9) {
+            throw new AssertionError("Ohne Daten, Chunk nicht beim Server: nie auf der festen Höhe -63, tiefstes y " + fremd[1]);
+        }
+        System.out.println("Heroic Map Gametest: Teleport ohne Daten, Chunk nicht beim Server, Schaden " + (leben - fremd[0]));
+    }
+
+    /** Ein Loch unter dem Spieler bis auf das Grundgestein, er steht darin bei y = -63. */
+    private static void insLoch(ClientGameTestContext context, TestServerContext server) {
+        server.runCommand("execute as @p at @s run fill ~ -63 ~ ~ -61 ~ air");
+        server.runCommand("execute as @p at @s run tp @s ~ -63 ~");
+        context.waitFor(mc -> Math.abs(mc.player.getY() - -63) < 0.01 && mc.player.onGround(), 100);
+    }
+
+    /**
+     * Teleportiert über die Karte nach (x, x), in einen Chunk, den der Client nicht hat, und wartet, bis der Spieler dort
+     * auf dem Gras steht, Luft an den Füssen, und 20 Ticks so bleibt. Gibt das geringste Leben und das tiefste y am Ziel
+     * zurück.
+     */
+    private static double[] landet(ClientGameTestContext context, TestInput maus, int k, Path baum, int x, String fall) {
+        if (context.computeOnClient(mc -> mc.level.getChunkSource().getChunk(x >> 4, x >> 4, ChunkStatus.FULL, false) != null)) {
+            throw new AssertionError(fall + ": Der Chunk ist schon beim Client; der Test braucht einen fremden");
+        }
+        teleportiere(context, maus, k, baum, x, x);
+        double[] min = {Double.MAX_VALUE, Double.MAX_VALUE};
+        for (int i = 0, ruhig = 0; ruhig < 20; i++) {
+            double[] jetzt = context.computeOnClient(mc -> new double[] {mc.player.getHealth(), mc.player.getY(),
+                    Math.abs(mc.player.getX() - (x + 0.5)) < 0.01 && Math.abs(mc.player.getZ() - (x + 0.5)) < 0.01 ? 1 : 0,
+                    mc.player.onGround() && mc.level.getBlockState(new BlockPos(x, -60, x)).isAir()
+                            && mc.level.getBlockState(new BlockPos(x, -61, x)).is(Blocks.GRASS_BLOCK) ? 1 : 0});
+            min[0] = Math.min(min[0], jetzt[0]);
+            if (jetzt[2] == 1) {
+                min[1] = Math.min(min[1], jetzt[1]);
+            }
+            ruhig = jetzt[2] == 1 && jetzt[3] == 1 && Math.abs(jetzt[1] - -60) < 0.01 ? ruhig + 1 : 0;
+            if (i == 600) {
+                throw new AssertionError(fall + ": nicht auf dem Boden, der Spieler steht bei " + context.computeOnClient(mc -> mc.player.position()));
+            }
+            context.waitTick();
+        }
+        return min;
+    }
+
+    /**
+     * Im Nether: Ohne Daten sucht der Server den obersten Block, das Dach aus Grundgestein; die Korrektur setzt den
+     * Spieler unter die Decke, auf den freien Platz nahe seiner Höhe. Start und Ziel sind Hohlräume aus Luft auf
+     * Obsidian, 3 × 3 und 3 hoch, die Füsse bei y = 60.
+     */
+    private static void nether(ClientGameTestContext context, TestServerContext server, TestInput maus, int k, Path baum) {
+        int ziel = 600;
+        for (int a : new int[] {0, ziel}) {
+            server.runCommand("execute in minecraft:the_nether run forceload add " + a + " " + a);
+        }
+        server.waitFor(s -> s.getLevel(Level.NETHER).isLoaded(new BlockPos(0, 60, 0)) && s.getLevel(Level.NETHER).isLoaded(new BlockPos(ziel, 60, ziel)), 1200);
+        for (int a : new int[] {0, ziel}) {
+            server.runCommand("execute in minecraft:the_nether run fill " + (a - 1) + " 59 " + (a - 1) + " " + (a + 1) + " 59 " + (a + 1) + " obsidian");
+            server.runCommand("execute in minecraft:the_nether run fill " + (a - 1) + " 60 " + (a - 1) + " " + (a + 1) + " 62 " + (a + 1) + " air");
+        }
+        server.runCommand("execute in minecraft:the_nether run tp @p 0.5 60 0.5");
+        context.waitFor(mc -> mc.level.dimension() == Level.NETHER && Math.abs(mc.player.getY() - 60) < 0.01 && mc.player.onGround(), 600);
+        if (context.computeOnClient(mc -> mc.level.getChunkSource().getChunk(ziel >> 4, ziel >> 4, ChunkStatus.FULL, false) != null)) {
+            throw new AssertionError("Nether: Der Chunk des Ziels ist schon beim Client");
+        }
+        teleportiere(context, maus, k, baum, ziel, ziel);
+        for (int i = 0, ruhig = 0; ruhig < 20; i++) {
+            boolean steht = context.computeOnClient(mc -> Math.abs(mc.player.getX() - (ziel + 0.5)) < 0.01 && Math.abs(mc.player.getZ() - (ziel + 0.5)) < 0.01
+                    && Math.abs(mc.player.getY() - 60) < 0.01 && mc.player.onGround());
+            ruhig = steht ? ruhig + 1 : 0;
+            if (i == 600) {
+                throw new AssertionError("Nether: nicht unter der Decke auf dem Obsidian, der Spieler steht bei " + context.computeOnClient(mc -> mc.player.position()));
+            }
+            context.waitTick();
+        }
+        server.runCommand("execute in minecraft:the_nether run forceload remove all");
     }
 
     /** Öffnet die Karte über (x, z), Rechtsklick in die Mitte, ein Klick auf „Hierher teleportieren“; sie schliesst sich. */

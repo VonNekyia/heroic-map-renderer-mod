@@ -1,7 +1,7 @@
 ---
 title: "0019: Teleport mit fester Höhe"
 description: Warum „Hierher teleportieren“ die Höhe selbst bestimmt, aus dem Chunk beim Client, sonst aus Boden oder Höhen der Karte per HTTP, und erst ohne beides den Server suchen lässt; warum nur die Ablage einer Wurzel und höchstens eine Region je Klick.
-status: gilt
+status: abgelöst durch 0023
 date: 2026-10-11
 issues: [111]
 code:

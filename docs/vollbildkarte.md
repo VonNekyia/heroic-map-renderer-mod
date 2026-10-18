@@ -144,6 +144,13 @@ auf den Namen heftet die ganze Ebene an (mod#103).
 
 ### Teleportieren
 
+- **Der Eintrag** „Hierher teleportieren“ steht in jedem Menü der Karte,
+  sobald es eine Verbindung gibt, in jeder Dimension. Fehlen dem Spieler
+  die Rechte für `execute` und `tp`, lehnt der Server ab und sagt es im
+  Chat; der Mod umgeht nichts. So hat es der User gewünscht (mod#131),
+  siehe [0023](entscheidungen/0023-teleport-mit-korrektur.md). Bis 0.2.48
+  fehlte der Eintrag ohne beide Befehle im Befehlsbaum und unter einer
+  Decke.
 - **Befehl** (`Teleport.befehl`): `execute in <dimension> run tp @s
   <x+0,5> <y> <z+0,5>`, mit fester Höhe, so geht er auch in Chunks, die
   weder Client noch Server geladen haben. So hat es der User gewünscht
@@ -151,15 +158,25 @@ auf den Namen heftet die ganze Ebene an (mod#103).
   Der Mod schickt ihn mit `sendCommand`; darin stehen nur die Dimension des
   Spielers und die drei Zahlen, kein Text vom Server.
 - **Die Höhe,** in dieser Reihenfolge (`Teleport.los`):
-  1. **Beim Client:** Hat er den Chunk, aus dessen Heightmap
-     `MOTION_BLOCKING_NO_LEAVES`: der erste freie Block über dem obersten,
-     der Bewegung oder Flüssigkeit hält, ohne Laub; über Wasser also die
-     Oberfläche. Belegt per javap in 26.3: das Prädikat
-     `is(BLOCKS_MOTION_IN_HEIGHTMAP_NO_LEAVES) || !getFluidState().isEmpty()`,
-     und der Server schickt diese Heightmap mit jedem Chunk
-     (`Heightmap.Usage.CLIENT`). Ob der Client den Chunk hat, fragt der Mod
-     den Cache (`Teleport.chunk`), denn `ClientLevel.hasChunk` sagt immer
-     ja (per javap).
+  1. **Beim Client:** Hat er den Chunk, der freie Platz darin
+     (`Teleport.frei`). Ob der Client den Chunk hat, fragt der Mod den
+     Cache (`Teleport.chunk`), denn `ClientLevel.hasChunk` sagt immer ja
+     (per javap).
+     - **Ohne Decke** aus der Heightmap `MOTION_BLOCKING_NO_LEAVES`: der
+       erste freie Block über dem obersten, der Bewegung oder Flüssigkeit
+       hält, ohne Laub; über Wasser also die Oberfläche. Belegt per javap
+       in 26.3: das Prädikat
+       `is(BLOCKS_MOTION_IN_HEIGHTMAP_NO_LEAVES) || !getFluidState().isEmpty()`,
+       und der Server schickt diese Heightmap mit jedem Chunk
+       (`Heightmap.Usage.CLIENT`).
+     - **Mit Decke** (`dimensionType().hasCeiling()`), etwa im Nether: der
+       Platz unter der Decke, der der Höhe des Spielers am nächsten liegt,
+       bei gleichem Abstand der untere. Frei heisst: darunter ein Block mit
+       Kollision und ohne Flüssigkeit, Füsse und Kopf ohne beides. Die
+       Decke ist die logische Höhe der Dimension (`logicalHeight`), im
+       Nether 128. Der oberste Block wäre dort das Dach aus Grundgestein.
+     - **Ohne freien Platz,** etwa in einer leeren Säule oder über einem
+       Lavasee unter der Decke, gilt 2.
   2. **Aus der Karte:** sonst der Boden ohne Laub (`ground`, je Block), sonst
      die Höhen (`heights`, je 4 × 4) aus `map.json` des Satzes, wie der
      Renderer sie ab 0.9.0 schreibt, der oberste Block plus 1 (`Teleport.quelle`,
@@ -179,20 +196,51 @@ auf den Namen heftet die ganze Ebene an (mod#103).
      - **Über einem Stamm** von 1 × 1 nennt der Boden durch seinen Median
        die Erde darunter; dort landet der Spieler im Stamm. Selten, darum
        so gelassen.
-  3. **Ohne Höhe,** etwa auf der selbst gezeichneten Karte oder ohne
-     Webserver, der alte Befehl `execute in <dimension> positioned <x+0,5>
-     0 <z+0,5> positioned over motion_blocking_no_leaves run tp @s ~ ~ ~`,
-     und der Chat sagt „Höhe unbekannt …“. Der Server liest dann die Höhe
-     selbst. Hat er den Chunk nicht geladen, weist er den Befehl ab, „That
-     position is not loaded“, und nichts geschieht; so in der Gegenprobe des
-     Gametests `Bedienung`. Bis 0.2.35 galt dieser Befehl immer.
-- **Nur mit Recht:** Den Eintrag „Hierher teleportieren“ gibt es nur, wenn der Befehlsbaum des
-  Servers `execute` und `tp` enthält (`Teleport.erlaubt`); der Server
-  schickt nur Befehle, die der Spieler nutzen darf. Die Rechte prüft er
-  beim Ausführen noch einmal, der Mod umgeht nichts.
-- **Nicht unter einer Decke:** In Dimensionen mit Decke
-  (`dimensionType().hasCeiling()`), etwa dem Nether, fehlt der Eintrag. Der
-  oberste Block wäre dort das Dach aus Grundgestein.
+  3. **Ohne Höhe,** etwa auf der selbst gezeichneten Karte, ohne
+     Webserver oder in einer anderen Dimension als der des Satzes:
+     - **Zuerst der Server,** mit dem alten Befehl `execute in <dimension>
+       positioned <x+0,5> 0 <z+0,5> positioned over
+       motion_blocking_no_leaves run tp @s ~ ~ ~`. Hat er den Chunk
+       geladen, landet der Spieler auf dem Boden, ohne Schaden; im Nether
+       auf dem Dach, dann folgt die Korrektur. Hat er ihn nicht, weist er
+       den Befehl ab, „That position is not loaded“, und der Chat zeigt
+       es. Bis 0.2.35 galt dieser Befehl immer.
+     - **Dann die feste Höhe:** Steht der Spieler 5 Ticks danach
+       (`Teleport.SERVER_TICKS`) nicht am Ziel, geht der Befehl mit fester
+       Höhe ab: die Höhe des Spielers beim Klick, mindestens der
+       Meeresspiegel der Dimension, in der Welt (`Teleport.hoehe`). Danach
+       folgt die Korrektur. Bis 0.2.48 sagte der Chat nur „Höhe unbekannt
+       …“, und wo der Server ablehnte, geschah nichts.
+- **Korrektur nach dem Landen** (`Teleport.tick`, je Tick des Clients):
+  für jeden Teleport aus dem Menü, auch mit Höhe aus der Karte, denn die
+  kann veraltet sein.
+  - **Geprüft wird einmal,** sobald der Spieler höchstens 1,5 Blöcke
+    waagrecht vom Ziel steht (`Teleport.DA`) und der Client den Chunk hat
+    (`FULL`).
+  - **Korrigiert wird,** wenn er in einem Block mit Kollision steckt, über
+    der Decke steht, mehr als 3 Blöcke über dem freien Platz aus 1 ist,
+    dann kostete der Fall Schaden, oder mehr als 1 Block darunter, etwa in
+    einer Höhle unter dem Ziel (`Teleport.korrigieren`). Dann geht ein
+    zweiter Befehl mit fester Höhe auf den freien Platz.
+  - **Grenzen gegen Schleifen:** höchstens eine Korrektur je Teleport.
+    Nach 10 s (`Teleport.FRIST_TICKS`) gibt der Mod auf, ebenso, wenn der
+    Spieler nach der Ankunft mehr als 4 Blöcke weggeht (`Teleport.WEG`),
+    die Dimension wechselt oder die Verbindung endet. Ein neuer Teleport
+    ersetzt den offenen. Andere Teleports, etwa ein Befehl im Chat, prüft
+    der Mod nicht.
+  - **Schaden:** Hat der Server den Chunk, landet man ohne Schaden. Muss
+    er ihn erst laden oder erzeugen, liegt die feste Höhe vielleicht im
+    Block oder in der Luft, bis der Chunk beim Client ist. Im schlimmen
+    Fall kostet das ½ bis wenige Herzen. Belegt per javap in 26.3:
+    - **Ersticken:** Steckt der Kopf im Block, schadet das Spiel mit
+      `damageSources().inWall()`. Wegen der Unverwundbarkeit nach einem
+      Treffer ist das ½ Herz beim Landen und dann ½ je 10 Ticks bis zur
+      Korrektur.
+    - **Fallen:** Der Client lässt den Spieler auch über einem Chunk
+      fallen, den er noch nicht hat. `tp` setzt die Fallstrecke nicht
+      zurück, der Server nur, wenn der Spieler steigt
+      (`ServerGamePacketListenerImpl.handleMovePlayer`). Fällt man vor der
+      Korrektur mehr als 3 Blöcke, kostet die Landung danach Schaden.
 - **Das Menü** bleibt ganz auf dem Schirm, auch bei grossem GUI-Massstab.
 - **Nach dem Klick** schliesst sich die Karte. Holt der Mod die Höhe, geht
   der Befehl ab, sobald sie da ist, höchstens 10 s später.
