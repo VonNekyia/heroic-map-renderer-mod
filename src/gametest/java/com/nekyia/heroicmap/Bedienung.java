@@ -1391,6 +1391,7 @@ public final class Bedienung implements FabricClientGameTest {
             // Im Menü „Ebenen …“: ✎ benennt um, ✕ löscht.
             context.runOnClient(mc -> mc.gui.setScreen(new EbenenMenue(mc.gui.screen())));
             context.waitTicks(2);
+            context.takeScreenshot(TestScreenshotOptions.of("ebenen-menue").disableCounterPrefix());
             spielerKlick(context, maus, k, mitteVon(context, "✎")[0], mitteVon(context, "✎")[1]);
             String feld = context.computeOnClient(mc -> ((EbenenMenue) mc.gui.screen()).feld());
             if (!"Farmen".equals(feld)) {
