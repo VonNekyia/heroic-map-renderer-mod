@@ -1601,6 +1601,11 @@ final class Karte extends Screen {
             haengt = null;
             eckeHaengt = null;
             griffHaengt = null;
+            // Auch, was gedrückt ist: Sonst hinge es bei gehaltener Taste im nächsten Frame wieder an der Maus, und das Loslassen
+            // danach, das hier verbraucht ist, liesse es dort.
+            gedrueckt = null;
+            eckeGedrueckt = null;
+            griffGedrueckt = null;
             klickVerbraucht = true;
             return true;
         }

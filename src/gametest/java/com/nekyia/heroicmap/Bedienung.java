@@ -878,6 +878,10 @@ public final class Bedienung implements FabricClientGameTest {
                     || !(context.computeOnClient(mc -> mc.gui.screen()) instanceof Karte)) {
                 throw new AssertionError("Escape am Griff liess die Region nicht, wo sie war, oder schloss die Karte");
             }
+            // Bei noch gehaltener Taste hing sie bis hier im nächsten Frame wieder an der Maus, und das Loslassen liess sie dort.
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).griffHaengt()) != null) {
+                throw new AssertionError("Nach Escape und Loslassen hängt die Region noch am Griff");
+            }
         } finally {
             warte250();
             context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size())
