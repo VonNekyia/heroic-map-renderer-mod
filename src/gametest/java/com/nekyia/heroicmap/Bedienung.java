@@ -151,6 +151,7 @@ public final class Bedienung implements FabricClientGameTest {
         hinweisWeg(context, maus, k);
         wegpunktBei(context, maus, k);
         eigeneEbenen(context, maus, k);
+        ebenenTeilen(context, maus, k);
         ebenen(context, maus, k);
         zumSpieler(context, maus, k);
         optionen(context, maus, k);
@@ -1455,6 +1456,81 @@ public final class Bedienung implements FabricClientGameTest {
                 if (!(mc.gui.screen() instanceof Karte)) {
                     mc.gui.screen().onClose();
                 }
+            });
+            context.waitTicks(2);
+        }
+    }
+
+    /**
+     * Eine eigene Ebene als Code teilen (mod#130): Im Menü „Ebenen …“ legt „⧉“ in der Zeile von „Farmen“ ihren Code mit einem
+     * Wegpunkt in die Zwischenablage und meldet es. Ebene und Wegpunkt gelöscht, legt „Code einfügen“ sie wieder an, mit dem
+     * Wegpunkt auf demselben Block. Steht etwas anderes in der Zwischenablage, sagt es das und legt nichts an. Siehe
+     * docs/wegpunkte.md, „Ebenen teilen“.
+     */
+    private static void ebenenTeilen(ClientGameTestContext context, TestInput maus, int k) {
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        Object karte = context.computeOnClient(mc -> mc.gui.screen());
+        try {
+            context.runOnClient(mc -> {
+                int id = Wegpunkte.INSTANZ.neueEbene("Farmen");
+                Wegpunkte.INSTANZ.setze(mc.level.dimension().identifier().toString(), 77, -88);
+                Wegpunkte.INSTANZ.ordne(Wegpunkte.INSTANZ.punkte().getLast(), id);
+                mc.gui.setScreen(new EbenenMenue((net.minecraft.client.gui.screens.Screen) karte));
+            });
+            context.waitTicks(2);
+            // „⧉“ steht in jeder Zeile einer eigenen Ebene; der in der Zeile von „Farmen“.
+            double[] kopieren = context.computeOnClient(mc -> {
+                AbstractWidget zeile = mc.gui.screen().children().stream().filter(c -> c instanceof AbstractWidget w
+                        && w.getMessage().getString().startsWith("Farmen")).map(c -> (AbstractWidget) c).findFirst()
+                        .orElseThrow(() -> new AssertionError("Keine Zeile „Farmen“"));
+                return mc.gui.screen().children().stream().filter(c -> c instanceof AbstractWidget w && w.getMessage().getString().equals("⧉")
+                        && w.getY() == zeile.getY()).map(c -> (AbstractWidget) c).map(w -> new double[] {w.getX() + w.getWidth() / 2.0,
+                            w.getY() + w.getHeight() / 2.0}).findFirst().orElseThrow(() -> new AssertionError("Kein „⧉“ bei „Farmen“"));
+            });
+            spielerKlick(context, maus, k, kopieren[0], kopieren[1]);
+            String code = context.computeOnClient(mc -> mc.keyboardHandler.getClipboard());
+            String meldung = context.computeOnClient(mc -> ((EbenenMenue) mc.gui.screen()).meldung());
+            if (code == null || !code.startsWith(EbenenCode.VORSILBE) || meldung == null || !meldung.contains("Farmen")) {
+                throw new AssertionError("„⧉“: Zwischenablage „" + code + "“, Meldung „" + meldung + "“");
+            }
+
+            // Ebene und Wegpunkt weg, dann „Code einfügen“.
+            context.runOnClient(mc -> {
+                Wegpunkte.INSTANZ.ebenen().stream().filter(e -> e.name().equals("Farmen")).map(Wegpunkte.EigeneEbene::id).toList()
+                        .forEach(Wegpunkte.INSTANZ::loescheEbene);
+                Wegpunkte.INSTANZ.loesche(Wegpunkte.INSTANZ.punkte().getLast());
+                mc.gui.setScreen(new EbenenMenue((net.minecraft.client.gui.screens.Screen) karte));
+            });
+            context.waitTicks(2);
+            double[] einfuegen = mitteVon(context, context.computeOnClient(mc -> Component.translatable("heroicmap.ebenen.einfuegen").getString()));
+            spielerKlick(context, maus, k, einfuegen[0], einfuegen[1]);
+            String wieder = context.computeOnClient(mc -> {
+                Wegpunkte.EigeneEbene e = Wegpunkte.INSTANZ.ebenen().stream().filter(x -> x.name().equals("Farmen")).findFirst().orElse(null);
+                Wegpunkte.Punkt p = Wegpunkte.INSTANZ.punkte().getLast();
+                return e == null ? "keine Ebene „Farmen“" : p.x() == 77 && p.z() == -88 && p.ebene() == e.id() && !p.angeheftet() ? null : "Wegpunkt " + p;
+            });
+            if (wieder != null) {
+                throw new AssertionError("„Code einfügen“: " + wieder + "; Meldung „"
+                        + context.computeOnClient(mc -> ((EbenenMenue) mc.gui.screen()).meldung()) + "“");
+            }
+
+            // Kein Code in der Zwischenablage: eine Meldung, keine Ebene.
+            int ebenen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.ebenen().size());
+            context.runOnClient(mc -> mc.keyboardHandler.setClipboard("Hallo"));
+            context.waitTicks(2);
+            einfuegen = mitteVon(context, context.computeOnClient(mc -> Component.translatable("heroicmap.ebenen.einfuegen").getString()));
+            spielerKlick(context, maus, k, einfuegen[0], einfuegen[1]);
+            String keiner = context.computeOnClient(mc -> ((EbenenMenue) mc.gui.screen()).meldung());
+            if (!context.computeOnClient(mc -> Component.translatable("heroicmap.ebenen.code.kein_code").getString()).equals(keiner)
+                    || context.computeOnClient(mc -> Wegpunkte.INSTANZ.ebenen().size()) != ebenen) {
+                throw new AssertionError("„Code einfügen“ ohne Code: Meldung „" + keiner + "“");
+            }
+            context.takeScreenshot(TestScreenshotOptions.of("ebenen-teilen").disableCounterPrefix());
+        } finally {
+            context.runOnClient(mc -> {
+                List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                Wegpunkte.INSTANZ.ebenen().stream().skip(1).map(Wegpunkte.EigeneEbene::id).toList().forEach(Wegpunkte.INSTANZ::loescheEbene);
+                mc.gui.setScreen((net.minecraft.client.gui.screens.Screen) karte);
             });
             context.waitTicks(2);
         }

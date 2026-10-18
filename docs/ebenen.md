@@ -654,7 +654,8 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
 
 - **Untermenü „Ebenen …“** im Untermenü „Einstellungen …“, siehe
   [Minimap](minimap.md), „Bedienung“ (`EbenenMenue`): zuerst die eigenen
-  Ebenen mit Schalter, „✎“ und „✕“ und darunter „Neue Ebene …“, siehe
+  Ebenen mit Schalter, „⧉“, „✎“ und „✕“ und darunter „Neue Ebene …“ und
+  „Code einfügen“, siehe
   [Wegpunkte](wegpunkte.md), „Eigene Ebenen“; dann je Ebene vom Server ein
   Schalter mit ihrem Namen in der Sprache des Spiels, die oberste zuerst.
   Passen nicht alle auf den Schirm, blättern `<` und `>`. Ohne Ebenen vom

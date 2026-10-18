@@ -1,6 +1,6 @@
 ---
 title: Wegpunkte
-description: Wegpunkte auf der Vollbildkarte setzen und löschen, auch an eingetippten Koordinaten, der Todespunkt, eigene Linien und Regionen mit eigenen Ecken, Namen und Farben, eigene Ebenen zum An- und Ausschalten, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
+description: Wegpunkte auf der Vollbildkarte setzen und löschen, auch an eingetippten Koordinaten, der Todespunkt, eigene Linien und Regionen mit eigenen Ecken, Namen und Farben, eigene Ebenen zum An- und Ausschalten und zum Teilen als Code, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Wegpunkte.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
@@ -513,7 +513,8 @@ vom User am 18.10.; Plan vom Reviewer freigegeben.
 
 Wegpunkte, eigene Formen und alte Rechtecke liegen je in einer eigenen
 Ebene, die sich an- und ausschalten lässt. Gewünscht vom User am 18.10.
-(mod#130); Plan vom Reviewer freigegeben. Das Teilen als Code folgt eigens.
+(mod#130); Plan vom Reviewer freigegeben. Teilen als Code siehe „Ebenen
+teilen“.
 
 - **Base** (`Wegpunkte.BASE`, id 0) gibt es immer. Sie heisst fest „Base“,
   der User nannte sie „Standardlayer“, und lässt sich weder umbenennen
@@ -548,8 +549,10 @@ Ebene, die sich an- und ausschalten lässt. Gewünscht vom User am 18.10.
   dann auch ohne Ebenen vom Server. Ein Doppelklick auf den Namen einer
   eigenen Ebene tut nichts. Im Untermenü „Ebenen …“ steht Base immer.
 - **Verwalten** im Untermenü „Ebenen …“, siehe [Ebenen](ebenen.md),
-  „Umschalten“: je eigene Ebene ihr Schalter, „✎“ benennt um, „✕“ löscht,
-  und was in ihr lag, kommt nach Base; „Neue Ebene …“ legt eine an. Enter
+  „Umschalten“: je eigene Ebene ihr Schalter, „⧉“ kopiert sie als Code,
+  siehe „Ebenen teilen“, „✎“ benennt um, „✕“ löscht, und was in ihr lag,
+  kommt nach Base; Base hat nur Schalter und „⧉“. „Neue Ebene …“ legt eine
+  an, „Code einfügen“ daneben nimmt einen Code aus der Zwischenablage. Enter
   speichert, `Esc` bricht nur das Feld ab, ein ungültiger Name bleibt rot
   stehen (`EbenenMenue.keyPressed`).
 - **Datei:** oben `ebenen` mit `id`, `name` und `an`, Base zuerst; je
@@ -559,6 +562,65 @@ Ebene, die sich an- und ausschalten lässt. Gewünscht vom User am 18.10.
   und der Eintrag bleibt; doppelte ids, Ebenen ohne Namen und negative ids
   fallen weg. Eine ältere Version des Mods
   überliest beides; speichert sie, liegt danach wieder alles in Base.
+
+## Ebenen teilen
+
+Eine eigene Ebene geht als Text weiter, etwa in einer Nachricht, und kommt
+bei einem anderen Spieler als neue Ebene an. Gewünscht vom User am 18.10.
+(mod#130); Plan vom Reviewer freigegeben.
+
+- **Kopieren:** im Untermenü „Ebenen …“ „⧉“ in der Zeile der Ebene, auch
+  bei Base (`EbenenCode.schreibe`). Der Code liegt dann in der
+  Zwischenablage des Spiels, und unter „Fertig“ steht „„Farmen“ als Code
+  kopiert, N Zeichen“.
+- **Einfügen:** „Code einfügen“ liest die Zwischenablage, ohne Eingabefeld
+  (`EbenenCode.lies`, `Wegpunkte.fuegeEin`). Es entsteht eine neue eigene
+  Ebene, an, nichts angeheftet, mit neuen ids; heisst schon eine so, dann
+  „Farmen (2)“, „Farmen (3)“ …, der Name vorn gekürzt, damit die Zahl in
+  32 Zeichen passt. Ein Wegpunkt auf einem Block, auf dem schon einer
+  liegt, kommt nicht dazu; die Meldung zählt nur die neuen.
+- **Aufbau:** `HMAP1:`, dahinter Base64url ohne Auffüllen von Deflate ohne
+  Kopf von UTF-8-JSON:
+
+  ```json
+  {"v":1,"name":"Farmen",
+   "wegpunkte":[{"dimension":"minecraft:overworld","x":12,"z":-40,"farbe":0}],
+   "formen":[{"dimension":"minecraft:overworld","ecken":[[12,-40],[30,-40],[30,-20]],"farbe":"#3A7FD5","name":"Hof"}]}
+  ```
+
+  `farbe` ist bei einem Wegpunkt der Index in `Wegpunkte.FARBEN`, bei einer
+  Form der Index oder ihre eigene Farbe als `#RRGGBB`, siehe „Farbe“; mit
+  eigener Farbe steht kein Index darin, eingefügt ist er 0.
+- **Nicht darin:** Angeheftetes, Mitspieler, Formen vom Server, der
+  Todespunkt und alte Rechtecke. Ein altes Rechteck als Form durch die
+  Mitten seiner Eckblöcke wäre einen halben Block kleiner als es selbst;
+  so bleibt es, wie es ist, zu Hause.
+- **Geprüft beim Einfügen,** alles oder nichts, mit einer Meldung unter
+  „Fertig“:
+
+  | Fall | Meldung |
+  |---|---|
+  | keine Vorsilbe `HMAP1:` | „In der Zwischenablage steht kein Code von Heroic Map“ |
+  | mehr als 64 KiB Text, entpackt mehr als 256 KiB | „Der Code ist zu gross“ |
+  | kein Base64url, kein Deflate, kein JSON, ein Feld fehlt, falscher Typ | „Der Code ist kaputt oder unvollständig“ |
+  | `v` nicht 1 | „Der Code stammt von einer neueren Version des Mods“ |
+  | mehr als 256 Wegpunkte oder 256 Formen | „Höchstens 256 Wegpunkte und 256 Formen je Code“ |
+  | schon 32 eigene Ebenen | „Höchstens 32 eigene Ebenen“ |
+  | die Formen der Welt über 256 | „So viele Formen passen nicht mehr, höchstens 256 je Welt“ |
+
+  „Kaputt“ heisst auch: ein Name, der nach dem Bereinigen leer ist, siehe
+  „Namen“; eine Koordinate, die keine ganze Zahl bis 30 000 000 ist (`1.5`
+  und `"1"` nicht); eine Dimension, die nicht wie `ns:pfad` aus
+  Kleinbuchstaben, Ziffern und `_.-/` aussieht oder länger als 64 Zeichen
+  ist; eine Farbe ausser 0 bis 7 und `#RRGGBB`; weniger als 2 oder mehr als
+  64 Ecken. Die Grenze von 256 KiB entpackt fängt eine Bombe: wenig Text,
+  der entpackt riesig würde (`EbenenCode.MAX_ENTPACKT`). Unbekannte Felder
+  überliest der Mod, auch `name` an einem Wegpunkt; so bricht ein späteres
+  Feld nichts.
+- **Grösse,** gemessen am 19.10. mit zlib in derselben Stufe 9 wie der Mod:
+  50 Wegpunkte und 10 Formen mit je 4 Ecken an zufälligen Orten ergeben
+  1 009 Zeichen Code, aus 4 459 Zeichen JSON. Das passt in eine Nachricht
+  bei Discord.
 
 ## Regionen
 
@@ -720,6 +782,13 @@ Schleier am Rand, siehe „Schleier“.
   umbenennen, einordnen, aus zeichnet auf Karte und Minimap nichts, über
   die Datei, löschen nach Base, die Grenze von 32),
   `eigeneEbenenAlteDateiUndKaputteEintraege`.
+- `EbenenCodeTest`: hin und zurück, ohne Angeheftetes und Todespunkt, mit
+  Name und eigener Farbe (`hinUndZurueckOhneAngeheftetesUndTodespunkt`);
+  gleicher Name bekommt eine Zahl, auch gekürzt, und ein belegter Block
+  bleibt (`gleicherNameBekommtEineZahlUndBelegteBloeckeBleiben`); die
+  Grenzen der Welt beim Einfügen (`grenzenBeimEinfuegenInDieWelt`); beim
+  Lesen jede Grenze, eine Bombe, ein halber Code, falsche Felder und
+  unbekannte, die es überliest (`lesenPrueftAllesOderNichts`).
 - `SchleierTest`: Teilen an jeder ganzen Zahl, auch rückwärts und durch
   eine Ecke; ein Rechteck ein Stück je Block, nur im Kasten; ein Kreis in
   Sehnen über den Bogen, ein Kreis von 100 000 Blöcken nur beim Kasten;
@@ -820,7 +889,12 @@ Schleier am Rand, siehe „Schleier“.
   liegt wieder in Base; ist Base aus, steht sie allein in der Liste der
   Karte, „Wegpunkt setzen“ sagt, dass Neues in der ausgeschalteten Base
   landet, und auf demselben Block noch einmal, dass dort ein verborgener
-  Wegpunkt liegt. Am Todespunkt steht kein „Ebene …“ (`tod`).
+  Wegpunkt liegt. Am Todespunkt steht kein „Ebene …“ (`tod`). Ebenen
+  teilen (`ebenenTeilen`): „⧉“ in der Zeile von „Farmen“ legt ihren Code in
+  die Zwischenablage und meldet es; Ebene und Wegpunkt gelöscht, legt „Code
+  einfügen“ sie wieder an, mit dem Wegpunkt auf demselben Block; steht
+  „Hallo“ in der Zwischenablage, sagt es, dass dort kein Code ist, und legt
+  nichts an.
 - `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
   [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und
