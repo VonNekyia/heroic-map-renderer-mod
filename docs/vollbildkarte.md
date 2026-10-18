@@ -6,6 +6,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/Kartenblick.java
   - src/main/java/com/nekyia/heroicmap/Kartenlage.java
   - src/main/java/com/nekyia/heroicmap/Kacheln.java
+  - src/gametest/java/com/nekyia/heroicmap/Zoomstufen.java
   - src/main/java/com/nekyia/heroicmap/webp
   - src/main/java/com/nekyia/heroicmap/Satz.java
   - src/main/java/com/nekyia/heroicmap/Auswahl.java
@@ -281,11 +282,19 @@ Reviewer nach einem Entwurf entschieden.
 - **Im Hintergrund:** Ein Thread dekodiert und füllt das `NativeImage`; auf
   dem Render-Thread bleibt nur das Hochladen als `DynamicTexture`. Die
   Rückgabe an den Render-Thread steht im `finally`, auch nach einem `Error`.
-- **Platzhalter:** Bis eine Kachel da ist, zeigt die Karte ihren Ausschnitt
-  aus der nächsten gröberen Stufe, die schon geladen ist, vergrössert
-  (`Karte.platzhalter`, `Kartenblick.grob`). Angefragt wird dafür nichts;
-  beim Hineinzoomen liegt die gröbere Kachel meist schon da. Sonst bleibt
-  der Platz dunkel. Fehlt die Kachel aber auf der Platte (`Kacheln.fehlt`),
+- **Platzhalter:** Bis eine Kachel da ist, zeigt die Karte an ihrem Platz,
+  was schon geladen ist (`Karte.platzhalter`). Zuerst eine feinere Stufe,
+  verkleinert, wenn alle ihre 4 oder 16 Kacheln geladen sind
+  (`Karte.fein`): Sie ist schärfer, und beim Herauszoomen liegt die Stufe,
+  die gerade noch zu sehen war, schon da. Sonst den Ausschnitt aus der
+  nächsten gröberen, vergrössert (`Karte.grob`, `Kartenblick.grob`), und
+  darüber, was von der nächsten feineren schon geladen ist. Angefragt wird
+  für den Platzhalter nichts; beim Hineinzoomen liegt die gröbere Kachel
+  meist schon da. Sonst bleibt der Platz dunkel. Vorher nahm die Karte
+  nur gröbere Stufen: Beim Herauszoomen war sie, bis die neue Stufe
+  dekodiert war, dunkel oder grob, „mega unscharf“ beim User (mod#132).
+  Vorgeladen wird die nächste feinere Stufe nicht, Entscheid des
+  Reviewers; erst sehen, ob es dem User so reicht. Fehlt die Kachel aber auf der Platte (`Kacheln.fehlt`),
   etwa weil ein Strom erst die gröberen Stufen brachte, fragt die Karte die
   gröberen an, bis eine da ist; jede kostet einmal Dekodieren. Ohne das
   bliebe die Karte während des Stroms bis zur feinsten Stufe dunkel, denn

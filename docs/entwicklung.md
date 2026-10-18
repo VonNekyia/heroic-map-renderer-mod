@@ -132,6 +132,7 @@ eines Debuggers greift sie genauso.
 | `Spieler` | der eigene Spieler auf der Minimap als Kopf mit Pfeil, nur Pfeil und Kopf halb durchsichtig, je bei GUI-Massstab 1, 2 und 3, gedreht und ungedreht: der Pfeil waagrecht mittig, höchstens 0,5 px daneben, am Bildschirmfoto; mit `-Pbilder=<ordner>` die drei Darstellungen als Bild, siehe [Minimap](minimap.md), „Spieler“ |
 | `Messung` | nur mit `-Pmessung=<datei>`: Zeit je Chunk und Frametime mit und ohne Minimap, siehe [Minimap](minimap.md), „Kosten“ |
 | `Server` | nur mit `-Pserver=<adresse>`: von Ende zu Ende gegen einen echten Paper-Server mit dem Plugin, Angebot, voller Download des kleinsten Massstabs des ersten Baums, jeder Dialog mit Ja, die Vollbildkarte als Bild `server-karte`; siehe unten |
+| `Zoomstufen` | Verkleinern statt vergrössern: ein Satz ohne Stufe 1 auf der Platte und mit roter Stufe 0, eine Stufe heraus von der feinsten; wo die Stufe 2 Kacheln hat, steht sie verkleinert da, kein Pixel ist dort rot oder dunkel; am Rand bleibt die Stufe 0. Siehe [Vollbildkarte](vollbildkarte.md), „Kacheln“ (mod#132) |
 | `Uebernahme` | nur mit `-Puebernahme=<datei>`: was eine Kachel der Vollbildkarte den Render-Thread kostet, siehe [Vollbildkarte](vollbildkarte.md), „Kacheln“ |
 
 ### Schliessen der Welt
