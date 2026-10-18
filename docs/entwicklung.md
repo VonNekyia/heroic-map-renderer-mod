@@ -98,7 +98,10 @@ Modpacks, heute `sodium-fabric-0.9.2+mc26.3`, aus dem Maven von Modrinth
 (Configuration `sodium`). Vor dem Lauf prüft der Build die SHA-256 aus
 `gradle/libs.versions.toml` und bricht bei Abweichung ab. So läuft auch
 die CI, siehe [0017](entscheidungen/0017-gametests-in-der-ci-auch-mit-sodium.md).
-Beide Schalter lassen sich verbinden.
+Mit `-Pbetterf3` ebenso BetterF3 20.0.0 und Cloth Config 26.3.159, die
+Fassungen des Modpacks, nach ihrer id auf Modrinth (Configuration
+`betterf3`), je mit SHA-256; daran hängt „Bei F3“, siehe
+[Minimap](minimap.md), „Bei F3“. Die Schalter lassen sich verbinden.
 
 Mit `-Peula=<datei>` startet `Blockentities` zusätzlich einen Server des
 Tests (`createServer`), mit dem sich der Client übers Netz verbindet. Der
@@ -239,7 +242,7 @@ aus Pixeln. Bis 0.2.14 war es die Insel aus dem Banner des Hauptrepositorys.
 - **Gametests:** `./gradlew runClientGameTest` unter `xvfb-run`, ein
   Fenster ohne Bildschirm mit 24 Bit Farbtiefe und OpenGL in Software über
   Mesa (llvmpipe). Als Matrix zweimal nebeneinander: `ohne` und `sodium` mit
-  `-Psodium`, siehe „Gametests“ und
+  `-Psodium -Pbetterf3`, wie im Modpack, siehe „Gametests“ und
   [0017](entscheidungen/0017-gametests-in-der-ci-auch-mit-sodium.md).
   - **EGL statt GLX** (`SDL_VIDEO_FORCE_EGL=1`): Über GLX fand SDL3 unter
     Xvfb kein Visual für das Fenster des Spiels, obwohl `glxinfo` OpenGL

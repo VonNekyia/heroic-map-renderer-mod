@@ -735,7 +735,7 @@ public final class Minimap {
         Rahmen r = rahmen(g.guiWidth(), g.guiHeight());
         boolean imMenue = mc.gui.screen() instanceof Einstellungen || mc.gui.screen() instanceof Anzeige;
         // Im Menü steht sie, wo man sie hinzieht; nur im Spiel weicht sie dem Debug-Bildschirm. Siehe docs/minimap.md, „Bei F3“.
-        if (!imMenue && mc.debugEntries.isOverlayVisible()) {
+        if (!imMenue && DebugBildschirm.offen(mc)) {
             r = beiF3(r, beiF3, g.guiWidth());
             if (r == null) {
                 gibUmrissFrei();
