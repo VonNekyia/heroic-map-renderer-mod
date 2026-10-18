@@ -1460,9 +1460,13 @@ final class Karte extends Screen {
         int[] z = punkt != null ? new int[] {punkt.x(), punkt.z()} : block(x, y);
         String dimension = minecraft.level.dimension().identifier().toString();
         List<Eintrag> neu = new ArrayList<>();
-        GriffAn griff = punkt == null && marke == null && zug == null && eckeUnter(x, y) == null ? griffUnter(x, y) : null;
+        GriffAn griff = punkt == null && marke == null && eckeUnter(x, y) == null ? griffUnter(x, y) : null;
         if (griff != null) {
             formMenue(griff.form(), neu);
+            if (zug != null) {
+                // Im Bau bleibt die Form im Bau zu beenden, auch am Griff einer anderen.
+                bauEnde(neu);
+            }
         } else {
             allgemein(x, y, z, dimension, punkt, marke, neu);
         }
@@ -1474,14 +1478,24 @@ final class Karte extends Screen {
     }
 
     /**
-     * Das Menü einer eigenen Form, am Griff in ihrer Mitte: Anheften oder Lösen, neue Ecken hinter der letzten, Löschen. Eine
-     * Region schliesst danach wieder an die erste an.
+     * Das Menü einer eigenen Form, am Griff in ihrer Mitte: Anheften oder Lösen, ohne Form im Bau neue Ecken hinter der letzten,
+     * Löschen. Eine Region schliesst danach wieder an die erste an.
      */
     private void formMenue(Wegpunkte.EigeneForm f, List<Eintrag> neu) {
         neu.add(new Eintrag(Component.translatable(f.angeheftet() ? "heroicmap.karte.loesen" : "heroicmap.karte.anheften"),
                 () -> anheften(Wegpunkte.INSTANZ.umschalten(f), "heroicmap.karte.angeheftet_voll", Wegpunkte.MAX_ANGEHEFTET)));
-        neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> bearbeite(new EckeAn(f, f.ecken().size() - 1, 0, 0))));
+        if (zug == null) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> bearbeite(new EckeAn(f, f.ecken().size() - 1, 0, 0))));
+        }
         neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_loeschen"), () -> Wegpunkte.INSTANZ.loesche(f)));
+    }
+
+    /** „Form fertig“ ab zwei Ecken und „Form abbrechen“ für die Form im Bau. */
+    private void bauEnde(List<Eintrag> neu) {
+        if (zug.size() >= 2) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_fertig"), this::fertig));
+        }
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_abbrechen"), () -> zug = null));
     }
 
     /**
@@ -1507,10 +1521,7 @@ final class Karte extends Screen {
         } else {
             int[] b = punkt != null ? z : eckBlock(x, y, null);
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> hinzu(b[0], b[1])));
-            if (zug.size() >= 2) {
-                neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_fertig"), this::fertig));
-            }
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_abbrechen"), () -> zug = null));
+            bauEnde(neu);
         }
         if (ecke != null) {
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> bearbeite(ecke)));
