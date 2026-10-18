@@ -465,4 +465,24 @@ class MinimapTest {
         minimap.setzeSkin(Skin.OHNE);
         assertEquals(new Minimap.Rahmen(640 - 128 - 4, 4, 128), minimap.rahmen(640, 360));
     }
+
+    @Test
+    void schleierGekapptUndGespeichert(@TempDir Path ordner) throws Exception {
+        Minimap m = new Minimap();
+        assertEquals(Schleier.HOEHE, m.schleier());
+        m.setzeSchleier(99);
+        assertEquals(Schleier.MAX_HOEHE, m.schleier());
+        m.setzeSchleier(0);
+        assertEquals(Schleier.HOEHE, m.schleier());
+        m.setzeSchleier(11);
+        Path datei = ordner.resolve("heroicmap.properties");
+        m.schreibe(datei);
+        Minimap neu = new Minimap();
+        neu.lies(datei);
+        assertEquals(11, neu.schleier());
+        // Was jemand von Hand über die Grenze schreibt, kommt gekappt an.
+        Files.writeString(datei, "schleier=40\n");
+        neu.lies(datei);
+        assertEquals(Schleier.MAX_HOEHE, neu.schleier());
+    }
 }

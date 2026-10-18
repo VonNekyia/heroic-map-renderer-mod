@@ -119,6 +119,8 @@ public final class Minimap {
     private boolean chunklinien;
     /** Effekte in der Welt, Vorgabe an: der Strahl über angehefteten Wegpunkten. Siehe docs/wegpunkte.md, „Strahl“. */
     private boolean effekte = true;
+    /** Wie hoch der Schleier eigener Regionen steht, in Blöcken. Siehe docs/wegpunkte.md, „Schleier“. */
+    private int schleier = Schleier.HOEHE;
     private final Formen.Speicher formenSpeicher = new Formen.Speicher(), angeheftetSpeicher = new Formen.Speicher();
     /** Koordinaten unter der Minimap. Siehe docs/minimap.md, „Koordinaten“. */
     enum Koordinaten { AUS, XZ, XYZ }
@@ -323,6 +325,15 @@ public final class Minimap {
 
     void setzeEffekte(boolean effekte) {
         this.effekte = effekte;
+    }
+
+    int schleier() {
+        return schleier;
+    }
+
+    /** Setzt die Höhe des Schleiers eigener Regionen, gekappt auf {@link Schleier#HOEHE} bis {@link Schleier#MAX_HOEHE}. */
+    void setzeSchleier(int hoehe) {
+        schleier = Math.clamp(hoehe, Schleier.HOEHE, Schleier.MAX_HOEHE);
     }
 
     Koordinaten koordinaten() {
@@ -544,6 +555,7 @@ public final class Minimap {
         show = !"hidden".equals(p.getProperty("show"));
         chunklinien = "true".equals(p.getProperty("chunklinien"));
         effekte = !"false".equals(p.getProperty("effekte"));
+        setzeSchleier(zahl(p.getProperty("schleier"), Schleier.HOEHE));
         koordinaten = switch (String.valueOf(p.getProperty("koordinaten")).trim()) {
             case "aus" -> Koordinaten.AUS;
             case "xyz" -> Koordinaten.XYZ;
@@ -591,6 +603,7 @@ public final class Minimap {
         p.setProperty("show", show ? "simplevoicechat" : "hidden");
         p.setProperty("chunklinien", Boolean.toString(chunklinien));
         p.setProperty("effekte", Boolean.toString(effekte));
+        p.setProperty("schleier", Integer.toString(schleier));
         p.setProperty("koordinaten", koordinaten.name().toLowerCase(Locale.ROOT));
         p.setProperty("bei_f3", beiF3.name().toLowerCase(Locale.ROOT));
         p.setProperty("spieler", darstellung.name().toLowerCase(Locale.ROOT));

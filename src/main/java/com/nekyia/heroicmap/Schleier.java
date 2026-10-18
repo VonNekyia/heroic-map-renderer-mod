@@ -23,17 +23,17 @@ import org.slf4j.LoggerFactory;
 /**
  * Der Schleier am Rand angehefteter Regionen und Kreise in der Welt: je Stück der Kante, das in einem
  * Block liegt, ein Viereck vom Gelände {@link #HOEHE} Blöcke hoch, unten {@link #DECKUNG} deckend, oben
- * durchsichtig, in der Farbe der Form. Gebaut nur bei einer Änderung; je Frame reicht der Mod die
+ * durchsichtig, in der Farbe der Form; eigene Regionen so hoch, wie der Regler sagt ({@link #deckung}). Gebaut nur bei einer Änderung; je Frame reicht der Mod die
  * fertigen Ecken weiter. Nur der Render-Thread. Siehe docs/wegpunkte.md, „Schleier“.
  */
 public final class Schleier {
 
     public static final Schleier INSTANZ = new Schleier();
     private static final Logger LOGGER = LoggerFactory.getLogger(HeroicMap.ID);
-    /** So hoch steht der Schleier über dem Gelände, in Blöcken; oben ist er ganz durchsichtig. */
-    static final float HOEHE = 4;
-    /** So deckend ist er unten am Gelände, als Anteil vom Alpha seiner Farbe. */
-    static final float DECKUNG = 0.5f;
+    /** So hoch steht der Schleier über dem Gelände, in Blöcken; oben ist er ganz durchsichtig. Eigene Regionen bis {@link #MAX_HOEHE}. */
+    static final int HOEHE = 4, MAX_HOEHE = 16;
+    /** So deckend ist er unten am Gelände, als Anteil vom Alpha seiner Farbe; eigene Regionen bei {@link #MAX_HOEHE} bis {@link #MAX_DECKUNG}. */
+    static final float DECKUNG = 0.5f, MAX_DECKUNG = 0.9f;
     /** So viele Vierecke höchstens; darüber die nächsten zuerst. Siehe docs/wegpunkte.md, „Schleier“. */
     static final int MAX_VIERECKE = 5_000;
     /** So weit, in Blöcken, geht der Spieler, bis der Mod neu baut; so weit reicht der Schleier über die Sichtweite hinaus. */
@@ -46,15 +46,15 @@ public final class Schleier {
         void stueck(double x0, double z0, double x1, double z1);
     }
 
-    /** Je Viereck die Ecken unten {x0, y0, z0, x1, y1, z1} relativ zum Ursprung, und seine Farben unten und oben. */
-    private float[] ecken = new float[0];
+    /** Je Viereck die Ecken unten {x0, y0, z0, x1, y1, z1} relativ zum Ursprung, seine Höhe, und seine Farben unten und oben. */
+    private float[] ecken = new float[0], hoch = new float[0];
     private int[] unten = new int[0], oben = new int[0];
     private int vierecke;
     private int ursprungX, ursprungZ;
     /** Woraus gebaut ist; ändert sich etwas davon, baut der Mod neu. */
     private boolean gebaut, schmutzig, gewarnt;
     private Ebenen gebautAus;
-    private int ebenenStand, wegpunkteStand, weite;
+    private int ebenenStand, wegpunkteStand, weite, reglerStand;
     private ResourceKey<Level> dimension;
     private long gebautUm;
     /** Die Chunks unter den Stücken, geladen oder nicht; ändert sich einer, baut der Mod neu. */
@@ -73,7 +73,8 @@ public final class Schleier {
         long jetzt = Util.getMillis();
         // Ein Bau liest die Höhen aus der Welt und kostet bis zu einigen ms auf dem Render-Thread; darum höchstens alle 500 ms.
         boolean noetig = gebautAus != Ebenen.INSTANZ || ebenenStand != Ebenen.INSTANZ.stand() || wegpunkteStand != Wegpunkte.INSTANZ.stand()
-                || weite != weit || Math.abs(bx - ursprungX) > NEU_AB || Math.abs(bz - ursprungZ) > NEU_AB || schmutzig;
+                || weite != weit || Math.abs(bx - ursprungX) > NEU_AB || Math.abs(bz - ursprungZ) > NEU_AB || schmutzig
+                || reglerStand != Minimap.INSTANZ.schleier();
         if (!gebaut || dimension != level.dimension() || noetig && jetzt - gebautUm >= NEU_FRUEHESTENS_MS) {
             baue(level, bx, bz, weit, jetzt);
         }
@@ -88,14 +89,14 @@ public final class Schleier {
         pose.popPose();
     }
 
-    /** Je Viereck vier Ecken: unten in der Farbe unten, oben {@link #HOEHE} höher, durchsichtig. */
+    /** Je Viereck vier Ecken: unten in der Farbe unten, oben um seine Höhe höher, durchsichtig. */
     private void schreibe(PoseStack.Pose pose, VertexConsumer c) {
         for (int i = 0; i < vierecke; i++) {
             int o = 6 * i;
             c.addVertex(pose, ecken[o], ecken[o + 1], ecken[o + 2]).setColor(unten[i]);
             c.addVertex(pose, ecken[o + 3], ecken[o + 4], ecken[o + 5]).setColor(unten[i]);
-            c.addVertex(pose, ecken[o + 3], ecken[o + 4] + HOEHE, ecken[o + 5]).setColor(oben[i]);
-            c.addVertex(pose, ecken[o], ecken[o + 1] + HOEHE, ecken[o + 2]).setColor(oben[i]);
+            c.addVertex(pose, ecken[o + 3], ecken[o + 4] + hoch[i], ecken[o + 5]).setColor(oben[i]);
+            c.addVertex(pose, ecken[o], ecken[o + 1] + hoch[i], ecken[o + 2]).setColor(oben[i]);
         }
     }
 
@@ -111,6 +112,16 @@ public final class Schleier {
         return vierecke;
     }
 
+    /** Für den Gametest: wie hoch das Viereck {@code i} steht, in Blöcken. */
+    float hoch(int i) {
+        return hoch[i];
+    }
+
+    /** Für den Gametest: die Farbe des Vierecks {@code i} unten, mit Alpha. */
+    int unten(int i) {
+        return unten[i];
+    }
+
     /**
      * Baut den Schleier um den Block (bx, bz) bis zur Sichtweite {@code weit} und {@link #NEU_AB} dazu:
      * die Kanten der angehefteten Formen dieser Dimension in Stücken je Block, die nächsten
@@ -121,6 +132,7 @@ public final class Schleier {
         gebautAus = Ebenen.INSTANZ;
         ebenenStand = Ebenen.INSTANZ.stand();
         wegpunkteStand = Wegpunkte.INSTANZ.stand();
+        reglerStand = Minimap.INSTANZ.schleier();
         dimension = level.dimension();
         weite = weit;
         ursprungX = bx;
@@ -135,11 +147,12 @@ public final class Schleier {
         for (List<Ebenen.Form> formen : Wegpunkte.INSTANZ.minimap(Ebenen.INSTANZ)) {
             for (Ebenen.Form f : formen) {
                 int farbe = farbe(f);
+                boolean eigen = Wegpunkte.INSTANZ.eigen(f);
                 if (f.dimension().equals(name) && Ebenen.sichtbar(farbe)) {
                     kanten(f, kasten, mx, mz, r + 1, (x0, z0, x1, z1) -> {
                         double dx = (x0 + x1) / 2 - mx, dz = (z0 + z1) / 2 - mz;
                         if (dx * dx + dz * dz <= r * r) {
-                            s.add(x0, z0, x1, z1, dx * dx + dz * dz, farbe);
+                            s.add(x0, z0, x1, z1, dx * dx + dz * dz, farbe, eigen);
                         }
                     });
                 }
@@ -151,6 +164,7 @@ public final class Schleier {
         }
         gewarnt = s.n > MAX_VIERECKE;
         ecken = new float[6 * reihe.length];
+        hoch = new float[reihe.length];
         unten = new int[reihe.length];
         oben = new int[reihe.length];
         IntBinaryOperator gelaende = (x, z) -> level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
@@ -171,11 +185,20 @@ public final class Schleier {
             ecken[o + 4] = hoehe(gelaende, x1, z1);
             ecken[o + 5] = (float) (z1 - bz);
             int farbe = s.farben[k];
-            unten[n] = Math.round(DECKUNG * (farbe >>> 24)) << 24 | farbe & 0x00FFFFFF;
+            hoch[n] = s.eigen[k] ? reglerStand : HOEHE;
+            unten[n] = Math.round((s.eigen[k] ? deckung(reglerStand) : DECKUNG) * (farbe >>> 24)) << 24 | farbe & 0x00FFFFFF;
             oben[n] = farbe & 0x00FFFFFF;
             n++;
         }
         vierecke = n;
+    }
+
+    /**
+     * Wie deckend der Schleier einer eigenen Region unten ist, die {@code hoehe} Blöcke hoch steht: von {@link #DECKUNG} bei
+     * {@link #HOEHE} linear bis {@link #MAX_DECKUNG} bei {@link #MAX_HOEHE}. Siehe docs/wegpunkte.md, „Schleier“.
+     */
+    static float deckung(int hoehe) {
+        return DECKUNG + (MAX_DECKUNG - DECKUNG) * (hoehe - HOEHE) / (MAX_HOEHE - HOEHE);
     }
 
     /** Die Farbe des Schleiers einer Form: ihr Rand, ohne sichtbaren Rand ihre Füllung ohne Alpha; sonst 0. */
@@ -383,14 +406,17 @@ public final class Schleier {
 
         double[] punkte = new double[4 * 1024], abstand = new double[1024];
         int[] farben = new int[1024];
+        boolean[] eigen = new boolean[1024];
         int n;
 
-        void add(double x0, double z0, double x1, double z1, double d, int farbe) {
+        void add(double x0, double z0, double x1, double z1, double d, int farbe, boolean vonMir) {
             if (n == abstand.length) {
                 punkte = Arrays.copyOf(punkte, 8 * n);
                 abstand = Arrays.copyOf(abstand, 2 * n);
                 farben = Arrays.copyOf(farben, 2 * n);
+                eigen = Arrays.copyOf(eigen, 2 * n);
             }
+            eigen[n] = vonMir;
             punkte[4 * n] = x0;
             punkte[4 * n + 1] = z0;
             punkte[4 * n + 2] = x1;

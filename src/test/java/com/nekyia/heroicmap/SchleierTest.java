@@ -180,4 +180,11 @@ class SchleierTest {
         // Eine Linie, auch eine eigene aus Wegpunkten, bekommt keinen Schleier.
         assertEquals(0, Schleier.farbe(new Ebenen.Linie(WELT, new double[] {0, 0, 4, 4}, rand, new double[] {0, 0, 4, 4})));
     }
+
+    @Test
+    void deckungSteigtMitDerHoehe() {
+        assertEquals(Schleier.DECKUNG, Schleier.deckung(Schleier.HOEHE), 1e-6);
+        assertEquals(Schleier.MAX_DECKUNG, Schleier.deckung(Schleier.MAX_HOEHE), 1e-6);
+        assertEquals(0.7f, Schleier.deckung(10), 1e-6);
+    }
 }

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Predicate;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.MouseHandler;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -102,11 +103,18 @@ final class Karte extends Screen {
     private final List<EckeAn> ecken = new ArrayList<>();
     private final List<GriffAn> griffe = new ArrayList<>();
     private GriffAn griffGedrueckt, griffHaengt;
-    /** Das Eingabefeld für den Namen der Form {@code benannt}, oder null. Siehe docs/wegpunkte.md, „Namen“. */
-    private EditBox namensfeld;
-    private Wegpunkte.EigeneForm benannt;
-    /** So breit ist das Eingabefeld für den Namen, in Einheiten des GUI. */
-    private static final int NAMENSFELD_BREITE = 160;
+    /**
+     * Das Eingabefeld am Griff, für Name oder Farbe, oder null; Enter gibt seinen Text an {@code beiEnter}, und false lässt es
+     * offen. Unten links steht {@code eingabeHinweis}. Siehe docs/wegpunkte.md, „Namen“.
+     * Siehe docs/wegpunkte.md, „Farbe“.
+     */
+    private EditBox eingabe;
+    private Predicate<String> beiEnter;
+    private Component eingabeHinweis;
+    /** So breit ist das Eingabefeld, in Einheiten des GUI. */
+    private static final int EINGABE_BREITE = 160;
+    /** Die Schrift im Eingabefeld, wenn Enter den Text nicht nimmt. */
+    private static final int UNGUELTIG = 0xFFFF5555;
     /** Was die Maus gerade hervorhebt, höchstens eins davon; siehe {@link #schwebe}. */
     private Marke ueberMarke;
     private EckeAn ueberEcke;
@@ -201,8 +209,8 @@ final class Karte extends Screen {
     @Override
     protected void init() {
         // Ein neuer Aufbau, etwa bei einer anderen Fenstergrösse, nimmt alle Elemente weg, auch das Eingabefeld.
-        namensfeld = null;
-        benannt = null;
+        eingabe = null;
+        beiEnter = null;
         LocalPlayer spieler = minecraft.player;
         // Wie beim letzten Schliessen, je Satz; sonst der Spieler in der Mitte. Siehe docs/vollbildkarte.md, „Lage merken“.
         if (blick != null && spieler != null && !gestellt) {
@@ -437,8 +445,8 @@ final class Karte extends Screen {
         if (hinweis != null) {
             g.text(font, hinweis, 4, height - 24, TEXT);
         }
-        if (namensfeld != null || zug != null) {
-            g.text(font, Component.translatable(namensfeld != null ? "heroicmap.karte.name_hinweis" : "heroicmap.karte.form_hinweis"), 4,
+        if (eingabe != null || zug != null) {
+            g.text(font, eingabe != null ? eingabeHinweis : Component.translatable("heroicmap.karte.form_hinweis"), 4,
                     height - (hinweis != null ? 36 : 24), TEXT);
         }
         // Höchstens ein Abgleich je Tag: Nach einer Ablehnung mit wieder ist der Knopf bis dahin aus.
@@ -497,7 +505,7 @@ final class Karte extends Screen {
      * oder die Maus über einem Knopf oder der Tafel steht. Siehe docs/wegpunkte.md, „Bedienung“.
      */
     private void schwebe(int mausX, int mausY) {
-        boolean frei = ziel == null && namensfeld == null && gezogeneForm() == null && haengt == null && !(taste && gezogen > ZUG)
+        boolean frei = ziel == null && eingabe == null && gezogeneForm() == null && haengt == null && !(taste && gezogen > ZUG)
                 && getChildAt(mausX, mausY).isEmpty() && !drin(tafelKasten, mausX, mausY);
         Marke m = frei ? treffer(mausX, mausY) : null;
         ueberMarke = m != null && (m.punkt() != null || m.region() != null) ? m : null;
@@ -738,9 +746,9 @@ final class Karte extends Screen {
         return zug == null ? null : List.copyOf(zug);
     }
 
-    /** Für den Gametest: der Text im Eingabefeld für den Namen, oder null, wenn es zu ist. */
-    String namensfeld() {
-        return namensfeld == null ? null : namensfeld.getValue();
+    /** Für den Gametest: der Text im Eingabefeld, oder null, wenn es zu ist. */
+    String eingabe() {
+        return eingabe == null ? null : eingabe.getValue();
     }
 
     /** Für den Gametest: der Hinweis unten links, oder null. */
@@ -858,7 +866,7 @@ final class Karte extends Screen {
             if (!f.dimension().equals(dimension)) {
                 continue;
             }
-            int farbe = Wegpunkte.FARBEN[f.farbe()];
+            int farbe = f.argb();
             double[] p = punkte(f, mausX, mausY);
             for (int i = 0; i < f.ecken().size(); i++) {
                 float[] s = schirm(p[2 * i], p[2 * i + 1]);
@@ -1089,11 +1097,11 @@ final class Karte extends Screen {
         druckX = e.x();
         druckY = e.y();
         // Ein Klick neben das Eingabefeld bricht die Eingabe ab und tut sonst nichts; einer darauf setzt den Cursor.
-        if (namensfeld != null) {
-            if (namensfeld.isMouseOver(e.x(), e.y())) {
+        if (eingabe != null) {
+            if (eingabe.isMouseOver(e.x(), e.y())) {
                 super.mouseClicked(e, doppelt);
             } else {
-                schliesseNamen(false);
+                schliesseEingabe();
             }
             klickVerbraucht = true;
             return true;
@@ -1268,7 +1276,7 @@ final class Karte extends Screen {
             zeigen.zu();
         }
         boolean ueber = zug == null && drin(tafelKasten, mausX, mausY);
-        boolean frei = ziel == null && namensfeld == null && zug == null && gezogeneForm() == null && haengt == null && !ueber
+        boolean frei = ziel == null && eingabe == null && zug == null && gezogeneForm() == null && haengt == null && !ueber
                 && !(taste && gezogen > ZUG)
                 && getChildAt(mausX, mausY).isEmpty();
         zeigen.zeiger(frei ? zielUnter(mausX, mausY) : null, ueber, ms);
@@ -1510,33 +1518,50 @@ final class Karte extends Screen {
     private void formMenue(Wegpunkte.EigeneForm f, List<Eintrag> neu) {
         neu.add(new Eintrag(Component.translatable(f.angeheftet() ? "heroicmap.karte.loesen" : "heroicmap.karte.anheften"),
                 () -> anheften(Wegpunkte.INSTANZ.umschalten(f), "heroicmap.karte.angeheftet_voll", Wegpunkte.MAX_ANGEHEFTET)));
-        neu.add(new Eintrag(Component.translatable(f.name() == null ? "heroicmap.karte.name" : "heroicmap.karte.name_aendern"), () -> benennen(f)));
+        neu.add(new Eintrag(Component.translatable(f.name() == null ? "heroicmap.karte.name" : "heroicmap.karte.name_aendern"),
+                () -> oeffne(f.name() == null ? "" : f.name(), Wegpunkte.MAX_NAME, "heroicmap.karte.name_hinweis", t -> {
+                    Wegpunkte.INSTANZ.benenne(f, t);
+                    return true;
+                })));
+        // Leer heisst zurück zur Farbe aus der Liste; was keine Farbe ist, nimmt Enter nicht. Siehe docs/wegpunkte.md, „Farbe“.
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.farbe"), () -> oeffne(Wegpunkte.hex(f.argb()), 7,
+                "heroicmap.karte.farbe_hinweis", t -> {
+                    int hex = Wegpunkte.hex(t);
+                    if (hex == Wegpunkte.KEIN_HEX && !t.isBlank()) {
+                        eingabe.setTextColor(UNGUELTIG);
+                        return false;
+                    }
+                    Wegpunkte.INSTANZ.faerbe(f, hex);
+                    return true;
+                })));
         if (zug == null) {
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> bearbeite(new EckeAn(f, f.ecken().size() - 1, 0, 0))));
         }
         neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_loeschen"), () -> Wegpunkte.INSTANZ.loesche(f)));
     }
 
-    /** Öffnet an der Stelle des Menüs das Eingabefeld für den Namen der Form {@code f}, mit ihrem Namen darin. */
-    private void benennen(Wegpunkte.EigeneForm f) {
-        int breite = Math.min(NAMENSFELD_BREITE, width);
-        namensfeld = new EditBox(font, Math.max(0, Math.min(menueX, width - breite)), Math.max(0, Math.min(menueY, height - 20)), breite, 20,
-                Component.translatable("heroicmap.karte.name"));
-        namensfeld.setMaxLength(Wegpunkte.MAX_NAME);
-        namensfeld.setValue(f.name() == null ? "" : f.name());
-        benannt = f;
-        addRenderableWidget(namensfeld);
-        setFocused(namensfeld);
+    /**
+     * Öffnet an der Stelle des Menüs das Eingabefeld mit {@code wert}, höchstens {@code laenge} Zeichen, und unten links den
+     * Hinweis {@code hinweis}; Enter gibt den Text an {@code beiEnter}.
+     */
+    private void oeffne(String wert, int laenge, String hinweis, Predicate<String> beiEnter) {
+        int breite = Math.min(EINGABE_BREITE, width);
+        eingabe = new EditBox(font, Math.max(0, Math.min(menueX, width - breite)), Math.max(0, Math.min(menueY, height - 20)), breite, 20,
+                Component.translatable(hinweis));
+        eingabe.setMaxLength(laenge);
+        eingabe.setValue(wert);
+        // Was Enter nicht nahm, steht rot, bis der Spieler es ändert.
+        eingabe.setResponder(t -> eingabe.setTextColor(EditBox.DEFAULT_TEXT_COLOR));
+        this.beiEnter = beiEnter;
+        eingabeHinweis = Component.translatable(hinweis);
+        addRenderableWidget(eingabe);
+        setFocused(eingabe);
     }
 
-    /** Schliesst das Eingabefeld; mit {@code speichern} bekommt die Form den Namen darin, leer keinen. */
-    private void schliesseNamen(boolean speichern) {
-        if (speichern) {
-            Wegpunkte.INSTANZ.benenne(benannt, namensfeld.getValue());
-        }
-        removeWidget(namensfeld);
-        namensfeld = null;
-        benannt = null;
+    private void schliesseEingabe() {
+        removeWidget(eingabe);
+        eingabe = null;
+        beiEnter = null;
     }
 
     /** „Form fertig“ ab zwei Ecken und „Form abbrechen“ für die Form im Bau. */
@@ -1647,12 +1672,16 @@ final class Karte extends Screen {
     public boolean keyPressed(KeyEvent ereignis) {
         // Solange das Eingabefeld offen ist, gehört ihm jede Taste, auch die der Karte: Enter speichert, Escape bricht nur die
         // Eingabe ab. Siehe docs/wegpunkte.md, „Namen“.
-        if (namensfeld != null) {
+        if (eingabe != null) {
             int k = ereignis.key();
-            if (k == InputConstants.KEY_ESCAPE || k == InputConstants.KEY_RETURN || k == InputConstants.KEY_NUMPADENTER) {
-                schliesseNamen(k != InputConstants.KEY_ESCAPE);
+            if (k == InputConstants.KEY_ESCAPE) {
+                schliesseEingabe();
+            } else if (k == InputConstants.KEY_RETURN || k == InputConstants.KEY_NUMPADENTER) {
+                if (beiEnter.test(eingabe.getValue())) {
+                    schliesseEingabe();
+                }
             } else {
-                namensfeld.keyPressed(ereignis);
+                eingabe.keyPressed(ereignis);
             }
             return true;
         }

@@ -214,7 +214,7 @@ class WegpunkteTest {
                   {"id":3,"dimension":"minecraft:the_nether","x":3,"z":3,"farbe":0,"minimap":false}],
                  "eigene_formen":[{"punkte":[1,99,3,2],"farbe":1,"minimap":true},{"punkte":[99,1],"farbe":1,"minimap":false}]}
                 """).getAsJsonObject());
-        assertEquals(List.of(new Wegpunkte.EigeneForm(WELT, List.of(e(1, 1), e(2, 2)), 1, true, null)), alt.eigeneFormen());
+        assertEquals(List.of(new Wegpunkte.EigeneForm(WELT, List.of(e(1, 1), e(2, 2)), 1, true, null, Wegpunkte.KEIN_HEX)), alt.eigeneFormen());
         // Geschrieben wird nur das neue Format, und so liest es sich zurück.
         String json = alt.json().toString();
         assertFalse(json.contains("\"punkte\""), json);
@@ -628,7 +628,7 @@ class WegpunkteTest {
     @Test
     void namenEineSchrifthoeheNebenDemGriff() {
         // Region: waagrecht, ein Punkt eine Schrifthöhe unter dem Griff im Schwerpunkt; so hoch wie die halbe kürzere Seite, hier 5.
-        Wegpunkte.EigeneForm region = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10), e(0, 10)), 0, false, "Hof");
+        Wegpunkte.EigeneForm region = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10), e(0, 10)), 0, false, "Hof", Wegpunkte.KEIN_HEX);
         Ebenen.Schrift s = Wegpunkte.schrift(region, Wegpunkte.mitten(region));
         assertArrayEquals(new double[] {5.5, 5.5 + 5}, s.pfad(), 1e-9);
         assertEquals(5, s.groesse());
@@ -651,17 +651,79 @@ class WegpunkteTest {
         assertArrayEquals(new double[] {0.5 - g, 0.5, 0.5 - g, 10.5}, pfad(List.of(e(0, 0), e(0, 10))), 1e-9);
         assertArrayEquals(new double[] {0.5 - g, 10.5, 0.5 - g, 0.5}, pfad(List.of(e(0, 10), e(0, 0))), 1e-9);
         // Ohne Namen keine Schrift.
-        Wegpunkte.EigeneForm ohne = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(10, 0)), 0, false, null);
+        Wegpunkte.EigeneForm ohne = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(10, 0)), 0, false, null, Wegpunkte.KEIN_HEX);
         assertEquals(null, Wegpunkte.schrift(ohne, Wegpunkte.mitten(ohne)));
     }
 
     private static float groesse(List<Wegpunkte.Ecke> ecken) {
-        Wegpunkte.EigeneForm f = new Wegpunkte.EigeneForm(WELT, ecken, 0, false, "Weg");
+        Wegpunkte.EigeneForm f = new Wegpunkte.EigeneForm(WELT, ecken, 0, false, "Weg", Wegpunkte.KEIN_HEX);
         return Wegpunkte.schrift(f, Wegpunkte.mitten(f)).groesse();
     }
 
     private static double[] pfad(List<Wegpunkte.Ecke> ecken) {
-        Wegpunkte.EigeneForm f = new Wegpunkte.EigeneForm(WELT, ecken, 0, false, "Weg");
+        Wegpunkte.EigeneForm f = new Wegpunkte.EigeneForm(WELT, ecken, 0, false, "Weg", Wegpunkte.KEIN_HEX);
         return Wegpunkte.schrift(f, Wegpunkte.mitten(f)).pfad();
+    }
+
+    @Test
+    void hexFarbeLesenSchreibenUndUeberall() {
+        assertEquals(0x3A7FD5, Wegpunkte.hex("#3a7fd5"));
+        assertEquals(0x3A7FD5, Wegpunkte.hex(" 3A7FD5 "));
+        assertEquals("#3A7FD5", Wegpunkte.hex(0x3A7FD5));
+        // Fünf oder sieben Stellen, kein Hex, Ziffern einer anderen Schrift, leer: keine Farbe.
+        for (String falsch : new String[] {"#3A7FD", "#3A7FD55", "#3A7FDG", "\uFF13A7FD5", "", "#", null}) {
+            assertEquals(Wegpunkte.KEIN_HEX, Wegpunkte.hex(falsch), falsch);
+        }
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        w.setzeForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10)));
+        Wegpunkte.EigeneForm ohne = w.eigeneFormen().getFirst();
+        assertEquals(Wegpunkte.FARBEN[ohne.farbe()], ohne.argb());
+        w.faerbe(ohne, 0x3A7FD5);
+        Wegpunkte.EigeneForm mit = w.eigeneFormen().getFirst();
+        assertEquals(0xFF3A7FD5, mit.argb());
+        assertEquals(ohne.farbe(), mit.farbe());
+        // Die Form zum Zeichnen nimmt sie, für Rand und Füllung; Ecken ändern, Anheften und Name lassen sie.
+        Ebenen.Flaeche f = (Ebenen.Flaeche) w.form(mit);
+        assertEquals(0xFF3A7FD5, f.rand().farbe());
+        assertEquals(0x403A7FD5, f.fuellung());
+        w.ersetze(mit, List.of(e(0, 0), e(12, 0), e(10, 10)));
+        w.umschalten(w.eigeneFormen().getFirst());
+        w.benenne(w.eigeneFormen().getFirst(), "Hof");
+        assertEquals(0x3A7FD5, w.eigeneFormen().getFirst().hex());
+        // Über die Datei; der Index bleibt für ältere Versionen daneben.
+        String json = w.json().toString();
+        assertTrue(json.contains("\"hex\":\"#3A7FD5\""), json);
+        assertTrue(json.contains("\"farbe\":" + ohne.farbe()), json);
+        Wegpunkte zurueck = new Wegpunkte();
+        zurueck.lies(JsonParser.parseString(json).getAsJsonObject());
+        assertEquals(w.eigeneFormen(), zurueck.eigeneFormen());
+        // Weggenommen gilt wieder der Index, und geschrieben wird kein Feld.
+        zurueck.faerbe(zurueck.eigeneFormen().getFirst(), Wegpunkte.KEIN_HEX);
+        assertEquals(Wegpunkte.FARBEN[ohne.farbe()], zurueck.eigeneFormen().getFirst().argb());
+        assertFalse(zurueck.json().toString().contains("\"hex\""));
+        // Eine Farbe, die keine ist, fehlt; die Form bleibt.
+        Wegpunkte fremd = new Wegpunkte();
+        fremd.lies(JsonParser.parseString("""
+                {"eigene_formen":[{"dimension":"minecraft:overworld","ecken":[[0,0],[1,1]],"farbe":3,"minimap":false,"hex":"rot"},
+                  {"dimension":"minecraft:overworld","ecken":[[0,0],[2,2]],"farbe":3,"minimap":false,"hex":[1]}]}
+                """).getAsJsonObject());
+        assertEquals(2, fremd.eigeneFormen().size());
+        assertTrue(fremd.eigeneFormen().stream().allMatch(x -> x.hex() == Wegpunkte.KEIN_HEX));
+    }
+
+    @Test
+    void eigeneFormenFuerDenSchleierErkannt() {
+        Ebenen e = ebene("b:alles", "v1", FLAECHE);
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        assertTrue(w.umschalten("b:alles", "wald"));
+        w.setzeForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10)));
+        w.umschalten(w.eigeneFormen().getFirst());
+        List<Ebenen.Form> alle = w.minimap(e).stream().flatMap(List::stream).toList();
+        // Die Fläche vom Server und die eigene Region sind angeheftet; nur die eigene ist eigen.
+        assertEquals(2, alle.size());
+        assertEquals(1, alle.stream().filter(w::eigen).count());
+        assertTrue(alle.stream().filter(w::eigen).allMatch(f -> f instanceof Ebenen.Flaeche fl && fl.id() == null));
     }
 }

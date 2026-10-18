@@ -81,6 +81,7 @@ public final class Bedienung implements FabricClientGameTest {
             aussehen(context, maus, k);
             context.runOnClient(mc -> mc.gui.setScreen(null));
             beiF3(context, maus);
+            schleierRegler(context, maus, k);
 
             karte(context, maus, k);
             teleport(context, spiel.getServer(), maus, k);
@@ -144,6 +145,7 @@ public final class Bedienung implements FabricClientGameTest {
         formenZiehen(context, maus, k);
         schweben(context, maus, k);
         namen(context, maus, k);
+        farbe(context, maus, k);
         ebenen(context, maus, k);
         zumSpieler(context, maus, k);
         optionen(context, maus, k);
@@ -1009,7 +1011,7 @@ public final class Bedienung implements FabricClientGameTest {
             String hinweis = hinweis(context);
 
             eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.name");
-            String leer = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).namensfeld());
+            String leer = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe());
             if (!"".equals(leer)) {
                 throw new AssertionError("„Name…“ öffnet kein leeres Feld: " + leer);
             }
@@ -1018,7 +1020,7 @@ public final class Bedienung implements FabricClientGameTest {
             context.waitTicks(2);
             maus.pressKey(InputConstants.KEY_ESCAPE);
             context.waitTicks(2);
-            if (!(context.computeOnClient(mc -> mc.gui.screen()) instanceof Karte k2) || k2.namensfeld() != null
+            if (!(context.computeOnClient(mc -> mc.gui.screen()) instanceof Karte k2) || k2.eingabe() != null
                     || name(context, formen) != null) {
                 throw new AssertionError("Kartentaste und Escape im Feld: Karte offen "
                         + (context.computeOnClient(mc -> mc.gui.screen()) instanceof Karte) + ", Name " + name(context, formen));
@@ -1028,7 +1030,7 @@ public final class Bedienung implements FabricClientGameTest {
             maus.typeChars("Mühle M");
             maus.pressKey(InputConstants.KEY_RETURN);
             context.waitTicks(2);
-            if (!"Mühle M".equals(name(context, formen)) || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).namensfeld()) != null) {
+            if (!"Mühle M".equals(name(context, formen)) || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe()) != null) {
                 throw new AssertionError("Enter speicherte den Namen nicht: " + name(context, formen));
             }
             int nachher = dunkle(context.takeScreenshot(TestScreenshotOptions.of("namen").disableCounterPrefix()), k, ort, 12);
@@ -1055,14 +1057,14 @@ public final class Bedienung implements FabricClientGameTest {
             g = griff(context, formen);
 
             eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.name_aendern");
-            String voll = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).namensfeld());
+            String voll = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe());
             if (!"Mühle M".equals(voll)) {
                 throw new AssertionError("„Name ändern…“ zeigt nicht den Namen: " + voll);
             }
             maus.typeChars("X");
             // Links neben dem Feld, das am Griff beginnt.
             spielerKlick(context, maus, k, g[0] - 30, g[1] + 30);
-            if (!"Mühle M".equals(name(context, formen)) || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).namensfeld()) != null) {
+            if (!"Mühle M".equals(name(context, formen)) || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe()) != null) {
                 throw new AssertionError("Ein Klick neben das Feld: Name " + name(context, formen));
             }
 
@@ -1091,6 +1093,115 @@ public final class Bedienung implements FabricClientGameTest {
         return context.computeOnClient(mc -> {
             Component h = ((Karte) mc.gui.screen()).hinweis();
             return String.valueOf(h == null ? null : h.getString());
+        });
+    }
+
+    /**
+     * Eine eigene Farbe wie ein Spieler: Rechtsklick auf den Griff einer Region, „Farbe…“, das Feld zeigt ihre Farbe als #RRGGBB.
+     * Was keine Farbe ist, nimmt Enter nicht, das Feld bleibt offen; „3a7fd5“ und Enter färben die Region, und ihr Rand steht im
+     * Bildschirmfoto in dieser Farbe; leer und Enter gibt ihr die Farbe aus der Liste zurück. Siehe docs/wegpunkte.md, „Farbe“.
+     */
+    private static void farbe(ClientGameTestContext context, TestInput maus, int k) {
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        int bx = mitte[0] - 8, bz = mitte[1] - 24;
+        List<Wegpunkte.Ecke> region = List.of(new Wegpunkte.Ecke(bx, bz), new Wegpunkte.Ecke(bx + 16, bz),
+                new Wegpunkte.Ecke(bx + 16, bz + 16), new Wegpunkte.Ecke(bx, bz + 16));
+        try {
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.setzeForm(mc.level.dimension().identifier().toString(), region));
+            context.waitTicks(2);
+            double[] g = griff(context, formen);
+            frei(context, new double[][] {g});
+            String liste = context.computeOnClient(mc -> Wegpunkte.hex(Wegpunkte.INSTANZ.eigeneFormen().get(formen).argb()));
+
+            eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.farbe");
+            String feld = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe());
+            if (!liste.equals(feld)) {
+                throw new AssertionError("„Farbe…“ zeigt nicht die Farbe der Region: " + feld + " statt " + liste);
+            }
+            leeren(maus, 7);
+            maus.typeChars("#3A7FDG");
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe()) == null || hex(context, formen) != Wegpunkte.KEIN_HEX) {
+                throw new AssertionError("Enter nahm „#3A7FDG“: Farbe " + hex(context, formen));
+            }
+            leeren(maus, 7);
+            maus.typeChars("3a7fd5");
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe()) != null || hex(context, formen) != 0x3A7FD5) {
+                throw new AssertionError("Enter färbte die Region nicht: " + hex(context, formen));
+            }
+            // Auf der Mitte der oberen Kante, zwischen den ersten beiden Ecken, wie gezeichnet.
+            double[] a = ecke(context, formen, 0), b = ecke(context, formen, 1);
+            Path bild = context.takeScreenshot(TestScreenshotOptions.of("farbe").disableCounterPrefix());
+            if (!linieDa(bild, k, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 0xFF3A7FD5)) {
+                throw new AssertionError("Der Rand der Region steht nicht in #3A7FD5");
+            }
+
+            eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.farbe");
+            if (!"#3A7FD5".equals(context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe()))) {
+                throw new AssertionError("„Farbe…“ zeigt nicht die eigene Farbe");
+            }
+            leeren(maus, 7);
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            if (hex(context, formen) != Wegpunkte.KEIN_HEX) {
+                throw new AssertionError("Leer und Enter liess die eigene Farbe: " + hex(context, formen));
+            }
+        } finally {
+            context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size())
+                    .forEach(Wegpunkte.INSTANZ::loesche));
+            context.waitTicks(2);
+        }
+    }
+
+    /** Löscht {@code n} Zeichen vor dem Cursor im Eingabefeld, mit der Rücktaste. */
+    private static void leeren(TestInput maus, int n) {
+        for (int i = 0; i < n; i++) {
+            maus.pressKey(InputConstants.KEY_BACKSPACE);
+        }
+    }
+
+    private static int hex(ClientGameTestContext context, int form) {
+        return context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(form).hex());
+    }
+
+    /**
+     * Der Regler „Schleier“ im Untermenü „Einstellungen …“ wie von Hand: ein Klick ans rechte Ende gibt 16 Blöcke, einer ans
+     * linke 4, einer in die Mitte 10; „Fertig“ speichert ihn. Siehe docs/wegpunkte.md, „Schleier“.
+     */
+    private static void schleierRegler(ClientGameTestContext context, TestInput maus, int k) {
+        context.runOnClient(mc -> mc.gui.setScreen(new Anzeige(null)));
+        context.waitTicks(2);
+        int[] r = context.computeOnClient(mc -> {
+            for (Object kind : mc.gui.screen().children()) {
+                if (kind instanceof Anzeige.SchleierRegler w) {
+                    return new int[] {w.getX(), w.getY(), w.getWidth(), w.getHeight()};
+                }
+            }
+            throw new AssertionError("Kein Regler „Schleier“ im Untermenü");
+        });
+        double y = r[1] + r[3] / 2.0;
+        for (double[] klick : new double[][] {{r[0] + r[2] - 2, Schleier.MAX_HOEHE}, {r[0] + 2, Schleier.HOEHE}, {r[0] + r[2] / 2.0, 10}}) {
+            spielerKlick(context, maus, k, klick[0], y);
+            int ist = context.computeOnClient(mc -> Minimap.INSTANZ.schleier());
+            if (ist != (int) klick[1]) {
+                throw new AssertionError("Klick auf den Regler bei " + klick[0] + ": " + ist + " Blöcke statt " + (int) klick[1]);
+            }
+        }
+        context.runOnClient(mc -> {
+            mc.gui.setScreen(null);
+            Minimap neu = new Minimap();
+            neu.lies(HeroicMap.einstellungen());
+            if (neu.schleier() != 10) {
+                throw new AssertionError("Beim Schliessen nicht gespeichert: " + neu.schleier());
+            }
+            Minimap.INSTANZ.setzeSchleier(Schleier.HOEHE);
         });
     }
 
