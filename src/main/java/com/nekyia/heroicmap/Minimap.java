@@ -118,6 +118,10 @@ public final class Minimap {
     /** Chunklinien auf Minimap und Vollbildkarte, eine Vorliebe aus dem Untermenü. Siehe docs/minimap.md, „Chunklinien“. */
     private boolean chunklinien;
     /** Effekte in der Welt, Vorgabe an: der Strahl über angehefteten Wegpunkten. Siehe docs/wegpunkte.md, „Strahl“. */
+    /** Der Todespunkt: die Raute und ihr Strahl dunkel, das ✕ hell. Siehe docs/wegpunkte.md, „Todespunkt“. */
+    static final int TOD = 0xFF3A3A3A, TOD_KREUZ = 0xFFE0E0E0;
+    /** Setzt der Mod beim Tod einen Todespunkt? */
+    private boolean todespunkt = true;
     private boolean effekte = true;
     /** Wie hoch der Schleier eigener Regionen steht, in Blöcken. Siehe docs/wegpunkte.md, „Schleier“. */
     private int schleier = Schleier.HOEHE;
@@ -329,6 +333,18 @@ public final class Minimap {
 
     int schleier() {
         return schleier;
+    }
+
+    boolean todespunkt() {
+        return todespunkt;
+    }
+
+    /** Schaltet den Todespunkt; aus nimmt auch einen vorhandenen weg. Siehe docs/wegpunkte.md, „Todespunkt“. */
+    void setzeTodespunkt(boolean an) {
+        todespunkt = an;
+        if (!an) {
+            Wegpunkte.INSTANZ.loescheTod();
+        }
     }
 
     /** Setzt die Höhe des Schleiers eigener Regionen, gekappt auf {@link Schleier#HOEHE} bis {@link Schleier#MAX_HOEHE}. */
@@ -556,6 +572,7 @@ public final class Minimap {
         chunklinien = "true".equals(p.getProperty("chunklinien"));
         effekte = !"false".equals(p.getProperty("effekte"));
         setzeSchleier(zahl(p.getProperty("schleier"), Schleier.HOEHE));
+        todespunkt = !"false".equals(p.getProperty("todespunkt"));
         koordinaten = switch (String.valueOf(p.getProperty("koordinaten")).trim()) {
             case "aus" -> Koordinaten.AUS;
             case "xyz" -> Koordinaten.XYZ;
@@ -604,6 +621,7 @@ public final class Minimap {
         p.setProperty("chunklinien", Boolean.toString(chunklinien));
         p.setProperty("effekte", Boolean.toString(effekte));
         p.setProperty("schleier", Integer.toString(schleier));
+        p.setProperty("todespunkt", Boolean.toString(todespunkt));
         p.setProperty("koordinaten", koordinaten.name().toLowerCase(Locale.ROOT));
         p.setProperty("bei_f3", beiF3.name().toLowerCase(Locale.ROOT));
         p.setProperty("spieler", darstellung.name().toLowerCase(Locale.ROOT));
@@ -945,7 +963,7 @@ public final class Minimap {
         for (Wegpunkte.Punkt p : Wegpunkte.INSTANZ.punkte()) {
             if (p.angeheftet() && p.dimension().equals(dimension)) {
                 float[] m = marke(r, p.x() + 0.5, p.z() + 0.5, links, oben, k, zoom, rund, innen, true, lage);
-                wegpunkt(g, m[0], m[1], kopf, Wegpunkte.FARBEN[p.farbe()], 0);
+                wegpunkt(g, m[0], m[1], kopf, p, 0);
             }
         }
     }
@@ -1471,7 +1489,16 @@ public final class Minimap {
      * Ein Wegpunkt: eine Raute in seiner Farbe mit schwarzem Rand, {@code groesse} Einheiten hoch;
      * mit {@code hervor} ungleich 0 ein Ring in dieser Farbe darum. Siehe docs/wegpunkte.md.
      */
+    /** Wie {@link #wegpunkt(GuiGraphicsExtractor, float, float, float, int, int)} für den Wegpunkt {@code p}, ein Todespunkt dunkel mit hellem ✕. */
+    static void wegpunkt(GuiGraphicsExtractor g, float x, float y, float groesse, Wegpunkte.Punkt p, int hervor) {
+        wegpunkt(g, x, y, groesse, p.tod() ? TOD : Wegpunkte.FARBEN[p.farbe()], hervor, p.tod());
+    }
+
     static void wegpunkt(GuiGraphicsExtractor g, float x, float y, float groesse, int farbe, int hervor) {
+        wegpunkt(g, x, y, groesse, farbe, hervor, false);
+    }
+
+    private static void wegpunkt(GuiGraphicsExtractor g, float x, float y, float groesse, int farbe, int hervor, boolean kreuz) {
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.translate(x, y);
@@ -1483,6 +1510,13 @@ public final class Minimap {
         }
         g.fill(-6, -6, 6, 6, 0xFF000000);
         g.fill(-5, -5, 5, 5, farbe);
+        if (kreuz) {
+            // Gedreht wird das Plus zum ✕; in Vierteln der Sechzehntel, Arme 5 lang und 0,75 dick: dicker liefe es bei GS 2 zu
+            // einem Fleck zusammen. Siehe docs/wegpunkte.md, „Todespunkt“.
+            pose.scale(0.25f);
+            g.fill(-20, -3, 20, 3, TOD_KREUZ);
+            g.fill(-3, -20, 3, 20, TOD_KREUZ);
+        }
         pose.popMatrix();
     }
 }

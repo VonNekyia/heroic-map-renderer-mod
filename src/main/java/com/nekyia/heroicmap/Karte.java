@@ -172,6 +172,8 @@ final class Karte extends Screen {
 
     /** Ist die Lage beim Öffnen gestellt? {@code init} läuft bei jeder Grösse des Fensters und nach jedem Untermenü neu. */
     private boolean gestellt;
+    /** Was beim Öffnen in der Mitte steht, in Blöcken, statt der Lage vom letzten Schliessen; sonst null. */
+    private double[] start;
     /**
      * Die Ecken einer Form, die der Spieler gerade baut oder ändert, in Reihenfolge, und ihre Dimension; sonst null.
      * {@code zugAus} ist die eigene Form, die sie ändert, null für eine neue; die nächste Ecke kommt an {@code zugStelle}.
@@ -202,6 +204,12 @@ final class Karte extends Screen {
     private record Schalter(CycleButton<Boolean> knopf, String ebene, Component name) {
     }
 
+    /** Öffnet sich mit (x, z) in Blöcken in der Mitte, Stufe und Lupe wie beim letzten Schliessen; für {@code /hmap karte}. */
+    Karte bei(double x, double z) {
+        start = new double[] {x, z};
+        return this;
+    }
+
     /** {@code satz} ist null, wenn für diese Dimension nichts geladen ist. */
     Karte(Satz satz) {
         super(Component.translatable("heroicmap.karte.titel"));
@@ -226,6 +234,9 @@ final class Karte extends Screen {
             } else {
                 blick.mx = Projektion.zuPixel(spieler.getX(), satz.scale());
                 blick.mz = Projektion.zuPixel(spieler.getZ(), satz.scale());
+            }
+            if (start != null) {
+                zentriere(start[0], start[1]);
             }
         }
         int x = width - KNOPF - 4;
@@ -471,7 +482,7 @@ final class Karte extends Screen {
         }
         if (haengt != null) {
             // Der Wegpunkt, der an der Maus hängt, unter dem Zeiger.
-            Minimap.wegpunkt(g, mausX, mausY, Minimap.KOPF, Wegpunkte.FARBEN[haengt.farbe()], 0);
+            Minimap.wegpunkt(g, mausX, mausY, Minimap.KOPF, haengt, 0);
         }
         tafel(g, mausX, mausY);
         if (ziel != null) {
@@ -583,7 +594,7 @@ final class Karte extends Screen {
                 Marke m = marke(p.x() + 0.5, p.z() + 0.5, null, p);
                 // Unter der Maus mit hellem Rand, auch angeheftet: Dann weicht der bunte Rand so lange.
                 boolean hell = ueberMarke != null && p.equals(ueberMarke.punkt());
-                Minimap.wegpunkt(g, m.x(), m.y(), Minimap.KOPF, Wegpunkte.FARBEN[p.farbe()], hell ? HELL : p.angeheftet() ? bunt : 0);
+                Minimap.wegpunkt(g, m.x(), m.y(), Minimap.KOPF, p, hell ? HELL : p.angeheftet() ? bunt : 0);
             }
         }
         // Mitspieler mit Namen. Siehe docs/minimap.md, „Mitspieler“.
@@ -758,6 +769,16 @@ final class Karte extends Screen {
     void zeige(Component text) {
         hinweis = text;
         hinweisSeit = Util.getMillis();
+    }
+
+    /** Für den Gametest: was beim Öffnen in die Mitte kommt, oder null. */
+    double[] start() {
+        return start == null ? null : start.clone();
+    }
+
+    /** Für den Gametest: der Block unter (x, y) in Einheiten des GUI. */
+    int[] blockUnter(double x, double y) {
+        return block(x, y);
     }
 
     /** Für den Gametest: der Text im Eingabefeld, oder null, wenn es zu ist. */
@@ -1601,8 +1622,21 @@ final class Karte extends Screen {
             }));
         }
         neu.add(punkt != null
-                ? new Eintrag(Component.translatable("heroicmap.karte.wegpunkt_loeschen"), () -> Wegpunkte.INSTANZ.loesche(punkt))
+                ? new Eintrag(Component.translatable(punkt.tod() ? "heroicmap.karte.tod_loeschen" : "heroicmap.karte.wegpunkt_loeschen"),
+                        () -> Wegpunkte.INSTANZ.loesche(punkt))
                 : new Eintrag(Component.translatable("heroicmap.karte.wegpunkt"), () -> Wegpunkte.INSTANZ.setze(dimension, z[0], z[1])));
+        // Ein Wegpunkt an eingetippten Koordinaten, dann in der Mitte. Siehe docs/wegpunkte.md, „Bedienung“.
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.wegpunkt_bei"), () -> oeffne(z[0] + " " + z[1], 40,
+                "heroicmap.karte.wegpunkt_bei_hinweis", t -> {
+                    int[] k = Wegpunkte.koordinaten(t);
+                    if (k == null) {
+                        eingabe.setTextColor(UNGUELTIG);
+                        return false;
+                    }
+                    Wegpunkte.INSTANZ.setze(dimension, k[0], k[1]);
+                    zentriere(k[0] + 0.5, k[1] + 0.5);
+                    return true;
+                })));
         // Eigene Formen: ohne Form im Bau beginnt hier eine, auf einer Ecke kommen neue danach oder sie geht; im Bau eine
         // Ecke hier, „Form fertig“ und „Form abbrechen“. Siehe docs/wegpunkte.md, „Eigene Formen“.
         EckeAn ecke = zug == null ? eckeUnter(x, y) : null;

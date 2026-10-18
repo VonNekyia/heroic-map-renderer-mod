@@ -2,6 +2,7 @@ package com.nekyia.heroicmap;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,7 +31,7 @@ class WegpunkteTest {
 
         Wegpunkte nachher = new Wegpunkte();
         nachher.lies(ordner);
-        assertEquals(List.of(new Wegpunkte.Punkt(1, WELT, 12, -40, 0, true), new Wegpunkte.Punkt(2, "minecraft:the_nether", 1, 2, 0, false)),
+        assertEquals(List.of(new Wegpunkte.Punkt(1, WELT, 12, -40, 0, true, false), new Wegpunkte.Punkt(2, "minecraft:the_nether", 1, 2, 0, false, false)),
                 nachher.punkte());
         assertTrue(nachher.angeheftet(SAM));
     }
@@ -107,7 +108,7 @@ class WegpunkteTest {
         w.umschalten(w.punkte().getFirst());
         Wegpunkte.Punkt erster = w.punkte().getFirst();
         assertTrue(w.verschiebe(erster, 10, -3));
-        assertEquals(new Wegpunkte.Punkt(erster.id(), WELT, 10, -3, erster.farbe(), true), w.punkte().getFirst());
+        assertEquals(new Wegpunkte.Punkt(erster.id(), WELT, 10, -3, erster.farbe(), true, false), w.punkte().getFirst());
         // Auf einen besetzten Block nicht, und einen, den es nicht mehr gibt, auch nicht.
         assertFalse(w.verschiebe(w.punkte().getFirst(), 5, 5));
         assertFalse(w.verschiebe(erster, 20, 20));
@@ -270,7 +271,7 @@ class WegpunkteTest {
                 """).getAsJsonObject());
         // Die Farbe läuft in die Liste der Farben.
         // Ohne id in der Datei vergibt der Mod die erste freie.
-        assertEquals(List.of(new Wegpunkte.Punkt(1, WELT, 1, 2, 99 % Wegpunkte.FARBEN.length, false)), w.punkte());
+        assertEquals(List.of(new Wegpunkte.Punkt(1, WELT, 1, 2, 99 % Wegpunkte.FARBEN.length, false, false)), w.punkte());
         assertTrue(w.angeheftet(SAM));
     }
 
@@ -725,5 +726,65 @@ class WegpunkteTest {
         assertEquals(2, alle.size());
         assertEquals(1, alle.stream().filter(w::eigen).count());
         assertTrue(alle.stream().filter(w::eigen).allMatch(f -> f instanceof Ebenen.Flaeche fl && fl.id() == null));
+    }
+
+    @Test
+    void todespunktNurEinerAngeheftetUndEigensGespeichert(@TempDir Path ordner) {
+        Wegpunkte w = new Wegpunkte();
+        w.lies(ordner);
+        assertTrue(w.setzeTod(WELT, 10, -5));
+        Wegpunkte.Punkt tod = w.tod();
+        assertTrue(tod.tod() && tod.angeheftet() && tod.x() == 10 && tod.z() == -5 && tod.dimension().equals(WELT), tod.toString());
+        // Er nimmt keine Farbe: Der erste Wegpunkt bekommt die erste.
+        w.setze(WELT, 1, 1);
+        assertEquals(0, w.punkte().getLast().farbe());
+        // Ein neuer Tod verschiebt ihn; es bleibt einer.
+        assertTrue(w.setzeTod("minecraft:the_nether", 3, 4));
+        assertEquals(1, w.punkte().stream().filter(Wegpunkte.Punkt::tod).count());
+        assertEquals("minecraft:the_nether", w.tod().dimension());
+        // In der Datei eigens, nicht in der Liste der Wegpunkte, und so zurück.
+        String json = w.json().toString();
+        assertTrue(json.contains("\"tod\":{\"dimension\":\"minecraft:the_nether\",\"x\":3,\"z\":4,\"minimap\":true}"), json);
+        assertEquals(1, w.json().getAsJsonArray("wegpunkte").size());
+        Wegpunkte nachher = new Wegpunkte();
+        nachher.lies(ordner);
+        Wegpunkte.Punkt zurueck = nachher.tod();
+        assertTrue(zurueck.tod() && zurueck.angeheftet() && zurueck.x() == 3 && zurueck.z() == 4, zurueck.toString());
+        assertEquals(2, nachher.punkte().size());
+        // Lösen und Verschieben lassen ihn Todespunkt.
+        nachher.umschalten(nachher.tod());
+        assertTrue(nachher.verschiebe(nachher.tod(), 7, 7));
+        assertTrue(nachher.tod().tod() && !nachher.tod().angeheftet() && nachher.tod().x() == 7);
+        // Auf einem Wegpunkt gibt es keinen; der Block ist schon markiert.
+        assertFalse(nachher.setzeTod(WELT, 1, 1));
+        assertNull(nachher.tod());
+        nachher.setzeTod(WELT, 2, 2);
+        nachher.loescheTod();
+        assertNull(nachher.tod());
+        // Eine Datei ohne Todespunkt oder mit einem kaputten liest der Mod ohne Fehler.
+        Wegpunkte alt = new Wegpunkte();
+        alt.lies(JsonParser.parseString("{\"tod\":{\"x\":1}}").getAsJsonObject());
+        assertNull(alt.tod());
+    }
+
+    @Test
+    void todMeldungOeffnetDieKarteDort() {
+        net.minecraft.network.chat.Component m = Wegpunkte.todMeldung(12, -40);
+        assertEquals(new net.minecraft.network.chat.ClickEvent.RunCommand("/hmap karte 12 -40"), m.getStyle().getClickEvent());
+        assertTrue(m.getStyle().getHoverEvent() instanceof net.minecraft.network.chat.HoverEvent.ShowText);
+        assertEquals(List.of(12, -40), List.of(((net.minecraft.network.chat.contents.TranslatableContents) m.getContents()).getArgs()));
+    }
+
+    @Test
+    void koordinatenEingetippt() {
+        assertArrayEquals(new int[] {12, -40}, Wegpunkte.koordinaten("12 -40"));
+        assertArrayEquals(new int[] {12, -40}, Wegpunkte.koordinaten(" 12, -40 "));
+        // Drei Zahlen sind x y z; y zählt nicht.
+        assertArrayEquals(new int[] {12, -40}, Wegpunkte.koordinaten("12 64 -40"));
+        assertArrayEquals(new int[] {Wegpunkte.MAX_KOORDINATE, -Wegpunkte.MAX_KOORDINATE}, Wegpunkte.koordinaten("+30000000 -30000000"));
+        for (String falsch : new String[] {"12", "1 2 3 4", "12 a", "12.5 3", "30000001 0", "0 -30000001", "", "  ", null, "\uFF112 3",
+            "9999999999 0"}) {
+            assertNull(Wegpunkte.koordinaten(falsch), falsch);
+        }
     }
 }

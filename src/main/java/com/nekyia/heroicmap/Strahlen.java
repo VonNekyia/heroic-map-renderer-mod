@@ -60,7 +60,8 @@ final class Strahlen {
             pose.pushPose();
             pose.translate(p.x() - kamera.x, boden - kamera.y, p.z() - kamera.z);
             BeaconRenderer.submitBeaconBeam(pose, ctx.submitNodeCollector(), BeaconRenderer.BEAM_LOCATION, 1, zeit, 0,
-                    BeaconRenderer.MAX_RENDER_Y, Wegpunkte.FARBEN[p.farbe()], BeaconRenderer.SOLID_BEAM_RADIUS * b, BeaconRenderer.BEAM_GLOW_RADIUS * b);
+                    BeaconRenderer.MAX_RENDER_Y, p.tod() ? Minimap.TOD : Wegpunkte.FARBEN[p.farbe()], BeaconRenderer.SOLID_BEAM_RADIUS * b,
+                    BeaconRenderer.BEAM_GLOW_RADIUS * b);
             pose.popPose();
         }
     }

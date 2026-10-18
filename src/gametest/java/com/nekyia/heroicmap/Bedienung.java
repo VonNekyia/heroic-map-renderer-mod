@@ -85,6 +85,7 @@ public final class Bedienung implements FabricClientGameTest {
 
             karte(context, maus, k);
             teleport(context, spiel.getServer(), maus, k);
+            tod(context, spiel.getServer(), maus, k);
         } finally {
             context.runOnClient(mc -> Wegpunkte.INSTANZ.leeren());
             // Das Menü speichert beim Schliessen; danach wieder die Vorgabe.
@@ -147,6 +148,7 @@ public final class Bedienung implements FabricClientGameTest {
         namen(context, maus, k);
         farbe(context, maus, k);
         hinweisWeg(context, maus, k);
+        wegpunktBei(context, maus, k);
         ebenen(context, maus, k);
         zumSpieler(context, maus, k);
         optionen(context, maus, k);
@@ -1192,6 +1194,127 @@ public final class Bedienung implements FabricClientGameTest {
         }
     }
 
+    /**
+     * Ein Wegpunkt an eingetippten Koordinaten wie ein Spieler (mod#129): Rechtsklick auf freie Karte, „Wegpunkt bei …“, das
+     * Feld zeigt `x z` des Blocks; „12“ nimmt Enter nicht; `x 64 z` 30 Blöcke weiter setzt dort einen Wegpunkt, y zählt nicht,
+     * und er steht in der Mitte. Siehe docs/wegpunkte.md, „Bedienung“.
+     */
+    private static void wegpunktBei(ClientGameTestContext context, TestInput maus, int k) {
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        double[] ort = context.computeOnClient(mc -> new double[] {60, mc.getWindow().getGuiScaledHeight() - 60});
+        frei(context, new double[][] {ort});
+        int[] block = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blockUnter(ort[0], ort[1]));
+        try {
+            eintrag(context, maus, k, ort[0], ort[1], "heroicmap.karte.wegpunkt_bei");
+            String feld = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe());
+            if (!(block[0] + " " + block[1]).equals(feld)) {
+                throw new AssertionError("„Wegpunkt bei …“ zeigt „" + feld + "“ statt " + block[0] + " " + block[1]);
+            }
+            leeren(maus, feld.length());
+            maus.typeChars("12");
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe()) == null
+                    || context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size()) != punkte) {
+                throw new AssertionError("Enter nahm „12“");
+            }
+            leeren(maus, 2);
+            int x = block[0] + 30, z = block[1] - 7;
+            maus.typeChars(x + " 64 " + z);
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            Wegpunkte.Punkt neu = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().getLast());
+            if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size()) != punkte + 1 || neu.x() != x || neu.z() != z) {
+                throw new AssertionError("„" + x + " 64 " + z + "“ setzte " + neu);
+            }
+            Karte.Marke m = marke(context, neu);
+            double[] mitte = context.computeOnClient(mc -> new double[] {mc.getWindow().getGuiScaledWidth() / 2.0,
+                mc.getWindow().getGuiScaledHeight() / 2.0});
+            if (Math.abs(m.x() - mitte[0]) > 1 || Math.abs(m.y() - mitte[1]) > 1) {
+                throw new AssertionError("Der neue Wegpunkt steht bei " + m.x() + "," + m.y() + ", nicht in der Mitte " + Arrays.toString(mitte));
+            }
+        } finally {
+            context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size())
+                    .forEach(Wegpunkte.INSTANZ::loesche));
+            context.waitTicks(2);
+        }
+    }
+
+    /**
+     * Der Todespunkt (mod#129): Stirbt der Spieler, steht auf seinem Block ein angehefteter Todespunkt. Nach dem Respawn öffnet
+     * der Weg des Klicks im Chat, `sendUnattendedCommand` mit `hmap karte x z`, die Karte mit ihm als Ziel; mit dem Testsatz
+     * steht er dort in der Mitte, dunkel mit hellem ✕, und ein Rechtsklick auf ihn bietet „Todespunkt löschen“, der ihn
+     * löscht. Mit dem Schalter aus setzt ein Tod keinen. Siehe docs/wegpunkte.md, „Todespunkt“.
+     */
+    private static void tod(ClientGameTestContext context, TestServerContext server, TestInput maus, int k) {
+        server.runCommand("tp @a 40.5 -60 -30.5");
+        context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - 40.5) < 0.1, 200);
+        try {
+            stirb(context, server);
+            Wegpunkte.Punkt tod = context.computeOnClient(mc -> Wegpunkte.INSTANZ.tod());
+            if (tod == null || tod.x() != 40 || tod.z() != -31 || !tod.angeheftet()) {
+                throw new AssertionError("Nach dem Tod bei 40 -31: Todespunkt " + tod);
+            }
+            context.runOnClient(mc -> mc.player.connection.sendUnattendedCommand("hmap karte 40 -31", null));
+            context.waitFor(mc -> mc.gui.screen() instanceof Karte, 100);
+            double[] ziel = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).start());
+            if (ziel == null || ziel[0] != 40.5 || ziel[1] != -30.5) {
+                throw new AssertionError("hmap karte 40 -31 öffnete die Karte mit dem Ziel " + Arrays.toString(ziel));
+            }
+            // Die Welt des Tests hat keinen geladenen Satz; mit dem Testsatz wie die übrigen Schritte steht das Ziel in der Mitte.
+            Path baum = Bilder.testsatz();
+            context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum)).bei(40.5, -30.5)));
+            context.waitTicks(5);
+            Karte.Marke m = marke(context, tod);
+            double[] mitte = context.computeOnClient(mc -> new double[] {mc.getWindow().getGuiScaledWidth() / 2.0,
+                mc.getWindow().getGuiScaledHeight() / 2.0});
+            if (Math.abs(m.x() - mitte[0]) > 1 || Math.abs(m.y() - mitte[1]) > 1) {
+                throw new AssertionError("Karte bei 40 -31: der Todespunkt steht bei " + m.x() + "," + m.y() + ", nicht in der Mitte");
+            }
+            // Mitten im ✕ die helle Farbe, auf 12 je Kanal genau; das ✕ ist bei GS 2 nur gut einen Pixel breit, also ±1 Pixel.
+            Path bild = context.takeScreenshot(TestScreenshotOptions.of("tod").disableCounterPrefix());
+            boolean kreuz = false;
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    kreuz |= linieDa(bild, k, m.x() + dx / (double) k, m.y() + dy / (double) k, Minimap.TOD_KREUZ);
+                }
+            }
+            if (!kreuz) {
+                throw new AssertionError("Mitten im Todespunkt fehlt das helle ✕");
+            }
+            eintrag(context, maus, k, m.x(), m.y(), "heroicmap.karte.tod_loeschen");
+            if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.tod()) != null) {
+                throw new AssertionError("„Todespunkt löschen“ liess ihn stehen");
+            }
+            context.runOnClient(mc -> mc.gui.setScreen(null));
+            // Mit dem Schalter aus kein Todespunkt.
+            context.runOnClient(mc -> Minimap.INSTANZ.setzeTodespunkt(false));
+            stirb(context, server);
+            if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.tod()) != null) {
+                throw new AssertionError("Mit „Todespunkt“ aus setzte ein Tod einen");
+            }
+        } finally {
+            context.runOnClient(mc -> {
+                Minimap.INSTANZ.setzeTodespunkt(true);
+                Wegpunkte.INSTANZ.loescheTod();
+                mc.gui.setScreen(null);
+            });
+            server.runCommand("tp @a 0.5 -30 0.5 0 90");
+            context.waitTicks(5);
+        }
+    }
+
+    /** Der Spieler stirbt und steht wieder auf; danach ist kein Schirm offen. */
+    private static void stirb(ClientGameTestContext context, TestServerContext server) {
+        server.runCommand("kill @a");
+        context.waitFor(mc -> mc.player != null && mc.player.isDeadOrDying(), 200);
+        context.waitTicks(2);
+        context.runOnClient(mc -> mc.player.respawn());
+        context.waitFor(mc -> mc.player != null && !mc.player.isDeadOrDying(), 200);
+        context.runOnClient(mc -> mc.gui.setScreen(null));
+        context.waitTicks(5);
+    }
+
     /** Löscht {@code n} Zeichen vor dem Cursor im Eingabefeld, mit der Rücktaste. */
     private static void leeren(TestInput maus, int n) {
         for (int i = 0; i < n; i++) {
@@ -2005,6 +2128,30 @@ public final class Bedienung implements FabricClientGameTest {
             context.waitTicks(2);
             String f = passt(context);
             fehler = fehler != null ? fehler : f == null ? null : (unter ? "Untermenü: " : "") + f;
+        }
+        // Bei GS 3 stehen „Auflösung“ und „Todespunkt“, je halb breit, ganz in ihrem Knopf (mod#129). Bei GS 4 sind die halben
+        // Knöpfe schmaler, auch die übrigen laufen dort; davon bleibt das Bild.
+        for (int gs : new int[] {3, 4}) {
+            context.getInput().resizeWindow(1280, 240 * gs);
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(gs);
+                mc.resizeGui();
+                mc.gui.setScreen(new Anzeige(new Einstellungen()));
+            });
+            context.waitTicks(2);
+            context.takeScreenshot(TestScreenshotOptions.of("anzeige-gs" + gs).disableCounterPrefix());
+            String f = context.computeOnClient(mc -> {
+                for (String schluessel : gs == 3 ? new String[] {"heroicmap.menue.aufloesung", "heroicmap.menue.todespunkt"} : new String[0]) {
+                    String name = Component.translatable(schluessel).getString();
+                    AbstractWidget w = mc.gui.screen().children().stream().filter(c -> c instanceof AbstractWidget a
+                            && a.getMessage().getString().startsWith(name)).map(c -> (AbstractWidget) c).findFirst().orElse(null);
+                    if (w == null || mc.font.width(w.getMessage()) > w.getWidth() - 8) {
+                        return name + (w == null ? " fehlt" : ": " + mc.font.width(w.getMessage()) + " breit, Knopf " + w.getWidth());
+                    }
+                }
+                return null;
+            });
+            fehler = fehler != null ? fehler : f == null ? null : "GS " + gs + ": " + f;
         }
         context.getInput().resizeWindow(vorher[0], vorher[1]);
         context.runOnClient(mc -> {
