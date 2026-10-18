@@ -35,6 +35,8 @@ final class EbenenMenue extends Screen {
      * beim Aufbau schon weg ist; das Feld bekäme dann keine Taste.
      */
     private boolean neuBauen;
+    /** Wo der Hinweis ohne Ebenen vom Server steht: unter „Fertig“. */
+    private int hinweisY;
 
     EbenenMenue(Screen zurueck) {
         super(Component.translatable("heroicmap.ebenen.titel"));
@@ -72,6 +74,7 @@ final class EbenenMenue extends Screen {
             unten += 24;
         }
         addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x, unten, breite, 20).build());
+        hinweisY = unten + 28;
     }
 
     /** Die Zeile einer eigenen Ebene: Schalter, dahinter Umbenennen und Löschen, ausser bei Base; beim Umbenennen das Feld. */
@@ -174,8 +177,8 @@ final class EbenenMenue extends Screen {
         int[] s = Einstellungen.spalte(width, height);
         g.centeredText(font, title, s[0] + s[1] / 2, oben() - 14, TEXT);
         if (Ebenen.INSTANZ.alle().isEmpty()) {
-            // Unter der Liste, die nun mit den eigenen Ebenen beginnt.
-            g.centeredText(font, Component.translatable("heroicmap.ebenen.keine"), s[0] + s[1] / 2, height - 22, TEXT);
+            // Unter „Fertig“; oben beginnt die Liste mit den eigenen Ebenen.
+            g.centeredText(font, Component.translatable("heroicmap.ebenen.keine"), s[0] + s[1] / 2, hinweisY, TEXT);
         }
     }
 

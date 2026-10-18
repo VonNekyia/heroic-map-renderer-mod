@@ -658,7 +658,7 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   [Wegpunkte](wegpunkte.md), „Eigene Ebenen“; dann je Ebene vom Server ein
   Schalter mit ihrem Namen in der Sprache des Spiels, die oberste zuerst.
   Passen nicht alle auf den Schirm, blättern `<` und `>`. Ohne Ebenen vom
-  Server steht unten „Der Server schickt keine Ebenen.“
+  Server steht unter „Fertig“ „Der Server schickt keine Ebenen.“
 - **Auf der Vollbildkarte** dieselbe Wahl in einer Liste unter dem Knopf
   „Ebenen +“; ein Doppelklick auf ihren Namen heftet dort die ganze Ebene an, siehe
   [Vollbildkarte](vollbildkarte.md), „Ebenen“ (mod#76).
