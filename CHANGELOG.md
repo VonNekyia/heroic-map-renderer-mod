@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.43
+
+- **Name your lines and regions.** Right-click a shape's handle and choose "Name…": type a name and press Enter. It shows on the full map in the same lettering as the names from the server, next to the handle, and on the minimap when the shape is pinned. Leave it empty to remove the name; Esc cancels.
+
 ## 0.2.42
 
 - **Lines and regions follow while you drag a corner.** Hold a corner for half a second and move it: the shape moves with it right away, instead of jumping into place when you let go.
