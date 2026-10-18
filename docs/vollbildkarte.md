@@ -241,6 +241,10 @@ auf den Namen heftet die ganze Ebene an (mod#103).
       zurück, der Server nur, wenn der Spieler steigt
       (`ServerGamePacketListenerImpl.handleMovePlayer`). Fällt man vor der
       Korrektur mehr als 3 Blöcke, kostet die Landung danach Schaden.
+    - **Im Gametest `Bedienung`,** in der flachen Welt, die der Server
+      schnell erzeugt, kostet der Teleport ohne Daten in einen Chunk, den
+      er nicht hat, ½ Herz: Der Spieler landet in der Erde und erstickt
+      einmal, bis die Korrektur kommt (Stand 18.10.).
 - **Das Menü** bleibt ganz auf dem Schirm, auch bei grossem GUI-Massstab.
 - **Nach dem Klick** schliesst sich die Karte. Holt der Mod die Höhe, geht
   der Befehl ab, sobald sie da ist, höchstens 10 s später.

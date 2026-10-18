@@ -118,7 +118,7 @@ final class Teleport {
         Quelle q = satz != null && dimension.equals(satz.dimension()) ? quelle(satz) : null;
         URI uri = q == null ? null : uri(Symbole.INSTANZ.basis(), q, x, z);
         if (uri == null) {
-            sende(new Offen(verbindung, level, dimension, x, z, nahe, true), befehl(dimension, x, z));
+            ohneHoehe(new Offen(verbindung, level, dimension, x, z, nahe, true));
             return;
         }
         InetAddress server = Symbole.INSTANZ.spielserver();
@@ -126,8 +126,17 @@ final class Teleport {
             if (mc.getConnection() != verbindung || mc.level != level) {
                 return;
             }
-            sende(new Offen(verbindung, level, dimension, x, z, nahe, y == null), y != null ? befehl(dimension, x, y, z) : befehl(dimension, x, z));
+            if (y != null) {
+                sende(new Offen(verbindung, level, dimension, x, z, nahe, false), befehl(dimension, x, y, z));
+            } else {
+                ohneHoehe(new Offen(verbindung, level, dimension, x, z, nahe, true));
+            }
         }));
+    }
+
+    /** Ohne Höhe sucht zuerst der Server den Boden; findet er ihn nicht, folgt in {@link #tick} die feste Höhe. */
+    private static void ohneHoehe(Offen o) {
+        sende(o, befehl(o.dimension, o.x, o.z));
     }
 
     private static void sende(Offen o, String befehl) {
