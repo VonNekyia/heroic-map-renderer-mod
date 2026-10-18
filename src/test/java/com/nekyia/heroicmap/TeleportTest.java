@@ -9,8 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.sun.net.httpserver.HttpServer;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -24,7 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.Deflater;
 import org.junit.jupiter.api.Test;
 
-/** Der Befehl zum Teleportieren, woher die Höhe kommt und wann es ihn gibt. Siehe docs/vollbildkarte.md, „Teleportieren“. */
+/** Der Befehl zum Teleportieren, woher die Höhe kommt und wann der Mod korrigiert. Siehe docs/vollbildkarte.md, „Teleportieren“. */
 class TeleportTest {
 
     private static final Teleport.Quelle BODEN = new Teleport.Quelle("ground", 1, -64, 319);
@@ -37,14 +35,72 @@ class TeleportTest {
         assertEquals("execute in minecraft:overworld run tp @s 12.5 70 -40.5", Teleport.befehl("minecraft:overworld", 12, 70, -41));
     }
 
+    /** Eine Säule ab y = 0 aus Zeichen: # fest, . Luft, ~ Flüssigkeit, unten zuerst. */
+    private static Integer frei(String saeule, int nahe) {
+        boolean[] fest = new boolean[saeule.length()], leer = new boolean[saeule.length()];
+        for (int i = 0; i < saeule.length(); i++) {
+            fest[i] = saeule.charAt(i) == '#';
+            leer[i] = saeule.charAt(i) == '.';
+        }
+        return Teleport.frei(fest, leer, 0, nahe);
+    }
+
     @Test
-    void nurMitExecuteUndTp() {
-        CommandDispatcher<Object> befehle = new CommandDispatcher<>();
-        assertFalse(Teleport.erlaubt(befehle));
-        befehle.register(LiteralArgumentBuilder.literal("tp"));
-        assertFalse(Teleport.erlaubt(befehle));
-        befehle.register(LiteralArgumentBuilder.literal("execute"));
-        assertTrue(Teleport.erlaubt(befehle));
+    void freierPlatzNaheDerHoehe() {
+        // Plätze bei 1 und 6, beide mit festem Boden und zwei freien Blöcken.
+        String saeule = "#..###....#";
+        assertEquals(1, frei(saeule, 0));
+        assertEquals(6, frei(saeule, 5));
+        assertEquals(6, frei(saeule, 9));
+        // Gleich weit: der untere.
+        assertEquals(1, frei("#...#..", 3));
+        // Nur ein Block Luft ist kein Platz, Flüssigkeit weder Boden noch Luft.
+        assertNull(frei("#.#", 1));
+        assertNull(frei("~...", 1));
+        assertNull(frei("#~.", 1));
+        // Der Kopf muss unter der Decke bleiben, dem Ende der Säule.
+        assertNull(frei("#.", 1));
+        assertNull(frei("....", 1));
+    }
+
+    @Test
+    void korrigiertImBlockUeberDerDeckeZuHochOderDarunter() {
+        assertFalse(Teleport.korrigieren(-60, -60, false, false));
+        assertFalse(Teleport.korrigieren(-57, -60, false, false));
+        assertFalse(Teleport.korrigieren(-60.5, -60, false, false));
+        assertFalse(Teleport.korrigieren(-61, -60, false, false));
+        assertTrue(Teleport.korrigieren(-60, -60, true, false));
+        assertTrue(Teleport.korrigieren(-60, -60, false, true));
+        assertTrue(Teleport.korrigieren(-56.9, -60, false, false));
+        assertTrue(Teleport.korrigieren(-61.1, -60, false, false));
+    }
+
+    @Test
+    void festeHoeheMindestensMeeresspiegelInDerWelt() {
+        assertEquals(80, Teleport.hoehe(80, 63, -64, 318));
+        assertEquals(63, Teleport.hoehe(20, 63, -64, 318));
+        assertEquals(318, Teleport.hoehe(400, 63, -64, 318));
+        assertEquals(-60, Teleport.hoehe(-70, -80, -60, 318));
+    }
+
+    @Test
+    void grenzenDesOffenenTeleports() {
+        // Unterwegs wartet er; sucht der Server, nach 5 Ticks die feste Höhe.
+        assertEquals(Teleport.Schritt.WARTEN, Teleport.schritt(1, true, false, 500));
+        assertEquals(Teleport.Schritt.WARTEN, Teleport.schritt(4, true, false, 500));
+        assertEquals(Teleport.Schritt.FEST, Teleport.schritt(5, true, false, 500));
+        assertEquals(Teleport.Schritt.WARTEN, Teleport.schritt(5, false, false, 500));
+        // Am Ziel prüfen, auch nach der festen Höhe.
+        assertEquals(Teleport.Schritt.PRUEFEN, Teleport.schritt(2, true, false, 0.4));
+        assertEquals(Teleport.Schritt.PRUEFEN, Teleport.schritt(30, false, true, 1.5));
+        // Nach der Ankunft bis 4 Blöcke weg warten, weiter weg aufgeben; vor der Ankunft zählt der Weg nicht.
+        assertEquals(Teleport.Schritt.WARTEN, Teleport.schritt(30, false, true, 4));
+        assertEquals(Teleport.Schritt.ENDE, Teleport.schritt(30, false, true, 4.1));
+        assertEquals(Teleport.Schritt.WARTEN, Teleport.schritt(30, false, false, 4.1));
+        // Nach 10 s gibt er auf, auch am Ziel.
+        assertEquals(Teleport.Schritt.PRUEFEN, Teleport.schritt(200, false, true, 0));
+        assertEquals(Teleport.Schritt.ENDE, Teleport.schritt(201, false, true, 0));
+        assertEquals(Teleport.Schritt.ENDE, Teleport.schritt(201, true, false, 500));
     }
 
     private static JsonObject karte(String felder) {

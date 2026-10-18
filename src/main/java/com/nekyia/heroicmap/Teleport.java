@@ -2,7 +2,6 @@ package com.nekyia.heroicmap;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.mojang.brigadier.CommandDispatcher;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
@@ -19,7 +18,10 @@ import java.util.zip.Inflater;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -27,9 +29,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * „Hierher teleportieren“ auf der Vollbildkarte: der Befehl mit fester Höhe, woher die Höhe kommt, und ob der Server
- * den Befehl dem Spieler erlaubt. Der Mod umgeht keine Rechte; die prüft der Server.
- * Siehe docs/vollbildkarte.md, „Teleportieren“.
+ * „Hierher teleportieren“ auf der Vollbildkarte: der Befehl, woher die Höhe kommt, und die Korrektur nach dem Landen.
+ * Der Mod umgeht keine Rechte; die prüft der Server. Siehe docs/vollbildkarte.md, „Teleportieren“.
  */
 final class Teleport {
 
@@ -37,7 +38,39 @@ final class Teleport {
     static final short OHNE = Short.MIN_VALUE;
     /** So gross ist die Datei einer Region höchstens, gepackt; ungepackt hat der Boden genau 512 KiB, die Höhen 32 KiB. */
     static final int MAX_GEPACKT = 1 << 20;
+    /** Steht der Spieler so viele Ticks nach dem Befehl über den Server nicht am Ziel, folgt die feste Höhe. */
+    static final int SERVER_TICKS = 5;
+    /** So lange, 10 s, wartet ein Teleport höchstens auf Ankunft und Chunk. */
+    static final int FRIST_TICKS = 200;
+    /** Bis {@code DA} Blöcke waagrecht vom Ziel ist der Spieler dort; nach der Ankunft weiter als {@code WEG} ist er weggegangen. */
+    static final double DA = 1.5, WEG = 4;
     private static final Logger LOGGER = LoggerFactory.getLogger(HeroicMap.ID);
+
+    /** Der offene Teleport aus dem Menü, oder null; nur im Thread des Clients. Ein neuer ersetzt ihn. */
+    private static Offen offen;
+
+    /** Was ein Tick mit dem offenen Teleport tut. */
+    enum Schritt { WARTEN, FEST, PRUEFEN, ENDE }
+
+    /** Ein Teleport, bis er sitzt: Ziel, Höhe des Spielers beim Klick, ob der Server den Boden sucht, ob der Spieler schon dort war. */
+    private static final class Offen {
+        final ClientPacketListener verbindung;
+        final ClientLevel level;
+        final String dimension;
+        final int x, z, nahe;
+        boolean server, da;
+        int ticks;
+
+        Offen(ClientPacketListener verbindung, ClientLevel level, String dimension, int x, int z, int nahe, boolean server) {
+            this.verbindung = verbindung;
+            this.level = level;
+            this.dimension = dimension;
+            this.x = x;
+            this.z = z;
+            this.nahe = nahe;
+            this.server = server;
+        }
+    }
 
     /** Woher die Höhen einer Karte kommen: Ordner unter {@code /tiles}, Kante einer Zelle in Blöcken, unterster und oberster Block. */
     record Quelle(String ordner, int zelle, int minY, int maxY) {
@@ -58,7 +91,7 @@ final class Teleport {
 
     /**
      * Ohne bekannte Höhe: auf den obersten Block, der Bewegung aufhält, ohne Laub. Die Höhe liest der Server selbst;
-     * hat er den Chunk nicht geladen, weist er den Befehl ab („That position is not loaded“).
+     * hat er den Chunk nicht geladen, weist er den Befehl ab („That position is not loaded“), dann folgt {@link #tick}.
      */
     static String befehl(String dimension, int x, int z) {
         return String.format(Locale.ROOT,
@@ -66,54 +99,163 @@ final class Teleport {
                 dimension, x + 0.5, z + 0.5);
     }
 
-    /** Der Server schickt nur die Befehle, die der Spieler nutzen darf; fehlt einer, gibt es den Eintrag nicht. */
-    static boolean erlaubt(CommandDispatcher<?> befehle) {
-        return befehle.getRoot().getChild("execute") != null && befehle.getRoot().getChild("tp") != null;
-    }
-
     /**
      * Teleportiert nach (x, z) in {@code dimension}, der des Spielers. Hat der Client den Chunk, nimmt er die Höhe
-     * aus seiner Heightmap; sonst aus Boden oder Höhen der Karte, eine Region per HTTP; ohne beides sucht der
-     * Server den Boden, und der Chat sagt es.
+     * daraus ({@link #frei(ClientLevel, LevelChunk, int, int, int)}); sonst aus Boden oder Höhen der Karte, eine Region
+     * per HTTP; ohne beides sucht zuerst der Server den Boden. Danach prüft {@link #tick} die Landung.
      */
     static void los(Minecraft mc, Satz satz, String dimension, int x, int z) {
         ClientPacketListener verbindung = mc.getConnection();
         ClientLevel level = mc.level;
+        int nahe = Mth.floor(mc.player.getY());
+        offen = null;
         LevelChunk chunk = chunk(level, x, z);
-        if (chunk != null) {
-            // Der erste freie Block über dem obersten, der Bewegung oder Flüssigkeit hält, ohne Laub: über Wasser die Oberfläche.
-            verbindung.sendCommand(befehl(dimension, x, chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15) + 1, z));
+        Integer frei = chunk == null ? null : frei(level, chunk, x, z, nahe);
+        if (frei != null) {
+            sende(new Offen(verbindung, level, dimension, x, z, nahe, false), befehl(dimension, x, frei, z));
             return;
         }
         Quelle q = satz != null && dimension.equals(satz.dimension()) ? quelle(satz) : null;
         URI uri = q == null ? null : uri(Symbole.INSTANZ.basis(), q, x, z);
         if (uri == null) {
-            ohneHoehe(mc, verbindung, dimension, x, z);
+            ohneHoehe(new Offen(verbindung, level, dimension, x, z, nahe, true));
             return;
         }
         InetAddress server = Symbole.INSTANZ.spielserver();
         CompletableFuture.supplyAsync(() -> hole(Symbole.CLIENT, uri, server, Symbole.FRIST, q, x, z)).thenAccept(y -> mc.execute(() -> {
-            if (mc.getConnection() != verbindung) {
+            if (mc.getConnection() != verbindung || mc.level != level) {
                 return;
             }
             if (y != null) {
-                verbindung.sendCommand(befehl(dimension, x, y, z));
+                sende(new Offen(verbindung, level, dimension, x, z, nahe, false), befehl(dimension, x, y, z));
             } else {
-                ohneHoehe(mc, verbindung, dimension, x, z);
+                ohneHoehe(new Offen(verbindung, level, dimension, x, z, nahe, true));
             }
         }));
+    }
+
+    /** Ohne Höhe sucht zuerst der Server den Boden; findet er ihn nicht, folgt in {@link #tick} die feste Höhe. */
+    private static void ohneHoehe(Offen o) {
+        sende(o, befehl(o.dimension, o.x, o.z));
+    }
+
+    private static void sende(Offen o, String befehl) {
+        offen = o;
+        o.verbindung.sendCommand(befehl);
+    }
+
+    /**
+     * Je Tick des Clients: Hat der Server den Boden nicht gefunden, die feste Höhe; ist der Spieler da und der Chunk
+     * beim Client, einmal prüfen und wenn nötig ein zweiter {@code tp} auf den freien Platz. Siehe docs/vollbildkarte.md,
+     * „Teleportieren“.
+     */
+    static void tick(Minecraft mc) {
+        Offen o = offen;
+        LocalPlayer p = mc.player;
+        if (o == null) {
+            return;
+        }
+        if (p == null || mc.getConnection() != o.verbindung || mc.level != o.level) {
+            offen = null;
+            return;
+        }
+        double weg = Math.hypot(p.getX() - (o.x + 0.5), p.getZ() - (o.z + 0.5));
+        switch (schritt(++o.ticks, o.server, o.da, weg)) {
+            case ENDE -> offen = null;
+            case FEST -> {
+                o.server = false;
+                o.verbindung.sendCommand(befehl(o.dimension, o.x, hoehe(o.nahe, o.level.getSeaLevel(), o.level.getMinY(), o.level.getMaxY() - 1), o.z));
+            }
+            case PRUEFEN -> {
+                o.da = true;
+                o.server = false;
+                LevelChunk chunk = chunk(o.level, o.x, o.z);
+                if (chunk == null) {
+                    return;
+                }
+                offen = null;
+                Integer frei = frei(o.level, chunk, o.x, o.z, o.nahe);
+                boolean imBlock = !o.level.noBlockCollision(p, p.getBoundingBox().deflate(1.0E-3));
+                boolean ueberDecke = o.level.dimensionType().hasCeiling() && p.getY() >= o.level.getMinY() + o.level.dimensionType().logicalHeight();
+                if (frei != null && korrigieren(p.getY(), frei, imBlock, ueberDecke)) {
+                    o.verbindung.sendCommand(befehl(o.dimension, o.x, frei, o.z));
+                }
+            }
+            case WARTEN -> {
+            }
+        }
+    }
+
+    /**
+     * Was der Tick {@code ticks} nach dem Befehl tut, {@code weg} Blöcke waagrecht vom Ziel: nach {@link #FRIST_TICKS}
+     * oder weggegangen aufgeben; am Ziel prüfen; sucht noch der Server und ist der Spieler nach {@link #SERVER_TICKS}
+     * nicht da, die feste Höhe; sonst warten.
+     */
+    static Schritt schritt(int ticks, boolean server, boolean warDa, double weg) {
+        if (ticks > FRIST_TICKS || warDa && weg > WEG) {
+            return Schritt.ENDE;
+        }
+        if (weg <= DA) {
+            return Schritt.PRUEFEN;
+        }
+        return server && ticks >= SERVER_TICKS ? Schritt.FEST : Schritt.WARTEN;
+    }
+
+    /** Die feste Höhe ohne Daten: die des Spielers, mindestens der Meeresspiegel, von {@code unten} bis {@code oben}. */
+    static int hoehe(int spieler, int meer, int unten, int oben) {
+        return Mth.clamp(Math.max(spieler, meer), unten, oben);
+    }
+
+    /**
+     * Ob der Spieler mit den Füssen auf {@code y} neu muss: in einem Block, über der Decke, mehr als 3 Blöcke über dem
+     * freien Platz {@code frei}, dann kostet der Fall Schaden, oder mehr als 1 darunter.
+     */
+    static boolean korrigieren(double y, int frei, boolean imBlock, boolean ueberDecke) {
+        return imBlock || ueberDecke || y > frei + 3 || y < frei - 1;
+    }
+
+    /**
+     * Die Höhe der Füsse am freien Platz über (x, z) im Chunk des Clients, oder null. Ohne Decke der erste freie Block über
+     * dem obersten, der Bewegung oder Flüssigkeit hält, ohne Laub, über Wasser also die Oberfläche; mit Decke der Platz
+     * unter ihr, der {@code nahe} am nächsten liegt, siehe {@link #frei(boolean[], boolean[], int, int)}.
+     */
+    static Integer frei(ClientLevel level, LevelChunk chunk, int x, int z, int nahe) {
+        int unten = level.getMinY();
+        if (!level.dimensionType().hasCeiling()) {
+            // getHeight nennt den obersten Block, in einer leeren Säule unten - 1.
+            int y = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15) + 1;
+            return y > unten ? y : null;
+        }
+        int n = Math.min(level.dimensionType().logicalHeight(), level.getHeight());
+        boolean[] fest = new boolean[n], leer = new boolean[n];
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int i = 0; i < n; i++) {
+            BlockState s = chunk.getBlockState(pos.set(x, unten + i, z));
+            boolean kollision = !s.getCollisionShape(level, pos).isEmpty(), fluessig = !s.getFluidState().isEmpty();
+            fest[i] = kollision && !fluessig;
+            leer[i] = !kollision && !fluessig;
+        }
+        return frei(fest, leer, unten, nahe);
+    }
+
+    /**
+     * Die Höhe der Füsse am freien Platz, der {@code nahe} am nächsten liegt, bei gleichem Abstand der untere: darunter
+     * ein Block mit Kollision ohne Flüssigkeit, Füsse und Kopf ohne beides. Index 0 ist die Höhe {@code unten}, die
+     * Felder enden unter der Decke. Null ohne Platz.
+     */
+    static Integer frei(boolean[] fest, boolean[] leer, int unten, int nahe) {
+        Integer best = null;
+        for (int i = 1; i + 1 < fest.length; i++) {
+            if (fest[i - 1] && leer[i] && leer[i + 1] && (best == null || Math.abs(unten + i - nahe) < Math.abs(best - nahe))) {
+                best = unten + i;
+            }
+        }
+        return best;
     }
 
     /** Der Chunk um (x, z), wenn der Client ihn hat, sonst null; {@code ClientLevel.hasChunk} sagt immer ja (per javap). */
     static LevelChunk chunk(ClientLevel level, int x, int z) {
         return level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.FULL, false);
-    }
-
-    private static void ohneHoehe(Minecraft mc, ClientPacketListener verbindung, String dimension, int x, int z) {
-        verbindung.sendCommand(befehl(dimension, x, z));
-        if (mc.player != null) {
-            mc.player.sendSystemMessage(Component.translatable("heroicmap.karte.teleport_ohne_hoehe"));
-        }
     }
 
     /** Die Quelle aus {@code map.json} des Satzes, oder null; siehe {@link #quelle(JsonObject)}. */

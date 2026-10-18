@@ -54,7 +54,6 @@
   "heroicmap.karte.zum_spieler": "Zum Spieler",
   "heroicmap.karte.optionen": "Optionen …",
   "heroicmap.karte.teleport": "Hierher teleportieren (%s, %s)",
-  "heroicmap.karte.teleport_ohne_hoehe": "Höhe unbekannt: Der Server sucht den Boden selbst; wo er die Chunks nicht geladen hat, lehnt er ab.",
   "heroicmap.karte.wegpunkt": "Wegpunkt setzen",
   "heroicmap.karte.wegpunkt_loeschen": "Wegpunkt löschen",
   "heroicmap.karte.region_loeschen": "Region löschen",
