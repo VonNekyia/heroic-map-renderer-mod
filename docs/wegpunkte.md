@@ -674,7 +674,9 @@ Schleier am Rand, siehe „Schleier“.
   die zweite Stelle; 700 ms gehalten hängt eine Ecke an der Maus und liegt
   nach dem Loslassen 2 bis 3 Blöcke weiter; eine Linie mit zwei Ecken fällt
   beim Löschen einer weg; im Bau gelöscht, speichert „Form fertig“ nichts
-  und zeigt den Hinweis. Formen ziehen (`formenZiehen`): eine gehaltene
+  und zeigt den Hinweis, nach 4 s noch und nach gut 5 s nicht mehr. Ein
+  Hinweis geht beim nächsten Klick auf die Karte und bei der nächsten
+  Taste weg (`hinweisWeg`). Formen ziehen (`formenZiehen`): eine gehaltene
   Ecke einer Linie folgt der Maus, und im Bildschirmfoto liegt die Farbe der
   Linie schon vor dem Loslassen mitten auf ihrem neuen Weg und nicht mehr
   auf dem alten (`form-live`); am Griff einer Region folgt der Griff, und
@@ -690,7 +692,7 @@ Schleier am Rand, siehe „Schleier“.
   Bildschirmfoto mindestens 100 Pixel mehr in der Farbe der Kartenschrift
   als vorher. Am Griff gezogen behält sie den Namen. „Name ändern…“ zeigt
   den Namen, ein Klick neben das Feld lässt ihn, leer gemacht und Enter
-  nimmt ihn weg. Der Hinweis unten links bleibt dabei, wie er war. Farbe
+  nimmt ihn weg. Danach steht unten links kein Hinweis. Farbe
   (`farbe`): „Farbe…“ am Griff zeigt die Farbe der Region als `#RRGGBB`;
   „#3A7FDG“ nimmt Enter nicht, das Feld bleibt offen; „3a7fd5“ und Enter
   färben sie, und im Bildschirmfoto steht ihr Rand in `#3A7FD5`; leer und
