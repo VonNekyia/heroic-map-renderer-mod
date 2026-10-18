@@ -1191,7 +1191,14 @@ public final class Bilder implements FabricClientGameTest {
         context.runOnClient(mc -> Minimap.INSTANZ.setzeSchleier(Schleier.MAX_HOEHE));
         context.waitFor(mc -> Schleier.INSTANZ.vierecke() > 0 && Schleier.INSTANZ.hoch(0) == Schleier.MAX_HOEHE, 200);
         context.waitTicks(5);
-        context.takeScreenshot(TestScreenshotOptions.of("schleier-16").disableCounterPrefix());
+        Path hoch = context.takeScreenshot(TestScreenshotOptions.of("schleier-16").disableCounterPrefix());
+        if (!AUSGABE.isEmpty()) {
+            try {
+                Files.copy(hoch, Path.of(AUSGABE, "schleier-16.png"), StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
         String falsch = context.computeOnClient(mc -> {
             int n = Schleier.INSTANZ.vierecke();
             for (int i = 0; i < n; i++) {

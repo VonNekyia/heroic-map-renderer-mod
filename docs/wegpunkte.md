@@ -207,6 +207,8 @@ nach oben immer durchsichtiger.
   dazu. Eine andere Höhe baut neu, wie eine andere Sichtweite. Gewünscht
   vom User am 18.10.: „ein Regler, der Höhe und Deckkraft zusammen
   hebt“.
+
+  ![Dieselbe Region wie oben mit dem Regler auf 16 Blöcken: der Schleier viermal so hoch und unten deckender; Szene `schleier` des Gametests](bilder/schleier-16.png)
 - **Gelände:** Die Ecken unten stehen auf der Heightmap
   `MOTION_BLOCKING_NO_LEAVES` des Clients, also unter dem Laub und auf der
   Oberfläche von Wasser, wie der Strahl. Der Client hat `WORLD_SURFACE`,
