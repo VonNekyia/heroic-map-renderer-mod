@@ -4,6 +4,11 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.44
+
+- **Pick any color for your lines and regions.** Right-click a shape's handle and choose "Color…": type a color like `#3A7FD5` and press Enter. It shows everywhere the shape does, on both maps and in the veil. Leave it empty to go back to the color from the list.
+- **A taller veil for your own regions.** "Veil" next to "World effects" in "Settings …" raises the veil at the edge of your pinned regions from 4 up to 16 blocks, and makes it more opaque as it grows. Regions from the server stay as they are.
+
 ## 0.2.43
 
 - **Name your lines and regions.** Right-click a shape's handle and choose "Name…": type a name and press Enter. It shows on the full map in the same lettering as the names from the server, sized to the shape and next to the handle, and on the minimap when the shape is pinned. Leave it empty to remove the name; Esc cancels.

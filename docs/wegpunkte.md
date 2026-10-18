@@ -1,6 +1,6 @@
 ---
 title: Wegpunkte
-description: Wegpunkte auf der Vollbildkarte setzen und löschen, eigene Linien und Regionen mit eigenen Ecken und Namen, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
+description: Wegpunkte auf der Vollbildkarte setzen und löschen, eigene Linien und Regionen mit eigenen Ecken, Namen und Farben, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Wegpunkte.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
@@ -50,7 +50,7 @@ Formen“ (mod#79, mod#112).
 | Linke Taste 0,5 s still auf dem Griff in der Mitte einer Form halten | die ganze Form hängt an der Maus; beim Loslassen liegt sie um ganze Blöcke verschoben; `Esc` bricht ab, siehe „Eigene Formen“ |
 | Rechtsklick, „Form fertig“ | speichert die Form im Bau, mit zwei Ecken eine Linie, mit mehr eine Region; den Eintrag gibt es ab zwei Ecken |
 | Rechtsklick, „Form abbrechen“, oder `Esc` | verwirft die Form im Bau; eine geänderte bleibt, wie sie war |
-| Rechtsklick auf den Griff einer eigenen Form | ihr Menü: „An die Minimap heften“ oder „Von der Minimap lösen“, „Name…“, „Eckpunkt hinzufügen“, „Form löschen“; siehe „Eigene Formen“ und „Namen“ |
+| Rechtsklick auf den Griff einer eigenen Form | ihr Menü: „An die Minimap heften“ oder „Von der Minimap lösen“, „Name…“, „Farbe…“, „Eckpunkt hinzufügen“, „Form löschen“; siehe „Eigene Formen“, „Namen“ und „Farbe“ |
 | Rechtsklick auf die Raute eines alten Rechtecks | „Region löschen“ |
 
 - **Unter der Maus** steht hervorgehoben, was ein Klick dort träfe: ein
@@ -195,6 +195,18 @@ nach oben immer durchsichtiger.
 - **Höhe:** 4 Blöcke (`Schleier.HOEHE`). Unten ist der Schleier zur Hälfte
   so deckend wie seine Farbe (`Schleier.DECKUNG`), oben ganz durchsichtig,
   dazwischen linear.
+- **Regler** „Schleier“ im Untermenü „Einstellungen …“, neben „Effekte in
+  der Welt“ (`Anzeige.SchleierRegler`): für eigene Regionen und alte
+  Rechtecke 4 bis 16 Blöcke hoch, in ganzen Blöcken, Vorgabe 4
+  (`Minimap.schleier`, gespeichert als `schleier`, gekappt auch beim
+  Lesen). Höhe und Deckung steigen zusammen: unten von 50 % bei 4 Blöcken
+  linear bis 90 % bei 16 (`Schleier.deckung`, `Schleier.MAX_DECKUNG`).
+  Flächen und Kreise vom Server bleiben bei 4 Blöcken und 50 %; welche
+  Form eigen ist, sagt `Wegpunkte.eigen`. Es sind gleich viele Vierecke,
+  nur höher; die Grenze von 5 000 bleibt, und je Frame kommt keine Arbeit
+  dazu. Eine andere Höhe baut neu, wie eine andere Sichtweite. Gewünscht
+  vom User am 18.10.: „ein Regler, der Höhe und Deckkraft zusammen
+  hebt“.
 - **Gelände:** Die Ecken unten stehen auf der Heightmap
   `MOTION_BLOCKING_NO_LEAVES` des Clients, also unter dem Laub und auf der
   Oberfläche von Wasser, wie der Strahl. Der Client hat `WORLD_SURFACE`,
@@ -349,6 +361,7 @@ sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
 - **Menü am Griff:** Ein Rechtsklick auf den Griff öffnet nur das Menü der
   Form (`Karte.formMenue`): „An die Minimap heften“ oder „Von der Minimap
   lösen“, wie der Doppelklick; „Name…“ oder „Name ändern…“, siehe „Namen“;
+  „Farbe…“, siehe „Farbe“;
   „Eckpunkt hinzufügen“, neue Ecken hinter der
   letzten, bei einer Region zwischen der letzten und der ersten, wie auf
   einer Ecke; „Form löschen“. Ist eine Form im Bau, fehlt „Eckpunkt
@@ -431,6 +444,29 @@ am 18.10. (mod#128); Plan, Farbe und Ort hat der Reviewer freigegeben.
   Kartenschrift höchstens ein Zehntel ihrer Seite hoch.
 - **Bleibt** beim Ziehen, wo er der Form an der Maus folgt, beim Ändern der
   Ecken und beim Anheften (`Wegpunkte.ersetze`, `Wegpunkte.umschalten`).
+
+## Farbe
+
+Eigene Linien und Regionen bekommen auf Wunsch eine eigene Farbe als
+`#RRGGBB`, statt einer der 8 aus der Liste (`Wegpunkte.FARBEN`). Gewünscht
+vom User am 18.10.; Plan vom Reviewer freigegeben.
+
+- **Wählen:** Rechtsklick auf den Griff, „Farbe…“. An der Stelle des Menüs
+  öffnet sich dasselbe Eingabefeld wie bei „Name…“, mit der jetzigen Farbe
+  als `#RRGGBB` darin (`Karte.oeffne`). Enter nimmt `#RRGGBB` oder
+  `RRGGBB` in beliebiger Schreibung, aussen ohne Leerraum
+  (`Wegpunkte.hex`); leer heisst zurück zur Farbe aus der Liste. Was keine
+  Farbe ist, nimmt Enter nicht: Das Feld bleibt offen, der Text wird rot,
+  bis der Spieler ihn ändert. `Esc` oder ein Klick daneben bricht ab, und
+  jede Taste gehört dem Feld, wie bei „Name…“, siehe „Namen“.
+- **Gilt überall,** wo die Form ihre Farbe zeigt (`EigeneForm.argb`):
+  Fläche zu 25 % und Rand auf Vollbildkarte und Minimap, Ecken, Griff,
+  Schleier. Ändern der Ecken, Verschieben, Anheften und Namen lassen sie.
+- **Nur ASCII:** Ziffern anderer Schriften nimmt `Wegpunkte.hex` nicht,
+  obwohl `Integer.parseInt` sie läse.
+- **Datei:** `hex` neben dem Index `farbe`, siehe „Ablage“; ohne eigene
+  Farbe fehlt das Feld. Eine ältere Version nimmt die Farbe des Index.
+- **Wegpunkte** haben weiter nur die 8 Farben, siehe „Was fehlt“.
 
 ## Regionen
 
@@ -522,7 +558,7 @@ Schleier am Rand, siehe „Schleier“.
 
   ```json
   {"wegpunkte":[{"id":1,"dimension":"minecraft:overworld","x":12,"z":-40,"farbe":0,"minimap":true}],
-   "eigene_formen":[{"dimension":"minecraft:overworld","ecken":[[12,-40],[30,-40],[30,-20]],"farbe":2,"minimap":false,"name":"Mühle"}],
+   "eigene_formen":[{"dimension":"minecraft:overworld","ecken":[[12,-40],[30,-40],[30,-20]],"farbe":2,"minimap":false,"name":"Mühle","hex":"#3A7FD5"}],
    "regionen":[{"dimension":"minecraft:overworld","x0":2,"z0":-5,"x1":10,"z1":3,"farbe":1,"minimap":false}],
    "spieler":["00000000-0000-0000-0000-000000000001"],
    "formen":[{"ebene":"b:staedte","id":"westmark"}],
@@ -531,8 +567,9 @@ Schleier am Rand, siehe „Schleier“.
 
   `farbe` ist ein Index in `Wegpunkte.FARBEN`, `minimap` heisst angeheftet,
   `eigene_formen` nennt ihre Dimension und die Blöcke ihrer Ecken in Reihenfolge,
-  dazu `name`, wenn sie einen hat, siehe „Namen“; eine ältere Version des
-  Mods überliest ihn und verliert ihn beim nächsten Speichern,
+  dazu `name`, wenn sie einen hat, siehe „Namen“, und `hex`, wenn sie eine
+  eigene Farbe hat, siehe „Farbe“; eine ältere Version des Mods überliest
+  beide und verliert sie beim nächsten Speichern,
   `spieler` sind die angehefteten Mitspieler, `formen` die angehefteten
   Flächen und Kreise vom Server, `nadeln` die angehefteten Nadeln und
   Banner. Eine Region nennt die Blöcke ihrer Ecken,
@@ -574,7 +611,10 @@ Schleier am Rand, siehe „Schleier“.
   `nameBereinigtUndGekappt`, `namenUeberstehenDenNeustartUndAenderungen`
   (auch ein Name, der kein Text ist), `namenEineSchrifthoeheNebenDemGriff`
   (Region, Linie in vier Richtungen, Höhe nach der Form und gekappt, ohne
-  Namen).
+  Namen). Zur Farbe: `hexFarbeLesenSchreibenUndUeberall` (gültig und
+  ungültig, auch Ziffern anderer Schriften; Rand und Füllung; über die
+  Datei, mit dem Index daneben; weggenommen; eine Farbe, die keine ist).
+  Zum Schleier: `eigeneFormenFuerDenSchleierErkannt`.
 - `SchleierTest`: Teilen an jeder ganzen Zahl, auch rückwärts und durch
   eine Ecke; ein Rechteck ein Stück je Block, nur im Kasten; ein Kreis in
   Sehnen über den Bogen, ein Kreis von 100 000 Blöcken nur beim Kasten;
@@ -648,7 +688,15 @@ Schleier am Rand, siehe „Schleier“.
   Bildschirmfoto mindestens 100 Pixel mehr in der Farbe der Kartenschrift
   als vorher. Am Griff gezogen behält sie den Namen. „Name ändern…“ zeigt
   den Namen, ein Klick neben das Feld lässt ihn, leer gemacht und Enter
-  nimmt ihn weg. Der Hinweis unten links bleibt dabei, wie er war.
+  nimmt ihn weg. Der Hinweis unten links bleibt dabei, wie er war. Farbe
+  (`farbe`): „Farbe…“ am Griff zeigt die Farbe der Region als `#RRGGBB`;
+  „#3A7FDG“ nimmt Enter nicht, das Feld bleibt offen; „3a7fd5“ und Enter
+  färben sie, und im Bildschirmfoto steht ihr Rand in `#3A7FD5`; leer und
+  Enter gibt ihr die Farbe aus der Liste zurück. Regler (`schleierRegler`):
+  Klicks ans rechte Ende, ans linke und in die Mitte des Reglers geben 16,
+  4 und 10 Blöcke, gespeichert beim Schliessen. In der Szene des Schleiers
+  (`Bilder`): mit dem Regler auf 16 dieselbe Zahl Vierecke, jedes 16 Blöcke
+  hoch und unten zu 90 % deckend.
 - `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
   [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und
@@ -667,6 +715,5 @@ Schleier am Rand, siehe „Schleier“.
 
 - **Namen, Farbe wählen:** Ein Wegpunkt hat nur Block und Farbe; die Farbe
   ändern heisst löschen und neu setzen. Verschieben geht, siehe „Bedienung“.
-- **Formen ändern:** Die Farbe einer fertigen Form wählen geht nicht;
-  dafür die Form löschen und neu bauen. Ecken einfügen, löschen und
-  verschieben geht, siehe „Eigene Formen“.
+- **Formen** lassen sich ganz ändern: Ecken, Name und Farbe, siehe
+  „Eigene Formen“, „Namen“ und „Farbe“.
