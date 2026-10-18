@@ -61,6 +61,8 @@ public final class HeroicMap implements ClientModInitializer {
         ResourceLoader ressourcen = ResourceLoader.get(PackType.CLIENT_RESOURCES);
         ressourcen.registerReloadListener(formen, (ResourceManagerReloadListener) manager -> Formen.neuGeladen());
         ressourcen.addListenerOrdering(ResourceReloaderKeys.Client.FONTS, formen);
+        ressourcen.registerReloadListener(Identifier.fromNamespaceAndPath(ID, "pflanzen"),
+                (ResourceManagerReloadListener) manager -> Pflanzen.neuGeladen());
         // Die Live-Ebene gibt es nicht mehr; ihre alten Ordner gehen beim Start weg. Siehe docs/download.md, „Ablage“.
         Thread.ofPlatform().daemon().name("Heroic Map Aufräumen").start(() -> {
             try {

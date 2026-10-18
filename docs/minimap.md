@@ -1,11 +1,13 @@
 ---
 title: Minimap
-description: Bedienung über das Menü hinter /hmap und das Untermenü „Einstellungen …“, das Aussehen per Klick auf Spieler und Marken, Chunklinien, Effekte in der Welt, Drehen mit der Blickrichtung, Koordinaten unter der Minimap, was sie bei F3 tut, der eigene Spieler in drei Darstellungen, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
+description: Bedienung über das Menü hinter /hmap und das Untermenü „Einstellungen …“, das Aussehen per Klick auf Spieler und Marken, Chunklinien, Effekte in der Welt, Drehen mit der Blickrichtung, Koordinaten unter der Minimap, was sie bei F3 tut, der eigene Spieler in drei Darstellungen, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pflanzen von oben, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
 code:
   - src/main/java/com/nekyia/heroicmap/Minimap.java
   - src/main/java/com/nekyia/heroicmap/DebugBildschirm.java
   - src/test/java/com/nekyia/heroicmap/DebugBildschirmTest.java
   - src/main/java/com/nekyia/heroicmap/ChunkMaler.java
+  - src/main/java/com/nekyia/heroicmap/Pflanzen.java
+  - src/test/java/com/nekyia/heroicmap/PflanzenTest.java
   - src/main/java/com/nekyia/heroicmap/Licht.java
   - src/main/java/com/nekyia/heroicmap/HeroicMap.java
   - src/main/java/com/nekyia/heroicmap/Einstellungen.java
@@ -573,11 +575,13 @@ Tönung (`putQuadWithTint`).
 - **Nach oben:** Der Mod behält Flächen, deren Normale nach oben zeigt,
   n_y > 10⁻⁴ · |n|. Die Normale ist (p1 − p0) × (p2 − p0); die Ecken einer
   Oberseite liegen so, dass sie nach oben zeigt (`FaceInfo.UP`). Kreuze wie
-  Gras, Blumen und Getreide stehen senkrecht und fallen weg.
+  Gras, Blumen und Getreide stehen senkrecht; sie legt der Mod flach, siehe
+  „Pflanzen von oben“.
 - **Reihenfolge:** In einem Block zuerst die höchste Fläche, dann die Blöcke
   darunter.
 - **Versatz:** `tesselateBlock` gibt den Versatz des Blocks (`getOffset`)
-  mit, etwa bei Bambus und Blumen; der Mod schiebt die Fläche um ihn. Was
+  mit, etwa bei Bambus und Blumen; der Mod schiebt die Fläche um ihn, nur
+  die flache Pflanze nicht, siehe „Pflanzen von oben“. Was
   dabei über die eigene Spalte hinausragt, fällt weg, siehe „Was anders ist
   als top-north“.
 - **Leuchten** einzelner Flächen (`lightEmission`) hebt ihr Licht wie im
@@ -585,6 +589,57 @@ Tönung (`putQuadWithTint`).
 - **Weiche Beleuchtung** ist immer an, gleich was der Spieler eingestellt
   hat, wie auf der Serverkarte.
 - **Tönung** kommt über `BlockColors`, auch die anderer Mods.
+
+## Pflanzen von oben
+
+Wie der Renderer von oben legt der Mod Bodenpflanzen flach, nach derselben
+Regel, siehe
+[Kamera](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/renderer/kamera.md),
+„Pflanzen von oben“. So stimmen Minimap und Kacheln überein, Wunsch des
+Users (mod#133). Bis 0.2.49 fielen Gras, Blumen, Getreide und Seegras von
+oben weg.
+
+![Die Minimap der Szene bei 4 px oben und 2 px unten, links bis 0.2.49, rechts mit Pflanzen von oben: das Weizenfeld, Gras und Mohn; Szene des Gametests `Bilder`](bilder/pflanzen-vergleich.png)
+
+- **Welche Blöcke** (`Pflanzen.bodenpflanze`): Jedes Modell des Zustands
+  erbt über `parent` von `minecraft:block/cross`, `tinted_cross`,
+  `cross_emissive`, `crop`, `template_seagrass`, `flowerbed_*` oder
+  `template_leaf_litter_*` (`Pflanzen.vorlage`), dieselben Vorlagen wie im
+  Renderer. Dazu gehören auch Setzlinge, Pilze, Spinnennetz und die
+  Amethystknospen.
+  - **Die Blockstate-Datei** liest das Spiel selbst
+    (`BlockStateModelDispatcher.CODEC`, `instantiate`), aus allen Packs,
+    das oberste zuletzt, wie beim Laden; die Modelle eines Zustands nennt
+    `resolveDependencies`. Belegt per javap am Client 26.3.
+  - **Die `parent`-Kette** liest der Mod aus den Modelldateien im obersten
+    Pack, höchstens 32 Glieder; eine längere gilt als Schleife.
+  - **Je Block einmal:** die Blockstate-Datei beim ersten Treffen eines
+    Blocks im Worker, die Kette je Modell einmal. Ein Neuladen der Packs
+    nimmt einen neuen Merker (`Pflanzen.neuGeladen`); was ein Worker
+    danach noch in den alten schreibt, zählt nicht.
+- **Welche Modelle:** Hat das Modell eine Fläche nach oben, bleibt es, wie
+  es ist, etwa Blütenteppiche und Laub am Boden.
+- **Was flach liegt** (`ChunkMaler.flach`): die erste Fläche aus dem
+  Tesselator, als Fläche über den ganzen Block, 1/16 über seinem Boden.
+  - **UV:** das Rechteck aus min und max über alle vier Ecken
+    (`ChunkMaler.rechteck`), u0 und v0 im Nordwesten wie das Bild in der
+    Datei. Drehung und Spiegelung zählen nicht.
+  - **Ohne den Versatz des Blocks,** wie im Renderer, der keinen kennt.
+    So deckt sie die eigene Spalte ganz.
+  - **Licht und Tönung** im Mittel der vier Ecken der Vorlage, Gras also
+    in der Farbe des Bioms. Das Spiel schattiert jede Fläche nach
+    `shadeDirectionOverride`, sonst nach ihrer Richtung
+    (`BlockModelLighter.getDirectionalBrightness`, per javap am Client
+    26.3); der Mod teilt das heraus und schattiert nach oben
+    (`CardinalLighting.up`). Die Vorlagen des Spiels schattieren schon nach
+    oben.
+  - **Seegras** liegt so unter seiner Wasseroberfläche, die sich höher
+    einreiht.
+- **Deckung** wie jede ausgeschnittene Fläche, siehe „Flächen und Pixel“.
+  Bei 4 px deckt ein Pixel 4 × 4 Texel: Vom Mohn bleibt ein Pixel, vom
+  Seegras ein Viertel des Blocks, Weizen deckt fast ganz.
+- **Die eigene Karte** zeichnet mit demselben Maler, siehe
+  [Selbst gezeichnete Karte](selbst.md).
 
 ## Flächen und Pixel
 
@@ -784,6 +839,13 @@ runde Form am 09.10., seit dem Vieleck, siehe
 
 Der Flug geht dabei mit 20 Blöcken/s über geladenes Gelände.
 
+**Pflanzen von oben,** geschätzt, nicht gemessen: Je Spalte mit Pflanze
+kommt eine volle Fläche über das gemittelte Raster dazu, rund 0,5 bis 1 µs,
+gegen rund 10 µs je Spalte bei 4 px (2,6 ms je Chunk). Getroffen und
+gezeichnet wurde die Pflanze schon vorher, nur ihre Flächen fielen weg. Auf
+dichter Wiese also rund 2 bis 5 % je Chunk, auf Stein, Sand und Wasser
+nichts. Die Messung läuft nachts mit `-Pmessung`.
+
 **Der Umriss rund ohne Rahmen** (`Minimap.umrissRing`), geschätzt, nicht
 gemessen:
 
@@ -839,7 +901,8 @@ Chunklinien auf Vollbildkarte und Minimap (siehe „Chunklinien“):
 Ein Becken mit Wasser von 1 bis 6 Blöcken Tiefe, nach Osten tiefer; im
 Westen ragen Mangrovenwurzeln und obere Stufen aus dem Wasser. Dazu ein
 Haus mit einem Schild an der Wand, Bambus, ein Kopf, drei Bäume, ein Weg, Glas, Eis, Schnee, Lava, eine Truhe, Teppich und
-ein Feld. Gras, Blumen und Weizen stehen senkrecht und fehlen von oben.
+ein Feld. Gras, Blumen und Weizen liegen von oben flach, siehe „Pflanzen
+von oben“.
 
 Danach die Ebenen (siehe [ebenen.md](ebenen.md)): Flächen, Kreis, Linie und
 Kartenschrift, der Kreis und eine eigene Region aus drei Wegpunkten angeheftet (`formen.png`,
@@ -858,7 +921,10 @@ Zuletzt das Banner in drei Grössen bei GUI-Massstab 2 und 3
 und aus Eisen, Truhen einzeln und doppelt, Ender- und Fallentruhe, ein Fass,
 dazu ein Stück Dorf mit Zaun, Fackeln, Scheiben, Gitter, Mauer und
 Falltüren, auf der Minimap bei 1, 2 und 4 px (`tueren.png`); bei 2 px prüft
-der Test, dass die Türen zu sehen sind.
+der Test, dass die Türen zu sehen sind. Zuletzt eine Reihe Pflanzen bei
+4 px, mit und ohne (`pflanzen.png`, siehe „Pflanzen von oben“): Mohn,
+Weizen und Seegras ändern ihre Pixel, im Südosten des Blütenteppichs und
+an der Leiter bleibt alles gleich.
 
 ## Was anders ist als top-north
 
@@ -875,6 +941,14 @@ der Test, dass die Türen zu sehen sind.
 - **Biomübergang** nach der Einstellung des Spielers, Vorgabe 2 wie der
   Renderer.
 - **Nur geladene Chunks,** also nur die Sichtweite.
+- **Pflanzen aus mehreren Teilen** (multipart): Der Mod prüft alle Teile
+  der Datei, nicht nur die für den Zustand. In Vanilla sind das
+  Blütenteppiche und Laub am Boden; sie haben eine Oberseite und bleiben
+  ohnehin.
+- **Eigene Kacheln von früher:** Die selbst gezeichnete Karte hat keinen
+  Stand der Zeichnung. Ihre Kacheln bis 0.2.49 bleiben ohne Pflanzen, bis
+  der Chunk neu gezeichnet wird, siehe [Selbst gezeichnete Karte](selbst.md),
+  „Wann gezeichnet wird“.
 - **Versatz über die Spalte hinaus:** Der Mod tastet je Spalte nur deren
   Pixel ab. Was ein Versatz über die Spalte schiebt, etwa ein Bambusrohr am
   Rand, fehlt.
