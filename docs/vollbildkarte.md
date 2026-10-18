@@ -61,7 +61,7 @@ sagt sie das und zeigt nichts.
   ist nach 5 s weg (`Karte.HINWEIS_MS`), oder beim nächsten Klick oder
   Tastendruck auf der Karte, was eher kommt (`Karte.zeige`); Mausrad und
   Zeigen nehmen ihn nicht weg. Meldet der Klick selbst etwas, steht danach
-  das Neue. Bis 0.2.45 blieb er, bis die Karte zuging; so entschied es der
+  das Neue. Bis 0.2.46 blieb er, bis die Karte zuging; so entschied es der
   Reviewer am 18.10. Die Hilfe beim Bauen einer Form und beim Eingabefeld
   steht darüber, solange beides offen ist.
 - **Ohne Satz** zeigt die Karte nur den Hinweis und den Knopf zum Laden.
