@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.44
+
+- **Name your lines and regions.** Right-click a shape's handle and choose "Name…": type a name and press Enter. It shows on the full map in the same lettering as the names from the server, sized to the shape and next to the handle, and on the minimap when the shape is pinned. Leave it empty to remove the name; Esc cancels.
+
 ## 0.2.43
 
 - **"On F3" works with BetterF3.** BetterF3 keeps the debug screen switched on while it slides out, so the minimap stayed centered or hidden until the animation ended; now it returns as soon as you press F3.

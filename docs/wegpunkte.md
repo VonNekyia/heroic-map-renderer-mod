@@ -1,6 +1,6 @@
 ---
 title: Wegpunkte
-description: Wegpunkte auf der Vollbildkarte setzen und löschen, eigene Linien und Regionen mit eigenen Ecken, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
+description: Wegpunkte auf der Vollbildkarte setzen und löschen, eigene Linien und Regionen mit eigenen Ecken und Namen, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Wegpunkte.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
@@ -50,7 +50,7 @@ Formen“ (mod#79, mod#112).
 | Linke Taste 0,5 s still auf dem Griff in der Mitte einer Form halten | die ganze Form hängt an der Maus; beim Loslassen liegt sie um ganze Blöcke verschoben; `Esc` bricht ab, siehe „Eigene Formen“ |
 | Rechtsklick, „Form fertig“ | speichert die Form im Bau, mit zwei Ecken eine Linie, mit mehr eine Region; den Eintrag gibt es ab zwei Ecken |
 | Rechtsklick, „Form abbrechen“, oder `Esc` | verwirft die Form im Bau; eine geänderte bleibt, wie sie war |
-| Rechtsklick auf den Griff einer eigenen Form | ihr Menü: „An die Minimap heften“ oder „Von der Minimap lösen“, „Eckpunkt hinzufügen“, „Form löschen“; siehe „Eigene Formen“ |
+| Rechtsklick auf den Griff einer eigenen Form | ihr Menü: „An die Minimap heften“ oder „Von der Minimap lösen“, „Name…“, „Eckpunkt hinzufügen“, „Form löschen“; siehe „Eigene Formen“ und „Namen“ |
 | Rechtsklick auf die Raute eines alten Rechtecks | „Region löschen“ |
 
 - **Unter der Maus** steht hervorgehoben, was ein Klick dort träfe: ein
@@ -348,7 +348,8 @@ sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
   was ein Klick dort sonst tut. Gewünscht vom User am 18.10. (mod#128).
 - **Menü am Griff:** Ein Rechtsklick auf den Griff öffnet nur das Menü der
   Form (`Karte.formMenue`): „An die Minimap heften“ oder „Von der Minimap
-  lösen“, wie der Doppelklick; „Eckpunkt hinzufügen“, neue Ecken hinter der
+  lösen“, wie der Doppelklick; „Name…“ oder „Name ändern…“, siehe „Namen“;
+  „Eckpunkt hinzufügen“, neue Ecken hinter der
   letzten, bei einer Region zwischen der letzten und der ersten, wie auf
   einer Ecke; „Form löschen“. Ist eine Form im Bau, fehlt „Eckpunkt
   hinzufügen“, dafür kommen „Form fertig“ und „Form abbrechen“ dazu
@@ -385,6 +386,51 @@ sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
   Griff“.
 - **Anheften:** Doppelklick, siehe „Anheften“. Auch Linien, entschieden
   vom Reviewer; den Schleier in der Welt bekommen nur Regionen.
+
+## Namen
+
+Eigene Linien und Regionen tragen einen Namen, wenn der Spieler ihnen einen
+gibt. Er steht auf der Karte wie die Namen vom Server. Gewünscht vom User
+am 18.10. (mod#128); Plan, Farbe und Ort hat der Reviewer freigegeben.
+
+- **Geben:** Rechtsklick auf den Griff, „Name…“, mit Namen „Name ändern…“
+  (`Karte.benennen`). An der Stelle des Menüs öffnet sich ein Eingabefeld
+  des Spiels, 160 Einheiten breit, mit dem Namen darin. Enter speichert,
+  leer heisst ohne Namen (`Wegpunkte.benenne`); `Esc` oder ein Klick neben
+  das Feld bricht ab. Unten links steht „Enter: Name speichern, leer ohne
+  Namen; Esc bricht ab“.
+- **Tasten:** Solange das Feld offen ist, gehört ihm jede Taste
+  (`Karte.keyPressed`): Die Kartentaste tippt, statt die Karte zu
+  schliessen, und `Esc` schliesst nur das Feld. Nichts ist hervorgehoben,
+  keine Tafel geht auf. Baut das Spiel den Schirm neu auf, etwa bei einer
+  anderen Fenstergrösse, ist das Feld zu, ohne zu speichern.
+- **Erlaubt** (`Wegpunkte.name`): höchstens 32 Zeichen
+  (`Wegpunkte.MAX_NAME`), Codes mit § gestrichen, NFC, ohne Steuer- und
+  Formatzeichen, aussen ohne Leerraum. Ebenso beim Lesen der Datei; ein
+  Name, der kein Text ist, fehlt, die Form bleibt.
+- **Gezeichnet** als Kartenschrift in den Vorgaben vom Server
+  (`Wegpunkte.schrift`), siehe [Ebenen](ebenen.md), „Kartenschrift“:
+  `#2B2B2B` mit heller Kontur `#F2E8D0`, 1,25 Einheiten breit wie beim
+  Namen einer Nadel (`Wegpunkte.NAME_KONTUR`). Nicht in der Farbe der Form:
+  Die steht schon an Rand und Griff; so hat es der Reviewer entschieden,
+  für Einheitlichkeit und Lesbarkeit.
+- **Grösse** nach der Form (`Wegpunkte.groesse`): Grossbuchstaben so hoch
+  wie die halbe kürzere Seite des Kastens einer Region oder ein Viertel der
+  Länge einer Linie, mindestens 4 und höchstens 16 Blöcke
+  (`Wegpunkte.NAME_KLEINSTE`, `Wegpunkte.NAME_GROESSE`); 16 ist die Vorgabe
+  vom Server. Unter 8 Einheiten fehlt der Name, über 96 bleibt er 96 hoch;
+  so verschwinden die Namen kleiner Formen beim Herauszoomen zuerst. Mit
+  16 Blöcken für alle war der Name einer Region von 6 × 6 Blöcken rund 100
+  Blöcke breit und erschlug die Form; entschieden vom Reviewer am 18.10.
+- **Wo:** eine Schrifthöhe neben dem Griff, so deckt der Griff keinen
+  Buchstaben: bei einer Region waagrecht darunter, bei einer Linie parallel
+  zu ihr auf ihrer Nordseite, bei einer Linie von Nord nach Süd auf ihrer
+  Westseite. Eine Linie hat genau zwei Ecken. Der Abstand zählt in Blöcken;
+  ist die Schrift auf 96 Einheiten gekappt, steht sie weiter vom Griff weg.
+- **Minimap:** Der Name steht dort, wenn die Form angeheftet ist, wie jede
+  Kartenschrift höchstens ein Zehntel ihrer Seite hoch.
+- **Bleibt** beim Ziehen, wo er der Form an der Maus folgt, beim Ändern der
+  Ecken und beim Anheften (`Wegpunkte.ersetze`, `Wegpunkte.umschalten`).
 
 ## Regionen
 
@@ -476,7 +522,7 @@ Schleier am Rand, siehe „Schleier“.
 
   ```json
   {"wegpunkte":[{"id":1,"dimension":"minecraft:overworld","x":12,"z":-40,"farbe":0,"minimap":true}],
-   "eigene_formen":[{"dimension":"minecraft:overworld","ecken":[[12,-40],[30,-40],[30,-20]],"farbe":2,"minimap":false}],
+   "eigene_formen":[{"dimension":"minecraft:overworld","ecken":[[12,-40],[30,-40],[30,-20]],"farbe":2,"minimap":false,"name":"Mühle"}],
    "regionen":[{"dimension":"minecraft:overworld","x0":2,"z0":-5,"x1":10,"z1":3,"farbe":1,"minimap":false}],
    "spieler":["00000000-0000-0000-0000-000000000001"],
    "formen":[{"ebene":"b:staedte","id":"westmark"}],
@@ -485,6 +531,8 @@ Schleier am Rand, siehe „Schleier“.
 
   `farbe` ist ein Index in `Wegpunkte.FARBEN`, `minimap` heisst angeheftet,
   `eigene_formen` nennt ihre Dimension und die Blöcke ihrer Ecken in Reihenfolge,
+  dazu `name`, wenn sie einen hat, siehe „Namen“; eine ältere Version des
+  Mods überliest ihn und verliert ihn beim nächsten Speichern,
   `spieler` sind die angehefteten Mitspieler, `formen` die angehefteten
   Flächen und Kreise vom Server, `nadeln` die angehefteten Nadeln und
   Banner. Eine Region nennt die Blöcke ihrer Ecken,
@@ -522,7 +570,11 @@ Schleier am Rand, siehe „Schleier“.
   ändert keine Form), `eckeLoeschenUndEinfuegen` (Region mit drei Ecken wird
   Linie, Linie mit zwei fällt weg, über 64 nicht) und
   `formenGrenzenUndAlteDatei` (Umzug von `punkte` zu `ecken`),
-  `griffAufHalberLaengeOderImSchwerpunkt`.
+  `griffAufHalberLaengeOderImSchwerpunkt`. Zu Namen:
+  `nameBereinigtUndGekappt`, `namenUeberstehenDenNeustartUndAenderungen`
+  (auch ein Name, der kein Text ist), `namenEineSchrifthoeheNebenDemGriff`
+  (Region, Linie in vier Richtungen, Höhe nach der Form und gekappt, ohne
+  Namen).
 - `SchleierTest`: Teilen an jeder ganzen Zahl, auch rückwärts und durch
   eine Ecke; ein Rechteck ein Stück je Block, nur im Kasten; ein Kreis in
   Sehnen über den Bogen, ein Kreis von 100 000 Blöcken nur beim Kasten;
@@ -589,6 +641,14 @@ Schleier am Rand, siehe „Schleier“.
   Maus, auch bei noch gedrückter Taste. Unter der Maus (`schweben`): Auf
   einem Wegpunkt, einer Ecke und einem Griff zählt das Bildschirmfoto um
   die Stelle mehr weisse Pixel als mit der Maus 20 Einheiten daneben.
+  Namen (`namen`): Rechtsklick auf den Griff einer Region, „Name…“, das
+  Feld ist leer; nach Tippen, der Kartentaste und `Esc` ist die Karte noch
+  offen, das Feld zu und kein Name gespeichert. Wieder „Name…“, tippen,
+  Enter: Die Form heisst so, und eine Schrifthöhe unter dem Griff zählt das
+  Bildschirmfoto mindestens 100 Pixel mehr in der Farbe der Kartenschrift
+  als vorher. Am Griff gezogen behält sie den Namen. „Name ändern…“ zeigt
+  den Namen, ein Klick neben das Feld lässt ihn, leer gemacht und Enter
+  nimmt ihn weg. Der Hinweis unten links bleibt dabei, wie er war.
 - `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
   [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und
@@ -607,5 +667,6 @@ Schleier am Rand, siehe „Schleier“.
 
 - **Namen, Farbe wählen:** Ein Wegpunkt hat nur Block und Farbe; die Farbe
   ändern heisst löschen und neu setzen. Verschieben geht, siehe „Bedienung“.
-- **Formen ändern:** Einen Punkt in eine fertige Form einfügen oder ihre
-  Farbe wählen geht nicht; dafür die Form löschen und neu bauen.
+- **Formen ändern:** Die Farbe einer fertigen Form wählen geht nicht;
+  dafür die Form löschen und neu bauen. Ecken einfügen, löschen und
+  verschieben geht, siehe „Eigene Formen“.

@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -22,6 +23,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import net.minecraft.ChatFormatting;
 import org.slf4j.Logger;
 
 /**
@@ -47,9 +49,10 @@ final class Wegpunkte {
 
     /**
      * Eine eigene Form, ein Marker mit eigenen Ecken in Reihenfolge: zwei sind eine Linie, drei und mehr eine
-     * Region. Sie verweist auf keinen Wegpunkt. Siehe docs/wegpunkte.md, „Eigene Formen“.
+     * Region. Sie verweist auf keinen Wegpunkt. {@code name} wie aus {@link #name}, null ohne. Siehe docs/wegpunkte.md,
+     * „Eigene Formen“.
      */
-    record EigeneForm(String dimension, List<Ecke> ecken, int farbe, boolean angeheftet) {
+    record EigeneForm(String dimension, List<Ecke> ecken, int farbe, boolean angeheftet, String name) {
 
         EigeneForm {
             ecken = List.copyOf(ecken);
@@ -79,6 +82,13 @@ final class Wegpunkte {
     static final int MAX_REGIONEN = 256;
     /** So viele eigene Formen je Welt, und so viele Ecken je Form. */
     static final int MAX_EIGENE_FORMEN = 256, MAX_PUNKTE_FORM = 64;
+    /** So viele Zeichen hat der Name einer eigenen Form höchstens. */
+    static final int MAX_NAME = 32;
+    /**
+     * Der Name einer eigenen Form als Kartenschrift: die Grossbuchstaben je nach Form so hoch in Blöcken, höchstens wie die
+     * Vorgabe vom Server; die Kontur in Einheiten des GUI wie beim Namen einer Nadel. Siehe docs/wegpunkte.md, „Namen“.
+     */
+    static final float NAME_KLEINSTE = 4, NAME_GROESSE = 16, NAME_KONTUR = 1.25f;
     /** So viele Regionen und Kreise je Welt angeheftet, eigene und vom Server zusammen; darüber heftet der Mod keine an. */
     static final int MAX_ANGEHEFTET = 64;
     /** So viele Nadeln und Banner je Welt angeheftet, eine eigene Grenze; darüber heftet der Mod keine an. */
@@ -217,8 +227,10 @@ final class Wegpunkte {
                 }
                 List<Ecke> gueltig = gueltig(ecken);
                 if (dimension != null && gueltig != null && eigene.size() < MAX_EIGENE_FORMEN) {
+                    // Ein Name, der kein Text ist, fehlt; die Form bleibt.
+                    String name = o.has("name") && o.get("name").isJsonPrimitive() ? name(o.get("name").getAsString()) : null;
                     eigene.add(new EigeneForm(dimension, gueltig, Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length),
-                            o.get("minimap").getAsBoolean() && angeheftet() < MAX_ANGEHEFTET));
+                            o.get("minimap").getAsBoolean() && angeheftet() < MAX_ANGEHEFTET, name));
                 }
             } catch (RuntimeException kaputt) {
                 // Nur dieser Eintrag fällt weg.
@@ -287,6 +299,9 @@ final class Wegpunkte {
             o.add("ecken", ecken);
             o.addProperty("farbe", f.farbe());
             o.addProperty("minimap", f.angeheftet());
+            if (f.name() != null) {
+                o.addProperty("name", f.name());
+            }
             zuege.add(o);
         }
         json.add("eigene_formen", zuege);
@@ -441,7 +456,7 @@ final class Wegpunkte {
         if (gueltig == null || eigene.size() >= MAX_EIGENE_FORMEN) {
             return false;
         }
-        eigene.add(new EigeneForm(dimension, gueltig, farbe(dimension), false));
+        eigene.add(new EigeneForm(dimension, gueltig, farbe(dimension), false, null));
         schreibe();
         return true;
     }
@@ -459,7 +474,7 @@ final class Wegpunkte {
         if (gueltig == null) {
             eigene.remove(i);
         } else {
-            eigene.set(i, new EigeneForm(f.dimension(), gueltig, f.farbe(), f.angeheftet()));
+            eigene.set(i, new EigeneForm(f.dimension(), gueltig, f.farbe(), f.angeheftet(), f.name()));
         }
         schreibe();
         return true;
@@ -480,9 +495,35 @@ final class Wegpunkte {
         if (!f.angeheftet() && angeheftet() >= MAX_ANGEHEFTET) {
             return false;
         }
-        eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), !f.angeheftet()));
+        eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), !f.angeheftet(), f.name()));
         schreibe();
         return true;
+    }
+
+    /** Gibt der eigenen Form {@code f} den Namen {@code name}, bereinigt wie in {@link #name}; was leer bleibt, nimmt ihn weg. */
+    void benenne(EigeneForm f, String name) {
+        int i = eigene.indexOf(f);
+        if (i >= 0) {
+            eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), name(name)));
+            schreibe();
+        }
+    }
+
+    /**
+     * Ein Name als schlichter Text: Codes mit § gestrichen, NFC, ohne Steuer- und Formatzeichen, aussen ohne Leerraum,
+     * höchstens {@link #MAX_NAME} Zeichen; null, wenn nichts bleibt.
+     */
+    static String name(String roh) {
+        if (roh == null) {
+            return null;
+        }
+        String t = Normalizer.normalize(ChatFormatting.stripFormatting(roh), Normalizer.Form.NFC).codePoints()
+                .filter(c -> !Character.isISOControl(c) && Character.getType(c) != Character.FORMAT)
+                .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString().strip();
+        if (t.codePointCount(0, t.length()) > MAX_NAME) {
+            t = t.substring(0, t.offsetByCodePoints(0, MAX_NAME)).strip();
+        }
+        return t.isEmpty() ? null : t;
     }
 
     /**
@@ -773,13 +814,21 @@ final class Wegpunkte {
         List<Ebenen.Form> aufKarte = new ArrayList<>(), aufMinimap = new ArrayList<>();
         regionen.stream().filter(Region::angeheftet).map(Wegpunkte::flaeche).forEach(aufMinimap::add);
         for (EigeneForm f : this.eigene) {
-            Ebenen.Form form = form(f);
+            double[] p = mitten(f);
+            Ebenen.Form form = form(f, p);
+            Ebenen.Schrift name = schrift(f, p);
             // Die Form, die gerade gezogen wird, zeichnet die Vollbildkarte selbst, wo sie an der Maus steht.
             if (f != gezogen) {
                 aufKarte.add(f.angeheftet() ? breiter(form) : form);
+                if (name != null) {
+                    aufKarte.add(name);
+                }
             }
             if (f.angeheftet()) {
                 aufMinimap.add(form);
+                if (name != null) {
+                    aufMinimap.add(name);
+                }
             }
         }
         if (!aufKarte.isEmpty()) {
@@ -800,10 +849,48 @@ final class Wegpunkte {
         return form(f, mitten(f));
     }
 
-    /** Wie {@link #form(EigeneForm)}, wie auf der Vollbildkarte, angeheftet breiter, durch die Punkte {@code p} statt der Ecken; fürs Ziehen. */
-    Ebenen.Form aufKarte(EigeneForm f, double[] p) {
+    /**
+     * Wie {@link #form(EigeneForm)}, wie auf der Vollbildkarte, angeheftet breiter, durch die Punkte {@code p} statt der Ecken,
+     * mit dem Namen; fürs Ziehen.
+     */
+    List<Ebenen.Form> aufKarte(EigeneForm f, double[] p) {
         Ebenen.Form form = form(f, p);
-        return f.angeheftet() ? breiter(form) : form;
+        form = f.angeheftet() ? breiter(form) : form;
+        Ebenen.Schrift name = schrift(f, p);
+        return name == null ? List.of(form) : List.of(form, name);
+    }
+
+    /**
+     * Der Name der Form durch die Punkte {@code p} als Kartenschrift in den Vorgaben vom Server, eine Schrifthöhe neben dem
+     * Griff, so deckt der Griff keinen Buchstaben: unter einer Region waagrecht, an einer Linie entlang auf ihrer Nordseite,
+     * an einer Linie von Nord nach Süd auf ihrer Westseite. Null ohne Namen. Siehe docs/wegpunkte.md, „Namen“.
+     */
+    static Ebenen.Schrift schrift(EigeneForm f, double[] p) {
+        if (f.name() == null) {
+            return null;
+        }
+        double[] pfad;
+        float groesse;
+        if (f.region()) {
+            double[] b = box(p), g = griff(p, true);
+            groesse = groesse(Math.min(b[2] - b[0], b[3] - b[1]) / 2);
+            pfad = new double[] {g[0], g[1] + groesse};
+        } else {
+            // Eine Linie hat genau zwei Ecken. Die Normale (dz, −dx) zeigt für dx > 0 nach Norden, für dx = 0 und dz < 0 nach Westen.
+            double dx = p[2] - p[0], dz = p[3] - p[1], laenge = Math.hypot(dx, dz);
+            groesse = groesse(laenge / 4);
+            double s = (dx > 0 || dx == 0 && dz < 0 ? 1 : -1) * groesse / laenge;
+            pfad = new double[] {p[0] + s * dz, p[1] - s * dx, p[2] + s * dz, p[3] - s * dx};
+        }
+        return new Ebenen.Schrift(f.dimension(), f.name(), pfad, groesse, 0, Ebenen.SCHRIFTFARBE, Ebenen.KONTURFARBE, NAME_KONTUR, box(pfad));
+    }
+
+    /**
+     * Wie hoch die Grossbuchstaben eines Namens stehen, in Blöcken: {@code d}, gekappt auf {@link #NAME_KLEINSTE} bis
+     * {@link #NAME_GROESSE}. Für eine Region die Hälfte der kürzeren Seite ihres Kastens, für eine Linie ein Viertel ihrer Länge.
+     */
+    private static float groesse(double d) {
+        return (float) Math.clamp(d, NAME_KLEINSTE, NAME_GROESSE);
     }
 
     /** Die Mitten der Blöcke der Ecken, x und z abwechselnd. */
