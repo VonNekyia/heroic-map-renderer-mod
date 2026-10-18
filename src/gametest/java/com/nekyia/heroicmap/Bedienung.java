@@ -536,14 +536,15 @@ public final class Bedienung implements FabricClientGameTest {
                     + Arrays.toString(stand) + " -> " + Arrays.toString(danach));
         }
         // Ein Rechtsklick auf die Fläche, ein Drittel vom Griff zur ersten Ecke, zeigt nur das allgemeine Menü (mod#128);
-        // auf dem Griff in der Mitte, dem Schwerpunkt der drei Ecken, das der Form mit „Form löschen“.
-        double fx = (2 * ix + orte[0][0]) / 3, fy = (2 * iy + orte[0][1]) / 3;
+        // auf dem Griff in der Mitte, wie gezeichnet, das der Form mit „Form löschen“.
+        double[] griff = griff(context, formen), erste = ecke(context, formen, 0);
+        double fx = (2 * griff[0] + erste[0]) / 3, fy = (2 * griff[1] + erste[1]) / 3;
         List<String> flaeche = eintraegeBei(context, maus, k, fx, fy);
         String loeschen = context.computeOnClient(mc -> Component.translatable("heroicmap.karte.form_loeschen").getString());
         if (flaeche.contains(loeschen) || !flaeche.contains(context.computeOnClient(mc -> Component.translatable("heroicmap.karte.wegpunkt").getString()))) {
             throw new AssertionError("Rechtsklick auf die Fläche der Region zeigt nicht nur das allgemeine Menü: " + flaeche);
         }
-        eintrag(context, maus, k, ix, iy, "heroicmap.karte.form_loeschen");
+        eintrag(context, maus, k, griff[0], griff[1], "heroicmap.karte.form_loeschen");
         if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size()) != formen + 1) {
             throw new AssertionError("„Form löschen“ am Griff löschte die Region nicht");
         }
