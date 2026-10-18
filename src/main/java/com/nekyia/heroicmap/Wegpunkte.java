@@ -49,13 +49,18 @@ final class Wegpunkte {
 
     /**
      * Eine eigene Form, ein Marker mit eigenen Ecken in Reihenfolge: zwei sind eine Linie, drei und mehr eine
-     * Region. Sie verweist auf keinen Wegpunkt. {@code name} wie aus {@link #name}, null ohne. Siehe docs/wegpunkte.md,
-     * „Eigene Formen“.
+     * Region. Sie verweist auf keinen Wegpunkt. {@code name} wie aus {@link #name}, null ohne; {@code hex} eine eigene Farbe
+     * als RGB, {@link #KEIN_HEX} ohne, dann gilt {@code farbe}. Siehe docs/wegpunkte.md, „Eigene Formen“.
      */
-    record EigeneForm(String dimension, List<Ecke> ecken, int farbe, boolean angeheftet, String name) {
+    record EigeneForm(String dimension, List<Ecke> ecken, int farbe, boolean angeheftet, String name, int hex) {
 
         EigeneForm {
             ecken = List.copyOf(ecken);
+        }
+
+        /** Die Farbe der Form, deckend: die eigene, sonst die aus {@link #FARBEN}. Siehe docs/wegpunkte.md, „Farbe“. */
+        int argb() {
+            return hex == KEIN_HEX ? FARBEN[farbe] : 0xFF000000 | hex;
         }
 
         boolean region() {
@@ -84,6 +89,8 @@ final class Wegpunkte {
     static final int MAX_EIGENE_FORMEN = 256, MAX_PUNKTE_FORM = 64;
     /** So viele Zeichen hat der Name einer eigenen Form höchstens. */
     static final int MAX_NAME = 32;
+    /** Eine eigene Form ohne eigene Farbe; dann gilt ihr Index in {@link #FARBEN}. */
+    static final int KEIN_HEX = -1;
     /**
      * Der Name einer eigenen Form als Kartenschrift: die Grossbuchstaben je nach Form so hoch in Blöcken, höchstens wie die
      * Vorgabe vom Server; die Kontur in Einheiten des GUI wie beim Namen einer Nadel. Siehe docs/wegpunkte.md, „Namen“.
@@ -121,6 +128,8 @@ final class Wegpunkte {
     private List<Ebenen.Ort> fuerNadeln = List.of();
     /** Dieselben Nadeln und Banner nach Identität, so prüft die Vollbildkarte je Nadel ohne Allokation. */
     private Set<Ebenen.Ort> angeheftetOrte = Set.of();
+    /** Die eigenen Formen und alten Rechtecke für die Minimap nach Identität; der Schleier gibt ihnen die Höhe des Reglers. */
+    private Set<Ebenen.Form> eigeneAufMinimap = Set.of();
     /** Die Datei, oder null ohne Ordner der Welt. */
     private Path datei;
     /** Ist gelesen, seit dem letzten Leeren? */
@@ -229,8 +238,9 @@ final class Wegpunkte {
                 if (dimension != null && gueltig != null && eigene.size() < MAX_EIGENE_FORMEN) {
                     // Ein Name, der kein Text ist, fehlt; die Form bleibt.
                     String name = o.has("name") && o.get("name").isJsonPrimitive() ? name(o.get("name").getAsString()) : null;
+                    int hex = o.has("hex") && o.get("hex").isJsonPrimitive() ? hex(o.get("hex").getAsString()) : KEIN_HEX;
                     eigene.add(new EigeneForm(dimension, gueltig, Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length),
-                            o.get("minimap").getAsBoolean() && angeheftet() < MAX_ANGEHEFTET, name));
+                            o.get("minimap").getAsBoolean() && angeheftet() < MAX_ANGEHEFTET, name, hex));
                 }
             } catch (RuntimeException kaputt) {
                 // Nur dieser Eintrag fällt weg.
@@ -301,6 +311,9 @@ final class Wegpunkte {
             o.addProperty("minimap", f.angeheftet());
             if (f.name() != null) {
                 o.addProperty("name", f.name());
+            }
+            if (f.hex() != KEIN_HEX) {
+                o.addProperty("hex", hex(f.hex()));
             }
             zuege.add(o);
         }
@@ -456,7 +469,7 @@ final class Wegpunkte {
         if (gueltig == null || eigene.size() >= MAX_EIGENE_FORMEN) {
             return false;
         }
-        eigene.add(new EigeneForm(dimension, gueltig, farbe(dimension), false, null));
+        eigene.add(new EigeneForm(dimension, gueltig, farbe(dimension), false, null, KEIN_HEX));
         schreibe();
         return true;
     }
@@ -474,7 +487,7 @@ final class Wegpunkte {
         if (gueltig == null) {
             eigene.remove(i);
         } else {
-            eigene.set(i, new EigeneForm(f.dimension(), gueltig, f.farbe(), f.angeheftet(), f.name()));
+            eigene.set(i, new EigeneForm(f.dimension(), gueltig, f.farbe(), f.angeheftet(), f.name(), f.hex()));
         }
         schreibe();
         return true;
@@ -495,7 +508,7 @@ final class Wegpunkte {
         if (!f.angeheftet() && angeheftet() >= MAX_ANGEHEFTET) {
             return false;
         }
-        eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), !f.angeheftet(), f.name()));
+        eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), !f.angeheftet(), f.name(), f.hex()));
         schreibe();
         return true;
     }
@@ -504,9 +517,31 @@ final class Wegpunkte {
     void benenne(EigeneForm f, String name) {
         int i = eigene.indexOf(f);
         if (i >= 0) {
-            eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), name(name)));
+            eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), name(name), f.hex()));
             schreibe();
         }
+    }
+
+    /** Gibt der eigenen Form {@code f} die Farbe {@code hex} als RGB; {@link #KEIN_HEX} nimmt sie weg. */
+    void faerbe(EigeneForm f, int hex) {
+        int i = eigene.indexOf(f);
+        if (i >= 0) {
+            eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), hex));
+            schreibe();
+        }
+    }
+
+    /** Eine Farbe als „#RRGGBB“ oder „RRGGBB“, gross oder klein, aussen ohne Leerraum: ihr RGB; sonst {@link #KEIN_HEX}. */
+    static int hex(String roh) {
+        String t = roh == null ? "" : roh.strip();
+        t = t.startsWith("#") ? t.substring(1) : t;
+        // Nur ASCII: Integer.parseInt nähme auch Ziffern anderer Schriften.
+        return t.matches("[0-9A-Fa-f]{6}") ? Integer.parseInt(t, 16) : KEIN_HEX;
+    }
+
+    /** Die Farbe {@code rgb} als „#RRGGBB“. */
+    static String hex(int rgb) {
+        return String.format("#%06X", rgb & 0xFFFFFF);
     }
 
     /**
@@ -755,6 +790,11 @@ final class Wegpunkte {
         return fuerMinimap;
     }
 
+    /** Ist {@code f} aus {@link #minimap} eine eigene Form oder ein altes Rechteck, nicht vom Server? */
+    boolean eigen(Ebenen.Form f) {
+        return eigeneAufMinimap.contains(f);
+    }
+
     /** Die angehefteten Nadeln und Banner der sichtbaren Ebenen für die Minimap, unten zuerst; dieselbe Liste wie oben. */
     List<Ebenen.Ort> nadeln(Ebenen e) {
         baue(e);
@@ -837,6 +877,8 @@ final class Wegpunkte {
         if (!aufMinimap.isEmpty()) {
             minimap.add(List.copyOf(aufMinimap));
         }
+        eigeneAufMinimap = Collections.newSetFromMap(new IdentityHashMap<>());
+        eigeneAufMinimap.addAll(aufMinimap);
         fuerKarte = List.copyOf(karte);
         fuerMinimap = List.copyOf(minimap);
     }
@@ -942,7 +984,7 @@ final class Wegpunkte {
 
     private Ebenen.Form form(EigeneForm f, double[] p) {
         String dimension = f.dimension();
-        int farbe = FARBEN[f.farbe()];
+        int farbe = f.argb();
         double[] box = box(p);
         if (!f.region()) {
             return new Ebenen.Linie(dimension, p, new Ebenen.Rand(farbe, 2, 0, 0), box);

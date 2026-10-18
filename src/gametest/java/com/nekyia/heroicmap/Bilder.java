@@ -1186,6 +1186,32 @@ public final class Bilder implements FabricClientGameTest {
                 throw new UncheckedIOException(e);
             }
         }
+        // Der Regler auf 16 Blöcke: dieselben Vierecke, nur höher, unten zu 90 % deckend (docs/wegpunkte.md, „Schleier“).
+        int vierecke = context.computeOnClient(mc -> Schleier.INSTANZ.vierecke());
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeSchleier(Schleier.MAX_HOEHE));
+        context.waitFor(mc -> Schleier.INSTANZ.vierecke() > 0 && Schleier.INSTANZ.hoch(0) == Schleier.MAX_HOEHE, 200);
+        context.waitTicks(5);
+        Path hoch = context.takeScreenshot(TestScreenshotOptions.of("schleier-16").disableCounterPrefix());
+        if (!AUSGABE.isEmpty()) {
+            try {
+                Files.copy(hoch, Path.of(AUSGABE, "schleier-16.png"), StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        String falsch = context.computeOnClient(mc -> {
+            int n = Schleier.INSTANZ.vierecke();
+            for (int i = 0; i < n; i++) {
+                if (Schleier.INSTANZ.hoch(i) != Schleier.MAX_HOEHE || Schleier.INSTANZ.unten(i) >>> 24 != Math.round(Schleier.MAX_DECKUNG * 255)) {
+                    return "Viereck " + i + ": " + Schleier.INSTANZ.hoch(i) + " hoch, Alpha unten " + (Schleier.INSTANZ.unten(i) >>> 24);
+                }
+            }
+            return n == vierecke ? null : n + " Vierecke statt " + vierecke;
+        });
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeSchleier(Schleier.HOEHE));
+        if (falsch != null) {
+            throw new AssertionError("Schleier auf 16 Blöcken: " + falsch);
+        }
         server.runCommand("fill 44 -60 -8 60 -53 8 air");
         server.runCommand("tp @a 0.5 -30 0.5 0 90");
         context.runOnClient(mc -> {

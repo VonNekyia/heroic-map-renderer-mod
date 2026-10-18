@@ -69,6 +69,8 @@
   "heroicmap.karte.name": "Name…",
   "heroicmap.karte.name_aendern": "Name ändern…",
   "heroicmap.karte.name_hinweis": "Enter: Name speichern, leer ohne Namen; Esc bricht ab",
+  "heroicmap.karte.farbe": "Farbe…",
+  "heroicmap.karte.farbe_hinweis": "Enter: Farbe als #RRGGBB speichern, leer: Farbe aus der Liste; Esc bricht ab",
   "heroicmap.karte.formen_voll": "Höchstens %s eigene Formen",
   "heroicmap.karte.form_weg": "Die Form gibt es so nicht mehr; die neuen Ecken sind nicht gespeichert",
   "heroicmap.karte.form_hinweis": "Linksklick: Eckpunkt hier oder auf einem Wegpunkt, auf den ersten: Region; Rechtsklick: Menü mit „Form fertig“; Esc bricht ab",
@@ -169,5 +171,7 @@
   "heroicmap.menue.spieler.durchsichtig": "Halb",
   "heroicmap.menue.spieler.beschreibung": "Wie du auf Minimap und Vollbildkarte aussiehst: Kopf mit Pfeil, nur der Pfeil oder der Kopf halb durchsichtig mit Pfeil.",
   "heroicmap.menue.effekte": "Effekte in der Welt",
-  "heroicmap.menue.effekte.beschreibung": "Ein Strahl wie vom Leuchtfeuer über jedem angehefteten Wegpunkt und ein Schleier am Rand angehefteter Regionen"
+  "heroicmap.menue.effekte.beschreibung": "Ein Strahl wie vom Leuchtfeuer über jedem angehefteten Wegpunkt und ein Schleier am Rand angehefteter Regionen",
+  "heroicmap.menue.schleier": "Schleier: %s Blöcke",
+  "heroicmap.menue.schleier.beschreibung": "Wie hoch der Schleier am Rand deiner angehefteten Regionen steht; höher heisst auch deckender. Regionen vom Server bleiben bei 4 Blöcken."
 }

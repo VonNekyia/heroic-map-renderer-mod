@@ -2,6 +2,7 @@ package com.nekyia.heroicmap;
 
 import java.util.Locale;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.Tooltip;
@@ -12,7 +13,7 @@ import net.minecraft.network.chat.Component;
 
 /**
  * Das Untermenü „Einstellungen …“ für Vorlieben der Anzeige: Form, Bei F3, Auflösung, Chunklinien, Drehen, Verzierungen, Effekte in der
- * Welt, die Ablage der Karten, die Koordinaten unter der Minimap und das Untermenü „Ebenen …“. Die Minimap im HUD bleibt sichtbar,
+ * Welt, der Schleier eigener Regionen, die Ablage der Karten, die Koordinaten unter der Minimap und das Untermenü „Ebenen …“. Die Minimap im HUD bleibt sichtbar,
  * jede Wahl wirkt gleich; den Spieler und den Rahmen stellt ein Klick auf die Minimap ein ({@link MinimapKlick}).
  * Gespeichert wird beim Schliessen. Siehe docs/minimap.md, „Bedienung“.
  */
@@ -59,7 +60,8 @@ final class Anzeige extends Screen {
                 .create(x + breite - halb, y + 72, halb, 20, Component.translatable("heroicmap.menue.koordinaten"), (b, k) -> m.setzeKoordinaten(k)));
         addRenderableWidget(CycleButton.onOffBuilder(m.effekte())
                 .withTooltip(an -> Tooltip.create(Component.translatable("heroicmap.menue.effekte.beschreibung")))
-                .create(x, y + 96, breite, 20, Component.translatable("heroicmap.menue.effekte"), (b, an) -> m.setzeEffekte(an)));
+                .create(x, y + 96, halb, 20, Component.translatable("heroicmap.menue.effekte"), (b, an) -> m.setzeEffekte(an)));
+        addRenderableWidget(new SchleierRegler(x + breite - halb, y + 96, halb));
         addRenderableWidget(CycleButton.builder((Downloads.Ablage a) -> Component.translatable(
                         "heroicmap.menue.ablage." + a.name().toLowerCase(Locale.ROOT)), m.ablage())
                 .withValues(Downloads.Ablage.values())
@@ -67,6 +69,28 @@ final class Anzeige extends Screen {
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.menue.ebenen"),
                 b -> minecraft.gui.setScreen(new EbenenMenue(this))).bounds(x, y + 148, halb, 20).build());
         addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x + breite - halb, y + 148, halb, 20).build());
+    }
+
+    /** Der Regler für die Höhe des Schleiers eigener Regionen, in ganzen Blöcken. Siehe docs/wegpunkte.md, „Schleier“. */
+    static final class SchleierRegler extends AbstractSliderButton {
+
+        private static final int SPANNE = Schleier.MAX_HOEHE - Schleier.HOEHE;
+
+        SchleierRegler(int x, int y, int breite) {
+            super(x, y, breite, 20, Component.empty(), (double) (Minimap.INSTANZ.schleier() - Schleier.HOEHE) / SPANNE);
+            setTooltip(Tooltip.create(Component.translatable("heroicmap.menue.schleier.beschreibung")));
+            updateMessage();
+        }
+
+        @Override
+        protected void updateMessage() {
+            setMessage(Component.translatable("heroicmap.menue.schleier", Minimap.INSTANZ.schleier()));
+        }
+
+        @Override
+        protected void applyValue() {
+            Minimap.INSTANZ.setzeSchleier(Schleier.HOEHE + (int) Math.round(value * SPANNE));
+        }
     }
 
     /** Oben so weit, dass alles mittig steht, aber Platz für den Titel bleibt; bei 240 Einheiten Höhe reicht „Fertig“ bis 228. */

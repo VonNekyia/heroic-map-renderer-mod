@@ -59,7 +59,7 @@ steht unter „Kosten“.
 Das Untermenü „Einstellungen …“ hält, was man selten ändert; das Hauptmenü
 bleibt so kurz. „Fertig“ führt zurück ins Menü:
 
-![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien, halben Marken auf dem Ring und den Koordinaten darunter; „Form“ neben „Bei F3“, „Chunklinien“ neben „Drehen“, unten „Ebenen …“ neben „Fertig“](bilder/anzeige.png)
+![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien, halben Marken auf dem Ring und den Koordinaten darunter; „Form“ neben „Bei F3“, „Chunklinien“ neben „Drehen“, „Effekte in der Welt“ neben dem Regler „Schleier“, unten „Ebenen …“ neben „Fertig“](bilder/anzeige.png)
 
 | Einstellung | Vorgabe | tut |
 |---|---|---|
@@ -70,6 +70,7 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
 | Drehen | an | die Minimap dreht mit der Blickrichtung, siehe „Drehen“ |
 | Verzierungen | an | die Marken N, O, S, W des Rahmens, aus nur Bänder oder Ring, siehe [Rahmen](rahmen.md), „Verzierungen“ |
 | Effekte in der Welt | an | der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen, siehe [Wegpunkte](wegpunkte.md), „Strahl“ und „Schleier“ |
+| Schleier | 4 Blöcke | Regler neben „Effekte in der Welt“: wie hoch und deckend der Schleier eigener Regionen steht, 4 bis 16 Blöcke, siehe [Wegpunkte](wegpunkte.md), „Schleier“ |
 | Koordinaten | xz | aus, `x z` oder `x y z` des Spielers unter der Minimap, siehe „Koordinaten“ |
 | Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
 | Knopf „Ebenen …“ | – | je Ebene vom Server an oder aus, siehe [Ebenen](ebenen.md), „Umschalten“ |
