@@ -40,6 +40,9 @@ class EbenenCodeTest {
         // Der Todespunkt und was in Base liegt, gehören nicht in den Code.
         w.setzeTod(WELT, 50, 50);
         w.setze(WELT, 60, 60);
+        // Aus Base kopiert: der Wegpunkt dort, der Todespunkt nicht.
+        assertEquals(List.of(new EbenenCode.Ort(WELT, 60, 60, w.punkte().getLast().farbe())),
+                EbenenCode.lies(EbenenCode.schreibe(w, Wegpunkte.BASE)).inhalt().orte());
         String code = EbenenCode.schreibe(w, farmen);
         assertTrue(code.startsWith(EbenenCode.VORSILBE) && code.substring(EbenenCode.VORSILBE.length()).matches("[A-Za-z0-9_-]+"), code);
         EbenenCode.Gelesen g = EbenenCode.lies("  " + code + "\n");
