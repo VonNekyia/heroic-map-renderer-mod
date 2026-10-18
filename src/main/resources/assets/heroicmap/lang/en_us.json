@@ -198,5 +198,7 @@
   "heroicmap.ebenen.code.version": "The code comes from a newer version of the mod",
   "heroicmap.ebenen.code.zu_viele": "At most 256 waypoints and 256 shapes per code",
   "heroicmap.ebenen.code.ebenen_voll": "At most 32 layers of your own",
-  "heroicmap.ebenen.code.formen_voll": "That many shapes no longer fit, at most 256 per world"
+  "heroicmap.ebenen.code.formen_voll": "That many shapes no longer fit, at most 256 per world",
+  "heroicmap.karte.base_aus": "New things go to Base, and Base is off; they show once you switch it on",
+  "heroicmap.karte.wegpunkt_verborgen": "There is already a waypoint there, in a layer that is off"
 }

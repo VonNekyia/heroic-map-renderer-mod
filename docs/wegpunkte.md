@@ -518,7 +518,11 @@ Ebene, die sich an- und ausschalten lässt. Gewünscht vom User am 18.10.
 - **Base** (`Wegpunkte.BASE`, id 0) gibt es immer. Sie heisst fest „Base“,
   der User nannte sie „Standardlayer“, und lässt sich weder umbenennen
   noch löschen, wohl aber ausschalten. Alles Neue kommt nach Base, auch
-  der Todespunkt.
+  der Todespunkt. Ist Base aus, sagt die Vollbildkarte bei einem neuen
+  Wegpunkt und einer neuen Form unten links „Neues kommt nach Base, und
+  Base ist aus; es steht erst, wenn du sie anschaltest“
+  (`Karte.neuInBase`); von selbst schaltet sie Base nicht an. So
+  entschieden im Review von #143.
 - **Höchstens 32** eigene Ebenen neben Base (`Wegpunkte.MAX_EBENEN`); ihr
   Name wie der einer Form, 1 bis 32 Zeichen, siehe „Namen“
   (`Wegpunkte.name`). Eine neue bekommt die nächste freie id.
@@ -530,11 +534,17 @@ Ebene, die sich an- und ausschalten lässt. Gewünscht vom User am 18.10.
   oder auf die Raute eines alten Rechtecks, „Ebene …“. An der Stelle des
   Menüs stehen dann die eigenen Ebenen zur Wahl, die jetzige mit „• “
   davor (`Karte.ebenenWahl`). „Neue Ebene …“ öffnet das Eingabefeld wie
-  bei „Name…“, legt die Ebene an und das Ding gleich hinein.
+  bei „Name…“, legt die Ebene an und das Ding gleich hinein. Der
+  Todespunkt bietet „Ebene …“ nicht an: Er bleibt in Base, die Datei kennt
+  für ihn keine Ebene.
+- **Verborgen:** Liegt auf einem Block ein Wegpunkt in einer Ebene, die aus
+  ist, setzt „Wegpunkt setzen“ oder „Wegpunkt bei …“ dort keinen zweiten
+  und sagt unten links „Dort liegt schon ein Wegpunkt, in einer Ebene, die
+  aus ist“ (`Karte.setzeWegpunkt`).
 - **Schalten** in der Liste der Vollbildkarte, vor den Ebenen vom Server,
   siehe [Vollbildkarte](vollbildkarte.md), „Ebenen“, sobald es neben Base
-  eine eigene gibt; Base allein steht dort nicht, so bleibt die Liste, wie
-  sie war, für wen keine eigenen Ebenen hat. Den Knopf „Ebenen +“ gibt es
+  eine eigene gibt oder Base aus ist; Base allein und an steht dort nicht,
+  so bleibt die Liste, wie sie war, für wen keine eigenen Ebenen hat. Den Knopf „Ebenen +“ gibt es
   dann auch ohne Ebenen vom Server. Ein Doppelklick auf den Namen einer
   eigenen Ebene tut nichts. Im Untermenü „Ebenen …“ steht Base immer.
 - **Verwalten** im Untermenü „Ebenen …“, siehe [Ebenen](ebenen.md),
@@ -545,8 +555,9 @@ Ebene, die sich an- und ausschalten lässt. Gewünscht vom User am 18.10.
 - **Datei:** oben `ebenen` mit `id`, `name` und `an`, Base zuerst; je
   Eintrag `ebene`, siehe „Ablage“. Ohne `ebenen` gibt es nur Base, ohne
   `ebene` liegt ein Eintrag in Base; so ziehen ältere Dateien ohne Schritt
-  um. Eine Ebene, die es nicht gibt, heisst Base; doppelte ids, Ebenen ohne
-  Namen und negative ids fallen weg. Eine ältere Version des Mods
+  um. Eine Ebene, die es nicht gibt oder die keine Zahl ist, heisst Base,
+  und der Eintrag bleibt; doppelte ids, Ebenen ohne Namen und negative ids
+  fallen weg. Eine ältere Version des Mods
   überliest beides; speichert sie, liegt danach wieder alles in Base.
 
 ## Regionen
@@ -806,7 +817,10 @@ Schleier am Rand, siehe „Schleier“.
   angelegt, liegt er in ihr; ihr Knopf in der Liste der Karte schaltet sie
   aus, und der Wegpunkt fehlt auf der Karte, wieder an steht er da; im
   Untermenü „Ebenen …“ benennt „✎“ sie um, „✕“ löscht sie, und der Wegpunkt
-  liegt wieder in Base.
+  liegt wieder in Base; ist Base aus, steht sie allein in der Liste der
+  Karte, „Wegpunkt setzen“ sagt, dass Neues in der ausgeschalteten Base
+  landet, und auf demselben Block noch einmal, dass dort ein verborgener
+  Wegpunkt liegt. Am Todespunkt steht kein „Ebene …“ (`tod`).
 - `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
   [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und

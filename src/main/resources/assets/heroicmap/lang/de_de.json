@@ -198,5 +198,7 @@
   "heroicmap.ebenen.code.version": "Der Code stammt von einer neueren Version des Mods",
   "heroicmap.ebenen.code.zu_viele": "Höchstens 256 Wegpunkte und 256 Formen je Code",
   "heroicmap.ebenen.code.ebenen_voll": "Höchstens 32 eigene Ebenen",
-  "heroicmap.ebenen.code.formen_voll": "So viele Formen passen nicht mehr, höchstens 256 je Welt"
+  "heroicmap.ebenen.code.formen_voll": "So viele Formen passen nicht mehr, höchstens 256 je Welt",
+  "heroicmap.karte.base_aus": "Neues kommt nach Base, und Base ist aus; es steht erst, wenn du sie anschaltest",
+  "heroicmap.karte.wegpunkt_verborgen": "Dort liegt schon ein Wegpunkt, in einer Ebene, die aus ist"
 }

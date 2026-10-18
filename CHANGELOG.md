@@ -4,9 +4,13 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
-## 0.2.50
+## 0.2.51
 
 - **Your own layers.** Waypoints, lines and regions can live in layers of your own and be switched off together. Right-click one and choose "Layer …" to move it, or to create a new layer on the spot. Your layers sit in the layer list on the full map, before the ones from the server, and in "Layers …" in the settings, where you can rename and delete them. Everything starts in "Base".
+
+## 0.2.50
+
+- **Grass, flowers, crops and seagrass on the minimap.** Seen from above, plants used to stand on their edge and vanish. The minimap now lays each one flat over its block, tinted like the plant, the same way the map tiles from the server do. Your own map drawn with "Self" shows them too, once a chunk is drawn again.
 
 ## 0.2.49
 

@@ -129,6 +129,7 @@ public final class Bilder implements FabricClientGameTest {
             schleier(context, server);
             selbst(context);
             tueren(context, server);
+            pflanzen(context, server);
         }
     }
 
@@ -1257,6 +1258,82 @@ public final class Bilder implements FabricClientGameTest {
         if (!AUSGABE.isEmpty()) {
             try {
                 ImageIO.write(nebeneinander(0, teile), "png", Path.of(AUSGABE, "tueren.png").toFile());
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        server.runCommand("tp @a 0.5 -30 0.5 0 90");
+    }
+
+    /** Die Reihe der Pflanzen bei z = 20, je zwei Blöcke auseinander; dazu Wasser für den Ackerboden und die Wand der Leiter. */
+    private static final String[] PFLANZEN = {
+        "setblock -40 -60 20 poppy",
+        "setblock -38 -61 20 farmland[moisture=7]", "setblock -38 -60 20 wheat[age=7]", "setblock -38 -61 22 water",
+        "setblock -36 -61 20 seagrass",
+        "setblock -34 -60 20 pink_petals[facing=north,flower_amount=1]",
+        "setblock -32 -60 21 stone", "setblock -32 -60 20 ladder[facing=north]",
+    };
+
+    /** Was an ihrer Stelle steht, wenn die Pflanzen weg sind. */
+    private static final String[] OHNE_PFLANZEN = {
+        "setblock -40 -60 20 air", "setblock -38 -60 20 air", "setblock -36 -61 20 water", "setblock -34 -60 20 air",
+        "setblock -32 -60 20 air",
+    };
+
+    /**
+     * Pflanzen von oben, bei 4 px und Zoom 4, verglichen mit derselben Stelle ohne sie: Mohn, Weizen und Seegras liegen
+     * flach; der Blütenteppich mit einer Blüte im Nordwesten hat eine Oberseite und bleibt, ausserhalb der Blüte Gras; die
+     * Leiter erbt von keiner Vorlage und fehlt wie bisher. Siehe docs/minimap.md, „Pflanzen von oben“.
+     */
+    private static void pflanzen(ClientGameTestContext context, TestServerContext server) {
+        for (String befehl : PFLANZEN) {
+            server.runCommand(befehl);
+        }
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeScale(4);
+            Minimap.INSTANZ.setzeZoom(4);
+        });
+        context.waitTicks(10);
+        BufferedImage mit = minimapBei(context, server, -35.5, 26.5, "pflanzen-mit");
+        for (String befehl : OHNE_PFLANZEN) {
+            server.runCommand(befehl);
+        }
+        context.waitTicks(10);
+        BufferedImage ohne = minimapBei(context, server, -35.5, 26.5, "pflanzen-ohne");
+        int gs = context.computeOnClient(mc -> mc.getWindow().getGuiScale()), block = 4 * gs;
+        // Die Ecke des Blocks (x, 20) im Bild; der Spieler steht bei (-35,5, 26,5) in der Mitte, seine Marke deckt die Reihe nicht.
+        java.util.function.IntUnaryOperator links = x -> mit.getWidth() / 2 + Math.round((x + 35.5f) * block);
+        int oben = mit.getHeight() / 2 - Math.round(6.5f * block);
+        int[] anders = new int[5];
+        int rot = 0;
+        for (int i = 0; i < 5; i++) {
+            int x0 = links.applyAsInt(-40 + 2 * i);
+            // Der Block ohne den Rand; beim Blütenteppich ohne das Viertel im Nordwesten, wo die Blüte liegt.
+            for (int y = oben + 1; y < oben + block - 1; y++) {
+                for (int x = x0 + 1; x < x0 + block - 1; x++) {
+                    if (i == 3 && x < x0 + block / 2 && y < oben + block / 2) {
+                        continue;
+                    }
+                    int a = mit.getRGB(x, y), b = ohne.getRGB(x, y);
+                    boolean gleich = true;
+                    for (int s = 0; s <= 16; s += 8) {
+                        gleich &= Math.abs((a >> s & 0xFF) - (b >> s & 0xFF)) <= 2;
+                    }
+                    anders[i] += gleich ? 0 : 1;
+                    rot += i == 0 && (a >> 16 & 0xFF) > (a >> 8 & 0xFF) + 60 ? 1 : 0;
+                }
+            }
+        }
+        // Bei 4 px deckt ein Pixel 4 × 4 Texel, ausgeschnitten: Mohn und Seegras sind spärlich, nur einzelne Pixel decken.
+        int innen = (block - 2) * (block - 2);
+        if (rot == 0 || anders[1] < innen / 2 || anders[2] < gs * gs || anders[3] != 0 || anders[4] != 0) {
+            throw new AssertionError("Pflanzen von oben: Pixel anders als ohne Pflanze, Mohn " + anders[0] + " (rot " + rot
+                    + "), Weizen " + anders[1] + ", Seegras " + anders[2] + " von " + innen + "; Blütenteppich ausser im Nordwesten "
+                    + anders[3] + " und Leiter " + anders[4] + " statt 0");
+        }
+        if (!AUSGABE.isEmpty()) {
+            try {
+                ImageIO.write(nebeneinander(0, mit, ohne), "png", Path.of(AUSGABE, "pflanzen.png").toFile());
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }

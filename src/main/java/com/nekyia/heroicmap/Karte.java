@@ -283,8 +283,9 @@ final class Karte extends Screen {
         ebenenStand = Ebenen.INSTANZ.stand();
         ganzEbenen = -1;
         eigeneStand = Wegpunkte.INSTANZ.ebenenStand();
-        // Eigene Ebenen stehen vor denen vom Server; ohne beide, nur mit Base, gibt es keinen Knopf. Siehe docs/wegpunkte.md, „Eigene Ebenen“.
-        if (blick == null || gebauteEbenen.isEmpty() && Wegpunkte.INSTANZ.ebenen().size() == 1) {
+        // Eigene Ebenen stehen vor denen vom Server; ohne beide, nur mit Base an, gibt es keinen Knopf. Siehe docs/wegpunkte.md, „Eigene Ebenen“.
+        boolean eigeneZeigen = Wegpunkte.INSTANZ.ebenen().size() > 1 || !Wegpunkte.INSTANZ.an(Wegpunkte.BASE);
+        if (blick == null || gebauteEbenen.isEmpty() && !eigeneZeigen) {
             return ueber;
         }
         AbstractWidget unterster = addRenderableWidget(Button.builder(Component.translatable(ebenenOffen ? "heroicmap.karte.ebenen_zu" : "heroicmap.karte.ebenen"),
@@ -298,8 +299,9 @@ final class Karte extends Screen {
         }
         boolean deutsch = minecraft.getLanguageManager().getSelected().startsWith("de");
         List<Ebenen.Eintrag> alle = Ebenen.INSTANZ.alle();
-        // Base allein steht nicht in der Liste; so bleibt sie, wie sie war, für wen keine eigenen Ebenen hat.
-        List<Wegpunkte.EigeneEbene> eigene = Wegpunkte.INSTANZ.ebenen().size() > 1 ? Wegpunkte.INSTANZ.ebenen() : List.of();
+        // Base allein und an steht nicht in der Liste; so bleibt sie, wie sie war, für wen keine eigenen Ebenen hat. Aus steht sie da,
+        // sonst fände man sie auf der Karte nicht wieder.
+        List<Wegpunkte.EigeneEbene> eigene = eigeneZeigen ? Wegpunkte.INSTANZ.ebenen() : List.of();
         // Platz bis über „Optionen …“ unten rechts, je Schalter 22 Einheiten.
         int platz = Math.max(1, (height - 28 - (unterster.getY() + unterster.getHeight())) / 22);
         int gesamt = eigene.size() + alle.size(), n = gesamt <= platz ? gesamt : platz - 1;
@@ -1065,6 +1067,8 @@ final class Karte extends Screen {
                 }
             } else if (!Wegpunkte.INSTANZ.setzeForm(zugDimension, zug)) {
                 zeige(Component.translatable("heroicmap.karte.formen_voll", Wegpunkte.MAX_EIGENE_FORMEN));
+            } else {
+                neuInBase();
             }
         }
         zug = null;
@@ -1659,6 +1663,29 @@ final class Karte extends Screen {
         menueY = Math.max(0, Math.min(menueY, height - neu.size() * ZEILE));
     }
 
+    /**
+     * Setzt einen Wegpunkt auf den Block (x, z). Liegt dort schon einer in einer ausgeschalteten Ebene, sagt es das, statt still
+     * nichts zu tun. Siehe docs/wegpunkte.md, „Eigene Ebenen“.
+     */
+    private void setzeWegpunkt(String dimension, int x, int z) {
+        Wegpunkte.Punkt da = Wegpunkte.INSTANZ.punktAuf(dimension, x, z);
+        if (da != null) {
+            if (!Wegpunkte.INSTANZ.sichtbar(da)) {
+                zeige(Component.translatable("heroicmap.karte.wegpunkt_verborgen"));
+            }
+            return;
+        }
+        Wegpunkte.INSTANZ.setze(dimension, x, z);
+        neuInBase();
+    }
+
+    /** Neues kommt nach Base; ist sie aus, sagt es das. Base schaltet es nicht von selbst an. */
+    private void neuInBase() {
+        if (!Wegpunkte.INSTANZ.an(Wegpunkte.BASE)) {
+            zeige(Component.translatable("heroicmap.karte.base_aus"));
+        }
+    }
+
     /** „Form fertig“ ab zwei Ecken und „Form abbrechen“ für die Form im Bau. */
     private void bauEnde(List<Eintrag> neu) {
         if (zug.size() >= 2) {
@@ -1681,8 +1708,9 @@ final class Karte extends Screen {
         neu.add(punkt != null
                 ? new Eintrag(Component.translatable(punkt.tod() ? "heroicmap.karte.tod_loeschen" : "heroicmap.karte.wegpunkt_loeschen"),
                         () -> Wegpunkte.INSTANZ.loesche(punkt))
-                : new Eintrag(Component.translatable("heroicmap.karte.wegpunkt"), () -> Wegpunkte.INSTANZ.setze(dimension, z[0], z[1])));
-        if (punkt != null) {
+                : new Eintrag(Component.translatable("heroicmap.karte.wegpunkt"), () -> setzeWegpunkt(dimension, z[0], z[1])));
+        // Der Todespunkt bleibt in Base; die Datei kennt für ihn keine Ebene. Siehe docs/wegpunkte.md, „Eigene Ebenen“.
+        if (punkt != null && !punkt.tod()) {
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.ebene"), () -> ebenenWahl(punkt.ebene(), id -> Wegpunkte.INSTANZ.ordne(punkt, id))));
         }
         // Ein Wegpunkt an eingetippten Koordinaten, dann in der Mitte. Siehe docs/wegpunkte.md, „Bedienung“.
@@ -1693,7 +1721,7 @@ final class Karte extends Screen {
                         eingabe.setTextColor(UNGUELTIG);
                         return false;
                     }
-                    Wegpunkte.INSTANZ.setze(dimension, k[0], k[1]);
+                    setzeWegpunkt(dimension, k[0], k[1]);
                     zentriere(k[0] + 0.5, k[1] + 0.5);
                     return true;
                 })));

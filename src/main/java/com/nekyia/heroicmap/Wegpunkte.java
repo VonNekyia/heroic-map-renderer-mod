@@ -316,7 +316,8 @@ final class Wegpunkte {
 
     /** Die Ebene aus dem Feld {@code ebene} eines Eintrags, wenn es sie gibt; sonst Base. */
     private int ebeneAus(JsonObject o) {
-        int id = o.has("ebene") && o.get("ebene").isJsonPrimitive() ? o.get("ebene").getAsInt() : BASE;
+        // Nur eine Zahl; was sonst dasteht, heisst Base, und der Eintrag bleibt.
+        int id = o.has("ebene") && o.get("ebene").isJsonPrimitive() && o.get("ebene").getAsJsonPrimitive().isNumber() ? o.get("ebene").getAsInt() : BASE;
         return ebene(id) != null ? id : BASE;
     }
 
@@ -621,6 +622,12 @@ final class Wegpunkte {
 
     private static EigeneForm mitEbene(EigeneForm f, int ebene) {
         return new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), f.hex(), ebene);
+    }
+
+    /** Der Wegpunkt auf dem Block (x, z) in {@code dimension}, sichtbar oder nicht, oder null. */
+    Punkt punktAuf(String dimension, int x, int z) {
+        int i = finde(dimension, x, z);
+        return i < 0 ? null : punkte.get(i);
     }
 
     /** Der Todespunkt, oder null. */

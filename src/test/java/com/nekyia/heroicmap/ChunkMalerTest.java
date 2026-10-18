@@ -1,15 +1,17 @@
 package com.nekyia.heroicmap;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import net.minecraft.core.Direction;
+import net.minecraft.world.level.CardinalLighting;
 import net.minecraft.world.level.block.state.properties.ChestType;
 import org.junit.jupiter.api.Test;
 
 /**
- * Dünne Flächen mindestens ein Pixel, und der Deckel einer Truhe in ihrer Textur. Siehe docs/minimap.md, „Flächen und Pixel“,
- * und docs/minimap.md, „Blockentities“.
+ * Dünne Flächen mindestens ein Pixel, der Deckel einer Truhe in ihrer Textur und die UV einer flachen Pflanze. Siehe
+ * docs/minimap.md, „Flächen und Pixel“, „Blockentities“ und „Pflanzen von oben“.
  */
 class ChunkMalerTest {
 
@@ -49,5 +51,28 @@ class ChunkMalerTest {
                 ChunkMaler.deckel(Direction.SOUTH, ChestType.LEFT, rechteck(0, 1 / 16f, 15 / 16f, 15 / 16f)), 1e-4f);
         assertArrayEquals(new float[] {29, 14, 29, 0, 44, 0, 44, 14},
                 ChunkMaler.deckel(Direction.SOUTH, ChestType.RIGHT, rechteck(1 / 16f, 1 / 16f, 1, 15 / 16f)), 1e-4f);
+    }
+
+    @Test
+    void flachePflanzeNimmtDasRechteckDerUv() {
+        // Die Ostseite einer Feldfrucht, gespiegelt (uv 16 0 0 16), Ecken oben rechts beginnend: Das Rechteck liegt mit u0, v0 im Nordwesten.
+        float[] gespiegelt = {0.2f, 0.1f, 0.2f, 0.3f, 0.1f, 0.3f, 0.1f, 0.1f};
+        assertArrayEquals(new float[] {0.1f, 0.1f, 0.1f, 0.3f, 0.2f, 0.3f, 0.2f, 0.1f}, ChunkMaler.rechteck(gespiegelt));
+        // Um 90° gedreht: dasselbe Rechteck, die Drehung zählt nicht.
+        float[] gedreht = {0.1f, 0.3f, 0.2f, 0.3f, 0.2f, 0.1f, 0.1f, 0.1f};
+        assertArrayEquals(new float[] {0.1f, 0.1f, 0.1f, 0.3f, 0.2f, 0.3f, 0.2f, 0.1f}, ChunkMaler.rechteck(gedreht));
+        // Nicht die erste und dritte Ecke: Ein Teil des Sprites, dessen Ecken 0 und 2 nicht gegenüber liegen.
+        float[] schief = {0.1f, 0.1f, 0.1f, 0.2f, 0.4f, 0.1f, 0.4f, 0.2f};
+        assertArrayEquals(new float[] {0.1f, 0.1f, 0.1f, 0.2f, 0.4f, 0.2f, 0.4f, 0.1f}, ChunkMaler.rechteck(schief));
+    }
+
+    @Test
+    void flachePflanzeNachObenSchattiert() {
+        CardinalLighting licht = CardinalLighting.DEFAULT;
+        // Die Vorlagen des Spiels schattieren schon nach oben: nichts zu ändern.
+        assertEquals(1f, ChunkMaler.schattenNachOben(licht, Direction.UP, Direction.NORTH), 1e-6f);
+        // Eine Fläche nach Norden, ohne Überschreiben: deren Schatten heraus, der nach oben hinein.
+        assertEquals(licht.up() / licht.north(), ChunkMaler.schattenNachOben(licht, null, Direction.NORTH), 1e-6f);
+        assertEquals(licht.up() / licht.east(), ChunkMaler.schattenNachOben(licht, Direction.EAST, Direction.NORTH), 1e-6f);
     }
 }

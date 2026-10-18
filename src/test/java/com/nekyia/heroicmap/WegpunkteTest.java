@@ -856,11 +856,15 @@ class WegpunkteTest {
                 {"ebenen":[{"id":0,"name":"Anders","an":false},{"id":4,"name":"Wald"},{"id":4,"name":"Doppelt"},{"id":5,"name":" "},
                    {"id":-2,"name":"Minus"},{"name":"ohne id"}],
                  "wegpunkte":[{"id":1,"dimension":"minecraft:overworld","x":1,"z":1,"farbe":0,"minimap":false,"ebene":9},
-                   {"id":2,"dimension":"minecraft:overworld","x":2,"z":2,"farbe":0,"minimap":false,"ebene":4}]}
+                   {"id":2,"dimension":"minecraft:overworld","x":2,"z":2,"farbe":0,"minimap":false,"ebene":4},
+                   {"id":3,"dimension":"minecraft:overworld","x":3,"z":3,"farbe":0,"minimap":false,"ebene":"Wald"}]}
                 """).getAsJsonObject());
         assertEquals(List.of(new Wegpunkte.EigeneEbene(Wegpunkte.BASE, "Base", false), new Wegpunkte.EigeneEbene(4, "Wald", true)), w.ebenen());
         assertEquals(Wegpunkte.BASE, w.punkte().get(0).ebene());
         assertEquals(4, w.punkte().get(1).ebene());
+        // Eine Ebene, die keine Zahl ist, heisst Base; der Eintrag bleibt (Review von #143).
+        assertEquals(3, w.punkte().size());
+        assertEquals(Wegpunkte.BASE, w.punkte().get(2).ebene());
         // Eine neue bekommt die nächste freie id.
         assertEquals(5, w.neueEbene("Neu"));
     }
