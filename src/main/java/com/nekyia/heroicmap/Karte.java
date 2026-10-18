@@ -1586,11 +1586,49 @@ final class Karte extends Screen {
     }
 
     /**
-     * Solange eine Kachel lädt, ihr Ausschnitt aus der nächsten gröberen Stufe, die schon geladen
-     * ist, vergrössert; angefragt wird dafür nur, wenn die Kachel auf der Platte fehlt. Siehe
-     * docs/vollbildkarte.md, „Kacheln“.
+     * Solange eine Kachel lädt, steht an ihrem Platz, was schon geladen ist: zuerst eine feinere Stufe, verkleinert,
+     * denn sie ist schärfer; sonst ihr Ausschnitt aus der nächsten gröberen, vergrössert, und darüber, was von der
+     * nächsten feineren schon da ist. Angefragt wird nur eine gröbere, und nur, wenn die Kachel auf der Platte fehlt.
+     * Siehe docs/vollbildkarte.md, „Kacheln“.
      */
     private void platzhalter(GuiGraphicsExtractor g, int tx, int ty, int sx, int sy, int seite) {
+        for (int k = 1; blick.zoom + k <= blick.stufe && seite >> k > 0; k++) {
+            if (fein(g, tx, ty, sx, sy, seite, k, true)) {
+                return;
+            }
+        }
+        grob(g, tx, ty, sx, sy, seite);
+        if (blick.zoom < blick.stufe) {
+            fein(g, tx, ty, sx, sy, seite, 1, false);
+        }
+    }
+
+    /**
+     * Die Teile der Kachel aus der Stufe, die {@code k} feiner ist, je 2 hoch {@code k} mal schmaler, verkleinert; mit
+     * {@code ganz} nur, wenn alle geladen sind. True, wenn alle da waren.
+     */
+    private boolean fein(GuiGraphicsExtractor g, int tx, int ty, int sx, int sy, int seite, int k, boolean ganz) {
+        int n = 1 << k, teil = seite >> k, z = blick.zoom + k;
+        Identifier[] ids = new Identifier[n * n];
+        boolean alle = true;
+        for (int i = 0; i < ids.length; i++) {
+            ids[i] = kacheln.vorhanden(z, tx * n + i % n, ty * n + i / n);
+            alle &= ids[i] != null;
+        }
+        if (ganz && !alle) {
+            return false;
+        }
+        for (int i = 0; i < ids.length; i++) {
+            if (ids[i] != null) {
+                g.blit(RenderPipelines.GUI_TEXTURED, ids[i], sx + i % n * teil, sy + i / n * teil, 0, 0, teil, teil, satz.kachel(),
+                        satz.kachel(), satz.kachel(), satz.kachel());
+            }
+        }
+        return alle;
+    }
+
+    /** Der Ausschnitt der Kachel aus der nächsten gröberen Stufe, die geladen ist, vergrössert; fehlt sie auf der Platte, angefragt. */
+    private void grob(GuiGraphicsExtractor g, int tx, int ty, int sx, int sy, int seite) {
         boolean fehlt = kacheln.fehlt(blick.zoom, tx, ty);
         for (int k = 1; blick.zoom - k >= satz.minZoom(); k++) {
             int[] grob = Kartenblick.grob(tx, ty, k, satz.kachel());
