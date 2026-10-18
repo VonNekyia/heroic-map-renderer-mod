@@ -214,7 +214,7 @@ class WegpunkteTest {
                   {"id":3,"dimension":"minecraft:the_nether","x":3,"z":3,"farbe":0,"minimap":false}],
                  "eigene_formen":[{"punkte":[1,99,3,2],"farbe":1,"minimap":true},{"punkte":[99,1],"farbe":1,"minimap":false}]}
                 """).getAsJsonObject());
-        assertEquals(List.of(new Wegpunkte.EigeneForm(WELT, List.of(e(1, 1), e(2, 2)), 1, true)), alt.eigeneFormen());
+        assertEquals(List.of(new Wegpunkte.EigeneForm(WELT, List.of(e(1, 1), e(2, 2)), 1, true, null)), alt.eigeneFormen());
         // Geschrieben wird nur das neue Format, und so liest es sich zurück.
         String json = alt.json().toString();
         assertFalse(json.contains("\"punkte\""), json);
@@ -579,5 +579,80 @@ class WegpunkteTest {
         assertArrayEquals(new double[] {5.0 / 3, 5.0 / 3}, Wegpunkte.griff(new double[] {0, 0, 4, 0, 4, 2, 2, 2, 2, 4, 0, 4}, true), 1e-12);
         // Ohne Fläche, alle Ecken auf einer Geraden: die Mitte des Kastens.
         assertArrayEquals(new double[] {3, 0}, Wegpunkte.griff(new double[] {0, 0, 6, 0, 3, 0}, true), 1e-12);
+    }
+
+    @Test
+    void nameBereinigtUndGekappt() {
+        assertEquals("Burg Nord", Wegpunkte.name("  §cBurg\u0000 Nord\u200B  "));
+        // NFC: e mit einem Akzent als eigenem Zeichen wird ein Zeichen.
+        assertEquals("Caf\u00e9", Wegpunkte.name("Cafe\u0301"));
+        assertEquals("a".repeat(Wegpunkte.MAX_NAME), Wegpunkte.name("a".repeat(Wegpunkte.MAX_NAME + 8)));
+        // Gezählt in Zeichen, nicht in Hälften eines Paars: 33 Zeichen ausserhalb der BMP werden 32.
+        String pilz = "\uD83C\uDF44";
+        assertEquals(pilz.repeat(Wegpunkte.MAX_NAME), Wegpunkte.name(pilz.repeat(Wegpunkte.MAX_NAME + 1)));
+        assertEquals(null, Wegpunkte.name("   "));
+        assertEquals(null, Wegpunkte.name("§a"));
+        assertEquals(null, Wegpunkte.name(null));
+    }
+
+    @Test
+    void namenUeberstehenDenNeustartUndAenderungen(@TempDir Path ordner) {
+        Wegpunkte w = new Wegpunkte();
+        w.lies(ordner);
+        w.setzeForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10)));
+        w.setzeForm(WELT, List.of(e(0, 20), e(10, 20)));
+        w.benenne(w.eigeneFormen().get(0), " Hof ");
+        assertEquals("Hof", w.eigeneFormen().get(0).name());
+        // Ecken ändern und Anheften lassen den Namen.
+        w.ersetze(w.eigeneFormen().get(0), List.of(e(0, 0), e(12, 0), e(10, 10)));
+        w.umschalten(w.eigeneFormen().get(0));
+        assertEquals("Hof", w.eigeneFormen().get(0).name());
+        Wegpunkte nachher = new Wegpunkte();
+        nachher.lies(ordner);
+        assertEquals(w.eigeneFormen(), nachher.eigeneFormen());
+        // Leer nimmt den Namen weg; geschrieben wird dann kein Feld.
+        nachher.benenne(nachher.eigeneFormen().get(0), "  ");
+        assertEquals(null, nachher.eigeneFormen().get(0).name());
+        assertFalse(nachher.json().toString().contains("\"name\""), nachher.json().toString());
+        // Ein Name, der kein Text ist, fehlt; die Form bleibt. Einer aus der Datei wird bereinigt.
+        Wegpunkte fremd = new Wegpunkte();
+        fremd.lies(JsonParser.parseString("""
+                {"eigene_formen":[{"dimension":"minecraft:overworld","ecken":[[0,0],[1,1]],"farbe":0,"minimap":false,"name":{"a":1}},
+                  {"dimension":"minecraft:overworld","ecken":[[0,0],[2,2]],"farbe":0,"minimap":false,"name":"§cRot"}]}
+                """).getAsJsonObject());
+        assertEquals(2, fremd.eigeneFormen().size());
+        assertEquals(null, fremd.eigeneFormen().get(0).name());
+        assertEquals("Rot", fremd.eigeneFormen().get(1).name());
+    }
+
+    @Test
+    void namenEineSchrifthoeheNebenDemGriff() {
+        double g = Wegpunkte.NAME_GROESSE;
+        // Region: waagrecht, ein Punkt eine Schrifthöhe unter dem Griff im Schwerpunkt.
+        Wegpunkte.EigeneForm region = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10), e(0, 10)), 0, false, "Hof");
+        Ebenen.Schrift s = Wegpunkte.schrift(region, Wegpunkte.mitten(region));
+        assertArrayEquals(new double[] {5.5, 5.5 + g}, s.pfad(), 1e-9);
+        assertEquals("Hof", s.text());
+        assertEquals(Ebenen.SCHRIFTFARBE, s.farbe());
+        assertEquals(Ebenen.KONTURFARBE, s.konturFarbe());
+        assertEquals(Wegpunkte.NAME_KONTUR, s.konturBreite());
+        assertEquals(Wegpunkte.NAME_GROESSE, s.groesse());
+        // Linie: parallel daneben auf der Nordseite, in beiden Richtungen.
+        assertArrayEquals(new double[] {0.5, 0.5 - g, 10.5, 0.5 - g}, pfad(List.of(e(0, 0), e(10, 0))), 1e-9);
+        assertArrayEquals(new double[] {10.5, 0.5 - g, 0.5, 0.5 - g}, pfad(List.of(e(10, 0), e(0, 0))), 1e-9);
+        // Schräg nach Nordosten: senkrecht zur Linie, nach Nordwesten.
+        double d = g / Math.sqrt(2);
+        assertArrayEquals(new double[] {0.5 - d, 0.5 - d, 10.5 - d, -9.5 - d}, pfad(List.of(e(0, 0), e(10, -10))), 1e-9);
+        // Von Nord nach Süd und zurück: auf der Westseite.
+        assertArrayEquals(new double[] {0.5 - g, 0.5, 0.5 - g, 10.5}, pfad(List.of(e(0, 0), e(0, 10))), 1e-9);
+        assertArrayEquals(new double[] {0.5 - g, 10.5, 0.5 - g, 0.5}, pfad(List.of(e(0, 10), e(0, 0))), 1e-9);
+        // Ohne Namen keine Schrift.
+        Wegpunkte.EigeneForm ohne = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(10, 0)), 0, false, null);
+        assertEquals(null, Wegpunkte.schrift(ohne, Wegpunkte.mitten(ohne)));
+    }
+
+    private static double[] pfad(List<Wegpunkte.Ecke> ecken) {
+        Wegpunkte.EigeneForm f = new Wegpunkte.EigeneForm(WELT, ecken, 0, false, "Weg");
+        return Wegpunkte.schrift(f, Wegpunkte.mitten(f)).pfad();
     }
 }

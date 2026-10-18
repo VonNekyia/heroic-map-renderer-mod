@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntPredicate;
 import java.util.zip.Deflater;
 import javax.imageio.ImageIO;
 import net.fabricmc.fabric.api.client.gametest.v1.TestInput;
@@ -142,6 +143,7 @@ public final class Bedienung implements FabricClientGameTest {
         eckenBearbeiten(context, maus, k);
         formenZiehen(context, maus, k);
         schweben(context, maus, k);
+        namen(context, maus, k);
         ebenen(context, maus, k);
         zumSpieler(context, maus, k);
         optionen(context, maus, k);
@@ -948,19 +950,120 @@ public final class Bedienung implements FabricClientGameTest {
 
     /** Die fast weissen Pixel im Quadrat ±{@code r} Einheiten um (x, y) im Bildschirmfoto. */
     private static int weisse(Path bild, int k, double[] mitte, int r) {
+        return pixel(bild, k, mitte, r, p -> (p >> 16 & 0xFF) >= 0xF0 && (p >> 8 & 0xFF) >= 0xF0 && (p & 0xFF) >= 0xF0);
+    }
+
+    /** Die Pixel in der Farbe der Kartenschrift, auf 16 je Kanal genau, im Quadrat ±{@code r} Einheiten um (x, y). */
+    private static int dunkle(Path bild, int k, double[] mitte, int r) {
+        return pixel(bild, k, mitte, r, p -> {
+            for (int s = 0; s < 24; s += 8) {
+                if (Math.abs((p >> s & 0xFF) - (Ebenen.SCHRIFTFARBE >> s & 0xFF)) > 16) {
+                    return false;
+                }
+            }
+            return true;
+        });
+    }
+
+    /** Die Pixel im Quadrat ±{@code r} Einheiten um (x, y) im Bildschirmfoto, auf die {@code passt} zutrifft. */
+    private static int pixel(Path bild, int k, double[] mitte, int r, IntPredicate passt) {
         try {
             BufferedImage b = ImageIO.read(bild.toFile());
             int n = 0;
             for (int y = (int) ((mitte[1] - r) * k); y < (mitte[1] + r) * k; y++) {
                 for (int x = (int) ((mitte[0] - r) * k); x < (mitte[0] + r) * k; x++) {
-                    int p = b.getRGB(x, y);
-                    n += (p >> 16 & 0xFF) >= 0xF0 && (p >> 8 & 0xFF) >= 0xF0 && (p & 0xFF) >= 0xF0 ? 1 : 0;
+                    n += passt.test(b.getRGB(x, y)) ? 1 : 0;
                 }
             }
             return n;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /**
+     * Namen wie ein Spieler (mod#128): Rechtsklick auf den Griff einer Region, „Name…“, und das Feld ist leer. Getippt, dann
+     * die Kartentaste und Escape: Die Karte bleibt offen, Escape schliesst nur das Feld, ohne Namen. Wieder „Name…“, tippen,
+     * Enter: Die Form heisst so, und eine Schrifthöhe unter dem Griff steht die Kartenschrift, wo vorher keine stand.
+     * „Name ändern…“ zeigt den Namen; ein Klick daneben lässt ihn; leer gemacht und Enter nimmt ihn weg. Siehe
+     * docs/wegpunkte.md, „Namen“.
+     */
+    private static void namen(ClientGameTestContext context, TestInput maus, int k) {
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        // Über der Mitte, so liegt der Name darunter auf dem Schirm; ein Block sind 4 Einheiten, die Schrift 16 Blöcke hoch.
+        int bx = mitte[0] - 3, bz = mitte[1] - 24;
+        List<Wegpunkte.Ecke> region = List.of(new Wegpunkte.Ecke(bx, bz), new Wegpunkte.Ecke(bx + 6, bz),
+                new Wegpunkte.Ecke(bx + 6, bz + 6), new Wegpunkte.Ecke(bx, bz + 6));
+        try {
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.setzeForm(mc.level.dimension().identifier().toString(), region));
+            context.waitTicks(2);
+            double[] g = griff(context, formen);
+            frei(context, new double[][] {g});
+            double[] ort = {g[0], g[1] + Wegpunkte.NAME_GROESSE * 4};
+            int vorher = dunkle(context.takeScreenshot(TestScreenshotOptions.of("namen-vorher").disableCounterPrefix()), k, ort, 20);
+
+            eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.name");
+            String leer = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).namensfeld());
+            if (!"".equals(leer)) {
+                throw new AssertionError("„Name…“ öffnet kein leeres Feld: " + leer);
+            }
+            maus.typeChars("Mühle");
+            maus.pressKey(HeroicMap.karte);
+            context.waitTicks(2);
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTicks(2);
+            if (!(context.computeOnClient(mc -> mc.gui.screen()) instanceof Karte k2) || k2.namensfeld() != null
+                    || name(context, formen) != null) {
+                throw new AssertionError("Kartentaste und Escape im Feld: Karte offen "
+                        + (context.computeOnClient(mc -> mc.gui.screen()) instanceof Karte) + ", Name " + name(context, formen));
+            }
+
+            eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.name");
+            maus.typeChars("Mühle M");
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            if (!"Mühle M".equals(name(context, formen)) || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).namensfeld()) != null) {
+                throw new AssertionError("Enter speicherte den Namen nicht: " + name(context, formen));
+            }
+            int nachher = dunkle(context.takeScreenshot(TestScreenshotOptions.of("namen").disableCounterPrefix()), k, ort, 20);
+            if (nachher < vorher + 100) {
+                throw new AssertionError("Keine Kartenschrift unter dem Griff: " + nachher + " Pixel in ihrer Farbe, vorher " + vorher);
+            }
+
+            eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.name_aendern");
+            String voll = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).namensfeld());
+            if (!"Mühle M".equals(voll)) {
+                throw new AssertionError("„Name ändern…“ zeigt nicht den Namen: " + voll);
+            }
+            maus.typeChars("X");
+            // Links neben dem Feld, das am Griff beginnt.
+            spielerKlick(context, maus, k, g[0] - 30, g[1] + 30);
+            if (!"Mühle M".equals(name(context, formen)) || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).namensfeld()) != null) {
+                throw new AssertionError("Ein Klick neben das Feld: Name " + name(context, formen));
+            }
+
+            eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.name_aendern");
+            for (int i = 0; i < 10; i++) {
+                maus.pressKey(InputConstants.KEY_BACKSPACE);
+            }
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            if (name(context, formen) != null) {
+                throw new AssertionError("Leer und Enter liess den Namen: " + name(context, formen));
+            }
+        } finally {
+            context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size())
+                    .forEach(Wegpunkte.INSTANZ::loesche));
+            context.waitTicks(2);
+        }
+    }
+
+    private static String name(ClientGameTestContext context, int form) {
+        return context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(form).name());
     }
 
     /** Wo die Maus für das Spiel steht, in Einheiten des GUI, nicht gerundet. */
