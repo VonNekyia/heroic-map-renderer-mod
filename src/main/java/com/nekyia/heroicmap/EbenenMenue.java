@@ -17,7 +17,8 @@ import net.minecraft.network.chat.Component;
 /**
  * Das Untermenü „Ebenen …“: zuerst die eigenen Ebenen mit Schalter, Umbenennen und Löschen, dazu „Neue Ebene …“, dann je
  * Ebene vom Server ein Schalter, die oberste zuerst. Passen nicht alle auf den Schirm, auf Seiten. Jede Wahl wirkt und
- * speichert gleich. Siehe docs/ebenen.md, „Umschalten“, und docs/wegpunkte.md, „Eigene Ebenen“.
+ * speichert gleich. Siehe docs/ebenen.md, „Umschalten“.
+ * Siehe docs/wegpunkte.md, „Eigene Ebenen“.
  */
 final class EbenenMenue extends Screen {
 
