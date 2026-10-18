@@ -1624,6 +1624,15 @@ public final class Bedienung implements FabricClientGameTest {
         long zweiter = Util.getMillis();
         maus.holdMouse(LINKS);
         zittereBis(context, maus, n.x() * k, n.y() * k, zweiter + 700);
+        // Unter Last kommt der Frame, der ihn anhängt, später; ohne ihn schlösse Escape die Karte. Wie lange das Halten
+        // dauert, prüft schon der erste Durchgang.
+        for (int i = 0; i < 40 && context.computeOnClient(mc -> ((Karte) mc.gui.screen()).haengt()) == null; i++) {
+            zittere(context, maus, n.x() * k, n.y() * k, 1);
+        }
+        if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).haengt()) == null) {
+            maus.releaseMouse(LINKS);
+            throw new AssertionError("Nach " + (Util.getMillis() - zweiter) + " ms gehalten hängt der Wegpunkt für Escape nicht an der Maus");
+        }
         maus.moveCursor(0, 30 * k);
         context.waitTick();
         maus.pressKey(InputConstants.KEY_ESCAPE);
