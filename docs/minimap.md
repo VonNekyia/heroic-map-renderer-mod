@@ -3,6 +3,8 @@ title: Minimap
 description: Bedienung über das Menü hinter /hmap und das Untermenü „Einstellungen …“, das Aussehen per Klick auf Spieler und Marken, Chunklinien, Effekte in der Welt, Drehen mit der Blickrichtung, Koordinaten unter der Minimap, was sie bei F3 tut, der eigene Spieler in drei Darstellungen, Form, Lage und Grösse, Mitspieler, Bewegung zwischen zwei Ticks; wie der Mod die Minimap zeichnet, welcher Block oben liegt, Flächen aus dem Tesselator des Spiels, Pixel und Mittelung, Licht, Wasser, Blockentities, Decke, wann neu gezeichnet wird, was es kostet und was anders ist als top-north.
 code:
   - src/main/java/com/nekyia/heroicmap/Minimap.java
+  - src/main/java/com/nekyia/heroicmap/DebugBildschirm.java
+  - src/test/java/com/nekyia/heroicmap/DebugBildschirmTest.java
   - src/main/java/com/nekyia/heroicmap/ChunkMaler.java
   - src/main/java/com/nekyia/heroicmap/Licht.java
   - src/main/java/com/nekyia/heroicmap/HeroicMap.java
@@ -325,9 +327,23 @@ gewünscht.
 - **Gespeichert** als `bei_f3` in `heroicmap.properties`; ein anderer Wert
   gilt als Vorgabe (`Minimap.BeiF3`).
 - **Offen** heisst: F3 hat den Debug-Bildschirm eingeblendet
-  (`DebugScreenEntryList.isOverlayVisible`). Einträge, die der Spieler
-  ohne F3 dauerhaft zeigt, zählen nicht; `DebugScreenOverlay.showDebugScreen`
-  wäre auch für sie wahr, belegt per javap an 26.3.
+  (`DebugScreenEntryList.isOverlayVisible`, `DebugBildschirm.offen`).
+  Einträge, die der Spieler ohne F3 dauerhaft zeigt, zählen nicht;
+  `DebugScreenOverlay.showDebugScreen` wäre auch für sie wahr, belegt per
+  javap an 26.3.
+- **Mit BetterF3,** geprüft an 20.0.0 per javap, wie im Modpack: Es setzt
+  den Schalter des Spiels beim Öffnen selbst
+  (`DebugScreenEntryListMixin.onSetOverlayVisible`). Beim Schliessen mit
+  Animation, der Vorgabe, lässt es ihn an, setzt nur
+  `Utils.closingAnimation` und schiebt den Text Frame um Frame hinaus;
+  erst danach schaltet `DebugMixin.renderAnimation` ihn aus. Bis 0.2.42
+  stand die Minimap so lange noch in der Mitte oder blieb weg. Seitdem
+  gilt F3 als zu, solange `closingAnimation` wahr ist. Das Feld liest der
+  Mod nur, über Reflexion, einmal aufgelöst; fehlt die Klasse, still, passt
+  das Feld nicht oder lässt es sich nicht lesen, mit einer Zeile im Log,
+  dann folgt „Bei F3“ dem Spiel (`DebugBildschirm.feld`). Eine neue Fassung
+  von BetterF3 kann das brechen; dann hängt die Minimap wieder nach, bis
+  die Animation durch ist. Zu prüfen beim Heben im Modpack.
 - **Mitte** heisst waagrecht: Ganz in der Mitte läge die Minimap über dem
   Fadenkreuz. Gemerkt wird die Lage nicht; ohne F3 steht sie wieder, wo
   sie war.
@@ -335,7 +351,10 @@ gewünscht.
   hinzieht.
 - **Weg** zeichnet keine Chunks vor, wie mit der Minimap aus.
 - **Der Gametest** `Bedienung` öffnet F3 mit der Taste und prüft alle drei
-  Wahlen (`Bedienung.beiF3`).
+  Wahlen (`Bedienung.beiF3`), zwei Ticks nach dem Schliessen steht die
+  Minimap wieder an ihrem Platz. In der CI läuft er auch mit BetterF3, siehe
+  [Bauen und testen](entwicklung.md), „Gametests“. Dazu `DebugBildschirmTest`:
+  nur ein öffentliches statisches boolean-Feld zählt.
 
 ## Spieler
 

@@ -11,10 +11,17 @@ twelvemonkeys = "3.15.2"
 # Sodium nur für die Gametests mit -Psodium, dieselbe Version wie im Modpack; die SHA-256 prüft der Build.
 # Siehe docs/entscheidungen/0017-gametests-in-der-ci-auch-mit-sodium.md.
 sodium-sha256 = "87a5bb39f7e6e41106e77f122f82fc93f9d3bc0b6ebcb746b314172a446a287a"
+# BetterF3 und Cloth Config nur für die Gametests mit -Pbetterf3, dieselben Fassungen wie im Modpack; die SHA-256 prüft der Build.
+# Siehe docs/minimap.md, „Bei F3“.
+betterf3-sha256 = "e3ae4820dbbed0cd33e2b89dbb16b8a9f40fa576b39bc83f797658f4468738a5"
+cloth-config-sha256 = "1716b9964f90d2b885f9bd3887f8824b71b55c32a4123a5853486e722f7c2e4b"
 
 [libraries]
 minecraft = { module = "com.mojang:minecraft", version.ref = "minecraft" }
 sodium = { module = "maven.modrinth:sodium", version = "mc26.3-0.9.2-fabric" }
+# Nach der id der Fassung auf Modrinth: BetterF3 20.0.0 für Fabric 26.3, Cloth Config 26.3.159+fabric.
+betterf3 = { module = "maven.modrinth:betterf3", version = "XB7u4eSf" }
+cloth-config = { module = "maven.modrinth:cloth-config", version = "fg2uyxOW" }
 fabric-loader = { module = "net.fabricmc:fabric-loader", version.ref = "fabric-loader" }
 fabric-api = { module = "net.fabricmc.fabric-api:fabric-api", version.ref = "fabric-api" }
 twelvemonkeys-webp = { module = "com.twelvemonkeys.imageio:imageio-webp", version.ref = "twelvemonkeys" }
