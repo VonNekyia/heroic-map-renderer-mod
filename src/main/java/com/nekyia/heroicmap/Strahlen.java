@@ -76,7 +76,7 @@ final class Strahlen {
         for (int i = 0; i < punkte.size() && n < aus.length; i++) {
             Wegpunkte.Punkt p = punkte.get(i);
             double dx = p.x() + 0.5 - x, dz = p.z() + 0.5 - z;
-            if (p.angeheftet() && dx * dx + dz * dz <= weit * weit && p.dimension().equals(dimension)) {
+            if (p.angeheftet() && dx * dx + dz * dz <= weit * weit && p.dimension().equals(dimension) && Wegpunkte.INSTANZ.sichtbar(p)) {
                 aus[n++] = i;
             }
         }

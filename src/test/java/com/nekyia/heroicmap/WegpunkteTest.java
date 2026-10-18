@@ -31,7 +31,7 @@ class WegpunkteTest {
 
         Wegpunkte nachher = new Wegpunkte();
         nachher.lies(ordner);
-        assertEquals(List.of(new Wegpunkte.Punkt(1, WELT, 12, -40, 0, true, false), new Wegpunkte.Punkt(2, "minecraft:the_nether", 1, 2, 0, false, false)),
+        assertEquals(List.of(new Wegpunkte.Punkt(1, WELT, 12, -40, 0, true, false, Wegpunkte.BASE), new Wegpunkte.Punkt(2, "minecraft:the_nether", 1, 2, 0, false, false, Wegpunkte.BASE)),
                 nachher.punkte());
         assertTrue(nachher.angeheftet(SAM));
     }
@@ -59,7 +59,7 @@ class WegpunkteTest {
         w.lies(ordner);
         // Die Ecken in beliebiger Folge: ein Rechteck der Blöcke samt beiden Ecken.
         w.setze(WELT, 10, -5, 2, 3);
-        assertEquals(List.of(new Wegpunkte.Region(WELT, 2, -5, 10, 3, 0, false)), w.regionen());
+        assertEquals(List.of(new Wegpunkte.Region(WELT, 2, -5, 10, 3, 0, false, Wegpunkte.BASE)), w.regionen());
         // Dieselbe Region noch einmal bleibt eine; ein Wegpunkt daneben bekommt die nächste Farbe.
         w.setze(WELT, 2, 3, 10, -5);
         w.setze(WELT, 0, 0);
@@ -71,13 +71,13 @@ class WegpunkteTest {
         assertEquals(null, w.region("minecraft:the_nether", 5, 0));
         // Überlappen zwei, gilt die zuletzt gesetzte.
         w.setze(WELT, 4, 0, 6, 1);
-        assertEquals(new Wegpunkte.Region(WELT, 4, 0, 6, 1, 2, false), w.region(WELT, 5, 0));
+        assertEquals(new Wegpunkte.Region(WELT, 4, 0, 6, 1, 2, false, Wegpunkte.BASE), w.region(WELT, 5, 0));
 
         Wegpunkte nachher = new Wegpunkte();
         nachher.lies(ordner);
         assertEquals(w.regionen(), nachher.regionen());
         nachher.loesche(nachher.regionen().getFirst());
-        assertEquals(List.of(new Wegpunkte.Region(WELT, 4, 0, 6, 1, 2, false)), nachher.regionen());
+        assertEquals(List.of(new Wegpunkte.Region(WELT, 4, 0, 6, 1, 2, false, Wegpunkte.BASE)), nachher.regionen());
     }
 
     @Test
@@ -108,7 +108,7 @@ class WegpunkteTest {
         w.umschalten(w.punkte().getFirst());
         Wegpunkte.Punkt erster = w.punkte().getFirst();
         assertTrue(w.verschiebe(erster, 10, -3));
-        assertEquals(new Wegpunkte.Punkt(erster.id(), WELT, 10, -3, erster.farbe(), true, false), w.punkte().getFirst());
+        assertEquals(new Wegpunkte.Punkt(erster.id(), WELT, 10, -3, erster.farbe(), true, false, Wegpunkte.BASE), w.punkte().getFirst());
         // Auf einen besetzten Block nicht, und einen, den es nicht mehr gibt, auch nicht.
         assertFalse(w.verschiebe(w.punkte().getFirst(), 5, 5));
         assertFalse(w.verschiebe(erster, 20, 20));
@@ -215,7 +215,7 @@ class WegpunkteTest {
                   {"id":3,"dimension":"minecraft:the_nether","x":3,"z":3,"farbe":0,"minimap":false}],
                  "eigene_formen":[{"punkte":[1,99,3,2],"farbe":1,"minimap":true},{"punkte":[99,1],"farbe":1,"minimap":false}]}
                 """).getAsJsonObject());
-        assertEquals(List.of(new Wegpunkte.EigeneForm(WELT, List.of(e(1, 1), e(2, 2)), 1, true, null, Wegpunkte.KEIN_HEX)), alt.eigeneFormen());
+        assertEquals(List.of(new Wegpunkte.EigeneForm(WELT, List.of(e(1, 1), e(2, 2)), 1, true, null, Wegpunkte.KEIN_HEX, Wegpunkte.BASE)), alt.eigeneFormen());
         // Geschrieben wird nur das neue Format, und so liest es sich zurück.
         String json = alt.json().toString();
         assertFalse(json.contains("\"punkte\""), json);
@@ -271,7 +271,7 @@ class WegpunkteTest {
                 """).getAsJsonObject());
         // Die Farbe läuft in die Liste der Farben.
         // Ohne id in der Datei vergibt der Mod die erste freie.
-        assertEquals(List.of(new Wegpunkte.Punkt(1, WELT, 1, 2, 99 % Wegpunkte.FARBEN.length, false, false)), w.punkte());
+        assertEquals(List.of(new Wegpunkte.Punkt(1, WELT, 1, 2, 99 % Wegpunkte.FARBEN.length, false, false, Wegpunkte.BASE)), w.punkte());
         assertTrue(w.angeheftet(SAM));
     }
 
@@ -614,7 +614,7 @@ class WegpunkteTest {
         // Leer nimmt den Namen weg; geschrieben wird dann kein Feld.
         nachher.benenne(nachher.eigeneFormen().get(0), "  ");
         assertEquals(null, nachher.eigeneFormen().get(0).name());
-        assertFalse(nachher.json().toString().contains("\"name\""), nachher.json().toString());
+        assertFalse(nachher.json().getAsJsonArray("eigene_formen").get(0).getAsJsonObject().has("name"), nachher.json().toString());
         // Ein Name, der kein Text ist, fehlt; die Form bleibt. Einer aus der Datei wird bereinigt.
         Wegpunkte fremd = new Wegpunkte();
         fremd.lies(JsonParser.parseString("""
@@ -629,7 +629,7 @@ class WegpunkteTest {
     @Test
     void namenEineSchrifthoeheNebenDemGriff() {
         // Region: waagrecht, ein Punkt eine Schrifthöhe unter dem Griff im Schwerpunkt; so hoch wie die halbe kürzere Seite, hier 5.
-        Wegpunkte.EigeneForm region = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10), e(0, 10)), 0, false, "Hof", Wegpunkte.KEIN_HEX);
+        Wegpunkte.EigeneForm region = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10), e(0, 10)), 0, false, "Hof", Wegpunkte.KEIN_HEX, Wegpunkte.BASE);
         Ebenen.Schrift s = Wegpunkte.schrift(region, Wegpunkte.mitten(region));
         assertArrayEquals(new double[] {5.5, 5.5 + 5}, s.pfad(), 1e-9);
         assertEquals(5, s.groesse());
@@ -652,17 +652,17 @@ class WegpunkteTest {
         assertArrayEquals(new double[] {0.5 - g, 0.5, 0.5 - g, 10.5}, pfad(List.of(e(0, 0), e(0, 10))), 1e-9);
         assertArrayEquals(new double[] {0.5 - g, 10.5, 0.5 - g, 0.5}, pfad(List.of(e(0, 10), e(0, 0))), 1e-9);
         // Ohne Namen keine Schrift.
-        Wegpunkte.EigeneForm ohne = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(10, 0)), 0, false, null, Wegpunkte.KEIN_HEX);
+        Wegpunkte.EigeneForm ohne = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(10, 0)), 0, false, null, Wegpunkte.KEIN_HEX, Wegpunkte.BASE);
         assertEquals(null, Wegpunkte.schrift(ohne, Wegpunkte.mitten(ohne)));
     }
 
     private static float groesse(List<Wegpunkte.Ecke> ecken) {
-        Wegpunkte.EigeneForm f = new Wegpunkte.EigeneForm(WELT, ecken, 0, false, "Weg", Wegpunkte.KEIN_HEX);
+        Wegpunkte.EigeneForm f = new Wegpunkte.EigeneForm(WELT, ecken, 0, false, "Weg", Wegpunkte.KEIN_HEX, Wegpunkte.BASE);
         return Wegpunkte.schrift(f, Wegpunkte.mitten(f)).groesse();
     }
 
     private static double[] pfad(List<Wegpunkte.Ecke> ecken) {
-        Wegpunkte.EigeneForm f = new Wegpunkte.EigeneForm(WELT, ecken, 0, false, "Weg", Wegpunkte.KEIN_HEX);
+        Wegpunkte.EigeneForm f = new Wegpunkte.EigeneForm(WELT, ecken, 0, false, "Weg", Wegpunkte.KEIN_HEX, Wegpunkte.BASE);
         return Wegpunkte.schrift(f, Wegpunkte.mitten(f)).pfad();
     }
 
@@ -786,5 +786,82 @@ class WegpunkteTest {
             "9999999999 0"}) {
             assertNull(Wegpunkte.koordinaten(falsch), falsch);
         }
+    }
+
+    @Test
+    void eigeneEbenenAnlegenSchaltenLoeschenUndDatei(@TempDir Path ordner) {
+        Wegpunkte w = new Wegpunkte();
+        w.lies(ordner);
+        assertEquals(List.of(new Wegpunkte.EigeneEbene(Wegpunkte.BASE, "Base", true)), w.ebenen());
+        int farmen = w.neueEbene(" Farmen ");
+        assertEquals(1, farmen);
+        assertEquals("Farmen", w.ebene(farmen).name());
+        // Base heisst fest so; ohne Namen geht nichts.
+        assertFalse(w.benenneEbene(Wegpunkte.BASE, "Haupt"));
+        assertFalse(w.benenneEbene(farmen, "  "));
+        assertEquals(-1, w.neueEbene("§a"));
+        assertTrue(w.benenneEbene(farmen, "Höfe"));
+        // Neues landet in Base; eingeordnet zählt die Ebene, angeheftet oder nicht.
+        w.setze(WELT, 1, 1);
+        w.setzeForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10)));
+        w.setze(WELT, 20, 20, 30, 30);
+        assertTrue(w.punkte().getFirst().ebene() == Wegpunkte.BASE && w.eigeneFormen().getFirst().ebene() == Wegpunkte.BASE);
+        w.ordne(w.punkte().getFirst(), farmen);
+        w.ordne(w.eigeneFormen().getFirst(), farmen);
+        w.ordne(w.regionen().getFirst(), farmen);
+        w.umschalten(w.eigeneFormen().getFirst());
+        w.umschalten(w.regionen().getFirst());
+        Ebenen leer = new Ebenen();
+        assertEquals(2, w.minimap(leer).stream().mapToLong(List::size).sum());
+        // Aus: nirgends gezeichnet, auch angeheftet nicht.
+        w.schalteEbene(farmen, false);
+        assertFalse(w.an(farmen));
+        assertFalse(w.sichtbar(w.punkte().getFirst()));
+        assertEquals(0, w.minimap(leer).stream().mapToLong(List::size).sum());
+        assertEquals(0, w.karte(leer).stream().mapToLong(List::size).sum());
+        // Über die Datei, mit den Ebenen oben und der Ebene je Eintrag.
+        String json = w.json().toString();
+        assertTrue(json.contains("\"ebenen\":[{\"id\":0,\"name\":\"Base\",\"an\":true},{\"id\":1,\"name\":\"Höfe\",\"an\":false}]"), json);
+        Wegpunkte nachher = new Wegpunkte();
+        nachher.lies(ordner);
+        assertEquals(w.ebenen(), nachher.ebenen());
+        assertEquals(farmen, nachher.punkte().getFirst().ebene());
+        assertEquals(farmen, nachher.eigeneFormen().getFirst().ebene());
+        assertEquals(farmen, nachher.regionen().getFirst().ebene());
+        // Gelöscht kommt alles nach Base; Base lässt sich nicht löschen.
+        nachher.loescheEbene(Wegpunkte.BASE);
+        nachher.loescheEbene(farmen);
+        assertEquals(1, nachher.ebenen().size());
+        assertTrue(nachher.punkte().getFirst().ebene() == Wegpunkte.BASE && nachher.eigeneFormen().getFirst().ebene() == Wegpunkte.BASE
+                && nachher.regionen().getFirst().ebene() == Wegpunkte.BASE);
+        // Höchstens 32 neben Base.
+        for (int i = 0; i < Wegpunkte.MAX_EBENEN; i++) {
+            assertTrue(nachher.neueEbene("E" + i) > 0);
+        }
+        assertEquals(-1, nachher.neueEbene("zu viel"));
+    }
+
+    @Test
+    void eigeneEbenenAlteDateiUndKaputteEintraege() {
+        // Ohne „ebenen“ gibt es nur Base, und alles liegt darin.
+        Wegpunkte alt = new Wegpunkte();
+        alt.lies(JsonParser.parseString("""
+                {"wegpunkte":[{"id":1,"dimension":"minecraft:overworld","x":1,"z":1,"farbe":0,"minimap":false}]}
+                """).getAsJsonObject());
+        assertEquals(1, alt.ebenen().size());
+        assertEquals(Wegpunkte.BASE, alt.punkte().getFirst().ebene());
+        // Eine Ebene, die es nicht gibt, heisst Base; doppelte ids, leere Namen und negative ids fallen weg; Base nimmt nur „an“.
+        Wegpunkte w = new Wegpunkte();
+        w.lies(JsonParser.parseString("""
+                {"ebenen":[{"id":0,"name":"Anders","an":false},{"id":4,"name":"Wald"},{"id":4,"name":"Doppelt"},{"id":5,"name":" "},
+                   {"id":-2,"name":"Minus"},{"name":"ohne id"}],
+                 "wegpunkte":[{"id":1,"dimension":"minecraft:overworld","x":1,"z":1,"farbe":0,"minimap":false,"ebene":9},
+                   {"id":2,"dimension":"minecraft:overworld","x":2,"z":2,"farbe":0,"minimap":false,"ebene":4}]}
+                """).getAsJsonObject());
+        assertEquals(List.of(new Wegpunkte.EigeneEbene(Wegpunkte.BASE, "Base", false), new Wegpunkte.EigeneEbene(4, "Wald", true)), w.ebenen());
+        assertEquals(Wegpunkte.BASE, w.punkte().get(0).ebene());
+        assertEquals(4, w.punkte().get(1).ebene());
+        // Eine neue bekommt die nächste freie id.
+        assertEquals(5, w.neueEbene("Neu"));
     }
 }

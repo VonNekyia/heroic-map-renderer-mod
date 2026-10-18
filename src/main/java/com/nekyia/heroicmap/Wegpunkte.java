@@ -47,7 +47,7 @@ final class Wegpunkte {
      * Ein Wegpunkt auf dem Block (x, z), mit einer festen {@code id}; {@code farbe} ist ein Index in {@link #FARBEN}. Mit
      * {@code tod} der Todespunkt, höchstens einer, ohne eigene Farbe. Siehe docs/wegpunkte.md, „Todespunkt“.
      */
-    record Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet, boolean tod) {
+    record Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet, boolean tod, int ebene) {
     }
 
     /** Eine Ecke einer eigenen Form auf dem Block (x, z). */
@@ -57,9 +57,10 @@ final class Wegpunkte {
     /**
      * Eine eigene Form, ein Marker mit eigenen Ecken in Reihenfolge: zwei sind eine Linie, drei und mehr eine
      * Region. Sie verweist auf keinen Wegpunkt. {@code name} wie aus {@link #name}, null ohne; {@code hex} eine eigene Farbe
-     * als RGB, {@link #KEIN_HEX} ohne, dann gilt {@code farbe}. Siehe docs/wegpunkte.md, „Eigene Formen“.
+     * als RGB, {@link #KEIN_HEX} ohne, dann gilt {@code farbe}; {@code ebene} die id ihrer eigenen Ebene. Siehe docs/wegpunkte.md,
+     * „Eigene Formen“.
      */
-    record EigeneForm(String dimension, List<Ecke> ecken, int farbe, boolean angeheftet, String name, int hex) {
+    record EigeneForm(String dimension, List<Ecke> ecken, int farbe, boolean angeheftet, String name, int hex, int ebene) {
 
         EigeneForm {
             ecken = List.copyOf(ecken);
@@ -79,11 +80,18 @@ final class Wegpunkte {
      * Ein altes Rechteck aus „Region von hier“, die Blöcke von (x0, z0) bis (x1, z1) samt beiden, x0 ≤ x1 und
      * z0 ≤ z1; {@code farbe} ist ein Index in {@link #FARBEN}. Siehe docs/wegpunkte.md, „Regionen“.
      */
-    record Region(String dimension, int x0, int z0, int x1, int z1, int farbe, boolean angeheftet) {
+    record Region(String dimension, int x0, int z0, int x1, int z1, int farbe, boolean angeheftet, int ebene) {
 
         boolean enthaelt(String d, int x, int z) {
             return x >= x0 && x <= x1 && z >= z0 && z <= z1 && dimension.equals(d);
         }
+    }
+
+    /**
+     * Eine eigene Ebene des Spielers; aus heisst nirgends gezeichnet. {@link #BASE} heisst fest „Base“ und lässt sich weder
+     * umbenennen noch löschen. Siehe docs/wegpunkte.md, „Eigene Ebenen“.
+     */
+    record EigeneEbene(int id, String name, boolean an) {
     }
 
     /** Ein angeheftetes Objekt vom Server, über die Kennungen von Ebene und Objekt; hält so über neue {@code version}s. */
@@ -96,6 +104,10 @@ final class Wegpunkte {
     static final int MAX_EIGENE_FORMEN = 256, MAX_PUNKTE_FORM = 64;
     /** So weit reicht eine Koordinate, die der Spieler eintippt, in Blöcken: der Rand der Welt. */
     static final int MAX_KOORDINATE = 30_000_000;
+    /** Die id von Base, der Ebene, in die alles Neue kommt. */
+    static final int BASE = 0;
+    /** So viele eigene Ebenen je Welt neben Base. */
+    static final int MAX_EBENEN = 32;
     /** So viele Zeichen hat der Name einer eigenen Form höchstens. */
     static final int MAX_NAME = 32;
     /** Eine eigene Form ohne eigene Farbe; dann gilt ihr Index in {@link #FARBEN}. */
@@ -118,6 +130,10 @@ final class Wegpunkte {
     private final List<Punkt> punkteSicht = Collections.unmodifiableList(punkte);
     private final List<Region> regionenSicht = Collections.unmodifiableList(regionen);
     private final List<EigeneForm> eigene = new ArrayList<>();
+    /** Die eigenen Ebenen, Base zuerst, und ein Zähler für jede Änderung an ihnen. */
+    private final List<EigeneEbene> ebenen = new ArrayList<>(List.of(base(true)));
+    private int ebenenStand;
+    private final List<EigeneEbene> ebenenSicht = Collections.unmodifiableList(ebenen);
     /** Die nächste freie id eines Wegpunkts. */
     private int naechsteId = 1;
     /** Die Mitspieler, die auf der Minimap angeheftet sind. */
@@ -177,13 +193,30 @@ final class Wegpunkte {
 
     void lies(JsonObject json) {
         stand++;
+        ebenenStand++;
+        // Ohne „ebenen“ gibt es nur Base; so ziehen ältere Dateien ohne Schritt um. Siehe docs/wegpunkte.md, „Eigene Ebenen“.
+        for (JsonElement element : liste(json, "ebenen")) {
+            try {
+                JsonObject o = element.getAsJsonObject();
+                int id = o.get("id").getAsInt();
+                boolean an = !o.has("an") || o.get("an").getAsBoolean();
+                String name = o.has("name") && o.get("name").isJsonPrimitive() ? name(o.get("name").getAsString()) : null;
+                if (id == BASE) {
+                    ebenen.set(0, base(an));
+                } else if (id > 0 && name != null && ebene(id) == null && ebenen.size() <= MAX_EBENEN) {
+                    ebenen.add(new EigeneEbene(id, name, an));
+                }
+            } catch (RuntimeException kaputt) {
+                // Nur diese Ebene fällt weg; was in ihr lag, kommt nach Base.
+            }
+        }
         for (JsonElement element : liste(json, "wegpunkte")) {
             try {
                 JsonObject o = element.getAsJsonObject();
                 // Eine Datei von vor mod#79 nennt keine id; dann vergibt der Mod sie unten.
                 int id = o.has("id") ? o.get("id").getAsInt() : 0;
                 Punkt p = new Punkt(id, o.get("dimension").getAsString(), o.get("x").getAsInt(), o.get("z").getAsInt(),
-                        Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length), o.get("minimap").getAsBoolean(), false);
+                        Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length), o.get("minimap").getAsBoolean(), false, ebeneAus(o));
                 if (finde(p.dimension(), p.x(), p.z()) < 0) {
                     punkte.add(p);
                 }
@@ -196,7 +229,7 @@ final class Wegpunkte {
             try {
                 JsonObject o = json.getAsJsonObject("tod");
                 Punkt p = new Punkt(0, o.get("dimension").getAsString(), o.get("x").getAsInt(), o.get("z").getAsInt(), 0,
-                        o.get("minimap").getAsBoolean(), true);
+                        o.get("minimap").getAsBoolean(), true, BASE);
                 if (finde(p.dimension(), p.x(), p.z()) < 0) {
                     punkte.add(p);
                 }
@@ -210,7 +243,7 @@ final class Wegpunkte {
                 JsonObject o = element.getAsJsonObject();
                 Region r = region(o.get("dimension").getAsString(), o.get("x0").getAsInt(), o.get("z0").getAsInt(), o.get("x1").getAsInt(),
                         o.get("z1").getAsInt(), Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length),
-                        o.get("minimap").getAsBoolean() && angeheftet() < MAX_ANGEHEFTET);
+                        o.get("minimap").getAsBoolean() && angeheftet() < MAX_ANGEHEFTET, ebeneAus(o));
                 if (regionen.size() < MAX_REGIONEN && finde(r) < 0) {
                     regionen.add(r);
                 }
@@ -262,7 +295,7 @@ final class Wegpunkte {
                     String name = o.has("name") && o.get("name").isJsonPrimitive() ? name(o.get("name").getAsString()) : null;
                     int hex = o.has("hex") && o.get("hex").isJsonPrimitive() ? hex(o.get("hex").getAsString()) : KEIN_HEX;
                     eigene.add(new EigeneForm(dimension, gueltig, Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length),
-                            o.get("minimap").getAsBoolean() && angeheftet() < MAX_ANGEHEFTET, name, hex));
+                            o.get("minimap").getAsBoolean() && angeheftet() < MAX_ANGEHEFTET, name, hex, ebeneAus(o)));
                 }
             } catch (RuntimeException kaputt) {
                 // Nur dieser Eintrag fällt weg.
@@ -279,6 +312,16 @@ final class Wegpunkte {
                 // Nur dieser Eintrag fällt weg.
             }
         }
+    }
+
+    /** Die Ebene aus dem Feld {@code ebene} eines Eintrags, wenn es sie gibt; sonst Base. */
+    private int ebeneAus(JsonObject o) {
+        int id = o.has("ebene") && o.get("ebene").isJsonPrimitive() ? o.get("ebene").getAsInt() : BASE;
+        return ebene(id) != null ? id : BASE;
+    }
+
+    private static EigeneEbene base(boolean an) {
+        return new EigeneEbene(BASE, "Base", an);
     }
 
     private static JsonArray liste(JsonObject json, String name) {
@@ -304,6 +347,7 @@ final class Wegpunkte {
             o.addProperty("z", p.z());
             o.addProperty("farbe", p.farbe());
             o.addProperty("minimap", p.angeheftet());
+            o.addProperty("ebene", p.ebene());
             liste.add(o);
         }
         JsonArray rechtecke = new JsonArray();
@@ -316,11 +360,21 @@ final class Wegpunkte {
             o.addProperty("z1", r.z1());
             o.addProperty("farbe", r.farbe());
             o.addProperty("minimap", r.angeheftet());
+            o.addProperty("ebene", r.ebene());
             rechtecke.add(o);
         }
         JsonArray uuids = new JsonArray();
         spieler.forEach(u -> uuids.add(u.toString()));
         JsonObject json = new JsonObject();
+        JsonArray schichten = new JsonArray();
+        for (EigeneEbene e : ebenen) {
+            JsonObject o = new JsonObject();
+            o.addProperty("id", e.id());
+            o.addProperty("name", e.name());
+            o.addProperty("an", e.an());
+            schichten.add(o);
+        }
+        json.add("ebenen", schichten);
         json.add("wegpunkte", liste);
         if (tod != null) {
             json.add("tod", tod);
@@ -349,6 +403,7 @@ final class Wegpunkte {
             if (f.hex() != KEIN_HEX) {
                 o.addProperty("hex", hex(f.hex()));
             }
+            o.addProperty("ebene", f.ebene());
             zuege.add(o);
         }
         json.add("eigene_formen", zuege);
@@ -370,6 +425,9 @@ final class Wegpunkte {
         punkte.clear();
         regionen.clear();
         eigene.clear();
+        ebenen.clear();
+        ebenen.add(base(true));
+        ebenenStand++;
         naechsteId = 1;
         spieler.clear();
         formen.clear();
@@ -386,9 +444,132 @@ final class Wegpunkte {
     /** Setzt einen Wegpunkt auf den Block; steht dort schon einer, bleibt er. */
     void setze(String dimension, int x, int z) {
         if (finde(dimension, x, z) < 0) {
-            punkte.add(new Punkt(naechsteId++, dimension, x, z, farbe(dimension), false, false));
+            punkte.add(new Punkt(naechsteId++, dimension, x, z, farbe(dimension), false, false, BASE));
             schreibe();
         }
+    }
+
+    /** Die eigenen Ebenen, Base zuerst. */
+    List<EigeneEbene> ebenen() {
+        return ebenenSicht;
+    }
+
+    /** Zählt jede Änderung an den eigenen Ebenen: anlegen, umbenennen, schalten, löschen, lesen. */
+    int ebenenStand() {
+        return ebenenStand;
+    }
+
+    /** Die eigene Ebene mit dieser id, oder null. */
+    EigeneEbene ebene(int id) {
+        for (EigeneEbene e : ebenen) {
+            if (e.id() == id) {
+                return e;
+            }
+        }
+        return null;
+    }
+
+    /** Ist die eigene Ebene {@code id} an? Eine, die es nicht gibt, gilt als Base. */
+    boolean an(int id) {
+        EigeneEbene e = ebene(id);
+        return e != null ? e.an() : ebenen.getFirst().an();
+    }
+
+    /** Wird der Wegpunkt gezeichnet? Nur, wenn seine Ebene an ist. */
+    boolean sichtbar(Punkt p) {
+        return an(p.ebene());
+    }
+
+    /**
+     * Legt eine eigene Ebene an, bereinigt wie ein Name, siehe {@link #name}, an; ihre id, oder -1 ohne Namen oder bei schon
+     * {@link #MAX_EBENEN}.
+     */
+    int neueEbene(String roh) {
+        String name = name(roh);
+        if (name == null || ebenen.size() > MAX_EBENEN) {
+            return -1;
+        }
+        int id = ebenen.stream().mapToInt(EigeneEbene::id).max().orElse(BASE) + 1;
+        ebenen.add(new EigeneEbene(id, name, true));
+        ebenenStand++;
+        schreibe();
+        return id;
+    }
+
+    /** Benennt die eigene Ebene um; Base nicht, und ohne Namen nicht. False, wenn nichts geschah. */
+    boolean benenneEbene(int id, String roh) {
+        String name = name(roh);
+        int i = ebenen.indexOf(ebene(id));
+        if (id == BASE || i < 0 || name == null) {
+            return false;
+        }
+        ebenen.set(i, new EigeneEbene(id, name, ebenen.get(i).an()));
+        ebenenStand++;
+        schreibe();
+        return true;
+    }
+
+    /** Schaltet die eigene Ebene an oder aus. */
+    void schalteEbene(int id, boolean an) {
+        int i = ebenen.indexOf(ebene(id));
+        if (i >= 0) {
+            ebenen.set(i, new EigeneEbene(id, ebenen.get(i).name(), an));
+            ebenenStand++;
+            schreibe();
+        }
+    }
+
+    /** Löscht die eigene Ebene; was in ihr lag, kommt nach Base. Base nicht. */
+    void loescheEbene(int id) {
+        EigeneEbene e = ebene(id);
+        if (id == BASE || e == null) {
+            return;
+        }
+        ebenen.remove(e);
+        ebenenStand++;
+        punkte.replaceAll(p -> p.ebene() == id ? mitEbene(p, BASE) : p);
+        regionen.replaceAll(r -> r.ebene() == id ? mitEbene(r, BASE) : r);
+        eigene.replaceAll(f -> f.ebene() == id ? mitEbene(f, BASE) : f);
+        schreibe();
+    }
+
+    /** Legt den Wegpunkt in die eigene Ebene {@code ebene}, wenn es sie gibt. */
+    void ordne(Punkt p, int ebene) {
+        int i = punkte.indexOf(p);
+        if (i >= 0 && ebene(ebene) != null) {
+            punkte.set(i, mitEbene(p, ebene));
+            schreibe();
+        }
+    }
+
+    /** Legt das alte Rechteck in die eigene Ebene {@code ebene}, wenn es sie gibt. */
+    void ordne(Region r, int ebene) {
+        int i = regionen.indexOf(r);
+        if (i >= 0 && ebene(ebene) != null) {
+            regionen.set(i, mitEbene(r, ebene));
+            schreibe();
+        }
+    }
+
+    /** Legt die eigene Form in die eigene Ebene {@code ebene}, wenn es sie gibt. */
+    void ordne(EigeneForm f, int ebene) {
+        int i = eigene.indexOf(f);
+        if (i >= 0 && ebene(ebene) != null) {
+            eigene.set(i, mitEbene(f, ebene));
+            schreibe();
+        }
+    }
+
+    private static Punkt mitEbene(Punkt p, int ebene) {
+        return new Punkt(p.id(), p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), ebene);
+    }
+
+    private static Region mitEbene(Region r, int ebene) {
+        return new Region(r.dimension(), r.x0(), r.z0(), r.x1(), r.z1(), r.farbe(), r.angeheftet(), ebene);
+    }
+
+    private static EigeneForm mitEbene(EigeneForm f, int ebene) {
+        return new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), f.hex(), ebene);
     }
 
     /** Der Todespunkt, oder null. */
@@ -409,7 +590,7 @@ final class Wegpunkte {
         punkte.removeIf(Punkt::tod);
         boolean frei = finde(dimension, x, z) < 0;
         if (frei) {
-            punkte.add(new Punkt(naechsteId++, dimension, x, z, 0, true, true));
+            punkte.add(new Punkt(naechsteId++, dimension, x, z, 0, true, true, BASE));
         }
         schreibe();
         return frei;
@@ -462,7 +643,7 @@ final class Wegpunkte {
      * Nur noch Tests setzen so ein altes Rechteck; der Spieler baut eigene Formen.
      */
     void setze(String dimension, int ax, int az, int bx, int bz) {
-        Region r = region(dimension, ax, az, bx, bz, farbe(dimension), false);
+        Region r = region(dimension, ax, az, bx, bz, farbe(dimension), false, BASE);
         if (regionen.size() < MAX_REGIONEN && finde(r) < 0) {
             regionen.add(r);
             schreibe();
@@ -477,8 +658,8 @@ final class Wegpunkte {
         }
     }
 
-    private static Region region(String dimension, int ax, int az, int bx, int bz, int farbe, boolean angeheftet) {
-        return new Region(dimension, Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), farbe, angeheftet);
+    private static Region region(String dimension, int ax, int az, int bx, int bz, int farbe, boolean angeheftet, int ebene) {
+        return new Region(dimension, Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), farbe, angeheftet, ebene);
     }
 
     /** Dieselbe Region heisst: dieselbe Dimension und dieselben Ecken; Farbe und Anheften zählen nicht. */
@@ -554,7 +735,7 @@ final class Wegpunkte {
         if (gueltig == null || eigene.size() >= MAX_EIGENE_FORMEN) {
             return false;
         }
-        eigene.add(new EigeneForm(dimension, gueltig, farbe(dimension), false, null, KEIN_HEX));
+        eigene.add(new EigeneForm(dimension, gueltig, farbe(dimension), false, null, KEIN_HEX, BASE));
         schreibe();
         return true;
     }
@@ -572,7 +753,7 @@ final class Wegpunkte {
         if (gueltig == null) {
             eigene.remove(i);
         } else {
-            eigene.set(i, new EigeneForm(f.dimension(), gueltig, f.farbe(), f.angeheftet(), f.name(), f.hex()));
+            eigene.set(i, new EigeneForm(f.dimension(), gueltig, f.farbe(), f.angeheftet(), f.name(), f.hex(), f.ebene()));
         }
         schreibe();
         return true;
@@ -593,7 +774,7 @@ final class Wegpunkte {
         if (!f.angeheftet() && angeheftet() >= MAX_ANGEHEFTET) {
             return false;
         }
-        eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), !f.angeheftet(), f.name(), f.hex()));
+        eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), !f.angeheftet(), f.name(), f.hex(), f.ebene()));
         schreibe();
         return true;
     }
@@ -602,7 +783,7 @@ final class Wegpunkte {
     void benenne(EigeneForm f, String name) {
         int i = eigene.indexOf(f);
         if (i >= 0) {
-            eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), name(name), f.hex()));
+            eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), name(name), f.hex(), f.ebene()));
             schreibe();
         }
     }
@@ -611,7 +792,7 @@ final class Wegpunkte {
     void faerbe(EigeneForm f, int hex) {
         int i = eigene.indexOf(f);
         if (i >= 0) {
-            eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), hex));
+            eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), hex, f.ebene()));
             schreibe();
         }
     }
@@ -678,7 +859,7 @@ final class Wegpunkte {
         for (int i = 0; i < punkte.size(); i++) {
             Punkt p = punkte.get(i);
             if (p.id() <= 0 || !gesehen.add(p.id())) {
-                punkte.set(i, new Punkt(naechsteId++, p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod()));
+                punkte.set(i, new Punkt(naechsteId++, p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), p.ebene()));
             }
         }
     }
@@ -693,7 +874,7 @@ final class Wegpunkte {
             return false;
         }
         Punkt alt = punkte.get(i);
-        punkte.set(i, new Punkt(alt.id(), alt.dimension(), x, z, alt.farbe(), alt.angeheftet(), alt.tod()));
+        punkte.set(i, new Punkt(alt.id(), alt.dimension(), x, z, alt.farbe(), alt.angeheftet(), alt.tod(), alt.ebene()));
         schreibe();
         return true;
     }
@@ -703,7 +884,7 @@ final class Wegpunkte {
         int i = finde(p.dimension(), p.x(), p.z());
         if (i >= 0) {
             Punkt alt = punkte.get(i);
-            punkte.set(i, new Punkt(alt.id(), alt.dimension(), alt.x(), alt.z(), alt.farbe(), !alt.angeheftet(), alt.tod()));
+            punkte.set(i, new Punkt(alt.id(), alt.dimension(), alt.x(), alt.z(), alt.farbe(), !alt.angeheftet(), alt.tod(), alt.ebene()));
             schreibe();
         }
     }
@@ -721,7 +902,7 @@ final class Wegpunkte {
         if (!alt.angeheftet() && angeheftet() >= MAX_ANGEHEFTET) {
             return false;
         }
-        regionen.set(i, new Region(alt.dimension(), alt.x0(), alt.z0(), alt.x1(), alt.z1(), alt.farbe(), !alt.angeheftet()));
+        regionen.set(i, new Region(alt.dimension(), alt.x0(), alt.z0(), alt.x1(), alt.z1(), alt.farbe(), !alt.angeheftet(), alt.ebene()));
         schreibe();
         return true;
     }
@@ -937,8 +1118,11 @@ final class Wegpunkte {
         angeheftetOrte = Collections.newSetFromMap(new IdentityHashMap<>());
         angeheftetOrte.addAll(orte);
         List<Ebenen.Form> aufKarte = new ArrayList<>(), aufMinimap = new ArrayList<>();
-        regionen.stream().filter(Region::angeheftet).map(Wegpunkte::flaeche).forEach(aufMinimap::add);
+        regionen.stream().filter(r -> r.angeheftet() && an(r.ebene())).map(Wegpunkte::flaeche).forEach(aufMinimap::add);
         for (EigeneForm f : this.eigene) {
+            if (!an(f.ebene())) {
+                continue;
+            }
             double[] p = mitten(f);
             Ebenen.Form form = form(f, p);
             Ebenen.Schrift name = schrift(f, p);
