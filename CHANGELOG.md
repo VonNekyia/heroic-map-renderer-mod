@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.47
+
+- **Notes at the bottom left go away.** A note on the full map, such as a shape that could not be saved, now disappears after five seconds or at your next click or key press, instead of staying until you close the map.
+
 ## 0.2.46
 
 - **Pick any color for your lines and regions.** Right-click a shape's handle and choose "Color…": type a color like `#3A7FD5` and press Enter. It shows everywhere the shape does, on both maps and in the veil. Leave it empty to go back to the color from the list.

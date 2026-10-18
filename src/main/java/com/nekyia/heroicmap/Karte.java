@@ -84,8 +84,13 @@ final class Karte extends Screen {
     /** Wonach das Ziel unter dem Zeiger zuletzt gesucht wurde, und was gefunden. */
     private double[] suche;
     private Tafeln.Ziel gefunden;
-    /** Was beim letzten Knopf schiefging, oder null. */
+    /**
+     * Was beim letzten Knopf oder Schritt schiefging, oder null, und seit wann es dasteht; nach {@link #HINWEIS_MS} oder beim
+     * nächsten Klick oder Tastendruck ist es weg. Siehe docs/vollbildkarte.md, „Bedienung“.
+     */
     private Component hinweis;
+    private long hinweisSeit;
+    static final long HINWEIS_MS = 5000;
     /** Wo die Knöpfe rechts oben beginnen und enden; Marken und Namen weichen ihnen aus. */
     private int knopfX, knopfUnten;
     /** {@link Downloads#stufen()} beim letzten Nachsehen; ohne Satz sieht die Karte nach, wenn es sich ändert. */
@@ -231,7 +236,7 @@ final class Karte extends Screen {
             // Der Baum ist der Ordner über dem Massstab.
             baum = satz.ordner().getParent().getFileName().toString();
             abgleich = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.abgleich"),
-                    b -> hinweis = Downloads.INSTANZ.frageAbgleich(baum)).bounds(x, 28, KNOPF, 20).build());
+                    b -> zeige(Downloads.INSTANZ.frageAbgleich(baum))).bounds(x, 28, KNOPF, 20).build());
             unterster = abgleich;
         }
         // Wer sich verirrt hat, kommt zum eigenen Spieler zurück; Stufe und Lupe bleiben. Siehe docs/vollbildkarte.md, „Bedienung“.
@@ -442,6 +447,9 @@ final class Karte extends Screen {
         int[] block = block(mausX, mausY);
         g.text(font, Component.literal(satz.name() + "   ").append(Component.translatable("heroicmap.koordinaten", block[0], block[1])),
                 4, height - 12, TEXT);
+        if (hinweis != null && Util.getMillis() - hinweisSeit >= HINWEIS_MS) {
+            hinweis = null;
+        }
         if (hinweis != null) {
             g.text(font, hinweis, 4, height - 24, TEXT);
         }
@@ -746,6 +754,12 @@ final class Karte extends Screen {
         return zug == null ? null : List.copyOf(zug);
     }
 
+    /** Zeigt {@code text} unten links, bis {@link #HINWEIS_MS} um sind oder der Spieler klickt oder eine Taste drückt; auch für den Gametest. */
+    void zeige(Component text) {
+        hinweis = text;
+        hinweisSeit = Util.getMillis();
+    }
+
     /** Für den Gametest: der Text im Eingabefeld, oder null, wenn es zu ist. */
     String eingabe() {
         return eingabe == null ? null : eingabe.getValue();
@@ -995,10 +1009,10 @@ final class Karte extends Screen {
             if (zugAus != null) {
                 // Im Bau gelöscht oder sonst geändert: Dann findet ersetze sie nicht, und die neuen Ecken gingen still verloren.
                 if (!Wegpunkte.INSTANZ.ersetze(zugAus, zug)) {
-                    hinweis = Component.translatable("heroicmap.karte.form_weg");
+                    zeige(Component.translatable("heroicmap.karte.form_weg"));
                 }
             } else if (!Wegpunkte.INSTANZ.setzeForm(zugDimension, zug)) {
-                hinweis = Component.translatable("heroicmap.karte.formen_voll", Wegpunkte.MAX_EIGENE_FORMEN);
+                zeige(Component.translatable("heroicmap.karte.formen_voll", Wegpunkte.MAX_EIGENE_FORMEN));
             }
         }
         zug = null;
@@ -1076,6 +1090,8 @@ final class Karte extends Screen {
      */
     @Override
     public boolean mouseClicked(MouseButtonEvent e, boolean doppeltNachZeit) {
+        // Der nächste Klick nimmt den Hinweis weg; was er selbst meldet, kommt danach.
+        hinweis = null;
         // Das Spiel meldet einen Doppelklick nach Zeit und Taste, nicht nach dem Ort; er zählt nur nah am vorigen Druckpunkt.
         // Siehe docs/wegpunkte.md, „Bedienung“.
         boolean doppelt = doppeltNachZeit && Math.hypot(e.x() - druckX, e.y() - druckY) <= ZUG;
@@ -1148,7 +1164,7 @@ final class Karte extends Screen {
             if (doppelt && s.equals(vorigerSchalter)) {
                 int uebrig = Wegpunkte.INSTANZ.alleUmschalten(Ebenen.INSTANZ, s.ebene());
                 if (uebrig > 0) {
-                    hinweis = Component.translatable("heroicmap.karte.ebene_voll", uebrig, Wegpunkte.MAX_ANGEHEFTET, Wegpunkte.MAX_NADELN_ANGEHEFTET);
+                    zeige(Component.translatable("heroicmap.karte.ebene_voll", uebrig, Wegpunkte.MAX_ANGEHEFTET, Wegpunkte.MAX_NADELN_ANGEHEFTET));
                 }
             } else {
                 letzterSchalter = s;
@@ -1259,7 +1275,7 @@ final class Karte extends Screen {
     /** Sagt unten links mit {@code text}, wenn schon {@code grenze} angeheftet sind und nichts geschah. */
     private void anheften(boolean geschehen, String text, int grenze) {
         if (!geschehen) {
-            hinweis = Component.translatable(text, grenze);
+            zeige(Component.translatable(text, grenze));
         }
     }
 
@@ -1708,6 +1724,7 @@ final class Karte extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent ereignis) {
+        hinweis = null;
         // Solange das Eingabefeld offen ist, gehört ihm jede Taste, auch die der Karte: Enter speichert, Escape bricht nur die
         // Eingabe ab. Siehe docs/wegpunkte.md, „Namen“.
         if (eingabe != null) {

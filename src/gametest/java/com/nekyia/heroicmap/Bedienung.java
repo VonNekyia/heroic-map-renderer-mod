@@ -146,6 +146,7 @@ public final class Bedienung implements FabricClientGameTest {
         schweben(context, maus, k);
         namen(context, maus, k);
         farbe(context, maus, k);
+        hinweisWeg(context, maus, k);
         ebenen(context, maus, k);
         zumSpieler(context, maus, k);
         optionen(context, maus, k);
@@ -735,7 +736,7 @@ public final class Bedienung implements FabricClientGameTest {
             // „Form löschen“ in der Region, an der Mitte ihrer drei Ecken.
             double[] e1 = ecke(context, formen, 1), e2 = ecke(context, formen, 2);
             eintrag(context, maus, k, (start[0] + e1[0] + e2[0]) / 3, (start[1] + e1[1] + e2[1]) / 3, "heroicmap.karte.form_loeschen");
-            eintrag(context, maus, k, neuOrt[0] + 30, neuOrt[1], "heroicmap.karte.form_fertig");
+            long fertig = eintrag(context, maus, k, neuOrt[0] + 30, neuOrt[1], "heroicmap.karte.form_fertig");
             context.waitTicks(2);
             String hinweis = context.computeOnClient(mc -> {
                 Component h = ((Karte) mc.gui.screen()).hinweis();
@@ -745,6 +746,17 @@ public final class Bedienung implements FabricClientGameTest {
                     || context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size()) != formen + 1) {
                 throw new AssertionError("„Form fertig“ nach „Form löschen“ im Bau: Hinweis „" + hinweis + "“, Formen "
                         + context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size()) + " statt " + (formen + 1));
+            }
+            // Ohne Klick und Taste steht er nach 4 s noch und ist nach gut 5 s weg (docs/vollbildkarte.md, „Bedienung“).
+            while (Util.getMillis() < fertig + Karte.HINWEIS_MS - 1000) {
+                context.waitTick();
+            }
+            String nach4 = hinweis(context);
+            while (Util.getMillis() < fertig + Karte.HINWEIS_MS + 300) {
+                context.waitTick();
+            }
+            if (!nach4.equals(hinweis) || !"null".equals(hinweis(context))) {
+                throw new AssertionError("Hinweis nach 4 s „" + nach4 + "“, nach 5,3 s „" + hinweis(context) + "“");
             }
 
             // Eine Linie mit zwei Ecken fällt beim Löschen einer weg; sie ist jetzt die erste neue Form.
@@ -1008,7 +1020,6 @@ public final class Bedienung implements FabricClientGameTest {
             frei(context, new double[][] {g});
             double[] ort = {g[0], g[1] + 8 * 4};
             int vorher = dunkle(context.takeScreenshot(TestScreenshotOptions.of("namen-vorher").disableCounterPrefix()), k, ort, 12);
-            String hinweis = hinweis(context);
 
             eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.name");
             String leer = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe());
@@ -1077,9 +1088,9 @@ public final class Bedienung implements FabricClientGameTest {
             if (name(context, formen) != null) {
                 throw new AssertionError("Leer und Enter liess den Namen: " + name(context, formen));
             }
-            // Umbenennen und Ziehen melden nichts unten links; dort steht noch, was vorher stand.
-            if (!hinweis.equals(hinweis(context))) {
-                throw new AssertionError("Der Hinweis unten links wechselte von „" + hinweis + "“ zu „" + hinweis(context) + "“");
+            // Umbenennen und Ziehen melden nichts unten links.
+            if (!"null".equals(hinweis(context))) {
+                throw new AssertionError("Nach Umbenennen und Ziehen steht unten links „" + hinweis(context) + "“");
             }
         } finally {
             context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size())
@@ -1157,6 +1168,27 @@ public final class Bedienung implements FabricClientGameTest {
             context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size())
                     .forEach(Wegpunkte.INSTANZ::loesche));
             context.waitTicks(2);
+        }
+    }
+
+    /**
+     * Ein Hinweis unten links geht beim nächsten Klick auf die Karte und bei der nächsten Taste weg, nicht erst nach 5 s. Siehe
+     * docs/vollbildkarte.md, „Bedienung“.
+     */
+    private static void hinweisWeg(ClientGameTestContext context, TestInput maus, int k) {
+        double[] ort = context.computeOnClient(mc -> new double[] {60, mc.getWindow().getGuiScaledHeight() - 60});
+        frei(context, new double[][] {ort});
+        context.runOnClient(mc -> ((Karte) mc.gui.screen()).zeige(Component.literal("Probe")));
+        spielerKlick(context, maus, k, ort[0], ort[1]);
+        if (!"null".equals(hinweis(context))) {
+            throw new AssertionError("Ein Klick auf die Karte liess den Hinweis stehen: " + hinweis(context));
+        }
+        context.runOnClient(mc -> ((Karte) mc.gui.screen()).zeige(Component.literal("Probe")));
+        context.waitTicks(2);
+        maus.pressKey(InputConstants.KEY_LSHIFT);
+        context.waitTicks(2);
+        if (!"null".equals(hinweis(context)) || !(context.computeOnClient(mc -> mc.gui.screen()) instanceof Karte)) {
+            throw new AssertionError("Eine Taste liess den Hinweis stehen oder schloss die Karte: " + hinweis(context));
         }
     }
 
