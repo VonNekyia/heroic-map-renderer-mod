@@ -101,6 +101,12 @@ final class Karte extends Screen {
     private final List<EckeAn> ecken = new ArrayList<>();
     private final List<GriffAn> griffe = new ArrayList<>();
     private GriffAn griffGedrueckt, griffHaengt;
+    /** Was die Maus gerade hervorhebt, höchstens eins davon; siehe {@link #schwebe}. */
+    private Marke ueberMarke;
+    private EckeAn ueberEcke;
+    private GriffAn ueberGriff;
+    /** Der helle Rand von dem, was unter der Maus liegt. */
+    private static final int HELL = 0xFFFFFFFF;
     private final Formen.Speicher gezogenSpeicher = new Formen.Speicher();
     /** Die Marke des letzten Klicks, wenn es einer auf eine Marke war; ein Doppelklick heftet sie an. */
     private Marke letzte;
@@ -137,11 +143,11 @@ final class Karte extends Screen {
     record Marke(float x, float y, float halb, double weltX, double weltZ, UUID spieler, Wegpunkte.Punkt punkt, Wegpunkte.Region region) {
     }
 
-    /** Die Ecke {@code index} der eigenen Form {@code form}, auf dem Schirm bei (x, y) in Einheiten des GUI. */
     /** Der Griff in der Mitte einer eigenen Form auf dem Schirm, in Einheiten des GUI. */
     record GriffAn(Wegpunkte.EigeneForm form, float x, float y) {
     }
 
+    /** Die Ecke {@code index} der eigenen Form {@code form}, auf dem Schirm bei (x, y) in Einheiten des GUI. */
     record EckeAn(Wegpunkte.EigeneForm form, int index, float x, float y) {
     }
 
@@ -388,6 +394,7 @@ final class Karte extends Screen {
         }
         // Die gezogene Form zeichnet die Karte selbst an der Maus; an ihrem alten Ort fällt sie solange weg.
         Wegpunkte.INSTANZ.ziehe(gezogeneForm());
+        schwebe(mausX, mausY);
         // Ein Klick auf eine Marke zentriert erst, wenn kein zweiter folgt; so bewegt ein Doppelklick die Karte nicht.
         if (wartend != null && Util.getMillis() - wartendSeit >= MouseHandler.DOUBLE_CLICK_THRESHOLD_MS) {
             zentriere(wartend.weltX(), wartend.weltZ());
@@ -474,6 +481,20 @@ final class Karte extends Screen {
         }
     }
 
+    /**
+     * Was unter der Maus hervorgehoben steht, so wie ein Klick es träfe: ein Wegpunkt oder die Raute eines alten Rechtecks vor
+     * einer Ecke vor einem Griff, nach den Lagen des letzten Frames. Nichts, solange ein Menü offen ist, etwas gezogen wird
+     * oder die Maus über einem Knopf oder der Tafel steht. Siehe docs/wegpunkte.md, „Bedienung“.
+     */
+    private void schwebe(int mausX, int mausY) {
+        boolean frei = ziel == null && gezogeneForm() == null && haengt == null && !(taste && gezogen > ZUG)
+                && getChildAt(mausX, mausY).isEmpty() && !drin(tafelKasten, mausX, mausY);
+        Marke m = frei ? treffer(mausX, mausY) : null;
+        ueberMarke = m != null && (m.punkt() != null || m.region() != null) ? m : null;
+        ueberEcke = frei && m == null ? eckeUnter(mausX, mausY) : null;
+        ueberGriff = frei && m == null && ueberEcke == null ? griffUnter(mausX, mausY) : null;
+    }
+
     /** Die eigene Form, die gerade an einer Ecke oder am Griff an der Maus hängt, oder null. */
     private Wegpunkte.EigeneForm gezogeneForm() {
         return eckeHaengt != null ? eckeHaengt.form() : griffHaengt != null ? griffHaengt.form() : null;
@@ -527,13 +548,16 @@ final class Karte extends Screen {
         for (Wegpunkte.Region r : Wegpunkte.INSTANZ.regionen()) {
             if (r.dimension().equals(dimension)) {
                 Marke m = marke((r.x0() + r.x1() + 1) / 2.0, (r.z0() + r.z1() + 1) / 2.0, null, null, r);
-                Minimap.wegpunkt(g, m.x(), m.y(), Minimap.KOPF, Wegpunkte.FARBEN[r.farbe()], r.angeheftet() ? bunt : 0);
+                boolean hell = ueberMarke != null && r.equals(ueberMarke.region());
+                Minimap.wegpunkt(g, m.x(), m.y(), Minimap.KOPF, Wegpunkte.FARBEN[r.farbe()], hell ? HELL : r.angeheftet() ? bunt : 0);
             }
         }
         for (Wegpunkte.Punkt p : Wegpunkte.INSTANZ.punkte()) {
             if (p.dimension().equals(dimension) && !p.equals(haengt)) {
                 Marke m = marke(p.x() + 0.5, p.z() + 0.5, null, p);
-                Minimap.wegpunkt(g, m.x(), m.y(), Minimap.KOPF, Wegpunkte.FARBEN[p.farbe()], p.angeheftet() ? bunt : 0);
+                // Unter der Maus mit hellem Rand, auch angeheftet: Dann weicht der bunte Rand so lange.
+                boolean hell = ueberMarke != null && p.equals(ueberMarke.punkt());
+                Minimap.wegpunkt(g, m.x(), m.y(), Minimap.KOPF, Wegpunkte.FARBEN[p.farbe()], hell ? HELL : p.angeheftet() ? bunt : 0);
             }
         }
         // Mitspieler mit Namen. Siehe docs/minimap.md, „Mitspieler“.
@@ -811,20 +835,23 @@ final class Karte extends Screen {
             for (int i = 0; i < f.ecken().size(); i++) {
                 float[] s = schirm(p[2 * i], p[2 * i + 1]);
                 ecken.add(new EckeAn(f, i, s[0], s[1]));
-                raute(g, s[0], s[1], farbe);
+                raute(g, s[0], s[1], farbe, ueberEcke != null && ueberEcke.form() == f && ueberEcke.index() == i ? HELL : 0xFF000000);
             }
             double[] m = Wegpunkte.griff(p, f.region());
             float[] s = schirm(m[0], m[1]);
             griffe.add(new GriffAn(f, s[0], s[1]));
-            griff(g, s[0], s[1], farbe);
+            griff(g, s[0], s[1], farbe, ueberGriff != null && ueberGriff.form() == f ? HELL : 0xFF000000);
         }
     }
 
-    /** Der Griff in der Mitte einer eigenen Form: ein Quadrat in ihrer Farbe mit dunklem Rand und hellem Kern, grösser als eine Ecke. */
-    private static void griff(GuiGraphicsExtractor g, float x, float y, int farbe) {
+    /**
+     * Der Griff in der Mitte einer eigenen Form: ein Quadrat in ihrer Farbe mit hellem Kern, grösser als eine Ecke, mit dem
+     * Rand {@code rand}, dunkel oder unter der Maus hell.
+     */
+    private static void griff(GuiGraphicsExtractor g, float x, float y, int farbe, int rand) {
         g.pose().pushMatrix();
         g.pose().translate(x, y);
-        g.fill(-3, -3, 3, 3, 0xFF000000);
+        g.fill(-3, -3, 3, 3, rand);
         g.fill(-2, -2, 2, 2, farbe | 0xFF000000);
         g.fill(-1, -1, 1, 1, 0xFFFFFFFF);
         g.pose().popMatrix();
@@ -846,10 +873,15 @@ final class Karte extends Screen {
 
     /** Eine kleine Raute bei (x, y) in {@code farbe}, mit dunklem Rand, der sie auf jeder Karte zeigt. */
     private static void raute(GuiGraphicsExtractor g, float x, float y, int farbe) {
+        raute(g, x, y, farbe, 0xFF000000);
+    }
+
+    /** Wie {@link #raute(GuiGraphicsExtractor, float, float, int)}, mit dem Rand {@code rand}, unter der Maus hell. */
+    private static void raute(GuiGraphicsExtractor g, float x, float y, int farbe, int rand) {
         g.pose().pushMatrix();
         g.pose().translate(x, y);
         g.pose().rotate((float) (Math.PI / 4));
-        g.fill(-2, -2, 2, 2, 0xFF000000);
+        g.fill(-2, -2, 2, 2, rand);
         g.fill(-1, -1, 1, 1, farbe | 0xFF000000);
         g.pose().popMatrix();
     }
