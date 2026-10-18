@@ -4,8 +4,8 @@ plugins {
     alias(libs.plugins.fabric.loom)
 }
 
-// Sodium nur für die Gametests mit -Psodium, aus dem Maven von Modrinth und von dort nichts sonst.
-// Siehe docs/entscheidungen/0017-gametests-in-der-ci-auch-mit-sodium.md.
+// Sodium nur für die Gametests mit -Psodium, BetterF3 samt Cloth Config mit -Pbetterf3, aus dem Maven von Modrinth
+// und von dort nichts sonst. Siehe docs/entscheidungen/0017-gametests-in-der-ci-auch-mit-sodium.md und docs/minimap.md, „Bei F3“.
 repositories {
     exclusiveContent {
         forRepository { maven("https://api.modrinth.com/maven") { name = "Modrinth" } }
@@ -13,9 +13,12 @@ repositories {
     }
 }
 val sodium = configurations.create("sodium") { isTransitive = false }
+val betterf3 = configurations.create("betterf3") { isTransitive = false }
 
 dependencies {
     sodium(libs.sodium)
+    betterf3(libs.betterf3)
+    betterf3(libs.cloth.config)
     minecraft(libs.minecraft)
     implementation(libs.fabric.loader)
     implementation(libs.fabric.api)
@@ -70,8 +73,15 @@ val messung = providers.gradleProperty("messung").map { file(it).absolutePath }.
 val uebernahme = providers.gradleProperty("uebernahme").map { file(it).absolutePath }.orElse("")
 val server = providers.gradleProperty("server").orElse("")
 val mitSodium = providers.gradleProperty("sodium").isPresent
-val sodiumJar = files(sodium)
-val sodiumSha256 = libs.versions.sodium.sha256.get()
+val mitBetterF3 = providers.gradleProperty("betterf3").isPresent
+val zusatzJars = files().apply {
+    if (mitSodium) from(sodium)
+    if (mitBetterF3) from(betterf3)
+}
+val zusatzSha256 = buildSet {
+    if (mitSodium) add(libs.versions.sodium.sha256.get())
+    if (mitBetterF3) addAll(listOf(libs.versions.betterf3.sha256.get(), libs.versions.cloth.config.sha256.get()))
+}
 tasks.matching { it.name == "runClientGameTest" }.configureEach {
     (this as JavaExec).systemProperty("heroicmap.bilder", bilder.get())
     systemProperty("heroicmap.messung", messung.get())
@@ -83,16 +93,18 @@ tasks.matching { it.name == "runClientGameTest" }.configureEach {
     systemProperty("heroicmap.server", server.get())
     val zusatz = providers.gradleProperty("zusatzmods").orNull?.let { file(it).absolutePath }
     zusatz?.let { systemProperty("fabric.addMods", it) }
-    if (mitSodium) {
+    if (mitSodium || mitBetterF3) {
         // Lokale Kopien: Die Aktion darf das Skript nicht festhalten, sonst geht der Configuration Cache nicht.
-        val jars = sodiumJar
-        val soll = sodiumSha256
-        // Erst die Prüfsumme, dann ins Spiel: Ein anderes Jar unter derselben Version bricht den Lauf ab.
+        val jars = zusatzJars
+        val soll = zusatzSha256
+        // Erst die Prüfsummen, dann ins Spiel: Ein anderes Jar unter derselben Version bricht den Lauf ab.
         doFirst {
-            val jar = jars.singleFile
-            val sha = MessageDigest.getInstance("SHA-256").digest(jar.readBytes()).joinToString("") { "%02x".format(it) }
-            check(sha == soll) { "${jar.name}: SHA-256 $sha statt $soll" }
-            (this as JavaExec).systemProperty("fabric.addMods", listOfNotNull(zusatz, jar.absolutePath).joinToString(File.pathSeparator))
+            val pfade = jars.files.map { jar ->
+                val sha = MessageDigest.getInstance("SHA-256").digest(jar.readBytes()).joinToString("") { "%02x".format(it) }
+                check(sha in soll) { "${jar.name}: SHA-256 $sha steht nicht in libs.versions.toml" }
+                jar.absolutePath
+            }
+            (this as JavaExec).systemProperty("fabric.addMods", (listOfNotNull(zusatz) + pfade).joinToString(File.pathSeparator))
         }
     }
     // Der Server-Fall von Blockentities nur mit einer eula.txt, die ein Mensch angenommen hat; der Test kopiert sie unverändert.

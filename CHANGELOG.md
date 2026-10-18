@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.43
+
+- **"On F3" works with BetterF3.** BetterF3 keeps the debug screen switched on while it slides out, so the minimap stayed centered or hidden until the animation ended; now it returns as soon as you press F3.
+
 ## 0.2.42
 
 - **Lines and regions follow while you drag a corner.** Hold a corner for half a second and move it: the shape moves with it right away, instead of jumping into place when you let go.
