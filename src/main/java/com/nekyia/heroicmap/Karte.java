@@ -773,7 +773,8 @@ final class Karte extends Screen {
     }
 
     List<Component> eintraege() {
-        return eintraege.stream().map(Eintrag::text).toList();
+        // Nur, solange ein Menü offen ist: Sonst läse der Test die Einträge des vorigen.
+        return ziel == null ? List.of() : eintraege.stream().map(Eintrag::text).toList();
     }
 
     /**

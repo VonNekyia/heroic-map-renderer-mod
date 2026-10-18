@@ -544,18 +544,9 @@ public final class Bedienung implements FabricClientGameTest {
         if (flaeche.contains(loeschen) || !flaeche.contains(context.computeOnClient(mc -> Component.translatable("heroicmap.karte.wegpunkt").getString()))) {
             throw new AssertionError("Rechtsklick auf die Fläche der Region zeigt nicht nur das allgemeine Menü: " + flaeche);
         }
-        String umgebung = context.computeOnClient(mc -> {
-            Karte karte = (Karte) mc.gui.screen();
-            return "Griffe " + karte.griffe().stream().filter(g -> Math.hypot(g.x() - griff[0], g.y() - griff[1]) < 5).toList()
-                    + ", Ecken " + karte.ecken().stream().filter(e -> Math.hypot(e.x() - griff[0], e.y() - griff[1]) < 5).toList()
-                    + ", Marken " + karte.marken().stream().filter(m -> Math.hypot(m.x() - griff[0], m.y() - griff[1]) < 5).toList()
-                    + ", im Bau " + karte.zug();
-        });
-        try {
-            eintrag(context, maus, k, griff[0], griff[1], "heroicmap.karte.form_loeschen");
-        } catch (AssertionError e) {
-            throw new AssertionError(e.getMessage() + "; am Griff " + Arrays.toString(griff) + ": " + umgebung);
-        }
+        // Die Tafel der Region vom Server, die beim Rechtsklick auf die Fläche aufging, läge sonst über dem Griff.
+        tafelZu(context, maus, k);
+        eintrag(context, maus, k, griff[0], griff[1], "heroicmap.karte.form_loeschen");
         if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size()) != formen + 1) {
             throw new AssertionError("„Form löschen“ am Griff löschte die Region nicht");
         }
@@ -1075,6 +1066,18 @@ public final class Bedienung implements FabricClientGameTest {
     }
 
     /** Lässt die Tafel der grossen Region aufgehen, wo der Zeiger steht: Frage als gesendet, Antwort abgelegt. */
+    /** Fährt den Zeiger auf „Optionen“ unten rechts, wo er auf kein Ziel zeigt, bis eine offene Tafel zu ist. */
+    private static void tafelZu(ClientGameTestContext context, TestInput maus, int k) {
+        int[] schirm = context.computeOnClient(mc -> new int[] {mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight()});
+        fahre(context, maus, k, schirm[0] - 30, schirm[1] - 14);
+        for (int i = 0; i < 100 && context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelOffen()); i++) {
+            context.waitTick();
+        }
+        if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelOffen())) {
+            throw new AssertionError("Die Tafel ging über „Optionen“ nach 5 s nicht zu");
+        }
+    }
+
     private static void tafelDerRegion(ClientGameTestContext context) {
         context.waitTicks(3);
         context.runOnClient(mc -> Tafeln.INSTANZ.antwort(Tafeln.Antwort.lies(LAND)));
