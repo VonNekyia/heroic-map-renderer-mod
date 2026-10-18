@@ -304,7 +304,10 @@ Reviewer freigegeben.
   statt „Wegpunkt löschen“.
 - **Gezeichnet** als dunkle Raute mit hellem ✕ (`Minimap.TOD`,
   `Minimap.TOD_KREUZ`), auf Vollbildkarte und Minimap; sein Strahl ist
-  dunkel. Eine Farbe aus der Liste nimmt er nicht; der nächste Wegpunkt
+  dunkel. Die Arme des ✕ sind 5 Sechzehntel der Marke lang und 0,75 dick;
+  mit 1 lief es bei GUI-Massstab 2 zu einem hellen Fleck zusammen, wie
+  ein Nachstellen der Pixel zeigte (ein Pixel gilt, wenn seine Mitte im
+  Viereck liegt). Eine Farbe aus der Liste nimmt er nicht; der nächste Wegpunkt
   bekommt sie, als gäbe es ihn nicht.
 - **Im Chat** steht „Todespunkt gesetzt bei x z“, unterstrichen. Ein Klick
   darauf ruft `/hmap karte x z`, siehe [Download](download.md), „Befehle“;
