@@ -762,8 +762,8 @@ public final class Bedienung implements FabricClientGameTest {
         // Rechts unter der Mitte, wo sonst nichts liegt; ein Block sind 4 Einheiten.
         int bx = mitte[0] + 12, bz = mitte[1] + 8;
         List<Wegpunkte.Ecke> linie = List.of(new Wegpunkte.Ecke(bx, bz), new Wegpunkte.Ecke(bx + 10, bz));
-        List<Wegpunkte.Ecke> region = List.of(new Wegpunkte.Ecke(bx, bz + 16), new Wegpunkte.Ecke(bx + 6, bz + 16),
-                new Wegpunkte.Ecke(bx + 6, bz + 22), new Wegpunkte.Ecke(bx, bz + 22));
+        List<Wegpunkte.Ecke> region = List.of(new Wegpunkte.Ecke(bx, bz + 12), new Wegpunkte.Ecke(bx + 6, bz + 12),
+                new Wegpunkte.Ecke(bx + 6, bz + 18), new Wegpunkte.Ecke(bx, bz + 18));
         try {
             context.runOnClient(mc -> {
                 String dimension = mc.level.dimension().identifier().toString();
@@ -774,7 +774,7 @@ public final class Bedienung implements FabricClientGameTest {
             double[] a = ecke(context, formen, 0), b = ecke(context, formen, 1);
             frei(context, new double[][] {a, b, griff(context, formen + 1)});
 
-            // Die zweite Ecke der Linie halten und 12 Einheiten nach unten ziehen, ohne loszulassen.
+            // Die zweite Ecke der Linie halten und 20 Einheiten nach unten ziehen, ohne loszulassen.
             warte250();
             maus.setCursorPos(b[0] * k, b[1] * k);
             context.waitTick();
@@ -785,20 +785,22 @@ public final class Bedienung implements FabricClientGameTest {
                 maus.releaseMouse(LINKS);
                 throw new AssertionError("Nach " + (Util.getMillis() - druck) + " ms gehalten hängt die Ecke der Linie nicht an der Maus");
             }
-            for (int i = 0; i < 4; i++) {
-                maus.moveCursor(0, 3 * k);
+            for (int i = 0; i < 5; i++) {
+                maus.moveCursor(0, 4 * k);
                 context.waitTick();
             }
             context.waitTicks(2);
             double[] an = ecke(context, formen, 1);
             Path bild = context.takeScreenshot(TestScreenshotOptions.of("form-live").disableCounterPrefix());
             int farbe = context.computeOnClient(mc -> Wegpunkte.FARBEN[Wegpunkte.INSTANZ.eigeneFormen().get(formen).farbe()]);
-            if (Math.abs(an[0] - b[0]) > 1 || Math.abs(an[1] - (b[1] + 12)) > 1) {
+            if (Math.abs(an[0] - b[0]) > 1 || Math.abs(an[1] - (b[1] + 20)) > 1) {
                 maus.releaseMouse(LINKS);
                 throw new AssertionError("Die gehaltene Ecke folgt der Maus nicht: " + Arrays.toString(an) + ", die Maus bei "
-                        + b[0] + "," + (b[1] + 12));
+                        + b[0] + "," + (b[1] + 20));
             }
-            boolean neuDa = linieDa(bild, k, (a[0] + an[0]) / 2, (a[1] + an[1]) / 2, farbe), altDa = linieDa(bild, k, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, farbe);
+            // Auf einem Viertel des Wegs, nicht der Hälfte: Dort sitzt der Griff. Alter und neuer Weg liegen dort 5 Einheiten auseinander.
+            boolean neuDa = linieDa(bild, k, a[0] + (an[0] - a[0]) / 4, a[1] + (an[1] - a[1]) / 4, farbe);
+            boolean altDa = linieDa(bild, k, a[0] + (b[0] - a[0]) / 4, a[1] + (b[1] - a[1]) / 4, farbe);
             if (!neuDa || altDa) {
                 maus.releaseMouse(LINKS);
                 throw new AssertionError("Die Linie folgt der gehaltenen Ecke nicht vor dem Loslassen: auf dem neuen Weg " + neuDa
@@ -807,8 +809,8 @@ public final class Bedienung implements FabricClientGameTest {
             maus.releaseMouse(LINKS);
             context.waitTicks(2);
             Wegpunkte.Ecke zweite = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
-            if (zweite.x() != bx + 10 || zweite.z() != bz + 3) {
-                throw new AssertionError("Nach dem Loslassen liegt die Ecke auf " + zweite + " statt " + new Wegpunkte.Ecke(bx + 10, bz + 3));
+            if (zweite.x() != bx + 10 || zweite.z() != bz + 5) {
+                throw new AssertionError("Nach dem Loslassen liegt die Ecke auf " + zweite + " statt " + new Wegpunkte.Ecke(bx + 10, bz + 5));
             }
 
             // Am Griff der Region halten und 8 Einheiten nach rechts und unten ziehen: Der Griff folgt, danach liegt alles 2 Blöcke weiter.
