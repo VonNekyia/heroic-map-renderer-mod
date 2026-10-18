@@ -52,7 +52,7 @@ steht unter „Kosten“.
 | Einstellung | Vorgabe | tut |
 |---|---|---|
 | Minimap | an | blendet die Minimap aus und ein |
-| Zoom der Minimap | 2× | 1, 2, 4 oder 8 Einheiten des GUI je Block: wie viel Gegend die Minimap zeigt |
+| Zoom der Minimap | 2× | 0,5, 1, 2, 4 oder 8 Einheiten des GUI je Block: wie viel Gegend die Minimap zeigt; im Menü ein Schieberegler mit einer Raste je Stufe |
 | Mitspieler | Simple Voice Chat | siehe „Mitspieler“ |
 | Knopf „Karte laden …“ | – | die Karten des Servers, wie in der [Vollbildkarte](vollbildkarte.md), „Bedienung“ |
 | Knopf „Kartenliste …“ | – | alle Karten auf der Platte mit Grösse und Summe in GB, mit Löschen, siehe [Download](download.md), „Kartenliste“ |
@@ -82,15 +82,20 @@ Den eigenen Spieler und den Rahmen stellt ein Klick auf die Minimap ein,
 nicht ein Knopf, siehe „Aussehen an der Minimap“.
 
 - **Zoom und Auflösung** sind getrennt. Der Zoom legt fest, wie viel
-  Gegend die Minimap zeigt: bei 128 Einheiten Seite 128 Blöcke bei 1×,
-  64 bei 2×, 32 bei 4×, 16 bei 8×. Die Auflösung ist eine Obergrenze für
+  Gegend die Minimap zeigt: bei 128 Einheiten Seite 256 Blöcke bei 0,5×,
+  128 bei 1×, 64 bei 2×, 32 bei 4×, 16 bei 8× (`Minimap.ZOOMS`). Die Auflösung ist eine Obergrenze für
   die Pixel je Block in den Texturen. Gezeichnet wird mit der grössten von
   1, 2, 4, 8 und 16 px bis dahin, die in die Pixel eines Blocks auf dem Schirm ganz
   aufgeht (`Minimap.effektiv`). Ein Block ist auf dem Schirm Zoom ×
   GUI-Massstab Pixel gross: bei 1× und GUI-Massstab 2 also 2, bei
   GUI-Massstab 3 also 3, dann zeichnet die Minimap mit 1 px, 3 Pixel je
   Texel. Das Spiel verkleinert die Texturen so nie; verkleinert war die
-  Minimap unscharf. Jeder Texel ist auf dem Schirm gleich gross. Mit einem
+  Minimap unscharf. Jeder Texel ist auf dem Schirm gleich gross. Nur bei
+  0,5× und ungeradem GUI-Massstab nicht: Bei GUI-Massstab 3 ist ein Block
+  1,5 Pixel, die Texel mit 1 px je Block sind dann abwechselnd 1 und 2
+  Pixel breit; bei GUI-Massstab 1 ist er ein halbes Pixel, dort verkleinert
+  das Spiel. Bei 2 und 4 bleibt es scharf. So hat es der Reviewer am 18.10.
+  entschieden, statt die Stufe nach dem GUI-Massstab zu wählen. Mit einem
   anderen GUI-Massstab oder Zoom passt sich die Auflösung im nächsten Frame
   an und zeichnet neu; ein anderer Zoom ändert sonst nur den Bereich.
 - **Lage und Grösse:** Das Menü dunkelt nicht ab, die Minimap im HUD bleibt
@@ -119,7 +124,7 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
 - **Knöpfe** stehen im grösseren freien Platz neben der Minimap, 200
   Einheiten breit oder schmaler, bis 120, wenn dort weniger Platz ist
   (`Einstellungen.spalte`), im Untermenü ebenso. Im Hauptmenü teilen sich
-  je zwei eine Zeile: „Minimap“ und „Zoom“, „Karte laden …“ und
+  je zwei eine Zeile: „Minimap“ und der Regler „Zoom der Minimap“, „Karte laden …“ und
   „Kartenliste …“, „Einstellungen …“ und „Fertig“; im Untermenü
   „Chunklinien“ und „Drehen“, „Verzierungen“ und „Koordinaten“, „Effekte in
   der Welt“ und der Regler „Schleier“, „Auflösung“ und „Todespunkt“,
@@ -144,13 +149,26 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
   bei einer anderen Fenstergrösse in ihrer Ecke. Die Seite steht als
   `groesse_anteil`. Fehlt die Datei oder ist ein Wert unlesbar, gilt die
   Vorgabe. Eine Datei von vor dem Zoom hat nur `massstab`; dann gilt er für
-  Auflösung und Zoom, der Ausschnitt bleibt. Eine Datei von vor dem Anteil
+  Auflösung und Zoom, der Ausschnitt bleibt. Der Zoom steht als ganze Zahl
+  wie bisher, 0,5 als `zoom=0.5`; eine ältere Version liest das nicht und
+  nimmt 2×. Eine Datei von vor dem Anteil
   hat `groesse` in Einheiten; sie gilt im ersten Schirm und wird dort zum
   Anteil, so springt nichts.
 - **Tasten:** Vorbelegt ist nur `.` für die
   [Vollbildkarte](vollbildkarte.md). „Minimap zeigen oder verbergen“ und
   „Zoom der Minimap“ gibt es auch als Tasten, ohne Belegung, unter
   Steuerung, Gruppe „Heroic Map“; was sie ändern, speichert der Mod gleich.
+  Die Taste für den Zoom geht reihum 0,5 → 1 → 2 → 4 → 8 → 0,5
+  (`Minimap.naechsterZoom`).
+- **Der Regler „Zoom der Minimap“** im Hauptmenü
+  (`Einstellungen.ZoomRegler`) ersetzt den Knopf, wie die Regler der
+  Spieleinstellungen, mit einer Raste je Stufe; dazwischen gibt es keinen
+  Zoom. Klick oder Ziehen stellt die nächste Raste, die Pfeiltasten gehen
+  je eine. Ein Mausrad am Zoom gibt es nicht; daran ändert sich nichts.
+- **Reichweite bei 0,5×:** Die Minimap zeigt 4× so viele Chunks wie bei
+  1×, bei 128 Einheiten Seite ±8 Chunks, bei der grössten Seite ±16
+  (`Minimap.reichweite`). Was jenseits der Sichtweite liegt, bleibt
+  dunkel wie heute am Rand.
 - **Der eigene Spieler** ist sein Kopf aus dem Skin mit schwarzem Rand,
   darüber ein kleiner Pfeil in Blickrichtung (`Minimap.avatar`), oder eine
   der anderen Darstellungen, siehe „Spieler“. Er ist

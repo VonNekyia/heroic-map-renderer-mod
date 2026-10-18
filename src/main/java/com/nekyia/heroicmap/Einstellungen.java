@@ -5,10 +5,12 @@ import java.util.List;
 import java.util.Objects;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.CommonComponents;
@@ -79,9 +81,7 @@ final class Einstellungen extends Screen {
         // Je zwei Knöpfe in einer Zeile; Vorlieben der Anzeige stehen im Untermenü.
         addRenderableWidget(CycleButton.onOffBuilder(m.sichtbar())
                 .create(x, y, halb, 20, Component.translatable("heroicmap.menue.minimap"), (b, an) -> m.setzeSichtbar(an)));
-        addRenderableWidget(CycleButton.builder((Integer z) -> Component.translatable("heroicmap.menue.fach", z), m.zoom())
-                .withValues(1, 2, 4, 8)
-                .create(x + breite - halb, y, halb, 20, Component.translatable("heroicmap.menue.zoom"), (b, z) -> m.setzeZoom(z)));
+        addRenderableWidget(new ZoomRegler(x + breite - halb, y, halb, m));
         // Gehen Mitspieler hier nicht, steht der Knopf rot und trägt den Grund als Tooltip.
         grund = Mitspieler.grund(Kanal.offen(), Mitspieler.INSTANZ.verweigert());
         CycleButton<Boolean> show = addRenderableWidget(CycleButton.booleanBuilder(rot(Component.translatable("heroicmap.menue.show.simplevoicechat")),
@@ -182,7 +182,8 @@ final class Einstellungen extends Screen {
         // In Pixeln des Schirms wie Minimap.zeichne.
         LocalPlayer p = minecraft.player;
         float a = Minimap.anteil(minecraft.level, p, minecraft.getDeltaTracker());
-        int k = minecraft.getWindow().getGuiScale(), n = r.seite() * k, block = m.zoom() * k;
+        int k = minecraft.getWindow().getGuiScale(), n = r.seite() * k;
+        double block = m.zoom() * k;
         int links = Minimap.ecke(p.xo, p.getX(), a, m.zoom(), k, n), oben = Minimap.ecke(p.zo, p.getZ(), a, m.zoom(), k, n);
         double ix = (mausX - r.x()) * k, iy = (mausY - r.y()) * k;
         int bx = Mth.floor((links + ix) / block), bz = Mth.floor((oben + iy) / block);
@@ -336,5 +337,49 @@ final class Einstellungen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    /**
+     * Der Zoom der Minimap als Schieberegler mit einer Raste je Stufe aus {@link Minimap#ZOOMS}, wie die Regler der
+     * Spieleinstellungen; die Pfeiltasten gehen je eine Raste. Siehe docs/minimap.md, „Bedienung“.
+     */
+    static final class ZoomRegler extends AbstractSliderButton {
+
+        private static final int RASTEN = Minimap.ZOOMS.length - 1;
+        private final Minimap minimap;
+
+        ZoomRegler(int x, int y, int breite, Minimap minimap) {
+            super(x, y, breite, 20, Component.empty(), (double) Math.max(0, Minimap.stufe(minimap.zoom())) / RASTEN);
+            this.minimap = minimap;
+            updateMessage();
+        }
+
+        private int raste() {
+            return (int) Math.round(value * RASTEN);
+        }
+
+        @Override
+        protected void updateMessage() {
+            double z = Minimap.ZOOMS[raste()];
+            Component fach = z == 0.5 ? Component.translatable("heroicmap.menue.fach_halb") : Component.translatable("heroicmap.menue.fach", (int) z);
+            setMessage(CommonComponents.optionNameValue(Component.translatable("heroicmap.menue.zoom"), fach));
+        }
+
+        @Override
+        protected void applyValue() {
+            // Nur auf den Rasten: zwischen zwei Stufen gibt es keinen Zoom.
+            value = (double) raste() / RASTEN;
+            minimap.setzeZoom(Minimap.ZOOMS[raste()]);
+        }
+
+        @Override
+        public boolean keyPressed(KeyEvent ereignis) {
+            int schritt = ereignis.key() == InputConstants.KEY_LEFT ? -1 : ereignis.key() == InputConstants.KEY_RIGHT ? 1 : 0;
+            if (schritt != 0 && active) {
+                setValue((double) Math.clamp(raste() + schritt, 0, RASTEN) / RASTEN);
+                return true;
+            }
+            return super.keyPressed(ereignis);
+        }
     }
 }

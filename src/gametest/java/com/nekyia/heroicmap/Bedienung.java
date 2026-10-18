@@ -1928,21 +1928,26 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("Am Griff gezogen: " + gezogen + " → " + groesser);
         }
 
-        // Der Zoom schaltet nur den Zoom.
-        int zoom = context.computeOnClient(mc -> Minimap.INSTANZ.zoom());
-        double[] knopf = context.computeOnClient(mc -> {
-            String text = Component.translatable("heroicmap.menue.zoom").getString();
+        // Der Regler „Zoom“: Ein Klick wie von Hand auf jede Raste stellt ihre Stufe, auch 0,5, und schaltet sonst nichts;
+        // zuletzt wieder die Stufe von vorher. Siehe docs/minimap.md, „Bedienung“.
+        double zoom = context.computeOnClient(mc -> Minimap.INSTANZ.zoom());
+        double[] regler = context.computeOnClient(mc -> {
             for (Object kind : mc.gui.screen().children()) {
-                if (kind instanceof AbstractWidget w && w.getMessage().getString().startsWith(text)) {
-                    return new double[] {w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0};
+                if (kind instanceof Einstellungen.ZoomRegler w) {
+                    return new double[] {w.getX(), w.getY() + w.getHeight() / 2.0, w.getWidth()};
                 }
             }
-            throw new AssertionError("Kein Knopf „Zoom“ im Menü");
+            throw new AssertionError("Kein Regler „Zoom“ im Menü");
         });
-        spielerKlick(context, maus, k, knopf[0], knopf[1]);
-        aussehenIst(context, Minimap.Darstellung.PFEIL, Skin.BIOM, "Klick auf Zoom");
-        if (context.computeOnClient(mc -> Minimap.INSTANZ.zoom()) == zoom) {
-            throw new AssertionError("Der Klick auf Zoom schaltete den Zoom nicht");
+        int rasten = Minimap.ZOOMS.length - 1;
+        for (int i : new int[] {4, 0, 1, 3, 2, Minimap.stufe(zoom)}) {
+            // Die Mitte des Griffs liegt bei x + 4 + Wert × (Breite − 8), wie im Spiel.
+            spielerKlick(context, maus, k, regler[0] + 4 + (regler[2] - 8) * i / rasten, regler[1]);
+            aussehenIst(context, Minimap.Darstellung.PFEIL, Skin.BIOM, "Klick auf den Regler Zoom");
+            double jetzt = context.computeOnClient(mc -> Minimap.INSTANZ.zoom());
+            if (jetzt != Minimap.ZOOMS[i]) {
+                throw new AssertionError("Klick auf die Raste " + i + " des Reglers Zoom: " + jetzt + " statt " + Minimap.ZOOMS[i]);
+            }
         }
 
         // Im Untermenü „Einstellungen …“ ebenso, ohne die Knöpfe „Spieler“ und „Rahmen“.

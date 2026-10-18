@@ -26,6 +26,43 @@ class MinimapTest {
         assertEquals(3, Minimap.reichweite(4, 128));
         assertEquals(10, Minimap.reichweite(1, 256));
         assertEquals(3, Minimap.reichweite(8, 128));
+        // Zoom 0,5: 128 Blöcke je Richtung, ±8 Chunks; bei der grössten Seite ±16.
+        assertEquals(10, Minimap.reichweite(0.5, 128));
+        assertEquals(18, Minimap.reichweite(0.5, 256));
+    }
+
+    @Test
+    void zoomStufenTasteUndDatei(@TempDir Path ordner) throws Exception {
+        Minimap m = new Minimap();
+        // Die Taste geht reihum, nach 8 wieder 0,5; eine Stufe ausserhalb gilt nicht.
+        double[] reihe = new double[6];
+        for (int i = 0; i < reihe.length; i++) {
+            reihe[i] = m.zoom();
+            m.naechsterZoom();
+        }
+        assertArrayEquals(new double[] {2, 4, 8, 0.5, 1, 2}, reihe);
+        double vor = m.zoom();
+        m.setzeZoom(3);
+        assertEquals(vor, m.zoom());
+        // 0,5 steht als 0.5 in der Datei, ganze Stufen wie bisher als ganze Zahl.
+        Path datei = ordner.resolve("heroicmap.properties");
+        m.setzeZoom(0.5);
+        m.schreibe(datei);
+        assertTrue(Files.readString(datei).contains("zoom=0.5"));
+        Minimap gelesen = new Minimap();
+        gelesen.lies(datei);
+        assertEquals(0.5, gelesen.zoom());
+        m.setzeZoom(4);
+        m.schreibe(datei);
+        java.util.Properties p = new java.util.Properties();
+        try (var r = Files.newBufferedReader(datei)) {
+            p.load(r);
+        }
+        assertEquals("4", p.getProperty("zoom"));
+        // Ein Wert, den es nicht gibt, gilt als Vorgabe.
+        Files.writeString(datei, "zoom=3");
+        gelesen.lies(datei);
+        assertEquals(2, gelesen.zoom());
     }
 
     @Test
@@ -339,6 +376,11 @@ class MinimapTest {
         // Zoom 8 bei GUI-Massstab 2: 16 Pixel je Block, 16 px gehen ganz auf.
         assertEquals(16, Minimap.effektiv(16, 8, 2));
         assertEquals(8, Minimap.effektiv(16, 4, 2));
+        // Zoom 0,5: bei GUI-Massstab 2 ein Pixel je Block, bei 4 zwei; bei 3 sind es 1,5, dann 1 px je Block.
+        assertEquals(1, Minimap.effektiv(4, 0.5, 2));
+        assertEquals(2, Minimap.effektiv(4, 0.5, 4));
+        assertEquals(1, Minimap.effektiv(4, 0.5, 3));
+        assertEquals(1, Minimap.effektiv(4, 0.5, 1));
         for (int a : new int[] {1, 2, 4, 8, 16}) {
             for (int z : new int[] {1, 2, 4, 8}) {
                 for (int k = 1; k <= 8; k++) {

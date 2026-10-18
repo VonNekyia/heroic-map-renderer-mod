@@ -117,6 +117,19 @@ public final class Bilder implements FabricClientGameTest {
                     schneide(context, bild, Path.of(AUSGABE, "minimap-" + scale + "px.png"));
                 }
             }
+            // Zoom 0,5 bei GUI-Massstab 2: ein Pixel je Block, die Minimap zeichnet mit 1 px fertig. Danach wieder wie zuletzt.
+            // Siehe docs/minimap.md, „Bedienung“.
+            context.runOnClient(mc -> Minimap.INSTANZ.setzeZoom(0.5));
+            context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
+            context.waitTicks(2);
+            Path halb = context.takeScreenshot(TestScreenshotOptions.of("minimap-zoom-halb").disableCounterPrefix());
+            Minimap.Rahmen r = context.computeOnClient(mc -> Minimap.INSTANZ.zuletzt());
+            int gs = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+            if (context.computeOnClient(mc -> Minimap.INSTANZ.scale()) != 1 || r == null || gezeichnet(halb, r, gs) < 0.9) {
+                throw new AssertionError("Zoom 0,5: Die Minimap zeichnet nicht mit 1 px je Block oder lässt die Mitte leer, siehe " + halb);
+            }
+            context.runOnClient(mc -> Minimap.INSTANZ.setzeZoom(4));
+            context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
             menue(context);
             rahmen(context);
             umriss(context);
@@ -1461,6 +1474,25 @@ public final class Bilder implements FabricClientGameTest {
      * Mod merkt sich dort Wegpunkte, Kartenlage und die eigene Karte, sonst brächte ein früherer Lauf
      * sie mit. Siehe docs/download.md, „Ablage“.
      */
+    /** Wie viel der inneren Hälfte der Minimap im Bild gezeichnet ist, nicht fast schwarz wie der leere Grund. */
+    private static double gezeichnet(Path bild, Minimap.Rahmen r, int gs) {
+        try {
+            BufferedImage b = ImageIO.read(bild.toFile());
+            int s = r.seite() * gs, x0 = r.x() * gs + s / 4, y0 = r.y() * gs + s / 4;
+            long voll = 0, alle = 0;
+            for (int y = y0; y < y0 + s / 2; y++) {
+                for (int x = x0; x < x0 + s / 2; x++) {
+                    int c = b.getRGB(x, y);
+                    voll += (c >> 16 & 0xFF) + (c >> 8 & 0xFF) + (c & 0xFF) > 60 ? 1 : 0;
+                    alle++;
+                }
+            }
+            return (double) voll / alle;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     static void leereWelt(ClientGameTestContext context) {
         context.runOnClient(mc -> {
             Path welt = Downloads.weltOrdner();

@@ -11,7 +11,7 @@ public final class Projektion {
     }
 
     /** Pixel zu einer Koordinate x oder z der Welt bei {@code scale} Pixeln je Block. */
-    public static double zuPixel(double welt, int scale) {
+    public static double zuPixel(double welt, double scale) {
         return welt * scale;
     }
 }

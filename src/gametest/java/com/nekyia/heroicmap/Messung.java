@@ -44,6 +44,8 @@ public final class Messung implements FabricClientGameTest {
     private static final String RAHMEN = System.getProperty("heroicmap.messung.rahmen", Skin.OHNE);
     /** Mit {@code -PmessungEffekte=true} nur die Läufe zu den Effekten in der Welt, siehe docs/wegpunkte.md, „Strahl“. */
     private static final boolean NUR_EFFEKTE = Boolean.getBoolean("heroicmap.messung.effekte");
+    /** Mit {@code -PmessungZoom=true} nur die Läufe zum Zoom 0,5 gegen 2, siehe docs/minimap.md, „Kosten“. */
+    private static final boolean NUR_ZOOM = Boolean.getBoolean("heroicmap.messung.zoom");
     /** Mit {@code -PmessungRegionen=<n>} so viele angeheftete Regionen für den Schleier, gleich verteilt bis 188 Blöcke halbe Seite. */
     private static final int REGIONEN = Integer.getInteger("heroicmap.messung.regionen", 47);
     private static final int SICHTWEITE = 12;
@@ -113,6 +115,11 @@ public final class Messung implements FabricClientGameTest {
                 schreibe();
                 return;
             }
+            if (NUR_ZOOM) {
+                zoom(context, server);
+                schreibe();
+                return;
+            }
             atlas(context);
             for (int scale : new int[] {1, 2, 4, 8, 16}) {
                 for (int runde = 1; runde <= RUNDEN; runde++) {
@@ -164,6 +171,48 @@ public final class Messung implements FabricClientGameTest {
 
         }
         schreibe();
+    }
+
+    /**
+     * Was Zoom 0,5 kostet gegen 2: 2 px, freie Bildrate, eckig, genordet; zuerst die Zeit nach dem Wechsel, bis die
+     * Minimap ganz gezeichnet ist, dann Frametime ohne und mit Minimap und die Zeit im HUD, im Stand und im Flug.
+     */
+    private void zoom(ClientGameTestContext context, TestServerContext server) {
+        flug(context, server, true);
+        flug(context, server, false);
+        boolean hin = true;
+        for (double zoom : new double[] {2, 0.5}) {
+            context.runOnClient(mc -> {
+                mc.options.framerateLimit().set(260);
+                Minimap.INSTANZ.setzeScale(2);
+                Minimap.INSTANZ.setzeZoom(zoom == 2 ? 1 : 2);
+                Minimap.INSTANZ.setzeRund(false);
+                Minimap.INSTANZ.setzeDrehen(false);
+            });
+            zeige(context, true);
+            context.waitFor(mc -> Minimap.INSTANZ.fertig(), 2400);
+            long start = System.nanoTime();
+            context.runOnClient(mc -> Minimap.INSTANZ.setzeZoom(zoom));
+            context.waitFor(mc -> Minimap.INSTANZ.fertig(), 2400);
+            zeile("zoom=%s voll_gezeichnet_ms=%.0f chunks_je_richtung=%d", zoom, (System.nanoTime() - start) / 1e6,
+                    context.computeOnClient(mc -> Minimap.INSTANZ.reichweite()));
+            String art = "fps=frei scale=2 zoom=" + zoom + " form=eckig";
+            warteAufFreieFrames(context, art);
+            for (int runde = 1; runde <= RUNDEN; runde++) {
+                for (boolean an : new boolean[] {false, true}) {
+                    zeige(context, an);
+                    frames(context, art + " stand", an, runde, () -> context.waitTicks(STAND_TICKS));
+                }
+            }
+            for (int runde = 1; runde <= RUNDEN; runde++) {
+                for (boolean an : new boolean[] {false, true}) {
+                    zeige(context, an);
+                    boolean richtung = hin;
+                    frames(context, art + " flug", an, runde, () -> flug(context, server, richtung));
+                    hin = !hin;
+                }
+            }
+        }
     }
 
     private void schreibe() {

@@ -4,6 +4,11 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.52
+
+- **The minimap zooms out one step further,** to 0.5×: it shows four times the area, one pixel per block at GUI scale 2.
+- **Minimap zoom is a slider** in the menu, with one notch per step, like the sliders in the game's options. The zoom key still steps through all levels.
+
 ## 0.2.50
 
 - **Grass, flowers, crops and seagrass on the minimap.** Seen from above, plants used to stand on their edge and vanish. The minimap now lays each one flat over its block, tinted like the plant, the same way the map tiles from the server do. Your own map drawn with "Self" shows them too, once a chunk is drawn again.
