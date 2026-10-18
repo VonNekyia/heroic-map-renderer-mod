@@ -923,8 +923,8 @@ dazu ein Stück Dorf mit Zaun, Fackeln, Scheiben, Gitter, Mauer und
 Falltüren, auf der Minimap bei 1, 2 und 4 px (`tueren.png`); bei 2 px prüft
 der Test, dass die Türen zu sehen sind. Zuletzt eine Reihe Pflanzen bei
 4 px, mit und ohne (`pflanzen.png`, siehe „Pflanzen von oben“): Mohn,
-Weizen und Seegras ändern ihre Pixel, im Südosten des Blütenteppichs und
-an der Leiter bleibt alles gleich.
+Weizen und Seegras ändern ihre Pixel, am Blütenteppich ausser unter der
+Blüte und an der Leiter bleibt alles gleich.
 
 ## Was anders ist als top-north
 

@@ -1282,7 +1282,7 @@ public final class Bilder implements FabricClientGameTest {
 
     /**
      * Pflanzen von oben, bei 4 px und Zoom 4, verglichen mit derselben Stelle ohne sie: Mohn, Weizen und Seegras liegen
-     * flach; der Blütenteppich mit einer Blüte im Nordwesten hat eine Oberseite und bleibt, im Südosten ist Gras; die
+     * flach; der Blütenteppich mit einer Blüte im Nordwesten hat eine Oberseite und bleibt, ausserhalb der Blüte Gras; die
      * Leiter erbt von keiner Vorlage und fehlt wie bisher. Siehe docs/minimap.md, „Pflanzen von oben“.
      */
     private static void pflanzen(ClientGameTestContext context, TestServerContext server) {
@@ -1308,10 +1308,12 @@ public final class Bilder implements FabricClientGameTest {
         int rot = 0;
         for (int i = 0; i < 5; i++) {
             int x0 = links.applyAsInt(-40 + 2 * i);
-            // Beim Blütenteppich nur das Viertel im Südosten, wo keine Blüte liegt; sonst der Block ohne den Rand.
-            int von = i == 3 ? block / 2 + 1 : 1;
-            for (int y = oben + von; y < oben + block - 1; y++) {
-                for (int x = x0 + von; x < x0 + block - 1; x++) {
+            // Der Block ohne den Rand; beim Blütenteppich ohne das Viertel im Nordwesten, wo die Blüte liegt.
+            for (int y = oben + 1; y < oben + block - 1; y++) {
+                for (int x = x0 + 1; x < x0 + block - 1; x++) {
+                    if (i == 3 && x < x0 + block / 2 && y < oben + block / 2) {
+                        continue;
+                    }
                     int a = mit.getRGB(x, y), b = ohne.getRGB(x, y);
                     boolean gleich = true;
                     for (int s = 0; s <= 16; s += 8) {
@@ -1326,7 +1328,7 @@ public final class Bilder implements FabricClientGameTest {
         int innen = (block - 2) * (block - 2);
         if (rot == 0 || anders[1] < innen / 2 || anders[2] < gs * gs || anders[3] != 0 || anders[4] != 0) {
             throw new AssertionError("Pflanzen von oben: Pixel anders als ohne Pflanze, Mohn " + anders[0] + " (rot " + rot
-                    + "), Weizen " + anders[1] + ", Seegras " + anders[2] + " von " + innen + "; Blütenteppich im Südosten "
+                    + "), Weizen " + anders[1] + ", Seegras " + anders[2] + " von " + innen + "; Blütenteppich ausser im Nordwesten "
                     + anders[3] + " und Leiter " + anders[4] + " statt 0");
         }
         if (!AUSGABE.isEmpty()) {
