@@ -984,9 +984,9 @@ public final class Bedienung implements FabricClientGameTest {
     /**
      * Namen wie ein Spieler (mod#128): Rechtsklick auf den Griff einer Region, „Name…“, und das Feld ist leer. Getippt, dann
      * die Kartentaste und Escape: Die Karte bleibt offen, Escape schliesst nur das Feld, ohne Namen. Wieder „Name…“, tippen,
-     * Enter: Die Form heisst so, und eine Schrifthöhe unter dem Griff steht die Kartenschrift, wo vorher keine stand.
-     * „Name ändern…“ zeigt den Namen; ein Klick daneben lässt ihn; leer gemacht und Enter nimmt ihn weg. Siehe
-     * docs/wegpunkte.md, „Namen“.
+     * Enter: Die Form heisst so, und eine Schrifthöhe unter dem Griff steht die Kartenschrift, wo vorher keine stand. Am Griff
+     * gezogen behält sie ihn. „Name ändern…“ zeigt den Namen; ein Klick daneben lässt ihn; leer gemacht und Enter nimmt ihn weg.
+     * Der Hinweis unten links bleibt dabei, wie er war. Siehe docs/wegpunkte.md, „Namen“.
      */
     private static void namen(ClientGameTestContext context, TestInput maus, int k) {
         int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
@@ -994,17 +994,19 @@ public final class Bedienung implements FabricClientGameTest {
             double[] m = ((Karte) mc.gui.screen()).blickMitte();
             return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
         });
-        // Über der Mitte, so liegt der Name darunter auf dem Schirm; ein Block sind 4 Einheiten, die Schrift 16 Blöcke hoch.
-        int bx = mitte[0] - 3, bz = mitte[1] - 24;
-        List<Wegpunkte.Ecke> region = List.of(new Wegpunkte.Ecke(bx, bz), new Wegpunkte.Ecke(bx + 6, bz),
-                new Wegpunkte.Ecke(bx + 6, bz + 6), new Wegpunkte.Ecke(bx, bz + 6));
+        // Über der Mitte, so liegt der Name darunter auf dem Schirm. Ein Block sind 4 Einheiten; die Region ist 16 Blöcke breit,
+        // ihr Name also 8 Blöcke hoch.
+        int bx = mitte[0] - 8, bz = mitte[1] - 24;
+        List<Wegpunkte.Ecke> region = List.of(new Wegpunkte.Ecke(bx, bz), new Wegpunkte.Ecke(bx + 16, bz),
+                new Wegpunkte.Ecke(bx + 16, bz + 16), new Wegpunkte.Ecke(bx, bz + 16));
         try {
             context.runOnClient(mc -> Wegpunkte.INSTANZ.setzeForm(mc.level.dimension().identifier().toString(), region));
             context.waitTicks(2);
             double[] g = griff(context, formen);
             frei(context, new double[][] {g});
-            double[] ort = {g[0], g[1] + Wegpunkte.NAME_GROESSE * 4};
-            int vorher = dunkle(context.takeScreenshot(TestScreenshotOptions.of("namen-vorher").disableCounterPrefix()), k, ort, 20);
+            double[] ort = {g[0], g[1] + 8 * 4};
+            int vorher = dunkle(context.takeScreenshot(TestScreenshotOptions.of("namen-vorher").disableCounterPrefix()), k, ort, 12);
+            String hinweis = hinweis(context);
 
             eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.name");
             String leer = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).namensfeld());
@@ -1029,10 +1031,28 @@ public final class Bedienung implements FabricClientGameTest {
             if (!"Mühle M".equals(name(context, formen)) || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).namensfeld()) != null) {
                 throw new AssertionError("Enter speicherte den Namen nicht: " + name(context, formen));
             }
-            int nachher = dunkle(context.takeScreenshot(TestScreenshotOptions.of("namen").disableCounterPrefix()), k, ort, 20);
+            int nachher = dunkle(context.takeScreenshot(TestScreenshotOptions.of("namen").disableCounterPrefix()), k, ort, 12);
             if (nachher < vorher + 100) {
                 throw new AssertionError("Keine Kartenschrift unter dem Griff: " + nachher + " Pixel in ihrer Farbe, vorher " + vorher);
             }
+
+            // Am Griff halten und 8 Einheiten nach rechts ziehen: Die Region liegt 2 Blöcke weiter und heisst weiter so.
+            warte250();
+            maus.setCursorPos(g[0] * k, g[1] * k);
+            context.waitTick();
+            long druck = Util.getMillis();
+            maus.holdMouse(LINKS);
+            zittereBis(context, maus, g[0] * k, g[1] * k, druck + 700);
+            maus.setCursorPos((g[0] + 8) * k, g[1] * k);
+            context.waitTicks(2);
+            maus.releaseMouse(LINKS);
+            context.waitTicks(2);
+            List<Wegpunkte.Ecke> soll = region.stream().map(c -> new Wegpunkte.Ecke(c.x() + 2, c.z())).toList();
+            List<Wegpunkte.Ecke> ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken());
+            if (!ist.equals(soll) || !"Mühle M".equals(name(context, formen))) {
+                throw new AssertionError("Am Griff gezogen: " + ist + " statt " + soll + ", Name " + name(context, formen));
+            }
+            g = griff(context, formen);
 
             eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.name_aendern");
             String voll = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).namensfeld());
@@ -1055,11 +1075,23 @@ public final class Bedienung implements FabricClientGameTest {
             if (name(context, formen) != null) {
                 throw new AssertionError("Leer und Enter liess den Namen: " + name(context, formen));
             }
+            // Umbenennen und Ziehen melden nichts unten links; dort steht noch, was vorher stand.
+            if (!hinweis.equals(hinweis(context))) {
+                throw new AssertionError("Der Hinweis unten links wechselte von „" + hinweis + "“ zu „" + hinweis(context) + "“");
+            }
         } finally {
             context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size())
                     .forEach(Wegpunkte.INSTANZ::loesche));
             context.waitTicks(2);
         }
+    }
+
+    /** Der Hinweis unten links als Text, „null“ ohne. */
+    private static String hinweis(ClientGameTestContext context) {
+        return context.computeOnClient(mc -> {
+            Component h = ((Karte) mc.gui.screen()).hinweis();
+            return String.valueOf(h == null ? null : h.getString());
+        });
     }
 
     private static String name(ClientGameTestContext context, int form) {

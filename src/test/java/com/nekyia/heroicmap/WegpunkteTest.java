@@ -627,17 +627,21 @@ class WegpunkteTest {
 
     @Test
     void namenEineSchrifthoeheNebenDemGriff() {
-        double g = Wegpunkte.NAME_GROESSE;
-        // Region: waagrecht, ein Punkt eine Schrifthöhe unter dem Griff im Schwerpunkt.
+        // Region: waagrecht, ein Punkt eine Schrifthöhe unter dem Griff im Schwerpunkt; so hoch wie die halbe kürzere Seite, hier 5.
         Wegpunkte.EigeneForm region = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10), e(0, 10)), 0, false, "Hof");
         Ebenen.Schrift s = Wegpunkte.schrift(region, Wegpunkte.mitten(region));
-        assertArrayEquals(new double[] {5.5, 5.5 + g}, s.pfad(), 1e-9);
+        assertArrayEquals(new double[] {5.5, 5.5 + 5}, s.pfad(), 1e-9);
+        assertEquals(5, s.groesse());
         assertEquals("Hof", s.text());
         assertEquals(Ebenen.SCHRIFTFARBE, s.farbe());
         assertEquals(Ebenen.KONTURFARBE, s.konturFarbe());
         assertEquals(Wegpunkte.NAME_KONTUR, s.konturBreite());
-        assertEquals(Wegpunkte.NAME_GROESSE, s.groesse());
-        // Linie: parallel daneben auf der Nordseite, in beiden Richtungen.
+        // Gekappt auf 4 bis 16 Blöcke: eine kleine und eine grosse Region; eine Linie ein Viertel ihrer Länge.
+        assertEquals(Wegpunkte.NAME_KLEINSTE, groesse(List.of(e(0, 0), e(4, 0), e(4, 4))));
+        assertEquals(Wegpunkte.NAME_GROESSE, groesse(List.of(e(0, 0), e(100, 0), e(100, 100))));
+        assertEquals(10, groesse(List.of(e(0, 0), e(40, 0))));
+        // Linie: parallel daneben auf der Nordseite, in beiden Richtungen; 10 Blöcke lang, also 4 hoch und 4 weg.
+        double g = Wegpunkte.NAME_KLEINSTE;
         assertArrayEquals(new double[] {0.5, 0.5 - g, 10.5, 0.5 - g}, pfad(List.of(e(0, 0), e(10, 0))), 1e-9);
         assertArrayEquals(new double[] {10.5, 0.5 - g, 0.5, 0.5 - g}, pfad(List.of(e(10, 0), e(0, 0))), 1e-9);
         // Schräg nach Nordosten: senkrecht zur Linie, nach Nordwesten.
@@ -649,6 +653,11 @@ class WegpunkteTest {
         // Ohne Namen keine Schrift.
         Wegpunkte.EigeneForm ohne = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(10, 0)), 0, false, null);
         assertEquals(null, Wegpunkte.schrift(ohne, Wegpunkte.mitten(ohne)));
+    }
+
+    private static float groesse(List<Wegpunkte.Ecke> ecken) {
+        Wegpunkte.EigeneForm f = new Wegpunkte.EigeneForm(WELT, ecken, 0, false, "Weg");
+        return Wegpunkte.schrift(f, Wegpunkte.mitten(f)).groesse();
     }
 
     private static double[] pfad(List<Wegpunkte.Ecke> ecken) {

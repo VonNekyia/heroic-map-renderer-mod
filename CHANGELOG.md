@@ -6,7 +6,7 @@ The release notes on GitHub and Modrinth come from here
 
 ## 0.2.43
 
-- **Name your lines and regions.** Right-click a shape's handle and choose "Name…": type a name and press Enter. It shows on the full map in the same lettering as the names from the server, next to the handle, and on the minimap when the shape is pinned. Leave it empty to remove the name; Esc cancels.
+- **Name your lines and regions.** Right-click a shape's handle and choose "Name…": type a name and press Enter. It shows on the full map in the same lettering as the names from the server, sized to the shape and next to the handle, and on the minimap when the shape is pinned. Leave it empty to remove the name; Esc cancels.
 
 ## 0.2.42
 

@@ -410,11 +410,18 @@ am 18.10. (mod#128); Plan, Farbe und Ort hat der Reviewer freigegeben.
   Name, der kein Text ist, fehlt, die Form bleibt.
 - **Gezeichnet** als Kartenschrift in den Vorgaben vom Server
   (`Wegpunkte.schrift`), siehe [Ebenen](ebenen.md), „Kartenschrift“:
-  Grossbuchstaben 16 Blöcke hoch (`Wegpunkte.NAME_GROESSE`), `#2B2B2B` mit
-  heller Kontur `#F2E8D0`, 1,25 Einheiten breit wie beim Namen einer Nadel
-  (`Wegpunkte.NAME_KONTUR`). Unter 8 Einheiten fehlt er, über 96 bleibt er
-  96 hoch. Nicht in der Farbe der Form: Die steht schon an Rand und Griff;
-  so hat es der Reviewer entschieden, für Einheitlichkeit und Lesbarkeit.
+  `#2B2B2B` mit heller Kontur `#F2E8D0`, 1,25 Einheiten breit wie beim
+  Namen einer Nadel (`Wegpunkte.NAME_KONTUR`). Nicht in der Farbe der Form:
+  Die steht schon an Rand und Griff; so hat es der Reviewer entschieden,
+  für Einheitlichkeit und Lesbarkeit.
+- **Grösse** nach der Form (`Wegpunkte.groesse`): Grossbuchstaben so hoch
+  wie die halbe kürzere Seite des Kastens einer Region oder ein Viertel der
+  Länge einer Linie, mindestens 4 und höchstens 16 Blöcke
+  (`Wegpunkte.NAME_KLEINSTE`, `Wegpunkte.NAME_GROESSE`); 16 ist die Vorgabe
+  vom Server. Unter 8 Einheiten fehlt der Name, über 96 bleibt er 96 hoch;
+  so verschwinden die Namen kleiner Formen beim Herauszoomen zuerst. Mit
+  16 Blöcken für alle war der Name einer Region von 6 × 6 Blöcken rund 100
+  Blöcke breit und erschlug die Form; entschieden vom Reviewer am 18.10.
 - **Wo:** eine Schrifthöhe neben dem Griff, so deckt der Griff keinen
   Buchstaben: bei einer Region waagrecht darunter, bei einer Linie parallel
   zu ihr auf ihrer Nordseite, bei einer Linie von Nord nach Süd auf ihrer
@@ -566,7 +573,8 @@ Schleier am Rand, siehe „Schleier“.
   `griffAufHalberLaengeOderImSchwerpunkt`. Zu Namen:
   `nameBereinigtUndGekappt`, `namenUeberstehenDenNeustartUndAenderungen`
   (auch ein Name, der kein Text ist), `namenEineSchrifthoeheNebenDemGriff`
-  (Region, Linie in vier Richtungen, ohne Namen).
+  (Region, Linie in vier Richtungen, Höhe nach der Form und gekappt, ohne
+  Namen).
 - `SchleierTest`: Teilen an jeder ganzen Zahl, auch rückwärts und durch
   eine Ecke; ein Rechteck ein Stück je Block, nur im Kasten; ein Kreis in
   Sehnen über den Bogen, ein Kreis von 100 000 Blöcken nur beim Kasten;
@@ -638,8 +646,9 @@ Schleier am Rand, siehe „Schleier“.
   offen, das Feld zu und kein Name gespeichert. Wieder „Name…“, tippen,
   Enter: Die Form heisst so, und eine Schrifthöhe unter dem Griff zählt das
   Bildschirmfoto mindestens 100 Pixel mehr in der Farbe der Kartenschrift
-  als vorher. „Name ändern…“ zeigt den Namen, ein Klick neben das Feld
-  lässt ihn, leer gemacht und Enter nimmt ihn weg.
+  als vorher. Am Griff gezogen behält sie den Namen. „Name ändern…“ zeigt
+  den Namen, ein Klick neben das Feld lässt ihn, leer gemacht und Enter
+  nimmt ihn weg. Der Hinweis unten links bleibt dabei, wie er war.
 - `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
   [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und

@@ -85,10 +85,10 @@ final class Wegpunkte {
     /** So viele Zeichen hat der Name einer eigenen Form höchstens. */
     static final int MAX_NAME = 32;
     /**
-     * Der Name einer eigenen Form als Kartenschrift: die Grossbuchstaben so hoch in Blöcken wie die Vorgabe vom Server, die
-     * Kontur in Einheiten des GUI wie beim Namen einer Nadel. Siehe docs/wegpunkte.md, „Namen“.
+     * Der Name einer eigenen Form als Kartenschrift: die Grossbuchstaben je nach Form so hoch in Blöcken, höchstens wie die
+     * Vorgabe vom Server; die Kontur in Einheiten des GUI wie beim Namen einer Nadel. Siehe docs/wegpunkte.md, „Namen“.
      */
-    static final float NAME_GROESSE = 16, NAME_KONTUR = 1.25f;
+    static final float NAME_KLEINSTE = 4, NAME_GROESSE = 16, NAME_KONTUR = 1.25f;
     /** So viele Regionen und Kreise je Welt angeheftet, eigene und vom Server zusammen; darüber heftet der Mod keine an. */
     static final int MAX_ANGEHEFTET = 64;
     /** So viele Nadeln und Banner je Welt angeheftet, eine eigene Grenze; darüber heftet der Mod keine an. */
@@ -870,16 +870,27 @@ final class Wegpunkte {
             return null;
         }
         double[] pfad;
+        float groesse;
         if (f.region()) {
-            double[] g = griff(p, true);
-            pfad = new double[] {g[0], g[1] + NAME_GROESSE};
+            double[] b = box(p), g = griff(p, true);
+            groesse = groesse(Math.min(b[2] - b[0], b[3] - b[1]) / 2);
+            pfad = new double[] {g[0], g[1] + groesse};
         } else {
             // Eine Linie hat genau zwei Ecken. Die Normale (dz, −dx) zeigt für dx > 0 nach Norden, für dx = 0 und dz < 0 nach Westen.
-            double dx = p[2] - p[0], dz = p[3] - p[1], s = (dx > 0 || dx == 0 && dz < 0 ? 1 : -1) * NAME_GROESSE / Math.hypot(dx, dz);
+            double dx = p[2] - p[0], dz = p[3] - p[1], laenge = Math.hypot(dx, dz);
+            groesse = groesse(laenge / 4);
+            double s = (dx > 0 || dx == 0 && dz < 0 ? 1 : -1) * groesse / laenge;
             pfad = new double[] {p[0] + s * dz, p[1] - s * dx, p[2] + s * dz, p[3] - s * dx};
         }
-        return new Ebenen.Schrift(f.dimension(), f.name(), pfad, NAME_GROESSE, 0, Ebenen.SCHRIFTFARBE, Ebenen.KONTURFARBE, NAME_KONTUR,
-                box(pfad));
+        return new Ebenen.Schrift(f.dimension(), f.name(), pfad, groesse, 0, Ebenen.SCHRIFTFARBE, Ebenen.KONTURFARBE, NAME_KONTUR, box(pfad));
+    }
+
+    /**
+     * Wie hoch die Grossbuchstaben eines Namens stehen, in Blöcken: {@code d}, gekappt auf {@link #NAME_KLEINSTE} bis
+     * {@link #NAME_GROESSE}. Für eine Region die Hälfte der kürzeren Seite ihres Kastens, für eine Linie ein Viertel ihrer Länge.
+     */
+    private static float groesse(double d) {
+        return (float) Math.clamp(d, NAME_KLEINSTE, NAME_GROESSE);
     }
 
     /** Die Mitten der Blöcke der Ecken, x und z abwechselnd. */
