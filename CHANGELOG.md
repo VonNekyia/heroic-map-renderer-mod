@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.50
+
+- **Your own layers.** Waypoints, lines and regions can live in layers of your own and be switched off together. Right-click one and choose "Layer …" to move it, or to create a new layer on the spot. Your layers sit in the layer list on the full map, before the ones from the server, and in "Layers …" in the settings, where you can rename and delete them. Everything starts in "Base".
+
 ## 0.2.48
 
 - **A death point where you died.** When you die, the mod sets a pinned waypoint on that spot, drawn dark with a light cross, so the minimap and the beam lead you back. Only one: the next death moves it. The chat says where; click the message to open the map there. "Death point" in "Settings …" turns it off.
