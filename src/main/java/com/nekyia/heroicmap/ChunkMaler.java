@@ -33,6 +33,7 @@ import net.minecraft.data.AtlasIds;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.CardinalLighting;
 import net.minecraft.world.level.block.AbstractChestBlock;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.CopperChestBlock;
@@ -161,6 +162,9 @@ final class ChunkMaler {
     private int scale;
     /** Der Abschnitt mit seinen Nachbarn, in dem der aktuelle Block liegt. */
     private RenderSectionRegion welt;
+    /** Die flache Fläche des aktuellen Blocks, wenn er eine Bodenpflanze ist, und ob er eine Fläche nach oben hat. */
+    private Flaeche flach;
+    private boolean oben;
     /** Je Pixel der Spalte vormultipliziert in sRGB: r, g, b, a. */
     private float[] summe = new float[0];
 
@@ -249,10 +253,17 @@ final class ChunkMaler {
             sammleBlockentity(model, state);
             return;
         }
+        boolean pflanze = Pflanzen.bodenpflanze(state);
+        flach = null;
+        oben = false;
         tesselator.tesselateBlock((x, y, z, quad, instanz) -> {
             if (!nachOben(quad)) {
+                if (pflanze && flach == null) {
+                    flach = flach(quad, instanz);
+                }
                 return;
             }
+            oben = true;
             // x, y und z tragen den Versatz des Blocks, etwa bei Bambus.
             float[] xz = new float[8], uv = new float[8];
             float hoehe = Float.NEGATIVE_INFINITY;
@@ -268,6 +279,53 @@ final class ChunkMaler {
             flaechen.add(new Flaeche(hoehe, xz, uv, quad.materialInfo().sprite(), quad.materialInfo().layer(),
                     ecken(instanz, quad.materialInfo().lightEmission())));
         }, 0, 0, 0, welt, pos, state, model, state.getSeed(pos));
+        // Ein Modell mit einer Fläche nach oben, etwa ein Blütenteppich, bleibt, wie es ist.
+        if (flach != null && !oben) {
+            flaechen.add(flach);
+        }
+    }
+
+    /**
+     * Die flache Fläche einer Bodenpflanze aus ihrer ersten Fläche: über den ganzen Block, ohne seinen Versatz, 1/16 über
+     * seinem Boden, das Rechteck ihrer UV, im Mittel ihrer Ecken und nach oben schattiert statt nach ihrer Richtung.
+     * Siehe docs/minimap.md, „Pflanzen von oben“.
+     */
+    private Flaeche flach(BakedQuad quad, QuadInstance instanz) {
+        float[] uv = new float[8];
+        for (int k = 0; k < 4; k++) {
+            long packed = quad.packedUV(k);
+            uv[2 * k] = UVPair.unpackU(packed);
+            uv[2 * k + 1] = UVPair.unpackV(packed);
+        }
+        float faktor = schattenNachOben(welt.cardinalLighting(), quad.materialInfo().shadeDirectionOverride(), quad.direction()) / 4;
+        float[] mittel = new float[3];
+        for (float[] ecke : ecken(instanz, quad.materialInfo().lightEmission())) {
+            for (int c = 0; c < 3; c++) {
+                mittel[c] += ecke[c] * faktor;
+            }
+        }
+        return new Flaeche(1 / 16f, VOLL, rechteck(uv), quad.materialInfo().sprite(), quad.materialInfo().layer(),
+                new float[][] {mittel, mittel, mittel, mittel});
+    }
+
+    /**
+     * Der Faktor, der die Schattierung einer Fläche durch die nach oben ersetzt: Das Spiel schattiert nach
+     * {@code ueberschrieben}, sonst nach ihrer {@code richtung}.
+     */
+    static float schattenNachOben(CardinalLighting licht, Direction ueberschrieben, Direction richtung) {
+        return licht.up() / licht.byFace(ueberschrieben != null ? ueberschrieben : richtung);
+    }
+
+    /** Das Rechteck aus min und max der UV über alle vier Ecken, auf {@link #VOLL}: u0, v0 im Nordwesten. */
+    static float[] rechteck(float[] uv) {
+        float u0 = Float.MAX_VALUE, u1 = -Float.MAX_VALUE, v0 = Float.MAX_VALUE, v1 = -Float.MAX_VALUE;
+        for (int k = 0; k < 4; k++) {
+            u0 = Math.min(u0, uv[2 * k]);
+            u1 = Math.max(u1, uv[2 * k]);
+            v0 = Math.min(v0, uv[2 * k + 1]);
+            v1 = Math.max(v1, uv[2 * k + 1]);
+        }
+        return new float[] {u0, v0, u0, v1, u1, v1, u1, v0};
     }
 
     /**

@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.50
+
+- **Grass, flowers, crops and seagrass on the minimap.** Seen from above, plants used to stand on their edge and vanish. The minimap now lays each one flat over its block, tinted like the plant, the same way the map tiles from the server do. Your own map drawn with "Self" shows them too, once a chunk is drawn again.
+
 ## 0.2.49
 
 - **Teleport from the full map always works.** "Teleport here" is in the map's menu in every dimension, also in the Nether. Without a height from your client or the map, the server looks for the ground first; where it has not loaded the chunk, you land at your own height and the mod moves you onto the ground as soon as the chunk arrives. If you land inside blocks or high in the air, it corrects that too. Landing where the server must first generate the chunk can cost half a heart to a few hearts.
