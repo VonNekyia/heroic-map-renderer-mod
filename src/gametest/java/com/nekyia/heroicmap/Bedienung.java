@@ -2162,6 +2162,9 @@ public final class Bedienung implements FabricClientGameTest {
             context.waitTick();
         }
         server.runCommand("execute in minecraft:the_nether run forceload remove all");
+        // Zurück in die Oberwelt, auf das Gras; die Schritte danach rechnen dort.
+        server.runCommand("execute in minecraft:overworld run tp @p 0.5 -60 0.5");
+        context.waitFor(mc -> mc.level.dimension() == Level.OVERWORLD && Math.abs(mc.player.getY() - -60) < 0.01 && mc.player.onGround(), 600);
     }
 
     /** Öffnet die Karte über (x, z), Rechtsklick in die Mitte, ein Klick auf „Hierher teleportieren“; sie schliesst sich. */
