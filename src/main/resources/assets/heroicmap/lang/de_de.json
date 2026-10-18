@@ -181,5 +181,13 @@
   "heroicmap.menue.todespunkt": "Todespunkt",
   "heroicmap.menue.todespunkt.beschreibung": "Stirbst du, setzt der Mod einen angehefteten Wegpunkt, wo du gestorben bist; nur einen, der nächste Tod verschiebt ihn",
   "heroicmap.tod.gesetzt": "Todespunkt gesetzt bei %s %s",
-  "heroicmap.tod.klick": "Klick: die Karte dort öffnen"
+  "heroicmap.tod.klick": "Klick: die Karte dort öffnen",
+  "heroicmap.karte.ebene": "Ebene …",
+  "heroicmap.karte.ebene_neu": "Neue Ebene …",
+  "heroicmap.karte.ebene_neu_hinweis": "Enter: Ebene mit diesem Namen anlegen und hineinlegen; Esc bricht ab",
+  "heroicmap.ebenen.neu": "Neue Ebene …",
+  "heroicmap.ebenen.umbenennen": "Umbenennen",
+  "heroicmap.ebenen.loeschen": "Löschen; was in ihr liegt, kommt nach Base",
+  "heroicmap.karte.base_aus": "Neues kommt nach Base, und Base ist aus; es steht erst, wenn du sie anschaltest",
+  "heroicmap.karte.wegpunkt_verborgen": "Dort liegt schon ein Wegpunkt, in einer Ebene, die aus ist"
 }

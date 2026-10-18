@@ -181,5 +181,13 @@
   "heroicmap.menue.todespunkt": "Death point",
   "heroicmap.menue.todespunkt.beschreibung": "When you die, the mod sets a pinned waypoint where you died; only one, the next death moves it",
   "heroicmap.tod.gesetzt": "Death point set at %s %s",
-  "heroicmap.tod.klick": "Click: open the map there"
+  "heroicmap.tod.klick": "Click: open the map there",
+  "heroicmap.karte.ebene": "Layer …",
+  "heroicmap.karte.ebene_neu": "New layer …",
+  "heroicmap.karte.ebene_neu_hinweis": "Enter: create a layer with this name and move it there; Esc cancels",
+  "heroicmap.ebenen.neu": "New layer …",
+  "heroicmap.ebenen.umbenennen": "Rename",
+  "heroicmap.ebenen.loeschen": "Delete; what is in it goes to Base",
+  "heroicmap.karte.base_aus": "New things go to Base, and Base is off; they show once you switch it on",
+  "heroicmap.karte.wegpunkt_verborgen": "There is already a waypoint there, in a layer that is off"
 }

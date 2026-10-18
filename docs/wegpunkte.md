@@ -1,6 +1,6 @@
 ---
 title: Wegpunkte
-description: Wegpunkte auf der Vollbildkarte setzen und löschen, auch an eingetippten Koordinaten, der Todespunkt, eigene Linien und Regionen mit eigenen Ecken, Namen und Farben, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
+description: Wegpunkte auf der Vollbildkarte setzen und löschen, auch an eingetippten Koordinaten, der Todespunkt, eigene Linien und Regionen mit eigenen Ecken, Namen und Farben, eigene Ebenen zum An- und Ausschalten, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Wegpunkte.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
@@ -38,6 +38,7 @@ Formen“ (mod#79, mod#112).
 |---|---|
 | Rechtsklick, „Wegpunkt setzen“ | der Eintrag unter „Hierher teleportieren“; setzt einen Wegpunkt auf den Block unter der Maus, in der ersten der 8 Farben (`Wegpunkte.FARBEN`), die in der Dimension noch frei ist, sind alle vergeben, reihum. Steht dort schon einer, bleibt es einer |
 | Rechtsklick auf einen Wegpunkt | das Menü für seinen Block: „Hierher teleportieren“ und „Wegpunkt löschen“, auf dem Todespunkt „Todespunkt löschen“ |
+| Rechtsklick auf einen Wegpunkt, den Griff einer Form oder die Raute eines alten Rechtecks, „Ebene …“ | legt es in eine eigene Ebene, auch in eine neue, siehe „Eigene Ebenen“ |
 | Rechtsklick, „Wegpunkt bei …“ | öffnet an der Stelle des Menüs ein Eingabefeld mit `x z` des Blocks unter der Maus, wie bei „Name…“, siehe „Namen“. Enter nimmt `x z`, `x, z` oder `x y z`, ganze Zahlen aus Ziffern in ASCII, x und z höchstens 30 000 000 weit (`Wegpunkte.koordinaten`); y zählt nicht, ein Wegpunkt hat nur x und z, so sagt es auch der Hinweis unten links. Dann setzt es dort einen Wegpunkt in der jetzigen Dimension wie „Wegpunkt setzen“ und legt ihn in die Mitte. Was keine Koordinaten sind, nimmt Enter nicht; der Text wird rot. Gewünscht vom User am 18.10. (mod#129) |
 | Klick auf eine Marke | legt sie in die Mitte, sobald kein zweiter Klick mehr folgen kann, 250 ms nach dem Loslassen: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück. Wer auf einer Marke zu ziehen beginnt und sich weiter als 3 Einheiten vom Druckpunkt entfernt (`Karte.ZUG`), zieht nur die Karte |
 | Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder; die Karte bewegt sich dabei nicht, siehe „Doppelklick“ unten |
@@ -401,7 +402,7 @@ sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
 - **Menü am Griff:** Ein Rechtsklick auf den Griff öffnet nur das Menü der
   Form (`Karte.formMenue`): „An die Minimap heften“ oder „Von der Minimap
   lösen“, wie der Doppelklick; „Name…“ oder „Name ändern…“, siehe „Namen“;
-  „Farbe…“, siehe „Farbe“;
+  „Farbe…“, siehe „Farbe“; „Ebene …“, siehe „Eigene Ebenen“;
   „Eckpunkt hinzufügen“, neue Ecken hinter der
   letzten, bei einer Region zwischen der letzten und der ersten, wie auf
   einer Ecke; „Form löschen“. Ist eine Form im Bau, fehlt „Eckpunkt
@@ -508,6 +509,57 @@ vom User am 18.10.; Plan vom Reviewer freigegeben.
   Farbe fehlt das Feld. Eine ältere Version nimmt die Farbe des Index.
 - **Wegpunkte** haben weiter nur die 8 Farben, siehe „Was fehlt“.
 
+## Eigene Ebenen
+
+Wegpunkte, eigene Formen und alte Rechtecke liegen je in einer eigenen
+Ebene, die sich an- und ausschalten lässt. Gewünscht vom User am 18.10.
+(mod#130); Plan vom Reviewer freigegeben. Das Teilen als Code folgt eigens.
+
+- **Base** (`Wegpunkte.BASE`, id 0) gibt es immer. Sie heisst fest „Base“,
+  der User nannte sie „Standardlayer“, und lässt sich weder umbenennen
+  noch löschen, wohl aber ausschalten. Alles Neue kommt nach Base, auch
+  der Todespunkt. Ist Base aus, sagt die Vollbildkarte bei einem neuen
+  Wegpunkt und einer neuen Form unten links „Neues kommt nach Base, und
+  Base ist aus; es steht erst, wenn du sie anschaltest“
+  (`Karte.neuInBase`); von selbst schaltet sie Base nicht an. So
+  entschieden im Review von #143.
+- **Höchstens 32** eigene Ebenen neben Base (`Wegpunkte.MAX_EBENEN`); ihr
+  Name wie der einer Form, 1 bis 32 Zeichen, siehe „Namen“
+  (`Wegpunkte.name`). Eine neue bekommt die nächste freie id.
+- **Aus** heisst nirgends gezeichnet: nicht auf Vollbildkarte und Minimap,
+  auch angeheftet nicht, ohne Strahl und Schleier, und ohne Klick,
+  Hervorheben und Tafel (`Wegpunkte.an`, `Wegpunkte.sichtbar`). Was darin
+  liegt, bleibt erhalten.
+- **Einordnen:** Rechtsklick auf einen Wegpunkt, auf den Griff einer Form
+  oder auf die Raute eines alten Rechtecks, „Ebene …“. An der Stelle des
+  Menüs stehen dann die eigenen Ebenen zur Wahl, die jetzige mit „• “
+  davor (`Karte.ebenenWahl`). „Neue Ebene …“ öffnet das Eingabefeld wie
+  bei „Name…“, legt die Ebene an und das Ding gleich hinein. Der
+  Todespunkt bietet „Ebene …“ nicht an: Er bleibt in Base, die Datei kennt
+  für ihn keine Ebene.
+- **Verborgen:** Liegt auf einem Block ein Wegpunkt in einer Ebene, die aus
+  ist, setzt „Wegpunkt setzen“ oder „Wegpunkt bei …“ dort keinen zweiten
+  und sagt unten links „Dort liegt schon ein Wegpunkt, in einer Ebene, die
+  aus ist“ (`Karte.setzeWegpunkt`).
+- **Schalten** in der Liste der Vollbildkarte, vor den Ebenen vom Server,
+  siehe [Vollbildkarte](vollbildkarte.md), „Ebenen“, sobald es neben Base
+  eine eigene gibt oder Base aus ist; Base allein und an steht dort nicht,
+  so bleibt die Liste, wie sie war, für wen keine eigenen Ebenen hat. Den Knopf „Ebenen +“ gibt es
+  dann auch ohne Ebenen vom Server. Ein Doppelklick auf den Namen einer
+  eigenen Ebene tut nichts. Im Untermenü „Ebenen …“ steht Base immer.
+- **Verwalten** im Untermenü „Ebenen …“, siehe [Ebenen](ebenen.md),
+  „Umschalten“: je eigene Ebene ihr Schalter, „✎“ benennt um, „✕“ löscht,
+  und was in ihr lag, kommt nach Base; „Neue Ebene …“ legt eine an. Enter
+  speichert, `Esc` bricht nur das Feld ab, ein ungültiger Name bleibt rot
+  stehen (`EbenenMenue.keyPressed`).
+- **Datei:** oben `ebenen` mit `id`, `name` und `an`, Base zuerst; je
+  Eintrag `ebene`, siehe „Ablage“. Ohne `ebenen` gibt es nur Base, ohne
+  `ebene` liegt ein Eintrag in Base; so ziehen ältere Dateien ohne Schritt
+  um. Eine Ebene, die es nicht gibt oder die keine Zahl ist, heisst Base,
+  und der Eintrag bleibt; doppelte ids, Ebenen ohne Namen und negative ids
+  fallen weg. Eine ältere Version des Mods
+  überliest beides; speichert sie, liegt danach wieder alles in Base.
+
 ## Regionen
 
 Die Rechtecke aus „Region von hier“ bis 0.2.15 (mod#35, mod#73). Neue
@@ -597,7 +649,8 @@ Schleier am Rand, siehe „Schleier“.
 - **Format:**
 
   ```json
-  {"wegpunkte":[{"id":1,"dimension":"minecraft:overworld","x":12,"z":-40,"farbe":0,"minimap":true}],
+  {"ebenen":[{"id":0,"name":"Base","an":true},{"id":1,"name":"Höfe","an":false}],
+   "wegpunkte":[{"id":1,"dimension":"minecraft:overworld","x":12,"z":-40,"farbe":0,"minimap":true,"ebene":1}],
    "tod":{"dimension":"minecraft:the_nether","x":3,"z":4,"minimap":true},
    "eigene_formen":[{"dimension":"minecraft:overworld","ecken":[[12,-40],[30,-40],[30,-20]],"farbe":2,"minimap":false,"name":"Mühle","hex":"#3A7FD5"}],
    "regionen":[{"dimension":"minecraft:overworld","x0":2,"z0":-5,"x1":10,"z1":3,"farbe":1,"minimap":false}],
@@ -606,6 +659,8 @@ Schleier am Rand, siehe „Schleier“.
    "nadeln":[{"ebene":"b:staedte","id":"nordhafen"}]}
   ```
 
+  `ebenen` sind die eigenen Ebenen und `ebene` die eines Eintrags, auch bei
+  Formen und alten Rechtecken, siehe „Eigene Ebenen“;
   `farbe` ist ein Index in `Wegpunkte.FARBEN`, `minimap` heisst angeheftet,
   `tod` ist der Todespunkt, siehe „Todespunkt“, ohne `farbe` und `id`,
   `eigene_formen` nennt ihre Dimension und die Blöcke ihrer Ecken in Reihenfolge,
@@ -660,7 +715,11 @@ Schleier am Rand, siehe „Schleier“.
   `todespunktNurEinerAngeheftetUndEigensGespeichert` (nur einer, keine
   Farbe, eigens in der Datei, Lösen und Verschieben, nicht auf einem
   Wegpunkt, ein kaputter fehlt), `todMeldungOeffnetDieKarteDort`;
-  `koordinatenEingetippt`.
+  `koordinatenEingetippt`. Zu eigenen Ebenen:
+  `eigeneEbenenAnlegenSchaltenLoeschenUndDatei` (anlegen, Base fest,
+  umbenennen, einordnen, aus zeichnet auf Karte und Minimap nichts, über
+  die Datei, löschen nach Base, die Grenze von 32),
+  `eigeneEbenenAlteDateiUndKaputteEintraege`.
 - `SchleierTest`: Teilen an jeder ganzen Zahl, auch rückwärts und durch
   eine Ecke; ein Rechteck ein Stück je Block, nur im Kasten; ein Kreis in
   Sehnen über den Bogen, ein Kreis von 100 000 Blöcken nur beim Kasten;
@@ -753,7 +812,15 @@ Schleier am Rand, siehe „Schleier“.
   die Karte mit ihm als Ziel; die Welt des Tests hat keinen geladenen Satz,
   also steht er mit dem Testsatz in der Mitte, mitten in ihm das helle ✕, und
   „Todespunkt löschen“ löscht ihn; mit dem Schalter aus setzt ein zweiter
-  Tod keinen.
+  Tod keinen. Eigene Ebenen (`eigeneEbenen`): Rechtsklick auf einen
+  Wegpunkt, „Ebene …“ zeigt „• Base“ und „Neue Ebene …“; darüber „Farmen“
+  angelegt, liegt er in ihr; ihr Knopf in der Liste der Karte schaltet sie
+  aus, und der Wegpunkt fehlt auf der Karte, wieder an steht er da; im
+  Untermenü „Ebenen …“ benennt „✎“ sie um, „✕“ löscht sie, und der Wegpunkt
+  liegt wieder in Base; ist Base aus, steht sie allein in der Liste der
+  Karte, „Wegpunkt setzen“ sagt, dass Neues in der ausgeschalteten Base
+  landet, und auf demselben Block noch einmal, dass dort ein verborgener
+  Wegpunkt liegt. Am Todespunkt steht kein „Ebene …“ (`tod`).
 - `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
   [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und

@@ -150,6 +150,7 @@ public final class Bedienung implements FabricClientGameTest {
         farbe(context, maus, k);
         hinweisWeg(context, maus, k);
         wegpunktBei(context, maus, k);
+        eigeneEbenen(context, maus, k);
         ebenen(context, maus, k);
         zumSpieler(context, maus, k);
         optionen(context, maus, k);
@@ -1283,6 +1284,11 @@ public final class Bedienung implements FabricClientGameTest {
             if (!kreuz) {
                 throw new AssertionError("Mitten im Todespunkt fehlt das helle ✕");
             }
+            // Am Todespunkt kein „Ebene …“: Er bleibt in Base (Review von #143).
+            List<String> menue = eintraegeBei(context, maus, k, m.x(), m.y());
+            if (menue.contains(context.computeOnClient(mc -> Component.translatable("heroicmap.karte.ebene").getString()))) {
+                throw new AssertionError("Am Todespunkt steht „Ebene …“: " + menue);
+            }
             eintrag(context, maus, k, m.x(), m.y(), "heroicmap.karte.tod_loeschen");
             if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.tod()) != null) {
                 throw new AssertionError("„Todespunkt löschen“ liess ihn stehen");
@@ -1317,6 +1323,164 @@ public final class Bedienung implements FabricClientGameTest {
         context.waitFor(mc -> mc.player != null && !mc.player.isDeadOrDying(), 200);
         context.runOnClient(mc -> mc.gui.setScreen(null));
         context.waitTicks(5);
+    }
+
+    /**
+     * Eigene Ebenen wie ein Spieler (mod#130): Rechtsklick auf einen Wegpunkt, „Ebene …“, die Wahl zeigt „• Base“ und „Neue
+     * Ebene …“; darüber eine Ebene „Farmen“ angelegt, liegt er in ihr. In der Liste der Karte schaltet ihr Knopf sie aus, und
+     * der Wegpunkt fehlt auf der Karte, wieder an steht er da. Im Menü „Ebenen …“ benennt ✎ sie um, ✕ löscht sie, und der
+     * Wegpunkt liegt wieder in Base. Siehe docs/wegpunkte.md, „Eigene Ebenen“.
+     */
+    private static void eigeneEbenen(ClientGameTestContext context, TestInput maus, int k) {
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        double[] ort = context.computeOnClient(mc -> new double[] {60, mc.getWindow().getGuiScaledHeight() - 60});
+        frei(context, new double[][] {ort});
+        int[] block = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blockUnter(ort[0], ort[1]));
+        try {
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.setze(mc.level.dimension().identifier().toString(), block[0], block[1]));
+            context.waitTicks(2);
+            Wegpunkte.Punkt p = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().getLast());
+            Karte.Marke m = marke(context, p);
+            eintrag(context, maus, k, m.x(), m.y(), "heroicmap.karte.ebene");
+            String neue = context.computeOnClient(mc -> Component.translatable("heroicmap.karte.ebene_neu").getString());
+            List<String> wahl = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eintraege().stream().map(Component::getString).toList());
+            if (!wahl.equals(List.of("• Base", neue))) {
+                throw new AssertionError("„Ebene …“ zeigt " + wahl);
+            }
+            klickeEintrag(context, maus, k, neue);
+            maus.typeChars("Farmen");
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            int id = context.computeOnClient(mc -> Wegpunkte.INSTANZ.ebenen().stream().filter(e -> e.name().equals("Farmen"))
+                    .mapToInt(Wegpunkte.EigeneEbene::id).findFirst().orElse(-1));
+            if (id < 0 || context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().getLast().ebene()) != id) {
+                throw new AssertionError("„Neue Ebene …“ legte keine Ebene „Farmen“ mit dem Wegpunkt an: " + id);
+            }
+
+            // Der Knopf der Ebene in der Liste der Karte; ist sie zu, erst „Ebenen +“.
+            context.waitTicks(2);
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eigenerSchalter("Farmen")) == null) {
+                String knoepfe = context.computeOnClient(mc -> mc.gui.screen().children().stream()
+                        .filter(c -> c instanceof AbstractWidget).map(c -> ((AbstractWidget) c).getMessage().getString()).toList()
+                        + " Ebenen " + Wegpunkte.INSTANZ.ebenen());
+                double[] e;
+                try {
+                    e = knopf(context, "heroicmap.karte.ebenen");
+                } catch (AssertionError f) {
+                    throw new AssertionError("Kein Schalter „Farmen“ und kein „Ebenen +“: " + knoepfe);
+                }
+                spielerKlick(context, maus, k, e[0], e[1]);
+            }
+            for (boolean an : new boolean[] {false, true}) {
+                double[] s = context.computeOnClient(mc -> {
+                    AbstractWidget w = ((Karte) mc.gui.screen()).eigenerSchalter("Farmen");
+                    if (w == null) {
+                        throw new AssertionError("Kein Schalter „Farmen“ in der Liste der Karte");
+                    }
+                    return new double[] {w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0};
+                });
+                spielerKlick(context, maus, k, s[0], s[1]);
+                context.waitTicks(2);
+                boolean da = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).marken().stream()
+                        .anyMatch(x -> x.punkt() != null && x.punkt().x() == block[0] && x.punkt().z() == block[1]));
+                if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.an(id)) != an || da != an) {
+                    throw new AssertionError("Schalter „Farmen“ auf " + (an ? "an" : "aus") + ": Ebene an " + context.computeOnClient(
+                            mc -> Wegpunkte.INSTANZ.an(id)) + ", Wegpunkt auf der Karte " + da);
+                }
+            }
+
+            // Die Liste wieder zu, wie die folgenden Schritte sie erwarten; offen merkt sie sich die Karte.
+            double[] zu = knopf(context, "heroicmap.karte.ebenen_zu");
+            spielerKlick(context, maus, k, zu[0], zu[1]);
+
+            // Im Menü „Ebenen …“: ✎ benennt um, ✕ löscht.
+            context.runOnClient(mc -> mc.gui.setScreen(new EbenenMenue(mc.gui.screen())));
+            context.waitTicks(2);
+            context.takeScreenshot(TestScreenshotOptions.of("ebenen-menue").disableCounterPrefix());
+            spielerKlick(context, maus, k, mitteVon(context, "✎")[0], mitteVon(context, "✎")[1]);
+            String feld = context.computeOnClient(mc -> ((EbenenMenue) mc.gui.screen()).feld());
+            if (!"Farmen".equals(feld)) {
+                throw new AssertionError("✎ zeigt „" + feld + "“");
+            }
+            leeren(maus, 6);
+            maus.typeChars("Höfe");
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            if (!"Höfe".equals(context.computeOnClient(mc -> Wegpunkte.INSTANZ.ebene(id).name()))) {
+                throw new AssertionError("Umbenannt heisst die Ebene " + context.computeOnClient(mc -> Wegpunkte.INSTANZ.ebene(id).name()));
+            }
+            double[] x = mitteVon(context, "✕");
+            spielerKlick(context, maus, k, x[0], x[1]);
+            if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.ebene(id)) != null
+                    || context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().getLast().ebene()) != Wegpunkte.BASE) {
+                throw new AssertionError("✕ liess die Ebene stehen oder den Wegpunkt nicht in Base");
+            }
+            context.runOnClient(mc -> mc.gui.screen().onClose());
+            context.waitTicks(2);
+
+            // Base aus (Review von #143): Sie steht in der Liste der Karte, auch allein. „Wegpunkt setzen“ sagt, dass Neues in der
+            // ausgeschalteten Base landet; noch einmal auf demselben Block sagt es, dass dort ein verborgener Wegpunkt liegt.
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.schalteEbene(Wegpunkte.BASE, false));
+            context.waitTicks(2);
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eigenerSchalter("Base")) == null) {
+                double[] e = knopf(context, "heroicmap.karte.ebenen");
+                spielerKlick(context, maus, k, e[0], e[1]);
+            }
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eigenerSchalter("Base")) == null) {
+                throw new AssertionError("Base aus steht nicht in der Liste der Karte");
+            }
+            double[] zweiter = {ort[0] + 30, ort[1]};
+            frei(context, new double[][] {zweiter});
+            int vorher = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+            eintrag(context, maus, k, zweiter[0], zweiter[1], "heroicmap.karte.wegpunkt");
+            String hinweisBase = hinweis(context);
+            eintrag(context, maus, k, zweiter[0], zweiter[1], "heroicmap.karte.wegpunkt");
+            String hinweisVerborgen = hinweis(context);
+            int nachher = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+            if (nachher != vorher + 1
+                    || !hinweisBase.equals(context.computeOnClient(mc -> Component.translatable("heroicmap.karte.base_aus").getString()))
+                    || !hinweisVerborgen.equals(context.computeOnClient(mc -> Component.translatable("heroicmap.karte.wegpunkt_verborgen").getString()))) {
+                throw new AssertionError("Base aus: " + (nachher - vorher) + " neue Wegpunkte, Hinweise „" + hinweisBase + "“ und „" + hinweisVerborgen + "“");
+            }
+            // Die Liste wieder zu, solange es den Knopf noch gibt, dann Base wieder an.
+            double[] zu2 = knopf(context, "heroicmap.karte.ebenen_zu");
+            spielerKlick(context, maus, k, zu2[0], zu2[1]);
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.schalteEbene(Wegpunkte.BASE, true));
+            context.waitTicks(2);
+        } finally {
+            context.runOnClient(mc -> {
+                Wegpunkte.INSTANZ.schalteEbene(Wegpunkte.BASE, true);
+                List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                Wegpunkte.INSTANZ.ebenen().stream().skip(1).map(Wegpunkte.EigeneEbene::id).toList().forEach(Wegpunkte.INSTANZ::loescheEbene);
+                if (!(mc.gui.screen() instanceof Karte)) {
+                    mc.gui.screen().onClose();
+                }
+            });
+            context.waitTicks(2);
+        }
+    }
+
+    /** Klickt im offenen Menü der Karte den Eintrag mit diesem Text, ohne es neu zu öffnen. */
+    private static void klickeEintrag(ClientGameTestContext context, TestInput maus, int k, String text) {
+        List<String> alle = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eintraege().stream().map(Component::getString).toList());
+        int zeile = alle.indexOf(text);
+        if (zeile < 0) {
+            throw new AssertionError("Kein Eintrag „" + text + "“ in " + alle);
+        }
+        int[] lage = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).menueLage());
+        warte250();
+        maus.setCursorPos((lage[0] + 6) * k, (lage[1] + zeile * 14 + 6) * k);
+        context.waitTick();
+        maus.pressMouse(LINKS);
+        context.waitTicks(2);
+    }
+
+    /** Die Mitte des Knopfs mit genau diesem Text auf dem Schirm. */
+    private static double[] mitteVon(ClientGameTestContext context, String text) {
+        return context.computeOnClient(mc -> mc.gui.screen().children().stream()
+                .filter(c -> c instanceof AbstractWidget w && w.getMessage().getString().equals(text)).map(c -> (AbstractWidget) c)
+                .map(w -> new double[] {w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0}).findFirst()
+                .orElseThrow(() -> new AssertionError("Kein Knopf „" + text + "“")));
     }
 
     /** Löscht {@code n} Zeichen vor dem Cursor im Eingabefeld, mit der Rücktaste. */
