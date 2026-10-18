@@ -36,6 +36,8 @@ public final class HeroicMap implements ClientModInitializer {
     public static final String ID = "heroicmap";
     private static final Logger LOGGER = LogUtils.getLogger();
     /** Die Taste der Vollbildkarte; die Karte schliesst sich mit ihr. */
+    /** War der Spieler im letzten Tick schon am Sterben? So setzt ein Tod den Todespunkt nur einmal. */
+    private static boolean warTot;
     static KeyMapping karte;
 
     /** Für {@code FontManagerMixin}: Die Optionen der Schrift wechselten ohne Neuladen der Ressourcen. */
@@ -84,6 +86,12 @@ public final class HeroicMap implements ClientModInitializer {
                 Minimap.INSTANZ.schreibe(einstellungen());
             }
             Selbst.INSTANZ.arbeite(client);
+            // Beim Wechsel ins Sterben einmal der Todespunkt. Siehe docs/wegpunkte.md, „Todespunkt“.
+            boolean tot = client.player != null && client.player.isDeadOrDying();
+            if (tot && !warTot && client.level != null && Minimap.INSTANZ.todespunkt()) {
+                gestorben(client);
+            }
+            warTot = tot;
             while (karte.consumeClick()) {
                 if (client.gui.screen() == null && client.level != null) {
                     String dimension = client.level.dimension().identifier().toString();
@@ -129,6 +137,10 @@ public final class HeroicMap implements ClientModInitializer {
                 ClientCommands.literal("hmap")
                         .executes(HeroicMap::menue)
                         .then(ClientCommands.literal("angebot").executes(HeroicMap::angebot))
+                        .then(ClientCommands.literal("karte")
+                                .then(ClientCommands.argument("x", IntegerArgumentType.integer(-Wegpunkte.MAX_KOORDINATE, Wegpunkte.MAX_KOORDINATE))
+                                        .then(ClientCommands.argument("z", IntegerArgumentType.integer(-Wegpunkte.MAX_KOORDINATE, Wegpunkte.MAX_KOORDINATE))
+                                                .executes(HeroicMap::karte))))
                         .then(ClientCommands.literal("laden")
                                 .then(ClientCommands.argument("baum", StringArgumentType.word())
                                         .then(ClientCommands.argument("massstab", IntegerArgumentType.integer(1, 4))
@@ -142,6 +154,29 @@ public final class HeroicMap implements ClientModInitializer {
     private static int menue(CommandContext<FabricClientCommandSource> c) {
         Minecraft mc = c.getSource().getClient();
         mc.schedule(() -> mc.gui.setScreen(new Einstellungen()));
+        return 1;
+    }
+
+    /**
+     * Der Spieler stirbt: der Todespunkt auf seinem Block und im Chat, mit dem Klick, der die Karte dort öffnet. Siehe
+     * docs/wegpunkte.md, „Todespunkt“.
+     */
+    static void gestorben(Minecraft mc) {
+        int x = mc.player.getBlockX(), z = mc.player.getBlockZ();
+        Wegpunkte.INSTANZ.setzeTod(mc.level.dimension().identifier().toString(), x, z);
+        mc.player.sendSystemMessage(Wegpunkte.todMeldung(x, z));
+    }
+
+    /** Öffnet die Vollbildkarte der jetzigen Dimension mit dem Block (x, z) in der Mitte. */
+    private static int karte(CommandContext<FabricClientCommandSource> c) {
+        Minecraft mc = c.getSource().getClient();
+        int x = IntegerArgumentType.getInteger(c, "x"), z = IntegerArgumentType.getInteger(c, "z");
+        mc.schedule(() -> {
+            if (mc.level != null) {
+                String dimension = mc.level.dimension().identifier().toString();
+                mc.gui.setScreen(new Karte(Satz.fuer(Downloads.weltOrdner(), dimension)).bei(x + 0.5, z + 0.5));
+            }
+        });
         return 1;
     }
 

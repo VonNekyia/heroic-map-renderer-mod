@@ -65,13 +65,14 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
 |---|---|---|
 | Form | eckig | eckig oder rund, siehe „Form“ |
 | Bei F3 | bleibt | was die Minimap tut, solange der Debug-Bildschirm offen ist: bleibt, weg oder waagrecht in die Mitte, siehe „Bei F3“ |
-| Auflösung der Minimap | 2 px je Block | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet |
+| Auflösung | 2 px | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet; der volle Text „Auflösung der Minimap“ steht im Tooltip |
 | Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte, siehe „Chunklinien“ |
 | Drehen | an | die Minimap dreht mit der Blickrichtung, siehe „Drehen“ |
 | Verzierungen | an | die Marken N, O, S, W des Rahmens, aus nur Bänder oder Ring, siehe [Rahmen](rahmen.md), „Verzierungen“ |
 | Effekte in der Welt | an | der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen, siehe [Wegpunkte](wegpunkte.md), „Strahl“ und „Schleier“ |
 | Schleier | 4 Blöcke | Regler neben „Effekte in der Welt“: wie hoch und deckend der Schleier eigener Regionen steht, 4 bis 16 Blöcke, siehe [Wegpunkte](wegpunkte.md), „Schleier“ |
 | Koordinaten | xz | aus, `x z` oder `x y z` des Spielers unter der Minimap, siehe „Koordinaten“ |
+| Todespunkt | an | beim Tod ein angehefteter Wegpunkt, wo der Spieler gestorben ist, siehe [Wegpunkte](wegpunkte.md), „Todespunkt“ |
 | Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
 | Knopf „Ebenen …“ | – | je Ebene vom Server an oder aus, siehe [Ebenen](ebenen.md), „Umschalten“ |
 
@@ -118,8 +119,14 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
   (`Einstellungen.spalte`), im Untermenü ebenso. Im Hauptmenü teilen sich
   je zwei eine Zeile: „Minimap“ und „Zoom“, „Karte laden …“ und
   „Kartenliste …“, „Einstellungen …“ und „Fertig“; im Untermenü
-  „Chunklinien“ und „Drehen“, „Verzierungen“ und „Koordinaten“, „Ebenen …“
-  und „Fertig“. So passen Menü und
+  „Chunklinien“ und „Drehen“, „Verzierungen“ und „Koordinaten“, „Effekte in
+  der Welt“ und der Regler „Schleier“, „Auflösung“ und „Todespunkt“,
+  „Ebenen …“ und „Fertig“. Bei GUI-Massstab 3 passen „Auflösung“ und
+  „Todespunkt“ ganz in ihren halben Knopf, 98 Einheiten breit; das prüft
+  der Gametest `Bedienung.kleinerSchirm`. „Ablage der Karten“ bleibt ganz
+  breit, halb passte sie in keiner Sprache. Bei GUI-Massstab 4 sind die
+  halben Knöpfe rund 83 Einheiten breit; längere Texte lässt das Spiel
+  dort laufen, auch bei den übrigen halben Knöpfen. So passen Menü und
   Untermenü auch bei grossem GUI-Massstab auf den Schirm, bis 240
   Einheiten Höhe, etwa 1280 × 720 bei GUI-Massstab 3. Das Untermenü
   beginnt dafür höchstens 108 Einheiten über der Mitte und mindestens 20

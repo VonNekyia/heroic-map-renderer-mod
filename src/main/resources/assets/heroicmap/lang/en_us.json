@@ -86,7 +86,9 @@
   "heroicmap.menue.minimap": "Minimap",
   "heroicmap.menue.zoom": "Minimap zoom",
   "heroicmap.menue.fach": "%s×",
-  "heroicmap.menue.massstab": "Minimap resolution",
+  "heroicmap.menue.aufloesung": "Resolution",
+  "heroicmap.menue.aufloesung.beschreibung": "Minimap resolution: how many pixels per block it draws at most",
+  "heroicmap.menue.px_kurz": "%s px",
   "heroicmap.menue.px": "%s px per block",
   "heroicmap.menue.form": "Shape",
   "heroicmap.menue.eckig": "Square",
@@ -173,5 +175,12 @@
   "heroicmap.menue.effekte": "World effects",
   "heroicmap.menue.effekte.beschreibung": "A beacon beam above each pinned waypoint and a veil along the edge of pinned regions",
   "heroicmap.menue.schleier": "Veil: %s blocks",
-  "heroicmap.menue.schleier.beschreibung": "How high the veil stands at the edge of your pinned regions; higher also means more opaque. Regions from the server stay at 4 blocks."
+  "heroicmap.menue.schleier.beschreibung": "How high the veil stands at the edge of your pinned regions; higher also means more opaque. Regions from the server stay at 4 blocks.",
+  "heroicmap.karte.tod_loeschen": "Delete death point",
+  "heroicmap.karte.wegpunkt_bei": "Waypoint at …",
+  "heroicmap.karte.wegpunkt_bei_hinweis": "Enter: set a waypoint at x z, y does not count; Esc cancels",
+  "heroicmap.menue.todespunkt": "Death point",
+  "heroicmap.menue.todespunkt.beschreibung": "When you die, the mod sets a pinned waypoint where you died; only one, the next death moves it",
+  "heroicmap.tod.gesetzt": "Death point set at %s %s",
+  "heroicmap.tod.klick": "Click: open the map there"
 }

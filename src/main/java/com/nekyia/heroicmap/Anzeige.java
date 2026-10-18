@@ -12,7 +12,7 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
 /**
- * Das Untermenü „Einstellungen …“ für Vorlieben der Anzeige: Form, Bei F3, Auflösung, Chunklinien, Drehen, Verzierungen, Effekte in der
+ * Das Untermenü „Einstellungen …“ für Vorlieben der Anzeige: Form, Bei F3, Auflösung, Todespunkt, Chunklinien, Drehen, Verzierungen, Effekte in der
  * Welt, der Schleier eigener Regionen, die Ablage der Karten, die Koordinaten unter der Minimap und das Untermenü „Ebenen …“. Die Minimap im HUD bleibt sichtbar,
  * jede Wahl wirkt gleich; den Spieler und den Rahmen stellt ein Klick auf die Minimap ein ({@link MinimapKlick}).
  * Gespeichert wird beim Schliessen. Siehe docs/minimap.md, „Bedienung“.
@@ -44,9 +44,14 @@ final class Anzeige extends Screen {
                 .withValues(Minimap.BeiF3.values())
                 .withTooltip(f -> Tooltip.create(Component.translatable("heroicmap.menue.bei_f3.beschreibung")))
                 .create(x + breite - halb, y, halb, 20, Component.translatable("heroicmap.menue.bei_f3"), (b, f) -> m.setzeBeiF3(f)));
-        addRenderableWidget(CycleButton.builder((Integer px) -> Component.translatable("heroicmap.menue.px", px), m.aufloesung())
+        // Kurz, so passt neben ihr der Todespunkt; der volle Text steht im Tooltip. Siehe docs/minimap.md, „Bedienung“.
+        addRenderableWidget(CycleButton.builder((Integer px) -> Component.translatable("heroicmap.menue.px_kurz", px), m.aufloesung())
                 .withValues(1, 2, 4, 8, 16)
-                .create(x, y + 24, breite, 20, Component.translatable("heroicmap.menue.massstab"), (b, px) -> m.setzeScale(px)));
+                .withTooltip(px -> Tooltip.create(Component.translatable("heroicmap.menue.aufloesung.beschreibung")))
+                .create(x, y + 24, halb, 20, Component.translatable("heroicmap.menue.aufloesung"), (b, px) -> m.setzeScale(px)));
+        addRenderableWidget(CycleButton.onOffBuilder(m.todespunkt())
+                .withTooltip(an -> Tooltip.create(Component.translatable("heroicmap.menue.todespunkt.beschreibung")))
+                .create(x + breite - halb, y + 24, halb, 20, Component.translatable("heroicmap.menue.todespunkt"), (b, an) -> m.setzeTodespunkt(an)));
         addRenderableWidget(CycleButton.onOffBuilder(m.chunklinien())
                 .create(x, y + 48, halb, 20, Component.translatable("heroicmap.menue.chunklinien"), (b, an) -> m.setzeChunklinien(an)));
         addRenderableWidget(CycleButton.onOffBuilder(m.drehen())

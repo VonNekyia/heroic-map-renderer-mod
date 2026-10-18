@@ -485,4 +485,16 @@ class MinimapTest {
         neu.lies(datei);
         assertEquals(Schleier.MAX_HOEHE, neu.schleier());
     }
+
+    @Test
+    void todespunktSchalterGespeichert(@TempDir Path ordner) throws Exception {
+        assertTrue(new Minimap().todespunkt());
+        Minimap m = new Minimap();
+        m.setzeTodespunkt(false);
+        Path datei = ordner.resolve("heroicmap.properties");
+        m.schreibe(datei);
+        Minimap neu = new Minimap();
+        neu.lies(datei);
+        assertFalse(neu.todespunkt());
+    }
 }

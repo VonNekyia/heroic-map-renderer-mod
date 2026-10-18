@@ -86,7 +86,9 @@
   "heroicmap.menue.minimap": "Minimap",
   "heroicmap.menue.zoom": "Zoom der Minimap",
   "heroicmap.menue.fach": "%s×",
-  "heroicmap.menue.massstab": "Auflösung der Minimap",
+  "heroicmap.menue.aufloesung": "Auflösung",
+  "heroicmap.menue.aufloesung.beschreibung": "Auflösung der Minimap: wie viele Pixel je Block sie höchstens zeichnet",
+  "heroicmap.menue.px_kurz": "%s px",
   "heroicmap.menue.px": "%s px je Block",
   "heroicmap.menue.form": "Form",
   "heroicmap.menue.eckig": "Eckig",
@@ -173,5 +175,12 @@
   "heroicmap.menue.effekte": "Effekte in der Welt",
   "heroicmap.menue.effekte.beschreibung": "Ein Strahl wie vom Leuchtfeuer über jedem angehefteten Wegpunkt und ein Schleier am Rand angehefteter Regionen",
   "heroicmap.menue.schleier": "Schleier: %s Blöcke",
-  "heroicmap.menue.schleier.beschreibung": "Wie hoch der Schleier am Rand deiner angehefteten Regionen steht; höher heisst auch deckender. Regionen vom Server bleiben bei 4 Blöcken."
+  "heroicmap.menue.schleier.beschreibung": "Wie hoch der Schleier am Rand deiner angehefteten Regionen steht; höher heisst auch deckender. Regionen vom Server bleiben bei 4 Blöcken.",
+  "heroicmap.karte.tod_loeschen": "Todespunkt löschen",
+  "heroicmap.karte.wegpunkt_bei": "Wegpunkt bei …",
+  "heroicmap.karte.wegpunkt_bei_hinweis": "Enter: Wegpunkt bei x z setzen, y zählt nicht; Esc bricht ab",
+  "heroicmap.menue.todespunkt": "Todespunkt",
+  "heroicmap.menue.todespunkt.beschreibung": "Stirbst du, setzt der Mod einen angehefteten Wegpunkt, wo du gestorben bist; nur einen, der nächste Tod verschiebt ihn",
+  "heroicmap.tod.gesetzt": "Todespunkt gesetzt bei %s %s",
+  "heroicmap.tod.klick": "Klick: die Karte dort öffnen"
 }

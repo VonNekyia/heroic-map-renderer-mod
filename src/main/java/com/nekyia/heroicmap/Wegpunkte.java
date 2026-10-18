@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.text.Normalizer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,6 +25,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 import org.slf4j.Logger;
 
 /**
@@ -39,8 +43,11 @@ final class Wegpunkte {
     /** Die Farben der Wegpunkte, der Reihe nach. */
     static final int[] FARBEN = {0xFFE04040, 0xFF4090F0, 0xFF40C040, 0xFFF0C020, 0xFFC050F0, 0xFFF08020, 0xFF40D0D0, 0xFFF070B0};
 
-    /** Ein Wegpunkt auf dem Block (x, z), mit einer festen {@code id}; {@code farbe} ist ein Index in {@link #FARBEN}. */
-    record Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet) {
+    /**
+     * Ein Wegpunkt auf dem Block (x, z), mit einer festen {@code id}; {@code farbe} ist ein Index in {@link #FARBEN}. Mit
+     * {@code tod} der Todespunkt, höchstens einer, ohne eigene Farbe. Siehe docs/wegpunkte.md, „Todespunkt“.
+     */
+    record Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet, boolean tod) {
     }
 
     /** Eine Ecke einer eigenen Form auf dem Block (x, z). */
@@ -87,6 +94,8 @@ final class Wegpunkte {
     static final int MAX_REGIONEN = 256;
     /** So viele eigene Formen je Welt, und so viele Ecken je Form. */
     static final int MAX_EIGENE_FORMEN = 256, MAX_PUNKTE_FORM = 64;
+    /** So weit reicht eine Koordinate, die der Spieler eintippt, in Blöcken: der Rand der Welt. */
+    static final int MAX_KOORDINATE = 30_000_000;
     /** So viele Zeichen hat der Name einer eigenen Form höchstens. */
     static final int MAX_NAME = 32;
     /** Eine eigene Form ohne eigene Farbe; dann gilt ihr Index in {@link #FARBEN}. */
@@ -174,12 +183,25 @@ final class Wegpunkte {
                 // Eine Datei von vor mod#79 nennt keine id; dann vergibt der Mod sie unten.
                 int id = o.has("id") ? o.get("id").getAsInt() : 0;
                 Punkt p = new Punkt(id, o.get("dimension").getAsString(), o.get("x").getAsInt(), o.get("z").getAsInt(),
-                        Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length), o.get("minimap").getAsBoolean());
+                        Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length), o.get("minimap").getAsBoolean(), false);
                 if (finde(p.dimension(), p.x(), p.z()) < 0) {
                     punkte.add(p);
                 }
             } catch (RuntimeException kaputt) {
                 // Nur dieser Eintrag fällt weg.
+            }
+        }
+        // Der Todespunkt steht eigens, so zählt eine ältere Version ihn nicht zu den Wegpunkten. Eine id bekommt er unten.
+        if (json.has("tod") && json.get("tod").isJsonObject()) {
+            try {
+                JsonObject o = json.getAsJsonObject("tod");
+                Punkt p = new Punkt(0, o.get("dimension").getAsString(), o.get("x").getAsInt(), o.get("z").getAsInt(), 0,
+                        o.get("minimap").getAsBoolean(), true);
+                if (finde(p.dimension(), p.x(), p.z()) < 0) {
+                    punkte.add(p);
+                }
+            } catch (RuntimeException kaputt) {
+                // Dann gibt es keinen.
             }
         }
         vergibIds();
@@ -265,7 +287,16 @@ final class Wegpunkte {
 
     JsonObject json() {
         JsonArray liste = new JsonArray();
+        JsonObject tod = null;
         for (Punkt p : punkte) {
+            if (p.tod()) {
+                tod = new JsonObject();
+                tod.addProperty("dimension", p.dimension());
+                tod.addProperty("x", p.x());
+                tod.addProperty("z", p.z());
+                tod.addProperty("minimap", p.angeheftet());
+                continue;
+            }
             JsonObject o = new JsonObject();
             o.addProperty("id", p.id());
             o.addProperty("dimension", p.dimension());
@@ -291,6 +322,9 @@ final class Wegpunkte {
         spieler.forEach(u -> uuids.add(u.toString()));
         JsonObject json = new JsonObject();
         json.add("wegpunkte", liste);
+        if (tod != null) {
+            json.add("tod", tod);
+        }
         json.add("regionen", rechtecke);
         json.add("spieler", uuids);
         json.add("formen", json(formen));
@@ -352,9 +386,60 @@ final class Wegpunkte {
     /** Setzt einen Wegpunkt auf den Block; steht dort schon einer, bleibt er. */
     void setze(String dimension, int x, int z) {
         if (finde(dimension, x, z) < 0) {
-            punkte.add(new Punkt(naechsteId++, dimension, x, z, farbe(dimension), false));
+            punkte.add(new Punkt(naechsteId++, dimension, x, z, farbe(dimension), false, false));
             schreibe();
         }
+    }
+
+    /** Der Todespunkt, oder null. */
+    Punkt tod() {
+        for (Punkt p : punkte) {
+            if (p.tod()) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Setzt den Todespunkt auf den Block (x, z) in {@code dimension}, angeheftet; ein alter fällt weg. Liegt dort schon ein
+     * Wegpunkt, gibt es keinen, denn der Block ist schon markiert; dann false. Siehe docs/wegpunkte.md, „Todespunkt“.
+     */
+    boolean setzeTod(String dimension, int x, int z) {
+        punkte.removeIf(Punkt::tod);
+        boolean frei = finde(dimension, x, z) < 0;
+        if (frei) {
+            punkte.add(new Punkt(naechsteId++, dimension, x, z, 0, true, true));
+        }
+        schreibe();
+        return frei;
+    }
+
+    /** „Todespunkt gesetzt bei x z“ für den Chat; ein Klick darauf öffnet die Karte dort über {@code /hmap karte}. */
+    static Component todMeldung(int x, int z) {
+        return Component.translatable("heroicmap.tod.gesetzt", x, z).withStyle(s -> s.withUnderlined(true)
+                .withClickEvent(new ClickEvent.RunCommand("/hmap karte " + x + " " + z))
+                .withHoverEvent(new HoverEvent.ShowText(Component.translatable("heroicmap.tod.klick"))));
+    }
+
+    /** Nimmt den Todespunkt weg, wenn es einen gibt. */
+    void loescheTod() {
+        if (punkte.removeIf(Punkt::tod)) {
+            schreibe();
+        }
+    }
+
+    /**
+     * „x z“, „x, z“ oder „x y z“ als ganze Blöcke, y überlesen, denn ein Wegpunkt hat nur x und z; jede Zahl nur aus Ziffern
+     * in ASCII, x und z höchstens {@link #MAX_KOORDINATE} weit. Sonst null.
+     */
+    static int[] koordinaten(String roh) {
+        String[] t = roh == null ? new String[0] : roh.strip().split("[\\s,;]+");
+        if (t.length != 2 && t.length != 3 || !Arrays.stream(t).allMatch(s -> s.matches("[-+]?[0-9]{1,9}"))) {
+            return null;
+        }
+        int x = Integer.parseInt(t[0]), z = Integer.parseInt(t[t.length - 1]);
+        return Math.abs(x) <= MAX_KOORDINATE && Math.abs(z) <= MAX_KOORDINATE ? new int[] {x, z} : null;
     }
 
     List<Region> regionen() {
@@ -412,7 +497,7 @@ final class Wegpunkte {
         boolean[] belegt = new boolean[FARBEN.length];
         int anzahl = 0;
         for (Punkt p : punkte) {
-            if (p.dimension().equals(dimension)) {
+            if (!p.tod() && p.dimension().equals(dimension)) {
                 belegt[p.farbe()] = true;
                 anzahl++;
             }
@@ -593,7 +678,7 @@ final class Wegpunkte {
         for (int i = 0; i < punkte.size(); i++) {
             Punkt p = punkte.get(i);
             if (p.id() <= 0 || !gesehen.add(p.id())) {
-                punkte.set(i, new Punkt(naechsteId++, p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet()));
+                punkte.set(i, new Punkt(naechsteId++, p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod()));
             }
         }
     }
@@ -608,7 +693,7 @@ final class Wegpunkte {
             return false;
         }
         Punkt alt = punkte.get(i);
-        punkte.set(i, new Punkt(alt.id(), alt.dimension(), x, z, alt.farbe(), alt.angeheftet()));
+        punkte.set(i, new Punkt(alt.id(), alt.dimension(), x, z, alt.farbe(), alt.angeheftet(), alt.tod()));
         schreibe();
         return true;
     }
@@ -618,7 +703,7 @@ final class Wegpunkte {
         int i = finde(p.dimension(), p.x(), p.z());
         if (i >= 0) {
             Punkt alt = punkte.get(i);
-            punkte.set(i, new Punkt(alt.id(), alt.dimension(), alt.x(), alt.z(), alt.farbe(), !alt.angeheftet()));
+            punkte.set(i, new Punkt(alt.id(), alt.dimension(), alt.x(), alt.z(), alt.farbe(), !alt.angeheftet(), alt.tod()));
             schreibe();
         }
     }
