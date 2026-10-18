@@ -1672,8 +1672,7 @@ final class Karte extends Screen {
      * Rechtecks, wenn seine Raute {@code marke} getroffen ist. Die Fläche einer eigenen Form hat hier keine Einträge mehr.
      */
     private void allgemein(double x, double y, int[] z, String dimension, Wegpunkte.Punkt punkt, Wegpunkte.Region region, List<Eintrag> neu) {
-        if (minecraft.getConnection() != null && !minecraft.level.dimensionType().hasCeiling()
-                && Teleport.erlaubt(minecraft.getConnection().getCommands())) {
+        if (minecraft.getConnection() != null) {
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.teleport", z[0], z[1]), () -> {
                 Teleport.los(minecraft, satz, dimension, z[0], z[1]);
                 onClose();

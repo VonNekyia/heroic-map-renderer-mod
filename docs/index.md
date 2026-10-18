@@ -44,12 +44,13 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [0016](entscheidungen/0016-zweiter-haken-an-der-welt.md): Ein zweiter Haken an `ClientLevel` neben dem an `LevelExtractor.setSectionDirty`, weil Sodium jenen umgeht; gesetzte Truhen erscheinen sofort.
 - [0017](entscheidungen/0017-gametests-in-der-ci-auch-mit-sodium.md): Die Gametests laufen in der CI unter Xvfb, ohne und mit Sodium in der Version des Modpacks, fest mit Prüfsumme und nur für die Gametests.
 - [0018](entscheidungen/0018-api-fuer-client-mods.md): Ebenen anderer Fabric-Mods über `HeroicMapClientApi`, im JSON der Ebenen vom Server, englische Namen, Entrypoint `heroicmap` und Modrinth Maven; bei gleicher Kennung gilt der Server.
-- [0019](entscheidungen/0019-teleport-mit-fester-hoehe.md): „Hierher teleportieren“ mit fester Höhe, aus dem Chunk beim Client, sonst aus Boden oder Höhen der Karte per HTTP, sonst der alte Befehl mit Hinweis; nur die Ablage einer Wurzel, eine Region je Klick.
+- [0019](entscheidungen/0019-teleport-mit-fester-hoehe.md): „Hierher teleportieren“ mit fester Höhe, aus dem Chunk beim Client, sonst aus Boden oder Höhen der Karte per HTTP, sonst der alte Befehl mit Hinweis; nur die Ablage einer Wurzel, eine Region je Klick. Punkt 3 abgelöst durch 0023.
 - [0020](entscheidungen/0020-tafel-mit-eigenem-massstab.md): Die Infotafel mit eigenem ganzem Massstab bis zum GUI-Massstab, höchstens etwa ein Fünftel der Fensterbreite, geeicht auf 1920 × 1080 bei GS 2.
 - [0021](entscheidungen/0021-erster-download-als-strom.md): Der volle Download als ein Strom, ZIP ohne Kompression vom Renderer, früh sichtbar ab der gröbsten Stufe, Fortsetzen mit `nach`; Abgleich weiter einzeln.
 - [0014](entscheidungen/0014-eigene-karte-mit-massstab.md): Die eigene Karte mit 1, 2 oder 4 Pixeln je Block, fest bis zum Löschen, der Baum wie ein Download; löst 0004 im Massstab ab.
 - [0015](entscheidungen/0015-ordner-fuer-einzelspielerwelten.md): Ein Ordner der Welt auch im Einzelspieler, unter heroicmap/ nach Speicherordner und Hash, nicht im Speicherordner der Welt; löst 0004 im Einzelspieler ab.
 - [0022](entscheidungen/0022-marken-nach-aussen.md): Bei „kompass“ und „biom“ zeigt das Bild jeder Marke von der Mitte weg, genordet wie gedreht; die anderen Skins bleiben starr.
+- [0023](entscheidungen/0023-teleport-mit-korrektur.md): „Hierher teleportieren“ immer im Menü; ohne Höhe zuerst der Server, nach 5 Ticks die Höhe des Spielers; danach einmal korrigieren, sobald der Chunk beim Client ist; löst 0019 in Punkt 3 ab.
 
 ## Messungen
 

@@ -73,6 +73,7 @@ public final class HeroicMap implements ClientModInitializer {
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> FabricLoader.getInstance()
                 .getEntrypoints(ID, HeroicMapClientApi.Listener.class).forEach(HeroicMapClientApi.Listener::ready));
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            Teleport.tick(client);
             boolean geaendert = false;
             while (zeigen.consumeClick()) {
                 Minimap.INSTANZ.umschalten();

@@ -36,8 +36,8 @@ Formen“ (mod#79, mod#112).
 
 | Eingabe auf der Vollbildkarte | tut |
 |---|---|
-| Rechtsklick, „Wegpunkt setzen“ | der Eintrag unter „Hierher teleportieren“; setzt einen Wegpunkt auf den Block unter der Maus, in der ersten der 8 Farben (`Wegpunkte.FARBEN`), die in der Dimension noch frei ist, sind alle vergeben, reihum. Steht dort schon einer, bleibt es einer. Den Eintrag gibt es auch ohne Recht zum Teleportieren und unter einer Decke |
-| Rechtsklick auf einen Wegpunkt | das Menü für seinen Block: „Hierher teleportieren“, wenn erlaubt, und „Wegpunkt löschen“, auf dem Todespunkt „Todespunkt löschen“ |
+| Rechtsklick, „Wegpunkt setzen“ | der Eintrag unter „Hierher teleportieren“; setzt einen Wegpunkt auf den Block unter der Maus, in der ersten der 8 Farben (`Wegpunkte.FARBEN`), die in der Dimension noch frei ist, sind alle vergeben, reihum. Steht dort schon einer, bleibt es einer |
+| Rechtsklick auf einen Wegpunkt | das Menü für seinen Block: „Hierher teleportieren“ und „Wegpunkt löschen“, auf dem Todespunkt „Todespunkt löschen“ |
 | Rechtsklick auf einen Wegpunkt, den Griff einer Form oder die Raute eines alten Rechtecks, „Ebene …“ | legt es in eine eigene Ebene, auch in eine neue, siehe „Eigene Ebenen“ |
 | Rechtsklick, „Wegpunkt bei …“ | öffnet an der Stelle des Menüs ein Eingabefeld mit `x z` des Blocks unter der Maus, wie bei „Name…“, siehe „Namen“. Enter nimmt `x z`, `x, z` oder `x y z`, ganze Zahlen aus Ziffern in ASCII, x und z höchstens 30 000 000 weit (`Wegpunkte.koordinaten`); y zählt nicht, ein Wegpunkt hat nur x und z, so sagt es auch der Hinweis unten links. Dann setzt es dort einen Wegpunkt in der jetzigen Dimension wie „Wegpunkt setzen“ und legt ihn in die Mitte. Was keine Koordinaten sind, nimmt Enter nicht; der Text wird rot. Gewünscht vom User am 18.10. (mod#129) |
 | Klick auf eine Marke | legt sie in die Mitte, sobald kein zweiter Klick mehr folgen kann, 250 ms nach dem Loslassen: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück. Wer auf einer Marke zu ziehen beginnt und sich weiter als 3 Einheiten vom Druckpunkt entfernt (`Karte.ZUG`), zieht nur die Karte |
@@ -349,7 +349,7 @@ sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
   Maus. Unten links steht „Linksklick: Eckpunkt hier oder auf einem
   Wegpunkt, auf den ersten: Region; Rechtsklick: Menü mit „Form fertig“;
   Esc bricht ab“. Ein Rechtsklick schliesst nie sofort ab; das Menü hat
-  dann: „Hierher teleportieren“, wenn erlaubt; „Wegpunkt setzen“, auf einem
+  dann: „Hierher teleportieren“; „Wegpunkt setzen“, auf einem
   Wegpunkt „Wegpunkt löschen“; „Eckpunkt hinzufügen“; „Form fertig“ ab zwei
   Ecken; „Form abbrechen“; „Region löschen“ auf der Raute eines alten
   Rechtecks. Auf dem Griff einer Form das Menü der Form, siehe „Griff“, mit
