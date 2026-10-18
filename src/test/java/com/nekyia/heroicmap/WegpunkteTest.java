@@ -563,4 +563,21 @@ class WegpunkteTest {
         Ebenen.Kreis dick = new Ebenen.Kreis(WELT, 0, 0, 3, 0, new Ebenen.Rand(0xFF000000, Ebenen.MAX_BREITE, 0, 0), "d");
         assertEquals(Ebenen.MAX_BREITE, ((Ebenen.Kreis) Wegpunkte.breiter(dick)).rand().breite());
     }
+
+    @Test
+    void griffAufHalberLaengeOderImSchwerpunkt() {
+        // Eine Linie über zwei Stücke, 6 und 4 lang: die Hälfte, 5, liegt auf dem ersten.
+        assertArrayEquals(new double[] {5, 0}, Wegpunkte.griff(new double[] {0, 0, 6, 0, 6, 4}, false), 1e-12);
+        // Auf dem zweiten, wenn das erste kürzer ist: 2 und 6 lang, die Hälfte, 4, liegt 2 weit auf dem zweiten.
+        assertArrayEquals(new double[] {2, 2}, Wegpunkte.griff(new double[] {0, 0, 2, 0, 2, 6}, false), 1e-12);
+        // Eine Region: der Schwerpunkt der Fläche, nicht der Mittelwert der Ecken; im Quadrat wie in einem Dreieck, gleich in welchem Umlauf.
+        assertArrayEquals(new double[] {2, 2}, Wegpunkte.griff(new double[] {0, 0, 4, 0, 4, 4, 0, 4}, true), 1e-12);
+        assertArrayEquals(new double[] {2, 2}, Wegpunkte.griff(new double[] {0, 0, 0, 4, 4, 4, 4, 0}, true), 1e-12);
+        assertArrayEquals(new double[] {2, 1}, Wegpunkte.griff(new double[] {0, 0, 6, 0, 0, 3}, true), 1e-12);
+        // Ein L aus 4 × 2 unten (Fläche 8, Mitte (2, 1)) und 2 × 2 darüber (Fläche 4, Mitte (1, 3)): (20/12, 20/12).
+        // Der Mittelwert der sechs Ecken wäre (2, 2).
+        assertArrayEquals(new double[] {5.0 / 3, 5.0 / 3}, Wegpunkte.griff(new double[] {0, 0, 4, 0, 4, 2, 2, 2, 2, 4, 0, 4}, true), 1e-12);
+        // Ohne Fläche, alle Ecken auf einer Geraden: die Mitte des Kastens.
+        assertArrayEquals(new double[] {3, 0}, Wegpunkte.griff(new double[] {0, 0, 6, 0, 3, 0}, true), 1e-12);
+    }
 }

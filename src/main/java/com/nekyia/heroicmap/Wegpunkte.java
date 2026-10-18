@@ -105,6 +105,8 @@ final class Wegpunkte {
     /** Die Listen für Karte und Minimap und woraus sie gebaut sind. */
     private Ebenen gebautAus;
     private int gebautEbenen, gebautStand;
+    /** Die eigene Form, die die Vollbildkarte gerade zieht, oder null; und die, für die zuletzt gebaut wurde. */
+    private EigeneForm gezogen, gebautGezogen;
     private List<List<Ebenen.Form>> fuerKarte = List.of(), fuerMinimap = List.of();
     private List<Ebenen.Ort> fuerNadeln = List.of();
     /** Dieselben Nadeln und Banner nach Identität, so prüft die Vollbildkarte je Nadel ohne Allokation. */
@@ -724,13 +726,19 @@ final class Wegpunkte {
         return angeheftetOrte.contains(o);
     }
 
+    /** Lässt die eigene Form {@code f} aus den Formen der Vollbildkarte weg, solange sie gezogen wird; null zeigt wieder alle. */
+    void ziehe(EigeneForm f) {
+        gezogen = f;
+    }
+
     private void baue(Ebenen e) {
-        if (e == gebautAus && e.stand() == gebautEbenen && stand == gebautStand) {
+        if (e == gebautAus && e.stand() == gebautEbenen && stand == gebautStand && gezogen == gebautGezogen) {
             return;
         }
         gebautAus = e;
         gebautEbenen = e.stand();
         gebautStand = stand;
+        gebautGezogen = gezogen;
         Map<String, Set<String>> je = new HashMap<>();
         formen.forEach(a -> je.computeIfAbsent(a.ebene(), k -> new HashSet<>()).add(a.id()));
         List<List<Ebenen.Form>> karte = new ArrayList<>(), minimap = new ArrayList<>();
@@ -766,7 +774,10 @@ final class Wegpunkte {
         regionen.stream().filter(Region::angeheftet).map(Wegpunkte::flaeche).forEach(aufMinimap::add);
         for (EigeneForm f : this.eigene) {
             Ebenen.Form form = form(f);
-            aufKarte.add(f.angeheftet() ? breiter(form) : form);
+            // Die Form, die gerade gezogen wird, zeichnet die Vollbildkarte selbst, wo sie an der Maus steht.
+            if (f != gezogen) {
+                aufKarte.add(f.angeheftet() ? breiter(form) : form);
+            }
             if (f.angeheftet()) {
                 aufMinimap.add(form);
             }
@@ -786,11 +797,63 @@ final class Wegpunkte {
      * Farbe zu 25 % mit 1 Einheit Rand, eine Linie 2 Einheiten breit.
      */
     Ebenen.Form form(EigeneForm f) {
+        return form(f, mitten(f));
+    }
+
+    /** Wie {@link #form(EigeneForm)}, wie auf der Vollbildkarte, angeheftet breiter, durch die Punkte {@code p} statt der Ecken; fürs Ziehen. */
+    Ebenen.Form aufKarte(EigeneForm f, double[] p) {
+        Ebenen.Form form = form(f, p);
+        return f.angeheftet() ? breiter(form) : form;
+    }
+
+    /** Die Mitten der Blöcke der Ecken, x und z abwechselnd. */
+    static double[] mitten(EigeneForm f) {
         double[] p = new double[2 * f.ecken().size()];
         for (int i = 0; i < f.ecken().size(); i++) {
             p[2 * i] = f.ecken().get(i).x() + 0.5;
             p[2 * i + 1] = f.ecken().get(i).z() + 0.5;
         }
+        return p;
+    }
+
+    /**
+     * Wo der Griff einer Form durch die Punkte {@code p} sitzt: bei einer Linie auf halber Länge, bei einer Region
+     * im Schwerpunkt ihrer Fläche, ohne Fläche in der Mitte ihres Kastens. Siehe docs/wegpunkte.md, „Eigene Formen“.
+     */
+    static double[] griff(double[] p, boolean region) {
+        int n = p.length / 2;
+        if (!region) {
+            double laenge = 0;
+            for (int i = 1; i < n; i++) {
+                laenge += Math.hypot(p[2 * i] - p[2 * i - 2], p[2 * i + 1] - p[2 * i - 1]);
+            }
+            double rest = laenge / 2;
+            for (int i = 1; i < n; i++) {
+                double s = Math.hypot(p[2 * i] - p[2 * i - 2], p[2 * i + 1] - p[2 * i - 1]);
+                if (rest <= s && s > 0) {
+                    double t = rest / s;
+                    return new double[] {p[2 * i - 2] + t * (p[2 * i] - p[2 * i - 2]), p[2 * i - 1] + t * (p[2 * i + 1] - p[2 * i - 1])};
+                }
+                rest -= s;
+            }
+            return new double[] {p[0], p[1]};
+        }
+        double flaeche = 0, cx = 0, cz = 0;
+        for (int i = 0; i < n; i++) {
+            int j = (i + 1) % n;
+            double k = p[2 * i] * p[2 * j + 1] - p[2 * j] * p[2 * i + 1];
+            flaeche += k;
+            cx += (p[2 * i] + p[2 * j]) * k;
+            cz += (p[2 * i + 1] + p[2 * j + 1]) * k;
+        }
+        if (Math.abs(flaeche) < 1e-9) {
+            double[] b = box(p);
+            return new double[] {(b[0] + b[2]) / 2, (b[1] + b[3]) / 2};
+        }
+        return new double[] {cx / (3 * flaeche), cz / (3 * flaeche)};
+    }
+
+    private Ebenen.Form form(EigeneForm f, double[] p) {
         String dimension = f.dimension();
         int farbe = FARBEN[f.farbe()];
         double[] box = box(p);
