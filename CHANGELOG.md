@@ -4,9 +4,13 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
-## 0.2.56
+## 0.2.57
 
 - **Snap with Ctrl.** Hold `Ctrl` (`⌘` on a Mac) while you drag a corner or a waypoint on the full map, and it snaps onto a nearby corner of another shape or, for a corner, onto a waypoint. Regions now meet cleanly.
+
+## 0.2.56
+
+- **Coordinates stay on screen.** The line under the minimap no longer runs off the edge with large numbers and the height shown: it moves toward the screen and ends flush with the minimap in a corner. If there is room neither below nor above the minimap, it sits at the bottom of the screen.
 
 ## 0.2.55
 

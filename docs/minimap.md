@@ -315,9 +315,26 @@ im Debug-Bildschirm des Spiels (`Mth.floor`). So hat es der User gewünscht.
 - **Lage:** mittig unter der Minimap, in der Schrift des Spiels, weiss mit
   Schatten. 2 Einheiten Abstand unter dem Ring, mit Rahmen unter den
   Ornamenten, die halb über die Ecken ragen, so weit wie der Abstand zum
-  Rand (`Minimap.rand`). Sie folgt
-  Grösse und Lage der Minimap. Ist unten kein Platz mehr, steht die Zeile
-  ebenso über der Minimap (`Minimap.koordinatenLage`).
+  Rand (`Minimap.rand`). Sie folgt Grösse und Lage der Minimap
+  (`Minimap.koordinatenLage`).
+- **Immer ganz auf dem Schirm** (mod#157, Plan vom Reviewer freigegeben am
+  19.10.):
+  - **Waagrecht** rückt die Zeile zum Schirm hin, bis zum selben Abstand vom
+    Rand wie die Minimap (`Minimap.rand`). In einer Ecke endet sie darum
+    bündig mit der Aussenkante der Minimap; breiter als die Minimap darf sie
+    sein. Mit `y` am Rand der Welt ist sie 180 Einheiten breit, bei jedem
+    GUI-Massstab; jede Minimap unter dieser Seite schob sie vorher in einer
+    Ecke über den Rand, bei Seite 64 um 58 Einheiten.
+  - **Senkrecht** steht sie unter der Minimap; ist dort kein Platz, darüber.
+    Passt sie auch dort nicht, steht sie unten am Schirm, auf dem unteren
+    Rand der Minimap. Das geschieht nur, wenn die Minimap fast die ganze
+    Höhe einnimmt, etwa bei GUI-Massstab 4 und mehr als 220 Einheiten Seite.
+  - **Zwei Zeilen** braucht es nicht: Das Spiel wählt den GUI-Massstab so,
+    dass der Schirm mindestens 320 Einheiten breit ist. Nur eine breitere
+    Schrift aus einem Pack könnte mehr brauchen; dann wird die Zeile kleiner,
+    bis sie zwischen die Ränder passt.
+
+![Die Koordinaten am Rand der Welt bei GUI-Massstab 4, links vorher, rechts nachher; oben die kleinste Minimap oben links und oben rechts, je über die ganze Breite des Schirms, unten die grösste oben links](bilder/koordinaten-vergleich.png)
 - **Nicht gedreht:** Die Zeile bleibt waagrecht, auch wenn die Minimap
   dreht.
 
