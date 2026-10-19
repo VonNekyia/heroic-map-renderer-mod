@@ -136,6 +136,8 @@ public final class Minimap {
     private BeiF3 beiF3 = BeiF3.BLEIBT;
     /** Wo die Minimap im letzten Frame stand, oder null, wenn sie nicht zu sehen war; der Gametest fragt es ab. */
     private Rahmen zuletzt;
+    /** Wo die Zeile der Koordinaten im letzten Frame stand: x, y, Breite, Höhe; null ohne Zeile. Für die Gametests. */
+    private int[] koordinatenKasten;
     /** Wie der eigene Spieler aussieht, auf Minimap und Vollbildkarte. Siehe docs/minimap.md, „Spieler“. */
     enum Darstellung { KOPF, PFEIL, DURCHSICHTIG }
 
@@ -358,6 +360,10 @@ public final class Minimap {
 
     BeiF3 beiF3() {
         return beiF3;
+    }
+
+    int[] koordinatenKasten() {
+        return koordinatenKasten;
     }
 
     Rahmen zuletzt() {
@@ -834,12 +840,20 @@ public final class Minimap {
             }
         }
         Object[] werte = werte(koordinaten, spieler.getX(), spieler.getY(), spieler.getZ());
+        koordinatenKasten = null;
         if (werte != null) {
             Component text = Component.translatable(werte.length == 3 ? "heroicmap.koordinaten_xyz" : "heroicmap.koordinaten", werte);
-            int breite = mc.font.width(text);
+            int abstand = rand();
+            float f = koordinatenMassstab(g.guiWidth(), abstand, mc.font.width(text));
+            int breite = Mth.ceil(mc.font.width(text) * f), zeile = Mth.ceil(mc.font.lineHeight * f);
             // Unter dem Ring oder den Ornamenten des Rahmens, die halb über die Ecken ragen.
-            int[] wo = koordinatenLage(r, rahmen == null ? 1 : rand(), g.guiHeight(), breite, mc.font.lineHeight);
-            g.text(mc.font, text, wo[0], wo[1], TEXT, true);
+            int[] wo = koordinatenLage(r, rahmen == null ? 1 : abstand, abstand, g.guiWidth(), g.guiHeight(), breite, zeile);
+            g.pose().pushMatrix();
+            g.pose().translate(wo[0], wo[1]);
+            g.pose().scale(f);
+            g.text(mc.font, text, 0, 0, TEXT, true);
+            g.pose().popMatrix();
+            koordinatenKasten = new int[] {wo[0], wo[1], breite, zeile};
         }
     }
 
@@ -865,12 +879,23 @@ public final class Minimap {
     }
 
     /**
-     * Wo der Text der Koordinaten links oben beginnt: mittig unter der Minimap, {@code ueberstand}
-     * Einheiten unter ihrem Rand und 2 Abstand; passt er dort nicht mehr auf den Schirm, ebenso darüber.
+     * Wo der Text der Koordinaten links oben beginnt: mittig unter der Minimap, {@code ueberstand} Einheiten unter ihrem
+     * Rand und 2 Abstand; passt er dort nicht auf den Schirm, ebenso darüber, sonst unten am Schirm auf der Minimap.
+     * Waagrecht zum Schirm hin verschoben, bis {@code abstand} vor seinen Rand; so endet er in einer Ecke bündig mit der
+     * Minimap. Siehe docs/minimap.md, „Koordinaten“.
      */
-    static int[] koordinatenLage(Rahmen r, int ueberstand, int schirmHoehe, int textBreite, int zeile) {
-        int x = r.x() + (r.seite() - textBreite) / 2, unter = r.y() + r.seite() + ueberstand + 2;
-        return new int[] {x, unter + zeile <= schirmHoehe ? unter : r.y() - ueberstand - 2 - zeile};
+    static int[] koordinatenLage(Rahmen r, int ueberstand, int abstand, int schirmBreite, int schirmHoehe, int textBreite, int zeile) {
+        int x = Math.clamp(r.x() + (r.seite() - textBreite) / 2, abstand, Math.max(abstand, schirmBreite - abstand - textBreite));
+        int unter = r.y() + r.seite() + ueberstand + 2, ueber = r.y() - ueberstand - 2 - zeile;
+        return new int[] {x, unter + zeile <= schirmHoehe ? unter : ueber >= 0 ? ueber : schirmHoehe - zeile};
+    }
+
+    /**
+     * Wie gross die Zeile der Koordinaten steht: 1, ausser sie passt nicht zwischen die Ränder; das geschieht nur mit einer
+     * breiten Schrift aus einem Pack, denn der Schirm ist mindestens 320 Einheiten breit. Siehe docs/minimap.md, „Koordinaten“.
+     */
+    static float koordinatenMassstab(int schirmBreite, int abstand, int textBreite) {
+        return Math.min(1, (schirmBreite - 2 * abstand) / (float) textBreite);
     }
 
     /** Die Seite eines Kopfes auf der Minimap: {@link #KOPF} bei 128 Einheiten, mit der Seite wachsend, mindestens 4. */
