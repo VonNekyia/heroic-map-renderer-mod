@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.56
+
+- **Right-click finishes a shape.** While you build a line or region on the full map, a right-click finishes it: two corners make a line, more make a region. With only one corner, a note says so. Right-click a shape's handle to get its menu, including "Cancel shape"; `Esc` cancels as before.
+
 ## 0.2.55
 
 - **A menu for what you click.** Right-click a waypoint, a corner or the diamond of an old rectangle on the full map, and the menu shows only what concerns it. The free map keeps the general menu.
