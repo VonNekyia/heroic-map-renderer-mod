@@ -33,6 +33,7 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Util;
 import net.minecraft.world.level.storage.LevelResource;
 import org.slf4j.Logger;
 
@@ -109,7 +110,11 @@ final class Downloads {
             case "freigabe" -> freigabe(json);
             case "abgelehnt" -> abgelehnt(json);
             case "spieler" -> Mitspieler.INSTANZ.empfange(json, System.currentTimeMillis());
-            case "show" -> Mitspieler.INSTANZ.antwort(json);
+            case "show" -> {
+                Mitspieler.INSTANZ.antwort(json);
+                Webkarte.INSTANZ.show(json);
+            }
+            case "web" -> Webkarte.INSTANZ.antwort(json, Symbole.INSTANZ.basis(), Symbole.INSTANZ.spielserver(), Util.getMillis());
             case "ebenen" -> {
                 // Die Adresse nur aus einer Liste, die gilt; Symbole von Ebenen, die fehlen, frei.
                 if (Ebenen.INSTANZ.empfange(json)) {

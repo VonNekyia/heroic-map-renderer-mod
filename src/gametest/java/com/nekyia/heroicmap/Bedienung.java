@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,6 +18,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.IntPredicate;
 import java.util.zip.Deflater;
 import javax.imageio.ImageIO;
@@ -91,6 +93,8 @@ public final class Bedienung implements FabricClientGameTest {
             // Vor tod: Der lässt den Spieler am Ende fallen, und ein toter Spieler hat statt der Karte den Todesschirm.
             knoepfeGross(context, maus);
             teleport(context, spiel.getServer(), maus, k);
+            // Vor tod: Der lässt den Spieler am Ende in der Luft, er fällt.
+            imBrowser(context, maus, k);
             tod(context, spiel.getServer(), maus, k);
         } finally {
             context.runOnClient(mc -> Wegpunkte.INSTANZ.leeren());
@@ -2787,6 +2791,107 @@ public final class Bedienung implements FabricClientGameTest {
         // Zurück in die Oberwelt, auf das Gras; die Schritte danach rechnen dort.
         server.runCommand("execute in minecraft:overworld run tp @p 0.5 -60 0.5");
         context.waitFor(mc -> mc.level.dimension() == Level.OVERWORLD && Math.abs(mc.player.getY() - -60) < 0.01 && mc.player.onGround(), 600);
+    }
+
+    /**
+     * „Im Browser öffnen“, siehe docs/vollbildkarte.md, „Im Browser öffnen“. Der Einzelspieler hat keinen Kanal zum Plugin; den
+     * setzt der Test, ebenso die Frage und das Öffnen, so geht kein Browser auf. Die Antworten des Plugins gibt er wie das Netz
+     * über {@code Downloads.empfange}. Geprüft: grau mit Grund bei altem Plugin und ohne Freigabe; mit Freigabe ein Klick von
+     * Hand, die Frage, der Link aus der eigenen Basis mit dem Token im Fragment; eine Absage wegen der Rate; und das Token steht
+     * nicht im Log.
+     */
+    private static void imBrowser(ClientGameTestContext context, TestInput maus, int k) {
+        String token = "eyJ2IjoyfQ.Gametest_Token-0123456789";
+        AtomicInteger fragen = new AtomicInteger();
+        AtomicReference<URI> geoeffnet = new AtomicReference<>();
+        var kanalVorher = Webkarte.kanal;
+        var fragenVorher = Webkarte.fragen;
+        var oeffnenVorher = Webkarte.oeffnen;
+        Webkarte.kanal = () -> true;
+        Webkarte.fragen = () -> {
+            fragen.incrementAndGet();
+            return true;
+        };
+        Webkarte.oeffnen = geoeffnet::set;
+        try {
+            context.runOnClient(mc -> {
+                Webkarte.INSTANZ.leeren();
+                Symbole.INSTANZ.basis(JsonParser.parseString("{\"url\":\"http://127.0.0.1:8082/welt/tiles\"}").getAsJsonObject(),
+                        InetAddress.getLoopbackAddress());
+                mc.gui.setScreen(new Karte(Satz.lies(Bilder.testsatz())));
+            });
+            context.waitTicks(3);
+            // Ohne Antwort auf show mit dem Feld web: ein altes Plugin, grau.
+            pruefeWeb(context, false, "heroicmap.web.alt");
+            context.runOnClient(mc -> Downloads.INSTANZ.empfange("{\"v\":1,\"typ\":\"show\",\"erlaubt\":true,\"web\":false}"));
+            context.waitTicks(2);
+            pruefeWeb(context, false, "heroicmap.web.nicht_frei");
+            context.runOnClient(mc -> Downloads.INSTANZ.empfange("{\"v\":1,\"typ\":\"show\",\"erlaubt\":true,\"web\":true}"));
+            context.waitTicks(2);
+            pruefeWeb(context, true, null);
+            // Ein Klick von Hand auf den Knopf: die Frage geht hinaus, der Knopf wartet auf die Antwort.
+            int[] knopf = context.computeOnClient(mc -> {
+                AbstractWidget w = ((Karte) mc.gui.screen()).webKnopf();
+                return new int[] {w.getX() + w.getWidth() / 2, w.getY() + w.getHeight() / 2};
+            });
+            spielerKlick(context, maus, k, knopf[0], knopf[1]);
+            if (fragen.get() != 1) {
+                throw new AssertionError("Im Browser öffnen: " + fragen.get() + " Fragen statt 1 nach dem Klick");
+            }
+            pruefeWeb(context, false, "heroicmap.web.laeuft");
+            context.runOnClient(mc -> Downloads.INSTANZ.empfange("{\"v\":1,\"typ\":\"web\",\"erlaubt\":true,\"token\":\"" + token + "\"}"));
+            for (int i = 0; geoeffnet.get() == null; i++) {
+                if (i == 100) {
+                    throw new AssertionError("Im Browser öffnen: nach der Antwort kein Link geöffnet");
+                }
+                context.waitTick();
+            }
+            String link = geoeffnet.get().toString();
+            if (!link.equals("http://127.0.0.1:8082/welt/#anmelden=" + token)) {
+                throw new AssertionError("Im Browser öffnen: Link " + link.replace(token, "<token>"));
+            }
+            pruefeWeb(context, true, null);
+            // Noch einmal, und der Server sagt: erst in 12 s. Das steht unten links.
+            spielerKlick(context, maus, k, knopf[0], knopf[1]);
+            context.runOnClient(mc -> Downloads.INSTANZ.empfange(
+                    "{\"v\":1,\"typ\":\"web\",\"erlaubt\":false,\"grund\":\"rate\",\"jetzt\":1760000000,\"wieder\":12}"));
+            context.waitTicks(2);
+            String hinweis = context.computeOnClient(mc -> {
+                Component h = ((Karte) mc.gui.screen()).hinweis();
+                return h == null ? "" : h.getString();
+            });
+            String erwartet = context.computeOnClient(mc -> Component.translatable("heroicmap.web.grund.rate", 12L).getString());
+            if (fragen.get() != 2 || !hinweis.equals(erwartet)) {
+                throw new AssertionError("Im Browser öffnen, Rate: " + fragen.get() + " Fragen, Hinweis „" + hinweis + "“ statt „" + erwartet + "“");
+            }
+            context.runOnClient(mc -> mc.gui.setScreen(null));
+            context.waitTicks(5);
+            // Das Token steht nirgends im Log.
+            Path log = net.fabricmc.loader.api.FabricLoader.getInstance().getGameDir().resolve("logs").resolve("latest.log");
+            if (Files.readString(log, StandardCharsets.UTF_8).contains(token)) {
+                throw new AssertionError("Im Browser öffnen: Das Token steht in latest.log");
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } finally {
+            Webkarte.kanal = kanalVorher;
+            Webkarte.fragen = fragenVorher;
+            Webkarte.oeffnen = oeffnenVorher;
+            context.runOnClient(mc -> Webkarte.INSTANZ.leeren());
+        }
+    }
+
+    /** Der Knopf „Im Browser öffnen“ geht oder ist aus mit dem Grund {@code schluessel}. */
+    private static void pruefeWeb(ClientGameTestContext context, boolean geht, String schluessel) {
+        String[] stand = context.computeOnClient(mc -> {
+            Karte karte = (Karte) mc.gui.screen();
+            Component aus = Webkarte.INSTANZ.aus(Symbole.INSTANZ.basis(), Util.getMillis());
+            return new String[] {String.valueOf(karte.webKnopf() != null && karte.webKnopf().active), aus == null ? "" : aus.getString(),
+                schluessel == null ? "" : Component.translatable(schluessel).getString()};
+        });
+        if (Boolean.parseBoolean(stand[0]) != geht || !stand[1].equals(stand[2])) {
+            throw new AssertionError("Im Browser öffnen: an " + stand[0] + " statt " + geht + ", Grund „" + stand[1] + "“ statt „" + stand[2] + "“");
+        }
     }
 
     /** Öffnet die Karte über (x, z), Rechtsklick in die Mitte, ein Klick auf „Hierher teleportieren“; sie schliesst sich. */

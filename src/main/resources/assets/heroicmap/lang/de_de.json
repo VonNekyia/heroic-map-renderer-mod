@@ -201,5 +201,19 @@
   "heroicmap.ebenen.code.ebenen_voll": "Höchstens 32 eigene Ebenen",
   "heroicmap.ebenen.code.formen_voll": "So viele Formen passen nicht mehr, höchstens 256 je Welt",
   "heroicmap.karte.base_aus": "Neues kommt nach Base, und Base ist aus; es steht erst, wenn du sie anschaltest",
-  "heroicmap.karte.wegpunkt_verborgen": "Dort liegt schon ein Wegpunkt, in einer Ebene, die aus ist"
+  "heroicmap.karte.wegpunkt_verborgen": "Dort liegt schon ein Wegpunkt, in einer Ebene, die aus ist",
+  "heroicmap.karte.web": "Im Browser öffnen",
+  "heroicmap.web.kein_plugin": "Auf diesem Server fehlt das Plugin von Heroic Map",
+  "heroicmap.web.alt": "Das Plugin des Servers kann das noch nicht",
+  "heroicmap.web.nicht_frei": "Auf diesem Server nicht freigegeben",
+  "heroicmap.web.ohne_basis": "Die Adresse der Webkarte ist nicht bekannt",
+  "heroicmap.web.laeuft": "Der Link wird angefragt …",
+  "heroicmap.web.oeffnet": "Die Webkarte öffnet sich im Browser",
+  "heroicmap.web.adresse": "Die Adresse der Webkarte ist nicht erlaubt",
+  "heroicmap.web.browser": "Der Browser liess sich nicht öffnen",
+  "heroicmap.web.grund.permission": "Der Server erlaubt dir die Webkarte nicht",
+  "heroicmap.web.grund.webserver": "Die Webkarte ist auf diesem Server gerade nicht da",
+  "heroicmap.web.grund.rate": "Erst wieder in %s s",
+  "heroicmap.web.grund.rate_ohne": "Erst gleich wieder",
+  "heroicmap.web.grund.sonst": "Der Server konnte keinen Link geben"
 }

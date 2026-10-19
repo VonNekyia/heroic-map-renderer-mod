@@ -201,5 +201,19 @@
   "heroicmap.ebenen.code.ebenen_voll": "At most 32 layers of your own",
   "heroicmap.ebenen.code.formen_voll": "That many shapes no longer fit, at most 256 per world",
   "heroicmap.karte.base_aus": "New things go to Base, and Base is off; they show once you switch it on",
-  "heroicmap.karte.wegpunkt_verborgen": "There is already a waypoint there, in a layer that is off"
+  "heroicmap.karte.wegpunkt_verborgen": "There is already a waypoint there, in a layer that is off",
+  "heroicmap.karte.web": "Open in browser",
+  "heroicmap.web.kein_plugin": "This server does not have the Heroic Map plugin",
+  "heroicmap.web.alt": "The server's plugin can't do this yet",
+  "heroicmap.web.nicht_frei": "Not enabled for you on this server",
+  "heroicmap.web.ohne_basis": "The address of the web map is not known",
+  "heroicmap.web.laeuft": "Requesting the link …",
+  "heroicmap.web.oeffnet": "The web map opens in your browser",
+  "heroicmap.web.adresse": "The address of the web map is not allowed",
+  "heroicmap.web.browser": "The browser could not be opened",
+  "heroicmap.web.grund.permission": "The server does not allow you the web map",
+  "heroicmap.web.grund.webserver": "The web map is not available on this server right now",
+  "heroicmap.web.grund.rate": "Try again in %s s",
+  "heroicmap.web.grund.rate_ohne": "Try again in a moment",
+  "heroicmap.web.grund.sonst": "The server could not give a link"
 }
