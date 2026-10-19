@@ -16,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.IntPredicate;
@@ -29,6 +30,8 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
 import net.minecraft.client.MouseHandler;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
@@ -87,6 +90,8 @@ public final class Bedienung implements FabricClientGameTest {
             schleierRegler(context, maus, k);
 
             karte(context, maus, k);
+            // Vor tod: Der lässt den Spieler am Ende fallen, und ein toter Spieler hat statt der Karte den Todesschirm.
+            knoepfeGross(context, maus);
             teleport(context, spiel.getServer(), maus, k);
             // Vor tod: Der lässt den Spieler am Ende in der Luft, er fällt.
             imBrowser(context, maus, k);
@@ -156,6 +161,7 @@ public final class Bedienung implements FabricClientGameTest {
         wegpunktBei(context, maus, k);
         eigeneEbenen(context, maus, k);
         ebenenTeilen(context, maus, k);
+        knoepfe(context, maus, k);
         ebenen(context, maus, k);
         zumSpieler(context, maus, k);
         optionen(context, maus, k);
@@ -418,6 +424,379 @@ public final class Bedienung implements FabricClientGameTest {
         }
         context.runOnClient(mc -> Ebenen.INSTANZ.leeren());
         warte250();
+    }
+
+    /** Die Tafel der Stadt, wie das Plugin sie schickt: Titel, eine Zeile und dahinter die Knöpfe „Schiff“ und „Zug“ mit Zustand. */
+    private static String stadtTafel(String version, boolean schiff, boolean zug) {
+        return """
+                {"v":1,"typ":"tafel","jetzt":1,"ebene":"test:knopf","version":"%s","id":"stadt","panel":{"blocks":[
+                  {"type":"title","text":"Hafenstadt"},
+                  {"type":"lines","lines":["Routen per Schiff"]},
+                  {"type":"button","id":"beispiel:schiff","label":{"de":"Schiff","en":"Ship"},"on":%s},
+                  {"type":"button","id":"beispiel:zug","label":{"de":"Zug","en":"Train"},"on":%s}]}}""".formatted(version, schiff, zug);
+    }
+
+    /** Die Ebene test:knopf mit den Nadeln „stadt“, „dorf“ und „voll“, je mit dem Fuss an der Stelle des Schirms; ein Block sind 4 Einheiten. */
+    private static void knopfEbene(ClientGameTestContext context, String version, double[]... fuesse) {
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+        double[] mitte = mitte(context);
+        String[] ids = {"stadt", "dorf", "voll"};
+        StringBuilder nadeln = new StringBuilder();
+        for (int i = 0; i < fuesse.length; i++) {
+            nadeln.append(i == 0 ? "" : ",").append("{\"type\":\"pin\",\"id\":\"%s\",\"at\":[%s,%s],\"name\":\"%s\"}".formatted(ids[i],
+                    (mitte[0] + fuesse[i][0] - breite / 2.0) / 4, (mitte[1] + fuesse[i][1] - hoehe / 2.0) / 4, ids[i]));
+        }
+        context.runOnClient(mc -> {
+            Ebenen.INSTANZ.empfange(JsonParser.parseString("""
+                    {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:knopf","visible":true,"version":"%s"}]}""".formatted(version))
+                    .getAsJsonObject());
+            Ebenen.INSTANZ.teil(Ebenen.Teil.lies("""
+                    {"v":1,"typ":"ebene","jetzt":1,"id":"test:knopf","version":"%s","teil":1,"teile":1,"objects":[%s]}"""
+                    .formatted(version, nadeln)));
+        });
+        context.waitTick();
+    }
+
+    /**
+     * Fährt wie die Hand auf die Nadel mit dem Fuss bei {@code fuss}, bis der Mod ihre Tafel fragt, und antwortet wie das
+     * Plugin; dann steht die Tafel mit ihren Knöpfen. Wo das Schild liegt, sagt die Karte selbst.
+     */
+    private static double[] oeffne(ClientGameTestContext context, TestInput maus, int k, double[] fuss, Tafeln.Ziel ziel,
+            List<Tafeln.Ziel> fragen, String antwort) {
+        double[] auf = null;
+        for (int dy = 0; dy <= 24 && auf == null; dy += 2) {
+            double y = fuss[1] - dy;
+            if (ziel.equals(context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zielBei(fuss[0], y)))) {
+                auf = new double[] {fuss[0], y};
+            }
+        }
+        if (auf == null) {
+            throw new AssertionError("Keine Nadel „" + ziel.id() + "“ über " + fuss[0] + "," + fuss[1]);
+        }
+        // Stand der Zeiger schon auf ihr, als die Ebene kam, ging die Frage schon hinaus; darum jede Frage nach diesem Ziel.
+        fahre(context, maus, k, auf[0], auf[1]);
+        for (int i = 0; i < 40 && !fragen.contains(ziel); i++) {
+            context.waitTick();
+        }
+        if (!fragen.contains(ziel)) {
+            double[] ort = auf;
+            throw new AssertionError("Keine Frage nach " + ziel + ": " + context.computeOnClient(mc -> {
+                Karte karte = (Karte) mc.gui.screen();
+                double x = mc.mouseHandler.xpos() / mc.getWindow().getGuiScale(), y = mc.mouseHandler.ypos() / mc.getWindow().getGuiScale();
+                return "GS " + mc.getWindow().getGuiScale() + ", Fenster " + mc.getWindow().getWidth() + " × " + mc.getWindow().getHeight()
+                        + ", Zeiger " + x + "," + y + " statt " + ort[0] + "," + ort[1] + ", Ziel dort " + karte.zielBei(x, y) + ", Tafel "
+                        + karte.tafelOffen() + ", Menü " + Arrays.toString(karte.ziel()) + ", Knopf " + karte.getChildAt(x, y).isPresent()
+                        + ", Fragen " + fragen;
+            }));
+        }
+        antworte(context, antwort);
+        context.waitFor(mc -> !((Karte) mc.gui.screen()).knopfStuecke().isEmpty(), 20);
+        return auf;
+    }
+
+    /**
+     * Ein schneller Schwung des Zeigers in die offene Tafel, 4 Einheiten in ihre linke obere Ecke, in einem Frame wie eine
+     * Hand, die zielt: So geht sie auch auf einem langsamen Runner nicht zu, weil der Zeiger zu lange über keinem Ziel steht.
+     */
+    private static void rein(ClientGameTestContext context, TestInput maus, int k) {
+        int[] t = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelKasten());
+        maus.setCursorPos((t[0] + 4) * k, (t[1] + 4) * k);
+        context.waitTick();
+    }
+
+    private static void antworte(ClientGameTestContext context, String antwort) {
+        context.runOnClient(mc -> Tafeln.INSTANZ.antwort(Tafeln.Antwort.lies(antwort)));
+        context.waitTicks(2);
+    }
+
+    /** Der Zustand des Knopfs {@code id} in der offenen Tafel, wie gezeichnet, oder null ohne ihn. */
+    private static Boolean knopfAn(ClientGameTestContext context, String id) {
+        return context.computeOnClient(mc -> ((Karte) mc.gui.screen()).knopfStuecke().stream().filter(s -> s.knopf().id().equals(id))
+                .map(s -> s.knopf().an()).findFirst().orElse(null));
+    }
+
+    private static double[] mitteDes(ClientGameTestContext context, String id) {
+        int[] b = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).knopfKasten(id));
+        if (b == null) {
+            throw new AssertionError("Kein Knopf " + id + " in der Tafel");
+        }
+        return new double[] {b[0] + b[2] / 2.0, b[1] + b[3] / 2.0};
+    }
+
+    /**
+     * Knöpfe in der Tafel (#294 Teil 6), mit Klicks wie von Hand. Das Plugin spielt der Test: Er merkt jede Frage und
+     * jeden Klick und antwortet wie das Plugin. Siehe docs/ebenen.md, „Knöpfe“.
+     */
+    private static void knoepfe(ClientGameTestContext context, TestInput maus, int k) {
+        List<Tafeln.Ziel> fragen = new CopyOnWriteArrayList<>();
+        List<String> klicks = new CopyOnWriteArrayList<>();
+        Tafeln.fragen = fragen::add;
+        Tafeln.druecken = (z, knopf) -> klicks.add(z.id() + "@" + z.version() + " " + knopf);
+        try {
+            knoepfeSchritte(context, maus, k, fragen, klicks);
+        } finally {
+            Tafeln.fragen = Kanal::frageTafel;
+            Tafeln.druecken = Kanal::drueckeKnopf;
+            context.runOnClient(mc -> {
+                Ebenen.INSTANZ.leeren();
+                Tafeln.INSTANZ.leeren();
+            });
+        }
+    }
+
+    private static void knoepfeSchritte(ClientGameTestContext context, TestInput maus, int k, List<Tafeln.Ziel> fragen, List<String> klicks) {
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+        double cx = breite / 2.0, cy = hoehe / 2.0;
+        // Links oben und links unten, damit die Tafeln rechts davon aufgehen; die volle rechts unten.
+        double[] stadt = {cx - 150, cy - 70}, dorf = {cx - 150, cy + 40}, voll = {cx + 40, cy + 60};
+        for (double[] o : new double[][] {stadt, dorf, voll}) {
+            boolean frei = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).marken().stream()
+                    .noneMatch(m -> Math.abs(m.x() - o[0]) < 16 && Math.abs(m.y() - o[1]) < 16));
+            if (!frei) {
+                throw new AssertionError("Eine Marke liegt bei " + o[0] + "," + o[1] + "; der Test braucht dort freie Karte");
+            }
+        }
+        knopfEbene(context, "1", stadt, dorf, voll);
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        Tafeln.Ziel ziel = new Tafeln.Ziel("test:knopf", "1", "stadt");
+        String schiff = "beispiel:schiff", zug = "beispiel:zug";
+
+        // Die Tafel mit zwei Knöpfen unter dem Inhalt: Schiff aus, Zug an.
+        double[] aufStadt = oeffne(context, maus, k, stadt, ziel, fragen, stadtTafel("1", false, true));
+        if (!Boolean.FALSE.equals(knopfAn(context, schiff)) || !Boolean.TRUE.equals(knopfAn(context, zug))) {
+            throw new AssertionError("Tafel der Stadt: Schiff " + knopfAn(context, schiff) + ", Zug " + knopfAn(context, zug));
+        }
+        context.takeScreenshot(TestScreenshotOptions.of("knoepfe").disableCounterPrefix());
+
+        // Ein Klick auf „Schiff“: genau ein knopf mit Objekt, version und Knopf; danach ist er gesperrt, ein Doppelklick schickt nichts.
+        rein(context, maus, k);
+        double[] s = mitteDes(context, schiff);
+        spielerKlick(context, maus, k, s[0], s[1]);
+        if (!klicks.equals(List.of("stadt@1 " + schiff)) || !context.computeOnClient(mc -> Tafeln.INSTANZ.gesperrt(ziel, schiff))) {
+            throw new AssertionError("Klick auf „Schiff“: " + klicks + ", gesperrt "
+                    + context.computeOnClient(mc -> Tafeln.INSTANZ.gesperrt(ziel, schiff)));
+        }
+        maus.pressMouse(LINKS);
+        context.waitTick();
+        maus.pressMouse(LINKS);
+        context.waitTicks(2);
+        if (klicks.size() != 1) {
+            throw new AssertionError("Doppelklick auf den gesperrten Knopf: " + klicks);
+        }
+        // Nach dem Ereignis schickt das Plugin die Tafel, hier noch mit dem alten Zustand: gesperrt, der Mod fragt neu.
+        int vorher = fragen.size();
+        antworte(context, stadtTafel("1", false, true));
+        context.waitFor(mc -> fragen.size() > vorher, 40);
+        if (!context.computeOnClient(mc -> Tafeln.INSTANZ.gesperrt(ziel, schiff))) {
+            throw new AssertionError("Die Tafel mit dem alten Zustand gab den Knopf frei");
+        }
+        // Die Antwort auf die Nachfrage mit dem neuen Zustand: das Quadrat gefüllt, der Knopf frei.
+        antworte(context, stadtTafel("1", true, true));
+        if (!Boolean.TRUE.equals(knopfAn(context, schiff)) || context.computeOnClient(mc -> Tafeln.INSTANZ.gesperrt(ziel, schiff))) {
+            throw new AssertionError("Neuer Zustand: Schiff " + knopfAn(context, schiff) + ", gesperrt "
+                    + context.computeOnClient(mc -> Tafeln.INSTANZ.gesperrt(ziel, schiff)));
+        }
+        context.takeScreenshot(TestScreenshotOptions.of("knoepfe-an").disableCounterPrefix());
+
+        // Ohne Antwort: Klick auf „Zug“. Der Mod fragt nach 0,3, 0,8, 1,5 und 3 s, nach 3,5 s ist der Knopf frei, mit Hinweis.
+        double[] z = mitteDes(context, zug);
+        int vorZug = fragen.size();
+        spielerKlick(context, maus, k, z[0], z[1]);
+        long seit = Util.getMillis();
+        context.waitFor(mc -> !Tafeln.INSTANZ.gesperrt(ziel, zug), 400);
+        long dauer = Util.getMillis() - seit;
+        String hinweis = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).hinweis() == null ? null
+                : ((Karte) mc.gui.screen()).hinweis().getString());
+        String erwartet = context.computeOnClient(mc -> Component.translatable("heroicmap.tafel.keine_antwort").getString());
+        if (klicks.size() != 2 || fragen.size() - vorZug != Tafeln.NACHFRAGEN.length || dauer < 3000 || !erwartet.equals(hinweis)
+                || !Boolean.TRUE.equals(knopfAn(context, zug))) {
+            throw new AssertionError("Ohne Antwort: " + klicks + ", " + (fragen.size() - vorZug) + " Nachfragen, frei nach " + dauer
+                    + " ms, Hinweis „" + hinweis + "“, Zug " + knopfAn(context, zug));
+        }
+
+        // Kein Klick in die Tafel wirkt auf die Karte: kein Wegpunkt, nichts angeheftet, kein Menü.
+        if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size()) != punkte
+                || context.computeOnClient(mc -> Wegpunkte.INSTANZ.nadelAngeheftet("test:knopf", "stadt"))
+                || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).ziel()) != null) {
+            throw new AssertionError("Ein Klick auf einen Knopf wirkte auf die Karte");
+        }
+
+        // Wieder aufgehen: Eine Tafel mit Knöpfen fragt der Mod neu und zeigt bis zur Antwort die gemerkte; ein Zustand von
+        // anderswo, etwa von der Webkarte, steht danach.
+        tafelZu(context, maus, k);
+        int vorAuf = fragen.size();
+        fahre(context, maus, k, aufStadt[0], aufStadt[1]);
+        for (int i = 0; i < 40 && !(fragen.size() > vorAuf && context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelOffen())); i++) {
+            context.waitTick();
+        }
+        if (fragen.size() <= vorAuf || !fragen.getLast().equals(ziel) || !Boolean.TRUE.equals(knopfAn(context, schiff))) {
+            throw new AssertionError("Wieder aufgegangen: gefragt " + fragen.subList(vorAuf, fragen.size()) + ", Schiff " + knopfAn(context, schiff));
+        }
+        antworte(context, stadtTafel("1", false, true));
+        if (!Boolean.FALSE.equals(knopfAn(context, schiff))) {
+            throw new AssertionError("Der Zustand von anderswo steht nicht: Schiff " + knopfAn(context, schiff));
+        }
+        // Rechts auf einen Knopf: kein knopf, kein Menü.
+        rein(context, maus, k);
+        double[] rechts = mitteDes(context, schiff);
+        fahre(context, maus, k, rechts[0], rechts[1]);
+        maus.pressMouse(RECHTS);
+        context.waitTicks(2);
+        if (klicks.size() != 2 || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).ziel()) != null) {
+            throw new AssertionError("Rechtsklick auf einen Knopf: " + klicks);
+        }
+
+        // Eine neue version der Ebene, ehe die Tafel zugeht: Ein Klick im selben Augenblick schickt nichts (Review),
+        // und nach dem Zugehen auch einer mit der Hand nicht.
+        rein(context, maus, k);
+        double[] alt = mitteDes(context, schiff);
+        int[] kasten = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelKasten());
+        context.runOnClient(mc -> {
+            Ebenen.INSTANZ.empfange(JsonParser.parseString("""
+                    {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:knopf","visible":true,"version":"2"}]}""").getAsJsonObject());
+            Ebenen.INSTANZ.teil(Ebenen.Teil.lies("""
+                    {"v":1,"typ":"ebene","jetzt":1,"id":"test:knopf","version":"2","teil":1,"teile":1,"objects":[]}"""));
+            mc.gui.screen().mouseClicked(new MouseButtonEvent(alt[0], alt[1], new MouseButtonInfo(LINKS, 0)), false);
+        });
+        context.waitTicks(2);
+        if (kasten == null || klicks.size() != 2) {
+            throw new AssertionError("Klick auf die Tafel einer alten version: Tafel " + Arrays.toString(kasten) + ", " + klicks);
+        }
+        if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelOffen())) {
+            throw new AssertionError("Die Tafel der alten version blieb offen");
+        }
+        spielerKlick(context, maus, k, alt[0], alt[1]);
+        if (klicks.size() != 2) {
+            throw new AssertionError("Klick mit der Hand nach der neuen version: " + klicks);
+        }
+
+        // Ein Objekt ohne Tafel mit einem Knopf: eine Tafel nur mit dem Knopf.
+        knopfEbene(context, "3", stadt, dorf, voll);
+        Tafeln.Ziel dorfZiel = new Tafeln.Ziel("test:knopf", "3", "dorf");
+        oeffne(context, maus, k, dorf, dorfZiel, fragen, """
+                {"v":1,"typ":"tafel","jetzt":1,"ebene":"test:knopf","version":"3","id":"dorf","panel":{"blocks":[
+                  {"type":"button","id":"beispiel:schiff","label":{"de":"Schiff","en":"Ship"},"on":false}]}}""");
+        int[] nurTafel = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelKasten());
+        int[] nurKnopf = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).knopfKasten(schiff));
+        if (nurTafel == null || nurKnopf == null || nurTafel[3] > nurKnopf[3] + 2 * Tafel.INNEN + 2) {
+            throw new AssertionError("Tafel nur mit dem Knopf: Tafel " + Arrays.toString(nurTafel) + ", Knopf " + Arrays.toString(nurKnopf));
+        }
+        tafelZu(context, maus, k);
+
+        // Eine volle Tafel, 64 Bausteine, und dahinter 5 Knöpfe: Die ersten 4 stehen darunter, gescrollt ist der letzte zu sehen.
+        StringBuilder bloecke = new StringBuilder();
+        for (int i = 0; i < Tafel.MAX_BAUSTEINE; i++) {
+            bloecke.append("{\"type\":\"lines\",\"lines\":[\"Zeile ").append(i).append("\"]},");
+        }
+        for (int i = 0; i < 5; i++) {
+            bloecke.append(i == 0 ? "" : ",").append("{\"type\":\"button\",\"id\":\"beispiel:k").append(i)
+                    .append("\",\"label\":{\"de\":\"Knopf ").append(i).append("\"},\"on\":false}");
+        }
+        oeffne(context, maus, k, voll, new Tafeln.Ziel("test:knopf", "3", "voll"), fragen,
+                "{\"v\":1,\"typ\":\"tafel\",\"jetzt\":1,\"ebene\":\"test:knopf\",\"version\":\"3\",\"id\":\"voll\",\"panel\":{\"blocks\":["
+                + bloecke + "]}}");
+        List<String> vier = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).knopfStuecke().stream().map(x -> x.knopf().id()).toList());
+        if (!vier.equals(List.of("beispiel:k0", "beispiel:k1", "beispiel:k2", "beispiel:k3"))) {
+            throw new AssertionError("Volle Tafel: Knöpfe " + vier);
+        }
+        int[] tafel = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelKasten());
+        rein(context, maus, k);
+        fahre(context, maus, k, tafel[0] + tafel[2] / 2.0, tafel[1] + tafel[3] / 2.0);
+        maus.scroll(-200);
+        context.waitTicks(2);
+        int[] letzter = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).knopfKasten("beispiel:k3"));
+        if (letzter == null || letzter[1] < tafel[1] || letzter[1] + letzter[3] > tafel[1] + tafel[3]) {
+            throw new AssertionError("Volle Tafel gescrollt: letzter Knopf " + Arrays.toString(letzter) + ", Tafel " + Arrays.toString(tafel));
+        }
+        // Gescrollt trifft ein Klick den Knopf, der dort zu sehen ist.
+        spielerKlick(context, maus, k, letzter[0] + letzter[2] / 2.0, letzter[1] + letzter[3] / 2.0);
+        if (!klicks.getLast().equals("voll@3 beispiel:k3")) {
+            throw new AssertionError("Klick auf den letzten Knopf der gescrollten Tafel: " + klicks);
+        }
+        // Review von #147: Blendet der Spieler die Ebene aus, während der Knopf wartet, fällt er still weg, ohne
+        // Nachfrage und ohne „Noch keine Antwort“; das Plugin antwortet darauf ohnehin nicht.
+        Tafeln.Ziel vollZiel = new Tafeln.Ziel("test:knopf", "3", "voll");
+        context.runOnClient(mc -> Ebenen.INSTANZ.setze("test:knopf", false));
+        int nachAus = fragen.size();
+        long bis = Util.getMillis() + Tafeln.GESPERRT_MS + 500;
+        while (Util.getMillis() < bis) {
+            context.waitTick();
+        }
+        String danach = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).hinweis() == null ? null
+                : ((Karte) mc.gui.screen()).hinweis().getString());
+        boolean wartet = context.computeOnClient(mc -> Tafeln.INSTANZ.gesperrt(vollZiel, "beispiel:k3"));
+        context.runOnClient(mc -> Ebenen.INSTANZ.setze("test:knopf", true));
+        if (fragen.size() != nachAus || wartet || erwartet.equals(danach)) {
+            throw new AssertionError("Ebene ausgeblendet, während der Knopf wartet: " + (fragen.size() - nachAus) + " Nachfragen, wartet "
+                    + wartet + ", Hinweis „" + danach + "“");
+        }
+        tafelZu(context, maus, k);
+    }
+
+    /**
+     * Bei GUI-Massstab 3 und 4 steht die Tafel mit Knöpfen ganz auf dem Schirm, jeder Knopf in ihr, mit vollem Label. Die
+     * Tafel hat ihren eigenen Massstab (0020); davon bleiben die Bilder. Siehe docs/ebenen.md, „Knöpfe“.
+     */
+    private static void knoepfeGross(ClientGameTestContext context, TestInput maus) {
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(),
+                mc.options.guiScale().get()});
+        List<Tafeln.Ziel> fragen = new CopyOnWriteArrayList<>();
+        Tafeln.fragen = fragen::add;
+        String fehler = null;
+        try {
+            for (int gs : new int[] {3, 4}) {
+                fragen.clear();
+                context.getInput().resizeWindow(1280, 240 * gs);
+                context.runOnClient(mc -> {
+                    mc.options.guiScale().set(gs);
+                    mc.resizeGui();
+                    mc.gui.setScreen(new Karte(Satz.lies(Bilder.testsatz())));
+                });
+                context.waitTicks(5);
+                int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+                int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+                double[] stadt = {breite / 2.0 - 80, hoehe / 2.0 - 50};
+                knopfEbene(context, "1", stadt);
+                oeffne(context, maus, gs, stadt, new Tafeln.Ziel("test:knopf", "1", "stadt"), fragen, stadtTafel("1", true, false));
+                context.takeScreenshot(TestScreenshotOptions.of("knoepfe-gs" + gs).disableCounterPrefix());
+                String f = context.computeOnClient(mc -> {
+                    Karte karte = (Karte) mc.gui.screen();
+                    int[] t = karte.tafelKasten();
+                    if (t[0] < 0 || t[1] < 0 || t[0] + t[2] > breite || t[1] + t[3] > hoehe) {
+                        return "Tafel " + Arrays.toString(t) + " nicht ganz auf dem Schirm " + breite + " × " + hoehe;
+                    }
+                    for (Tafel.Knopfstueck s : karte.knopfStuecke()) {
+                        int[] b = karte.knopfKasten(s.knopf().id());
+                        if (b[0] < t[0] || b[1] < t[1] || b[0] + b[2] > t[0] + t[2] || b[1] + b[3] > t[1] + t[3]) {
+                            return s.knopf().id() + " " + Arrays.toString(b) + " nicht in der Tafel " + Arrays.toString(t);
+                        }
+                        if (!s.label().equals(s.knopf().label(mc.getLanguageManager().getSelected().startsWith("de")))) {
+                            return "Label gekürzt: „" + s.label() + "“";
+                        }
+                    }
+                    return karte.knopfStuecke().size() == 2 ? null : karte.knopfStuecke().size() + " Knöpfe";
+                });
+                fehler = fehler != null ? fehler : f == null ? null : "GS " + gs + ": " + f;
+                context.runOnClient(mc -> {
+                    Ebenen.INSTANZ.leeren();
+                    Tafeln.INSTANZ.leeren();
+                });
+            }
+        } finally {
+            Tafeln.fragen = Kanal::frageTafel;
+            context.getInput().resizeWindow(vorher[0], vorher[1]);
+            context.runOnClient(mc -> {
+                mc.gui.setScreen(null);
+                mc.options.guiScale().set(vorher[2]);
+                mc.resizeGui();
+            });
+            context.waitTicks(2);
+        }
+        if (fehler != null) {
+            throw new AssertionError("Knöpfe: " + fehler);
+        }
     }
 
     /** Die Antwort des Plugins auf die Frage nach der Tafel der grossen Region unter den Wegpunkten. */

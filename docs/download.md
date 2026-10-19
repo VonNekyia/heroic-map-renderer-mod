@@ -62,9 +62,10 @@ der Mod mit den Kacheln zeigt, steht unter [Vollbildkarte](vollbildkarte.md).
   `web` bringt das Token für die Webkarte, siehe „Webkarte“ unten. Nachrichten mit einem anderen
   `v` als 1 oder über 1 MiB verwirft er; so gross wird nur ein Teil einer
   Ebene.
-- **Senden:** `anfrage`, `show`, `tafel`, `banner` und `web` nur, wenn
+- **Senden:** `anfrage`, `show`, `tafel`, `knopf`, `banner` und `web` nur, wenn
   `ClientPlayNetworking.canSend` wahr ist, also wenn das Plugin den Kanal
-  angemeldet hat. Zu `show` siehe [Minimap](minimap.md), „Mitspieler“.
+  angemeldet hat. Zu `show` siehe [Minimap](minimap.md), „Mitspieler“, zu
+  `knopf` [Ebenen](ebenen.md), „Knöpfe“.
 - **`neu: true`** steht in der `anfrage` eines vollen Downloads, wenn es
   für den Massstab keinen Stand zum Fortsetzen gibt, also kein `etags.txt`
   im Ordner des Massstabs (`Laden.hatStand`), etwa nachdem die Karte

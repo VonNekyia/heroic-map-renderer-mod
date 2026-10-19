@@ -119,6 +119,27 @@ record Kanal(String json, Ebenen.Teil teil, Tafeln.Antwort tafel, Geheimbanner.A
         return json.toString();
     }
 
+    /** Drückt einen Knopf in der Tafel eines Objekts, wenn der Server den Kanal hört; true, wenn der Klick hinausging. Siehe docs/ebenen.md, „Knöpfe“. */
+    static boolean drueckeKnopf(Tafeln.Ziel z, String knopf) {
+        if (!offen()) {
+            return false;
+        }
+        ClientPlayNetworking.send(new Kanal(knopf(z, knopf)));
+        return true;
+    }
+
+    /** Der Klick {@code knopf}: Ebene, version und Kennung des Objekts wie bei {@code tafel}, dazu der Knopf. */
+    static String knopf(Tafeln.Ziel z, String knopf) {
+        JsonObject json = new JsonObject();
+        json.addProperty("v", 1);
+        json.addProperty("typ", "knopf");
+        json.addProperty("ebene", z.ebene());
+        json.addProperty("version", z.version());
+        json.addProperty("id", z.id());
+        json.addProperty("knopf", knopf);
+        return json.toString();
+    }
+
     /** Fragt das Sprite eines geheimen Banners, wenn der Server den Kanal hört; true, wenn die Frage hinausging. Siehe docs/ebenen.md, „Geheime Banner“. */
     static boolean frageBanner(Geheimbanner.Schluessel k) {
         if (!offen()) {
