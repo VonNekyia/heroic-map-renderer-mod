@@ -88,8 +88,9 @@ public final class Bedienung implements FabricClientGameTest {
 
             karte(context, maus, k);
             teleport(context, spiel.getServer(), maus, k);
-            tod(context, spiel.getServer(), maus, k);
+            // Vor tod: Der lässt den Spieler am Ende in der Luft, er fällt.
             imBrowser(context, maus, k);
+            tod(context, spiel.getServer(), maus, k);
         } finally {
             context.runOnClient(mc -> Wegpunkte.INSTANZ.leeren());
             // Das Menü speichert beim Schliessen; danach wieder die Vorgabe.
