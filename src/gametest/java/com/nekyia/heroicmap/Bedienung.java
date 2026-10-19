@@ -895,7 +895,9 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("Rechtsklick mit zwei Punkten gab keine Linie: " + linie);
         }
 
-        // Ein Doppelklick in die Region heftet sie an; „Form löschen“ löscht sie.
+        // Ein Doppelklick in die Region heftet sie an; „Form löschen“ löscht sie. Erst geht die Tafel der Region vom Server zu,
+        // die nach dem Abschliessen am Ort des Rechtsklicks aufging; sonst nähme sie die Klicks.
+        tafelZu(context, maus, k);
         warte250();
         double ix = (orte[0][0] + orte[1][0] + orte[2][0]) / 3, iy = (orte[0][1] + orte[1][1] + orte[2][1]) / 3;
         fahre(context, maus, k, ix, iy);
@@ -905,9 +907,13 @@ public final class Bedienung implements FabricClientGameTest {
         context.waitTicks(2);
         if (!context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).angeheftet())
                 || context.computeOnClient(mc -> Wegpunkte.INSTANZ.angeheftet("test:land", "land"))) {
+            int[] tafelDa = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelKasten());
+            int[] menueDa = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).ziel());
             throw new AssertionError("Doppelklick in die eigene Region heftete nicht sie an: eigene "
                     + context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).angeheftet()) + ", vom Server "
-                    + context.computeOnClient(mc -> Wegpunkte.INSTANZ.angeheftet("test:land", "land")));
+                    + context.computeOnClient(mc -> Wegpunkte.INSTANZ.angeheftet("test:land", "land")) + "; bei " + ix + "," + iy + " Tafel "
+                    + Arrays.toString(tafelDa) + ", Menü " + Arrays.toString(menueDa) + ", im Bau "
+                    + context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug()));
         }
         // Ein Doppelklick von Hand auf einen Wegpunkt in der Region heftet ihn an, die Karte bleibt stehen (mod#75).
         double[] stand = mitte(context);
