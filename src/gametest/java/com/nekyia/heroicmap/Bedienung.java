@@ -1644,8 +1644,9 @@ public final class Bedienung implements FabricClientGameTest {
 
     /**
      * Ein Rechtsklick im Bau schliesst die Form ab (mod#149): mit einer Ecke nur der Hinweis, mit zweien eine Linie, auch auf
-     * einem Wegpunkt; mit vier eine Region. Am Griff einer Form kommt ihr Menü mit „Form fertig“ und „Form abbrechen“, und
-     * „Form abbrechen“ verwirft die Form im Bau. Im Bau sonst kein Menü. Siehe docs/wegpunkte.md, „Eigene Formen“.
+     * einem Wegpunkt; mit vier eine Region. Am Griff einer Form kommt ihr Menü, mit einer Ecke im Bau mit „Form abbrechen“ und
+     * ohne „Form fertig“, und „Form abbrechen“ verwirft die Form im Bau. Im Bau sonst kein Menü. Siehe docs/wegpunkte.md,
+     * „Eigene Formen“.
      */
     private static void rechtsklickImBau(ClientGameTestContext context, TestInput maus, int k) {
         int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
@@ -1698,12 +1699,14 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Rechtsklick mit vier Ecken gab keine Region mit vieren: " + (alle.size() > formen ? alle.getLast() : null));
             }
 
-            // Im Bau am Griff dieser Region: ihr Menü mit „Form fertig“ und „Form abbrechen“; „Form abbrechen“ verwirft den Bau.
+            // Im Bau mit einer Ecke am Griff dieser Region: ihr Menü mit „Form abbrechen“, ohne „Form fertig“, das es erst ab zwei Ecken
+            // gibt; „Form abbrechen“ verwirft den Bau.
             double[] griff = griff(context, formen);
             eintrag(context, maus, k, orte[4][0] + 30, orte[4][1] + 30, "heroicmap.karte.form_von_hier");
             List<String> menue = eintraegeBei(context, maus, k, griff[0], griff[1]);
-            List<String> bau = texte(context, "heroicmap.karte.form_fertig", "heroicmap.karte.form_abbrechen");
-            if (!menue.containsAll(bau) || !menue.contains(texte(context, "heroicmap.karte.form_loeschen").getFirst())) {
+            if (!menue.contains(texte(context, "heroicmap.karte.form_abbrechen").getFirst())
+                    || menue.contains(texte(context, "heroicmap.karte.form_fertig").getFirst())
+                    || !menue.contains(texte(context, "heroicmap.karte.form_loeschen").getFirst())) {
                 throw new AssertionError("Rechtsklick am Griff im Bau: " + menue);
             }
             eintrag(context, maus, k, griff[0], griff[1], "heroicmap.karte.form_abbrechen");

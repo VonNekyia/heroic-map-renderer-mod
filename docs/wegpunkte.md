@@ -52,7 +52,7 @@ Formen“ (mod#79, mod#112).
 | Rechtsklick auf eine Ecke, „Eckpunkt löschen“ | nimmt sie aus der Form; aus einer Region mit drei Ecken wird eine Linie, eine Linie mit zwei fällt weg |
 | Linke Taste 0,5 s still auf einer Ecke halten | sie hängt an der Maus, die Form folgt ihr, und sie liegt beim Loslassen auf dem Block darunter; `Esc` bricht ab |
 | Linke Taste 0,5 s still auf dem Griff in der Mitte einer Form halten | die ganze Form hängt an der Maus; beim Loslassen liegt sie um ganze Blöcke verschoben; `Esc` bricht ab, siehe „Eigene Formen“ |
-| Rechtsklick, solange eine Form im Bau ist | schliesst sie ab: mit zwei Ecken eine Linie, mit mehr eine Region; mit einer nur ein Hinweis. Am Griff einer Form statt dessen ihr Menü mit „Form fertig“ und „Form abbrechen“ |
+| Rechtsklick, solange eine Form im Bau ist | schliesst sie ab: mit zwei Ecken eine Linie, mit mehr eine Region; mit einer nur ein Hinweis. Am Griff einer Form statt dessen ihr Menü mit „Form fertig“ ab zwei Ecken und „Form abbrechen“ |
 | `Esc`, oder am Griff „Form abbrechen“ | verwirft die Form im Bau; eine geänderte bleibt, wie sie war |
 | Rechtsklick auf den Griff einer eigenen Form | ihr Menü: „An die Minimap heften“ oder „Von der Minimap lösen“, „Name…“, „Farbe…“, „Eckpunkt hinzufügen“, „Form löschen“; siehe „Eigene Formen“, „Namen“ und „Farbe“ |
 
@@ -921,7 +921,8 @@ Schleier am Rand, siehe „Schleier“.
   Mitte. Rechtsklick im Bau (`rechtsklickImBau`): mit einer Ecke der Hinweis,
   kein Menü und keine Form; mit zweien auf einem Wegpunkt eine Linie; mit
   vier auf freier Karte eine Region mit allen vieren; am Griff einer Form im
-  Bau ihr Menü mit „Form fertig“ und „Form abbrechen“, das den Bau verwirft.
+  Bau mit einer Ecke ihr Menü mit „Form abbrechen“ und ohne „Form fertig“;
+  „Form abbrechen“ verwirft den Bau.
   Menü je Objekt (`menueJeObjekt`): die Einträge an einem Wegpunkt,
   an einem Wegpunkt auf einer Ecke nur seine, an einer Ecke, an der Raute
   eines alten Rechtecks und auf freier Karte in einer Region; „Koordinaten
