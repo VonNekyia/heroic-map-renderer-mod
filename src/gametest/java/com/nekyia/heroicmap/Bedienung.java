@@ -1806,12 +1806,15 @@ public final class Bedienung implements FabricClientGameTest {
             // Zurück, dann ohne Strg dasselbe: auf dem Block unter der Maus, nicht auf B0.
             context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
             context.waitTicks(2);
+            // Die Lage von B0 von jetzt; das Halten schiebt die Karte dann noch um bis zu eine Einheit, also höchstens einen Block.
             a1 = ecke(context, formen, 1);
-            int[] unter = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blockUnter(daneben[0], daneben[1]));
-            halteUndZiehe(context, maus, k, a1, daneben, false, -1, 0);
+            double[] b0Ohne = ecke(context, formen + 1, 0);
+            double[] nebenOhne = {b0Ohne[0] - 6, b0Ohne[1]};
+            int[] unter = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blockUnter(nebenOhne[0], nebenOhne[1]));
+            halteUndZiehe(context, maus, k, a1, nebenOhne, false, -1, 0);
             ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
-            if (!ist.equals(new Wegpunkte.Ecke(unter[0], unter[1])) || ist.equals(b0)) {
-                throw new AssertionError("Ecke ohne Strg: " + ist + " statt " + unter[0] + " " + unter[1]);
+            if (ist.equals(b0) || Math.abs(ist.x() - unter[0]) > 1 || Math.abs(ist.z() - unter[1]) > 1) {
+                throw new AssertionError("Ecke ohne Strg: " + ist + " statt bei " + unter[0] + " " + unter[1] + ", nicht auf " + b0);
             }
 
             // Ecke 2 von A mit Strg 6 Einheiten neben den Wegpunkt: auf seinem Block.
