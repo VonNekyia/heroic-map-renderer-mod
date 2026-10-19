@@ -1798,6 +1798,26 @@ public final class Bedienung implements FabricClientGameTest {
                     || context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size()) != formen + 1) {
                 throw new AssertionError("Entf auf freier Karte löschte etwas");
             }
+            // Bei offenem Menü: nichts, auch wenn die Maus danach über dem Wegpunkt steht (Review von #153).
+            warte250();
+            maus.setCursorPos(leer[0] * k, leer[1] * k);
+            context.waitTick();
+            maus.pressMouse(RECHTS);
+            context.waitTicks(2);
+            fahre(context, maus, k, m.x(), m.y());
+            boolean menueOffen = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).ziel()) != null;
+            maus.pressKey(InputConstants.KEY_DELETE);
+            context.waitTicks(2);
+            boolean nachMenue = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size()) == punkte + 1;
+            // Ein Klick neben das Menü schliesst es und tut sonst nichts.
+            warte250();
+            maus.setCursorPos((leer[0] - 10) * k, (leer[1] - 10) * k);
+            context.waitTick();
+            maus.pressMouse(LINKS);
+            context.waitTicks(2);
+            if (!menueOffen || !nachMenue) {
+                throw new AssertionError("Entf bei offenem Menü: Menü offen " + menueOffen + ", Wegpunkt noch da " + nachMenue);
+            }
             // Im Bau: nichts, auch auf dem Wegpunkt.
             eintrag(context, maus, k, leer[0], leer[1], "heroicmap.karte.form_von_hier");
             fahre(context, maus, k, m.x(), m.y());

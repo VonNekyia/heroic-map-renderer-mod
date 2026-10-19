@@ -2040,10 +2040,11 @@ final class Karte extends Screen {
             zug = null;
             return true;
         }
-        // Entf oder ⌫ löscht, was unter der Maus hervorgehoben steht; ⌫, weil die Taste auf dem Mac so heisst. Nicht im Bau und
-        // nicht bei gedrückter Taste. Siehe docs/wegpunkte.md, „Bedienung“.
+        // Entf oder ⌫ löscht, was unter der Maus hervorgehoben steht; ⌫, weil die Taste auf dem Mac so heisst. Nicht im Bau, nicht
+        // bei gedrückter Taste und nicht bei offenem Menü: Die Hervorhebung des letzten Frames stünde dann noch. Siehe
+        // docs/wegpunkte.md, „Bedienung“.
         if ((ereignis.key() == InputConstants.KEY_DELETE || ereignis.key() == InputConstants.KEY_BACKSPACE) && zug == null && !taste
-                && loescheUnterMaus()) {
+                && ziel == null && loescheUnterMaus()) {
             return true;
         }
         if (HeroicMap.karte != null && HeroicMap.karte.matches(ereignis)) {
