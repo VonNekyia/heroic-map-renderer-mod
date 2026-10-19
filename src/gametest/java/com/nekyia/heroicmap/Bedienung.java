@@ -428,8 +428,8 @@ public final class Bedienung implements FabricClientGameTest {
                 {"v":1,"typ":"tafel","jetzt":1,"ebene":"test:knopf","version":"%s","id":"stadt","panel":{"blocks":[
                   {"type":"title","text":"Hafenstadt"},
                   {"type":"lines","lines":["Routen per Schiff"]},
-                  {"type":"button","id":"proficisci:schiff","label":{"de":"Schiff","en":"Ship"},"on":%s},
-                  {"type":"button","id":"proficisci:zug","label":{"de":"Zug","en":"Train"},"on":%s}]}}""".formatted(version, schiff, zug);
+                  {"type":"button","id":"beispiel:schiff","label":{"de":"Schiff","en":"Ship"},"on":%s},
+                  {"type":"button","id":"beispiel:zug","label":{"de":"Zug","en":"Train"},"on":%s}]}}""".formatted(version, schiff, zug);
     }
 
     /** Die Ebene test:knopf mit den Nadeln „stadt“, „dorf“ und „voll“, je mit dem Fuss an der Stelle des Schirms; ein Block sind 4 Einheiten. */
@@ -557,7 +557,7 @@ public final class Bedienung implements FabricClientGameTest {
         knopfEbene(context, "1", stadt, dorf, voll);
         int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
         Tafeln.Ziel ziel = new Tafeln.Ziel("test:knopf", "1", "stadt");
-        String schiff = "proficisci:schiff", zug = "proficisci:zug";
+        String schiff = "beispiel:schiff", zug = "beispiel:zug";
 
         // Die Tafel mit zwei Knöpfen unter dem Inhalt: Schiff aus, Zug an.
         double[] aufStadt = oeffne(context, maus, k, stadt, ziel, fragen, stadtTafel("1", false, true));
@@ -671,7 +671,7 @@ public final class Bedienung implements FabricClientGameTest {
         Tafeln.Ziel dorfZiel = new Tafeln.Ziel("test:knopf", "3", "dorf");
         oeffne(context, maus, k, dorf, dorfZiel, fragen, """
                 {"v":1,"typ":"tafel","jetzt":1,"ebene":"test:knopf","version":"3","id":"dorf","panel":{"blocks":[
-                  {"type":"button","id":"proficisci:schiff","label":{"de":"Schiff","en":"Ship"},"on":false}]}}""");
+                  {"type":"button","id":"beispiel:schiff","label":{"de":"Schiff","en":"Ship"},"on":false}]}}""");
         int[] nurTafel = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelKasten());
         int[] nurKnopf = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).knopfKasten(schiff));
         if (nurTafel == null || nurKnopf == null || nurTafel[3] > nurKnopf[3] + 2 * Tafel.INNEN + 2) {
@@ -685,14 +685,14 @@ public final class Bedienung implements FabricClientGameTest {
             bloecke.append("{\"type\":\"lines\",\"lines\":[\"Zeile ").append(i).append("\"]},");
         }
         for (int i = 0; i < 5; i++) {
-            bloecke.append(i == 0 ? "" : ",").append("{\"type\":\"button\",\"id\":\"proficisci:k").append(i)
+            bloecke.append(i == 0 ? "" : ",").append("{\"type\":\"button\",\"id\":\"beispiel:k").append(i)
                     .append("\",\"label\":{\"de\":\"Knopf ").append(i).append("\"},\"on\":false}");
         }
         oeffne(context, maus, k, voll, new Tafeln.Ziel("test:knopf", "3", "voll"), fragen,
                 "{\"v\":1,\"typ\":\"tafel\",\"jetzt\":1,\"ebene\":\"test:knopf\",\"version\":\"3\",\"id\":\"voll\",\"panel\":{\"blocks\":["
                 + bloecke + "]}}");
         List<String> vier = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).knopfStuecke().stream().map(x -> x.knopf().id()).toList());
-        if (!vier.equals(List.of("proficisci:k0", "proficisci:k1", "proficisci:k2", "proficisci:k3"))) {
+        if (!vier.equals(List.of("beispiel:k0", "beispiel:k1", "beispiel:k2", "beispiel:k3"))) {
             throw new AssertionError("Volle Tafel: Knöpfe " + vier);
         }
         int[] tafel = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelKasten());
@@ -700,13 +700,13 @@ public final class Bedienung implements FabricClientGameTest {
         fahre(context, maus, k, tafel[0] + tafel[2] / 2.0, tafel[1] + tafel[3] / 2.0);
         maus.scroll(-200);
         context.waitTicks(2);
-        int[] letzter = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).knopfKasten("proficisci:k3"));
+        int[] letzter = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).knopfKasten("beispiel:k3"));
         if (letzter == null || letzter[1] < tafel[1] || letzter[1] + letzter[3] > tafel[1] + tafel[3]) {
             throw new AssertionError("Volle Tafel gescrollt: letzter Knopf " + Arrays.toString(letzter) + ", Tafel " + Arrays.toString(tafel));
         }
         // Gescrollt trifft ein Klick den Knopf, der dort zu sehen ist.
         spielerKlick(context, maus, k, letzter[0] + letzter[2] / 2.0, letzter[1] + letzter[3] / 2.0);
-        if (!klicks.getLast().equals("voll@3 proficisci:k3")) {
+        if (!klicks.getLast().equals("voll@3 beispiel:k3")) {
             throw new AssertionError("Klick auf den letzten Knopf der gescrollten Tafel: " + klicks);
         }
         tafelZu(context, maus, k);
