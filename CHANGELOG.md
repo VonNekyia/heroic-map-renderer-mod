@@ -10,6 +10,10 @@ The release notes on GitHub and Modrinth come from here
 - **Set coordinates.** "Set coordinates…" on a waypoint or a corner moves it to the `x z` you type.
 - **Delete with a key.** `Delete` or `Backspace` removes the waypoint, corner, shape (at its handle) or old rectangle under the mouse.
 
+## 0.2.54
+
+- **Open the web map in your browser, already logged in.** "Open in browser" on the full map, or `/hmap web`, opens the server's web map and logs you in, so it knows exactly who you are and lets you click there too. It needs a server with a matching Heroic Map plugin; otherwise the button is grey and says why.
+
 ## 0.2.53
 
 - **Buttons in info panels.** A server plugin can put buttons under the info panel of a place on the full map, for example "Ship" at every town. Click one to switch it on or off for you; the square on the left is filled while it is on. If the server does not answer within a few seconds, the button is free again and a note says so.
