@@ -218,4 +218,69 @@ class TafelTest {
         assertEquals(3, Tafel.massstab(3840, 1300, 4));
         assertEquals(2, Tafel.massstab(100, 100, 4));
     }
+
+    private static String knopf(String id, String label, boolean an) {
+        return "{\"type\":\"button\",\"id\":\"" + id + "\",\"label\":{" + label + "},\"on\":" + an + "}";
+    }
+
+    /** Knöpfe nur oben, höchstens 4, nicht unter den 64 Bausteinen; ein kaputter oder doppelter fällt weg. Siehe docs/ebenen.md, „Knöpfe“. */
+    @Test
+    void knoepfeLesen() {
+        // Wie das Plugin sie schickt: hinter einer vollen Tafel.
+        StringBuilder bloecke = new StringBuilder("{\"type\":\"lines\",\"lines\":[\"x\"]},".repeat(Tafel.MAX_BAUSTEINE));
+        for (int i = 0; i < 5; i++) {
+            bloecke.append(knopf("b:k" + i, "\"de\":\"Knopf " + i + "\"", i % 2 == 0)).append(',');
+        }
+        Tafel t = lies(bloecke + "{\"type\":\"title\",\"text\":\"zu viel\"}");
+        assertEquals(Tafel.MAX_BAUSTEINE, t.bausteine().size());
+        assertEquals(List.of("b:k0", "b:k1", "b:k2", "b:k3"), t.knoepfe().stream().map(Tafel.Knopf::id).toList());
+        assertEquals(new Tafel.Knopf("b:k0", "Knopf 0", null, true), t.knoepfe().getFirst());
+        assertFalse(t.knoepfe().get(1).an());
+        String de = "\"de\":\"Schiff\"";
+        for (String kaputt : new String[] {
+            knopf("schiff", de, true), knopf("B:schiff", de, true), knopf("b:.schiff", de, true), knopf("b:nul", de, true),
+            knopf("b:schiff", "", true), knopf("b:schiff", "\"de\":\"" + "x".repeat(Tafel.MAX_LABEL + 1) + "\"", true),
+            knopf("b:schiff", "\"de\":\"§a\"", true), knopf("b:schiff", "\"fr\":\"Bateau\"", true),
+            "{\"type\":\"button\",\"id\":\"b:schiff\",\"label\":{" + de + "},\"on\":\"true\"}",
+            "{\"type\":\"button\",\"id\":\"b:schiff\",\"label\":{" + de + "}}"}) {
+            assertEquals(List.of(), lies(kaputt).knoepfe(), kaputt);
+        }
+        // 32 Zeichen nach Codepoints wie im Plugin: 32 Emoji sind 64 Zeichen in Java und gelten.
+        assertEquals(1, lies(knopf("b:schiff", "\"en\":\"" + "😀".repeat(Tafel.MAX_LABEL) + "\"", false)).knoepfe().size());
+        // Ein Label über der Grenze fällt allein weg, das andere gilt; Codes mit § sind gestrichen.
+        assertEquals(new Tafel.Knopf("b:schiff", null, "Ship", true),
+                lies(knopf("b:schiff", "\"de\":\"" + "x".repeat(40) + "\",\"en\":\"§aShip\"", true)).knoepfe().getFirst());
+        // Nur oben: in einem Abschnitt oder in Spalten fällt er weg. Eine Kennung zweimal: der erste gilt.
+        assertEquals(List.of(), lies("{\"type\":\"section\",\"heading\":{\"text\":\"A\"},\"blocks\":[" + knopf("b:k", de, true) + "]},"
+                + "{\"type\":\"columns\",\"columns\":[[" + knopf("b:l", de, true) + "],[]]}").knoepfe());
+        assertEquals(List.of(new Tafel.Knopf("b:k", "Eins", null, true)),
+                lies(knopf("b:k", "\"de\":\"Eins\"", true) + "," + knopf("b:k", "\"de\":\"Zwei\"", false)).knoepfe());
+        // Das Label in der Sprache des Spiels, sonst in der anderen.
+        assertEquals("Schiff", new Tafel.Knopf("b:k", "Schiff", "Ship", true).label(true));
+        assertEquals("Ship", new Tafel.Knopf("b:k", "Schiff", "Ship", true).label(false));
+        assertEquals("Schiff", new Tafel.Knopf("b:k", "Schiff", null, true).label(false));
+        assertEquals("Ship", new Tafel.Knopf("b:k", null, "Ship", true).label(true));
+    }
+
+    /** Die Knöpfe unter dem Inhalt, je einer in einer Zeile über die ganze Breite, 4 Abstand, so hoch wie eine Zeile und 2 × 2. */
+    @Test
+    void knoepfeSetzen() {
+        Tafel t = lies("{\"type\":\"title\",\"text\":\"Burgtal\"}," + knopf("b:schiff", "\"de\":\"Schiff\",\"en\":\"Ship\"", true) + ","
+                + knopf("b:zug", "\"en\":\"Train\"", false));
+        Tafel.Satz s = Tafel.setze(t, MASSE, true);
+        // Der breiteste ist der erste Knopf: 14 bis zum Label, 6 × 6 Label, 3 Rand.
+        assertEquals(53, s.breite());
+        assertEquals(new Tafel.Knopfstueck(0, 14, 53, 14, t.knoepfe().get(0), "Schiff"), s.stuecke().get(1));
+        assertEquals(new Tafel.Knopfstueck(0, 32, 53, 14, t.knoepfe().get(1), "Train"), s.stuecke().get(2));
+        assertEquals(46, s.hoehe());
+        assertEquals("Ship", ((Tafel.Knopfstueck) Tafel.setze(t, MASSE, false).stuecke().get(1)).label());
+        // Nur Knöpfe: der erste ganz oben, ohne Abstand davor.
+        Tafel.Satz nur = Tafel.setze(lies(knopf("b:zug", "\"en\":\"Train\"", false)), MASSE, false);
+        assertEquals(0, ((Tafel.Knopfstueck) nur.stuecke().getFirst()).y());
+        assertEquals(14, nur.hoehe());
+        // Ein langes Label kürzt die Tafel auf 200 und sich auf den Platz.
+        Tafel.Satz lang = Tafel.setze(lies(knopf("b:l", "\"de\":\"" + "x".repeat(32) + "\"", true)), MASSE, true);
+        assertEquals(Tafel.BREITE, lang.breite());
+        assertEquals("x".repeat(30), ((Tafel.Knopfstueck) lang.stuecke().getFirst()).label());
+    }
 }

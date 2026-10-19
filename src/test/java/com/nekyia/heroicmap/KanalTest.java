@@ -77,4 +77,15 @@ class KanalTest {
         JsonObject json = JsonParser.parseString(Kanal.anfrage("welt", 2, "voll", true)).getAsJsonObject();
         assertTrue(json.get("neu").getAsBoolean());
     }
+
+    /** Typ und Felder wie EbenenFuerMod.klick im Plugin, Klick(ebene, version, id, knopf), alle als Text; wie das Beispiel in seiner Doku. */
+    @Test
+    void knopfWieImPlugin() {
+        assertEquals("{\"v\":1,\"typ\":\"knopf\",\"ebene\":\"nations:staedte\",\"version\":\"5f3a9c1e5f3a9c1e\",\"id\":\"stadt-17\","
+                + "\"knopf\":\"proficisci:schiff\"}", Kanal.knopf(new Tafeln.Ziel("nations:staedte", "5f3a9c1e5f3a9c1e", "stadt-17"), "proficisci:schiff"));
+        // Mit den längsten Feldern, die der Mod liest, und einer id, die das JSON maskieren muss: unter den 1024 Bytes, die das Plugin je Anfrage liest.
+        String lang = Kanal.knopf(new Tafeln.Ziel("a".repeat(Ebenen.MAX_KENNUNG), "b".repeat(Ebenen.MAX_KENNUNG), "\u0001".repeat(Ebenen.MAX_TEXT)),
+                "c".repeat(Ebenen.MAX_KENNUNG));
+        assertTrue(lang.getBytes(StandardCharsets.UTF_8).length < 1024, lang.length() + " Zeichen");
+    }
 }
