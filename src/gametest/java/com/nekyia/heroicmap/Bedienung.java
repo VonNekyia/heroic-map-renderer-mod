@@ -1796,10 +1796,12 @@ public final class Bedienung implements FabricClientGameTest {
             double[] a1 = ecke(context, formen, 1);
             double[] daneben = {zielB[0] - 6, zielB[1]};
             double[] gezeichnet = halteUndZiehe(context, maus, k, a1, daneben, true, formen, 1);
+            // Das Zittern beim Halten kann die Karte um eine Einheit schieben; verglichen wird mit der Lage von B0 danach.
+            double[] zielJetzt = ecke(context, formen + 1, 0);
             Wegpunkte.Ecke ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
-            if (!ist.equals(b0) || Math.abs(gezeichnet[0] - zielB[0]) > 0.5 || Math.abs(gezeichnet[1] - zielB[1]) > 0.5) {
+            if (!ist.equals(b0) || Math.abs(gezeichnet[0] - zielJetzt[0]) > 0.5 || Math.abs(gezeichnet[1] - zielJetzt[1]) > 0.5) {
                 throw new AssertionError("Ecke mit Strg neben die Ecke einer anderen Form: " + ist + " statt " + b0 + ", gezeichnet bei "
-                        + Arrays.toString(gezeichnet) + " statt " + Arrays.toString(zielB));
+                        + Arrays.toString(gezeichnet) + " statt " + Arrays.toString(zielJetzt));
             }
             // Zurück, dann ohne Strg dasselbe: auf dem Block unter der Maus, nicht auf B0.
             context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
