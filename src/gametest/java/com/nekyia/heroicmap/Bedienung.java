@@ -1827,7 +1827,8 @@ public final class Bedienung implements FabricClientGameTest {
             // 12 Einheiten neben B0: kein Einrasten. Ecke 0 von A mit Strg neben ihre eigene Ecke 2: kein Einrasten.
             context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
             context.waitTicks(2);
-            halteUndZiehe(context, maus, k, ecke(context, formen, 1), new double[] {zielB[0] - 12, zielB[1]}, true, -1, 0);
+            double[] b0Jetzt = ecke(context, formen + 1, 0);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 1), new double[] {b0Jetzt[0] - 12, b0Jetzt[1]}, true, -1, 0);
             ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
             if (ist.equals(b0)) {
                 throw new AssertionError("Ecke mit Strg 12 Einheiten neben B0 rastete ein");
@@ -1841,10 +1842,13 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Ecke mit Strg rastete auf eine Ecke der eigenen Form ein");
             }
 
-            // Der Wegpunkt mit Strg 6 Einheiten neben B0: auf B0. Ein Bild beim Ziehen zeigt ihn dort.
+            // Der Wegpunkt mit Strg 6 Einheiten neben B0: auf B0. Ein Bild beim Ziehen zeigt ihn dort. Jedes Halten mit Zittern
+            // schiebt die Karte um bis zu eine Einheit; darum gilt die Lage von B0 von jetzt.
             context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
             context.waitTicks(2);
             wm = marke(context, w);
+            double[] b0Neu = ecke(context, formen + 1, 0);
+            double[] nebenB0 = {b0Neu[0] - 6, b0Neu[1]};
             warte250();
             maus.setCursorPos(wm.x() * k, wm.y() * k);
             context.waitTick();
@@ -1853,7 +1857,7 @@ public final class Bedienung implements FabricClientGameTest {
             zittereBis(context, maus, wm.x() * k, wm.y() * k, druck + 700);
             maus.holdControl();
             for (int i = 1; i <= 8; i++) {
-                maus.setCursorPos((wm.x() + (daneben[0] - wm.x()) * i / 8) * k, (wm.y() + (daneben[1] - wm.y()) * i / 8) * k);
+                maus.setCursorPos((wm.x() + (nebenB0[0] - wm.x()) * i / 8) * k, (wm.y() + (nebenB0[1] - wm.y()) * i / 8) * k);
                 context.waitTick();
             }
             context.waitTicks(2);
