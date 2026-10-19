@@ -18,6 +18,7 @@ import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
+import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -27,6 +28,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.FormattedText;
 import net.minecraft.network.chat.Style;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.ARGB;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.minecraft.util.Util;
@@ -44,6 +46,8 @@ final class Karte extends Screen {
     private static final int TEXT = 0xFFFFFFFF;
     /** Die zweite Zeile im Kasten des Downloads. */
     private static final int GRAU = 0xFFC0C0C0;
+    /** Der Rand des Hinweises auf eine neue Version pulsiert in dieser Zeit einmal von Gold nach Weiss und zurück. */
+    static final int GOLD = 0xFFFFAA00, PULS_MS = 2000;
     /** Breite der Knöpfe in Einheiten des GUI. */
     private static final int KNOPF = 90;
     /** Breite des Knopfs „An“/„Aus“ einer Ebene; ihr Name steht links daneben. */
@@ -102,6 +106,8 @@ final class Karte extends Screen {
     /** Der Knopf „Im Browser öffnen“, oder null ohne Kanal; und der Grund, mit dem er zuletzt aus war, leer, wenn er ging. */
     private Button web;
     private String webAus;
+    /** Der Hinweis auf eine neue Version oben links, sonst null. */
+    private Button neueVersion;
     /** {@link Downloads#stufen()} beim letzten Nachsehen; ohne Satz sieht die Karte nach, wenn es sich ändert. */
     private int stufen = Downloads.INSTANZ.stufen();
     /** Der Knopf für den Abgleich, oder null ohne Satz vom Server; er ist aus, bis ein Abgleich wieder geht. */
@@ -285,6 +291,15 @@ final class Karte extends Screen {
         // Unten rechts das Menü von /hmap; „Fertig“ dort führt zurück auf die Karte. Siehe docs/vollbildkarte.md, „Bedienung“.
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.optionen"),
                 b -> minecraft.gui.setScreen(new Einstellungen(this))).bounds(x, height - 24, KNOPF, 20).build());
+        // Oben links der Hinweis auf eine neue Version, solange der Schalter an ist; der Link ist fest. Siehe docs/vollbildkarte.md, „Neue Version“.
+        neueVersion = null;
+        String neu = NeueVersion.neu;
+        if (neu != null && Minimap.INSTANZ.neueVersion()) {
+            Component text = Component.translatable("heroicmap.karte.neue_version", neu);
+            neueVersion = addRenderableWidget(Button.builder(text, ConfirmLinkScreen.confirmLink(this, NeueVersion.SEITE))
+                    .tooltip(Tooltip.create(Component.translatable("heroicmap.karte.neue_version.beschreibung", neu, NeueVersion.eigene())))
+                    .bounds(4, 4, font.width(text) + 12, 20).build());
+        }
     }
 
     /**
@@ -461,6 +476,7 @@ final class Karte extends Screen {
                 g.centeredText(font, Component.translatable("heroicmap.karte.keine"), width / 2, height / 2, TEXT);
             }
             super.extractRenderState(g, mausX, mausY, delta);
+            leuchte(g);
             if (laeuft != null) {
                 fortschritt(g, laeuft);
             }
@@ -532,6 +548,7 @@ final class Karte extends Screen {
                     : Component.translatable("heroicmap.karte.abgleich_ab", Downloads.uhr(ab)));
         }
         super.extractRenderState(g, mausX, mausY, delta);
+        leuchte(g);
         ueberschriften(g);
         if (laeuft != null) {
             fortschritt(g, laeuft);
@@ -864,6 +881,19 @@ final class Karte extends Screen {
     /** Für den Gametest: der Knopf „Im Browser öffnen“, oder null. */
     Button webKnopf() {
         return web;
+    }
+
+    Button neueVersionKnopf() {
+        return neueVersion;
+    }
+
+    /** Ein Rand um den Hinweis auf eine neue Version, der zwischen Gold und Weiss pulsiert. */
+    private void leuchte(GuiGraphicsExtractor g) {
+        if (neueVersion != null) {
+            float t = (float) (1 - Math.cos(2 * Math.PI * (Util.getMillis() % PULS_MS) / PULS_MS)) / 2;
+            g.outline(neueVersion.getX() - 1, neueVersion.getY() - 1, neueVersion.getWidth() + 2, neueVersion.getHeight() + 2,
+                    ARGB.srgbLerp(t, GOLD, TEXT));
+        }
     }
 
     /** Für den Gametest: die Ecken der Form im Bau, oder null. */

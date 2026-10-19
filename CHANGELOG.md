@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.57
+
+- **New version hint.** When Modrinth has a newer Heroic Map for your game version, the full map shows it top left. A click opens the Modrinth page after the game's usual link prompt. Turn it off with "Report new version" under "Settings …"; then the mod doesn't ask Modrinth at all.
+
 ## 0.2.56
 
 - **Coordinates stay on screen.** The line under the minimap no longer runs off the edge with large numbers and the height shown: it moves toward the screen and ends flush with the minimap in a corner. If there is room neither below nor above the minimap, it sits at the bottom of the screen.

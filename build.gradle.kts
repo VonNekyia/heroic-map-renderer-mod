@@ -91,6 +91,8 @@ tasks.matching { it.name == "runClientGameTest" }.configureEach {
     systemProperty("heroicmap.messung.regionen", providers.gradleProperty("messungRegionen").orElse("47").get())
     systemProperty("heroicmap.uebernahme", uebernahme.get())
     systemProperty("heroicmap.server", server.get())
+    // Die Gametests fragen Modrinth nie; den Hinweis prüfen sie gegen einen Server auf loopback.
+    systemProperty("heroicmap.ohne_modrinth", "true")
     val zusatz = providers.gradleProperty("zusatzmods").orNull?.let { file(it).absolutePath }
     zusatz?.let { systemProperty("fabric.addMods", it) }
     if (mitSodium || mitBetterF3) {

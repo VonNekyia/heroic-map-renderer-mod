@@ -1,6 +1,6 @@
 ---
 title: Vollbildkarte
-description: Die Karte über den ganzen Schirm aus den geladenen Kacheln, mit Bedienung samt Menü nach Rechtsklick, Liste der Ebenen mit Anheften der ganzen Ebene, welchem Satz sie zeigt, dem Fortschritt eines Downloads, Stufen und Lupe, wie Kacheln gelesen und behalten werden, Spieler und Koordinaten, dem Bild aus dem Gametest und was fehlt.
+description: Die Karte über den ganzen Schirm aus den geladenen Kacheln, mit Bedienung samt Menü nach Rechtsklick, Liste der Ebenen mit Anheften der ganzen Ebene, dem Hinweis auf eine neue Version, welchem Satz sie zeigt, dem Fortschritt eines Downloads, Stufen und Lupe, wie Kacheln gelesen und behalten werden, Spieler und Koordinaten, dem Bild aus dem Gametest und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Karte.java
   - src/main/java/com/nekyia/heroicmap/Kartenblick.java
@@ -14,6 +14,8 @@ code:
   - src/main/java/com/nekyia/heroicmap/Teleport.java
   - src/main/java/com/nekyia/heroicmap/Webkarte.java
   - src/test/java/com/nekyia/heroicmap/WebkarteTest.java
+  - src/main/java/com/nekyia/heroicmap/NeueVersion.java
+  - src/test/java/com/nekyia/heroicmap/NeueVersionTest.java
   - src/test/java/com/nekyia/heroicmap/TeleportTest.java
   - src/test/java/com/nekyia/heroicmap/KartenblickTest.java
   - src/test/java/com/nekyia/heroicmap/KachelnTest.java
@@ -49,6 +51,7 @@ sagt sie das und zeigt nichts.
 | Klick auf „An“/„Aus“ in der Liste | schaltet die Ebene an oder aus, sonst nichts, siehe „Ebenen“ |
 | Doppelklick auf den Namen einer Ebene in der Liste | heftet alles von ihr an die Minimap oder löst es, siehe „Ebenen“ |
 | Knopf „Im Browser öffnen“ über „Optionen …“ | öffnet die Webkarte des Servers im Browser, angemeldet, wie `/hmap web`; nur mit dem Plugin auf dem Server, siehe „Im Browser öffnen“ |
+| Hinweis „Neue Version …“ oben links | öffnet nach der Rückfrage des Spiels die Versionen des Mods auf Modrinth; nur, wenn es dort eine neuere gibt, siehe „Neue Version“ |
 | Knopf „Optionen …“ unten rechts | öffnet das Menü von `/hmap`, siehe [Minimap](minimap.md), „Bedienung“; „Fertig“ und `Esc` führen von dort zurück auf die Karte, an dieselbe Stelle (mod#75) |
 | `Esc` | bricht zuerst eine Form ab, die der Spieler aus Wegpunkten baut, sonst schliesst es die Karte |
 
@@ -307,6 +310,54 @@ Ohne Mod erkennt die Webkarte den Spieler über die IP oder mit
   sucht es nach dem Klick in `latest.log`.
 - **Ob Windows das Fragment** an den Browser weitergibt, prüft der User bei
   der Abnahme; ein Test öffnet keinen Browser.
+
+### Neue Version
+
+Gibt es auf Modrinth eine neuere Version des Mods für dieses Spiel und
+Fabric, steht oben links auf der Karte ein Hinweis. Vorgeschlagen vom
+Reviewer in mod#155, Plan freigegeben am 19.10.; siehe
+[0025](entscheidungen/0025-neue-version-von-modrinth.md).
+
+- **Frage:** einmal je Start, im Hintergrund, sobald der Client läuft
+  (`NeueVersion.frage`):
+  `GET https://api.modrinth.com/v2/project/heroic-map/version` mit
+  `loaders=["fabric"]`, `game_versions=["<Version des Spiels>"]` und
+  `include_changelog=false` (`NeueVersion.adresse`). Die Version des
+  Spiels liest der Mod aus dem laufenden Spiel, so stimmt sie nach einem
+  Update von selbst.
+- **User-Agent:**
+  `VonNekyia/heroic-map-renderer-mod/<Version> (+https://github.com/VonNekyia/heroic-map-renderer-mod)`
+  (`NeueVersion.agent`). Sonst schickt der Mod nichts mit, keinen Namen und
+  keine UUID; Modrinth sieht die IP.
+- **Grenzen:** derselbe Client wie für die Symbole, HTTP/1.1, ohne
+  Weiterleitung und Proxy; Header und Körper in 10 s, höchstens 256 KiB
+  (`NeueVersion.MAX`). Ohne Changelogs ist die Antwort heute rund 0,8 KiB
+  je Version, gemessen an einem öffentlichen Projekt.
+- **Welche Version zählt:** die höchste nach Semver, wie Fabric sie
+  vergleicht (`SemanticVersion`), wenn sie höher ist als die eigene
+  (`NeueVersion.neuere`). Vorabversionen mit `-…`, etwa `0.3.0-rc.1`,
+  zählen nicht, ebenso Einträge ohne lesbare Version und Versionen über 32
+  Zeichen. Den Kanal auf Modrinth liest der Mod nicht: Jede Version liegt
+  dort als `beta` (`.github/workflows/modrinth.yml`).
+- **Fehler** geben keinen Hinweis und keine Meldung im Spiel, nur eine
+  Zeile im Log, ohne die Antwort. Gefragt wird auch nach einem Fehler erst
+  beim nächsten Start wieder.
+- **Hinweis:** ein Knopf oben links, „Neue Version 0.2.x“, mit einem Rand,
+  der alle 2 s von Gold nach Weiss und zurück pulsiert (`Karte.PULS_MS`).
+  Der Tooltip nennt beide Versionen. Ein Klick öffnet den Bestätigungsschirm
+  des Spiels mit der festen Adresse
+  `https://modrinth.com/mod/heroic-map/versions` (`NeueVersion.SEITE`);
+  nichts aus der Antwort kommt in den Link. Kommt die Antwort, während die
+  Karte offen ist, steht der Hinweis beim nächsten Öffnen da.
+- **Schalter** „Neue Version melden“ im Untermenü „Einstellungen …“,
+  Vorgabe an, siehe [Minimap](minimap.md), „Bedienung“. Aus fragt der Mod
+  nicht und zeigt keinen Hinweis. Wird er angeschaltet und hat der Mod in
+  diesem Start noch nicht gefragt, fragt er gleich.
+- **Stand 19.10.:** Ohne Token antwortet Modrinth zum Projekt mit 404; es
+  ist noch nicht öffentlich. Bis dahin zeigt der Mod keinen Hinweis.
+- **Tests ohne Netz:** Die Gametests fragen Modrinth nie
+  (`heroicmap.ohne_modrinth` in `build.gradle.kts`), sondern einen Server
+  auf loopback; siehe [Entwicklung](entwicklung.md), „Tests“.
 
 ## Welcher Satz
 
