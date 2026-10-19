@@ -61,7 +61,7 @@ steht unter „Kosten“.
 Das Untermenü „Einstellungen …“ hält, was man selten ändert; das Hauptmenü
 bleibt so kurz. „Fertig“ führt zurück ins Menü:
 
-![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien, halben Marken auf dem Ring und den Koordinaten darunter; „Form“ neben „Bei F3“, „Chunklinien“ neben „Drehen“, „Effekte in der Welt“ neben dem Regler „Schleier“, unten „Ebenen …“ neben „Fertig“](bilder/anzeige.png)
+![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien, halben Marken auf dem Ring und den Koordinaten darunter; „Form“ neben „Bei F3“, „Chunklinien“ neben „Drehen“, „Effekte in der Welt“ neben dem Regler „Schleier“, darunter „Ablage der Karten“ und „Neue Version melden“, unten „Ebenen …“ neben „Fertig“](bilder/anzeige.png)
 
 | Einstellung | Vorgabe | tut |
 |---|---|---|
@@ -76,6 +76,7 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
 | Koordinaten | xz | aus, `x z` oder `x y z` des Spielers unter der Minimap, siehe „Koordinaten“ |
 | Todespunkt | an | beim Tod ein angehefteter Wegpunkt, wo der Spieler gestorben ist, siehe [Wegpunkte](wegpunkte.md), „Todespunkt“ |
 | Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
+| Neue Version melden | an | fragt beim Start Modrinth nach einer neueren Version des Mods; der Tooltip sagt, dass Modrinth dabei die IP sieht; siehe [Vollbildkarte](vollbildkarte.md), „Neue Version“ |
 | Knopf „Ebenen …“ | – | je Ebene vom Server an oder aus, siehe [Ebenen](ebenen.md), „Umschalten“ |
 
 Den eigenen Spieler und den Rahmen stellt ein Klick auf die Minimap ein,
@@ -126,13 +127,14 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
   „Ebenen …“ und „Fertig“. Bei GUI-Massstab 3 passen „Auflösung“ und
   „Todespunkt“ ganz in ihren halben Knopf, 98 Einheiten breit; das prüft
   der Gametest `Bedienung.kleinerSchirm`. „Ablage der Karten“ bleibt ganz
-  breit, halb passte sie in keiner Sprache. Bei GUI-Massstab 4 sind die
+  breit, halb passte sie in keiner Sprache; darunter ebenso „Neue Version
+  melden“. Bei GUI-Massstab 4 sind die
   halben Knöpfe rund 83 Einheiten breit; längere Texte lässt das Spiel
   dort laufen, auch bei den übrigen halben Knöpfen. So passen Menü und
   Untermenü auch bei grossem GUI-Massstab auf den Schirm, bis 240
   Einheiten Höhe, etwa 1280 × 720 bei GUI-Massstab 3. Das Untermenü
-  beginnt dafür höchstens 108 Einheiten über der Mitte und mindestens 20
-  unter dem oberen Rand; bei 240 Einheiten endet „Fertig“ bei 236
+  beginnt dafür höchstens 74 Einheiten über der Mitte und mindestens 30
+  unter dem oberen Rand; bei 240 Einheiten endet „Fertig“ bei 238
   (`Anzeige.oben`).
 - **Koordinaten:** Im Menü stehen über der Minimap `x` und `z` des Blocks
   unter der Maus fest unten links, wie auf der Karte im Browser, genau wie

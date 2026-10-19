@@ -75,6 +75,8 @@ public final class HeroicMap implements ClientModInitializer {
         // Client-Mods mit Entrypoint heroicmap legen ihre Ebenen an, sobald der Client läuft. Siehe docs/api.md.
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> FabricLoader.getInstance()
                 .getEntrypoints(ID, HeroicMapClientApi.Listener.class).forEach(HeroicMapClientApi.Listener::ready));
+        // Einmal je Start im Hintergrund, nach den Einstellungen. Siehe docs/vollbildkarte.md, „Neue Version“.
+        ClientLifecycleEvents.CLIENT_STARTED.register(client -> NeueVersion.frage());
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             Teleport.tick(client);
             boolean geaendert = false;

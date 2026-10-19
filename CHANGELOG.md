@@ -6,6 +6,7 @@ The release notes on GitHub and Modrinth come from here
 
 ## 0.2.57
 
+- **New version hint.** When Modrinth has a newer Heroic Map for your game version, the full map shows it top left. A click opens the Modrinth page after the game's usual link prompt. Turn it off with "Report new version" under "Settings …"; then the mod doesn't ask Modrinth at all.
 - **Snap with Ctrl.** Hold `Ctrl` (`⌘` on a Mac) while you drag a corner or a waypoint on the full map, and it snaps onto a nearby corner of another shape or, for a corner, onto a waypoint. Regions now meet cleanly.
 
 ## 0.2.56
