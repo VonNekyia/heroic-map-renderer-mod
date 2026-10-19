@@ -265,10 +265,12 @@ nach oben immer durchsichtiger.
   Kreis um den Spieler liegt, einen Block weiter als die Reichweite
   (`Schleier.imKreis`). Ein Stück mit der Mitte in der Reichweite liegt ganz
   darin, so fehlt keins; was ausserhalb liegt, entsteht gar nicht erst.
-- **Geschätzt, noch nicht gemessen:** Beides nimmt von den rund 2 ms für
-  Sammeln und Sortieren an der Spitze den grössten Teil; ein Bau mit
-  47 Regionen läge dann eher bei 3 als bei 4,5 ms. Die Messung folgt in
-  der nächsten Nacht.
+- **Gemessen am 19.10.,** siehe
+  [Schleier, Auswahl statt Sortieren](messungen/2026-10-19-schleier-auswahl.md):
+  Ein Bau mit 47 Regionen dauert im Median 3,44 statt 4,31 ms, rund 20 %
+  weniger. Das Sortieren sinkt von 1,34 auf 0,49 ms, das Sammeln steigt
+  von 0,57 auf 0,70 ms; die Höhen bleiben bei rund 2,6 ms und sind jetzt
+  drei Viertel des Baus. Je Frame ändert sich nichts.
 - **Schalter** „Effekte in der Welt“, siehe „Strahl“.
 
 ## Grösse
