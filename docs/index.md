@@ -14,7 +14,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 
 - [Projektion](projektion.md): wo ein Block auf Minimap und Vollbildkarte liegt, genordet von oben wie `top-north`, geprüft an `projektion.json` des Renderers.
 - [Download](download.md): wie der Mod die Karte vom Plugin lädt, Kanal, Befehle, Zustimmung und Grösse, Sicherheit, Manifest, harte Grenzen, Ablage je Welt nach dem Hash des Seeds, Kartenliste mit Löschen, Fortsetzen und Abgleich.
-- [Vollbildkarte](vollbildkarte.md): Bedienung, welcher Satz, Stufen und Lupe, Kacheln lesen und behalten, Farbindex hinter der Palette, Spieler und Koordinaten, das Bild aus dem Gametest und was fehlt.
+- [Vollbildkarte](vollbildkarte.md): Bedienung, der Hinweis auf eine neue Version, welcher Satz, Stufen und Lupe, Kacheln lesen und behalten, Farbindex hinter der Palette, Spieler und Koordinaten, das Bild aus dem Gametest und was fehlt.
 - [Ebenen](ebenen.md): Ebenen vom Plugin empfangen, in Teilen je `version`, ihre Nadeln als Wappenschild mit Symbol und Namen, ihre Banner und ihre Flächen, Kreise, Linien und Kartenschrift auf Minimap und Vollbildkarte zeichnen, Knöpfe des Plugins in der Tafel, Grenzen und Kosten, und je Ebene im Menü umschalten.
 - [API für Client-Mods](api.md): wie ein anderer Fabric-Mod eigene Ebenen anlegt, im Format der Ebenen vom Server, über den Entrypoint `heroicmap` und `HeroicMapClientApi`; Kennungen, Grenzen, Version, was v1 nicht kann.
 - [Wegpunkte](wegpunkte.md): Wegpunkte setzen und löschen, auch an eingetippten Koordinaten, der Todespunkt, eigene Linien und Regionen mit eigenen Ecken, Namen und Farben, eigene Ebenen und ihr Teilen als Code, Marken am Rand der Vollbildkarte, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen und Kreise vom Server, Grösse der Köpfe und Ablage in `wegpunkte.json`.
@@ -51,6 +51,7 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [0015](entscheidungen/0015-ordner-fuer-einzelspielerwelten.md): Ein Ordner der Welt auch im Einzelspieler, unter heroicmap/ nach Speicherordner und Hash, nicht im Speicherordner der Welt; löst 0004 im Einzelspieler ab.
 - [0022](entscheidungen/0022-marken-nach-aussen.md): Bei „kompass“ und „biom“ zeigt das Bild jeder Marke von der Mitte weg, genordet wie gedreht; die anderen Skins bleiben starr.
 - [0024](entscheidungen/0024-browser-ohne-bestaetigung.md): „Im Browser öffnen“ öffnet direkt nach dem Klick, ohne Bestätigungsschirm und nicht über Blaze3D.openUri, mit dem Link aus der eigenen Basis.
+- [0025](entscheidungen/0025-neue-version-von-modrinth.md): Einmal je Start Modrinth nach einer neueren Version fragen, Vorabversionen nach Semver statt nach dem Kanal, das Repo als Kontakt, Vorgabe an, der feste Link hinter dem Bestätigungsschirm.
 - [0023](entscheidungen/0023-teleport-mit-korrektur.md): „Hierher teleportieren“ immer im Menü; ohne Höhe zuerst der Server, nach 5 Ticks die Höhe des Spielers; danach einmal korrigieren, sobald der Chunk beim Client ist; löst 0019 in Punkt 3 ab.
 
 ## Messungen

@@ -122,6 +122,8 @@ public final class Minimap {
     static final int TOD = 0xFF3A3A3A, TOD_KREUZ = 0xFFE0E0E0;
     /** Setzt der Mod beim Tod einen Todespunkt? */
     private boolean todespunkt = true;
+    /** Fragt der Mod beim Start Modrinth nach einer neuen Version? Siehe docs/vollbildkarte.md, „Neue Version“. */
+    private boolean neueVersion = true;
     private boolean effekte = true;
     /** Wie hoch der Schleier eigener Regionen steht, in Blöcken. Siehe docs/wegpunkte.md, „Schleier“. */
     private int schleier = Schleier.HOEHE;
@@ -319,6 +321,14 @@ public final class Minimap {
 
     boolean chunklinien() {
         return chunklinien;
+    }
+
+    boolean neueVersion() {
+        return neueVersion;
+    }
+
+    void setzeNeueVersion(boolean neueVersion) {
+        this.neueVersion = neueVersion;
     }
 
     void setzeChunklinien(boolean chunklinien) {
@@ -579,6 +589,7 @@ public final class Minimap {
         effekte = !"false".equals(p.getProperty("effekte"));
         setzeSchleier(zahl(p.getProperty("schleier"), Schleier.HOEHE));
         todespunkt = !"false".equals(p.getProperty("todespunkt"));
+        neueVersion = !"false".equals(p.getProperty("neue_version"));
         koordinaten = switch (String.valueOf(p.getProperty("koordinaten")).trim()) {
             case "aus" -> Koordinaten.AUS;
             case "xyz" -> Koordinaten.XYZ;
@@ -628,6 +639,7 @@ public final class Minimap {
         p.setProperty("effekte", Boolean.toString(effekte));
         p.setProperty("schleier", Integer.toString(schleier));
         p.setProperty("todespunkt", Boolean.toString(todespunkt));
+        p.setProperty("neue_version", Boolean.toString(neueVersion));
         p.setProperty("koordinaten", koordinaten.name().toLowerCase(Locale.ROOT));
         p.setProperty("bei_f3", beiF3.name().toLowerCase(Locale.ROOT));
         p.setProperty("spieler", darstellung.name().toLowerCase(Locale.ROOT));
