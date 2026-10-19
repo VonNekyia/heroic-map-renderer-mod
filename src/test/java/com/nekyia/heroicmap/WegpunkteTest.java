@@ -728,18 +728,64 @@ class WegpunkteTest {
         assertTrue(alle.stream().filter(w::eigen).allMatch(f -> f instanceof Ebenen.Flaeche fl && fl.id() == null));
     }
 
+    /**
+     * Mehrere Todespunkte (mod#151): höchstens so viele wie eingestellt, die ältesten fallen weg; nur der neueste ist angeheftet;
+     * derselbe Block frischt einen auf; weniger einstellen nimmt die ältesten weg. In der Datei als tode, der älteste zuerst, und
+     * der neueste als tod für ältere Versionen; eine alte Datei mit nur tod gibt einen. Siehe docs/wegpunkte.md, „Todespunkt“.
+     */
+    @Test
+    void mehrereTodespunkte(@TempDir Path ordner) {
+        Wegpunkte w = new Wegpunkte();
+        w.lies(ordner);
+        w.setzeTod(WELT, 1, 1, 3);
+        w.setzeTod(WELT, 2, 2, 3);
+        w.setzeTod(WELT, 3, 3, 3);
+        assertEquals(List.of(1, 2, 3), w.tode().stream().map(Wegpunkte.Punkt::x).toList());
+        assertEquals(List.of(false, false, true), w.tode().stream().map(Wegpunkte.Punkt::angeheftet).toList());
+        // Ein vierter: Der älteste fällt weg.
+        w.setzeTod(WELT, 4, 4, 3);
+        assertEquals(List.of(2, 3, 4), w.tode().stream().map(Wegpunkte.Punkt::x).toList());
+        // Wieder auf dem Block des ältesten: Er wird der neueste und angeheftet, der vorige neueste gelöst.
+        w.setzeTod(WELT, 2, 2, 3);
+        assertEquals(List.of(3, 4, 2), w.tode().stream().map(Wegpunkte.Punkt::x).toList());
+        assertEquals(List.of(false, false, true), w.tode().stream().map(Wegpunkte.Punkt::angeheftet).toList());
+        // In der Datei: tode in dieser Folge, tod der neueste; und so zurück.
+        String json = w.json().toString();
+        assertTrue(json.contains("\"tod\":{\"dimension\":\"" + WELT + "\",\"x\":2,\"z\":2,\"minimap\":true}"), json);
+        assertEquals(3, w.json().getAsJsonArray("tode").size());
+        Wegpunkte nachher = new Wegpunkte();
+        nachher.lies(ordner);
+        assertEquals(List.of(3, 4, 2), nachher.tode().stream().map(Wegpunkte.Punkt::x).toList());
+        assertEquals(List.of(false, false, true), nachher.tode().stream().map(Wegpunkte.Punkt::angeheftet).toList());
+        // Weniger einstellen nimmt die ältesten weg, 0 alle.
+        nachher.kappeTode(1);
+        assertEquals(List.of(2), nachher.tode().stream().map(Wegpunkte.Punkt::x).toList());
+        nachher.kappeTode(0);
+        assertEquals(List.of(), nachher.tode());
+        // Eine alte Datei hat nur tod: ein Todespunkt.
+        Wegpunkte alt = new Wegpunkte();
+        alt.lies(JsonParser.parseString("{\"tod\":{\"dimension\":\"" + WELT + "\",\"x\":9,\"z\":9,\"minimap\":true}}").getAsJsonObject());
+        assertEquals(List.of(9), alt.tode().stream().map(Wegpunkte.Punkt::x).toList());
+        // Stehen beide da, gilt tode; tod ist dort nur der neueste noch einmal.
+        Wegpunkte beide = new Wegpunkte();
+        beide.lies(JsonParser.parseString("{\"tode\":[{\"dimension\":\"" + WELT + "\",\"x\":5,\"z\":5,\"minimap\":false},"
+                + "{\"dimension\":\"" + WELT + "\",\"x\":6,\"z\":6,\"minimap\":true}],"
+                + "\"tod\":{\"dimension\":\"" + WELT + "\",\"x\":6,\"z\":6,\"minimap\":true}}").getAsJsonObject());
+        assertEquals(List.of(5, 6), beide.tode().stream().map(Wegpunkte.Punkt::x).toList());
+    }
+
     @Test
     void todespunktNurEinerAngeheftetUndEigensGespeichert(@TempDir Path ordner) {
         Wegpunkte w = new Wegpunkte();
         w.lies(ordner);
-        assertTrue(w.setzeTod(WELT, 10, -5));
+        assertTrue(w.setzeTod(WELT, 10, -5, 1));
         Wegpunkte.Punkt tod = w.tod();
         assertTrue(tod.tod() && tod.angeheftet() && tod.x() == 10 && tod.z() == -5 && tod.dimension().equals(WELT), tod.toString());
         // Er nimmt keine Farbe: Der erste Wegpunkt bekommt die erste.
         w.setze(WELT, 1, 1);
         assertEquals(0, w.punkte().getLast().farbe());
-        // Ein neuer Tod verschiebt ihn; es bleibt einer.
-        assertTrue(w.setzeTod("minecraft:the_nether", 3, 4));
+        // Mit höchstens einem verschiebt ein neuer Tod ihn; es bleibt einer.
+        assertTrue(w.setzeTod("minecraft:the_nether", 3, 4, 1));
         assertEquals(1, w.punkte().stream().filter(Wegpunkte.Punkt::tod).count());
         assertEquals("minecraft:the_nether", w.tod().dimension());
         // In der Datei eigens, nicht in der Liste der Wegpunkte, und so zurück.
@@ -756,10 +802,10 @@ class WegpunkteTest {
         assertTrue(nachher.verschiebe(nachher.tod(), 7, 7));
         assertTrue(nachher.tod().tod() && !nachher.tod().angeheftet() && nachher.tod().x() == 7);
         // Auf einem Wegpunkt gibt es keinen; der Block ist schon markiert.
-        assertFalse(nachher.setzeTod(WELT, 1, 1));
-        assertNull(nachher.tod());
-        nachher.setzeTod(WELT, 2, 2);
-        nachher.loescheTod();
+        assertFalse(nachher.setzeTod(WELT, 1, 1, 1));
+        assertEquals(7, nachher.tod().x());
+        nachher.setzeTod(WELT, 2, 2, 1);
+        nachher.kappeTode(0);
         assertNull(nachher.tod());
         // Eine Datei ohne Todespunkt oder mit einem kaputten liest der Mod ohne Fehler.
         Wegpunkte alt = new Wegpunkte();

@@ -93,6 +93,7 @@ public final class Bedienung implements FabricClientGameTest {
             context.runOnClient(mc -> mc.gui.setScreen(null));
             beiF3(context, maus);
             schleierRegler(context, maus, k);
+            todRegler(context, maus, k);
 
             karte(context, maus, k);
             // Vor tod: Der lässt den Spieler am Ende fallen, und ein toter Spieler hat statt der Karte den Todesschirm.
@@ -2172,8 +2173,10 @@ public final class Bedienung implements FabricClientGameTest {
     /**
      * Der Todespunkt (mod#129): Stirbt der Spieler, steht auf seinem Block ein angehefteter Todespunkt. Nach dem Respawn öffnet
      * der Weg des Klicks im Chat, `sendUnattendedCommand` mit `hmap karte x z`, die Karte mit ihm als Ziel; mit dem Testsatz
-     * steht er dort in der Mitte, dunkel mit hellem ✕, und ein Rechtsklick auf ihn bietet „Todespunkt löschen“, der ihn
-     * löscht. Mit dem Schalter aus setzt ein Tod keinen. Siehe docs/wegpunkte.md, „Todespunkt“.
+     * steht er dort in der Mitte, dunkel mit hellem ✕; gehalten hängt er nicht an der Maus (mod#151), und ein Rechtsklick auf
+     * ihn bietet „Todespunkt löschen“, der ihn löscht. Mit zwei behaltenen Todespunkten bleiben nach drei Toden die zwei
+     * neuesten, nur der neueste angeheftet; einer eingestellt, bleibt der neueste; aus setzt ein Tod keinen. Siehe
+     * docs/wegpunkte.md, „Todespunkt“.
      */
     private static void tod(ClientGameTestContext context, TestServerContext server, TestInput maus, int k) {
         server.runCommand("tp @a 40.5 -60 -30.5");
@@ -2211,6 +2214,20 @@ public final class Bedienung implements FabricClientGameTest {
             if (!kreuz) {
                 throw new AssertionError("Mitten im Todespunkt fehlt das helle ✕");
             }
+            // Gehalten wie von Hand hängt er nicht an der Maus: Ein Todespunkt bleibt, wo er ist (mod#151).
+            warte250();
+            maus.setCursorPos(m.x() * k, m.y() * k);
+            context.waitTick();
+            long druck = Util.getMillis();
+            maus.holdMouse(LINKS);
+            zittereBis(context, maus, m.x() * k, m.y() * k, druck + 700);
+            boolean haengt = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).haengt()) != null;
+            maus.releaseMouse(LINKS);
+            context.waitTicks(2);
+            if (haengt) {
+                throw new AssertionError("Ein gehaltener Todespunkt hing an der Maus");
+            }
+            m = marke(context, tod);
             // Am Todespunkt nur Teleport und Löschen: kein „Ebene …“, er bleibt in Base (Review von #143), und keine Koordinaten, er
             // bleibt, wo er ist (mod#151).
             List<String> menue = eintraegeBei(context, maus, k, m.x(), m.y());
@@ -2224,19 +2241,40 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("„Todespunkt löschen“ liess ihn stehen");
             }
             context.runOnClient(mc -> mc.gui.setScreen(null));
-            // Mit dem Schalter aus kein Todespunkt. Erst an eine freie Stelle: Am Ort des Respawns kann ein Wegpunkt eines
+            // Zwei behalten, drei Tode an drei Stellen: die zwei neuesten, nur der neueste angeheftet. Dann einer: der neueste.
+            context.runOnClient(mc -> Minimap.INSTANZ.setzeTodespunkte(2));
+            for (int i = 0; i < 3; i++) {
+                double tx = 40.5 + 3 * i;
+                server.runCommand("tp @a " + tx + " -60 -30.5");
+                context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - tx) < 0.1, 200);
+                stirb(context, server);
+            }
+            List<Wegpunkte.Punkt> tode = context.computeOnClient(mc -> Wegpunkte.INSTANZ.tode());
+            if (!tode.stream().map(Wegpunkte.Punkt::x).toList().equals(List.of(43, 46))
+                    || !tode.stream().map(Wegpunkte.Punkt::angeheftet).toList().equals(List.of(false, true))) {
+                throw new AssertionError("Zwei behalten, drei Tode: " + tode);
+            }
+            context.runOnClient(mc -> Minimap.INSTANZ.setzeTodespunkte(1));
+            tode = context.computeOnClient(mc -> Wegpunkte.INSTANZ.tode());
+            if (tode.size() != 1 || tode.getFirst().x() != 46) {
+                throw new AssertionError("Einer eingestellt: " + tode);
+            }
+            // Aus: kein Todespunkt, auch der letzte geht. Erst an eine freie Stelle: Am Ort des Respawns kann ein Wegpunkt eines
             // früheren Schritts liegen, und dort gäbe es auch ohne Schalter keinen.
-            context.runOnClient(mc -> Minimap.INSTANZ.setzeTodespunkt(false));
+            context.runOnClient(mc -> Minimap.INSTANZ.setzeTodespunkte(0));
+            if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.tod()) != null) {
+                throw new AssertionError("„Todespunkte: aus“ liess einen stehen");
+            }
             server.runCommand("tp @a 44.5 -60 -36.5");
             context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - 44.5) < 0.1, 200);
             stirb(context, server);
             if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.tod()) != null) {
-                throw new AssertionError("Mit „Todespunkt“ aus setzte ein Tod einen");
+                throw new AssertionError("Mit „Todespunkte: aus“ setzte ein Tod einen");
             }
         } finally {
             context.runOnClient(mc -> {
-                Minimap.INSTANZ.setzeTodespunkt(true);
-                Wegpunkte.INSTANZ.loescheTod();
+                Minimap.INSTANZ.setzeTodespunkte(1);
+                Wegpunkte.INSTANZ.kappeTode(0);
                 mc.gui.setScreen(null);
             });
             server.runCommand("tp @a 0.5 -30 0.5 0 90");
@@ -2534,6 +2572,45 @@ public final class Bedienung implements FabricClientGameTest {
             }
             Minimap.INSTANZ.setzeSchleier(Schleier.HOEHE);
         });
+    }
+
+    /**
+     * Der Regler „Todespunkte“ (mod#151): Klicks wie von Hand ans rechte Ende, ans linke und in die Mitte geben 16, aus und 8,
+     * gespeichert beim Schliessen. Siehe docs/wegpunkte.md, „Todespunkt“.
+     */
+    private static void todRegler(ClientGameTestContext context, TestInput maus, int k) {
+        context.runOnClient(mc -> mc.gui.setScreen(new Anzeige(null)));
+        context.waitTicks(2);
+        int[] r = context.computeOnClient(mc -> {
+            for (Object kind : mc.gui.screen().children()) {
+                if (kind instanceof Anzeige.TodRegler w) {
+                    return new int[] {w.getX(), w.getY(), w.getWidth(), w.getHeight()};
+                }
+            }
+            throw new AssertionError("Kein Regler „Todespunkte“ im Untermenü");
+        });
+        double y = r[1] + r[3] / 2.0;
+        for (double[] klick : new double[][] {{r[0] + r[2] - 2, Minimap.MAX_TODESPUNKTE}, {r[0] + 2, 0}, {r[0] + r[2] / 2.0, 8}}) {
+            spielerKlick(context, maus, k, klick[0], y);
+            int ist = context.computeOnClient(mc -> Minimap.INSTANZ.todespunkte());
+            if (ist != (int) klick[1]) {
+                throw new AssertionError("Klick auf den Regler „Todespunkte“ bei " + klick[0] + ": " + ist + " statt " + (int) klick[1]);
+            }
+        }
+        String text = context.computeOnClient(mc -> mc.gui.screen().children().stream().filter(c -> c instanceof Anzeige.TodRegler)
+                .map(c -> ((Anzeige.TodRegler) c).getMessage().getString()).findFirst().orElse(""));
+        context.runOnClient(mc -> {
+            mc.gui.setScreen(null);
+            Minimap neu = new Minimap();
+            neu.lies(HeroicMap.einstellungen());
+            if (neu.todespunkte() != 8) {
+                throw new AssertionError("Todespunkte beim Schliessen nicht gespeichert: " + neu.todespunkte());
+            }
+            Minimap.INSTANZ.setzeTodespunkte(1);
+        });
+        if (!text.endsWith("8")) {
+            throw new AssertionError("Der Regler zeigt „" + text + "“");
+        }
     }
 
     private static String name(ClientGameTestContext context, int form) {
@@ -3661,12 +3738,14 @@ public final class Bedienung implements FabricClientGameTest {
             context.waitTicks(2);
             context.takeScreenshot(TestScreenshotOptions.of("anzeige-gs" + gs).disableCounterPrefix());
             String f = context.computeOnClient(mc -> {
-                for (String schluessel : gs == 3 ? new String[] {"heroicmap.menue.aufloesung", "heroicmap.menue.todespunkt"} : new String[0]) {
-                    String name = Component.translatable(schluessel).getString();
+                // Der Regler der Todespunkte mit seinem breitesten Text, „16“ (mod#151).
+                for (String schluessel : gs == 3 ? new String[] {"heroicmap.menue.aufloesung", "heroicmap.menue.todespunkte"} : new String[0]) {
+                    String name = Component.translatable(schluessel, "").getString();
                     AbstractWidget w = mc.gui.screen().children().stream().filter(c -> c instanceof AbstractWidget a
                             && a.getMessage().getString().startsWith(name)).map(c -> (AbstractWidget) c).findFirst().orElse(null);
-                    if (w == null || mc.font.width(w.getMessage()) > w.getWidth() - 8) {
-                        return name + (w == null ? " fehlt" : ": " + mc.font.width(w.getMessage()) + " breit, Knopf " + w.getWidth());
+                    int text = w == null ? 0 : Math.max(mc.font.width(w.getMessage()), mc.font.width(Component.translatable(schluessel, "16")));
+                    if (w == null || text > w.getWidth() - 8) {
+                        return name + (w == null ? " fehlt" : ": " + text + " breit, Knopf " + w.getWidth());
                     }
                 }
                 return null;

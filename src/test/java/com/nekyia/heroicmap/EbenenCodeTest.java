@@ -38,7 +38,7 @@ class EbenenCodeTest {
             w.ordne(f, farmen);
         }
         // Der Todespunkt und was in Base liegt, gehören nicht in den Code.
-        w.setzeTod(WELT, 50, 50);
+        w.setzeTod(WELT, 50, 50, 1);
         w.setze(WELT, 60, 60);
         // Aus Base kopiert: der Wegpunkt dort, der Todespunkt nicht.
         assertEquals(List.of(new EbenenCode.Ort(WELT, 60, 60, w.punkte().getLast().farbe())),

@@ -503,15 +503,30 @@ class MinimapTest {
         assertEquals(Schleier.MAX_HOEHE, neu.schleier());
     }
 
+    /** Wie viele Todespunkte: Vorgabe 1, 0 bis 16 gekappt und gespeichert; der alte Schalter todespunkt zieht um (mod#151). */
     @Test
-    void todespunktSchalterGespeichert(@TempDir Path ordner) throws Exception {
-        assertTrue(new Minimap().todespunkt());
+    void todespunkteGespeichertUndAlterSchalter(@TempDir Path ordner) throws Exception {
+        assertEquals(1, new Minimap().todespunkte());
         Minimap m = new Minimap();
-        m.setzeTodespunkt(false);
+        m.setzeTodespunkte(20);
+        assertEquals(Minimap.MAX_TODESPUNKTE, m.todespunkte());
+        m.setzeTodespunkte(-1);
+        assertEquals(0, m.todespunkte());
+        m.setzeTodespunkte(5);
         Path datei = ordner.resolve("heroicmap.properties");
         m.schreibe(datei);
         Minimap neu = new Minimap();
         neu.lies(datei);
-        assertFalse(neu.todespunkt());
+        assertEquals(5, neu.todespunkte());
+        // Bis 0.2.57: aus heisst keiner, an oder ohne Eintrag einer.
+        Path alt = ordner.resolve("alt.properties");
+        java.nio.file.Files.writeString(alt, "todespunkt=false\n");
+        Minimap aus = new Minimap();
+        aus.lies(alt);
+        assertEquals(0, aus.todespunkte());
+        java.nio.file.Files.writeString(alt, "todespunkt=true\n");
+        Minimap an = new Minimap();
+        an.lies(alt);
+        assertEquals(1, an.todespunkte());
     }
 }

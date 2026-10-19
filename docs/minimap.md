@@ -74,7 +74,7 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
 | Effekte in der Welt | an | der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen, siehe [Wegpunkte](wegpunkte.md), „Strahl“ und „Schleier“ |
 | Schleier | 4 Blöcke | Regler neben „Effekte in der Welt“: wie hoch und deckend der Schleier eigener Regionen steht, 4 bis 16 Blöcke, siehe [Wegpunkte](wegpunkte.md), „Schleier“ |
 | Koordinaten | xz | aus, `x z` oder `x y z` des Spielers unter der Minimap, siehe „Koordinaten“ |
-| Todespunkt | an | beim Tod ein angehefteter Wegpunkt, wo der Spieler gestorben ist, siehe [Wegpunkte](wegpunkte.md), „Todespunkt“ |
+| Todespunkte | 1 | Regler aus, 1 bis 16: so viele Wegpunkte, wo der Spieler gestorben ist, der neueste angeheftet, siehe [Wegpunkte](wegpunkte.md), „Todespunkt“ |
 | Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
 | Neue Version melden | an | fragt beim Start Modrinth nach einer neueren Version des Mods; der Tooltip sagt, dass Modrinth dabei die IP sieht; siehe [Vollbildkarte](vollbildkarte.md), „Neue Version“ |
 | Knopf „Ebenen …“ | – | je Ebene vom Server an oder aus, siehe [Ebenen](ebenen.md), „Umschalten“ |
@@ -123,9 +123,10 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
   je zwei eine Zeile: „Minimap“ und „Zoom“, „Karte laden …“ und
   „Kartenliste …“, „Einstellungen …“ und „Fertig“; im Untermenü
   „Chunklinien“ und „Drehen“, „Verzierungen“ und „Koordinaten“, „Effekte in
-  der Welt“ und der Regler „Schleier“, „Auflösung“ und „Todespunkt“,
-  „Ebenen …“ und „Fertig“. Bei GUI-Massstab 3 passen „Auflösung“ und
-  „Todespunkt“ ganz in ihren halben Knopf, 98 Einheiten breit; das prüft
+  der Welt“ und der Regler „Schleier“, „Auflösung“ und der Regler
+  „Todespunkte“, „Ebenen …“ und „Fertig“. Bei GUI-Massstab 3 passen
+  „Auflösung“ und „Todespunkte“ mit dem breitesten Wert, 16, ganz in ihren
+  halben Knopf, 98 Einheiten breit; das prüft
   der Gametest `Bedienung.kleinerSchirm`. „Ablage der Karten“ bleibt ganz
   breit, halb passte sie in keiner Sprache; darunter ebenso „Neue Version
   melden“. Bei GUI-Massstab 4 sind die

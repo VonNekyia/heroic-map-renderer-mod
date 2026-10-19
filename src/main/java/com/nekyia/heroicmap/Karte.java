@@ -490,8 +490,10 @@ final class Karte extends Screen {
             }
             return;
         }
-        // Still gehalten auf einem Wegpunkt hängt er nach HALTEN_MS an der Maus. Siehe docs/wegpunkte.md, „Bedienung“.
-        if (haengt == null && taste && gedrueckt != null && gedrueckt.punkt() != null && !doppelklick && gezogen <= ZUG
+        // Still gehalten auf einem Wegpunkt hängt er nach HALTEN_MS an der Maus, ein Todespunkt nicht. Siehe docs/wegpunkte.md,
+        // „Bedienung“.
+        if (haengt == null && taste && gedrueckt != null && gedrueckt.punkt() != null && !gedrueckt.punkt().tod() && !doppelklick
+                && gezogen <= ZUG
                 && Util.getMillis() - gedruecktSeit >= HALTEN_MS) {
             haengt = gedrueckt.punkt();
             wartend = null;
