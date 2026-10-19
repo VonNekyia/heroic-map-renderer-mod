@@ -44,6 +44,7 @@
   "key.heroicmap.karte": "Vollbildkarte",
   "heroicmap.karte.titel": "Karte",
   "heroicmap.tafel.laedt": "lädt …",
+  "heroicmap.tafel.keine_antwort": "Noch keine Antwort vom Server",
   "heroicmap.karte.keine": "Für diese Dimension ist keine Karte geladen; /hmap angebot zeigt, was der Server anbietet.",
   "heroicmap.karte.laden": "Karte laden …",
   "heroicmap.karte.abgleich": "Abgleich",

@@ -4,11 +4,15 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
-## 0.2.54
+## 0.2.56
 
 - **A menu for what you click.** Right-click a waypoint, a corner or the diamond of an old rectangle on the full map, and the menu shows only what concerns it. The free map keeps the general menu.
 - **Set coordinates.** "Set coordinates…" on a waypoint or a corner moves it to the `x z` you type.
 - **Delete with a key.** `Delete` or `Backspace` removes the waypoint, corner, shape (at its handle) or old rectangle under the mouse.
+
+## 0.2.53
+
+- **Buttons in info panels.** A server plugin can put buttons under the info panel of a place on the full map, for example "Ship" at every town. Click one to switch it on or off for you; the square on the left is filled while it is on. If the server does not answer within a few seconds, the button is free again and a note says so.
 
 ## 0.2.52
 

@@ -72,6 +72,10 @@ final class Karte extends Screen {
     private int tafelX, tafelY, tafelScroll;
     private long tafelSeit;
     private int[] tafelKasten;
+    /** Die zuletzt gezeichnete Tafel: ihr Satz, ihr Kasten {x, y, Breite, Höhe} in Einheiten der Tafel und deren Grösse in Einheiten des GUI. */
+    private Tafel.Satz tafelGesetzt;
+    private int[] tafelEinheiten;
+    private float tafelM;
     /** Ist die Tafel höher als ihr Platz? Nur dann scrollt das Rad sie statt die Karte zu zoomen. */
     private boolean tafelZuHoch;
     /** Der Klick schloss oder traf die Tafel oder das Menü; sein Loslassen hält keine neue, sein Ziehen schiebt nicht. */
@@ -783,6 +787,28 @@ final class Karte extends Screen {
         return tafelKasten == null ? null : tafelKasten.clone();
     }
 
+    /** Für die Gametests: die Knöpfe der offenen Tafel, wie gesetzt. */
+    List<Tafel.Knopfstueck> knopfStuecke() {
+        return tafelGesetzt == null ? List.of() : tafelGesetzt.stuecke().stream().filter(s -> s instanceof Tafel.Knopfstueck)
+                .map(s -> (Tafel.Knopfstueck) s).toList();
+    }
+
+    /** Für die Gametests: der Kasten des Knopfs {@code id} der offenen Tafel {x, y, Breite, Höhe} in Einheiten des GUI, gescrollt; oder null. */
+    int[] knopfKasten(String id) {
+        for (Tafel.Knopfstueck k : knopfStuecke()) {
+            if (k.knopf().id().equals(id)) {
+                int x = tafelEinheiten[0] + Tafel.INNEN + k.x(), y = tafelEinheiten[1] + Tafel.INNEN + k.y() - tafelScroll;
+                return new int[] {Math.round(x * tafelM), Math.round(y * tafelM), Math.round(k.breite() * tafelM), Math.round(k.hoehe() * tafelM)};
+            }
+        }
+        return null;
+    }
+
+    /** Für die Gametests: das Ziel einer Tafel bei (x, y) in Einheiten des GUI, oder null. */
+    Tafeln.Ziel zielBei(double x, double y) {
+        return tafelUnter(x, y);
+    }
+
     /** Für den Gametest Bedienung: die Mitte des Blicks in Pixeln der Basis, das offene Menü, oder null, und die Marken. */
     double[] blickMitte() {
         return blick == null ? null : new double[] {blick.mx, blick.mz};
@@ -1213,8 +1239,12 @@ final class Karte extends Screen {
             klickVerbraucht = true;
             return true;
         }
-        // Ein Klick in die Tafel wirkt nicht auf die Karte.
+        // Ein Klick in die Tafel wirkt nicht auf die Karte; links auf einen Knopf drückt ihn, solange die Tafel gilt.
         if (drin(tafelKasten, e.x(), e.y())) {
+            Tafel.Knopfstueck k = taste ? knopfUnter(e.x(), e.y()) : null;
+            if (k != null && Tafeln.gilt(Ebenen.INSTANZ, tafelOffen)) {
+                Tafeln.INSTANZ.druecke(tafelOffen, k.knopf(), Util.getMillis());
+            }
             klickVerbraucht = true;
             return true;
         }
@@ -1365,6 +1395,9 @@ final class Karte extends Screen {
      */
     private void tafel(GuiGraphicsExtractor g, int mausX, int mausY) {
         long ms = Util.getMillis();
+        if (Tafeln.INSTANZ.takt(ms, z -> Tafeln.gilt(Ebenen.INSTANZ, z)) > 0) {
+            zeige(Component.translatable("heroicmap.tafel.keine_antwort"));
+        }
         // Solange eine Form im Bau ist, geht keine Tafel auf: Sie ginge dort auf, wo das Menü war, und läge über
         // den Stellen, die der Spieler anklickt. Siehe docs/wegpunkte.md, „Eigene Formen“.
         if (zug != null && zeigen.offen() != null) {
@@ -1387,8 +1420,12 @@ final class Karte extends Screen {
             tafelY = mausY;
             tafelScroll = 0;
             tafelSeit = ms;
+            if (offen != null) {
+                Tafeln.INSTANZ.aufgegangen(offen, ms);
+            }
         }
         tafelKasten = null;
+        tafelGesetzt = null;
         tafelZuHoch = false;
         if (offen == null || t == null && ms - tafelSeit < Tafeln.LAEDT_MS) {
             return;
@@ -1406,6 +1443,10 @@ final class Karte extends Screen {
         y = Math.max(4, Math.min(y, hoehe - h - 4));
         tafelZuHoch = voll > h;
         tafelScroll = Math.max(0, Math.min(tafelScroll, voll - h));
+        tafelGesetzt = s;
+        tafelEinheiten = new int[] {x, y, w, h};
+        tafelM = m;
+        Tafel.Knopfstueck drauf = knopfUnter(mausX, mausY);
         g.pose().pushMatrix();
         g.pose().scale(m);
         g.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.fromNamespaceAndPath(HeroicMap.ID, "rahmen/" + tafelSkin() + "/tafel"), x, y, w, h);
@@ -1417,6 +1458,20 @@ final class Karte extends Screen {
                 case Tafel.Punkt p -> {
                     int px = x + Tafel.INNEN + p.x(), py = y + Tafel.INNEN + p.y() - tafelScroll;
                     g.fill(px, py, px + p.seite(), py + p.seite(), p.farbe());
+                }
+                case Tafel.Knopfstueck k -> {
+                    int kx = x + Tafel.INNEN + k.x(), ky = y + Tafel.INNEN + k.y() - tafelScroll;
+                    boolean gesperrt = Tafeln.INSTANZ.gesperrt(offen, k.knopf().id()), hell = k == drauf && !gesperrt;
+                    int schrift = gesperrt ? Tafel.GEDAEMPFT : Tafel.SCHRIFT, grund = hell ? Tafel.KNOPF_HELL : Tafel.KNOPF;
+                    g.fill(kx, ky, kx + k.breite(), ky + k.hoehe(), hell ? Tafel.KNOPF_RAHMEN_HELL : Tafel.KNOPF_RAHMEN);
+                    g.fill(kx + 1, ky + 1, kx + k.breite() - 1, ky + k.hoehe() - 1, grund);
+                    // Das Quadrat mit Rahmen in der Schrift, gefüllt, wenn der Knopf an ist.
+                    int qx = kx + Tafel.KNOPF_LINKS, qy = ky + (k.hoehe() - Tafel.QUADRAT) / 2;
+                    g.fill(qx, qy, qx + Tafel.QUADRAT, qy + Tafel.QUADRAT, schrift);
+                    if (!k.knopf().an()) {
+                        g.fill(qx + 1, qy + 1, qx + Tafel.QUADRAT - 1, qy + Tafel.QUADRAT - 1, grund);
+                    }
+                    g.text(font, k.label(), kx + Tafel.KNOPF_TEXT, ky + Tafel.KNOPF_RAND + 1, schrift, false);
                 }
                 case Tafel.Bildstueck b -> {
                     int bx = x + Tafel.INNEN + b.x(), by = y + Tafel.INNEN + b.y() - tafelScroll;
@@ -1452,6 +1507,24 @@ final class Karte extends Screen {
         tafelKasten = new int[] {Math.round(x * m), Math.round(y * m), Math.round(w * m), Math.round(h * m)};
     }
 
+    /** Der Knopf der zuletzt gezeichneten Tafel unter (mx, my) in Einheiten des GUI, nur im sichtbaren Inhalt; sonst null. */
+    private Tafel.Knopfstueck knopfUnter(double mx, double my) {
+        if (tafelGesetzt == null) {
+            return null;
+        }
+        double u = mx / tafelM - tafelEinheiten[0] - Tafel.INNEN, v = my / tafelM - tafelEinheiten[1] - Tafel.INNEN;
+        if (v < 0 || v >= tafelEinheiten[3] - 2 * Tafel.INNEN) {
+            return null;
+        }
+        for (Tafel.Stueck s : tafelGesetzt.stuecke()) {
+            if (s instanceof Tafel.Knopfstueck k && u >= k.x() && u < k.x() + k.breite() && v + tafelScroll >= k.y()
+                    && v + tafelScroll < k.y() + k.hoehe()) {
+                return k;
+            }
+        }
+        return null;
+    }
+
     /** Die kleine Tafel, solange die Antwort des Plugins aussteht. */
     private Tafel.Satz laedt() {
         String text = Component.translatable("heroicmap.tafel.laedt").getString();
@@ -1465,7 +1538,7 @@ final class Karte extends Screen {
             satzVon = t;
             satzGs = gs;
             satzGeneration = Formen.generation;
-            tafelSatz = Tafel.setze(t, masse());
+            tafelSatz = Tafel.setze(t, masse(), minecraft.getLanguageManager().getSelected().startsWith("de"));
         }
         return tafelSatz;
     }

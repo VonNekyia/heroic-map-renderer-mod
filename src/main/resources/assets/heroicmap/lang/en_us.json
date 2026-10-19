@@ -44,6 +44,7 @@
   "key.heroicmap.karte": "Full-screen map",
   "heroicmap.karte.titel": "Map",
   "heroicmap.tafel.laedt": "loading …",
+  "heroicmap.tafel.keine_antwort": "No answer from the server yet",
   "heroicmap.karte.keine": "No map is downloaded for this dimension; /hmap angebot shows what the server offers.",
   "heroicmap.karte.laden": "Download map …",
   "heroicmap.karte.abgleich": "Sync",
