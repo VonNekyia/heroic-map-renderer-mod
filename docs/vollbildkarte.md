@@ -12,6 +12,8 @@ code:
   - src/main/java/com/nekyia/heroicmap/Auswahl.java
   - src/main/java/com/nekyia/heroicmap/EbenenMenue.java
   - src/main/java/com/nekyia/heroicmap/Teleport.java
+  - src/main/java/com/nekyia/heroicmap/Webkarte.java
+  - src/test/java/com/nekyia/heroicmap/WebkarteTest.java
   - src/test/java/com/nekyia/heroicmap/TeleportTest.java
   - src/test/java/com/nekyia/heroicmap/KartenblickTest.java
   - src/test/java/com/nekyia/heroicmap/KachelnTest.java
@@ -46,6 +48,7 @@ sagt sie das und zeigt nichts.
 | Knopf „Ebenen +“ unter „Zum Spieler“ | klappt die Liste der Ebenen auf, „Ebenen -“ wieder zu; nur, wenn der Server Ebenen schickt, siehe „Ebenen“ (mod#76) |
 | Klick auf „An“/„Aus“ in der Liste | schaltet die Ebene an oder aus, sonst nichts, siehe „Ebenen“ |
 | Doppelklick auf den Namen einer Ebene in der Liste | heftet alles von ihr an die Minimap oder löst es, siehe „Ebenen“ |
+| Knopf „Im Browser öffnen“ über „Optionen …“ | öffnet die Webkarte des Servers im Browser, angemeldet, wie `/hmap web`; nur mit dem Plugin auf dem Server, siehe „Im Browser öffnen“ |
 | Knopf „Optionen …“ unten rechts | öffnet das Menü von `/hmap`, siehe [Minimap](minimap.md), „Bedienung“; „Fertig“ und `Esc` führen von dort zurück auf die Karte, an dieselbe Stelle (mod#75) |
 | `Esc` | bricht zuerst eine Form ab, die der Spieler aus Wegpunkten baut, sonst schliesst es die Karte |
 
@@ -250,6 +253,60 @@ auf den Namen heftet die ganze Ebene an (mod#103).
 - **Das Menü** bleibt ganz auf dem Schirm, auch bei grossem GUI-Massstab.
 - **Nach dem Klick** schliesst sich die Karte. Holt der Mod die Höhe, geht
   der Befehl ab, sobald sie da ist, höchstens 10 s später.
+
+### Im Browser öffnen
+
+Der Knopf öffnet die Webkarte des Servers im Browser und meldet den Spieler
+dort an, so erkennt sie ihn genau und lässt auch Klicks zu. Gewünscht vom
+User am 20.10.; Plan vom Reviewer freigegeben, mit dem Plugin abgestimmt.
+Ohne Mod erkennt die Webkarte den Spieler über die IP oder mit
+`/karte anmelden`.
+
+- **Knopf** „Im Browser öffnen“ über „Optionen …“ unten rechts, gleich
+  breit; die Liste der Ebenen hört dann darüber auf. Dasselbe tut
+  `/hmap web`, siehe [Download](download.md), „Befehle“. Den Knopf gibt es
+  nur, wenn das Plugin den Kanal angemeldet hat, also nicht im
+  Einzelspieler.
+- **Aus, mit dem Grund als Tooltip** (`Webkarte.grund`), in dieser Reihe:
+  - **Das Plugin ist alt:** Seine Antwort auf `show` hat kein Feld `web`.
+    Der Mod fragt dann nie, so bekommt ein altes Plugin die Nachricht `web`
+    nicht.
+  - **`web: false`:** Der Spieler bekäme jetzt keinen Link, ohne
+    `heroicmap.web` oder ohne Anmeldung auf dem Server.
+  - **Die Basis ist unbekannt:** Es kam keine Liste `ebenen` mit `url` oder
+    `port`, oder die Basis endet nicht auf `/tiles`.
+  - **Eine Frage ist offen,** höchstens 10 s (`Webkarte.FRIST_MS`).
+- **Ablauf:**
+  1. Der Mod schickt `{"v":1,"typ":"web"}`, siehe [Download](download.md),
+     „Kanal“.
+  2. Das Plugin antwortet mit einem Token, demselben wie bei
+     `/karte anmelden`: 5 min gültig, einmal, höchstens einer je 15 s und
+     Spieler. Sonst mit einem Grund; er steht unten links, bei `rate` mit
+     den Sekunden bis zum nächsten.
+  3. Der Mod prüft das Token: zwei Teile aus `A–Z`, `a–z`, `0–9`, `_` und
+     `-`, durch einen Punkt getrennt, höchstens 256 Zeichen
+     (`Webkarte.token`).
+  4. Den Link baut der Mod selbst, nie aus einer Adresse in der Nachricht:
+     die Basis der Kacheln aus der Liste `ebenen` ohne das letzte `/tiles`
+     (`Webkarte.wurzel`), dahinter `#anmelden=<token>` (`Webkarte.link`).
+     Das Token steht nur im Fragment; das schickt der Browser keinem
+     Server, so steht es in keinem Log eines Servers.
+  5. Die Wurzel prüft der Mod wie die Bilder der Ebenen
+     (`Adresse.pruefe`), siehe [Ebenen](ebenen.md), „Symbole“; abseits des
+     Render-Threads, denn sie löst den Namen auf.
+  6. Dann öffnet er den Browser.
+- **Ohne Bestätigungsschirm,** direkt nach dem Klick, siehe
+  [0024](entscheidungen/0024-browser-ohne-bestaetigung.md). Der Mod ruft
+  `SDLMisc.SDL_OpenURL` selbst auf, wie das Spiel, auf
+  `Util.nonCriticalIoPool`, aber nicht über `Blaze3D.openUri`: Das schriebe
+  bei einem Fehler den ganzen Link ins Log (per javap am Client 26.3).
+  Schlägt es fehl, steht im Log nur der Fehler von SDL, ein Fragment darin
+  ersetzt, und unten links „Der Browser liess sich nicht öffnen“.
+- **Das Token** steht nie im Log, auch nicht im Debug: Der Kanal loggt
+  keine Inhalte, kein Text zeigt den Link, und der Gametest `Bedienung`
+  sucht es nach dem Klick in `latest.log`.
+- **Ob Windows das Fragment** an den Browser weitergibt, prüft der User bei
+  der Abnahme; ein Test öffnet keinen Browser.
 
 ## Welcher Satz
 

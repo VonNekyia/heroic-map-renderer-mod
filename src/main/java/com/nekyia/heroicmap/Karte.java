@@ -16,6 +16,7 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
@@ -94,6 +95,9 @@ final class Karte extends Screen {
     static final long HINWEIS_MS = 5000;
     /** Wo die Knöpfe rechts oben beginnen und enden; Marken und Namen weichen ihnen aus. */
     private int knopfX, knopfUnten;
+    /** Der Knopf „Im Browser öffnen“, oder null ohne Kanal; und der Grund, mit dem er zuletzt aus war, leer, wenn er ging. */
+    private Button web;
+    private String webAus;
     /** {@link Downloads#stufen()} beim letzten Nachsehen; ohne Satz sieht die Karte nach, wenn es sich ändert. */
     private int stufen = Downloads.INSTANZ.stufen();
     /** Der Knopf für den Abgleich, oder null ohne Satz vom Server; er ist aus, bis ein Abgleich wieder geht. */
@@ -266,6 +270,14 @@ final class Karte extends Screen {
         unterster = ebenen(x, unterster);
         knopfX = x;
         knopfUnten = unterster.getY() + unterster.getHeight();
+        // Darüber die Webkarte im Browser, nur mit dem Kanal zum Plugin. Siehe docs/vollbildkarte.md, „Im Browser öffnen“.
+        web = null;
+        if (Webkarte.kanal.getAsBoolean()) {
+            web = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.web"),
+                    b -> zeige(Webkarte.INSTANZ.klick(Symbole.INSTANZ.basis(), Util.getMillis()))).bounds(x, height - 48, KNOPF, 20).build());
+            webAus = null;
+            webStand();
+        }
         // Unten rechts das Menü von /hmap; „Fertig“ dort führt zurück auf die Karte. Siehe docs/vollbildkarte.md, „Bedienung“.
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.optionen"),
                 b -> minecraft.gui.setScreen(new Einstellungen(this))).bounds(x, height - 24, KNOPF, 20).build());
@@ -302,8 +314,8 @@ final class Karte extends Screen {
         // Base allein und an steht nicht in der Liste; so bleibt sie, wie sie war, für wen keine eigenen Ebenen hat. Aus steht sie da,
         // sonst fände man sie auf der Karte nicht wieder.
         List<Wegpunkte.EigeneEbene> eigene = eigeneZeigen ? Wegpunkte.INSTANZ.ebenen() : List.of();
-        // Platz bis über „Optionen …“ unten rechts, je Schalter 22 Einheiten.
-        int platz = Math.max(1, (height - 28 - (unterster.getY() + unterster.getHeight())) / 22);
+        // Platz bis über „Optionen …“ unten rechts, mit dem Kanal bis über „Im Browser öffnen“, je Schalter 22 Einheiten.
+        int platz = Math.max(1, (height - (Webkarte.kanal.getAsBoolean() ? 52 : 28) - (unterster.getY() + unterster.getHeight())) / 22);
         int gesamt = eigene.size() + alle.size(), n = gesamt <= platz ? gesamt : platz - 1;
         for (int i = 0; i < n; i++) {
             Component name;
@@ -331,9 +343,23 @@ final class Karte extends Screen {
         return unterster;
     }
 
+    /** Ob „Im Browser öffnen“ geht, und sonst warum, als Tooltip; nur bei einem anderen Grund neu. */
+    private void webStand() {
+        Component aus = Webkarte.INSTANZ.aus(Symbole.INSTANZ.basis(), Util.getMillis());
+        String schluessel = aus == null ? "" : aus.getString();
+        if (!schluessel.equals(webAus)) {
+            webAus = schluessel;
+            web.active = aus == null;
+            web.setTooltip(aus == null ? null : Tooltip.create(aus));
+        }
+    }
+
     /** Kommen andere Ebenen vom Server, während die Karte offen ist, baut sie die Liste neu. */
     @Override
     public void tick() {
+        if (web != null) {
+            webStand();
+        }
         // Ohne Satz während eines Stroms: Sobald die gröbste Stufe daliegt, zeigt sich die Karte. Siehe docs/vollbildkarte.md, „Fortschritt“.
         if (satz == null && Downloads.INSTANZ.stufen() != stufen && minecraft.level != null) {
             stufen = Downloads.INSTANZ.stufen();
@@ -785,6 +811,11 @@ final class Karte extends Screen {
         int k = minecraft.getWindow().getGuiScale();
         return new float[] {aufPixel(blick.rasterX(Projektion.zuPixel(o.x(), satz.scale()), width), k),
             aufPixel(blick.rasterY(Projektion.zuPixel(o.z(), satz.scale()), height), k)};
+    }
+
+    /** Für den Gametest: der Knopf „Im Browser öffnen“, oder null. */
+    Button webKnopf() {
+        return web;
     }
 
     /** Für den Gametest: die Ecken der Form im Bau, oder null. */

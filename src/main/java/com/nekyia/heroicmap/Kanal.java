@@ -140,6 +140,18 @@ record Kanal(String json, Ebenen.Teil teil, Tafeln.Antwort tafel, Geheimbanner.A
         return json.toString();
     }
 
+    /** Fragt ein Token zur Anmeldung auf der Webkarte, wenn der Server den Kanal hört; true, wenn die Frage hinausging. Siehe docs/vollbildkarte.md, „Im Browser öffnen“. */
+    static boolean frageWeb() {
+        if (!offen()) {
+            return false;
+        }
+        ClientPlayNetworking.send(new Kanal(WEB));
+        return true;
+    }
+
+    /** Die Frage {@code web}, ohne weitere Felder. */
+    static final String WEB = "{\"v\":1,\"typ\":\"web\"}";
+
     /** Hört der Server auf dem Kanal? Das meldet Paper, wenn das Plugin ihn angemeldet hat. */
     static boolean offen() {
         return ClientPlayNetworking.canSend(TYPE);

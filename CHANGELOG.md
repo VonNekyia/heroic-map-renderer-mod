@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.55
+
+- **Open the web map in your browser, already logged in.** "Open in browser" on the full map, or `/hmap web`, opens the server's web map and logs you in, so it knows exactly who you are and lets you click there too. It needs a server with a matching Heroic Map plugin; otherwise the button is grey and says why.
+
 ## 0.2.52
 
 - **Share a layer as a code.** In "Layers …", the copy button next to a layer puts it on the clipboard as a short text; anyone can paste it with "Paste code" and gets it as a new layer of their own. Pinned things, players and the death point stay at home.
