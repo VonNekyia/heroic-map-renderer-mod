@@ -335,7 +335,7 @@ Raute eines alten Rechtecks vor einer Ecke vor dem Griff einer Form.
 
 | Objekt | Einträge |
 |---|---|
-| Wegpunkt | „Hierher teleportieren“, „Koordinaten setzen…“, „Ebene …“, „Wegpunkt löschen“ |
+| Wegpunkt | „Hierher teleportieren“, „Koordinaten setzen…“, „Linie/Region von hier“ auf seinem Block, „Ebene …“, „Wegpunkt löschen“ |
 | Todespunkt | „Hierher teleportieren“, „Todespunkt löschen“; er bleibt, wo er ist, und in Base |
 | Ecke einer eigenen Form | „Koordinaten setzen…“, „Eckpunkt hinzufügen“, „Eckpunkt löschen“ |
 | Raute eines alten Rechtecks | „Ebene …“, „Region löschen“ |

@@ -1287,7 +1287,8 @@ public final class Bedienung implements FabricClientGameTest {
 
             String teleport = context.computeOnClient(mc -> Component.translatable("heroicmap.karte.teleport", frei.x(), frei.z()).getString());
             List<String> punktSoll = new java.util.ArrayList<>(List.of(teleport));
-            punktSoll.addAll(texte(context, "heroicmap.karte.koordinaten", "heroicmap.karte.ebene", "heroicmap.karte.wegpunkt_loeschen"));
+            punktSoll.addAll(texte(context, "heroicmap.karte.koordinaten", "heroicmap.karte.form_von_hier", "heroicmap.karte.ebene",
+                    "heroicmap.karte.wegpunkt_loeschen"));
             Karte.Marke m = marke(context, frei);
             List<String> ist = eintraegeBei(context, maus, k, m.x(), m.y());
             if (!ist.equals(punktSoll)) {
@@ -1315,8 +1316,8 @@ public final class Bedienung implements FabricClientGameTest {
             frei(context, new double[][] {innen});
             int[] block = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blockUnter(innen[0], innen[1]));
             ist = eintraegeBei(context, maus, k, innen[0], innen[1]);
-            List<String> allgemeinSoll = new java.util.ArrayList<>(List.of(context.computeOnClient(mc ->
-                    Component.translatable("heroicmap.karte.teleport", block[0], block[1]).getString())));
+            String hier = context.computeOnClient(mc -> Component.translatable("heroicmap.karte.teleport", block[0], block[1]).getString());
+            List<String> allgemeinSoll = new java.util.ArrayList<>(List.of(hier));
             allgemeinSoll.addAll(texte(context, "heroicmap.karte.wegpunkt", "heroicmap.karte.wegpunkt_bei", "heroicmap.karte.form_von_hier"));
             if (!ist.equals(allgemeinSoll)) {
                 throw new AssertionError("Menü auf freier Karte: " + ist + " statt " + allgemeinSoll);

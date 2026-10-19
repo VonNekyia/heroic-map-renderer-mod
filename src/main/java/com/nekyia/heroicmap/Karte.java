@@ -1726,8 +1726,8 @@ final class Karte extends Screen {
     }
 
     /**
-     * Das Menü eines Wegpunkts: Teleport, „Koordinaten setzen…“, „Ebene …“ und Löschen; der Todespunkt nur Teleport und Löschen,
-     * er bleibt, wo er ist, und in Base. Siehe docs/wegpunkte.md, „Menü je Objekt“.
+     * Das Menü eines Wegpunkts: Teleport, „Koordinaten setzen…“, „Linie/Region von hier“ auf seinem Block, „Ebene …“ und Löschen;
+     * der Todespunkt nur Teleport und Löschen, er bleibt, wo er ist, und in Base. Siehe docs/wegpunkte.md, „Menü je Objekt“.
      */
     private void punktMenue(Wegpunkte.Punkt punkt, String dimension, List<Eintrag> neu) {
         if (minecraft.getConnection() != null) {
@@ -1745,6 +1745,7 @@ final class Karte extends Screen {
                 zeige(Component.translatable("heroicmap.karte.koordinaten_belegt"));
                 return false;
             })));
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_von_hier"), () -> beginne(punkt.x(), punkt.z())));
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.ebene"), () -> ebenenWahl(punkt.ebene(), id -> Wegpunkte.INSTANZ.ordne(punkt, id))));
         }
         neu.add(new Eintrag(Component.translatable(punkt.tod() ? "heroicmap.karte.tod_loeschen" : "heroicmap.karte.wegpunkt_loeschen"),
