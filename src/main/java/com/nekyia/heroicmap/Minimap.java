@@ -982,7 +982,7 @@ public final class Minimap {
     private void wegpunkte(GuiGraphicsExtractor g, Rahmen r, String dimension, int links, int oben, int k, float kopf, Drehung.Lage lage) {
         double innen = r.seite() / 2.0 - kopf / 2 - 1;
         for (Wegpunkte.Punkt p : Wegpunkte.INSTANZ.punkte()) {
-            if (p.angeheftet() && p.dimension().equals(dimension)) {
+            if (p.angeheftet() && p.dimension().equals(dimension) && Wegpunkte.INSTANZ.sichtbar(p)) {
                 float[] m = marke(r, p.x() + 0.5, p.z() + 0.5, links, oben, k, zoom, rund, innen, true, lage);
                 wegpunkt(g, m[0], m[1], kopf, p, 0);
             }

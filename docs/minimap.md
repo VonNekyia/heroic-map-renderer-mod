@@ -632,7 +632,9 @@ oben weg.
   - **Die `parent`-Kette** liest der Mod aus den Modelldateien im obersten
     Pack, höchstens 32 Glieder; eine längere gilt als Schleife.
   - **Je Block einmal:** die Blockstate-Datei beim ersten Treffen eines
-    Blocks im Worker, die Kette je Modell einmal. Ein Neuladen der Packs
+    Blocks im Worker, mit dem Ergebnis für jeden seiner Zustände
+    (`Pflanzen.eintragen`); fehlt die Datei oder ein Zustand darin, ist er
+    keine Pflanze. Die Kette je Modell einmal. Ein Neuladen der Packs
     nimmt einen neuen Merker (`Pflanzen.neuGeladen`); was ein Worker
     danach noch in den alten schreibt, zählt nicht.
 - **Welche Modelle:** Hat das Modell eine Fläche nach oben, bleibt es, wie

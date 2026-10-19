@@ -4,10 +4,18 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
-## 0.2.52
+## 0.2.53
 
 - **The minimap zooms out one step further,** to 0.5×: it shows four times the area, one pixel per block at GUI scale 2.
 - **Minimap zoom is a slider** in the menu, with one notch per step, like the sliders in the game's options. The zoom key still steps through all levels.
+
+## 0.2.52
+
+- **Share a layer as a code.** In "Layers …", the copy button next to a layer puts it on the clipboard as a short text; anyone can paste it with "Paste code" and gets it as a new layer of their own. Pinned things, players and the death point stay at home.
+
+## 0.2.51
+
+- **Your own layers.** Waypoints, lines and regions can live in layers of your own and be switched off together. Right-click one and choose "Layer …" to move it, or to create a new layer on the spot. Your layers sit in the layer list on the full map, before the ones from the server, and in "Layers …" in the settings, where you can rename and delete them. Everything starts in "Base".
 
 ## 0.2.50
 
