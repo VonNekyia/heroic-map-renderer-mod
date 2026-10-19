@@ -219,7 +219,7 @@ final class Karte extends Screen {
     Karte(Satz satz) {
         super(Component.translatable("heroicmap.karte.titel"));
         this.satz = satz;
-        this.kacheln = satz == null ? null : new Kacheln(satz);
+        this.kacheln = satz == null ? null : new Kacheln(satz, Kacheln.MAX);
         this.blick = satz == null ? null : new Kartenblick(satz.kachel(), satz.minZoom(), satz.maxZoom(), satz.stufe());
         this.ebenenOffen = Kartenlage.ebenenOffen(Downloads.weltOrdner());
     }

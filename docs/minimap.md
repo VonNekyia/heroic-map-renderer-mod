@@ -52,7 +52,7 @@ steht unter „Kosten“.
 | Einstellung | Vorgabe | tut |
 |---|---|---|
 | Minimap | an | blendet die Minimap aus und ein |
-| Zoom der Minimap | 2× | 0,5, 1, 2, 4 oder 8 Einheiten des GUI je Block: wie viel Gegend die Minimap zeigt; im Menü ein Schieberegler mit einer Raste je Stufe |
+| Zoom der Minimap | 2× | 1/32, 1/16, 1/8, 1/4, 1/2, 1, 2, 4 oder 8 Einheiten des GUI je Block: wie viel Gegend die Minimap zeigt; im Menü ein Schieberegler mit einer Raste je Stufe; ab 1/4 aus den Kacheln, siehe „Weit heraus“ |
 | Mitspieler | Simple Voice Chat | siehe „Mitspieler“ |
 | Knopf „Karte laden …“ | – | die Karten des Servers, wie in der [Vollbildkarte](vollbildkarte.md), „Bedienung“ |
 | Knopf „Kartenliste …“ | – | alle Karten auf der Platte mit Grösse und Summe in GB, mit Löschen, siehe [Download](download.md), „Kartenliste“ |
@@ -82,8 +82,9 @@ Den eigenen Spieler und den Rahmen stellt ein Klick auf die Minimap ein,
 nicht ein Knopf, siehe „Aussehen an der Minimap“.
 
 - **Zoom und Auflösung** sind getrennt. Der Zoom legt fest, wie viel
-  Gegend die Minimap zeigt: bei 128 Einheiten Seite 256 Blöcke bei 0,5×,
-  128 bei 1×, 64 bei 2×, 32 bei 4×, 16 bei 8× (`Minimap.ZOOMS`). Die Auflösung ist eine Obergrenze für
+  Gegend die Minimap zeigt: bei 128 Einheiten Seite 4096 Blöcke bei 1/32×,
+  512 bei 1/4×, 256 bei 1/2×, 128 bei 1×, 64 bei 2×, 32 bei 4×, 16 bei 8×
+  (`Minimap.ZOOMS`). Die Auflösung ist eine Obergrenze für
   die Pixel je Block in den Texturen. Gezeichnet wird mit der grössten von
   1, 2, 4, 8 und 16 px bis dahin, die in die Pixel eines Blocks auf dem Schirm ganz
   aufgeht (`Minimap.effektiv`). Ein Block ist auf dem Schirm Zoom ×
@@ -91,7 +92,7 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
   GUI-Massstab 3 also 3, dann zeichnet die Minimap mit 1 px, 3 Pixel je
   Texel. Das Spiel verkleinert die Texturen so nie; verkleinert war die
   Minimap unscharf. Jeder Texel ist auf dem Schirm gleich gross. Nur bei
-  0,5× und ungeradem GUI-Massstab nicht: Bei GUI-Massstab 3 ist ein Block
+  1/2× und ungeradem GUI-Massstab nicht: Bei GUI-Massstab 3 ist ein Block
   1,5 Pixel, die Texel mit 1 px je Block sind dann abwechselnd 1 und 2
   Pixel breit; bei GUI-Massstab 1 ist er ein halbes Pixel, dort verkleinert
   das Spiel. Bei 2 und 4 bleibt es scharf. So hat es der Reviewer am 18.10.
@@ -150,25 +151,29 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
   `groesse_anteil`. Fehlt die Datei oder ist ein Wert unlesbar, gilt die
   Vorgabe. Eine Datei von vor dem Zoom hat nur `massstab`; dann gilt er für
   Auflösung und Zoom, der Ausschnitt bleibt. Der Zoom steht als ganze Zahl
-  wie bisher, 0,5 als `zoom=0.5`; eine ältere Version liest das nicht und
-  nimmt 2×. Eine Datei von vor dem Anteil
+  wie bisher, ein Bruch als Dezimalzahl, `zoom=0.5` bis `zoom=0.03125`;
+  eine ältere Version liest das nicht und nimmt 2×. Eine Datei von vor dem Anteil
   hat `groesse` in Einheiten; sie gilt im ersten Schirm und wird dort zum
   Anteil, so springt nichts.
 - **Tasten:** Vorbelegt ist nur `.` für die
   [Vollbildkarte](vollbildkarte.md). „Minimap zeigen oder verbergen“ und
   „Zoom der Minimap“ gibt es auch als Tasten, ohne Belegung, unter
   Steuerung, Gruppe „Heroic Map“; was sie ändern, speichert der Mod gleich.
-  Die Taste für den Zoom geht reihum 0,5 → 1 → 2 → 4 → 8 → 0,5
+  Die Taste für den Zoom geht reihum 1/32 → 1/16 → … → 4 → 8 → 1/32
   (`Minimap.naechsterZoom`).
 - **Der Regler „Zoom der Minimap“** im Hauptmenü
   (`Einstellungen.ZoomRegler`) ersetzt den Knopf, wie die Regler der
   Spieleinstellungen, mit einer Raste je Stufe; dazwischen gibt es keinen
   Zoom. Klick oder Ziehen stellt die nächste Raste, die Pfeiltasten gehen
   je eine. Ein Mausrad am Zoom gibt es nicht; daran ändert sich nichts.
-- **Reichweite bei 0,5×:** Die Minimap zeigt 4× so viele Chunks wie bei
-  1×, bei 128 Einheiten Seite ±8 Chunks, bei der grössten Seite ±16
-  (`Minimap.reichweite`). Was jenseits der Sichtweite liegt, bleibt
-  dunkel wie heute am Rand.
+  Die Beschriftung zeigt die Brüche als Bruch, „1/32×“ bis „1/2×“
+  (`Minimap.fach`), so entschieden vom Reviewer am 19.10.
+- **Reichweite:** Die Minimap zeichnet die Chunks, die sie zeigt, plus 2,
+  höchstens bis zur Sichtweite des Clients plus 2 (`Minimap.reichweite`).
+  Weiter hat der Client keine Chunks; bei 1/32 und 128 Einheiten wären es
+  sonst ±130 Chunks, rund 68 000 Stellen je Durchgang. Was jenseits der
+  Sichtweite liegt, bleibt dunkel wie heute am Rand, ausser ab 1/4 mit
+  einem Satz, siehe „Weit heraus“.
 - **Der eigene Spieler** ist sein Kopf aus dem Skin mit schwarzem Rand,
   darüber ein kleiner Pfeil in Blickrichtung (`Minimap.avatar`), oder eine
   der anderen Darstellungen, siehe „Spieler“. Er ist
@@ -217,7 +222,8 @@ hat es der User gewünscht (mod#105); das Menü wird kürzer.
 Mit dem Schalter im Untermenü „Einstellungen …“ zeichnen Minimap und
 [Vollbildkarte](vollbildkarte.md) Linien auf den Grenzen der Chunks, je
 16 Blöcke; gespeichert als `chunklinien` in `heroicmap.properties`,
-Vorgabe aus. So hat es der User gewünscht.
+Vorgabe aus. So hat es der User gewünscht. Auf der Minimap erst ab 1/2;
+weiter heraus stünden die Linien dichter als ein Pixel.
 
 ![Die selbst gezeichnete Karte der Szene mit Chunklinien](bilder/chunklinien.png)
 
@@ -268,6 +274,57 @@ Vorgabe aus. So hat es der User gewünscht.
     keine Allokation je Linie.
 
 ![Die Minimap der Szene mit Chunklinien, bei Zoom 2×](bilder/minimap-chunklinien.png)
+
+## Weit heraus
+
+Ab 1/4 zeigt die Minimap nicht mehr die Chunks des Clients, sondern die
+Kacheln eines Satzes, wie die Vollbildkarte. Gewünscht vom User am 19.10.:
+mit dem Regler bis 1 Einheit je 32 Blöcke heraus. Plan vom Reviewer
+freigegeben.
+
+- **Warum dort:** Bei 1/4 und 128 Einheiten Seite sieht man 512 Blöcke, bei
+  1/32 schon 4096. Der Client hat bei Sichtweite 12 nur ±192 Blöcke; schon
+  bei 1/4 läge der grösste Teil der Minimap jenseits davon.
+- **Welcher Satz:** der der Dimension, wie bei der Vollbildkarte, die
+  eigene Karte vor einem Download (`Satz.fuer`), siehe
+  [Vollbildkarte](vollbildkarte.md), „Welcher Satz“. Die Minimap sucht ihn
+  alle 2 s neu, so gilt ein neuer Download bald.
+- **Aussehen und Aktualität ändern sich bei 1/4:**
+  - **Mit einem Download** sieht die Minimap ab dort aus wie die Webkarte:
+    die Texturen der Vanilla-Assets, das Licht des Renderers. Darunter
+    zeichnet sie mit den Packs des Spielers, siehe „Was anders ist als
+    top-north“.
+  - **Mit der eigenen Karte** sieht sie gleich aus, denn die zeichnet
+    derselbe Maler, siehe [Selbst gezeichnete Karte](selbst.md).
+  - **Was sich in der Nähe ändert,** zeigt die Minimap ab 1/4 erst, wenn
+    es die Kacheln zeigen: bei der eigenen Karte nach höchstens 5 s je
+    Chunk, bei einem Download erst nach dem nächsten Abgleich.
+  - Kacheln und Chunks des Clients mischt sie nicht; sie sähen
+    verschieden aus, und um den Spieler stünde ein Flicken.
+- **Die Stufe** ist die gröbste, deren Pixel auf dem Schirm noch höchstens
+  einen Pixel decken, bei Zoom × GUI-Massstab Pixeln je Block
+  (`Minimap.kachelStufe`). So verkleinert die Minimap höchstens 2× und
+  vergrössert nie; ist die gröbste Stufe des Satzes noch feiner, nimmt sie
+  sie. Beispiel bei 4 px und GUI-Massstab 2: Bei 1/32 braucht es 1/16
+  Pixel je Block, die feinste Stufe minus 6; eine Kachel deckt dort 4096
+  Blöcke.
+- **Kacheln:** wie auf der Vollbildkarte geladen, im Hintergrund dekodiert
+  (`Kacheln`), aber eigene: höchstens 64 behält die Minimap
+  (`Minimap.KACHELN_MAX`), rund 16 MiB auf der Grafikkarte; wieder ab 1/2
+  gibt sie alle frei. Eine Kachel, die noch lädt, bleibt dunkel; einen
+  Platzhalter wie auf der Vollbildkarte gibt es nicht.
+- **Die Chunks ruhen** im Kachelmodus: Der Mod zeichnet keine, und was sich
+  ändert, holt er nach, wenn der Zoom wieder 1/2 oder mehr ist.
+- **Ohne Satz** zeigt die Minimap auch ab 1/4 die geladenen Chunks, klein
+  in der Mitte, rundum dunkel; so entschieden vom Reviewer, statt die
+  Rasten zu sperren.
+- **Darüber** wie sonst: Wegpunkte, Mitspieler und der eigene Spieler,
+  Marken am Rand, eigene Formen und Angeheftetes vom Server; sie werden mit
+  dem Zoom klein, Nadeln und Banner behalten ihre Grösse. Schleier und
+  Strahl stehen in der Welt und ändern sich nicht. Drehen und runde Form
+  gelten auch für die Kacheln.
+
+![Die Minimap der Szene bei 1/2, 1/4, 1/8 und 1/32, ab 1/4 aus der eigenen Karte; rechts 1/32 ohne Satz](bilder/weit.png)
 
 ## Drehen
 
@@ -858,6 +915,15 @@ runde Form am 09.10., seit dem Vieleck, siehe
 | Frametime im p50, rund, mehr als ohne Minimap | freie Bildrate, 4 px, Stand, 09.10. | 0,03 ms |
 
 Der Flug geht dabei mit 20 Blöcken/s über geladenes Gelände.
+
+**Weit heraus,** geschätzt, nicht gemessen, siehe „Weit heraus“: je Frame ein
+Blit je sichtbarer Kachel, bei 128 Einheiten und GUI-Massstab 2 höchstens 9,
+so viele wie heute Regionen; im schlimmsten Fall, 256 Einheiten bei
+GUI-Massstab 4, bis 81. Dekodieren im Hintergrund, rund 2,8 ms je Kachel,
+beim Wechsel der Stufe typisch 25 ms verteilt; im Flug mit 20 Blöcken/s
+bei 1/32 alle rund 200 s eine neue Kachel. Speicher: typisch 9 Kacheln,
+rund 2,3 MiB auf der Grafikkarte und ebenso viel im RAM, höchstens 64. Auf
+der Platte nichts Neues. Die Messung 1/32 gegen 2 läuft nachts.
 
 **Pflanzen von oben,** geschätzt, nicht gemessen: Je Spalte mit Pflanze
 kommt eine volle Fläche über das gemittelte Raster dazu, rund 0,5 bis 1 µs,

@@ -85,7 +85,7 @@
   "heroicmap.menue.minimap": "Minimap",
   "heroicmap.menue.zoom": "Minimap zoom",
   "heroicmap.menue.fach": "%s×",
-  "heroicmap.menue.fach_halb": "0.5×",
+  "heroicmap.menue.fach_bruch": "1/%s×",
   "heroicmap.menue.aufloesung": "Resolution",
   "heroicmap.menue.aufloesung.beschreibung": "Minimap resolution: how many pixels per block it draws at most",
   "heroicmap.menue.px_kurz": "%s px",

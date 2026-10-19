@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.56
+
+- **Zoom the minimap much further out,** down to 1/32: the slider now has nine notches from 1/32× to 8×. From 1/4× on, the minimap shows the tiles of your map, like the full map: from a download it then looks like the web map, and nearby changes appear once the tiles have them. Without a map it shows just the loaded chunks in the middle.
+
 ## 0.2.54
 
 - **The minimap zooms out one step further,** to 0.5×: it shows four times the area, one pixel per block at GUI scale 2.

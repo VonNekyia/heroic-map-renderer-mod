@@ -143,6 +143,7 @@ public final class Bilder implements FabricClientGameTest {
             selbst(context);
             tueren(context, server);
             pflanzen(context, server);
+            weitHeraus(context, server);
         }
     }
 
@@ -1276,6 +1277,79 @@ public final class Bilder implements FabricClientGameTest {
             }
         }
         server.runCommand("tp @a 0.5 -30 0.5 0 90");
+    }
+
+    /**
+     * Weit heraus: bei 1/2 die Chunks des Clients, ab 1/4 die Kacheln der eigenen Karte, die {@link #selbst} gezeichnet hat,
+     * bis 1/32; ohne Satz bei 1/4 die geladenen Chunks. Geprüft wird rechts neben der Marke des Spielers, die die Mitte deckt:
+     * Dort liegt die Szene, nicht der dunkle Grund. Bei 1/32 ist der gezeichnete Bereich der Testwelt kleiner als die Marke;
+     * dort zählt nur der Kachelmodus. Mit -Pbilder nebeneinander als weit.png. Siehe docs/minimap.md, „Weit heraus“.
+     */
+    private static void weitHeraus(ClientGameTestContext context, TestServerContext server) {
+        server.runCommand("tp @a 0.5 -30 0.5 0 90");
+        double[] stufen = {1.0 / 2, 1.0 / 4, 1.0 / 8, 1.0 / 32};
+        BufferedImage[] teile = new BufferedImage[stufen.length + 1];
+        try {
+            for (int i = 0; i < stufen.length; i++) {
+                double zoom = stufen[i];
+                context.runOnClient(mc -> Minimap.INSTANZ.setzeZoom(zoom));
+                context.waitTicks(20);
+                if (zoom > Minimap.KACHELN_AB) {
+                    context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
+                }
+                boolean kacheln = context.computeOnClient(mc -> Minimap.INSTANZ.kachelmodus());
+                if (kacheln != (zoom <= Minimap.KACHELN_AB)) {
+                    throw new AssertionError("Weit heraus bei " + zoom + ": Kachelmodus " + kacheln);
+                }
+                teile[i] = mitRand(context, context.takeScreenshot(TestScreenshotOptions.of("weit-" + i).disableCounterPrefix()));
+                int breite = nebenDemSpieler(context, teile[i]);
+                if (zoom > 1.0 / 32 && breite < 4) {
+                    throw new AssertionError("Weit heraus bei " + zoom + ": neben dem Spieler nur " + breite + " Pixel Karte");
+                }
+            }
+            // Ohne Satz: Der Baum der eigenen Karte geht weg, nach höchstens 2 s sucht die Minimap neu und zeigt bei 1/4 die Chunks.
+            context.runOnClient(mc -> {
+                try {
+                    Laden.loesche(Downloads.weltOrdner().resolve(Selbst.baum("minecraft:overworld")));
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+                Minimap.INSTANZ.setzeZoom(1.0 / 4);
+            });
+            context.waitFor(mc -> !Minimap.INSTANZ.kachelmodus(), 200);
+            context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
+            context.waitTicks(2);
+            BufferedImage ohne = mitRand(context, context.takeScreenshot(TestScreenshotOptions.of("weit-ohne").disableCounterPrefix()));
+            teile[stufen.length] = ohne;
+            int breite = nebenDemSpieler(context, ohne);
+            int ecke = ohne.getRGB(ohne.getWidth() / 8, ohne.getHeight() / 8);
+            if (breite < 4 || (ecke >> 16 & 0xFF) + (ecke >> 8 & 0xFF) + (ecke & 0xFF) > 60) {
+                throw new AssertionError("Weit heraus ohne Satz bei 1/4: neben dem Spieler " + breite + " Pixel Karte, Ecke " + Integer.toHexString(ecke));
+            }
+            if (!AUSGABE.isEmpty()) {
+                ImageIO.write(nebeneinander(0, teile), "png", Path.of(AUSGABE, "weit.png").toFile());
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } finally {
+            context.runOnClient(mc -> Minimap.INSTANZ.setzeZoom(2));
+        }
+    }
+
+    /**
+     * Wie viele Pixel rechts neben der Marke des Spielers, auf der Höhe der Mitte, nicht fast schwarz sind, bis zum ersten
+     * dunklen; die Marke deckt die Mitte und zählt nicht.
+     */
+    private static int nebenDemSpieler(ClientGameTestContext context, BufferedImage bild) {
+        int ab = context.computeOnClient(mc -> (int) Math.ceil(Minimap.kopf(Minimap.INSTANZ.zuletzt().seite()) / 2 * mc.getWindow().getGuiScale())) + 2;
+        int y = bild.getHeight() / 2, n = 0;
+        for (int x = bild.getWidth() / 2 + ab; x < bild.getWidth(); x++, n++) {
+            int c = bild.getRGB(x, y);
+            if ((c >> 16 & 0xFF) + (c >> 8 & 0xFF) + (c & 0xFF) <= 60) {
+                break;
+            }
+        }
+        return n;
     }
 
     /** Die Reihe der Pflanzen bei z = 20, je zwei Blöcke auseinander; dazu Wasser für den Ackerboden und die Wand der Leiter. */
