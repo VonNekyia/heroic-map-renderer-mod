@@ -1765,8 +1765,9 @@ public final class Bedienung implements FabricClientGameTest {
     /**
      * Einrasten mit Strg (mod#149): Eine Ecke, 0,7 s gehalten und mit Strg 6 Einheiten neben die Ecke einer anderen Form
      * gezogen, liegt nach dem Loslassen auf deren Block und stand schon beim Ziehen dort; ohne Strg auf dem Block unter der
-     * Maus. Ebenso auf einen Wegpunkt. Ein Wegpunkt rastet auf eine Ecke ein. 12 Einheiten weg rastet nichts ein, und die
-     * Ecken der eigenen Form zählen nicht. Siehe docs/wegpunkte.md, „Einrasten“.
+     * Maus. Ebenso auf einen Wegpunkt. Ein Wegpunkt rastet auf eine Ecke ein. 12 Einheiten weg rastet nichts ein, die
+     * Ecken der eigenen Form zählen nicht, und neben der Marke eines fernen Wegpunkts am Rand rastet nichts ein. Siehe
+     * docs/wegpunkte.md, „Einrasten“.
      */
     private static void einrasten(ClientGameTestContext context, TestInput maus, int k) {
         int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
@@ -1871,6 +1872,24 @@ public final class Bedienung implements FabricClientGameTest {
             Wegpunkte.Punkt nach = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
             if (nach.x() != b0.x() || nach.z() != b0.z()) {
                 throw new AssertionError("Wegpunkt mit Strg neben die Ecke einer Form: " + nach + " statt " + b0);
+            }
+
+            // Ein Wegpunkt 400 Blöcke links steht als Marke am Rand. Eine Ecke mit Strg 6 Einheiten neben dieser Marke rastet nicht
+            // auf ihn ein, denn gemessen wird an seinem Block (Review von #161).
+            context.runOnClient(mc -> {
+                Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a);
+                Wegpunkte.INSTANZ.setze(mc.level.dimension().identifier().toString(), bx - 400, bz + 2);
+            });
+            context.waitTicks(2);
+            Wegpunkte.Punkt fern = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().getLast());
+            Karte.Marke rand = marke(context, fern);
+            double[] nebenRand = {rand.x() + 6, rand.y()};
+            int[] unterRand = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blockUnter(nebenRand[0], nebenRand[1]));
+            halteUndZiehe(context, maus, k, ecke(context, formen, 1), nebenRand, true, -1, 0);
+            ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
+            if (ist.x() == fern.x() || Math.abs(ist.x() - unterRand[0]) > 1 || Math.abs(ist.z() - unterRand[1]) > 1) {
+                throw new AssertionError("Ecke mit Strg neben der Marke eines fernen Wegpunkts am Rand (" + rand.x() + "," + rand.y() + "): "
+                        + ist + " statt bei " + unterRand[0] + " " + unterRand[1]);
             }
         } finally {
             maus.releaseControl();

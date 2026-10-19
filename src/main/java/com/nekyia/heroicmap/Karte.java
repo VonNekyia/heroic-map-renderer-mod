@@ -179,11 +179,11 @@ final class Karte extends Screen {
     record GriffAn(Wegpunkte.EigeneForm form, float x, float y) {
     }
 
-    /** Die Ecke {@code index} der eigenen Form {@code form}, auf dem Schirm bei (x, y) in Einheiten des GUI. */
     /** Wohin, was an der Maus hängt, mit Strg einrastet: der Block und die Ecke oder der Wegpunkt dort. */
     private record Rast(int x, int z, EckeAn ecke, Marke marke) {
     }
 
+    /** Die Ecke {@code index} der eigenen Form {@code form}, auf dem Schirm bei (x, y) in Einheiten des GUI. */
     record EckeAn(Wegpunkte.EigeneForm form, int index, float x, float y) {
     }
 
@@ -646,8 +646,13 @@ final class Karte extends Screen {
         }
         if (eckeHaengt != null) {
             for (Marke m : marken) {
-                double d = Math.hypot(mx - m.x(), my - m.y());
-                if (m.punkt() != null && d <= abstand) {
+                if (m.punkt() == null) {
+                    continue;
+                }
+                // An der Lage des Blocks, nicht an der Marke: Die eines fernen Wegpunkts steht am Rand (Review von #161).
+                float[] s = schirm(m.punkt().x() + 0.5, m.punkt().z() + 0.5);
+                double d = Math.hypot(mx - s[0], my - s[1]);
+                if (d <= abstand) {
                     beste = new Rast(m.punkt().x(), m.punkt().z(), null, m);
                     abstand = d;
                 }
