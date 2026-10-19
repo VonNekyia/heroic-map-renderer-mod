@@ -4,7 +4,7 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
-## 0.2.56
+## 0.2.55
 
 - **A menu for what you click.** Right-click a waypoint, a corner or the diamond of an old rectangle on the full map, and the menu shows only what concerns it. The free map keeps the general menu.
 - **Set coordinates.** "Set coordinates…" on a waypoint or a corner moves it to the `x z` you type.
