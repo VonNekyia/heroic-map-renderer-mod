@@ -154,4 +154,14 @@ class EbenenCodeTest {
         assertEquals("kaputt", EbenenCode.lies(EbenenCode.packe(gut.replace("[[0,0],[5,5]]", ecken + "]"))).fehler());
         assertFalse(EbenenCode.lies(EbenenCode.packe(gut)).inhalt().formen().isEmpty());
     }
+
+    @Test
+    void boesartigeCodesSindKaputtOhneZuWerfen() {
+        // 100 000 öffnende Klammern: tief verschachtelt, entpackt unter der Grenze (Review von #146).
+        assertEquals("kaputt", EbenenCode.lies(EbenenCode.packe("[".repeat(100_000))).fehler());
+        // Eine Koordinate mit 200 000 Ziffern.
+        String riesig = "{\"v\":1,\"name\":\"N\",\"wegpunkte\":[{\"dimension\":\"a:b\",\"x\":" + "9".repeat(200_000) + ",\"z\":0,\"farbe\":0}]}";
+        assertTrue(riesig.length() < EbenenCode.MAX_ENTPACKT);
+        assertEquals("kaputt", EbenenCode.lies(EbenenCode.packe(riesig)).fehler());
+    }
 }

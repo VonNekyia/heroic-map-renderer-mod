@@ -1470,6 +1470,8 @@ public final class Bedienung implements FabricClientGameTest {
     private static void ebenenTeilen(ClientGameTestContext context, TestInput maus, int k) {
         int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
         Object karte = context.computeOnClient(mc -> mc.gui.screen());
+        // Die Zwischenablage ist die echte des Rechners; was dort stand, kommt am Ende zurück (Review von #146).
+        String vorher = context.computeOnClient(mc -> mc.keyboardHandler.getClipboard());
         try {
             context.runOnClient(mc -> {
                 int id = Wegpunkte.INSTANZ.neueEbene("Farmen");
@@ -1531,6 +1533,7 @@ public final class Bedienung implements FabricClientGameTest {
                 List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
                 Wegpunkte.INSTANZ.ebenen().stream().skip(1).map(Wegpunkte.EigeneEbene::id).toList().forEach(Wegpunkte.INSTANZ::loescheEbene);
                 mc.gui.setScreen((net.minecraft.client.gui.screens.Screen) karte);
+                mc.keyboardHandler.setClipboard(vorher == null ? "" : vorher);
             });
             context.waitTicks(2);
         }
