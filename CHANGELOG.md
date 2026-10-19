@@ -4,6 +4,12 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.54
+
+- **A menu for what you click.** Right-click a waypoint, a corner or the diamond of an old rectangle on the full map, and the menu shows only what concerns it. The free map keeps the general menu.
+- **Set coordinates.** "Set coordinates…" on a waypoint or a corner moves it to the `x z` you type.
+- **Delete with a key.** `Delete` or `Backspace` removes the waypoint, corner, shape (at its handle) or old rectangle under the mouse.
+
 ## 0.2.52
 
 - **Share a layer as a code.** In "Layers …", the copy button next to a layer puts it on the clipboard as a short text; anyone can paste it with "Paste code" and gets it as a new layer of their own. Pinned things, players and the death point stay at home.

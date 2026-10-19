@@ -37,7 +37,9 @@ Formen“ (mod#79, mod#112).
 | Eingabe auf der Vollbildkarte | tut |
 |---|---|
 | Rechtsklick, „Wegpunkt setzen“ | der Eintrag unter „Hierher teleportieren“; setzt einen Wegpunkt auf den Block unter der Maus, in der ersten der 8 Farben (`Wegpunkte.FARBEN`), die in der Dimension noch frei ist, sind alle vergeben, reihum. Steht dort schon einer, bleibt es einer |
-| Rechtsklick auf einen Wegpunkt | das Menü für seinen Block: „Hierher teleportieren“ und „Wegpunkt löschen“, auf dem Todespunkt „Todespunkt löschen“ |
+| Rechtsklick auf einen Wegpunkt, eine Ecke oder die Raute eines alten Rechtecks | nur das Menü dieses Objekts, siehe „Menü je Objekt“ |
+| Rechtsklick, „Koordinaten setzen…“ | an einem Wegpunkt oder einer Ecke ein Feld mit ihrem `x z` wie bei „Wegpunkt bei …“; Enter legt sie dorthin und in die Mitte, siehe „Menü je Objekt“ |
+| `Entf` oder `⌫` | löscht, was unter der Maus hervorgehoben steht, wie „… löschen“ im Menü: einen Wegpunkt, auch den Todespunkt, eine Ecke, am Griff die ganze Form, die Raute eines alten Rechtecks. `⌫`, weil die Taste auf dem Mac so heisst (Reviewer). Nichts auf freier Karte, im offenen Feld (dort löscht sie Zeichen), bei gedrückter Taste und solange eine Form im Bau ist. Nichts vom Server. Wie im Menü ohne Rückgängig (mod#149) |
 | Rechtsklick auf einen Wegpunkt, den Griff einer Form oder die Raute eines alten Rechtecks, „Ebene …“ | legt es in eine eigene Ebene, auch in eine neue, siehe „Eigene Ebenen“ |
 | Rechtsklick, „Wegpunkt bei …“ | öffnet an der Stelle des Menüs ein Eingabefeld mit `x z` des Blocks unter der Maus, wie bei „Name…“, siehe „Namen“. Enter nimmt `x z`, `x, z` oder `x y z`, ganze Zahlen aus Ziffern in ASCII, x und z höchstens 30 000 000 weit (`Wegpunkte.koordinaten`); y zählt nicht, ein Wegpunkt hat nur x und z, so sagt es auch der Hinweis unten links. Dann setzt es dort einen Wegpunkt in der jetzigen Dimension wie „Wegpunkt setzen“ und legt ihn in die Mitte. Was keine Koordinaten sind, nimmt Enter nicht; der Text wird rot. Gewünscht vom User am 18.10. (mod#129) |
 | Klick auf eine Marke | legt sie in die Mitte, sobald kein zweiter Klick mehr folgen kann, 250 ms nach dem Loslassen: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück. Wer auf einer Marke zu ziehen beginnt und sich weiter als 3 Einheiten vom Druckpunkt entfernt (`Karte.ZUG`), zieht nur die Karte |
@@ -53,7 +55,6 @@ Formen“ (mod#79, mod#112).
 | Rechtsklick, „Form fertig“ | speichert die Form im Bau, mit zwei Ecken eine Linie, mit mehr eine Region; den Eintrag gibt es ab zwei Ecken |
 | Rechtsklick, „Form abbrechen“, oder `Esc` | verwirft die Form im Bau; eine geänderte bleibt, wie sie war |
 | Rechtsklick auf den Griff einer eigenen Form | ihr Menü: „An die Minimap heften“ oder „Von der Minimap lösen“, „Name…“, „Farbe…“, „Eckpunkt hinzufügen“, „Form löschen“; siehe „Eigene Formen“, „Namen“ und „Farbe“ |
-| Rechtsklick auf die Raute eines alten Rechtecks | „Region löschen“ |
 
 - **Unter der Maus** steht hervorgehoben, was ein Klick dort träfe: ein
   Wegpunkt oder die Raute eines alten Rechtecks mit hellem statt bunten oder
@@ -325,6 +326,40 @@ Reviewer freigegeben.
   „Ablage“; so zählt ihn eine ältere Version nicht mit, sie überliest ihn.
   Eine id bekommt er beim Lesen wie ein Wegpunkt ohne.
 
+## Menü je Objekt
+
+Ein Rechtsklick zeigt nur, was das Objekt unter der Maus betrifft
+(`Karte.menue`), gewünscht vom User am 20.10. (mod#149). Was unter der
+Maus liegt, zählt wie beim Zeigen und beim Klick: ein Wegpunkt oder die
+Raute eines alten Rechtecks vor einer Ecke vor dem Griff einer Form.
+
+| Objekt | Einträge |
+|---|---|
+| Wegpunkt | „Hierher teleportieren“, „Koordinaten setzen…“, „Ebene …“, „Wegpunkt löschen“ |
+| Todespunkt | „Hierher teleportieren“, „Todespunkt löschen“; er bleibt, wo er ist, und in Base |
+| Ecke einer eigenen Form | „Koordinaten setzen…“, „Eckpunkt hinzufügen“, „Eckpunkt löschen“ |
+| Raute eines alten Rechtecks | „Ebene …“, „Region löschen“ |
+| Griff einer eigenen Form | ihr Menü, siehe „Eigene Formen“, „Menü am Griff“ |
+| freie Karte, auch in einer Fläche | „Hierher teleportieren“, „Wegpunkt setzen“, „Wegpunkt bei …“, „Linie/Region von hier“ |
+
+- **Teleport** bleibt am Wegpunkt und am Todespunkt, entschieden vom
+  Reviewer: Er betrifft den Ort, und nach einem Tod ist er der Weg zurück.
+- **Im Bau** bleibt das Menü zum Bauen, ausser am Griff: Auf einem Wegpunkt
+  setzt „Eckpunkt hinzufügen“ die Ecke auf seinen Block, und „Form
+  fertig“ und „Form abbrechen“ stehen überall, siehe „Eigene Formen“.
+- **„Koordinaten setzen…“** öffnet an der Stelle des Menüs ein Feld mit
+  `x z` des Objekts (`Karte.koordinaten`). Enter nimmt dieselben Formen
+  wie „Wegpunkt bei …“, `x z`, `x, z` oder `x y z` (`Wegpunkte.koordinaten`),
+  legt das Objekt dorthin und es in die Mitte. Was keine Koordinaten sind,
+  steht rot.
+  - Eine Ecke liegt danach auf diesem Block, wie nach dem Loslassen; auf
+    dem Block ihrer Nachbarin werden beide eine.
+  - Ein Wegpunkt auf einen Block, auf dem schon einer liegt: Enter nimmt
+    es nicht, der Text steht rot, und unten links steht „Dort liegt schon
+    ein Wegpunkt“.
+  - Den Todespunkt gibt es dort nicht; er lässt sich nicht verschieben,
+    so hat es der User entschieden (mod#151).
+
 ## Eigene Formen
 
 Eigene Linien und Regionen baut der Spieler aus eigenen Ecken, je ein
@@ -368,8 +403,8 @@ sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
   ihrer Form, mit dunklem Rand, immer, unter den Marken (`Karte.ecken`).
   Ein Klick trifft die Ecke, deren Mitte am nächsten liegt, höchstens 3
   Einheiten weg (`Karte.eckeUnter`); liegen zwei eng, die nähere, nicht die
-  zuletzt gezeichnete. Ein Wegpunkt auf derselben Stelle geht beim
-  Linksklick vor; der Rechtsklick dort zeigt die Einträge für beide.
+  zuletzt gezeichnete. Ein Wegpunkt auf derselben Stelle geht vor, beim
+  Linksklick wie beim Rechtsklick, siehe „Menü je Objekt“.
 - **Eckpunkt hinzufügen** auf einer Ecke einer fertigen Form: Die Form kommt
   in den Bau (`Karte.bearbeite`), neue Ecken kommen zwischen diese und die
   nächste, jede weitere hinter die vorige neue. Nach der letzten Ecke einer
@@ -882,11 +917,20 @@ Schleier am Rand, siehe „Schleier“.
   hoch und unten zu 90 % deckend. Wegpunkt bei (`wegpunktBei`): „Wegpunkt
   bei …“ auf freier Karte zeigt `x z` des Blocks; „12“ nimmt Enter nicht;
   `x 64 z` 30 Blöcke weiter setzt dort einen Wegpunkt und legt ihn in die
-  Mitte. Todespunkt (`tod`): `kill @a`, danach steht auf dem Block des
+  Mitte. Menü je Objekt (`menueJeObjekt`): die Einträge an einem Wegpunkt,
+  an einem Wegpunkt auf einer Ecke nur seine, an einer Ecke, an der Raute
+  eines alten Rechtecks und auf freier Karte in einer Region; „Koordinaten
+  setzen…“ an einer Ecke, „Burg“ nimmt Enter nicht, `x, z` legt sie dorthin;
+  am Wegpunkt auf einen belegten Block mit Hinweis nicht, auf einen freien
+  dort und in die Mitte. Entf und ⌫ (`entfernen`): auf freier Karte, im Bau
+  und im offenen Feld nichts, dort löscht ⌫ ein Zeichen; dann ein Wegpunkt
+  mit Entf, eine Ecke mit ⌫, am Griff die Form, die Raute eines alten
+  Rechtecks. Todespunkt (`tod`): `kill @a`, danach steht auf dem Block des
   Spielers ein angehefteter Todespunkt; nach dem Respawn öffnet
   `sendUnattendedCommand("hmap karte x z")`, der Weg des Klicks im Chat,
   die Karte mit ihm als Ziel; die Welt des Tests hat keinen geladenen Satz,
-  also steht er mit dem Testsatz in der Mitte, mitten in ihm das helle ✕, und
+  also steht er mit dem Testsatz in der Mitte, mitten in ihm das helle ✕; sein
+  Menü hat genau „Hierher teleportieren“ und „Todespunkt löschen“, und
   „Todespunkt löschen“ löscht ihn; mit dem Schalter aus setzt ein zweiter
   Tod keinen. Eigene Ebenen (`eigeneEbenen`): Rechtsklick auf einen
   Wegpunkt, „Ebene …“ zeigt „• Base“ und „Neue Ebene …“; darüber „Farmen“

@@ -558,6 +558,28 @@ final class Karte extends Screen {
         ueberGriff = frei && m == null && ueberEcke == null ? griffUnter(mausX, mausY) : null;
     }
 
+    /**
+     * Löscht, was {@link #schwebe} hervorhebt, wie „… löschen“ im Menü: einen Wegpunkt, auch den Todespunkt, die Raute eines
+     * alten Rechtecks, eine Ecke oder am Griff die ganze Form. False, wenn nichts hervorgehoben ist.
+     */
+    private boolean loescheUnterMaus() {
+        if (ueberMarke != null && ueberMarke.punkt() != null) {
+            Wegpunkte.INSTANZ.loesche(ueberMarke.punkt());
+        } else if (ueberMarke != null && ueberMarke.region() != null) {
+            Wegpunkte.INSTANZ.loesche(ueberMarke.region());
+        } else if (ueberEcke != null) {
+            loescheEcke(ueberEcke);
+        } else if (ueberGriff != null) {
+            Wegpunkte.INSTANZ.loesche(ueberGriff.form());
+        } else {
+            return false;
+        }
+        ueberMarke = null;
+        ueberEcke = null;
+        ueberGriff = null;
+        return true;
+    }
+
     /** Die eigene Form, die gerade an einer Ecke oder am Griff an der Maus hängt, oder null. */
     private Wegpunkte.EigeneForm gezogeneForm() {
         return eckeHaengt != null ? eckeHaengt.form() : griffHaengt != null ? griffHaengt.form() : null;
@@ -1560,20 +1582,29 @@ final class Karte extends Screen {
     }
 
     /**
-     * Öffnet das Menü an (x, y) für den Block dort, oder für den Wegpunkt {@code punkt}; auf dem Griff einer eigenen Form
-     * nur ihr Menü. Siehe docs/wegpunkte.md, „Eigene Formen“.
+     * Öffnet das Menü an (x, y) für das, was dort liegt, im Vorrang wie beim Zeigen: ein Wegpunkt oder die Raute eines alten
+     * Rechtecks vor einer Ecke vor dem Griff einer Form; auf freier Karte das allgemeine Menü. Solange eine Form im Bau ist,
+     * bleibt es das Menü zum Bauen, ausser am Griff. Siehe docs/wegpunkte.md, „Menü je Objekt“.
      */
     private void menue(double x, double y, Wegpunkte.Punkt punkt, Wegpunkte.Region marke) {
         int[] z = punkt != null ? new int[] {punkt.x(), punkt.z()} : block(x, y);
         String dimension = minecraft.level.dimension().identifier().toString();
         List<Eintrag> neu = new ArrayList<>();
-        GriffAn griff = punkt == null && marke == null && eckeUnter(x, y) == null ? griffUnter(x, y) : null;
+        EckeAn ecke = punkt == null && marke == null ? eckeUnter(x, y) : null;
+        GriffAn griff = punkt == null && marke == null && ecke == null ? griffUnter(x, y) : null;
         if (griff != null) {
             formMenue(griff.form(), neu);
             if (zug != null) {
                 // Im Bau bleibt die Form im Bau zu beenden, auch am Griff einer anderen.
                 bauEnde(neu);
             }
+        } else if (zug == null && punkt != null) {
+            punktMenue(punkt, dimension, neu);
+        } else if (zug == null && marke != null) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ebene"), () -> ebenenWahl(marke.ebene(), id -> Wegpunkte.INSTANZ.ordne(marke, id))));
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_loeschen"), () -> Wegpunkte.INSTANZ.loesche(marke)));
+        } else if (zug == null && ecke != null) {
+            eckMenue(ecke, neu);
         } else {
             allgemein(x, y, z, dimension, punkt, marke, neu);
         }
@@ -1695,8 +1726,71 @@ final class Karte extends Screen {
     }
 
     /**
-     * Das allgemeine Menü an (x, y): Teleport, Wegpunkt, Formen beginnen und bauen, die Einträge einer Ecke dort und eines alten
-     * Rechtecks, wenn seine Raute {@code marke} getroffen ist. Die Fläche einer eigenen Form hat hier keine Einträge mehr.
+     * Das Menü eines Wegpunkts: Teleport, „Koordinaten setzen…“, „Ebene …“ und Löschen; der Todespunkt nur Teleport und Löschen,
+     * er bleibt, wo er ist, und in Base. Siehe docs/wegpunkte.md, „Menü je Objekt“.
+     */
+    private void punktMenue(Wegpunkte.Punkt punkt, String dimension, List<Eintrag> neu) {
+        if (minecraft.getConnection() != null) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.teleport", punkt.x(), punkt.z()), () -> {
+                Teleport.los(minecraft, satz, dimension, punkt.x(), punkt.z());
+                onClose();
+            }));
+        }
+        if (!punkt.tod()) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.koordinaten"), () -> koordinaten(punkt.x(), punkt.z(), k -> {
+                // Auf dem eigenen Block bleibt er; auf einem belegten nimmt Enter nichts.
+                if (k[0] == punkt.x() && k[1] == punkt.z() || Wegpunkte.INSTANZ.verschiebe(punkt, k[0], k[1])) {
+                    return true;
+                }
+                zeige(Component.translatable("heroicmap.karte.koordinaten_belegt"));
+                return false;
+            })));
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ebene"), () -> ebenenWahl(punkt.ebene(), id -> Wegpunkte.INSTANZ.ordne(punkt, id))));
+        }
+        neu.add(new Eintrag(Component.translatable(punkt.tod() ? "heroicmap.karte.tod_loeschen" : "heroicmap.karte.wegpunkt_loeschen"),
+                () -> Wegpunkte.INSTANZ.loesche(punkt)));
+    }
+
+    /** Das Menü einer Ecke: „Koordinaten setzen…“, „Eckpunkt hinzufügen“ und „Eckpunkt löschen“. */
+    private void eckMenue(EckeAn ecke, List<Eintrag> neu) {
+        Wegpunkte.Ecke e = ecke.form().ecken().get(ecke.index());
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.koordinaten"), () -> koordinaten(e.x(), e.z(), k -> {
+            // Wie beim Loslassen: Auf dem Block ihrer Nachbarin werden beide eine.
+            List<Wegpunkte.Ecke> neueEcken = new ArrayList<>(ecke.form().ecken());
+            neueEcken.set(ecke.index(), new Wegpunkte.Ecke(k[0], k[1]));
+            Wegpunkte.INSTANZ.ersetze(ecke.form(), neueEcken);
+            return true;
+        })));
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> bearbeite(ecke)));
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_loeschen"), () -> loescheEcke(ecke)));
+    }
+
+    /** Nimmt die Ecke aus ihrer Form: Aus einer Region mit drei Ecken wird eine Linie, eine Linie mit zwei fällt weg. */
+    private void loescheEcke(EckeAn ecke) {
+        List<Wegpunkte.Ecke> rest = new ArrayList<>(ecke.form().ecken());
+        rest.remove(ecke.index());
+        Wegpunkte.INSTANZ.ersetze(ecke.form(), rest);
+    }
+
+    /**
+     * Öffnet das Feld „Koordinaten setzen…“ mit {@code x z}; Enter nimmt {@code x z}, {@code x, z} oder {@code x y z} wie „Wegpunkt
+     * bei …“, gibt sie an {@code setze} und legt den Ort in die Mitte, wenn es sie nahm. Was keine Koordinaten sind, steht rot.
+     */
+    private void koordinaten(int x, int z, Predicate<int[]> setze) {
+        oeffne(x + " " + z, 40, "heroicmap.karte.koordinaten_hinweis", t -> {
+            int[] k = Wegpunkte.koordinaten(t);
+            if (k == null || !setze.test(k)) {
+                eingabe.setTextColor(UNGUELTIG);
+                return false;
+            }
+            zentriere(k[0] + 0.5, k[1] + 0.5);
+            return true;
+        });
+    }
+
+    /**
+     * Das allgemeine Menü an (x, y): Teleport, Wegpunkt, Formen beginnen und bauen. Im Bau dazu die Einträge des Wegpunkts
+     * {@code punkt} und eines alten Rechtecks, wenn seine Raute {@code region} getroffen ist; sonst haben sie ihr eigenes Menü.
      */
     private void allgemein(double x, double y, int[] z, String dimension, Wegpunkte.Punkt punkt, Wegpunkte.Region region, List<Eintrag> neu) {
         if (minecraft.getConnection() != null) {
@@ -1725,23 +1819,14 @@ final class Karte extends Screen {
                     zentriere(k[0] + 0.5, k[1] + 0.5);
                     return true;
                 })));
-        // Eigene Formen: ohne Form im Bau beginnt hier eine, auf einer Ecke kommen neue danach oder sie geht; im Bau eine
-        // Ecke hier, „Form fertig“ und „Form abbrechen“. Siehe docs/wegpunkte.md, „Eigene Formen“.
-        EckeAn ecke = zug == null ? eckeUnter(x, y) : null;
+        // Eigene Formen: ohne Form im Bau beginnt hier eine; im Bau eine Ecke hier, „Form fertig“ und „Form abbrechen“. Siehe
+        // docs/wegpunkte.md, „Eigene Formen“.
         if (zug == null) {
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_von_hier"), () -> beginne(z[0], z[1])));
         } else {
             int[] b = punkt != null ? z : eckBlock(x, y, null);
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> hinzu(b[0], b[1])));
             bauEnde(neu);
-        }
-        if (ecke != null) {
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> bearbeite(ecke)));
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_loeschen"), () -> {
-                List<Wegpunkte.Ecke> rest = new ArrayList<>(ecke.form().ecken());
-                rest.remove(ecke.index());
-                Wegpunkte.INSTANZ.ersetze(ecke.form(), rest);
-            }));
         }
         if (region != null) {
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.ebene"), () -> ebenenWahl(region.ebene(), id -> Wegpunkte.INSTANZ.ordne(region, id))));
@@ -1879,6 +1964,12 @@ final class Karte extends Screen {
         // Escape bricht dann eine Region ab, die der Spieler setzt.
         if (ereignis.key() == InputConstants.KEY_ESCAPE && zug != null) {
             zug = null;
+            return true;
+        }
+        // Entf oder ⌫ löscht, was unter der Maus hervorgehoben steht; ⌫, weil die Taste auf dem Mac so heisst. Nicht im Bau und
+        // nicht bei gedrückter Taste. Siehe docs/wegpunkte.md, „Bedienung“.
+        if ((ereignis.key() == InputConstants.KEY_DELETE || ereignis.key() == InputConstants.KEY_BACKSPACE) && zug == null && !taste
+                && loescheUnterMaus()) {
             return true;
         }
         if (HeroicMap.karte != null && HeroicMap.karte.matches(ereignis)) {
