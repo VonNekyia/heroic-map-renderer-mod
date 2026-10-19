@@ -307,9 +307,7 @@ public final class Bedienung implements FabricClientGameTest {
         double[] vorDoppel = mitte(context);
         maus.setCursorPos(mittig.x() * k, mittig.y() * k);
         context.waitTick();
-        maus.pressMouse(LINKS);
-        context.waitTick();
-        maus.pressMouse(LINKS);
+        doppelklick(maus);
         context.waitTicks(2);
         warte250();
         context.waitTicks(2);
@@ -391,11 +389,18 @@ public final class Bedienung implements FabricClientGameTest {
         if (kreisAngeheftet(context)) {
             throw new AssertionError("Ein Klick heftete den Kreis an");
         }
+        // Zwei Klicks mit 300 ms Abstand nach der Uhr sind keiner: Den Abstand hält der Test selbst.
+        warte250();
+        maus.pressMouse(LINKS);
+        schlafe(300);
+        maus.pressMouse(LINKS);
+        context.waitTicks(2);
+        if (kreisAngeheftet(context)) {
+            throw new AssertionError("Zwei Klicks 300 ms auseinander hefteten den Kreis an");
+        }
         for (boolean an : new boolean[] {true, false}) {
             warte250();
-            maus.pressMouse(LINKS);
-            context.waitTick();
-            maus.pressMouse(LINKS);
+            doppelklick(maus);
             context.waitTicks(2);
             if (kreisAngeheftet(context) != an) {
                 throw new AssertionError("Doppelklick auf den Kreis: angeheftet " + !an + " statt " + an);
@@ -405,9 +410,7 @@ public final class Bedienung implements FabricClientGameTest {
         warte250();
         maus.setCursorPos(breite / 2.0 * k, ny * k);
         context.waitTick();
-        maus.pressMouse(LINKS);
-        context.waitTick();
-        maus.pressMouse(LINKS);
+        doppelklick(maus);
         context.waitTicks(2);
         if (!context.computeOnClient(mc -> Wegpunkte.INSTANZ.nadelAngeheftet("test:anheften", "hafen"))) {
             throw new AssertionError("Doppelklick auf die Nadel heftet sie nicht an");
@@ -418,9 +421,7 @@ public final class Bedienung implements FabricClientGameTest {
                 .filter(m -> m.region() != null).findFirst().orElseThrow(() -> new AssertionError("Keine Raute der Region")));
         maus.setCursorPos(raute.x() * k, raute.y() * k);
         context.waitTick();
-        maus.pressMouse(LINKS);
-        context.waitTick();
-        maus.pressMouse(LINKS);
+        doppelklick(maus);
         context.waitTicks(2);
         if (!context.computeOnClient(mc -> Wegpunkte.INSTANZ.regionen().getFirst().angeheftet())) {
             throw new AssertionError("Doppelklick auf die Raute heftet die Region nicht an");
@@ -581,9 +582,7 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("Klick auf „Schiff“: " + klicks + ", gesperrt "
                     + context.computeOnClient(mc -> Tafeln.INSTANZ.gesperrt(ziel, schiff)));
         }
-        maus.pressMouse(LINKS);
-        context.waitTick();
-        maus.pressMouse(LINKS);
+        doppelklick(maus);
         context.waitTicks(2);
         if (klicks.size() != 1) {
             throw new AssertionError("Doppelklick auf den gesperrten Knopf: " + klicks);
@@ -905,9 +904,7 @@ public final class Bedienung implements FabricClientGameTest {
         warte250();
         double ix = (orte[0][0] + orte[1][0] + orte[2][0]) / 3, iy = (orte[0][1] + orte[1][1] + orte[2][1]) / 3;
         fahre(context, maus, k, ix, iy);
-        maus.pressMouse(LINKS);
-        context.waitTick();
-        maus.pressMouse(LINKS);
+        doppelklick(maus);
         context.waitTicks(2);
         if (!context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).angeheftet())
                 || context.computeOnClient(mc -> Wegpunkte.INSTANZ.angeheftet("test:land", "land"))) {
@@ -924,11 +921,12 @@ public final class Bedienung implements FabricClientGameTest {
         Karte.Marke b = marke(context, neu.get(1));
         warte250();
         fahre(context, maus, k, b.x(), b.y());
+        // Halten und Pause nach der Uhr, nicht nach Ticks; siehe doppelklick.
         for (int i = 0; i < 2; i++) {
             maus.holdMouse(LINKS);
-            context.waitTick();
+            schlafe(DOPPELKLICK_MS / 2);
             maus.releaseMouse(LINKS);
-            context.waitTick();
+            schlafe(DOPPELKLICK_MS / 2);
         }
         warte250();
         context.waitTicks(2);
@@ -2652,12 +2650,25 @@ public final class Bedienung implements FabricClientGameTest {
         warte250();
         maus.setCursorPos(ort[0] * k, ort[1] * k);
         context.waitTick();
-        maus.pressMouse(LINKS);
         if (doppelt) {
-            context.waitTick();
+            doppelklick(maus);
+        } else {
             maus.pressMouse(LINKS);
         }
         context.waitTicks(2);
+    }
+
+    /** Abstand der zwei Drücke eines Doppelklicks nach der Uhr: deutlich unter den 250 ms des Spiels. */
+    static final long DOPPELKLICK_MS = 50;
+
+    /**
+     * Ein Doppelklick an der Stelle der Maus: zwei Drücke {@link #DOPPELKLICK_MS} nach der Uhr auseinander, ohne Tick dazwischen;
+     * der Client steht, solange der Test schläft. Ein Tick dazwischen dauerte unter Last auch länger als 250 ms, dann war es keiner.
+     */
+    private static void doppelklick(TestInput maus) {
+        maus.pressMouse(LINKS);
+        schlafe(DOPPELKLICK_MS);
+        maus.pressMouse(LINKS);
     }
 
     /** Die Mitte des Knopfs mit dieser Aufschrift auf dem offenen Schirm, in Einheiten des GUI. */
