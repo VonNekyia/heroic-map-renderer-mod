@@ -624,8 +624,10 @@ public final class Bedienung implements FabricClientGameTest {
         tafelZu(context, maus, k);
         int vorAuf = fragen.size();
         fahre(context, maus, k, aufStadt[0], aufStadt[1]);
-        context.waitFor(mc -> fragen.size() > vorAuf && ((Karte) mc.gui.screen()).tafelOffen(), 40);
-        if (!fragen.getLast().equals(ziel) || !Boolean.TRUE.equals(knopfAn(context, schiff))) {
+        for (int i = 0; i < 40 && !(fragen.size() > vorAuf && context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelOffen())); i++) {
+            context.waitTick();
+        }
+        if (fragen.size() <= vorAuf || !fragen.getLast().equals(ziel) || !Boolean.TRUE.equals(knopfAn(context, schiff))) {
             throw new AssertionError("Wieder aufgegangen: gefragt " + fragen.subList(vorAuf, fragen.size()) + ", Schiff " + knopfAn(context, schiff));
         }
         antworte(context, stadtTafel("1", false, true));
