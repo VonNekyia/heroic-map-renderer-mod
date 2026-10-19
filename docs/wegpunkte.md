@@ -614,7 +614,10 @@ bei einem anderen Spieler als neue Ebene an. Gewünscht vom User am 18.10.
   Kleinbuchstaben, Ziffern und `_.-/` aussieht oder länger als 64 Zeichen
   ist; eine Farbe ausser 0 bis 7 und `#RRGGBB`; weniger als 2 oder mehr als
   64 Ecken. Die Grenze von 256 KiB entpackt fängt eine Bombe: wenig Text,
-  der entpackt riesig würde (`EbenenCode.MAX_ENTPACKT`). Unbekannte Felder
+  der entpackt riesig würde (`EbenenCode.MAX_ENTPACKT`). Tief
+  verschachteltes JSON, etwa 100 000 öffnende Klammern, und eine Zahl mit
+  200 000 Ziffern sind kaputt, ohne dass das Lesen einen Fehler wirft, der
+  das Spiel beenden könnte; das hält ein Unit-Test fest. Unbekannte Felder
   überliest der Mod, auch `name` an einem Wegpunkt; so bricht ein späteres
   Feld nichts.
 - **Grösse,** gemessen am 19.10. mit zlib in derselben Stufe 9 wie der Mod:
@@ -788,7 +791,9 @@ Schleier am Rand, siehe „Schleier“.
   bleibt (`gleicherNameBekommtEineZahlUndBelegteBloeckeBleiben`); die
   Grenzen der Welt beim Einfügen (`grenzenBeimEinfuegenInDieWelt`); beim
   Lesen jede Grenze, eine Bombe, ein halber Code, falsche Felder und
-  unbekannte, die es überliest (`lesenPrueftAllesOderNichts`).
+  unbekannte, die es überliest (`lesenPrueftAllesOderNichts`); tief
+  verschachteltes JSON und eine Zahl mit 200 000 Ziffern
+  (`boesartigeCodesSindKaputtOhneZuWerfen`).
 - `SchleierTest`: Teilen an jeder ganzen Zahl, auch rückwärts und durch
   eine Ecke; ein Rechteck ein Stück je Block, nur im Kasten; ein Kreis in
   Sehnen über den Bogen, ein Kreis von 100 000 Blöcken nur beim Kasten;
@@ -894,7 +899,8 @@ Schleier am Rand, siehe „Schleier“.
   die Zwischenablage und meldet es; Ebene und Wegpunkt gelöscht, legt „Code
   einfügen“ sie wieder an, mit dem Wegpunkt auf demselben Block; steht
   „Hallo“ in der Zwischenablage, sagt es, dass dort kein Code ist, und legt
-  nichts an.
+  nichts an. Die Zwischenablage ist die echte des Rechners; was vorher darin
+  stand, schreibt der Test am Ende zurück.
 - `AblageTest`: der Ordner der Welt je Wahl und je Dimension, siehe
   [Download](download.md), „Ablage“.
 - Gametest `Bilder`: die Vollbildkarte mit einem angehefteten Wegpunkt und
