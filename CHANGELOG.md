@@ -9,6 +9,7 @@ The release notes on GitHub and Modrinth come from here
 - **A menu for what you click.** Right-click a waypoint, a corner or the diamond of an old rectangle on the full map, and the menu shows only what concerns it. The free map keeps the general menu.
 - **Set coordinates.** "Set coordinates…" on a waypoint or a corner moves it to the `x z` you type.
 - **Delete with a key.** `Delete` or `Backspace` removes the waypoint, corner, shape (at its handle) or old rectangle under the mouse.
+- **Right-click finishes a shape.** While you build a line or region on the full map, a right-click finishes it: two corners make a line, more make a region. With only one corner, a note says so. Right-click a shape's handle to get its menu, including "Cancel shape"; `Esc` cancels as before.
 
 ## 0.2.54
 
