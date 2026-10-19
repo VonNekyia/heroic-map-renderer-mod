@@ -707,6 +707,9 @@ Kanal stehen beim Plugin,
     dann „Noch keine Antwort vom Server“.
   - Fehlt der Knopf in der Antwort, hat das Objekt keine Tafel mehr oder
     kommt eine neue `version` der Ebene, wartet er nicht mehr.
+  - Ist die Ebene weg oder ausgeblendet, fällt er still weg, ohne
+    Nachfrage und ohne Hinweis, denn darauf antwortet das Plugin nicht
+    (Review von mod#147).
 - **Neu gefragt** wird eine gemerkte Tafel mit Knöpfen jedes Mal, wenn sie
   aufgeht (`Tafeln.aufgegangen`), denn ihr Zustand ändert sich ohne neue
   `version`, etwa nach einem Klick auf der Webkarte. Bis zur Antwort steht

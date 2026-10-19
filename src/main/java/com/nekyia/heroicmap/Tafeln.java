@@ -191,14 +191,17 @@ final class Tafeln {
 
     /**
      * Je Frame: Nach einem Klick fragt der Mod die Tafel nach {@link #NACHFRAGEN} neu, bis der Knopf umspringt; nach
-     * {@link #GESPERRT_MS} ist er mit dem alten Zustand wieder frei. Zurück kommt, wie viele so frei wurden.
+     * {@link #GESPERRT_MS} ist er mit dem alten Zustand wieder frei. Zurück kommt, wie viele so frei wurden. Ein Knopf,
+     * dessen Ziel nicht mehr {@code gilt}, Ebene weg oder ausgeblendet, fällt still weg: Darauf antwortet das Plugin nicht.
      */
-    int takt(long ms) {
+    int takt(long ms, Predicate<Ziel> gilt) {
         int frei = 0;
         for (Iterator<Map.Entry<Druck, Warten>> i = gedrueckt.entrySet().iterator(); i.hasNext(); ) {
             Map.Entry<Druck, Warten> e = i.next();
             Warten w = e.getValue();
-            if (ms - w.seit() >= GESPERRT_MS) {
+            if (!gilt.test(e.getKey().ziel())) {
+                i.remove();
+            } else if (ms - w.seit() >= GESPERRT_MS) {
                 i.remove();
                 frei++;
             } else if (w.nachgefragt() < NACHFRAGEN.length && ms - w.seit() >= NACHFRAGEN[w.nachgefragt()]) {

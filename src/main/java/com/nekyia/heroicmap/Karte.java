@@ -1373,7 +1373,7 @@ final class Karte extends Screen {
      */
     private void tafel(GuiGraphicsExtractor g, int mausX, int mausY) {
         long ms = Util.getMillis();
-        if (Tafeln.INSTANZ.takt(ms) > 0) {
+        if (Tafeln.INSTANZ.takt(ms, z -> Tafeln.gilt(Ebenen.INSTANZ, z)) > 0) {
             zeige(Component.translatable("heroicmap.tafel.keine_antwort"));
         }
         // Solange eine Form im Bau ist, geht keine Tafel auf: Sie ginge dort auf, wo das Menü war, und läge über

@@ -709,6 +709,23 @@ public final class Bedienung implements FabricClientGameTest {
         if (!klicks.getLast().equals("voll@3 beispiel:k3")) {
             throw new AssertionError("Klick auf den letzten Knopf der gescrollten Tafel: " + klicks);
         }
+        // Review von #147: Blendet der Spieler die Ebene aus, während der Knopf wartet, fällt er still weg, ohne
+        // Nachfrage und ohne „Noch keine Antwort“; das Plugin antwortet darauf ohnehin nicht.
+        Tafeln.Ziel vollZiel = new Tafeln.Ziel("test:knopf", "3", "voll");
+        context.runOnClient(mc -> Ebenen.INSTANZ.setze("test:knopf", false));
+        int nachAus = fragen.size();
+        long bis = Util.getMillis() + Tafeln.GESPERRT_MS + 500;
+        while (Util.getMillis() < bis) {
+            context.waitTick();
+        }
+        String danach = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).hinweis() == null ? null
+                : ((Karte) mc.gui.screen()).hinweis().getString());
+        boolean wartet = context.computeOnClient(mc -> Tafeln.INSTANZ.gesperrt(vollZiel, "beispiel:k3"));
+        context.runOnClient(mc -> Ebenen.INSTANZ.setze("test:knopf", true));
+        if (fragen.size() != nachAus || wartet || erwartet.equals(danach)) {
+            throw new AssertionError("Ebene ausgeblendet, während der Knopf wartet: " + (fragen.size() - nachAus) + " Nachfragen, wartet "
+                    + wartet + ", Hinweis „" + danach + "“");
+        }
         tafelZu(context, maus, k);
     }
 
