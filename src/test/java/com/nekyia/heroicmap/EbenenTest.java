@@ -885,4 +885,14 @@ class EbenenTest {
         assertFalse(Ebenen.kennungEinesMods("MeinMod:Staedte"));
         assertFalse(Ebenen.kennungEinesMods(null));
     }
+
+    /** Eine Aktionsebene, "player": true, ist im Mod eine gewöhnliche Ebene, mit der version der Fassung dieses Spielers. Siehe docs/ebenen.md, „Knöpfe“. */
+    @Test
+    void aktionsebeneWieJedeEbene() {
+        Ebenen e = new Ebenen();
+        liste(e, "{\"id\":\"b:routen\",\"player\":true,\"visible\":true,\"version\":\"f1\"}");
+        teil(e, "b:routen", "f1", 1, 1, nadel("eigen", 1));
+        assertEquals(List.of("b:routen"), e.sichtbar().stream().map(Ebenen.Eintrag::id).toList());
+        assertEquals(List.of("eigen"), e.nadeln("b:routen").stream().map(Ebenen.Ort::name).toList());
+    }
 }

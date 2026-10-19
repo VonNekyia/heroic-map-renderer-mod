@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 
 /**
@@ -19,6 +20,8 @@ final class Tafeln {
 
     /** Wie der Mod fragt; true, wenn die Frage hinausging. Nur der Gametest setzt einen anderen. */
     static Predicate<Ziel> fragen = Kanal::frageTafel;
+    /** Wie der Mod einen Knopf drückt; true, wenn der Klick hinausging. Nur der Gametest setzt einen anderen. */
+    static BiPredicate<Ziel, String> druecken = Kanal::drueckeKnopf;
     static final Tafeln INSTANZ = new Tafeln(z -> fragen.test(z));
     /** So viele Tafeln behält der Mod, wie mit dem Plugin vereinbart; so viele Fragen merkt er sich höchstens. */
     static final int MAX = 256, MAX_GEFRAGT = 1024;
@@ -26,6 +29,10 @@ final class Tafeln {
     static final long WARTEN_MS = 5000;
     /** So lange ohne Antwort zeigt die Karte nichts, erst danach „lädt …“; so blitzt es bei einem Ziel ohne Tafel nicht. */
     static final long LAEDT_MS = 200;
+    /** Nach so vielen ms nach einem Klick fragt der Mod die Tafel neu, bis der Knopf umspringt, wie die Webkarte. */
+    static final long[] NACHFRAGEN = {300, 800, 1500, 3000};
+    /** So lange ist ein Knopf nach dem Klick höchstens gesperrt: bis zur letzten Frage und eine halbe Sekunde für ihre Antwort. */
+    static final long GESPERRT_MS = 3500;
 
     /** Das Ziel eines Orts: die {@code version} der Daten, aus denen er kommt, nicht die der Liste. */
     static Ziel ziel(String ebene, Ebenen.Ort o) {
@@ -67,11 +74,11 @@ final class Tafeln {
             }
         }
 
-        /** Ein unlesbares {@code panel} oder eins ohne gültige Bausteine heisst: ohne Tafel. */
+        /** Ein unlesbares {@code panel} oder eins ohne gültige Bausteine und Knöpfe heisst: ohne Tafel. */
         private static Tafel panel(JsonObject json) {
             try {
                 Tafel t = Tafel.lies(json.getAsJsonObject("panel"));
-                return t.bausteine().isEmpty() ? null : t;
+                return t.bausteine().isEmpty() && t.knoepfe().isEmpty() ? null : t;
             } catch (RuntimeException e) {
                 return null;
             }
@@ -82,7 +89,17 @@ final class Tafeln {
     private record Frage(long seit, int mal) {
     }
 
+    /** Ein gedrückter Knopf in der Tafel eines Ziels. */
+    record Druck(Ziel ziel, String knopf) {
+    }
+
+    /** Ein Klick, auf dessen neuen Zustand der Mod wartet: der Zustand davor, wann er hinausging und wie oft der Mod nachfragte. */
+    private record Warten(boolean an, long seit, int nachgefragt) {
+    }
+
     private final Predicate<Ziel> frage;
+    private final BiPredicate<Ziel, String> druck;
+    private final Map<Druck, Warten> gedrueckt = new HashMap<>();
     private final Map<Ziel, Optional<Tafel>> tafeln = new LinkedHashMap<>(16, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<Ziel, Optional<Tafel>> aelteste) {
@@ -93,7 +110,12 @@ final class Tafeln {
     private final Map<String, String> versionen = new HashMap<>();
 
     Tafeln(Predicate<Ziel> frage) {
+        this(frage, (z, k) -> druecken.test(z, k));
+    }
+
+    Tafeln(Predicate<Ziel> frage, BiPredicate<Ziel, String> druck) {
         this.frage = frage;
+        this.druck = druck;
     }
 
     /**
@@ -121,21 +143,85 @@ final class Tafeln {
             // Ohne Kanal ohne Tafel, aber nicht gemerkt: Hört der Server später, fragt der Mod dann.
             return Optional.empty();
         }
+        merke(z, ms, f == null ? 1 : 2);
+        return null;
+    }
+
+    /** Merkt eine Frage, die eben hinausging; die älteste fällt weg, wenn es mehr als {@link #MAX_GEFRAGT} sind. */
+    private void merke(Ziel z, long ms, int mal) {
         gefragt.remove(z);
-        gefragt.put(z, new Frage(ms, f == null ? 1 : 2));
+        gefragt.put(z, new Frage(ms, mal));
         if (gefragt.size() > MAX_GEFRAGT) {
             Iterator<Ziel> aelteste = gefragt.keySet().iterator();
             aelteste.next();
             aelteste.remove();
         }
-        return null;
     }
 
-    /** Eine Antwort; nur auf eine Frage, die noch offen ist. */
+    /**
+     * Beim Aufgehen der Tafel des Ziels: Hat sie Knöpfe, fragt der Mod sie neu, denn deren Zustand ändert sich ohne neue
+     * {@code version}; bis zur Antwort gilt die gemerkte.
+     */
+    void aufgegangen(Ziel z, long ms) {
+        Optional<Tafel> t = tafeln.get(z);
+        if (t != null && t.isPresent() && !t.get().knoepfe().isEmpty() && frage.test(z)) {
+            merke(z, ms, 1);
+        }
+    }
+
+    /**
+     * Drückt den Knopf {@code k} in der Tafel des Ziels: schickt {@code knopf}, wenn er nicht schon auf seinen neuen Zustand
+     * wartet, und merkt den Klick als Frage, denn danach schickt das Plugin die Tafel. True, wenn der Klick hinausging.
+     * Siehe docs/ebenen.md, „Knöpfe“.
+     */
+    boolean druecke(Ziel z, Tafel.Knopf k, long ms) {
+        Druck d = new Druck(z, k.id());
+        if (gedrueckt.containsKey(d) || !druck.test(z, k.id())) {
+            return false;
+        }
+        gedrueckt.put(d, new Warten(k.an(), ms, 0));
+        merke(z, ms, 1);
+        return true;
+    }
+
+    /** Wartet der Knopf noch auf seinen neuen Zustand? Solange schickt ein Klick nichts. */
+    boolean gesperrt(Ziel z, String knopf) {
+        return gedrueckt.containsKey(new Druck(z, knopf));
+    }
+
+    /**
+     * Je Frame: Nach einem Klick fragt der Mod die Tafel nach {@link #NACHFRAGEN} neu, bis der Knopf umspringt; nach
+     * {@link #GESPERRT_MS} ist er mit dem alten Zustand wieder frei. Zurück kommt, wie viele so frei wurden. Ein Knopf,
+     * dessen Ziel nicht mehr {@code gilt}, Ebene weg oder ausgeblendet, fällt still weg: Darauf antwortet das Plugin nicht.
+     */
+    int takt(long ms, Predicate<Ziel> gilt) {
+        int frei = 0;
+        for (Iterator<Map.Entry<Druck, Warten>> i = gedrueckt.entrySet().iterator(); i.hasNext(); ) {
+            Map.Entry<Druck, Warten> e = i.next();
+            Warten w = e.getValue();
+            if (!gilt.test(e.getKey().ziel())) {
+                i.remove();
+            } else if (ms - w.seit() >= GESPERRT_MS) {
+                i.remove();
+                frei++;
+            } else if (w.nachgefragt() < NACHFRAGEN.length && ms - w.seit() >= NACHFRAGEN[w.nachgefragt()]) {
+                Ziel z = e.getKey().ziel();
+                if (frage.test(z)) {
+                    merke(z, ms, 1);
+                }
+                e.setValue(new Warten(w.an(), w.seit(), w.nachgefragt() + 1));
+            }
+        }
+        return frei;
+    }
+
+    /** Eine Antwort; nur auf eine Frage, die noch offen ist. Ein Knopf, der umsprang oder fehlt, wartet danach nicht mehr. */
     void antwort(Antwort a) {
         if (gefragt.remove(a.ziel()) != null) {
             neueVersion(a.ziel());
             tafeln.put(a.ziel(), Optional.ofNullable(a.tafel()));
+            gedrueckt.entrySet().removeIf(e -> e.getKey().ziel().equals(a.ziel()) && (a.tafel() == null
+                    || a.tafel().knoepfe().stream().noneMatch(k -> k.id().equals(e.getKey().knopf()) && k.an() == e.getValue().an())));
         }
     }
 
@@ -144,6 +230,7 @@ final class Tafeln {
         if (alt != null && !alt.equals(z.version())) {
             tafeln.keySet().removeIf(k -> k.ebene().equals(z.ebene()));
             gefragt.keySet().removeIf(k -> k.ebene().equals(z.ebene()) && !k.version().equals(z.version()));
+            gedrueckt.keySet().removeIf(k -> k.ziel().ebene().equals(z.ebene()) && !k.ziel().version().equals(z.version()));
         }
     }
 
@@ -195,6 +282,7 @@ final class Tafeln {
         tafeln.clear();
         gefragt.clear();
         versionen.clear();
+        gedrueckt.clear();
     }
 
     /**

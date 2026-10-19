@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.53
+
+- **Buttons in info panels.** A server plugin can put buttons under the info panel of a place on the full map, for example "Ship" at every town. Click one to switch it on or off for you; the square on the left is filled while it is on. If the server does not answer within a few seconds, the button is free again and a note says so.
+
 ## 0.2.52
 
 - **Share a layer as a code.** In "Layers …", the copy button next to a layer puts it on the clipboard as a short text; anyone can paste it with "Paste code" and gets it as a new layer of their own. Pinned things, players and the death point stay at home.

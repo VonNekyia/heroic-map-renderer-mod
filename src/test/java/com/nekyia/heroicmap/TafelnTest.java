@@ -198,4 +198,136 @@ class TafelnTest {
         assertNull(Tafeln.Antwort.lies("{\"v\":1,\"typ\":\"ebene\",\"id\":\"x\"}"));
         assertNull(Tafeln.Antwort.lies("{\"v\":1,\"typ\":\"tafel\",\"ebene\":\"beispiel:staedte\",\"version\":\"5f3a\"}"));
     }
+
+    private static final Tafel.Knopf AUS = new Tafel.Knopf("b:schiff", "Schiff", "Ship", false);
+    private static final Tafel MIT_AUS = new Tafel(List.of(), List.of(AUS));
+    private static final Tafel MIT_AN = new Tafel(List.of(), List.of(new Tafel.Knopf("b:schiff", "Schiff", "Ship", true)));
+
+    /** Ein Klick geht einmal hinaus, bis der Knopf umspringt; die Tafel danach gilt, obwohl der Mod sie nicht fragte. Siehe docs/ebenen.md, „Knöpfe“. */
+    @Test
+    void klickBisZumNeuenZustand() {
+        List<Tafeln.Ziel> gefragt = new ArrayList<>();
+        List<String> gedrueckt = new ArrayList<>();
+        Tafeln t = new Tafeln(gefragt::add, (z, k) -> gedrueckt.add(z.id() + " " + k));
+        Tafeln.Ziel stadt = new Tafeln.Ziel("b:staedte", "v1", "stadt-17");
+        t.tafel(stadt, 0);
+        t.antwort(new Tafeln.Antwort(stadt, MIT_AUS));
+        assertTrue(t.druecke(stadt, AUS, 1000));
+        assertFalse(t.druecke(stadt, AUS, 1010));
+        assertEquals(List.of("stadt-17 b:schiff"), gedrueckt);
+        assertTrue(t.gesperrt(stadt, "b:schiff"));
+        // Die Tafel nach dem Klick mit dem alten Zustand: weiter gesperrt; nachgefragt erst nach 0,3 s.
+        t.antwort(new Tafeln.Antwort(stadt, MIT_AUS));
+        assertTrue(t.gesperrt(stadt, "b:schiff"));
+        assertEquals(0, t.takt(1299, z -> true));
+        assertEquals(1, gefragt.size());
+        assertEquals(0, t.takt(1300, z -> true));
+        assertEquals(2, gefragt.size());
+        // Die Antwort darauf mit dem neuen Zustand: frei, die Tafel zeigt ihn, und der Mod fragt nicht weiter.
+        t.antwort(new Tafeln.Antwort(stadt, MIT_AN));
+        assertFalse(t.gesperrt(stadt, "b:schiff"));
+        assertEquals(Optional.of(MIT_AN), t.tafel(stadt, 1400));
+        assertEquals(0, t.takt(1800, z -> true));
+        assertEquals(2, gefragt.size());
+    }
+
+    /** Ohne neuen Zustand fragt der Mod nach 0,3, 0,8, 1,5 und 3 s, nach 3,5 s ist der Knopf mit dem alten wieder frei. */
+    @Test
+    void ohneNeuenZustandNachDreieinhalbSekundenFrei() {
+        List<Tafeln.Ziel> gefragt = new ArrayList<>();
+        Tafeln t = new Tafeln(gefragt::add, (z, k) -> true);
+        Tafeln.Ziel stadt = new Tafeln.Ziel("b:staedte", "v1", "stadt-17");
+        t.tafel(stadt, 0);
+        t.antwort(new Tafeln.Antwort(stadt, MIT_AUS));
+        t.druecke(stadt, AUS, 0);
+        int frei = 0;
+        for (long ms = 0; ms < Tafeln.GESPERRT_MS; ms += 50) {
+            frei += t.takt(ms, z -> true);
+        }
+        assertEquals(0, frei);
+        assertEquals(1 + Tafeln.NACHFRAGEN.length, gefragt.size());
+        assertTrue(t.gesperrt(stadt, "b:schiff"));
+        assertEquals(1, t.takt(Tafeln.GESPERRT_MS, z -> true));
+        assertFalse(t.gesperrt(stadt, "b:schiff"));
+        assertTrue(t.druecke(stadt, AUS, Tafeln.GESPERRT_MS));
+        // Ohne Kanal geht kein Klick hinaus, und nichts sperrt.
+        Tafeln ohne = new Tafeln(z -> false, (z, k) -> false);
+        assertFalse(ohne.druecke(stadt, AUS, 0));
+        assertFalse(ohne.gesperrt(stadt, "b:schiff"));
+    }
+
+    /** Fehlt der Knopf in der Antwort oder hat das Objekt keine Tafel mehr, wartet er nicht mehr; nach einer neuen version der Ebene ebenso. */
+    @Test
+    void knopfWegOderNeueVersion() {
+        Tafeln t = new Tafeln(z -> true, (z, k) -> true);
+        Tafeln.Ziel stadt = new Tafeln.Ziel("b:staedte", "v1", "stadt-17");
+        t.druecke(stadt, AUS, 0);
+        t.antwort(new Tafeln.Antwort(stadt, TAFEL));
+        assertFalse(t.gesperrt(stadt, "b:schiff"));
+        t.druecke(stadt, AUS, 0);
+        t.antwort(new Tafeln.Antwort(stadt, null));
+        assertFalse(t.gesperrt(stadt, "b:schiff"));
+        t.druecke(stadt, AUS, 0);
+        t.tafel(new Tafeln.Ziel("b:staedte", "v2", "dorf"), 0);
+        assertFalse(t.gesperrt(stadt, "b:schiff"));
+        // Ein anderer Knopf am selben Ziel wartet weiter.
+        Tafeln.Ziel neu = new Tafeln.Ziel("b:staedte", "v2", "stadt-17");
+        t.druecke(neu, AUS, 0);
+        t.druecke(neu, new Tafel.Knopf("b:zug", null, "Train", true), 0);
+        t.antwort(new Tafeln.Antwort(neu, new Tafel(List.of(), List.of(new Tafel.Knopf("b:schiff", null, "Ship", true),
+                new Tafel.Knopf("b:zug", null, "Train", true)))));
+        assertFalse(t.gesperrt(neu, "b:schiff"));
+        assertTrue(t.gesperrt(neu, "b:zug"));
+    }
+
+    /** Gilt das Ziel nicht mehr, Ebene weg oder ausgeblendet, fällt ein wartender Knopf still weg: keine Nachfrage, nicht als frei gezählt (Review von #147). */
+    @Test
+    void nichtMehrGueltigStillWeg() {
+        List<Tafeln.Ziel> gefragt = new ArrayList<>();
+        Tafeln t = new Tafeln(gefragt::add, (z, k) -> true);
+        Tafeln.Ziel stadt = new Tafeln.Ziel("b:staedte", "v1", "stadt-17"), dorf = new Tafeln.Ziel("b:staedte", "v1", "dorf");
+        t.druecke(stadt, AUS, 0);
+        t.druecke(dorf, AUS, 0);
+        // Das Dorf gilt und ist nach 3,5 s frei, gezählt; die Stadt gilt nicht und fällt still weg.
+        assertEquals(1, t.takt(Tafeln.GESPERRT_MS, z -> !z.equals(stadt)));
+        assertFalse(t.gesperrt(stadt, "b:schiff"));
+        assertEquals(List.of(), gefragt);
+        t.druecke(stadt, AUS, 10_000);
+        for (long ms = 10_000; ms < 10_000 + Tafeln.GESPERRT_MS; ms += 50) {
+            assertEquals(0, t.takt(ms, z -> false));
+        }
+        assertFalse(t.gesperrt(stadt, "b:schiff"));
+        assertEquals(List.of(), gefragt);
+    }
+
+    /** Eine gemerkte Tafel mit Knöpfen fragt der Mod beim Aufgehen neu, eine ohne nicht. */
+    @Test
+    void mitKnoepfenBeimAufgehenNeu() {
+        List<Tafeln.Ziel> gefragt = new ArrayList<>();
+        Tafeln t = new Tafeln(gefragt::add, (z, k) -> true);
+        Tafeln.Ziel stadt = new Tafeln.Ziel("b:staedte", "v1", "stadt-17"), dorf = new Tafeln.Ziel("b:staedte", "v1", "dorf");
+        t.aufgegangen(stadt, 0);
+        assertEquals(0, gefragt.size());
+        t.tafel(stadt, 0);
+        t.antwort(new Tafeln.Antwort(stadt, MIT_AUS));
+        t.tafel(dorf, 0);
+        t.antwort(new Tafeln.Antwort(dorf, TAFEL));
+        assertEquals(2, gefragt.size());
+        t.aufgegangen(dorf, 10);
+        assertEquals(2, gefragt.size());
+        t.aufgegangen(stadt, 10);
+        assertEquals(List.of(stadt, dorf, stadt), gefragt);
+        // Bis zur Antwort gilt die gemerkte, danach die neue.
+        assertEquals(Optional.of(MIT_AUS), t.tafel(stadt, 20));
+        t.antwort(new Tafeln.Antwort(stadt, MIT_AN));
+        assertEquals(Optional.of(MIT_AN), t.tafel(stadt, 30));
+    }
+
+    /** Eine Antwort nur mit Knöpfen ist eine Tafel, keine ohne. */
+    @Test
+    void nurKnoepfeSindEineTafel() {
+        Tafeln.Antwort a = Tafeln.Antwort.lies("{\"v\":1,\"typ\":\"tafel\",\"ebene\":\"b:e\",\"version\":\"v\",\"id\":\"a\",\"panel\":{\"blocks\":["
+                + "{\"type\":\"button\",\"id\":\"b:schiff\",\"label\":{\"de\":\"Schiff\"},\"on\":false}]}}");
+        assertEquals(new Tafel(List.of(), List.of(new Tafel.Knopf("b:schiff", "Schiff", null, false))), a.tafel());
+    }
 }
