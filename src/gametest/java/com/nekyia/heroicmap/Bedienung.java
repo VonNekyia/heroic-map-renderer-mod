@@ -7,6 +7,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -29,13 +30,17 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContex
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
 import net.minecraft.client.MouseHandler;
+import net.minecraft.SharedConstants;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Util;
 import net.minecraft.util.Mth;
@@ -95,6 +100,7 @@ public final class Bedienung implements FabricClientGameTest {
             teleport(context, spiel.getServer(), maus, k);
             // Vor tod: Der lässt den Spieler am Ende in der Luft, er fällt.
             imBrowser(context, maus, k);
+            neueVersion(context, maus, k);
             tod(context, spiel.getServer(), maus, k);
         } finally {
             context.runOnClient(mc -> Wegpunkte.INSTANZ.leeren());
@@ -3264,17 +3270,134 @@ public final class Bedienung implements FabricClientGameTest {
         }
     }
 
+    /**
+     * Neue Version: Beim Start fragte der Gametest niemanden. Mit Schalter aus fragt der Mod nicht und zeigt nichts. Von Hand
+     * im Untermenü angeschaltet fragt er einmal einen Server auf loopback, mit Spielversion und User-Agent; ein zweites An im
+     * selben Start fragt nicht wieder. Dann steht oben links der Hinweis; ein Klick von Hand öffnet den Bestätigungsschirm mit
+     * der festen Adresse, Abbrechen führt zurück, kein Browser. Siehe docs/vollbildkarte.md, „Neue Version“.
+     */
+    private static void neueVersion(ClientGameTestContext context, TestInput maus, int k) {
+        List<String> anfragen = new CopyOnWriteArrayList<>();
+        HttpServer server;
+        try {
+            server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        server.createContext("/", t -> {
+            anfragen.add(t.getRequestURI().getRawQuery() + " " + t.getRequestHeaders().getFirst("User-Agent"));
+            byte[] koerper = "[{\"version_number\":\"100.0.0-rc.1\"},{\"version_number\":\"99.0.0\"}]".getBytes(StandardCharsets.UTF_8);
+            t.sendResponseHeaders(200, koerper.length);
+            try (OutputStream aus = t.getResponseBody()) {
+                aus.write(koerper);
+            }
+        });
+        server.start();
+        try {
+            String beimStart = context.computeOnClient(mc -> NeueVersion.basis + " " + NeueVersion.neu + " " + NeueVersion.gefragt.get());
+            if (!beimStart.equals("null null false")) {
+                throw new AssertionError("Neue Version beim Start der Gametests: " + beimStart);
+            }
+            context.runOnClient(mc -> {
+                NeueVersion.basis = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v2/project/heroic-map/version");
+                Minimap.INSTANZ.setzeNeueVersion(false);
+                NeueVersion.frage();
+                mc.gui.setScreen(new Karte(Satz.lies(Bilder.testsatz())));
+            });
+            context.waitTicks(20);
+            boolean knopf = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).neueVersionKnopf() != null);
+            if (!anfragen.isEmpty() || NeueVersion.gefragt.get() || knopf) {
+                throw new AssertionError("Neue Version mit Schalter aus: " + anfragen.size() + " Fragen, Knopf " + knopf);
+            }
+            // Von Hand an im Untermenü; dann aus und wieder an, das fragt nicht noch einmal.
+            context.runOnClient(mc -> mc.gui.setScreen(new Anzeige(null)));
+            context.waitTicks(2);
+            int[] schalter = context.computeOnClient(mc -> {
+                String name = Component.translatable("heroicmap.menue.neue_version").getString();
+                AbstractWidget w = mc.gui.screen().children().stream().filter(c -> c instanceof CycleButton<?> b
+                        && b.getMessage().getString().startsWith(name)).map(c -> (AbstractWidget) c).findFirst().orElseThrow();
+                return new int[] {w.getX() + w.getWidth() / 2, w.getY() + w.getHeight() / 2};
+            });
+            spielerKlick(context, maus, k, schalter[0], schalter[1]);
+            for (int i = 0; NeueVersion.neu == null; i++) {
+                if (i == 200) {
+                    throw new AssertionError("Neue Version: keine Antwort nach dem Anschalten, " + anfragen.size() + " Fragen");
+                }
+                context.waitTick();
+            }
+            spielerKlick(context, maus, k, schalter[0], schalter[1]);
+            spielerKlick(context, maus, k, schalter[0], schalter[1]);
+            context.waitTicks(20);
+            String erwartet = context.computeOnClient(mc -> NeueVersion.adresse(URI.create(""), SharedConstants.getCurrentVersion().name())
+                    .getRawQuery() + " " + NeueVersion.agent(NeueVersion.eigene()));
+            if (!anfragen.equals(List.of(erwartet)) || !"99.0.0".equals(NeueVersion.neu) || !Minimap.INSTANZ.neueVersion()) {
+                throw new AssertionError("Neue Version: Fragen " + anfragen + " statt [" + erwartet + "], neu " + NeueVersion.neu);
+            }
+            // Oben links der Hinweis; ein Klick von Hand öffnet den Bestätigungsschirm mit der festen Adresse.
+            context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(Bilder.testsatz()))));
+            context.waitTicks(3);
+            int[] hinweis = context.computeOnClient(mc -> {
+                AbstractWidget w = ((Karte) mc.gui.screen()).neueVersionKnopf();
+                if (w == null || w.getX() != 4 || w.getY() != 4
+                        || !w.getMessage().getString().equals(Component.translatable("heroicmap.karte.neue_version", "99.0.0").getString())) {
+                    throw new AssertionError("Neue Version: Hinweis " + (w == null ? "fehlt" : w.getMessage().getString() + " bei " + w.getX() + ", " + w.getY()));
+                }
+                return new int[] {w.getX() + w.getWidth() / 2, w.getY() + w.getHeight() / 2};
+            });
+            spielerKlick(context, maus, k, hinweis[0], hinweis[1]);
+            context.waitFor(mc -> mc.gui.screen() instanceof ConfirmLinkScreen, 100);
+            int[] abbrechen = context.computeOnClient(mc -> {
+                if (!(mc.gui.screen() instanceof ConfirmLinkScreen s) || !s.getNarrationMessage().getString().contains(NeueVersion.SEITE.toString())) {
+                    throw new AssertionError("Neue Version: nach dem Klick " + mc.gui.screen());
+                }
+                AbstractWidget w = s.children().stream().filter(c -> c instanceof AbstractWidget a
+                        && (a.getMessage().getString().equals(CommonComponents.GUI_CANCEL.getString())
+                        || a.getMessage().getString().equals(CommonComponents.GUI_NO.getString()))).map(c -> (AbstractWidget) c).findFirst().orElseThrow();
+                return new int[] {w.getX() + w.getWidth() / 2, w.getY() + w.getHeight() / 2};
+            });
+            spielerKlick(context, maus, k, abbrechen[0], abbrechen[1]);
+            context.waitFor(mc -> mc.gui.screen() instanceof Karte, 100);
+            // Mit Schalter aus kein Hinweis, auch wenn die Antwort da ist.
+            boolean zurueck = context.computeOnClient(mc -> mc.gui.screen() instanceof Karte);
+            context.runOnClient(mc -> {
+                Minimap.INSTANZ.setzeNeueVersion(false);
+                mc.gui.setScreen(new Karte(Satz.lies(Bilder.testsatz())));
+            });
+            context.waitTicks(3);
+            boolean ohne = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).neueVersionKnopf() == null);
+            if (!zurueck || !ohne || anfragen.size() != 1) {
+                throw new AssertionError("Neue Version: zurück auf der Karte " + zurueck + ", ohne Hinweis bei aus " + ohne + ", " + anfragen.size() + " Fragen");
+            }
+        } finally {
+            server.stop(0);
+            context.runOnClient(mc -> {
+                mc.gui.setScreen(null);
+                Minimap.INSTANZ.setzeNeueVersion(true);
+                NeueVersion.basis = null;
+                NeueVersion.neu = null;
+            });
+        }
+    }
+
     /** Der Knopf „Im Browser öffnen“ geht oder ist aus mit dem Grund {@code schluessel}. */
     private static void pruefeWeb(ClientGameTestContext context, boolean geht, String schluessel) {
-        String[] stand = context.computeOnClient(mc -> {
-            Karte karte = (Karte) mc.gui.screen();
-            Component aus = Webkarte.INSTANZ.aus(Symbole.INSTANZ.basis(), Util.getMillis());
-            return new String[] {String.valueOf(karte.webKnopf() != null && karte.webKnopf().active), aus == null ? "" : aus.getString(),
-                schluessel == null ? "" : Component.translatable(schluessel).getString()};
-        });
-        if (Boolean.parseBoolean(stand[0]) != geht || !stand[1].equals(stand[2])) {
-            throw new AssertionError("Im Browser öffnen: an " + stand[0] + " statt " + geht + ", Grund „" + stand[1] + "“ statt „" + stand[2] + "“");
+        // Den Knopf stellt erst der nächste Tick der Karte (Karte.webStand); darauf warten, höchstens 5 s, statt ihn sofort zu lesen.
+        String[] stand = null;
+        for (int i = 0; i <= 100; i++) {
+            if (i > 0) {
+                context.waitTick();
+            }
+            stand = context.computeOnClient(mc -> {
+                Karte karte = (Karte) mc.gui.screen();
+                Component aus = Webkarte.INSTANZ.aus(Symbole.INSTANZ.basis(), Util.getMillis());
+                return new String[] {String.valueOf(karte.webKnopf() != null && karte.webKnopf().active), aus == null ? "" : aus.getString(),
+                    schluessel == null ? "" : Component.translatable(schluessel).getString()};
+            });
+            if (Boolean.parseBoolean(stand[0]) == geht && stand[1].equals(stand[2])) {
+                return;
+            }
         }
+        throw new AssertionError("Im Browser öffnen: an " + stand[0] + " statt " + geht + ", Grund „" + stand[1] + "“ statt „" + stand[2] + "“");
     }
 
     /** Öffnet die Karte über (x, z), Rechtsklick in die Mitte, ein Klick auf „Hierher teleportieren“; sie schliesst sich. */
