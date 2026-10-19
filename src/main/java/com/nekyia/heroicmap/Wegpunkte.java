@@ -534,6 +534,57 @@ final class Wegpunkte {
         schreibe();
     }
 
+    /** Was „Code einfügen“ tat: die neue Ebene und wie viele Wegpunkte und Formen hineinkamen, oder der Schlüssel der Meldung. */
+    record Eingefuegt(int ebene, int punkte, int formen, String fehler) {
+    }
+
+    /**
+     * Legt den Inhalt eines Codes als neue eigene Ebene an, an, nichts angeheftet; bei gleichem Namen „Name (2)“. Ein Wegpunkt
+     * auf einem Block, auf dem schon einer liegt, kommt nicht dazu. Passt die Ebene oder passen die Formen nicht mehr, nichts.
+     * Siehe docs/wegpunkte.md, „Ebenen teilen“.
+     */
+    Eingefuegt fuegeEin(EbenenCode.Inhalt inhalt) {
+        if (ebenen.size() > MAX_EBENEN) {
+            return new Eingefuegt(-1, 0, 0, "ebenen_voll");
+        }
+        if (eigene.size() + inhalt.formen().size() > MAX_EIGENE_FORMEN) {
+            return new Eingefuegt(-1, 0, 0, "formen_voll");
+        }
+        int id = ebenen.stream().mapToInt(EigeneEbene::id).max().orElse(BASE) + 1;
+        ebenen.add(new EigeneEbene(id, freierName(inhalt.name()), true));
+        ebenenStand++;
+        int n = 0;
+        for (EbenenCode.Ort o : inhalt.orte()) {
+            if (finde(o.dimension(), o.x(), o.z()) < 0) {
+                punkte.add(new Punkt(naechsteId++, o.dimension(), o.x(), o.z(), o.farbe(), false, false, id));
+                n++;
+            }
+        }
+        for (EbenenCode.Form f : inhalt.formen()) {
+            eigene.add(new EigeneForm(f.dimension(), f.ecken(), f.farbe(), false, f.name(), f.hex(), id));
+        }
+        schreibe();
+        return new Eingefuegt(id, n, inhalt.formen().size(), null);
+    }
+
+    /** {@code name}, oder ist er vergeben, „name (2)“, „name (3)“ …, vorn gekürzt auf höchstens {@link #MAX_NAME} Zeichen. */
+    private String freierName(String name) {
+        Set<String> vergeben = ebenen.stream().map(EigeneEbene::name).collect(Collectors.toSet());
+        if (!vergeben.contains(name)) {
+            return name;
+        }
+        for (int i = 2; ; i++) {
+            String zusatz = " (" + i + ")", kopf = name;
+            int platz = MAX_NAME - zusatz.length();
+            if (kopf.codePointCount(0, kopf.length()) > platz) {
+                kopf = kopf.substring(0, kopf.offsetByCodePoints(0, platz)).strip();
+            }
+            if (!vergeben.contains(kopf + zusatz)) {
+                return kopf + zusatz;
+            }
+        }
+    }
+
     /** Legt den Wegpunkt in die eigene Ebene {@code ebene}, wenn es sie gibt. */
     void ordne(Punkt p, int ebene) {
         int i = punkte.indexOf(p);
