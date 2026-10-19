@@ -160,6 +160,7 @@ public final class Bedienung implements FabricClientGameTest {
         hinweisWeg(context, maus, k);
         wegpunktBei(context, maus, k);
         menueJeObjekt(context, maus, k);
+        einrasten(context, maus, k);
         rechtsklickImBau(context, maus, k);
         entfernen(context, maus, k);
         eigeneEbenen(context, maus, k);
@@ -1723,6 +1724,147 @@ public final class Bedienung implements FabricClientGameTest {
                 maus.pressKey(InputConstants.KEY_ESCAPE);
                 context.waitTick();
             }
+            context.runOnClient(mc -> {
+                List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+            });
+            context.waitTicks(2);
+        }
+    }
+
+    /**
+     * Hält wie die Hand 0,7 s still auf {@code von}, fährt dann in acht Schritten nach {@code nach}, auf Wunsch mit gehaltener
+     * Strg, wartet und lässt los. Gibt den Ort der gezogenen Ecke der Form {@code form} an der Stelle {@code index}, wie er
+     * kurz vor dem Loslassen gezeichnet stand, oder null, wenn {@code form} kleiner 0.
+     */
+    private static double[] halteUndZiehe(ClientGameTestContext context, TestInput maus, int k, double[] von, double[] nach, boolean strg,
+            int form, int index) {
+        warte250();
+        maus.setCursorPos(von[0] * k, von[1] * k);
+        context.waitTick();
+        long druck = Util.getMillis();
+        maus.holdMouse(LINKS);
+        zittereBis(context, maus, von[0] * k, von[1] * k, druck + 700);
+        if (strg) {
+            maus.holdControl();
+        }
+        for (int i = 1; i <= 8; i++) {
+            maus.setCursorPos((von[0] + (nach[0] - von[0]) * i / 8) * k, (von[1] + (nach[1] - von[1]) * i / 8) * k);
+            context.waitTick();
+        }
+        context.waitTicks(2);
+        double[] gezeichnet = form < 0 ? null : ecke(context, form, index);
+        maus.releaseMouse(LINKS);
+        context.waitTicks(2);
+        if (strg) {
+            maus.releaseControl();
+        }
+        return gezeichnet;
+    }
+
+    /**
+     * Einrasten mit Strg (mod#149): Eine Ecke, 0,7 s gehalten und mit Strg 6 Einheiten neben die Ecke einer anderen Form
+     * gezogen, liegt nach dem Loslassen auf deren Block und stand schon beim Ziehen dort; ohne Strg auf dem Block unter der
+     * Maus. Ebenso auf einen Wegpunkt. Ein Wegpunkt rastet auf eine Ecke ein. 12 Einheiten weg rastet nichts ein, und die
+     * Ecken der eigenen Form zählen nicht. Siehe docs/wegpunkte.md, „Einrasten“.
+     */
+    private static void einrasten(ClientGameTestContext context, TestInput maus, int k) {
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        int bx = mitte[0] - 34, bz = mitte[1] + 6;
+        // Form A, ein Viereck, links; Form B, eine Linie, rechts davon; ein Wegpunkt darunter. Ein Block sind 4 Einheiten.
+        List<Wegpunkte.Ecke> a = List.of(new Wegpunkte.Ecke(bx, bz), new Wegpunkte.Ecke(bx + 8, bz), new Wegpunkte.Ecke(bx + 8, bz + 8),
+                new Wegpunkte.Ecke(bx, bz + 8));
+        Wegpunkte.Ecke b0 = new Wegpunkte.Ecke(bx + 20, bz + 2);
+        try {
+            context.runOnClient(mc -> {
+                String dimension = mc.level.dimension().identifier().toString();
+                Wegpunkte.INSTANZ.setzeForm(dimension, a);
+                Wegpunkte.INSTANZ.setzeForm(dimension, List.of(b0, new Wegpunkte.Ecke(bx + 26, bz + 2)));
+                Wegpunkte.INSTANZ.setze(dimension, bx + 20, bz + 12);
+            });
+            context.waitTicks(2);
+            Wegpunkte.Punkt w = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
+            double[] zielB = ecke(context, formen + 1, 0);
+            frei(context, new double[][] {ecke(context, formen, 1), zielB});
+
+            // Ecke 1 von A mit Strg 6 Einheiten neben B0: auf B0, schon beim Ziehen dort gezeichnet.
+            double[] a1 = ecke(context, formen, 1);
+            double[] daneben = {zielB[0] - 6, zielB[1]};
+            double[] gezeichnet = halteUndZiehe(context, maus, k, a1, daneben, true, formen, 1);
+            Wegpunkte.Ecke ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
+            if (!ist.equals(b0) || Math.abs(gezeichnet[0] - zielB[0]) > 0.5 || Math.abs(gezeichnet[1] - zielB[1]) > 0.5) {
+                throw new AssertionError("Ecke mit Strg neben die Ecke einer anderen Form: " + ist + " statt " + b0 + ", gezeichnet bei "
+                        + Arrays.toString(gezeichnet) + " statt " + Arrays.toString(zielB));
+            }
+            // Zurück, dann ohne Strg dasselbe: auf dem Block unter der Maus, nicht auf B0.
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
+            context.waitTicks(2);
+            a1 = ecke(context, formen, 1);
+            int[] unter = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blockUnter(daneben[0], daneben[1]));
+            halteUndZiehe(context, maus, k, a1, daneben, false, -1, 0);
+            ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
+            if (!ist.equals(new Wegpunkte.Ecke(unter[0], unter[1])) || ist.equals(b0)) {
+                throw new AssertionError("Ecke ohne Strg: " + ist + " statt " + unter[0] + " " + unter[1]);
+            }
+
+            // Ecke 2 von A mit Strg 6 Einheiten neben den Wegpunkt: auf seinem Block.
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
+            context.waitTicks(2);
+            Karte.Marke wm = marke(context, w);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 2), new double[] {wm.x() - 6, wm.y()}, true, -1, 0);
+            ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(2));
+            if (!ist.equals(new Wegpunkte.Ecke(w.x(), w.z()))) {
+                throw new AssertionError("Ecke mit Strg neben einen Wegpunkt: " + ist + " statt " + w.x() + " " + w.z());
+            }
+
+            // 12 Einheiten neben B0: kein Einrasten. Ecke 0 von A mit Strg neben ihre eigene Ecke 2: kein Einrasten.
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
+            context.waitTicks(2);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 1), new double[] {zielB[0] - 12, zielB[1]}, true, -1, 0);
+            ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
+            if (ist.equals(b0)) {
+                throw new AssertionError("Ecke mit Strg 12 Einheiten neben B0 rastete ein");
+            }
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
+            context.waitTicks(2);
+            double[] a2 = ecke(context, formen, 2);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 0), new double[] {a2[0] - 6, a2[1]}, true, -1, 0);
+            ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(0));
+            if (ist.equals(a.get(2))) {
+                throw new AssertionError("Ecke mit Strg rastete auf eine Ecke der eigenen Form ein");
+            }
+
+            // Der Wegpunkt mit Strg 6 Einheiten neben B0: auf B0. Ein Bild beim Ziehen zeigt ihn dort.
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
+            context.waitTicks(2);
+            wm = marke(context, w);
+            warte250();
+            maus.setCursorPos(wm.x() * k, wm.y() * k);
+            context.waitTick();
+            long druck = Util.getMillis();
+            maus.holdMouse(LINKS);
+            zittereBis(context, maus, wm.x() * k, wm.y() * k, druck + 700);
+            maus.holdControl();
+            for (int i = 1; i <= 8; i++) {
+                maus.setCursorPos((wm.x() + (daneben[0] - wm.x()) * i / 8) * k, (wm.y() + (daneben[1] - wm.y()) * i / 8) * k);
+                context.waitTick();
+            }
+            context.waitTicks(2);
+            context.takeScreenshot(TestScreenshotOptions.of("einrasten").disableCounterPrefix());
+            maus.releaseMouse(LINKS);
+            context.waitTicks(2);
+            maus.releaseControl();
+            Wegpunkte.Punkt nach = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
+            if (nach.x() != b0.x() || nach.z() != b0.z()) {
+                throw new AssertionError("Wegpunkt mit Strg neben die Ecke einer Form: " + nach + " statt " + b0);
+            }
+        } finally {
+            maus.releaseControl();
             context.runOnClient(mc -> {
                 List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
                 List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);

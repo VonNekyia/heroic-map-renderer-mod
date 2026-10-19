@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.56
+
+- **Snap with Ctrl.** Hold `Ctrl` (`⌘` on a Mac) while you drag a corner or a waypoint on the full map, and it snaps onto a nearby corner of another shape or, for a corner, onto a waypoint. Regions now meet cleanly.
+
 ## 0.2.55
 
 - **A menu for what you click.** Right-click a waypoint, a corner or the diamond of an old rectangle on the full map, and the menu shows only what concerns it. The free map keeps the general menu.
