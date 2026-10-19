@@ -75,7 +75,7 @@ Das baut das Jar nach `build/libs/` und lässt die Tests laufen.
 | `SchleierTest` | wie der Schleier Kanten in Stücke je Block teilt, Kreise nur über den Bogen, Höhe, Auswahl und Farbe, siehe [Wegpunkte](wegpunkte.md), „Schleier“ |
 | `StrahlenTest` | welche Wegpunkte einen Strahl bekommen, höchstens 64, und wie breit er steht, siehe [Wegpunkte](wegpunkte.md), „Strahl“ |
 | `ChunkMalerTest` | dünne Flächen mindestens ein Pixel, der Deckel einer Truhe nach `facing` und Hälfte, das UV-Rechteck einer flachen Pflanze aus gespiegelter, gedrehter und schiefer UV, siehe [Minimap](minimap.md), „Flächen und Pixel“, „Blockentities“ und „Pflanzen von oben“ |
-| `PflanzenTest` | die Vorlagen der Bodenpflanzen wie im Renderer, die Kette über `parent` mit Schleife und fehlender Datei, jedes Modell nur einmal gelesen, siehe [Minimap](minimap.md), „Pflanzen von oben“ |
+| `PflanzenTest` | die Vorlagen der Bodenpflanzen wie im Renderer, die Kette über `parent` mit Schleife und fehlender Datei, jedes Modell nur einmal gelesen, jeder Zustand eines Blocks eingetragen, auch ohne Datei, siehe [Minimap](minimap.md), „Pflanzen von oben“ |
 | `WegpunkteTest` | Wegpunkte setzen, löschen, anheften, Farben, kaputte Einträge und Dateien; feste ids, eigene Formen mit eigenen Ecken, Ecken löschen und einfügen, der Umzug alter Formen aus ids von Wegpunkten; Formen, Rechtecke, Kreise, Nadeln und Banner anheften, je höchstens 64, eine ganze Ebene anheften und lösen, tote Einträge, Listen für Karte und Minimap; siehe [Wegpunkte](wegpunkte.md) |
 | `LichtTest` | die Lightmap gegen die Werte aus der Doku des Renderers, siehe [Minimap](minimap.md), „Licht“ |
 

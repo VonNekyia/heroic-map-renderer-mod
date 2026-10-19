@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
 import java.io.Reader;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -12,6 +13,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModelDispatcher;
@@ -56,11 +58,23 @@ final class Pflanzen {
         if (ja == null) {
             ResourceManager packs = Minecraft.getInstance().getResourceManager();
             Function<Identifier, Identifier> eltern = id -> eltern(packs, id);
-            lies(packs, state.getBlock()).forEach((s, modelle) -> m.zustaende().put(s,
-                    !modelle.isEmpty() && modelle.stream().allMatch(id -> erbt(id, eltern, m.modelle()))));
-            ja = m.zustaende().computeIfAbsent(state, s -> false);
+            Block block = state.getBlock();
+            eintragen(block.getStateDefinition().getPossibleStates(), lies(packs, block), id -> erbt(id, eltern, m.modelle()),
+                    m.zustaende());
+            ja = m.zustaende().get(state);
         }
         return ja;
+    }
+
+    /**
+     * Trägt jeden Zustand des Blocks ein: eine Bodenpflanze, wenn er Modelle hat und jedes erbt. Ohne Datei oder ohne
+     * Eintrag für den Zustand keine; so liest kein weiterer Zustand desselben Blocks die Dateien noch einmal.
+     */
+    static <S> void eintragen(Collection<S> alle, Map<S, Set<Identifier>> modelle, Predicate<Identifier> erbt, Map<S, Boolean> ziel) {
+        for (S s : alle) {
+            Set<Identifier> m = modelle.getOrDefault(s, Set.of());
+            ziel.put(s, !m.isEmpty() && m.stream().allMatch(erbt));
+        }
     }
 
     /** Je Zustand des Blocks die Modelle, die das Spiel für ihn lädt, aus allen Packs, das oberste zuletzt; leer bei jedem Fehler. */
