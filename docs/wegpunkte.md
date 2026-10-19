@@ -48,12 +48,12 @@ Formen“ (mod#79, mod#112).
 | Doppelklick in eine eigene Region, auf eine eigene Linie, auf die Raute eines alten Rechtecks, auf eine Fläche, einen Kreis, eine Nadel oder ein Banner vom Server | heftet sie an die Minimap oder löst sie wieder, siehe „Anheften“ |
 | Rechtsklick, „Linie/Region von hier“ | beginnt eine eigene Form mit einer Ecke auf dem Block unter der Maus, auf einem Wegpunkt auf dessen Block, siehe „Eigene Formen“ |
 | Linksklick auf die Karte, solange eine Form im Bau ist | setzt eine Ecke, auf einem Wegpunkt auf dessen Block, statt ihn in die Mitte zu legen, sonst auf den Block darunter; auf die erste Ecke schliesst er bei drei und mehr die Region. Ziehen verschiebt die Karte wie sonst |
-| Rechtsklick, „Eckpunkt hinzufügen“ | im Bau: eine Ecke hier, wie ein Linksklick; auf einer Ecke einer fertigen Form: neue Ecken zwischen ihr und der nächsten |
+| Rechtsklick auf eine Ecke, „Eckpunkt hinzufügen“ | neue Ecken zwischen ihr und der nächsten, siehe „Eigene Formen“ |
 | Rechtsklick auf eine Ecke, „Eckpunkt löschen“ | nimmt sie aus der Form; aus einer Region mit drei Ecken wird eine Linie, eine Linie mit zwei fällt weg |
 | Linke Taste 0,5 s still auf einer Ecke halten | sie hängt an der Maus, die Form folgt ihr, und sie liegt beim Loslassen auf dem Block darunter; `Esc` bricht ab |
 | Linke Taste 0,5 s still auf dem Griff in der Mitte einer Form halten | die ganze Form hängt an der Maus; beim Loslassen liegt sie um ganze Blöcke verschoben; `Esc` bricht ab, siehe „Eigene Formen“ |
-| Rechtsklick, „Form fertig“ | speichert die Form im Bau, mit zwei Ecken eine Linie, mit mehr eine Region; den Eintrag gibt es ab zwei Ecken |
-| Rechtsklick, „Form abbrechen“, oder `Esc` | verwirft die Form im Bau; eine geänderte bleibt, wie sie war |
+| Rechtsklick, solange eine Form im Bau ist | schliesst sie ab: mit zwei Ecken eine Linie, mit mehr eine Region; mit einer nur ein Hinweis. Am Griff einer Form statt dessen ihr Menü mit „Form fertig“ und „Form abbrechen“ |
+| `Esc`, oder am Griff „Form abbrechen“ | verwirft die Form im Bau; eine geänderte bleibt, wie sie war |
 | Rechtsklick auf den Griff einer eigenen Form | ihr Menü: „An die Minimap heften“ oder „Von der Minimap lösen“, „Name…“, „Farbe…“, „Eckpunkt hinzufügen“, „Form löschen“; siehe „Eigene Formen“, „Namen“ und „Farbe“ |
 
 - **Unter der Maus** steht hervorgehoben, was ein Klick dort träfe: ein
@@ -344,9 +344,8 @@ Raute eines alten Rechtecks vor einer Ecke vor dem Griff einer Form.
 
 - **Teleport** bleibt am Wegpunkt und am Todespunkt, entschieden vom
   Reviewer: Er betrifft den Ort, und nach einem Tod ist er der Weg zurück.
-- **Im Bau** bleibt das Menü zum Bauen, ausser am Griff: Auf einem Wegpunkt
-  setzt „Eckpunkt hinzufügen“ die Ecke auf seinen Block, und „Form
-  fertig“ und „Form abbrechen“ stehen überall, siehe „Eigene Formen“.
+- **Im Bau** gibt es kein Menü ausser am Griff; ein Rechtsklick schliesst
+  die Form ab, siehe „Eigene Formen“.
 - **„Koordinaten setzen…“** öffnet an der Stelle des Menüs ein Feld mit
   `x z` des Objekts (`Karte.koordinaten`). Enter nimmt dieselben Formen
   wie „Wegpunkt bei …“, `x z`, `x, z` oder `x y z` (`Wegpunkte.koordinaten`),
@@ -376,21 +375,23 @@ sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
   auf die Karte eine Ecke (`Karte.hinzu`): auf einem Wegpunkt auf dessen
   Block, statt ihn in die Mitte zu legen, sonst auf den Block darunter, und
   höchstens 3 Einheiten neben einer Ecke im Bau auf deren Block
-  (`Karte.eckBlock`). Ebenso Rechtsklick, „Eckpunkt hinzufügen“. Ziehen
-  über `Karte.ZUG` verschiebt die Karte wie sonst. Ein Wegpunkt entsteht
-  dabei nicht. Ein Linksklick auf die erste Ecke schliesst eine neue Form
-  ab drei Ecken zur Region; „Form fertig“ speichert sie, wie sie ist
-  (`Karte.fertig`, `Wegpunkte.setzeForm`).
+  (`Karte.eckBlock`). Ziehen über `Karte.ZUG` verschiebt die Karte wie
+  sonst. Ein Wegpunkt entsteht dabei nicht. Ein Linksklick auf die erste
+  Ecke schliesst eine neue Form ab drei Ecken zur Region.
+- **Abschliessen:** Ein Rechtsklick speichert die Form, wie sie ist, wie
+  „Form fertig“ (`Karte.fertig`, `Wegpunkte.setzeForm`): mit zwei Ecken eine
+  Linie, ab drei eine Region. Das gilt auch auf einem Wegpunkt, einer
+  Ecke oder der Raute eines alten Rechtecks. Mit einer Ecke sagt er unten
+  links „Mindestens zwei Eckpunkte; Esc bricht ab“ und tut sonst nichts.
+  Am Griff einer Form, wo nichts darüber liegt, kommt statt dessen ihr
+  Menü, siehe „Griff“. Gewünscht vom User am 20.10. (mod#149); bis dahin
+  öffnete der Rechtsklick ein Menü zum Bauen.
 - **Im Bau** verbindet eine gepunktete weisse Vorschau die Ecken, mit
   einer weissen Raute auf jeder, und die Stelle der nächsten Ecke mit der
   Maus. Unten links steht „Linksklick: Eckpunkt hier oder auf einem
-  Wegpunkt, auf den ersten: Region; Rechtsklick: Menü mit „Form fertig“;
-  Esc bricht ab“. Ein Rechtsklick schliesst nie sofort ab; das Menü hat
-  dann: „Hierher teleportieren“; „Wegpunkt setzen“, auf einem
-  Wegpunkt „Wegpunkt löschen“; „Eckpunkt hinzufügen“; „Form fertig“ ab zwei
-  Ecken; „Form abbrechen“; „Region löschen“ auf der Raute eines alten
-  Rechtecks. Auf dem Griff einer Form das Menü der Form, siehe „Griff“, mit
-  „Form fertig“ und „Form abbrechen“ für die Form im Bau.
+  Wegpunkt, auf den ersten: Region; Rechtsklick: fertig; Esc bricht ab“.
+  Ein Menü gibt es im Bau nur am Griff einer Form: ihr Menü, siehe
+  „Griff“, mit „Form fertig“ und „Form abbrechen“ für die Form im Bau.
 - **Keine Tafel,** solange die Form im Bau ist (`Karte.tafel`). Sonst ging
   die Tafel einer Region vom Server dort auf, wo das Menü war, lag über den
   Stellen, die der Spieler anklickt, und nahm deren Klick; so fügte ein
@@ -409,10 +410,10 @@ sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
   in den Bau (`Karte.bearbeite`), neue Ecken kommen zwischen diese und die
   nächste, jede weitere hinter die vorige neue. Nach der letzten Ecke einer
   Region ist die erste die nächste; an der letzten einer Linie hängt sie
-  hinten an. „Form fertig“ speichert an derselben Stelle, mit Farbe und
+  hinten an. Abschliessen speichert an derselben Stelle, mit Farbe und
   Anheften (`Wegpunkte.ersetze`); „Form abbrechen“ oder `Esc` lässt die Form,
   wie sie war. Gibt es sie beim Speichern so nicht mehr, etwa weil sie im
-  Bau über „Form löschen“ ging, speichert „Form fertig“ nichts und sagt
+  Bau über „Form löschen“ ging, speichert das Abschliessen nichts und sagt
   unten links „Die Form gibt es so nicht mehr; die neuen Ecken sind nicht
   gespeichert“, statt sie still zu verwerfen (Review von #122).
 - **Eckpunkt löschen** auf einer Ecke nimmt sie heraus, die Form bleibt.
@@ -866,7 +867,7 @@ Schleier am Rand, siehe „Schleier“.
   setzen“; auf dem ersten „Linie/Region von hier“, die Tafel der Region geht
   auf, wo das Menü war; Linksklicks auf den dritten, rechts unter dem
   Menü, den zweiten und den ersten schliessen eine Region; „Linie/Region
-  von hier“, ein Linksklick und „Form fertig“ geben eine Linie; ein
+  von hier“, ein Linksklick und ein Rechtsklick geben eine Linie; ein
   Doppelklick in die Region heftet sie an und nicht die Region vom Server;
   ein Doppelklick von Hand auf einen Wegpunkt in ihr heftet ihn an, und
   die Karte bleibt stehen; ein Rechtsklick in die Fläche bietet kein „Form
@@ -887,7 +888,7 @@ Schleier am Rand, siehe „Schleier“.
   löscht die zweite; „Eckpunkt hinzufügen“ an der ersten setzt die neue an
   die zweite Stelle; 700 ms gehalten hängt eine Ecke an der Maus und liegt
   nach dem Loslassen 2 bis 3 Blöcke weiter; eine Linie mit zwei Ecken fällt
-  beim Löschen einer weg; im Bau gelöscht, speichert „Form fertig“ nichts
+  beim Löschen einer weg; im Bau gelöscht, speichert der Rechtsklick nichts
   und zeigt den Hinweis, nach 4 s noch und nach gut 5 s nicht mehr. Ein
   Hinweis geht beim nächsten Klick auf die Karte und bei der nächsten
   Taste weg (`hinweisWeg`). Formen ziehen (`formenZiehen`): eine gehaltene
@@ -917,7 +918,11 @@ Schleier am Rand, siehe „Schleier“.
   hoch und unten zu 90 % deckend. Wegpunkt bei (`wegpunktBei`): „Wegpunkt
   bei …“ auf freier Karte zeigt `x z` des Blocks; „12“ nimmt Enter nicht;
   `x 64 z` 30 Blöcke weiter setzt dort einen Wegpunkt und legt ihn in die
-  Mitte. Menü je Objekt (`menueJeObjekt`): die Einträge an einem Wegpunkt,
+  Mitte. Rechtsklick im Bau (`rechtsklickImBau`): mit einer Ecke der Hinweis,
+  kein Menü und keine Form; mit zweien auf einem Wegpunkt eine Linie; mit
+  vier auf freier Karte eine Region mit allen vieren; am Griff einer Form im
+  Bau ihr Menü mit „Form fertig“ und „Form abbrechen“, das den Bau verwirft.
+  Menü je Objekt (`menueJeObjekt`): die Einträge an einem Wegpunkt,
   an einem Wegpunkt auf einer Ecke nur seine, an einer Ecke, an der Raute
   eines alten Rechtecks und auf freier Karte in einer Region; „Koordinaten
   setzen…“ an einer Ecke, „Burg“ nimmt Enter nicht, `x, z` legt sie dorthin;

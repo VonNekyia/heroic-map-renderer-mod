@@ -1304,6 +1304,16 @@ final class Karte extends Screen {
             return true;
         }
         if (e.button() == InputConstants.MOUSE_BUTTON_RIGHT) {
+            // Im Bau schliesst er die Form ab, ausser am Griff, wo nichts darüber liegt: dort das Menü der Form. Siehe
+            // docs/wegpunkte.md, „Eigene Formen“.
+            if (zug != null && (m != null || eckeUnter(e.x(), e.y()) != null || griffUnter(e.x(), e.y()) == null)) {
+                if (zug.size() < 2) {
+                    zeige(Component.translatable("heroicmap.karte.form_zwei"));
+                } else {
+                    fertig();
+                }
+                return true;
+            }
             menue(e.x(), e.y(), m != null ? m.punkt() : null, m != null ? m.region() : null);
             return true;
         }
@@ -1657,7 +1667,7 @@ final class Karte extends Screen {
     /**
      * Öffnet das Menü an (x, y) für das, was dort liegt, im Vorrang wie beim Zeigen: ein Wegpunkt oder die Raute eines alten
      * Rechtecks vor einer Ecke vor dem Griff einer Form; auf freier Karte das allgemeine Menü. Solange eine Form im Bau ist,
-     * bleibt es das Menü zum Bauen, ausser am Griff. Siehe docs/wegpunkte.md, „Menü je Objekt“.
+     * kommt es nur am Griff, mit „Form fertig“ und „Form abbrechen“. Siehe docs/wegpunkte.md, „Menü je Objekt“.
      */
     private void menue(double x, double y, Wegpunkte.Punkt punkt, Wegpunkte.Region marke) {
         int[] z = punkt != null ? new int[] {punkt.x(), punkt.z()} : block(x, y);
@@ -1679,7 +1689,7 @@ final class Karte extends Screen {
         } else if (zug == null && ecke != null) {
             eckMenue(ecke, neu);
         } else {
-            allgemein(x, y, z, dimension, punkt, marke, neu);
+            allgemein(z, dimension, neu);
         }
         ziel = z;
         eintraege = neu;
@@ -1862,25 +1872,15 @@ final class Karte extends Screen {
         });
     }
 
-    /**
-     * Das allgemeine Menü an (x, y): Teleport, Wegpunkt, Formen beginnen und bauen. Im Bau dazu die Einträge des Wegpunkts
-     * {@code punkt} und eines alten Rechtecks, wenn seine Raute {@code region} getroffen ist; sonst haben sie ihr eigenes Menü.
-     */
-    private void allgemein(double x, double y, int[] z, String dimension, Wegpunkte.Punkt punkt, Wegpunkte.Region region, List<Eintrag> neu) {
+    /** Das allgemeine Menü auf freier Karte am Block {@code z}: Teleport, „Wegpunkt setzen“, „Wegpunkt bei …“, eine Form beginnen. */
+    private void allgemein(int[] z, String dimension, List<Eintrag> neu) {
         if (minecraft.getConnection() != null) {
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.teleport", z[0], z[1]), () -> {
                 Teleport.los(minecraft, satz, dimension, z[0], z[1]);
                 onClose();
             }));
         }
-        neu.add(punkt != null
-                ? new Eintrag(Component.translatable(punkt.tod() ? "heroicmap.karte.tod_loeschen" : "heroicmap.karte.wegpunkt_loeschen"),
-                        () -> Wegpunkte.INSTANZ.loesche(punkt))
-                : new Eintrag(Component.translatable("heroicmap.karte.wegpunkt"), () -> setzeWegpunkt(dimension, z[0], z[1])));
-        // Der Todespunkt bleibt in Base; die Datei kennt für ihn keine Ebene. Siehe docs/wegpunkte.md, „Eigene Ebenen“.
-        if (punkt != null && !punkt.tod()) {
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ebene"), () -> ebenenWahl(punkt.ebene(), id -> Wegpunkte.INSTANZ.ordne(punkt, id))));
-        }
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.wegpunkt"), () -> setzeWegpunkt(dimension, z[0], z[1])));
         // Ein Wegpunkt an eingetippten Koordinaten, dann in der Mitte. Siehe docs/wegpunkte.md, „Bedienung“.
         neu.add(new Eintrag(Component.translatable("heroicmap.karte.wegpunkt_bei"), () -> oeffne(z[0] + " " + z[1], 40,
                 "heroicmap.karte.wegpunkt_bei_hinweis", t -> {
@@ -1893,19 +1893,8 @@ final class Karte extends Screen {
                     zentriere(k[0] + 0.5, k[1] + 0.5);
                     return true;
                 })));
-        // Eigene Formen: ohne Form im Bau beginnt hier eine; im Bau eine Ecke hier, „Form fertig“ und „Form abbrechen“. Siehe
-        // docs/wegpunkte.md, „Eigene Formen“.
-        if (zug == null) {
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_von_hier"), () -> beginne(z[0], z[1])));
-        } else {
-            int[] b = punkt != null ? z : eckBlock(x, y, null);
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> hinzu(b[0], b[1])));
-            bauEnde(neu);
-        }
-        if (region != null) {
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ebene"), () -> ebenenWahl(region.ebene(), id -> Wegpunkte.INSTANZ.ordne(region, id))));
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_loeschen"), () -> Wegpunkte.INSTANZ.loesche(region)));
-        }
+        // Eine eigene Form beginnt hier. Siehe docs/wegpunkte.md, „Eigene Formen“.
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_von_hier"), () -> beginne(z[0], z[1])));
     }
 
     /**

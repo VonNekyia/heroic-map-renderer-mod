@@ -156,6 +156,7 @@ public final class Bedienung implements FabricClientGameTest {
         hinweisWeg(context, maus, k);
         wegpunktBei(context, maus, k);
         menueJeObjekt(context, maus, k);
+        rechtsklickImBau(context, maus, k);
         entfernen(context, maus, k);
         eigeneEbenen(context, maus, k);
         ebenenTeilen(context, maus, k);
@@ -880,7 +881,7 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("Linksklick auf den ersten Punkt schloss keine Region: " + region);
         }
 
-        // Linie aus zwei Punkten: „Linie/Region von hier“, Linksklick auf den zweiten, dann „Form fertig“.
+        // Linie aus zwei Punkten: „Linie/Region von hier“, Linksklick auf den zweiten, dann ein Rechtsklick (mod#149).
         warte250();
         Karte.Marke d = marke(context, neu.get(3));
         eintrag(context, maus, k, d.x(), d.y(), "heroicmap.karte.form_von_hier");
@@ -888,10 +889,10 @@ public final class Bedienung implements FabricClientGameTest {
         tafelDerRegion(context);
         Karte.Marke e = marke(context, neu.get(4));
         spielerKlick(context, maus, k, e.x(), e.y());
-        eintrag(context, maus, k, mx + 60, my + 40, "heroicmap.karte.form_fertig");
+        rechtsKlick(context, maus, k, mx + 60, my + 40);
         Wegpunkte.EigeneForm linie = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().getLast());
         if (linie.region() || linie.ecken().size() != 2) {
-            throw new AssertionError("„Form fertig“ mit zwei Punkten gab keine Linie: " + linie);
+            throw new AssertionError("Rechtsklick mit zwei Punkten gab keine Linie: " + linie);
         }
 
         // Ein Doppelklick in die Region heftet sie an; „Form löschen“ löscht sie.
@@ -1085,7 +1086,7 @@ public final class Bedienung implements FabricClientGameTest {
             double[] neuOrt = {erste[0] + 12, erste[1] + 40};
             frei(context, new double[][] {neuOrt});
             tempoKlick(context, maus, k, neuOrt[0], neuOrt[1], 0, 0);
-            eintrag(context, maus, k, neuOrt[0] + 30, neuOrt[1], "heroicmap.karte.form_fertig");
+            rechtsKlick(context, maus, k, neuOrt[0] + 30, neuOrt[1]);
             context.waitTicks(2);
             List<Wegpunkte.Ecke> nachEinfuegen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken());
             if (nachEinfuegen.size() != 3 || !nachEinfuegen.get(0).equals(a) || !nachEinfuegen.get(2).equals(c)) {
@@ -1115,14 +1116,14 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Gehaltene Ecke verschoben nach " + verschoben + " statt 2 bis 3 Blöcke östlich von " + c);
             }
 
-            // Im Bau gelöscht: „Form fertig“ speichert nichts und sagt es, statt die neuen Ecken still zu verwerfen.
+            // Im Bau gelöscht: Der Rechtsklick, der abschliesst, speichert nichts und sagt es, statt die neuen Ecken still zu verwerfen.
             double[] start = ecke(context, formen, 0);
             eintrag(context, maus, k, start[0], start[1], "heroicmap.karte.ecke_hinzu");
             tempoKlick(context, maus, k, neuOrt[0], neuOrt[1] + 20, 0, 0);
             // „Form löschen“ in der Region, an der Mitte ihrer drei Ecken.
             double[] e1 = ecke(context, formen, 1), e2 = ecke(context, formen, 2);
             eintrag(context, maus, k, (start[0] + e1[0] + e2[0]) / 3, (start[1] + e1[1] + e2[1]) / 3, "heroicmap.karte.form_loeschen");
-            long fertig = eintrag(context, maus, k, neuOrt[0] + 30, neuOrt[1], "heroicmap.karte.form_fertig");
+            long fertig = rechtsKlick(context, maus, k, neuOrt[0] + 30, neuOrt[1]);
             context.waitTicks(2);
             String hinweis = context.computeOnClient(mc -> {
                 Component h = ((Karte) mc.gui.screen()).hinweis();
@@ -1620,6 +1621,99 @@ public final class Bedienung implements FabricClientGameTest {
         } finally {
             context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size())
                     .forEach(Wegpunkte.INSTANZ::loesche));
+            context.waitTicks(2);
+        }
+    }
+
+    /** Ein Rechtsklick wie von Hand bei (x, y), ohne einen Eintrag zu wählen; gibt die Zeit des Drückens. */
+    private static long rechtsKlick(ClientGameTestContext context, TestInput maus, int k, double x, double y) {
+        warte250();
+        maus.setCursorPos(x * k, y * k);
+        context.waitTick();
+        long druck = Util.getMillis();
+        maus.pressMouse(RECHTS);
+        context.waitTicks(2);
+        return druck;
+    }
+
+    /**
+     * Ein Rechtsklick im Bau schliesst die Form ab (mod#149): mit einer Ecke nur der Hinweis, mit zweien eine Linie, auch auf
+     * einem Wegpunkt; mit vier eine Region. Am Griff einer Form kommt ihr Menü mit „Form fertig“ und „Form abbrechen“, und
+     * „Form abbrechen“ verwirft die Form im Bau. Im Bau sonst kein Menü. Siehe docs/wegpunkte.md, „Eigene Formen“.
+     */
+    private static void rechtsklickImBau(ClientGameTestContext context, TestInput maus, int k) {
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+        double mx = breite / 2.0, my = hoehe / 2.0;
+        double[][] orte = {{mx - 120, my + 30}, {mx - 80, my + 30}, {mx - 80, my + 70}, {mx - 120, my + 70}, {mx - 40, my + 50}};
+        frei(context, orte);
+        try {
+            // Ein Wegpunkt als Ziel des zweiten Rechtsklicks.
+            context.runOnClient(mc -> {
+                int[] b = ((Karte) mc.gui.screen()).blockUnter(orte[4][0], orte[4][1]);
+                Wegpunkte.INSTANZ.setze(mc.level.dimension().identifier().toString(), b[0], b[1]);
+            });
+            context.waitTicks(2);
+            Karte.Marke wegpunkt = marke(context, context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte)));
+
+            // Eine Ecke: Der Rechtsklick sagt es und lässt die Form im Bau.
+            eintrag(context, maus, k, orte[0][0], orte[0][1], "heroicmap.karte.form_von_hier");
+            rechtsKlick(context, maus, k, orte[2][0], orte[2][1]);
+            String hinweis = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).hinweis() == null ? null
+                    : ((Karte) mc.gui.screen()).hinweis().getString());
+            List<Wegpunkte.Ecke> zug = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug());
+            if (!texte(context, "heroicmap.karte.form_zwei").getFirst().equals(hinweis) || zug == null || zug.size() != 1
+                    || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eintraege()).size() != 0
+                    || context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size()) != formen) {
+                throw new AssertionError("Rechtsklick mit einer Ecke: Hinweis „" + hinweis + "“, im Bau " + zug);
+            }
+            // Eine zweite Ecke, dann der Rechtsklick auf den Wegpunkt: eine Linie, kein Menü.
+            spielerKlick(context, maus, k, orte[1][0], orte[1][1]);
+            rechtsKlick(context, maus, k, wegpunkt.x(), wegpunkt.y());
+            List<Wegpunkte.EigeneForm> alle = context.computeOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()));
+            if (alle.size() != formen + 1 || alle.getLast().region() || alle.getLast().ecken().size() != 2
+                    || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug()) != null
+                    || !context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eintraege()).isEmpty()) {
+                throw new AssertionError("Rechtsklick auf einen Wegpunkt mit zwei Ecken: " + (alle.size() > formen ? alle.getLast() : null));
+            }
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.loesche(Wegpunkte.INSTANZ.eigeneFormen().getLast()));
+            context.waitTicks(2);
+
+            // Vier Ecken, dann der Rechtsklick auf freie Karte: eine Region mit allen vier.
+            eintrag(context, maus, k, orte[0][0], orte[0][1], "heroicmap.karte.form_von_hier");
+            for (int i = 1; i < 4; i++) {
+                spielerKlick(context, maus, k, orte[i][0], orte[i][1]);
+            }
+            rechtsKlick(context, maus, k, mx + 40, my - 40);
+            alle = context.computeOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()));
+            if (alle.size() != formen + 1 || !alle.getLast().region() || alle.getLast().ecken().size() != 4) {
+                throw new AssertionError("Rechtsklick mit vier Ecken gab keine Region mit vieren: " + (alle.size() > formen ? alle.getLast() : null));
+            }
+
+            // Im Bau am Griff dieser Region: ihr Menü mit „Form fertig“ und „Form abbrechen“; „Form abbrechen“ verwirft den Bau.
+            double[] griff = griff(context, formen);
+            eintrag(context, maus, k, orte[4][0] + 30, orte[4][1] + 30, "heroicmap.karte.form_von_hier");
+            List<String> menue = eintraegeBei(context, maus, k, griff[0], griff[1]);
+            List<String> bau = texte(context, "heroicmap.karte.form_fertig", "heroicmap.karte.form_abbrechen");
+            if (!menue.containsAll(bau) || !menue.contains(texte(context, "heroicmap.karte.form_loeschen").getFirst())) {
+                throw new AssertionError("Rechtsklick am Griff im Bau: " + menue);
+            }
+            eintrag(context, maus, k, griff[0], griff[1], "heroicmap.karte.form_abbrechen");
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug()) != null
+                    || context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size()) != formen + 1) {
+                throw new AssertionError("„Form abbrechen“ am Griff liess die Form im Bau");
+            }
+        } finally {
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug()) != null) {
+                maus.pressKey(InputConstants.KEY_ESCAPE);
+                context.waitTick();
+            }
+            context.runOnClient(mc -> {
+                List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+            });
             context.waitTicks(2);
         }
     }
