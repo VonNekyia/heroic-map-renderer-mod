@@ -5,7 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import net.minecraft.resources.Identifier;
@@ -28,6 +30,22 @@ class PflanzenTest {
                 "block/crossed"}) {
             assertFalse(Pflanzen.vorlage(id(v)), v);
         }
+    }
+
+    @Test
+    void jederZustandEingetragenAuchOhneDatei() {
+        Map<String, Boolean> ziel = new HashMap<>();
+        // Ohne Datei: jeder Zustand keine Pflanze, keiner fehlt im Merker.
+        Pflanzen.eintragen(List.of("age=0", "age=1"), Map.of(), id -> true, ziel);
+        assertEquals(Map.of("age=0", false, "age=1", false), ziel);
+        // Mit Datei: nur, wer Modelle hat, die alle erben; ein Zustand ohne Eintrag ist keine.
+        Pflanzen.eintragen(List.of("a", "b", "c", "d"),
+                Map.of("a", Set.of(id("block/poppy")), "b", Set.of(id("block/poppy"), id("block/ladder")), "c", Set.of()),
+                id -> id.getPath().equals("block/poppy"), ziel);
+        assertEquals(true, ziel.get("a"));
+        assertEquals(false, ziel.get("b"));
+        assertEquals(false, ziel.get("c"));
+        assertEquals(false, ziel.get("d"));
     }
 
     @Test
