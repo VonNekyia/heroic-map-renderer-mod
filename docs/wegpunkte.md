@@ -50,6 +50,7 @@ Formen“ (mod#79, mod#112).
 | Linksklick auf die Karte, solange eine Form im Bau ist | setzt eine Ecke, auf einem Wegpunkt auf dessen Block, statt ihn in die Mitte zu legen, sonst auf den Block darunter; auf die erste Ecke schliesst er bei drei und mehr die Region. Ziehen verschiebt die Karte wie sonst |
 | Rechtsklick auf eine Ecke, „Eckpunkt hinzufügen“ | neue Ecken zwischen ihr und der nächsten, siehe „Eigene Formen“ |
 | Rechtsklick auf eine Ecke, „Eckpunkt löschen“ | nimmt sie aus der Form; aus einer Region mit drei Ecken wird eine Linie, eine Linie mit zwei fällt weg |
+| Beim Ziehen einer Ecke oder eines Wegpunkts `Strg` halten | er rastet auf die nächste Ecke einer anderen Form oder, eine Ecke, auf den nächsten Wegpunkt ein, höchstens 8 Einheiten weg, siehe „Einrasten“ |
 | Linke Taste 0,5 s still auf einer Ecke halten | sie hängt an der Maus, die Form folgt ihr, und sie liegt beim Loslassen auf dem Block darunter; `Esc` bricht ab |
 | Linke Taste 0,5 s still auf dem Griff in der Mitte einer Form halten | die ganze Form hängt an der Maus; beim Loslassen liegt sie um ganze Blöcke verschoben; `Esc` bricht ab, siehe „Eigene Formen“ |
 | Rechtsklick, solange eine Form im Bau ist | schliesst sie ab: mit zwei Ecken eine Linie, mit mehr eine Region; mit einer nur ein Hinweis. Am Griff einer Form statt dessen ihr Menü mit „Form fertig“ ab zwei Ecken und „Form abbrechen“ |
@@ -329,7 +330,7 @@ Reviewer freigegeben.
 ## Menü je Objekt
 
 Ein Rechtsklick zeigt nur, was das Objekt unter der Maus betrifft
-(`Karte.menue`), gewünscht vom User am 20.10. (mod#149). Was unter der
+(`Karte.menue`), gewünscht vom User am 19.10. (mod#149). Was unter der
 Maus liegt, zählt wie beim Zeigen und beim Klick: ein Wegpunkt oder die
 Raute eines alten Rechtecks vor einer Ecke vor dem Griff einer Form.
 
@@ -359,6 +360,32 @@ Raute eines alten Rechtecks vor einer Ecke vor dem Griff einer Form.
   - Den Todespunkt gibt es dort nicht; er lässt sich nicht verschieben,
     so hat es der User entschieden (mod#151).
 
+## Einrasten
+
+Hält der Spieler beim Ziehen einer Ecke oder eines Wegpunkts `Strg`
+(auf dem Mac `⌘`, `Minecraft.hasControlDown`), rastet er auf ein nahes
+Ziel ein (`Karte.einrasten`), gewünscht vom User am 19.10. (mod#149): So
+schliessen Regionen sauber aneinander.
+
+- **Ziele:** die Ecken anderer eigener Formen und, für eine Ecke, die
+  Wegpunkte, alle in Ebenen, die an sind, und in dieser Dimension.
+  Gemessen wird an der Lage des Blocks, nicht an der Marke: Die Marke
+  eines fernen Wegpunkts steht am Rand, siehe „Am Rand“, und zählt nicht. Die
+  Ecken der eigenen Form zählen nicht; liegt eine Ecke beim Loslassen auf
+  dem Block ihrer Nachbarin, werden beide eine, wie ohne `Strg`. Ein
+  Wegpunkt rastet nur auf Ecken ein, denn zwei Wegpunkte liegen nie auf
+  einem Block.
+- **Nah** heisst höchstens 8 Einheiten des GUI von der Maus, gemessen an
+  den Lagen des letzten Frames; das nächste Ziel gewinnt. Entschieden vom
+  Reviewer.
+- **Beim Ziehen** steht, was an der Maus hängt, schon genau auf dem Ziel,
+  und das Ziel ist hell wie unter der Maus. Ohne `Strg` folgt es der Maus
+  wie bisher.
+- **Beim Loslassen** zählt, ob `Strg` dann gedrückt ist: mit dem Ziel auf
+  dessen Block (`Karte.ablage`), sonst auf dem Block unter der Maus.
+- **Nicht** am Griff, wo die ganze Form hängt, und nicht auf Objekte vom
+  Server.
+
 ## Eigene Formen
 
 Eigene Linien und Regionen baut der Spieler aus eigenen Ecken, je ein
@@ -384,7 +411,7 @@ sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
   Ecke oder der Raute eines alten Rechtecks. Mit einer Ecke sagt er unten
   links „Mindestens zwei Eckpunkte; Esc bricht ab“ und tut sonst nichts.
   Am Griff einer Form, wo nichts darüber liegt, kommt statt dessen ihr
-  Menü, siehe „Griff“. Gewünscht vom User am 20.10. (mod#149); bis dahin
+  Menü, siehe „Griff“. Gewünscht vom User am 19.10. (mod#149); bis dahin
   öffnete der Rechtsklick ein Menü zum Bauen.
 - **Im Bau** verbindet eine gepunktete weisse Vorschau die Ecken, mit
   einer weissen Raute auf jeder, und die Stelle der nächsten Ecke mit der
@@ -918,7 +945,14 @@ Schleier am Rand, siehe „Schleier“.
   hoch und unten zu 90 % deckend. Wegpunkt bei (`wegpunktBei`): „Wegpunkt
   bei …“ auf freier Karte zeigt `x z` des Blocks; „12“ nimmt Enter nicht;
   `x 64 z` 30 Blöcke weiter setzt dort einen Wegpunkt und legt ihn in die
-  Mitte. Rechtsklick im Bau (`rechtsklickImBau`): mit einer Ecke der Hinweis,
+  Mitte. Einrasten (`einrasten`): eine Ecke 0,7 s gehalten und mit `Strg`
+  6 Einheiten neben die Ecke einer anderen Form gezogen liegt auf deren
+  Block und stand schon beim Ziehen dort; ohne `Strg` auf dem Block unter
+  der Maus; mit `Strg` neben einem Wegpunkt auf seinem Block; 12 Einheiten
+  weg und neben einer Ecke der eigenen Form rastet nichts ein; ein Wegpunkt
+  mit `Strg` neben einer Ecke liegt auf ihr, das Bild `einrasten.png` zeigt
+  ihn beim Ziehen dort; neben der Marke eines fernen Wegpunkts am Rand rastet
+  eine Ecke nicht ein. Rechtsklick im Bau (`rechtsklickImBau`): mit einer Ecke der Hinweis,
   kein Menü und keine Form; mit zweien auf einem Wegpunkt eine Linie; mit
   vier auf freier Karte eine Region mit allen vieren; am Griff einer Form im
   Bau mit einer Ecke ihr Menü mit „Form abbrechen“ und ohne „Form fertig“;

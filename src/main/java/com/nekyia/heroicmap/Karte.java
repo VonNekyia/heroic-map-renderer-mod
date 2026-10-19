@@ -66,6 +66,8 @@ final class Karte extends Screen {
     private static final int VORSCHAU = 0xCCFFFFFF;
     /** So weit von der Mitte einer Ecke trifft ein Klick sie noch, in Einheiten des GUI; von zweien die nähere. */
     private static final double ECKE_TREFFER = 3;
+    /** So nah an der Maus, in Einheiten des GUI, rastet mit Strg eine gezogene Ecke oder ein gezogener Wegpunkt ein (Reviewer). */
+    private static final double EINRASTEN = 8;
 
     private final Satz satz;
     private final Kacheln kacheln;
@@ -138,6 +140,8 @@ final class Karte extends Screen {
     /** Was die Maus gerade hervorhebt, höchstens eins davon; siehe {@link #schwebe}. */
     private Marke ueberMarke;
     private EckeAn ueberEcke;
+    /** Wohin, was an der Maus hängt, in diesem Frame einrastet, oder null. */
+    private Rast rast;
     private GriffAn ueberGriff;
     /** Der helle Rand von dem, was unter der Maus liegt. */
     private static final int HELL = 0xFFFFFFFF;
@@ -179,6 +183,10 @@ final class Karte extends Screen {
 
     /** Der Griff in der Mitte einer eigenen Form auf dem Schirm, in Einheiten des GUI. */
     record GriffAn(Wegpunkte.EigeneForm form, float x, float y) {
+    }
+
+    /** Wohin, was an der Maus hängt, mit Strg einrastet: der Block und die Ecke oder der Wegpunkt dort. */
+    private record Rast(int x, int z, EckeAn ecke, Marke marke) {
     }
 
     /** Die Ecke {@code index} der eigenen Form {@code form}, auf dem Schirm bei (x, y) in Einheiten des GUI. */
@@ -500,6 +508,12 @@ final class Karte extends Screen {
         // Die gezogene Form zeichnet die Karte selbst an der Maus; an ihrem alten Ort fällt sie solange weg.
         Wegpunkte.INSTANZ.ziehe(gezogeneForm());
         schwebe(mausX, mausY);
+        // Mit Strg steht das Ziel des Einrastens hell wie unter der Maus.
+        rast = einrasten(mausX, mausY);
+        if (rast != null) {
+            ueberEcke = rast.ecke();
+            ueberMarke = rast.marke();
+        }
         // Ein Klick auf eine Marke zentriert erst, wenn kein zweiter folgt; so bewegt ein Doppelklick die Karte nicht.
         if (wartend != null && Util.getMillis() - wartendSeit >= MouseHandler.DOUBLE_CLICK_THRESHOLD_MS) {
             zentriere(wartend.weltX(), wartend.weltZ());
@@ -554,8 +568,9 @@ final class Karte extends Screen {
             fortschritt(g, laeuft);
         }
         if (haengt != null) {
-            // Der Wegpunkt, der an der Maus hängt, unter dem Zeiger.
-            Minimap.wegpunkt(g, mausX, mausY, Minimap.KOPF, haengt, 0);
+            // Der Wegpunkt, der an der Maus hängt, unter dem Zeiger, mit Strg auf dem Ziel des Einrastens.
+            float[] s = rast != null ? schirm(rast.x() + 0.5, rast.z() + 0.5) : new float[] {mausX, mausY};
+            Minimap.wegpunkt(g, s[0], s[1], Minimap.KOPF, haengt, 0);
         }
         tafel(g, mausX, mausY);
         if (ziel != null) {
@@ -627,6 +642,48 @@ final class Karte extends Screen {
         return true;
     }
 
+    /**
+     * Mit gedrückter Strg, solange eine Ecke oder ein Wegpunkt an der Maus hängt: die nächste Ecke einer anderen eigenen Form oder,
+     * für eine Ecke, der nächste Wegpunkt, höchstens {@link #EINRASTEN} von der Maus, nach den Lagen des letzten Frames; sonst null.
+     * Ein Wegpunkt rastet nur auf Ecken ein, denn zwei Wegpunkte liegen nie auf einem Block. Siehe docs/wegpunkte.md, „Einrasten“.
+     */
+    private Rast einrasten(double mx, double my) {
+        if (haengt == null && eckeHaengt == null || !minecraft.hasControlDown()) {
+            return null;
+        }
+        Rast beste = null;
+        double abstand = EINRASTEN;
+        for (EckeAn e : ecken) {
+            double d = Math.hypot(mx - e.x(), my - e.y());
+            if ((eckeHaengt == null || e.form() != eckeHaengt.form()) && d <= abstand) {
+                Wegpunkte.Ecke c = e.form().ecken().get(e.index());
+                beste = new Rast(c.x(), c.z(), e, null);
+                abstand = d;
+            }
+        }
+        if (eckeHaengt != null) {
+            for (Marke m : marken) {
+                if (m.punkt() == null) {
+                    continue;
+                }
+                // An der Lage des Blocks, nicht an der Marke: Die eines fernen Wegpunkts steht am Rand (Review von #161).
+                float[] s = schirm(m.punkt().x() + 0.5, m.punkt().z() + 0.5);
+                double d = Math.hypot(mx - s[0], my - s[1]);
+                if (d <= abstand) {
+                    beste = new Rast(m.punkt().x(), m.punkt().z(), null, m);
+                    abstand = d;
+                }
+            }
+        }
+        return beste;
+    }
+
+    /** Der Block, auf den beim Loslassen kommt, was an der Maus hängt: mit Strg das Ziel des Einrastens, sonst der darunter. */
+    private int[] ablage(double x, double y) {
+        Rast r = einrasten(x, y);
+        return r != null ? new int[] {r.x(), r.z()} : block(x, y);
+    }
+
     /** Die eigene Form, die gerade an einer Ecke oder am Griff an der Maus hängt, oder null. */
     private Wegpunkte.EigeneForm gezogeneForm() {
         return eckeHaengt != null ? eckeHaengt.form() : griffHaengt != null ? griffHaengt.form() : null;
@@ -639,7 +696,7 @@ final class Karte extends Screen {
     private double[] punkte(Wegpunkte.EigeneForm f, double mausX, double mausY) {
         double[] p = Wegpunkte.mitten(f);
         if (eckeHaengt != null && eckeHaengt.form() == f) {
-            double[] w = welt(mausX, mausY);
+            double[] w = rast != null ? new double[] {rast.x() + 0.5, rast.z() + 0.5} : welt(mausX, mausY);
             p[2 * eckeHaengt.index()] = w[0];
             p[2 * eckeHaengt.index() + 1] = w[1];
         } else if (griffHaengt != null && griffHaengt.form() == f) {
@@ -1395,16 +1452,16 @@ final class Karte extends Screen {
         EckeAn ecke = eckeGedrueckt;
         eckeGedrueckt = null;
         griffGedrueckt = null;
-        // Der Wegpunkt an der Maus kommt auf den Block unter ihr, mit Farbe und Anheften.
+        // Der Wegpunkt an der Maus kommt auf den Block unter ihr, mit Strg auf den, wo er einrastet, mit Farbe und Anheften.
         if (haengt != null) {
-            int[] b = block(e.x(), e.y());
+            int[] b = ablage(e.x(), e.y());
             Wegpunkte.INSTANZ.verschiebe(haengt, b[0], b[1]);
             haengt = null;
             return true;
         }
         // Ebenso die Ecke an der Maus; liegt sie dann auf dem Block ihrer Nachbarin, werden beide eine.
         if (eckeHaengt != null) {
-            int[] b = block(e.x(), e.y());
+            int[] b = ablage(e.x(), e.y());
             List<Wegpunkte.Ecke> neu = new ArrayList<>(eckeHaengt.form().ecken());
             neu.set(eckeHaengt.index(), new Wegpunkte.Ecke(b[0], b[1]));
             Wegpunkte.INSTANZ.ersetze(eckeHaengt.form(), neu);
