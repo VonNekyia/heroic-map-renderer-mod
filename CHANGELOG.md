@@ -4,9 +4,13 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
-## 0.2.65
+## 0.2.66
 
 - **Minecraft font for names.** Under the size and curve sliders of a shape's name sits a "Font" button: Map or Minecraft. It shows right away on the full map and the minimap; Enter saves, Esc undoes. With "Force Unicode Font" the game draws its Unicode font; capital letters stay the same height in all fonts. Only your own shapes; names from the server stay in the map font.
+
+## 0.2.65
+
+- **One map folder per server behind a proxy.** With the plugin from 0.14.0 on, the server names its map, and the mod keeps each server's map, waypoints and layers in its own folder, even when two servers share a world. A server that shows another server's map uses that server's folder. Existing folders move once on the first join. From the second join on, the mod remembers the map and uses the right folder right away.
 
 ## 0.2.64
 
