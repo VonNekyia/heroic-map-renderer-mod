@@ -96,6 +96,7 @@ public final class Bedienung implements FabricClientGameTest {
             zoomNebenMinimap(context, maus, k);
             aufloesungUndKoordinaten(context, maus, k);
             symbole(context, maus, k);
+            knoepfeUeberDemL(context, maus);
             context.runOnClient(mc -> mc.gui.setScreen(null));
             beiF3(context, maus);
             schleierRegler(context, maus, k);
@@ -4605,6 +4606,78 @@ public final class Bedienung implements FabricClientGameTest {
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        } finally {
+            context.getInput().resizeWindow(vorher[0], vorher[1]);
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(vorher[2]);
+                mc.resizeGui();
+                Minimap.INSTANZ.lies(sicherung);
+                mc.gui.setScreen(new Einstellungen());
+            });
+            context.waitTicks(2);
+            try {
+                Files.deleteIfExists(sicherung);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+    }
+
+    /**
+     * Bei GS 4 und grosser Minimap ist neben ihr weniger Platz als die 120 Einheiten der Knöpfe; dann liegen sie über dem
+     * Regler „Zoom“. Im Bildschirmfoto steht „Fertig“ dort über dem Regler: Auf seiner oberen Zeile, im Rand des Knopfs, ist
+     * die Stelle über dem Regler so hell wie die daneben. Ein Klick von Hand dorthin schliesst das Menü und lässt den Zoom,
+     * wie vorher über der Minimap. Siehe docs/minimap.md, „Bedienung“.
+     */
+    private static void knoepfeUeberDemL(ClientGameTestContext context, TestInput maus) {
+        Path sicherung = FabricLoader.getInstance().getGameDir().resolve("heroicmap-knoepfe-test.properties");
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        context.runOnClient(mc -> Minimap.INSTANZ.schreibe(sicherung));
+        context.getInput().resizeWindow(1280, 960);
+        context.runOnClient(mc -> {
+            mc.options.guiScale().set(4);
+            mc.resizeGui();
+            int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+            Minimap.INSTANZ.stelle(b, 0, Minimap.GROESSTE, b, h);
+            Minimap.INSTANZ.setzeZoom(2);
+            mc.gui.setScreen(new Einstellungen());
+        });
+        context.waitTicks(3);
+        try {
+            // Eine Stelle, an der „Fertig“ über dem Regler „Zoom“ liegt; dazu eine auf dem Knopf daneben, auf seiner oberen Zeile.
+            double[] ort = context.computeOnClient(mc -> {
+                AbstractWidget fertig = mc.gui.screen().children().stream().filter(c -> c instanceof AbstractWidget w
+                        && w.getMessage().getString().equals(CommonComponents.GUI_DONE.getString())).map(c -> (AbstractWidget) c).findFirst().orElseThrow();
+                AbstractWidget zoom = zoomReglerWidget(mc);
+                int x0 = Math.max(fertig.getX(), zoom.getX()), x1 = Math.min(fertig.getX() + fertig.getWidth(), zoom.getX() + zoom.getWidth());
+                int y0 = Math.max(fertig.getY(), zoom.getY()), y1 = Math.min(fertig.getY() + fertig.getHeight(), zoom.getY() + zoom.getHeight());
+                if (x0 >= x1 || y0 >= y1) {
+                    throw new AssertionError("Bei GS 4 und grosser Minimap liegt „Fertig“ nicht über dem Regler „Zoom“: Fertig "
+                            + fertig.getX() + ", " + fertig.getY() + "; Zoom " + zoom.getX() + ", " + zoom.getY());
+                }
+                int frei = fertig.getX() + 3 < x0 ? fertig.getX() + 3 : fertig.getX() + fertig.getWidth() - 4;
+                return new double[] {(x0 + x1) / 2.0, (y0 + y1) / 2.0, frei, fertig.getY() + 2};
+            });
+            maus.setCursorPos(0, 0);
+            context.waitTicks(2);
+            try {
+                BufferedImage bild = ImageIO.read(context.takeScreenshot(TestScreenshotOptions.of("knoepfe-ueber-dem-l").disableCounterPrefix()).toFile());
+                int ueber = bild.getRGB((int) Math.round(ort[0] * 4), (int) Math.round(ort[3] * 4) + 1);
+                int daneben = bild.getRGB((int) Math.round(ort[2] * 4), (int) Math.round(ort[3] * 4) + 1);
+                int hell = (ueber >> 16 & 0xFF) + (ueber >> 8 & 0xFF) + (ueber & 0xFF), hellDaneben = (daneben >> 16 & 0xFF) + (daneben >> 8 & 0xFF) + (daneben & 0xFF);
+                if (Math.abs(hell - hellDaneben) > 30) {
+                    throw new AssertionError("„Fertig“ steht im Bild nicht über dem Regler „Zoom“: Helligkeit " + hell + " über dem Regler, " + hellDaneben
+                            + " daneben auf dem Knopf");
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            spielerKlick(context, maus, 4, ort[0], ort[1]);
+            boolean zu = context.computeOnClient(mc -> mc.gui.screen() == null);
+            double zoom = context.computeOnClient(mc -> Minimap.INSTANZ.zoom());
+            if (!zu || zoom != 2) {
+                throw new AssertionError("Klick auf „Fertig“ über dem Regler „Zoom“: Menü zu " + zu + ", Zoom " + zoom + " statt 2");
+            }
         } finally {
             context.getInput().resizeWindow(vorher[0], vorher[1]);
             context.runOnClient(mc -> {

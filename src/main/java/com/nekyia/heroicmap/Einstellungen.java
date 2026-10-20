@@ -102,14 +102,15 @@ final class Einstellungen extends Screen {
         // Je zwei Knöpfe in einer Zeile; Vorlieben der Anzeige stehen im Untermenü.
         addRenderableWidget(CycleButton.onOffBuilder(m.sichtbar())
                 .create(x, y, breite, 20, Component.translatable("heroicmap.menue.minimap"), (b, an) -> m.setzeSichtbar(an)));
+        // Das L zuerst gezeichnet und zuletzt gefragt: Ist neben der Minimap zu wenig Platz, liegen die Knöpfe über ihm und
+        // bekommen den Klick, wie vorher über der Minimap. Siehe docs/minimap.md, „Bedienung“.
         int[] z = zoomLage(m.rahmen(width, height), m.rand(), width);
-        zoom = addRenderableWidget(new ZoomRegler(z[0], z[1], z[2], m));
-        zoom.visible = m.sichtbar();
+        zoom = addRenderableOnly(new ZoomRegler(z[0], z[1], z[2], m));
         int[] a = aufloesungLage(m.rahmen(width, height), m.koordinatenKasten(), m.rand(), height);
-        aufloesung = addRenderableWidget(new AufloesungRegler(a[0], a[1], a[2], m));
-        nord = addRenderableWidget(new Symbol(Symbol.NORD));
-        form = addRenderableWidget(new Symbol(Symbol.FORM));
-        raster = addRenderableWidget(new Symbol(Symbol.RASTER));
+        aufloesung = addRenderableOnly(new AufloesungRegler(a[0], a[1], a[2], m));
+        nord = addRenderableOnly(new Symbol(Symbol.NORD));
+        form = addRenderableOnly(new Symbol(Symbol.FORM));
+        raster = addRenderableOnly(new Symbol(Symbol.RASTER));
         lege();
         // Gehen Mitspieler hier nicht, steht der Knopf rot und trägt den Grund als Tooltip.
         grund = Mitspieler.grund(Kanal.offen(), Mitspieler.INSTANZ.verweigert());
@@ -127,6 +128,9 @@ final class Einstellungen extends Screen {
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.menue.einstellungen"),
                 b -> minecraft.gui.setScreen(new Anzeige(this))).bounds(x, y + 76, halb, 20).build());
         addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x + breite - halb, y + 76, halb, 20).build());
+        for (AbstractWidget w : List.<AbstractWidget>of(zoom, aufloesung, nord, form, raster)) {
+            addWidget(w);
+        }
     }
 
     private MutableComponent rot(MutableComponent text) {

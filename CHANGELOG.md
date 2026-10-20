@@ -14,6 +14,7 @@ The release notes on GitHub and Modrinth come from here
 - **Resolution is a slider under the minimap** in the menu, one notch per step from 1 to 16 px; the mouse wheel over it steps one notch.
 - **Click the coordinates** under the minimap in the menu to switch their style: x z, x y z, off. When off, the menu shows a grey "Coordinates off" line so you can click it back on; in the game it stays hidden. Both settings left the settings submenu.
 - **Settings right at the minimap.** In the menu, the controls around the minimap form an L: the zoom slider with a north arrow on top, the resolution slider with a grid symbol at its end, and a ◻/◯ symbol in the corner between them. Click the symbol to switch square or round, the north arrow to switch rotating, the grid for chunk lines. Right-click a mark N, E, S or W on the frame to make just that mark see-through; right-click it again to bring it back. The settings submenu is grouped into Waypoints, In the world and a collapsible Technical group.
+- At GUI scale 4 with a large minimap, the menu buttons lie over the zoom slider and take the click, as they did over the minimap before.
 
 ## 0.2.65
 

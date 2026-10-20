@@ -134,7 +134,11 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
 - **Knöpfe** stehen im grösseren freien Platz neben der Minimap, 200
   Einheiten breit oder schmaler, bis 120, wenn dort weniger Platz ist
   (`Einstellungen.spalte`), im Untermenü ebenso. Der Regler „Zoom der
-  Minimap“ zählt dabei zur Minimap; die Knöpfe liegen nie auf ihm. Nach dem
+  Minimap“ zählt dabei zur Minimap; die Knöpfe liegen nicht auf ihm,
+  solange daneben 120 Einheiten frei sind. Bei GUI-Massstab 4 und grosser
+  Minimap ist es weniger; dann liegen die Knöpfe über dem L, siehe
+  „Symbole an der Minimap“, und bekommen den Klick, wie vorher über der
+  Minimap (das L zuerst gezeichnet, zuletzt gefragt; Reviewer, 20.10.). Nach dem
   Verschieben oder Ziehen am Griff gehen die Knöpfe auf die dann freie
   Seite, so hat es der Reviewer am 20.10. freigegeben; vorher blieben sie
   stehen. Im Hauptmenü steht „Minimap“ allein in der ersten Zeile, ganz
