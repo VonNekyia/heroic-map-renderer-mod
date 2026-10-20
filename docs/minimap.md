@@ -912,6 +912,15 @@ Bei 8 und 16 px, gemessen am 07.10., siehe
 - **Frametime:** bei 16 px und Zoom 8× gegen 4 px nicht messbar anders; das
   HUD-Element im Flug im p95 0,25 ms statt 0,11 ms.
 
+Bei Zoom 0,5 gegen 2, gemessen am 20.10., siehe
+[Minimap, Zoom 0,5](messungen/2026-10-20-minimap-zoom-halb.md):
+
+- **Je Frame** gleich: mit Minimap im p50 0,304 statt 0,310 ms im Stand,
+  0,266 statt 0,262 ms im Flug; das HUD-Element 0,012 bis 0,013 ms.
+- **Nach dem Wechsel** ganz gezeichnet nach 0,90 bis 1,05 s statt 50 ms:
+  Bei GUI-Massstab 2 zeichnet die Minimap dann mit 1 px je Block alle 441
+  Chunks neu, ±10 statt ±4.
+
 Den Gametest dazu startet:
 
 ```bash
