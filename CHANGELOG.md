@@ -4,11 +4,24 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
-## 0.2.64
+## 0.2.65
 
 - **The minimap zooms out one step further,** to 0.5×: it shows four times the area, one pixel per block at GUI scale 2.
 - **Minimap zoom is a slider** in the menu, standing upright right next to the minimap, with one notch per step; up is closer, and the tooltip names the level. The mouse wheel over the minimap or the slider steps one notch. The zoom key still steps through all levels.
 - **The menu buttons move aside:** after you drag the minimap or resize it, the buttons go to the free side next to it.
+
+## 0.2.64
+
+- **Alt connects while you drag.** Hold `Alt` (`⌥` on a Mac) while dragging a corner or waypoint: it snaps like with `Ctrl` and connects on release; both corners already show the light centre while you drag. If the target can't be connected, it only snaps and says why. `Ctrl` alone still only snaps, on a Mac too (`Ctrl`, not `⌘`).
+- A corner can now be connected even if an unrelated waypoint sits on the target's block.
+
+## 0.2.63
+
+- **Reorder the layers.** In the layer list of the full map, ▲ and ▼ move a layer up or down; the upper one is drawn on top, on the full map and the minimap. Your order is kept per server world; "Server order" puts it back. Until you reorder, nothing changes.
+
+## 0.2.62
+
+- **Time of death.** On the full map, each death point shows when you died: the time for today, otherwise date and time. Death points from older versions have no time.
 
 ## 0.2.61
 
