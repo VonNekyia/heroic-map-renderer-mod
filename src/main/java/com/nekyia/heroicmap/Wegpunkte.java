@@ -984,8 +984,8 @@ final class Wegpunkte {
      * anderen. Siehe docs/wegpunkte.md, „Verbinden“.
      */
     boolean kannVerbinden(Glied von, Glied ziel) {
-        if (von.punkt() != null && ziel.punkt() != null || von.punkt() != null && von.punkt().tod() || ziel.punkt() != null && ziel.punkt().tod()
-                || !von.dimension().equals(ziel.dimension()) || von.bund() > 0 && von.bund() == ziel.bund()) {
+        if (von.punkt() != null && von.punkt().tod() || ziel.punkt() != null && ziel.punkt().tod() || !von.dimension().equals(ziel.dimension())
+                || von.bund() > 0 && von.bund() == ziel.bund()) {
             return false;
         }
         List<Glied> a = glieder(von), b = glieder(ziel);
@@ -997,6 +997,7 @@ final class Wegpunkte {
         List<Punkt> wegpunkte = new ArrayList<>();
         a.stream().filter(g -> g.punkt() != null).forEach(g -> wegpunkte.add(g.punkt()));
         b.stream().filter(g -> g.punkt() != null).forEach(g -> wegpunkte.add(g.punkt()));
+        // Höchstens ein Wegpunkt je Bund, denn zwei liegen nie auf einem Block; das schliesst auch zwei Wegpunkte miteinander aus.
         Punkt dort = punktAuf(ziel.dimension(), ziel.x(), ziel.z());
         return wegpunkte.size() <= 1 && (dort == null || wegpunkte.contains(dort));
     }
