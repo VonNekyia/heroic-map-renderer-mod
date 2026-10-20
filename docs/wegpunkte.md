@@ -46,12 +46,12 @@ Formen“ (mod#79, mod#112).
 | Doppelklick auf einen Wegpunkt oder Mitspieler | heftet ihn an die Minimap oder löst ihn wieder; die Karte bewegt sich dabei nicht, siehe „Doppelklick“ unten |
 | Linke Taste 0,5 s still auf einem Wegpunkt halten | er hängt an der Maus, die Karte zieht nicht mit; beim Loslassen liegt er auf dem Block darunter, mit Farbe und Anheften (`Wegpunkte.verschiebe`). Liegt dort schon einer, bleibt er, wo er war; `Esc` bricht ab. Still heisst: nie weiter als 3 Einheiten vom Druckpunkt weg (`Karte.ZUG`); das Zittern der Hand hin und her zählt nicht, nur der Abstand. Bis 0.2.32 zählte der ganze Weg der Maus: Mit 1 bis 2 Pixeln Zittern fügte ein Linksklick in einer Form im Bau oft nichts an, und Halten ging kaum (mod#112). Unter 0,5 s ist es ein Klick oder ein Zug wie sonst (`Karte.HALTEN_MS`, mod#75). Bis 0.2.36 waren es 2 s, dem User zu lang; 0,5 s hat der Reviewer entschieden (mod#112). Ein Klick dauert kürzer. Nur Wegpunkte, nicht die Rauten eigener Regionen |
 | Doppelklick in eine eigene Region, auf eine eigene Linie, auf die Raute eines alten Rechtecks, auf eine Fläche, einen Kreis, eine Nadel oder ein Banner vom Server | heftet sie an die Minimap oder löst sie wieder, siehe „Anheften“ |
-| Rechtsklick, „Linie/Region von hier“ | beginnt eine eigene Form mit einer Ecke auf dem Block unter der Maus, auf einem Wegpunkt auf dessen Block, siehe „Eigene Formen“ |
-| Linksklick auf die Karte, solange eine Form im Bau ist | setzt eine Ecke, auf einem Wegpunkt auf dessen Block, statt ihn in die Mitte zu legen, sonst auf den Block darunter; auf die erste Ecke schliesst er bei drei und mehr die Region. Ziehen verschiebt die Karte wie sonst |
+| Rechtsklick, „Linie/Region von hier“ | beginnt eine eigene Form mit einer Ecke auf der Kreuzung der Kanten nächst der Maus, auf einem Wegpunkt an der Ecke seines Blocks nächst dem Klick, siehe „Eigene Formen“ |
+| Linksklick auf die Karte, solange eine Form im Bau ist | setzt eine Ecke, auf einem Wegpunkt an der Ecke seines Blocks nächst dem Klick, statt ihn in die Mitte zu legen, sonst auf die Kreuzung nächst der Maus; auf die erste Ecke schliesst er bei drei und mehr die Region. Ziehen verschiebt die Karte wie sonst |
 | Rechtsklick auf eine Ecke, „Eckpunkt hinzufügen“ | neue Ecken zwischen ihr und der nächsten, siehe „Eigene Formen“ |
 | Rechtsklick auf eine Ecke, „Eckpunkt löschen“ | nimmt sie aus der Form; aus einer Region mit drei Ecken wird eine Linie, eine Linie mit zwei fällt weg |
 | Beim Ziehen einer Ecke oder eines Wegpunkts `Strg` halten | er rastet auf die nächste Ecke einer anderen Form oder, eine Ecke, auf den nächsten Wegpunkt ein, höchstens 8 Einheiten weg, siehe „Einrasten“ |
-| Linke Taste 0,5 s still auf einer Ecke halten | sie hängt an der Maus, die Form folgt ihr, und sie liegt beim Loslassen auf dem Block darunter; `Esc` bricht ab |
+| Linke Taste 0,5 s still auf einer Ecke halten | sie hängt an der Maus, die Form folgt ihr, und sie liegt beim Loslassen auf der Kreuzung nächst der Maus; `Esc` bricht ab |
 | Linke Taste 0,5 s still auf dem Griff in der Mitte einer Form halten | die ganze Form hängt an der Maus; beim Loslassen liegt sie um ganze Blöcke verschoben; `Esc` bricht ab, siehe „Eigene Formen“ |
 | Rechtsklick, solange eine Form im Bau ist | schliesst sie ab: mit zwei Ecken eine Linie, mit mehr eine Region; mit einer nur ein Hinweis. Am Griff einer Form statt dessen ihr Menü mit „Form fertig“ ab zwei Ecken und „Form abbrechen“ |
 | `Esc`, oder am Griff „Form abbrechen“ | verwirft die Form im Bau; eine geänderte bleibt, wie sie war |
@@ -385,8 +385,9 @@ Raute eines alten Rechtecks vor einer Ecke vor dem Griff einer Form.
   wie „Wegpunkt bei …“, `x z`, `x, z` oder `x y z` (`Wegpunkte.koordinaten`),
   legt das Objekt dorthin und es in die Mitte. Was keine Koordinaten sind,
   steht rot.
-  - Eine Ecke liegt danach auf diesem Block, wie nach dem Loslassen; auf
-    dem Block ihrer Nachbarin werden beide eine.
+  - Eine Ecke liegt danach auf dieser Kreuzung, der Nordwestecke des
+    Blocks `x z`, wie nach dem Loslassen; auf der Kreuzung ihrer Nachbarin
+    werden beide eine.
   - Ein Wegpunkt auf einen Block, auf dem schon einer liegt: Enter nimmt
     es nicht, der Text steht rot, und unten links steht „Dort liegt schon
     ein Wegpunkt“.
@@ -413,17 +414,22 @@ des Spiels liegt auf keiner der beiden Alt-Tasten (per javap,
   Gemessen wird an der Lage des Blocks, nicht an der Marke: Die Marke
   eines fernen Wegpunkts steht am Rand, siehe „Am Rand“, und zählt nicht. Die
   Ecken der eigenen Form zählen nicht; liegt eine Ecke beim Loslassen auf
-  dem Block ihrer Nachbarin, werden beide eine, wie ohne `Strg`. Ein
+  der Kreuzung ihrer Nachbarin, werden beide eine, wie ohne `Strg`. Ein
   Wegpunkt rastet nur auf Ecken ein, denn zwei Wegpunkte liegen nie auf
   einem Block.
+- **Wohin:** Eine Ecke kommt auf die Kreuzung des Ziels, auf einem
+  Wegpunkt an die Ecke seines Blocks nächst der Maus; ein Wegpunkt auf den
+  der vier Blöcke an der Kreuzung, der der Maus am nächsten liegt (K2),
+  siehe „Zwischen den Blöcken“.
 - **Nah** heisst höchstens 8 Einheiten des GUI von der Maus, gemessen an
   den Lagen des letzten Frames; das nächste Ziel gewinnt. Entschieden vom
   Reviewer.
 - **Beim Ziehen** steht, was an der Maus hängt, schon genau auf dem Ziel,
   und das Ziel ist hell wie unter der Maus. Ohne `Strg` folgt es der Maus
   wie bisher.
-- **Beim Loslassen** zählt, ob `Strg` dann gedrückt ist: mit dem Ziel auf
-  dessen Block (`Karte.ablage`), sonst auf dem Block unter der Maus.
+- **Beim Loslassen** zählt, ob `Strg` dann gedrückt ist: mit dem Ziel
+  dorthin (`Karte.ablage`), sonst ein Wegpunkt auf den Block unter der Maus,
+  eine Ecke auf die Kreuzung nächst der Maus.
 - **Nicht** am Griff, wo die ganze Form hängt, nicht auf Objekte vom
   Server und nicht auf Glieder des eigenen Bunds, die ohnehin mitziehen,
   siehe „Verbinden“.
@@ -438,8 +444,9 @@ verbundene Punkte bewegen sich immer zusammen. Gewünscht vom User am 20.10.
 ihm, D1 vom User bestätigt.
 
 - **Ein Bund** ist eine Zahl über 0 an jedem verbundenen Punkt
-  (`Wegpunkte.Ecke.bund`, `Wegpunkte.Punkt.bund`), 0 heisst lose. Alle
-  Glieder eines Bunds liegen immer auf demselben Block. Was sich verbinden
+  (`Wegpunkte.Ecke.bund`, `Wegpunkte.Punkt.bund`), 0 heisst lose. Die
+  Ecken eines Bunds liegen immer auf einer Kreuzung, ein Wegpunkt darin auf
+  einem der vier Blöcke daran (K3, `Wegpunkte.ordneBuende`). Was sich verbinden
   lässt: Ecken verschiedener eigener Formen untereinander und eine Ecke mit
   einem Wegpunkt. Nicht zwei Wegpunkte, denn zwei liegen nie auf einem
   Block; keine Todespunkte; keine Objekte vom Server; keine Form zweimal in
@@ -450,25 +457,30 @@ ihm, D1 vom User bestätigt.
 - **„Verbinden“** im Menü einer Ecke oder eines Wegpunkts nimmt den
   nächsten Punkt höchstens 8 Einheiten des GUI weg, gemessen an der Lage
   der Blöcke wie beim Einrasten, in Ebenen, die an sind (`Karte.verbindeZiel`).
-  Der angeklickte springt samt seinem Bund auf den Block des Ziels, und
-  beide Bünde werden einer (`Wegpunkte.verbinde`). Liegt keiner so nah,
+  Der angeklickte zieht samt seinem Bund zum Ziel: Ecken auf dessen
+  Kreuzung, auf einen losen Wegpunkt an die Ecke seines Blocks nächst ihnen;
+  ein loser Wegpunkt auf den der vier Blöcke an der Kreuzung des Ziels nächst
+  seinem alten Ort (K2). Beide Bünde werden einer (`Wegpunkte.verbinde`,
+  `Wegpunkte.weg`). Liegt keiner so nah,
   fehlt der Eintrag ganz, so hat es der User entschieden. Nie verbindet
   etwas aus Versehen, auch nicht das Einrasten mit `Strg`.
 - **Mit `Alt` beim Ziehen** einer Ecke oder eines Wegpunkts, gewünscht vom
   User am 20.10. (mod#169): Er rastet ein wie mit `Strg`, auf dasselbe
   Ziel im selben Radius, siehe „Einrasten“. Lässt sich das Ziel
   verbinden, tragen beim Ziehen schon beide Ecken den hellen Kern, und
-  beim Loslassen springt der Punkt samt Bund wie mit „Verbinden“ auf den
-  Block des Ziels (`Karte.verbindeMitAlt`). Sonst rastet er nur ein, und
+  beim Loslassen zieht der Punkt samt Bund wie mit „Verbinden“ dorthin, wo
+  er mit `Strg` einrastete, nach der Maus (`Karte.verbindeMitAlt`). Sonst rastet er nur ein, und
   unten links steht der Grund: „Mit einem Todespunkt verbindet sich
   nichts“, „Diese Form ist schon in dem Bund“, „Zwei Wegpunkte lassen sich
   nicht verbinden“ oder „Dort liegt schon ein Wegpunkt“.
-- **„Lösen“** an einem verbundenen Punkt löst den ganzen Bund auf diesem
-  Block, nicht nur den angeklickten (D2): Liegen Punkte gestapelt, sieht man
+- **„Lösen“** an einem verbundenen Punkt löst den ganzen Bund an dieser
+  Kreuzung, nicht nur den angeklickten (D2): Liegen Punkte gestapelt, sieht man
   nicht, welcher getroffen ist. Alle bleiben, wo sie sind (`Wegpunkte.loese`).
-- **Folgen:** Ziehen, „Koordinaten setzen…“ und Verschieben am Griff legen
-  alle Glieder des Bunds auf den neuen Block (`Wegpunkte.ersetze`,
-  `Wegpunkte.verschiebe`), schon beim Ziehen gezeichnet (`Karte.zuege`);
+- **Folgen:** Ziehen, „Koordinaten setzen…“ und Verschieben am Griff
+  ziehen alle Glieder des Bunds um denselben Weg, so bleibt ein Wegpunkt an
+  derselben Ecke seines Blocks (K3, `Wegpunkte.ersetze`,
+  `Wegpunkte.verschiebe`, `Wegpunkte.schiebeBund`), schon beim Ziehen
+  gezeichnet (`Karte.zuege`);
   `Esc` setzt alle zurück. Von einer anderen Form folgt nur die verbundene
   Ecke, ihre übrigen bleiben, und ihre Linien folgen der Ecke (D1, vom User
   bestätigt). Sonst liesse sich eine gemeinsame Grenze zweier Regionen nie
@@ -495,18 +507,40 @@ ihm, D1 vom User bestätigt.
 Eigene Linien und Regionen baut der Spieler aus eigenen Ecken, je ein
 Marker wie ein Wegpunkt (mod#79, mod#112). Zwei Ecken sind eine Linie,
 drei und mehr eine Region, ein Vieleck in der Folge der Ecken. Eine Ecke
-ist ein Block (x, z), kein Wegpunkt; so will es der User: „eine Linie
-sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
+ist eine Kreuzung der Blockkanten, kein Wegpunkt; so will es der User: „eine
+Linie sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
 
+- **Zwischen den Blöcken:** Eine Ecke (x, z) liegt auf der Kreuzung (x, z)
+  der Blockkanten, der Nordwestecke des Blocks (x, z) (`Wegpunkte.kanten`);
+  Wegpunkte liegen weiter auf Blöcken. So hat es der User am 20.10.
+  entschieden: Liegen Ecken auf Blöcken, haben zwei zusammengefügte
+  Regionen keine genaue Grenze, und ein Rand trifft eine Chunkgrenze nie;
+  zwischen den Blöcken ist es schöner. Plan vom Reviewer freigegeben, K1
+  bis K5.
+  - **Umzug (K1, vom User gewählt):** Die gespeicherten Zahlen bleiben,
+    nur ihre Bedeutung wechselt. Bis 0.2.64 lag eine Ecke in der Mitte des
+    Blocks; jede gespeicherte Form rückt so einen halben Block nach
+    Nordwesten, alle gleich: Aneinandergefügte bleiben aneinander, keine
+    wird grösser oder kleiner. Datei und Code zum Teilen (`v` 1) bleiben,
+    wie sie sind; eine ältere Version liest dieselben Zahlen als Blöcke und
+    zeigt die Form einen halben Block weiter südöstlich.
+  - **Nur rücken (K5):** Eine Region, die die Blöcke 0 bis 10 halb
+    umfasste, deckt danach 0 bis 9 ganz. Nach aussen erweitern wäre nur
+    für Rechtecke eindeutig, nicht für beliebige Vielecke.
+  - **Ecke und Wegpunkt (K2):** Eine Ecke an einem Wegpunkt liegt auf einer
+    der vier Ecken seines Blocks, der nächst der Maus oder dem Klick
+    (`Wegpunkte.eckeDesBlocks`). Ein Wegpunkt an einer Ecke liegt auf einem
+    der vier Blöcke an ihrer Kreuzung, dem nächst der Maus oder seinem alten
+    Ort (`Wegpunkte.blockAnEcke`).
 - **Beginnen:** Rechtsklick, „Linie/Region von hier“ beginnt eine Form mit
-  einer Ecke auf dem Block unter der Maus, auf einem Wegpunkt auf dessen
-  Block (`Karte.beginne`). Den Eintrag gibt es nur, solange keine Form im
-  Bau ist.
+  einer Ecke auf der Kreuzung nächst dem Rechtsklick, auf einem Wegpunkt
+  an der Ecke seines Blocks nächst dem Rechtsklick (K4, `Karte.beginne`).
+  Den Eintrag gibt es nur, solange keine Form im Bau ist.
 - **Bauen:** Solange eine Form im Bau ist, setzt ein Linksklick ohne Zug
-  auf die Karte eine Ecke (`Karte.hinzu`): auf einem Wegpunkt auf dessen
-  Block, statt ihn in die Mitte zu legen, sonst auf den Block darunter, und
-  höchstens 3 Einheiten neben einer Ecke im Bau auf deren Block
-  (`Karte.eckBlock`). Ziehen über `Karte.ZUG` verschiebt die Karte wie
+  auf die Karte eine Ecke (`Karte.hinzu`): auf einem Wegpunkt an der Ecke
+  seines Blocks nächst dem Klick, statt ihn in die Mitte zu legen, sonst auf
+  die Kreuzung nächst der Maus, und höchstens 3 Einheiten neben einer Ecke
+  im Bau auf deren Kreuzung (`Karte.eckBlock`). Ziehen über `Karte.ZUG` verschiebt die Karte wie
   sonst. Ein Wegpunkt entsteht dabei nicht. Ein Linksklick auf die erste
   Ecke schliesst eine neue Form ab drei Ecken zur Region.
 - **Abschliessen:** Ein Rechtsklick speichert die Form, wie sie ist, wie
@@ -554,8 +588,8 @@ sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
   einem Wegpunkt: Sie hängt an der Maus und folgt ihr genau, nicht auf
   ganze Blöcke, und die Form folgt mit (`Karte.punkte`); an ihrem alten Ort
   fällt die Form solange weg (`Wegpunkte.ziehe`). Beim Loslassen liegt die
-  Ecke auf dem Block darunter; `Esc` bricht ab. Liegt sie dann auf dem
-  Block ihrer Nachbarin, werden beide eine. Bis 0.2.41 hing nur die Ecke an
+  Ecke auf der Kreuzung nächst der Maus (`Karte.kante`); `Esc` bricht ab.
+  Liegt sie dann auf der Kreuzung ihrer Nachbarin, werden beide eine. Bis 0.2.41 hing nur die Ecke an
   der Maus, und die Form sprang erst beim Loslassen nach; so hat es der User
   am 18.10. gewünscht (mod#128). Ein Wegpunkt folgt der Maus ebenso; an ihm
   hängt keine Form.
@@ -597,7 +631,7 @@ sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
 - **Gezeichnet** auf der Vollbildkarte über den Formen der Ebenen
   (`Wegpunkte.form`, `Wegpunkte.karte`): eine Region als Fläche in ihrer
   Farbe zu 25 % mit 1 Einheit Rand, eine Linie 2 Einheiten breit, beide
-  durch die Mitten der Blöcke ihrer Ecken.
+  durch die Kreuzungen ihrer Ecken, siehe „Zwischen den Blöcken“.
 - **Höhe:** Eine Ecke hat nur x und z. Der Schleier einer angehefteten
   Region nimmt die Höhe je Stück aus der Höhenkarte des Spiels und lässt
   Stücke in Chunks aus, die nicht geladen sind, bis sie es sind; siehe
@@ -992,7 +1026,7 @@ Schleier am Rand, siehe „Schleier“.
   Formen und alten Rechtecken, siehe „Eigene Ebenen“;
   `farbe` ist ein Index in `Wegpunkte.FARBEN`, `minimap` heisst angeheftet,
   `tode` sind die Todespunkte mit `zeit` und `tod` der neueste, siehe „Todespunkt“, ohne `farbe` und `id`,
-  `eigene_formen` nennt ihre Dimension und die Blöcke ihrer Ecken in Reihenfolge,
+  `eigene_formen` nennt ihre Dimension und die Kreuzungen ihrer Ecken in Reihenfolge, siehe „Zwischen den Blöcken“,
   dazu `name`, wenn sie einen hat, siehe „Namen“, und `hex`, wenn sie eine
   eigene Farbe hat, siehe „Farbe“; eine ältere Version des Mods überliest
   beide und verliert sie beim nächsten Speichern. Eine verbundene Ecke hat
@@ -1042,7 +1076,13 @@ Schleier am Rand, siehe „Schleier“.
   ändert keine Form), `eckeLoeschenUndEinfuegen` (Region mit drei Ecken wird
   Linie, Linie mit zwei fällt weg, über 64 nicht) und
   `formenGrenzenUndAlteDatei` (Umzug von `punkte` zu `ecken`),
-  `griffAufHalberLaengeOderImSchwerpunkt`. Zum Verbinden:
+  `griffAufHalberLaengeOderImSchwerpunkt`. Zwischen den Blöcken:
+  `eckenZwischenDenBloecken` (Kreuzungen, alte Zahlen gleich, die Ecke eines
+  Blocks und der Block an einer Kreuzung nächst einem Punkt),
+  `buendeAnKreuzungen` (Ecke mit Wegpunkt an der Ecke seines Blocks,
+  Wegpunkt mit Ecke an den Block nächst seinem alten Ort, Folgen um
+  denselben Weg, beim Lesen ein Wegpunkt neben seiner Kreuzung im Bund,
+  einer weiter weg lose). Zum Verbinden:
   `verbindenUndLoesen` (Ecke mit Ecke und mit Wegpunkt, der Sprung, Bünde
   vereint; nicht zwei Wegpunkte, die eigene Form, ein Todespunkt, eine
   andere Dimension, schon verbunden, eine Form zweimal; Lösen löst den

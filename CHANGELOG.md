@@ -6,6 +6,7 @@ The release notes on GitHub and Modrinth come from here
 
 ## 0.2.65
 
+- **Lines and regions now sit between blocks.** Corners of your own lines and regions lie on the edges between blocks instead of in the middle of a block, so two joined regions share an exact border. Waypoints stay on blocks; a corner at a waypoint sits on the nearest corner of its block. **Existing shapes move half a block north-west:** the saved numbers stay the same and now mean the north-west corner of their block, so nothing needs converting and shapes that touched still touch. Older versions show the same shapes half a block south-east.
 - **One map folder per server behind a proxy.** With the plugin from 0.14.0 on, the server names its map, and the mod keeps each server's map, waypoints and layers in its own folder, even when two servers share a world. A server that shows another server's map uses that server's folder. Existing folders move once on the first join. From the second join on, the mod remembers the map and uses the right folder right away.
 
 ## 0.2.64

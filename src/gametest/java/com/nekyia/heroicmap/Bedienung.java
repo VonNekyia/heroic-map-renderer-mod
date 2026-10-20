@@ -1876,7 +1876,7 @@ public final class Bedienung implements FabricClientGameTest {
                 Component h = ((Karte) mc.gui.screen()).hinweis();
                 return h == null ? "" : h.getString();
             });
-            if (a0.x() != tod.x() || a0.z() != tod.z() || a0.bund() != 0 || !hinweis.equals(belegtNicht)) {
+            if (a0.x() != tod.x() || a0.z() != tod.z() && a0.z() != tod.z() + 1 || a0.bund() != 0 || !hinweis.equals(belegtNicht)) {
                 throw new AssertionError("Alt neben dem Todespunkt: " + a0 + ", Hinweis „" + hinweis + "“ statt lose auf " + tod.x() + " "
                         + tod.z() + " mit „" + belegtNicht + "“");
             }
@@ -1887,8 +1887,9 @@ public final class Bedienung implements FabricClientGameTest {
             halteUndZiehe(context, maus, k, new double[] {wm.x(), wm.y()}, new double[] {b1s[0] + 6, b1s[1]}, false, true, -1, 0);
             Wegpunkte.Punkt wNach = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
             Wegpunkte.Ecke b1 = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1).ecken().get(1));
-            if (wNach.x() != b1.x() || wNach.z() != b1.z() || wNach.bund() == 0 || wNach.bund() != b1.bund()) {
-                throw new AssertionError("Wegpunkt mit Alt neben B1: " + wNach + " und " + b1 + " statt verbunden auf einem Block");
+            // Auf den Block rechts an der Kreuzung von B1, oben oder unten je nach dem Zittern.
+            if (wNach.x() != b1.x() || wNach.z() != b1.z() && wNach.z() != b1.z() - 1 || wNach.bund() == 0 || wNach.bund() != b1.bund()) {
+                throw new AssertionError("Wegpunkt mit Alt neben B1: " + wNach + " und " + b1 + " statt verbunden rechts an B1");
             }
         } finally {
             maus.releaseAlt();
@@ -1944,28 +1945,33 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Ecke mit Strg neben die Ecke einer anderen Form: " + ist + " statt " + b0 + ", gezeichnet bei "
                         + Arrays.toString(gezeichnet) + " statt " + Arrays.toString(zielJetzt));
             }
-            // Zurück, dann ohne Strg dasselbe: auf dem Block unter der Maus, nicht auf B0.
+            // Zurück, dann ohne Strg dasselbe: auf der Kreuzung der Kanten nächst der Maus, nicht auf B0. Die Maus steht 1⅛ Blöcke
+            // links über B0, so liegt die nächste Kreuzung ⅛ Block von ihr, die Nordwestecke des Blocks darunter ⅞ Block (Kantenmodell).
             context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
             context.waitTicks(2);
             // Die Lage von B0 von jetzt; das Halten schiebt die Karte dann noch um bis zu eine Einheit, also höchstens einen Block.
             a1 = ecke(context, formen, 1);
             double[] b0Ohne = ecke(context, formen + 1, 0);
-            double[] nebenOhne = {b0Ohne[0] - 6, b0Ohne[1]};
-            int[] unter = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blockUnter(nebenOhne[0], nebenOhne[1]));
+            double[] nebenOhne = {b0Ohne[0] - 4.5, b0Ohne[1] - 4.5};
+            int[] unter = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).kanteUnter(nebenOhne[0], nebenOhne[1]));
             halteUndZiehe(context, maus, k, a1, nebenOhne, false, -1, 0);
             ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
-            if (ist.equals(b0) || Math.abs(ist.x() - unter[0]) > 1 || Math.abs(ist.z() - unter[1]) > 1) {
-                throw new AssertionError("Ecke ohne Strg: " + ist + " statt bei " + unter[0] + " " + unter[1] + ", nicht auf " + b0);
+            double[] gezeichnetOhne = ecke(context, formen, 1);
+            if (ist.equals(b0) || Math.abs(ist.x() - unter[0]) > 1 || Math.abs(ist.z() - unter[1]) > 1
+                    || Math.abs(gezeichnetOhne[0] - nebenOhne[0]) > 2 || Math.abs(gezeichnetOhne[1] - nebenOhne[1]) > 2) {
+                throw new AssertionError("Ecke ohne Strg: " + ist + " statt bei " + unter[0] + " " + unter[1] + ", nicht auf " + b0
+                        + "; gezeichnet bei " + Arrays.toString(gezeichnetOhne) + ", die Maus bei " + Arrays.toString(nebenOhne));
             }
 
-            // Ecke 2 von A mit Strg 6 Einheiten neben den Wegpunkt: auf seinem Block.
+            // Ecke 2 von A mit Strg 6 Einheiten links neben den Wegpunkt: auf die linke Ecke seines Blocks nächst der Maus; die Maus
+            // steht auf der Höhe seiner Mitte, so kann das Zittern oben oder unten wählen.
             context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
             context.waitTicks(2);
             Karte.Marke wm = marke(context, w);
             halteUndZiehe(context, maus, k, ecke(context, formen, 2), new double[] {wm.x() - 6, wm.y()}, true, -1, 0);
             ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(2));
-            if (!ist.equals(new Wegpunkte.Ecke(w.x(), w.z()))) {
-                throw new AssertionError("Ecke mit Strg neben einen Wegpunkt: " + ist + " statt " + w.x() + " " + w.z());
+            if (ist.x() != w.x() || ist.z() != w.z() && ist.z() != w.z() + 1) {
+                throw new AssertionError("Ecke mit Strg neben einen Wegpunkt: " + ist + " statt links an seinem Block " + w.x() + " " + w.z());
             }
 
             // 12 Einheiten neben B0: kein Einrasten. Ecke 0 von A mit Strg neben ihre eigene Ecke 2: kein Einrasten.
@@ -2010,8 +2016,9 @@ public final class Bedienung implements FabricClientGameTest {
             context.waitTicks(2);
             maus.releaseControl();
             Wegpunkte.Punkt nach = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
-            if (nach.x() != b0.x() || nach.z() != b0.z()) {
-                throw new AssertionError("Wegpunkt mit Strg neben die Ecke einer Form: " + nach + " statt " + b0);
+            // Auf den Block links an der Kreuzung von B0, oben oder unten je nach dem Zittern.
+            if (nach.x() != b0.x() - 1 || nach.z() != b0.z() && nach.z() != b0.z() - 1) {
+                throw new AssertionError("Wegpunkt mit Strg neben die Ecke einer Form: " + nach + " statt links an " + b0);
             }
 
             // Ein Wegpunkt 400 Blöcke links steht als Marke am Rand. Eine Ecke mit Strg 6 Einheiten neben dieser Marke rastet nicht
@@ -2124,21 +2131,24 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Nach „Lösen“ zog B0 A1 mit: A1 " + a1Nach + ", B0 " + b0Nach);
             }
 
-            // „Verbinden“ am Wegpunkt W: Er liegt danach auf A0. W gezogen, folgt A0; A1 bleibt.
+            // „Verbinden“ am Wegpunkt W (bx − 1, bz + 1): Er kommt auf den Block an der Kreuzung von A0 nächst seinem alten Ort,
+            // (bx − 1, bz), und A0 ist die Nordostecke seines Blocks (K2). W gezogen, folgt A0 um denselben Weg; A1 bleibt.
             Wegpunkte.Punkt w = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
             Karte.Marke wm = marke(context, w);
             eintrag(context, maus, k, wm.x(), wm.y(), "heroicmap.karte.verbinden");
             Wegpunkte.Punkt wAuf = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
-            if (wAuf.x() != bx || wAuf.z() != bz || wAuf.bund() == 0) {
-                throw new AssertionError("„Verbinden“ am Wegpunkt: " + wAuf + " statt auf " + bx + " " + bz + " in einem Bund");
+            if (wAuf.x() != bx - 1 || wAuf.z() != bz || wAuf.bund() == 0) {
+                throw new AssertionError("„Verbinden“ am Wegpunkt: " + wAuf + " statt auf " + (bx - 1) + " " + bz + " in einem Bund");
             }
             wm = marke(context, wAuf);
-            double[] von = {wm.x(), wm.y()}, hin = {wm.x(), wm.y() + 12};
+            double[] von = {wm.x(), wm.y()}, hin = {wm.x(), wm.y() + 12}, a0vor = ecke(context, formen, 0);
             live = halteUndZiehe(context, maus, k, von, hin, false, formen, 0);
+            // Beim Ziehen steht A0, wo es zur Marke stand, um den Weg der Maus versetzt.
+            hin = new double[] {hin[0] + a0vor[0] - von[0], hin[1] + a0vor[1] - von[1]};
             Wegpunkte.Punkt wNach = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
             Wegpunkte.Ecke a0Nach = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(0));
             Wegpunkte.Ecke a1Jetzt = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
-            if (Math.abs(live[0] - hin[0]) > 1.5 || Math.abs(live[1] - hin[1]) > 1.5 || a0Nach.x() != wNach.x() || a0Nach.z() != wNach.z()
+            if (Math.abs(live[0] - hin[0]) > 1.5 || Math.abs(live[1] - hin[1]) > 1.5 || a0Nach.x() != wNach.x() + 1 || a0Nach.z() != wNach.z()
                     || wNach.z() == bz || !a1Jetzt.equals(a1Nach)) {
                 throw new AssertionError("W gezogen: beim Ziehen A0 bei " + Arrays.toString(live) + " statt " + Arrays.toString(hin)
                         + ", danach W " + wNach + ", A0 " + a0Nach + ", A1 " + a1Jetzt);
