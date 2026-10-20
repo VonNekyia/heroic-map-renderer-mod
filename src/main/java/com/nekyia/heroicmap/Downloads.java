@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConfirmScreen;
@@ -113,6 +114,7 @@ final class Downloads {
             case "show" -> {
                 Mitspieler.INSTANZ.antwort(json);
                 Webkarte.INSTANZ.show(json);
+                karte(json);
             }
             case "web" -> Webkarte.INSTANZ.antwort(json, Symbole.INSTANZ.basis(), Symbole.INSTANZ.spielserver(), Util.getMillis());
             case "ebenen" -> {
@@ -147,6 +149,53 @@ final class Downloads {
         nameGelesen = false;
         servername = null;
         nameGilt.clear();
+        KARTE.neueSitzung();
+    }
+
+    /**
+     * {@code karte} an der Antwort auf show: Die erste gültige der Sitzung gilt für jede Welt, die der Spieler in ihr
+     * schon betrat, mit Umzug aus dem Ordner ohne sie ({@link #karteGilt}); dann lesen Minimap, eigene Karte, Wegpunkte
+     * und Ebenen neu. Ohne das Feld bleibt alles, wie es ist. Siehe docs/download.md, „Ablage“.
+     */
+    private void karte(JsonObject json) {
+        ServerData server = server();
+        if (server == null || !json.has("karte")) {
+            return;
+        }
+        String karte = karteAus(json);
+        if (karte == null) {
+            LOGGER.warn("Heroic Map: Name der Karte ungültig, übergangen");
+            return;
+        }
+        if (KARTE.setze(karte, List.copyOf(nameGilt.keySet()),
+                seed -> karteGilt(wurzel(), Minimap.INSTANZ.ablage(), server.ip, name(seed), karte, seed, reihe::belegtUnter))) {
+            Minimap.INSTANZ.leeren();
+            Selbst.INSTANZ.leeren();
+            HeroicMap.weltOrdnerGewechselt();
+            baeume().forEach(b -> zieheUm(b.id()));
+        }
+    }
+
+    /** {@code karte} aus der Antwort auf show, wenn sie als Name einer Karte taugt; sonst null. */
+    static String karteAus(JsonObject json) {
+        JsonElement feld = json.get("karte");
+        return feld != null && feld.isJsonPrimitive() ? Kartenname.gueltig(feld.getAsString()) : null;
+    }
+
+    /**
+     * Gilt die Karte {@code karte} für die Welt mit diesem Hash? Ja, wenn es ihren Ordner schon gibt, oder den ohne
+     * Karte nicht. Sonst zieht der ohne Karte um, wie beim Namen ({@link Servername#gilt}): nicht, solange ein Download
+     * in ihn läuft, oder wenn der Umzug scheitert. Der Ordner ohne Karte bleibt dann für diese Sitzung.
+     */
+    static boolean karteGilt(Path wurzel, Ablage ablage, String adresse, String name, String karte, long seed,
+            Predicate<String> belegt) {
+        Path alt = wurzel.resolve(weltOrdner(ablage, adresse, name, null, seed));
+        Path neu = wurzel.resolve(weltOrdner(ablage, adresse, name, karte, seed));
+        // Die Antwort auf show kommt nach dem Betreten: Was der Mod bis dahin schrieb, liegt ohne Karte und bleibt dort.
+        if (Files.isDirectory(neu)) {
+            return true;
+        }
+        return Servername.gilt(alt, neu, belegt.test(alt.toString()));
     }
 
     /** Zählt jeden Login mit; ein Download merkt sich die Sitzung, aus der er stammt. */
@@ -156,6 +205,8 @@ final class Downloads {
     private static volatile boolean nameGelesen;
     /** Je Hash einer Welt, ob der Name dort gilt: entschieden beim ersten Betreten der Sitzung, fest bis zur nächsten. */
     private static final Map<Long, Boolean> nameGilt = new ConcurrentHashMap<>();
+    /** Der Name der Karte vom Plugin, je Sitzung, und wo er gilt. */
+    static final Kartenname KARTE = new Kartenname();
 
     /** Hält eine freigabe, bis der Hash ihrer Dimension bekannt ist. */
     void warte(String baum, JsonObject json) {
@@ -530,7 +581,8 @@ final class Downloads {
         ServerData server = server();
         String dimension = text(eintrag(baum), "dimension");
         Long hash = server == null || dimension == null ? null : welten().hash(Welten.server(server.ip), dimension);
-        return hash == null ? null : ordner(wurzel(), Minimap.INSTANZ.ablage(), server.ip, name(hash), welten(), dimension, baum);
+        return hash == null ? null
+                : ordner(wurzel(), Minimap.INSTANZ.ablage(), server.ip, name(hash), KARTE.fuer(hash), welten(), dimension, baum);
     }
 
     /** Der Name vom Server für die Welt mit diesem Hash, wenn er dort in dieser Sitzung gilt; sonst null, also die Adresse. */
@@ -539,9 +591,11 @@ final class Downloads {
     }
 
     /** Der Ordner des Baums {@code baum} der Dimension, oder null, solange ihr Hash unbekannt ist. */
-    static Path ordner(Path wurzel, Ablage ablage, String adresse, String name, Welten welten, String dimension, String baum) {
+    static Path ordner(Path wurzel, Ablage ablage, String adresse, String name, String karte, Welten welten, String dimension,
+            String baum) {
         Long hash = welten.hash(Welten.server(adresse), dimension);
-        return hash == null || !Freigabe.baum(baum) ? null : wurzel.resolve(weltOrdner(ablage, adresse, name, hash)).resolve(baum);
+        return hash == null || !Freigabe.baum(baum) ? null
+                : wurzel.resolve(weltOrdner(ablage, adresse, name, karte, hash)).resolve(baum);
     }
 
     /** Der Fehler, wenn der Spieler die Dimension des Baums auf diesem Backend noch nicht betreten hat, sonst null. */
@@ -595,6 +649,9 @@ final class Downloads {
             Path neu = wurzel().resolve(weltOrdner(Minimap.INSTANZ.ablage(), server.ip, servername, seed));
             nameGilt.put(seed, Servername.gilt(alt, neu, reihe.belegtUnter(alt.toString())));
         }
+        // Erst der Name, dann die Karte: Sie liegt im Ordner des Namens.
+        KARTE.betreten(seed, s -> karteGilt(wurzel(), Minimap.INSTANZ.ablage(), server.ip, name(s), KARTE.karte(), s,
+                reihe::belegtUnter));
         welten().merke(Welten.server(server.ip), level.dimension().identifier().toString(), level.getBiomeManager().biomeZoomSeed);
         baeume().forEach(b -> zieheUm(b.id()));
         for (String baum : List.copyOf(wartend.keySet())) {
@@ -617,7 +674,7 @@ final class Downloads {
             return null;
         }
         long seed = level.getBiomeManager().biomeZoomSeed;
-        return wurzel().resolve(server != null ? weltOrdner(Minimap.INSTANZ.ablage(), server.ip, name(seed), seed)
+        return wurzel().resolve(server != null ? weltOrdner(Minimap.INSTANZ.ablage(), server.ip, name(seed), KARTE.fuer(seed), seed)
                 : einzelspieler(intern.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize().getFileName().toString(), seed));
     }
 
@@ -629,18 +686,24 @@ final class Downloads {
         return name("einzelspieler_" + speicherordner) + "/welt-" + HexFormat.of().toHexDigits(seed);
     }
 
-    /** Wie {@link #weltOrdner(Ablage, String, String, long)}, ohne Namen vom Server. */
+    /** Wie {@link #weltOrdner(Ablage, String, String, String, long)}, ohne Namen vom Server und ohne Karte. */
     static String weltOrdner(Ablage ablage, String adresse, long seed) {
-        return weltOrdner(ablage, adresse, null, seed);
+        return weltOrdner(ablage, adresse, null, null, seed);
+    }
+
+    /** Wie {@link #weltOrdner(Ablage, String, String, String, long)}, ohne Karte. */
+    static String weltOrdner(Ablage ablage, String adresse, String name, long seed) {
+        return weltOrdner(ablage, adresse, name, null, seed);
     }
 
     /**
      * Der Pfad einer Welt unter {@code heroicmap/}: {@code welt-<hash>}, davor der Host oder Host
-     * und Port; meldet der Server einen {@code name}, steht er statt des Hosts. {@code seed} ist der
-     * Hash des Seeds, den der Server dem Client schickt.
+     * und Port; meldet der Server einen {@code name}, steht er statt des Hosts. Mit einer {@code karte}
+     * vom Plugin steht {@code karte-<karte>} vor {@code welt-<hash>}. {@code seed} ist der Hash des
+     * Seeds, den der Server dem Client schickt.
      */
-    static String weltOrdner(Ablage ablage, String adresse, String name, long seed) {
-        String welt = "welt-" + HexFormat.of().toHexDigits(seed);
+    static String weltOrdner(Ablage ablage, String adresse, String name, String karte, long seed) {
+        String welt = (karte != null ? "karte-" + karte + "/" : "") + "welt-" + HexFormat.of().toHexDigits(seed);
         ServerAddress a = ServerAddress.parseString(adresse);
         String host = name != null ? name : a.getHost();
         return switch (ablage) {

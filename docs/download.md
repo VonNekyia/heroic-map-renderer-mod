@@ -8,6 +8,8 @@ code:
   - src/main/java/com/nekyia/heroicmap/Reihe.java
   - src/main/java/com/nekyia/heroicmap/Servername.java
   - src/test/java/com/nekyia/heroicmap/ServernameTest.java
+  - src/main/java/com/nekyia/heroicmap/Kartenname.java
+  - src/test/java/com/nekyia/heroicmap/KartennameTest.java
   - src/main/java/com/nekyia/heroicmap/Laden.java
   - src/main/java/com/nekyia/heroicmap/Adresse.java
   - src/test/java/com/nekyia/heroicmap/LadenTest.java
@@ -102,6 +104,9 @@ der Mod mit den Kacheln zeigt, steht unter [Vollbildkarte](vollbildkarte.md).
   - Die Antwort auf `show` trägt `"web": true` oder `false`: ob der Spieler
     jetzt einen Link bekäme. Fehlt das Feld, ist das Plugin alt, und der
     Mod fragt nicht.
+  - Die Antwort auf `show` trägt `karte`, den Namen der Karte für den
+    Ordner, siehe „Ablage“. Fehlt das Feld, bleibt der Ordner,
+    wie er ist.
   - Die Liste `ebenen` kommt mit `url` oder `port`, sobald der Webserver
     eine Adresse hat, auch leer, `"ebenen":[]`. Aus ihr nimmt der Mod die
     Basis, siehe [Ebenen](ebenen.md), „Symbole“.
@@ -393,6 +398,9 @@ eines Proxys von einem des Netzes (`Laden.Fehler.status`).
   | IP + Hash, die Vorgabe | `ip` | `<host>/welt-<hash>` |
   | IP:Port + Hash | `ip_port` | `<host>_<port>/welt-<hash>` |
 
+  Mit einer Karte vom Plugin steht `karte-<karte>/` vor `welt-<hash>`,
+  siehe unten, etwa `<host>/karte-main/welt-<hash>`.
+
   Meldet der Server einen Namen, siehe „Kanal“, steht er bei `ip` und
   `ip_port` statt `<host>`; der Port kommt weiter aus der eingetippten
   Adresse. So landet derselbe Server immer im selben Ordner, ob jemand
@@ -422,6 +430,43 @@ eines Proxys von einem des Netzes (`Laden.Fehler.status`).
     etwa `heroicmap/0/`, geht mit. Gibt es den neuen schon, etwa weil
     derselbe Server unter zwei Adressen eingetragen ist, bleibt der alte
     in der Kartenliste zum Löschen; zusammengeführt wird nicht.
+
+- **Karte** (heroic-map-renderer#318): Hinter einem Proxy haben alle
+  Server dieselbe Adresse, und eine Kopie einer Welt hat denselben Hash.
+  Darum nennt das Plugin an der Antwort auf `show` den Namen der Karte,
+  `karte`, etwa `main`, siehe
+  [Mehrere Server](https://github.com/VonNekyia/heroic-map-renderer-plugin/blob/main/docs/mehrere-server.md)
+  im Plugin. Zeigt ein Server die Karte eines anderen, nennt er dessen
+  Namen; dann teilen sich beide den Ordner.
+  - **Gültig** nur `a–z 0–9 _ -`, höchstens 64 Zeichen
+    (`Downloads.karteAus`, `Kartenname.gueltig`); sonst übergeht der Mod
+    das Feld mit einer Zeile im Log. Mit `karte-` davor ist kein Name ein
+    Gerät von Windows.
+  - **Einmal je Sitzung** (`Kartenname`): Die erste gültige Karte nach
+    einem Login gilt; eine andere später erst nach dem nächsten Login. Nur
+    im Speicher.
+  - **Nach dem Betreten:** Die Antwort auf `show` kommt erst, wenn der
+    Spieler schon in der Welt ist. Dann entscheidet der Mod für jede Welt,
+    die er in der Sitzung betrat, ob die Karte dort gilt
+    (`Downloads.karteGilt`), und liest neu: Minimap, eigene Karte,
+    Wegpunkte und Ebenen (`HeroicMap.weltOrdnerGewechselt`). Eine Welt,
+    die er später betritt, entscheidet beim Betreten, einmal je Sitzung.
+  - **Ob sie gilt:**
+
+    | Ordner ohne Karte | Ordner mit Karte | Ergebnis |
+    |---|---|---|
+    | fehlt | – | gilt |
+    | da | da | gilt, der ohne Karte bleibt in der Kartenliste |
+    | da | fehlt, ein Download läuft in den ohne Karte | gilt nicht in dieser Sitzung |
+    | da | fehlt | Umzug wie beim Namen, siehe oben; scheitert er, gilt sie nicht |
+
+    Gibt es den Ordner mit Karte schon, gilt er, anders als beim Namen:
+    Was der Mod vor der Antwort auf `show` schrieb, etwa die eigene Karte
+    der ersten Sekunden, liegt im Ordner ohne Karte und bliebe sonst jede
+    Sitzung der Grund, dort zu bleiben. Zusammengeführt wird nicht.
+  - **Zwei Server, ein alter Ordner:** Der zuerst betretene nimmt ihn mit,
+    der andere beginnt leer. Ein laufender Download lädt weiter in seinen
+    Ordner.
 
   Im Einzelspieler gilt die Wahl nicht, dort ist `<welt>`
   `einzelspieler_<speicherordner>/welt-<hash>`, `<speicherordner>` der
@@ -539,8 +584,8 @@ Platte (`Kartenliste`), auch die anderer Server und Welten:
 - **Oben** die Summe aller Dateien unter `heroicmap/`, immer in GB, so will
   es der User, und die Zahl der Karten.
 - **Ein Baum** ist ein Ordner mit `massstab.txt` oder `satz.json`, bis zu
-  drei Ebenen unter `heroicmap/`, in jeder Ablage oben und in der alten
-  (`Laden.bestand`).
+  vier Ebenen unter `heroicmap/`, in jeder Ablage oben, mit Karte und in
+  der alten (`Laden.bestand`).
 - **Zählen** ist ein Durchlauf über `heroicmap/` in einem eigenen Thread;
   bis er fertig ist, steht dort „Zähle …“. Ein Satz mit 450 000 Kacheln
   sind ebenso viele Dateien. Was sich nicht lesen lässt, fällt weg, die

@@ -112,8 +112,7 @@ public final class HeroicMap implements ClientModInitializer {
             Selbst.INSTANZ.leeren();
             // Erst den Hash der Welt merken; Wegpunkte und Bäume liegen unter ihm. Siehe docs/download.md, „Ablage“.
             Downloads.INSTANZ.weltBetreten();
-            Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());
-            Ebenen.INSTANZ.wechsel(Downloads.weltOrdner());
+            weltOrdnerGewechselt();
         });
         // Auch ein Wechsel des Backends hinter einem Proxy ist ein neuer Login, ohne DISCONNECT.
         ClientPlayConnectionEvents.INIT.register((listener, client) -> client.execute(() -> {
@@ -228,5 +227,14 @@ public final class HeroicMap implements ClientModInitializer {
             return 0;
         }
         return 1;
+    }
+
+    /**
+     * Der Ordner der Welt ist ein anderer, nach dem Betreten einer Welt oder wenn die Karte vom Plugin kommt: Was je
+     * Ordner liegt, liest neu. Auf dem Render-Thread. Siehe docs/download.md, „Ablage“.
+     */
+    static void weltOrdnerGewechselt() {
+        Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());
+        Ebenen.INSTANZ.wechsel(Downloads.weltOrdner());
     }
 }
