@@ -183,6 +183,9 @@ nach oben immer durchsichtiger.
 
 ![Der Schleier einer angehefteten Region am Hang und der Strahl eines angehefteten Wegpunkts; Szene `schleier` des Gametests](bilder/schleier.png)
 
+- **Geteilte Kanten:** Teilen zwei angeheftete eigene Regionen ein Stück
+  ihrer Kante genau, steht dort nur der Schleier der schwereren, siehe
+  „Gewicht“.
 - **Welche:** dieselben Formen wie auf der Minimap, siehe „Anheften“:
   angeheftete Flächen und Kreise der sichtbaren Ebenen, angeheftete eigene
   Regionen aus Wegpunkten und alte Rechtecke, in der Dimension des Spielers
@@ -624,7 +627,8 @@ vom User am 18.10.; Plan vom Reviewer freigegeben.
   (`Wegpunkte.hex`); leer heisst zurück zur Farbe aus der Liste. Was keine
   Farbe ist, nimmt Enter nicht: Das Feld bleibt offen, der Text wird rot,
   bis der Spieler ihn ändert. `Esc` oder ein Klick daneben bricht ab, und
-  jede Taste gehört dem Feld, wie bei „Name…“, siehe „Namen“.
+  jede Taste gehört dem Feld, wie bei „Name…“, siehe „Namen“. Darunter
+  steht der Regler „Gewicht“, siehe „Gewicht“.
 - **Gilt überall,** wo die Form ihre Farbe zeigt (`EigeneForm.argb`):
   Fläche zu 25 % und Rand auf Vollbildkarte und Minimap, Ecken, Griff,
   Schleier. Ändern der Ecken, Verschieben, Anheften und Namen lassen sie.
@@ -633,6 +637,43 @@ vom User am 18.10.; Plan vom Reviewer freigegeben.
 - **Datei:** `hex` neben dem Index `farbe`, siehe „Ablage“; ohne eigene
   Farbe fehlt das Feld. Eine ältere Version nimmt die Farbe des Index.
 - **Wegpunkte** haben weiter nur die 8 Farben, siehe „Was fehlt“.
+
+## Gewicht
+
+Wo sich eigene Formen überdecken oder ihre Ränder aufeinanderliegen, etwa
+nach dem Einrasten, entscheidet ein Gewicht, welche oben liegt. Gewünscht
+vom User am 20.10. (mod#163); Plan vom Reviewer freigegeben.
+
+- **Wert:** ganzzahlig von −9 bis +9, Vorgabe 0 (`Wegpunkte.MAX_GEWICHT`).
+  Mit der Vorgabe in der Mitte lässt sich eine Form auch unter alle anderen
+  legen.
+- **Einstellen:** unter dem Feld „Farbe…“ am Griff der Regler „Gewicht“,
+  „Gewicht: +3“, immer an (`Karte.faerben`). Er wirkt gleich auf Karte und
+  Minimap, nur im Speicher; Enter speichert Farbe und Gewicht, `Esc` und
+  ein Klick daneben nehmen es zurück, wie bei Schrift und Biegung, siehe
+  „Namen“. Bei Linien und Regionen gleich.
+- **Gezeichnet:** je Gewicht eine eigene Liste, die leichteste zuerst
+  (`Wegpunkte.baue`). Jede Liste zeichnet die Karte ganz, Fläche, Rand und
+  Name; so liegt eine schwerere Form mit allem über einer leichteren.
+  Innerhalb eines Gewichts bleibt es wie vorher: erst alle Flächen, dann
+  alle Ränder, dann die Namen, in der Reihenfolge der Formen. Haben alle
+  Gewicht 0, ist es genau eine Liste wie vor dem Gewicht. Gilt auf
+  Vollbildkarte und Minimap; die Form, die gerade gezogen wird, liegt an
+  der Maus obenauf. Ebenen vom Server bleiben, wie sie sind.
+- **Treffer:** Man trifft, was oben liegt. Bei Griffen und Ecken gewinnt
+  die nächste, bei gleichem Abstand die schwerere, bei gleichem Gewicht
+  wie vorher die spätere (`Wegpunkte.trifftEher`). Ein Doppelklick in eine
+  Region prüft die schwereren zuerst (`Karte.eigeneUnter`).
+- **Schleier:** Auf einem Stück einer Kante, das zwei angeheftete eigene
+  Regionen genau teilen, auf ein Millionstel Block und gleich in welcher
+  Richtung, steht nur der Schleier der schwereren (`Schleier.geteilt`). Bei
+  gleichem Gewicht beide, wie vorher; dort mischen sich die Farben.
+  Gerechnet beim Neubau des Schleiers, nicht je Frame; haben alle dasselbe
+  Gewicht, rechnet der Mod nichts.
+- **Gespeichert** als `gewicht` an der Form in `wegpunkte.json` und im Code
+  zum Teilen, nur ohne Vorgabe. In der Datei gilt ausserhalb der Grenzen
+  oder ohne ganze Zahl 0; im Code ist es dann kaputt. Ältere Versionen
+  überlesen das Feld.
 
 ## Eigene Ebenen
 
@@ -717,8 +758,9 @@ bei einem anderen Spieler als neue Ebene an. Gewünscht vom User am 18.10.
   `farbe` ist bei einem Wegpunkt der Index in `Wegpunkte.FARBEN`, bei einer
   Form der Index oder ihre eigene Farbe als `#RRGGBB`, siehe „Farbe“; mit
   eigener Farbe steht kein Index darin, eingefügt ist er 0. `schrift` und
-  `biegung` wie in der Datei, siehe „Namen“, nur ohne Vorgabe; ältere
-  Versionen überlesen sie, `v` bleibt 1.
+  `biegung` wie in der Datei, siehe „Namen“, ebenso `gewicht`, siehe
+  „Gewicht“, nur ohne Vorgabe; ältere Versionen überlesen sie, `v` bleibt
+  1.
 - **Nicht darin:** Angeheftetes, Mitspieler, Formen vom Server, der
   Todespunkt und alte Rechtecke. Ein altes Rechteck als Form durch die
   Mitten seiner Eckblöcke wäre einen halben Block kleiner als es selbst;
@@ -742,7 +784,8 @@ bei einem anderen Spieler als neue Ebene an. Gewünscht vom User am 18.10.
   Kleinbuchstaben, Ziffern und `_.-/` aussieht oder länger als 64 Zeichen
   ist; eine Farbe ausser 0 bis 7 und `#RRGGBB`; weniger als 2 oder mehr als
   64 Ecken; eine `schrift`, die keine Zahl von 0,25 bis 4 ist; eine
-  `biegung`, die keine ganze Zahl von −180 bis 180 ist. Die Grenze von
+  `biegung`, die keine ganze Zahl von −180 bis 180 ist; ein `gewicht`, das
+  keine ganze Zahl von −9 bis 9 ist. Die Grenze von
   256 KiB entpackt fängt eine Bombe: wenig Text,
   der entpackt riesig würde (`EbenenCode.MAX_ENTPACKT`). Tief
   verschachteltes JSON, etwa 100 000 öffnende Klammern, und eine Zahl mit
@@ -905,7 +948,9 @@ Schleier am Rand, siehe „Schleier“.
   (Region, Linie in vier Richtungen, Höhe nach der Form und gekappt, ohne
   Namen), `schriftUndBiegungJeForm` (Faktor und Bogenmass, eine Linie
   biegt nicht, nur ohne Vorgabe gespeichert, Rasten und Vorgabe beim
-  Lesen). Zur Farbe: `hexFarbeLesenSchreibenUndUeberall` (gültig und
+  Lesen), `gewichtLegtFormenUebereinander` (eine Liste je Gewicht,
+  aufsteigend, alle 0 wie vorher, Datei und Grenzen),
+  `trefferNachGewicht`. Zur Farbe: `hexFarbeLesenSchreibenUndUeberall` (gültig und
   ungültig, auch Ziffern anderer Schriften; Rand und Füllung; über die
   Datei, mit dem Index daneben; weggenommen; eine Farbe, die keine ist).
   Zum Schleier: `eigeneFormenFuerDenSchleierErkannt`. Zum Todespunkt:
@@ -928,7 +973,7 @@ Schleier am Rand, siehe „Schleier“.
   Lesen jede Grenze, eine Bombe, ein halber Code, falsche Felder und
   unbekannte, die es überliest (`lesenPrueftAllesOderNichts`); Schrift und
   Biegung hin und zurück, auf die Raste, falsche Werte kaputt
-  (`schriftUndBiegungImCode`); tief
+  (`schriftUndBiegungImCode`), ebenso das Gewicht; tief
   verschachteltes JSON und eine Zahl mit 200 000 Ziffern
   (`boesartigeCodesSindKaputtOhneZuWerfen`).
 - `SchleierTest`: Teilen an jeder ganzen Zahl, auch rückwärts und durch
@@ -1013,7 +1058,11 @@ Schleier am Rand, siehe „Schleier“.
   erst nach Enter. Wieder geöffnet stehen sie auf den Rasten; die Biegung
   verstellt und `Esc` nimmt sie zurück. An einer Linie nur „Schrift“. Bei
   GUI-Massstab 3 und 4 liegen Feld und Regler am unteren Rand ganz auf
-  dem Schirm. Farbe
+  dem Schirm. Gewicht (`gewicht`): zwei überlappende Regionen, A rot, B
+  blau; „Farbe…“ an A, der Regler „Gewicht“ auf +2, und im Bildschirmfoto
+  wird der Rand von B in A röter, denn die Fläche von A liegt jetzt
+  darüber; in der Datei erst nach Enter; −3 und `Esc` nimmt zurück; bei
+  GUI-Massstab 3 und 4 ganz auf dem Schirm. Farbe
   (`farbe`): „Farbe…“ am Griff zeigt die Farbe der Region als `#RRGGBB`;
   „#3A7FDG“ nimmt Enter nicht, das Feld bleibt offen; „3a7fd5“ und Enter
   färben sie, und im Bildschirmfoto steht ihr Rand in `#3A7FD5`; leer und

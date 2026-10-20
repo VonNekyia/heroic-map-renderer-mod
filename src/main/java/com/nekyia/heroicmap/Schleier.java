@@ -3,8 +3,11 @@ package com.nekyia.heroicmap;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.IntBinaryOperator;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
 import net.minecraft.client.Minecraft;
@@ -148,14 +151,22 @@ public final class Schleier {
             for (Ebenen.Form f : formen) {
                 int farbe = farbe(f);
                 boolean eigen = Wegpunkte.INSTANZ.eigen(f);
+                int gewicht = Wegpunkte.INSTANZ.gewicht(f);
                 if (f.dimension().equals(name) && Ebenen.sichtbar(farbe)) {
                     kanten(f, kasten, mx, mz, r + 1, (x0, z0, x1, z1) -> {
                         double dx = (x0 + x1) / 2 - mx, dz = (z0 + z1) / 2 - mz;
                         if (dx * dx + dz * dz <= r * r) {
-                            s.add(x0, z0, x1, z1, dx * dx + dz * dz, farbe, eigen);
+                            s.add(x0, z0, x1, z1, dx * dx + dz * dz, farbe, eigen, gewicht);
                         }
                     });
                 }
+            }
+        }
+        // Auf einem Stück, das zwei eigene Regionen genau teilen, nur der Schleier der schwereren. Siehe docs/wegpunkte.md, „Gewicht“.
+        boolean[] weg = geteilt(s.punkte, s.eigen, s.gewichte, s.n);
+        for (int i = 0; i < s.n; i++) {
+            if (weg[i]) {
+                s.abstand[i] = Double.POSITIVE_INFINITY;
             }
         }
         int[] reihe = naechste(s.abstand, s.n, MAX_VIERECKE);
@@ -170,6 +181,9 @@ public final class Schleier {
         IntBinaryOperator gelaende = (x, z) -> level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
         int n = 0;
         for (int k : reihe) {
+            if (weg[k]) {
+                continue;
+            }
             double x0 = s.punkte[4 * k], z0 = s.punkte[4 * k + 1], x1 = s.punkte[4 * k + 2], z1 = s.punkte[4 * k + 3];
             // Ein Stück liegt in einem Block; dessen Chunk merkt sich der Mod, geladen oder nicht.
             int cx = Math.floorDiv((int) Math.floor((x0 + x1) / 2), 16), cz = Math.floorDiv((int) Math.floor((z0 + z1) / 2), 16);
@@ -352,6 +366,45 @@ public final class Schleier {
      * Die Indizes der höchstens {@code max} kleinsten Abstände, die nächsten zuerst. Erst ausgewählt, dann nur die
      * gewählten sortiert: dasselbe wie alles zu sortieren, denn jeder Schlüssel trägt seinen Index und ist einzig.
      */
+    /**
+     * Welche Stücke wegfallen: ein eigenes, das ein anderes eigenes mit höherem Gewicht genau teilt, gleich in welcher
+     * Richtung, auf ein Millionstel Block. Bei gleichem Gewicht bleiben beide. Haben alle eigenen dasselbe Gewicht, fällt
+     * nichts weg, ohne Rechnung.
+     */
+    static boolean[] geteilt(double[] punkte, boolean[] eigen, int[] gewichte, int n) {
+        boolean[] weg = new boolean[n];
+        int min = Integer.MAX_VALUE, max = Integer.MIN_VALUE;
+        for (int i = 0; i < n; i++) {
+            if (eigen[i]) {
+                min = Math.min(min, gewichte[i]);
+                max = Math.max(max, gewichte[i]);
+            }
+        }
+        if (min >= max) {
+            return weg;
+        }
+        Map<List<Long>, Integer> schwerstes = new HashMap<>();
+        List<List<Long>> schluessel = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            List<Long> k = eigen[i] ? stueck(punkte, i) : null;
+            schluessel.add(k);
+            if (k != null) {
+                schwerstes.merge(k, gewichte[i], Math::max);
+            }
+        }
+        for (int i = 0; i < n; i++) {
+            weg[i] = schluessel.get(i) != null && gewichte[i] < schwerstes.get(schluessel.get(i));
+        }
+        return weg;
+    }
+
+    /** Das Stück {@code i} als Schlüssel ohne Richtung, auf ein Millionstel Block gerundet. */
+    private static List<Long> stueck(double[] punkte, int i) {
+        long ax = Math.round(punkte[4 * i] * 1e6), az = Math.round(punkte[4 * i + 1] * 1e6);
+        long bx = Math.round(punkte[4 * i + 2] * 1e6), bz = Math.round(punkte[4 * i + 3] * 1e6);
+        return ax < bx || ax == bx && az <= bz ? List.of(ax, az, bx, bz) : List.of(bx, bz, ax, az);
+    }
+
     static int[] naechste(double[] abstand, int n, int max) {
         long[] schluessel = new long[n];
         for (int i = 0; i < n; i++) {
@@ -407,16 +460,19 @@ public final class Schleier {
         double[] punkte = new double[4 * 1024], abstand = new double[1024];
         int[] farben = new int[1024];
         boolean[] eigen = new boolean[1024];
+        int[] gewichte = new int[1024];
         int n;
 
-        void add(double x0, double z0, double x1, double z1, double d, int farbe, boolean vonMir) {
+        void add(double x0, double z0, double x1, double z1, double d, int farbe, boolean vonMir, int gewicht) {
             if (n == abstand.length) {
                 punkte = Arrays.copyOf(punkte, 8 * n);
                 abstand = Arrays.copyOf(abstand, 2 * n);
                 farben = Arrays.copyOf(farben, 2 * n);
                 eigen = Arrays.copyOf(eigen, 2 * n);
+                gewichte = Arrays.copyOf(gewichte, 2 * n);
             }
             eigen[n] = vonMir;
+            gewichte[n] = gewicht;
             punkte[4 * n] = x0;
             punkte[4 * n + 1] = z0;
             punkte[4 * n + 2] = x1;

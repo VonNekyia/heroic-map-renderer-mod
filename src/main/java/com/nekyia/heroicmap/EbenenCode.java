@@ -35,7 +35,7 @@ final class EbenenCode {
     }
 
     /** Eine Form im Code; {@code hex}, {@code schrift} und {@code biegung} wie bei {@link Wegpunkte.EigeneForm}, {@code name} null ohne. */
-    record Form(String dimension, List<Wegpunkte.Ecke> ecken, int farbe, int hex, String name, double schrift, int biegung) {
+    record Form(String dimension, List<Wegpunkte.Ecke> ecken, int farbe, int hex, String name, double schrift, int biegung, int gewicht) {
     }
 
     /** Was ein Code enthält. */
@@ -95,6 +95,9 @@ final class EbenenCode {
             }
             if (f.biegung() != 0) {
                 q.addProperty("biegung", f.biegung());
+            }
+            if (f.gewicht() != 0) {
+                q.addProperty("gewicht", f.gewicht());
             }
             formen.add(q);
         }
@@ -243,7 +246,14 @@ final class EbenenCode {
             }
             biegung = Wegpunkte.biegung(b);
         }
-        return new Form(dimension(q), gueltig, index, hex, name, schrift, biegung);
+        int gewicht = 0;
+        if (q.has("gewicht")) {
+            gewicht = ganz(q.get("gewicht"));
+            if (!Wegpunkte.gewichtGilt(gewicht)) {
+                throw new IllegalArgumentException("Gewicht " + gewicht);
+            }
+        }
+        return new Form(dimension(q), gueltig, index, hex, name, schrift, biegung, gewicht);
     }
 
     private static Gelesen fehler(String schluessel) {

@@ -2,6 +2,7 @@ package com.nekyia.heroicmap;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -140,6 +141,8 @@ final class Karte extends Screen {
      * jetzt ist, und wie sie vorher war, null nach Enter. Siehe docs/wegpunkte.md, „Namen“.
      */
     private Raster schriftRegler, biegungRegler;
+    /** Unter dem Farbfeld einer Form der Regler „Gewicht“, sonst null. Siehe docs/wegpunkte.md, „Gewicht“. */
+    private Raster gewichtRegler;
     private Wegpunkte.EigeneForm stilForm, stilVorher;
     /** So breit ist das Eingabefeld, in Einheiten des GUI. */
     private static final int EINGABE_BREITE = 160;
@@ -266,6 +269,7 @@ final class Karte extends Screen {
         beiEnter = null;
         schriftRegler = null;
         biegungRegler = null;
+        gewichtRegler = null;
         LocalPlayer spieler = minecraft.player;
         // Wie beim letzten Schliessen, je Satz; sonst der Spieler in der Mitte. Siehe docs/vollbildkarte.md, „Lage merken“.
         if (blick != null && spieler != null && !gestellt) {
@@ -1002,9 +1006,9 @@ final class Karte extends Screen {
         return eingabe == null ? null : eingabe.getValue();
     }
 
-    /** Für den Gametest: das Eingabefeld und seine Regler „Schrift“ und „Biegung“, je null ohne. */
+    /** Für den Gametest: das Eingabefeld und seine Regler „Schrift“, „Biegung“ und „Gewicht“, je null ohne. */
     AbstractWidget[] eingabeWidgets() {
-        return new AbstractWidget[] {eingabe, schriftRegler, biegungRegler};
+        return new AbstractWidget[] {eingabe, schriftRegler, biegungRegler, gewichtRegler};
     }
 
     /** Für den Gametest: der Hinweis unten links, oder null. */
@@ -1149,13 +1153,13 @@ final class Karte extends Screen {
         g.pose().popMatrix();
     }
 
-    /** Der Griff einer eigenen Form unter (x, y): der nächste, höchstens {@link #ECKE_TREFFER} weg, oder null. */
+    /** Der Griff einer eigenen Form unter (x, y): der nächste, höchstens {@link #ECKE_TREFFER} weg, bei gleichem Abstand der schwerere; oder null. */
     private GriffAn griffUnter(double x, double y) {
         GriffAn beste = null;
         double abstand = ECKE_TREFFER;
         for (GriffAn gr : griffe) {
             double d = Math.hypot(x - gr.x(), y - gr.y());
-            if (d <= abstand) {
+            if (Wegpunkte.trifftEher(d, gr.form().gewicht(), abstand, beste == null ? Integer.MIN_VALUE : beste.form().gewicht())) {
                 beste = gr;
                 abstand = d;
             }
@@ -1178,13 +1182,13 @@ final class Karte extends Screen {
         g.pose().popMatrix();
     }
 
-    /** Die Ecke einer eigenen Form unter (x, y): die nächste, höchstens {@link #ECKE_TREFFER} weg, oder null. */
+    /** Die Ecke einer eigenen Form unter (x, y): die nächste, höchstens {@link #ECKE_TREFFER} weg, bei gleichem Abstand die schwerere; oder null. */
     private EckeAn eckeUnter(double x, double y) {
         EckeAn beste = null;
         double abstand = ECKE_TREFFER;
         for (EckeAn e : ecken) {
             double d = Math.hypot(x - e.x(), y - e.y());
-            if (d <= abstand) {
+            if (Wegpunkte.trifftEher(d, e.form().gewicht(), abstand, beste == null ? Integer.MIN_VALUE : beste.form().gewicht())) {
                 beste = e;
                 abstand = d;
             }
@@ -1288,9 +1292,10 @@ final class Karte extends Screen {
         double wx = blick.basisRasterX(mx, width) / scale, wz = blick.basisRasterZ(my, height) / scale;
         // So viele Blöcke sind 3 Einheiten des GUI auf dieser Stufe.
         double nah = 3 / (blick.rasterX(Projektion.zuPixel(1, scale), width) - blick.rasterX(0, width));
-        List<Wegpunkte.EigeneForm> alle = Wegpunkte.INSTANZ.eigeneFormen();
-        for (int i = alle.size() - 1; i >= 0; i--) {
-            Wegpunkte.EigeneForm f = alle.get(i);
+        // Von oben nach unten: die schwerere zuerst, bei gleichem Gewicht die spätere. Siehe docs/wegpunkte.md, „Gewicht“.
+        List<Wegpunkte.EigeneForm> alle = new ArrayList<>(Wegpunkte.INSTANZ.eigeneFormen().reversed());
+        alle.sort(Comparator.comparingInt(Wegpunkte.EigeneForm::gewicht).reversed());
+        for (Wegpunkte.EigeneForm f : alle) {
             Ebenen.Form form = Wegpunkte.INSTANZ.form(f);
             if (form == null || !dimension.equals(form.dimension()) || !Wegpunkte.INSTANZ.an(f.ebene())) {
                 continue;
@@ -1359,7 +1364,8 @@ final class Karte extends Screen {
         // Ein Klick neben das Eingabefeld und seine Regler bricht die Eingabe ab und tut sonst nichts; einer darauf setzt den Cursor
         // oder schiebt den Regler.
         if (eingabe != null) {
-            if (eingabe.isMouseOver(e.x(), e.y()) || auf(schriftRegler, e.x(), e.y()) || auf(biegungRegler, e.x(), e.y())) {
+            if (eingabe.isMouseOver(e.x(), e.y()) || auf(schriftRegler, e.x(), e.y()) || auf(biegungRegler, e.x(), e.y())
+                    || auf(gewichtRegler, e.x(), e.y())) {
                 super.mouseClicked(e, doppelt);
             } else {
                 schliesseEingabe();
@@ -1854,16 +1860,7 @@ final class Karte extends Screen {
                 () -> benennen(f)));
         neu.add(new Eintrag(Component.translatable("heroicmap.karte.ebene"), () -> ebenenWahl(f.ebene(), id -> Wegpunkte.INSTANZ.ordne(f, id))));
         // Leer heisst zurück zur Farbe aus der Liste; was keine Farbe ist, nimmt Enter nicht. Siehe docs/wegpunkte.md, „Farbe“.
-        neu.add(new Eintrag(Component.translatable("heroicmap.karte.farbe"), () -> oeffne(Wegpunkte.hex(f.argb()), 7,
-                "heroicmap.karte.farbe_hinweis", t -> {
-                    int hex = Wegpunkte.hex(t);
-                    if (hex == Wegpunkte.KEIN_HEX && !t.isBlank()) {
-                        eingabe.setTextColor(UNGUELTIG);
-                        return false;
-                    }
-                    Wegpunkte.INSTANZ.faerbe(f, hex);
-                    return true;
-                })));
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.farbe"), () -> faerben(f)));
         if (zug == null) {
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> bearbeite(new EckeAn(f, f.ecken().size() - 1, 0, 0))));
         }
@@ -1900,10 +1897,14 @@ final class Karte extends Screen {
         if (biegungRegler != null) {
             removeWidget(biegungRegler);
         }
+        if (gewichtRegler != null) {
+            removeWidget(gewichtRegler);
+        }
         eingabe = null;
         beiEnter = null;
         schriftRegler = null;
         biegungRegler = null;
+        gewichtRegler = null;
     }
 
     /**
@@ -1924,12 +1925,13 @@ final class Karte extends Screen {
         int x = eingabe.getX(), y = eingabe.getY() + REGLER_ZEILE, b = eingabe.getWidth();
         schriftRegler = addRenderableWidget(new Raster(x, y, b, Wegpunkte.SCHRIFTEN.length, raste(f.schrift()),
                 i -> Component.translatable("heroicmap.karte.schrift", SCHRIFT_TEXTE[i]),
-                i -> stilForm = Wegpunkte.INSTANZ.stil(stilForm, Wegpunkte.SCHRIFTEN[i], stilForm.biegung())));
+                i -> stilForm = Wegpunkte.INSTANZ.stil(stilForm, Wegpunkte.SCHRIFTEN[i], stilForm.biegung(), stilForm.gewicht())));
         if (f.region()) {
             int mitte = Wegpunkte.MAX_BIEGUNG / Wegpunkte.BIEGUNG_SCHRITT;
             biegungRegler = addRenderableWidget(new Raster(x, y + REGLER_ZEILE, b, 2 * mitte + 1, mitte + f.biegung() / Wegpunkte.BIEGUNG_SCHRITT,
                     i -> biegungText((i - mitte) * Wegpunkte.BIEGUNG_SCHRITT),
-                    i -> stilForm = Wegpunkte.INSTANZ.stil(stilForm, stilForm.schrift(), (i - mitte) * Wegpunkte.BIEGUNG_SCHRITT)));
+                    i -> stilForm = Wegpunkte.INSTANZ.stil(stilForm, stilForm.schrift(), (i - mitte) * Wegpunkte.BIEGUNG_SCHRITT,
+                            stilForm.gewicht())));
         }
         reglerStand();
     }
@@ -1937,6 +1939,36 @@ final class Karte extends Screen {
     /** Liegt (x, y) auf {@code w}, auch wenn es grau ist? {@code isMouseOver} zählt nur, was an ist. */
     private static boolean auf(AbstractWidget w, double x, double y) {
         return w != null && x >= w.getX() && x < w.getX() + w.getWidth() && y >= w.getY() && y < w.getY() + w.getHeight();
+    }
+
+    /**
+     * Das Feld für die Farbe von {@code f}, darunter der Regler „Gewicht“. Er wirkt gleich auf Karte und Minimap; Enter
+     * speichert Farbe und Gewicht, Esc und ein Klick daneben nehmen das Gewicht zurück. Leer heisst zurück zur Farbe aus der
+     * Liste; was keine Farbe ist, nimmt Enter nicht. Platz darunter wie bei {@link #benennen}. Siehe docs/wegpunkte.md,
+     * „Farbe“ und „Gewicht“.
+     */
+    private void faerben(Wegpunkte.EigeneForm f) {
+        stilForm = f;
+        stilVorher = f;
+        oeffne(Wegpunkte.hex(f.argb()), 7, "heroicmap.karte.farbe_hinweis", t -> {
+            int hex = Wegpunkte.hex(t);
+            if (hex == Wegpunkte.KEIN_HEX && !t.isBlank()) {
+                eingabe.setTextColor(UNGUELTIG);
+                return false;
+            }
+            Wegpunkte.INSTANZ.faerbe(stilForm, hex);
+            stilVorher = null;
+            return true;
+        });
+        int m = Wegpunkte.MAX_GEWICHT;
+        gewichtRegler = addRenderableWidget(new Raster(eingabe.getX(), eingabe.getY() + REGLER_ZEILE, eingabe.getWidth(), 2 * m + 1,
+                m + f.gewicht(), i -> Component.translatable("heroicmap.karte.gewicht", gewichtText(i - m)),
+                i -> stilForm = Wegpunkte.INSTANZ.stil(stilForm, stilForm.schrift(), stilForm.biegung(), i - m)));
+    }
+
+    /** Ein Gewicht mit Vorzeichen: „+3“, „0“, „−2“. */
+    static String gewichtText(int g) {
+        return g > 0 ? "+" + g : g < 0 ? "−" + -g : "0";
     }
 
     /** Die Raste von {@link Wegpunkte#SCHRIFTEN} mit dem Faktor {@code f}. */
@@ -1963,10 +1995,10 @@ final class Karte extends Screen {
         }
     }
 
-    /** Nicht gespeichert: Schrift und Biegung der Form wieder, wie sie vorher waren. */
+    /** Nicht gespeichert: Schrift, Biegung und Gewicht der Form wieder, wie sie vorher waren. */
     private void stilZurueck() {
         if (stilVorher != null && stilForm != null) {
-            Wegpunkte.INSTANZ.stil(stilForm, stilVorher.schrift(), stilVorher.biegung());
+            Wegpunkte.INSTANZ.stil(stilForm, stilVorher.schrift(), stilVorher.biegung(), stilVorher.gewicht());
         }
         stilForm = null;
         stilVorher = null;

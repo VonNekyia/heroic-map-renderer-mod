@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.60
+
+- **Which shape lies on top.** Under "Color…" on a shape's handle sits a weight slider from −9 to +9. A heavier shape is drawn above lighter ones, fill, border and name, on the full map and the minimap; clicks hit the shape on top. Where two pinned regions share an edge, only the heavier one's veil shows.
+
 ## 0.2.59
 
 - **Bigger, smaller and curved names.** When you name a shape, two sliders sit under the field: text size from ¼× to 4×, and for regions a curve of up to 180° upward or downward. The map shows them right away; Enter keeps them, Esc undoes them. Shared codes carry them along.
