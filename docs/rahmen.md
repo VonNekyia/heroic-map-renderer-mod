@@ -257,21 +257,36 @@ der User am 15.10. gewünscht, siehe
 
 ## Verzierungen
 
-Der Schalter „Verzierungen“ im Untermenü „Einstellungen …“, in der Zeile
-von „Drehen“, stellt die Marken an oder aus; gespeichert als
-`verzierungen` in `heroicmap.properties`, Vorgabe an. Aus zeigt der Rahmen
-nur seine Bänder oder den Ring, gedreht wie ungedreht. Der Griff im Menü
-bleibt, der Abstand zum Rand auch; im Menü stehen die Marken halb, siehe
-„Im Menü“.
+Jede Marke N, O, S, W steht für sich an oder durchsichtig, so hat es der
+User am 20.10. gewählt (mod#175). Einen Schalter im Untermenü gibt es dafür
+nicht mehr.
+
+- **Rechtsklick** im Menü auf eine Marke, ohne zu ziehen, macht nur sie
+  durchsichtig; ein zweiter holt sie zurück (`Minimap.schalteVerzierung`).
+  Ziehen heisst wie beim Linksklick: Die Maus wandert mehr als 3 Einheiten
+  (`MinimapKlick.WEG`); dann verschiebt sie die Minimap wie bisher.
+- **Linksklick** auf eine Marke wechselt weiter den Rahmen, siehe „Im
+  Menü“. Beide Tasten treffen dasselbe Ziel und tun anderes; der Tooltip
+  nennt beides.
+- **Durchsichtig** heisst: im Spiel nicht gezeichnet, im Menü halb, siehe
+  „Im Menü“. Der Rahmen zeigt dort nur seine Bänder oder den Ring, gedreht
+  wie ungedreht. Griff und Abstand zum Rand bleiben.
+- **Gespeichert** als `verzierungen_aus` in `heroicmap.properties`, die
+  Buchstaben der durchsichtigen Marken, etwa `N,S`; leer heisst alle an,
+  die Vorgabe. Eine Datei von vorher hat `verzierungen=false`; das heisst
+  alle vier durchsichtig, so springt nichts (`Minimap.marken`).
+- Nur die vier Marken, nicht die Ecken, so hat es der Reviewer entschieden;
+  in den Ecken zeichnet der Rahmen ohnehin nichts ausser dem Griff.
 
 ## Im Menü
 
 Ein Klick auf eine Marke wechselt den Rahmen, siehe [Minimap](minimap.md),
 „Aussehen an der Minimap“. Damit es immer eine gibt:
 
-- **Halbe Marken:** Zeigt der Rahmen keine, mit dem Schalter
-  „Verzierungen“ aus oder bei „ohne“, zeichnet das Menü sie zu 50 %
-  deckend, nur dort, nicht im HUD sonst (`Minimap.geister`). Mit Rahmen
+- **Halbe Marken:** Durchsichtige Marken, siehe „Verzierungen“, und bei
+  „ohne“ alle vier zeichnet das Menü zu 50 % deckend, nur dort, nicht im
+  HUD sonst (`Minimap.geister`). So trifft ein Rechtsklick sie zum
+  Zurückholen. Mit Rahmen
   dessen Marken an ihrem Ort, bei „ohne“ die von „grau“ auf der Mitte des
   Umrisses, 1,5 Einheiten ausserhalb der Karte.
 - **Genordet:** Im Menü dreht die Minimap nicht, auch mit Drehen an, siehe
@@ -285,7 +300,7 @@ Ein Klick auf eine Marke wechselt den Rahmen, siehe [Minimap](minimap.md),
   Einheit angeschnitten sein: Der Abstand zum Rand ist dort 4 Einheiten,
   siehe „Abstand zum Rand“, und gilt nur für das HUD.
 
-![Das Menü mit „uhr“ und Verzierungen aus: die Marken halb, N unter der Maus hell, der Tooltip zum Rahmen](bilder/rahmen-menue-halb.png)
+![Das Menü mit „uhr“ und allen Marken durchsichtig: die Marken halb, N unter der Maus hell, der Tooltip zum Rahmen](bilder/rahmen-menue-halb.png)
 
 ## Abstand zum Rand
 
