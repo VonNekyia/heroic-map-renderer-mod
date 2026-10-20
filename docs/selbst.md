@@ -44,7 +44,8 @@ mit der des Servers. Warum: [0004](entscheidungen/0004-karte-selbst-zeichnen.md)
 - **Was:** Die Wahl legt `heroicmap/<welt>/selbst-<dimension>-<crc>/` an,
   siehe [Download](download.md), „Ablage“, mit `satz.json` (Name „Selbst“,
   Massstab wie gewählt), `<massstab>/map.json` (`tileSize` 256, `minZoom` 0,
-  `maxZoom` 8, `scale` 4, für jeden Massstab gleich) und der Marke
+  `maxZoom` 8, `scale` 4, `downscale` `"nearest"`, für jeden Massstab
+  gleich, siehe „Pyramide“) und der Marke
   `selbst.txt` (`Selbst.anlegen`). Danach zeichnet
   der Mod gleich alle geladenen Chunks.
 - **Name:** Andere Zeichen der Kennung als `a`–`z`, `0`–`9`, `_` und `-`
@@ -155,13 +156,43 @@ hat es der User gewünscht, siehe
   Speicher oder auf der Platte sind (`Kachelwerk.viertel`). Der Vorfahr ist
   damit geändert und wird mit seiner Stufe geschrieben, so bis Stufe 0.
   Eine Kachel der Stufe 0 deckt 16 384 × 16 384 Blöcke.
-- **Verkleinern** wie die Pyramide des Renderers (`Pyramide.halbiere`): je
-  2 × 2 Pixel in linearem Licht mit vormultipliziertem Alpha, links oben,
-  rechts oben, links unten, rechts unten. Das Verfahren steht in
+- **Verkleinern** wie die Pyramide des Renderers bei `top-north`
+  (`Pyramide.halbiere`): je 2 × 2 genau ein Pixel, in ungerader Tiefe über
+  der gezeichneten Stufe, der feinsten des Massstabs, der rechts unten, in
+  gerader der links oben; ein durchsichtiger Pixel ohne Farbe. Das
+  Verfahren steht in
   [`zoomstufen.md` des Renderers](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/zoomstufen.md),
-  „Verkleinern“; `PyramideTest` prüft dieselben Fälle wie dessen Tests.
-- **Rundung:** Java rechnet die sRGB-Kurve in `double`, der Renderer in
-  `f32`. Ein Kanal kann deshalb selten um 1 abweichen.
+  „Verkleinern“; `PyramideTest` prüft denselben Fall wie dessen Test.
+- **Warum nicht mitteln:** Bis 0.2.66 mittelte der Mod je 2 × 2 in
+  linearem Licht. Mit jeder Stufe wurde die Karte weicher, beim User
+  „mega unscharfe Zwischenstufen“ (mod#132). Gemessen in der Testszene des
+  Gametests `SelbstZoom`, 4 px, als Anteil waagrechter Nachbarpixel mit
+  mehr als 10 Unterschied:
+
+  | Stufe | gemittelt | ein Pixel |
+  |---|---|---|
+  | 7 | 0,099 | 0,146 |
+  | 6 | 0,126 | 0,159 |
+  | 5 | 0,092 | 0,182 |
+  | 4 | 0,104 | 0,223 |
+
+  ![Die Vollbildkarte der eigenen Karte auf Stufe 5, links gemittelt bis 0.2.66, rechts je 2 × 2 ein Pixel; Szene des Gametests `SelbstZoom`, 4 px](bilder/selbst-stufen-vergleich.png)
+- **`map.json`** nennt `"downscale": "nearest"`, wie ein Baum des
+  Renderers, siehe dessen
+  [`map-json.md`](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/map-json.md),
+  „Verkleinern“.
+- **Alte Sätze** ohne das Feld, gemittelt bis 0.2.66, baut der Worker der
+  eigenen Karte einmal neu (`Kachelwerk.baueNeu`, `Selbst.baueNeu`):
+  - Er beginnt, sobald das Werk des Satzes zeichnet, also beim Betreten
+    der Welt mit „Selbst“ in dieser Dimension.
+  - Je Schritt 16 Kacheln der feinsten Stufe, 4 × 4 beieinander, in ihre
+    Vorfahren, dann alle Stufen schreiben; alle 250 ms ein Schritt
+    (`Selbst.NEUBAU_MS`), nur wenn kein Chunk im Worker wartet. Das
+    Zeichnen geht vor, und der Worker läuft mit niedriger Priorität.
+  - Erst wenn alles neu ist, kommt `"downscale": "nearest"` in
+    `map.json`. Bricht der Neubau ab, etwa beim Verlassen der Welt oder
+    beim Beenden des Spiels, fehlt das Feld noch, und der nächste Start
+    baut wieder alles.
 
 ## Kosten
 

@@ -1,21 +1,27 @@
 package com.nekyia.heroicmap;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayDeque;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import javax.imageio.ImageIO;
 
 /**
  * Die Kacheln der selbst gezeichneten Karte auf der Platte: nimmt die Bilder einzelner Chunks in
  * die Kacheln der feinsten Stufe und schreibt geänderte Kacheln als PNG. Jede geschriebene Kachel
- * verkleinert es in ihr Viertel des Vorfahren, wie die Pyramide des Renderers. Ohne Minecraft;
- * gehört einem Thread. Siehe docs/selbst.md, „Kacheln“.
+ * verkleinert es in ihr Viertel des Vorfahren, wie die Pyramide des Renderers bei top-north. Ohne
+ * Minecraft; gehört einem Thread. Siehe docs/selbst.md, „Kacheln“.
  */
 final class Kachelwerk {
 
@@ -35,6 +41,8 @@ final class Kachelwerk {
     private static final int BEHALTEN = 64;
     /** Nach so vielen gescheiterten Durchläufen in Folge gibt das Werk auf, etwa bei voller Platte. */
     static final int VERSUCHE = 3;
+    /** In {@code map.json}: die Pyramide nimmt je 2 × 2 einen Pixel, wie beim Renderer. */
+    static final String DOWNSCALE = "downscale", NEAREST = "nearest";
 
     private final Path ordner;
     private final int seite, chunk, minZoom, maxZoom;
@@ -42,6 +50,11 @@ final class Kachelwerk {
     private final Map<Kachel, int[]> geaendert = new HashMap<>();
     /** Gescheiterte Durchläufe in Folge. */
     private int fehlschlaege;
+    /**
+     * Die Kacheln der feinsten Stufe, deren Vorfahren noch neu zu bauen sind, je 4 × 4 beieinander; null, wenn die
+     * Pyramide schon je 2 × 2 einen Pixel nimmt. Siehe docs/selbst.md, „Pyramide“.
+     */
+    private ArrayDeque<Kachel> neubau;
     /** Ungeänderte Kacheln, zuletzt gelesen oder geschrieben; höchstens {@link #BEHALTEN}. */
     private final Map<Kachel, int[]> speicher = new LinkedHashMap<>(16, 0.75f, true) {
         @Override
@@ -60,6 +73,96 @@ final class Kachelwerk {
         this.chunk = chunk;
         this.minZoom = minZoom;
         this.maxZoom = maxZoom;
+        this.neubau = altePyramide(ordner) ? feinste() : null;
+    }
+
+    /** Hat der Satz eine {@code map.json} ohne {@code "downscale":"nearest"}, also gemittelte gröbere Stufen? */
+    static boolean altePyramide(Path ordner) {
+        Path karte = ordner.resolve("map.json");
+        if (!Files.isRegularFile(karte)) {
+            return false;
+        }
+        try {
+            JsonObject j = JsonParser.parseString(Files.readString(karte, StandardCharsets.UTF_8)).getAsJsonObject();
+            return !(j.has(DOWNSCALE) && NEAREST.equals(j.get(DOWNSCALE).getAsString()));
+        } catch (IOException | RuntimeException e) {
+            return false;
+        }
+    }
+
+    /** Die Kacheln der feinsten Stufe auf der Platte, je 4 × 4 beieinander; so teilen sich aufeinanderfolgende Schritte ihre Vorfahren. */
+    private ArrayDeque<Kachel> feinste() {
+        var alle = new ArrayDeque<Kachel>();
+        Path stufe = ordner.resolve(String.valueOf(maxZoom));
+        if (!Files.isDirectory(stufe)) {
+            return alle;
+        }
+        try (Stream<Path> spalten = Files.list(stufe)) {
+            for (Path spalte : spalten.toList()) {
+                int x = Integer.parseInt(spalte.getFileName().toString());
+                try (Stream<Path> dateien = Files.list(spalte)) {
+                    for (Path d : dateien.toList()) {
+                        String name = d.getFileName().toString();
+                        if (name.endsWith(".png")) {
+                            alle.add(new Kachel(maxZoom, x, Integer.parseInt(name.substring(0, name.length() - 4))));
+                        }
+                    }
+                }
+            }
+        } catch (IOException | RuntimeException e) {
+            // Was sich nicht lesen lässt, bleibt, wie es ist; der nächste Start versucht es wieder.
+            return new ArrayDeque<>();
+        }
+        var sortiert = alle.stream().sorted(Comparator.comparingInt((Kachel k) -> k.y() >> 2).thenComparingInt(k -> k.x() >> 2)
+                .thenComparingInt(Kachel::y).thenComparingInt(Kachel::x)).toList();
+        return new ArrayDeque<>(sortiert);
+    }
+
+    /** Sind noch gröbere Stufen eines alten Satzes neu zu bauen? */
+    boolean neubauOffen() {
+        return neubau != null;
+    }
+
+    /**
+     * Ein Schritt des Neubaus: höchstens {@code n} Kacheln der feinsten Stufe in ihre Vorfahren, dann alle Stufen
+     * schreiben. Erst wenn alles neu ist, steht {@code "downscale":"nearest"} in {@code map.json}; bricht der Neubau
+     * vorher ab, baut der nächste Start wieder alles. Siehe docs/selbst.md, „Pyramide“.
+     */
+    void baueNeu(int n, List<Kachel> fertig) throws IOException {
+        if (neubau == null || aufgegeben()) {
+            return;
+        }
+        for (int i = 0; i < n && !neubau.isEmpty(); i++) {
+            Kachel k = neubau.poll();
+            viertel(k, lies(k));
+        }
+        schreibe(true, fertig);
+        if (neubau.isEmpty()) {
+            markiere(ordner);
+            neubau = null;
+        }
+    }
+
+    /** Trägt {@code "downscale":"nearest"} in {@code map.json} ein, die übrigen Felder bleiben. */
+    static void markiere(Path ordner) throws IOException {
+        Path karte = ordner.resolve("map.json"), tmp = ordner.resolve("map.json.tmp");
+        JsonObject j = JsonParser.parseString(Files.readString(karte, StandardCharsets.UTF_8)).getAsJsonObject();
+        j.addProperty(DOWNSCALE, NEAREST);
+        try {
+            Files.writeString(tmp, j.toString(), StandardCharsets.UTF_8);
+            Files.move(tmp, karte, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } finally {
+            Files.deleteIfExists(tmp);
+        }
+    }
+
+    /** Die Pixel der Kachel zum Lesen, ohne sie zu ändern: geändert, aus dem Speicher oder von der Platte. */
+    private int[] lies(Kachel k) {
+        int[] argb = geaendert.get(k);
+        if (argb == null) {
+            argb = speicher.get(k);
+        }
+        return argb != null ? argb : vonPlatte(k);
     }
 
     Path ordner() {
@@ -137,7 +240,7 @@ final class Kachelwerk {
     /** Verkleinert die Kachel in ihr Viertel des Vorfahren; der ist damit geändert. Die anderen drei Viertel bleiben. */
     private void viertel(Kachel k, int[] argb) {
         int[] ziel = aendere(k.eltern());
-        int[] klein = Pyramide.halbiere(argb, seite);
+        int[] klein = Pyramide.halbiere(argb, seite, maxZoom - k.eltern().z());
         int halb = seite / 2, ox = (k.x() & 1) * halb, oy = (k.y() & 1) * halb;
         for (int y = 0; y < halb; y++) {
             System.arraycopy(klein, y * halb, ziel, (oy + y) * seite + ox, halb);

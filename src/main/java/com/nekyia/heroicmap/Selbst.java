@@ -49,6 +49,9 @@ public final class Selbst {
     static final long PAUSE_MS = 5000;
     /** So oft schreibt der Worker geänderte Kacheln der zwei feinsten Stufen, und so oft die gröberen. */
     static final long SCHREIBEN_MS = 5000, GROB_MS = 60_000;
+    /** So oft ein Schritt des Neubaus der gröberen Stufen eines alten Satzes, und so viele Kacheln der feinsten je Schritt. */
+    static final long NEUBAU_MS = 250;
+    static final int NEUBAU_KACHELN = 16;
     /** Die Datei, die einen Baum als selbst gezeichnet ausweist. */
     static final String MARKE = "selbst.txt";
     /** So viele Chunks hat der Worker höchstens vor sich. */
@@ -83,6 +86,7 @@ public final class Selbst {
 
     private Selbst() {
         worker.scheduleWithFixedDelay(() -> schreibe(false), SCHREIBEN_MS, SCHREIBEN_MS, TimeUnit.MILLISECONDS);
+        worker.scheduleWithFixedDelay(this::baueNeu, NEUBAU_MS, NEUBAU_MS, TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -125,6 +129,7 @@ public final class Selbst {
         karte.addProperty("minZoom", MIN_ZOOM);
         karte.addProperty("maxZoom", MAX_ZOOM);
         karte.addProperty("scale", SCALE);
+        karte.addProperty(Kachelwerk.DOWNSCALE, Kachelwerk.NEAREST);
         Files.writeString(ordner.resolve("map.json"), karte.toString(), StandardCharsets.UTF_8);
         Files.writeString(baum.resolve(MARKE), "Heroic Map: selbst gezeichnet, " + dimension + "\n", StandardCharsets.UTF_8);
         Satz.schreibe(baum, "Selbst", dimension, massstab);
@@ -339,7 +344,6 @@ public final class Selbst {
         if (werk == null) {
             return;
         }
-        Path ordner = werk.ordner();
         List<Kachelwerk.Kachel> fertig = new ArrayList<>();
         long jetzt = System.currentTimeMillis();
         boolean grob = alles || jetzt - grobGeschrieben >= GROB_MS;
@@ -354,9 +358,36 @@ public final class Selbst {
                 gibAuf();
             }
         } finally {
-            if (!fertig.isEmpty()) {
-                Minecraft.getInstance().execute(() -> fertig.forEach(k -> Kacheln.geaendert(ordner, k.z(), k.x(), k.y())));
+            gemeldet(fertig);
+        }
+    }
+
+    /**
+     * Im Worker, alle {@link #NEUBAU_MS}: ein Schritt des Neubaus der gröberen Stufen eines alten Satzes, nur wenn
+     * kein Chunk wartet; das Zeichnen geht vor. Siehe docs/selbst.md, „Pyramide“.
+     */
+    private void baueNeu() {
+        if (werk == null || aufgegeben || inArbeit.get() > 0 || !werk.neubauOffen()) {
+            return;
+        }
+        List<Kachelwerk.Kachel> fertig = new ArrayList<>();
+        try {
+            werk.baueNeu(NEUBAU_KACHELN, fertig);
+        } catch (IOException | RuntimeException e) {
+            melde(e);
+            if (werk.aufgegeben()) {
+                gibAuf();
             }
+        } finally {
+            gemeldet(fertig);
+        }
+    }
+
+    /** Der offenen Karte melden, was geschrieben ist; sie lädt es neu. */
+    private void gemeldet(List<Kachelwerk.Kachel> fertig) {
+        if (!fertig.isEmpty()) {
+            Path ordner = werk.ordner();
+            Minecraft.getInstance().execute(() -> fertig.forEach(k -> Kacheln.geaendert(ordner, k.z(), k.x(), k.y())));
         }
     }
 
