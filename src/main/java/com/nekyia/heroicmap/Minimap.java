@@ -174,8 +174,12 @@ public final class Minimap {
     /** Der Rahmen, ein Name aus {@link Skin#NAMEN}; „ohne“ ist der Umriss. Siehe docs/rahmen.md. */
     private String skin = Skin.BIOM;
     private boolean skinGewaehlt;
-    /** Die Marken N, O, S, W des Rahmens; aus nur Bänder oder Ring. Siehe docs/rahmen.md, „Verzierungen“. */
-    private boolean verzierungen = true;
+    /** Die Marken N, O, S, W des Rahmens, die durchsichtig sind: Bit i für Richtung i, 0 N bis 3 W. Siehe docs/rahmen.md, „Verzierungen“. */
+    private int verzierungenAus;
+    /** Alle vier Marken. */
+    static final int ALLE_MARKEN = 0b1111;
+    /** Die Gruppe „Technik“ im Untermenü ist aufgeklappt. Siehe docs/minimap.md, „Bedienung“. */
+    private boolean technikOffen;
     private Biom biom = new Biom();
     /** Solange das Menü offen ist: die Ecke des Griffs, 0 bis 3, sonst -1; und ob die Maus auf ihm liegt. */
     private int griffEcke = -1;
@@ -186,6 +190,7 @@ public final class Minimap {
     private float spielerX, spielerY, spielerHalb = -1;
     private List<Ornament> menueMarken = List.of();
     private Skin menueSkin;
+    /** Im Menü: alle Marken halb, denn der Rahmen ist „ohne“; sonst nur die durchsichtigen. */
     private boolean menueHalb;
     /** Die Form der Karte ({@link #schnitt(Rahmen, int, Skin)}) und wofür. */
     private float[] schnitt;
@@ -442,12 +447,32 @@ public final class Minimap {
         skinGewaehlt = true;
     }
 
+    /** Sind alle vier Marken zu sehen? */
     boolean verzierungen() {
-        return verzierungen;
+        return verzierungenAus == 0;
     }
 
-    void setzeVerzierungen(boolean verzierungen) {
-        this.verzierungen = verzierungen;
+    /** Alle vier Marken an oder durchsichtig. */
+    void setzeVerzierungen(boolean an) {
+        verzierungenAus = an ? 0 : ALLE_MARKEN;
+    }
+
+    /** Ist die Marke in Richtung {@code marke} (0 N bis 3 W) durchsichtig? */
+    boolean verzierungAus(int marke) {
+        return (verzierungenAus & 1 << marke) != 0;
+    }
+
+    /** Ein Rechtsklick im Menü: die Marke durchsichtig oder zurück. Siehe docs/rahmen.md, „Verzierungen“. */
+    void schalteVerzierung(int marke) {
+        verzierungenAus ^= 1 << marke;
+    }
+
+    boolean technikOffen() {
+        return technikOffen;
+    }
+
+    void setzeTechnikOffen(boolean offen) {
+        technikOffen = offen;
     }
 
     /** Der Skin, den die Minimap gerade zeichnet, bei „biom“ der der gezeigten Kategorie; null ohne Rahmen. */
@@ -486,14 +511,17 @@ public final class Minimap {
     }
 
     /**
-     * Vom Menü über allem: Zeigt der Rahmen keine Marken, Verzierungen aus oder „ohne“, die Marken halb deckend, bei
-     * „ohne“ die von „grau“ auf dem Umriss; die unter der Maus ganz und aktiv. Siehe docs/rahmen.md, „Im Menü“.
+     * Vom Menü über allem: die durchsichtigen Marken halb deckend, bei „ohne“ alle, die von „grau“ auf dem Umriss; die
+     * unter der Maus ganz und aktiv. So trifft ein Rechtsklick sie zum Zurückholen. Siehe docs/rahmen.md, „Im Menü“.
      */
     void geister(GuiGraphicsExtractor g) {
-        if (!menueHalb || menueSkin == null) {
+        if (menueSkin == null) {
             return;
         }
         for (int j = 0; j < menueMarken.size(); j++) {
+            if (!menueHalb && !verzierungAus(MARKEN[j])) {
+                continue;
+            }
             Ornament o = menueMarken.get(j);
             boolean an = MARKEN[j] == hervor;
             menueSkin.ornament(g, o.teil() + (an ? 1 : 0), o.ecke(), o.x(), o.y(), an ? 1 : 0.5f, o.winkel());
@@ -652,7 +680,10 @@ public final class Minimap {
         String rahmen = String.valueOf(rahmenWahl != null ? rahmenWahl : p.getProperty("rahmen")).trim();
         skinGewaehlt = Skin.NAMEN.contains(rahmen) && (rahmenWahl != null || !Skin.OHNE.equals(rahmen));
         skin = skinGewaehlt ? rahmen : Skin.BIOM;
-        verzierungen = !"false".equals(p.getProperty("verzierungen"));
+        // Vor mod#175 galt ein Schalter für alle vier; aus heisst alle vier durchsichtig, so springt nichts.
+        String aus = p.getProperty("verzierungen_aus");
+        verzierungenAus = aus != null ? marken(aus) : "false".equals(p.getProperty("verzierungen")) ? ALLE_MARKEN : 0;
+        technikOffen = "auf".equals(p.getProperty("technik"));
         ablage = switch (String.valueOf(p.getProperty("ablage")).trim()) {
             case "hash" -> Downloads.Ablage.HASH;
             case "ip_port" -> Downloads.Ablage.IP_PORT;
@@ -688,7 +719,8 @@ public final class Minimap {
         if (skinGewaehlt) {
             p.setProperty("rahmen_wahl", skin);
         }
-        p.setProperty("verzierungen", Boolean.toString(verzierungen));
+        p.setProperty("verzierungen_aus", marken(verzierungenAus));
+        p.setProperty("technik", technikOffen ? "auf" : "zu");
         p.setProperty("ablage", ablage.name().toLowerCase(Locale.ROOT));
         if (Float.isNaN(anteil)) {
             p.setProperty("groesse", Integer.toString(groesse));
@@ -919,11 +951,11 @@ public final class Minimap {
             spielerX = sx;
             spielerY = sy;
             spielerHalb = kopf / 2 + 2;
-            menueHalb = rahmen == null || !verzierungen;
+            menueHalb = rahmen == null;
             menueSkin = rahmen != null ? rahmen : Skin.von("grau");
             if (menueSkin != null) {
                 menueMarken = ornamente(rahmen != null ? r : new Rahmen(r.x() - 2, r.y() - 2, r.seite() + 4),
-                        rahmen != null ? rahmen.baender() : 1, rund, menueSkin.nachAussen, lage, k, true, -1, false, KEIN_ZIEL);
+                        rahmen != null ? rahmen.baender() : 1, rund, menueSkin.nachAussen, lage, k, 0, -1, false, KEIN_ZIEL);
             }
         }
         Object[] werte = werte(koordinaten, spieler.getX(), spieler.getY(), spieler.getZ());
@@ -958,6 +990,26 @@ public final class Minimap {
             case AUS -> null;
             case MITTE -> new Rahmen((breite - r.seite()) / 2, r.y(), r.seite());
         };
+    }
+
+    /** Die durchsichtigen Marken als Text, etwa „N,S“, und zurück; unbekannte Zeichen zählen nicht. */
+    static String marken(int bits) {
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < 4; i++) {
+            if ((bits & 1 << i) != 0) {
+                text.append(text.isEmpty() ? "" : ",").append("NOSW".charAt(i));
+            }
+        }
+        return text.toString();
+    }
+
+    static int marken(String text) {
+        int bits = 0;
+        for (String teil : text.split(",")) {
+            int i = teil.trim().length() == 1 ? "NOSW".indexOf(teil.trim().charAt(0)) : -1;
+            bits |= i >= 0 ? 1 << i : 0;
+        }
+        return bits;
     }
 
     /** Die Zahlen unter der Minimap, die Blockkoordinaten des Spielers: keine, x und z, oder x, y und z. */
@@ -1374,7 +1426,7 @@ public final class Minimap {
         } else {
             skin.baender(g, r.x(), r.y(), r.seite(), r.seite(), baender);
         }
-        for (Ornament o : ornamente(r, skin.baender(), rund, skin.nachAussen, lage, k, verzierungen, griffEcke, griffAktiv, hervor)) {
+        for (Ornament o : ornamente(r, skin.baender(), rund, skin.nachAussen, lage, k, verzierungenAus, griffEcke, griffAktiv, hervor)) {
             skin.ornament(g, o.teil(), o.ecke(), o.x(), o.y(), deckung, o.winkel());
         }
     }
@@ -1384,18 +1436,18 @@ public final class Minimap {
     }
 
     /**
-     * Was der Rahmen über den Bändern zeichnet, in dieser Reihenfolge: mit {@code marken} die Marken
-     * O, S, W, N auf der Mitte der Bänder, ungedreht fest rechts, unten, links und oben, gedreht starr
+     * Was der Rahmen über den Bändern zeichnet, in dieser Reihenfolge: die Marken O, S, W, N ausser denen in
+     * {@code ohne} (Bit i für Richtung i) auf der Mitte der Bänder, ungedreht fest rechts, unten, links und oben, gedreht starr
      * mit der Karte, die Marke {@code hervor} (0 bis 3, N, O, S, W) aktiv; im Menü zuletzt der Griff an seiner
      * Ecke, nie gedreht. In den Ecken sonst nichts. Mit {@code aussen} zeigt jedes Bild von der Mitte weg:
      * O, S und W nehmen {@code marke}, um eine, zwei und drei Vierteldrehungen weiter. Siehe docs/rahmen.md, „Marken“.
      */
-    static List<Ornament> ornamente(Rahmen r, int baender, boolean rund, boolean aussen, Drehung.Lage lage, int k, boolean marken,
+    static List<Ornament> ornamente(Rahmen r, int baender, boolean rund, boolean aussen, Drehung.Lage lage, int k, int ohne,
             int griffEcke, boolean griffAktiv, int hervor) {
         List<Ornament> aus = new ArrayList<>(5);
-        if (marken) {
-            double winkel = lage == null ? 0 : lage.winkel();
-            for (int i : MARKEN) {
+        double winkel = lage == null ? 0 : lage.winkel();
+        for (int i : MARKEN) {
+            if ((ohne & 1 << i) == 0) {
                 double[] p = lage == null ? Skin.marke(r.x(), r.y(), r.seite(), baender, rund, RICHTUNGEN[i][0], RICHTUNGEN[i][1])
                         : verzierung(r, baender, rund, lage, RICHTUNGEN[i], k);
                 int teil = aussen && i != 0 ? Skin.MARKE : Skin.MARKE_JE_RICHTUNG[i];

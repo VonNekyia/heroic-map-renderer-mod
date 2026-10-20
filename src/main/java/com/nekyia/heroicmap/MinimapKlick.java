@@ -25,11 +25,18 @@ final class MinimapKlick {
     private static final int TOOLTIP = 170;
 
     private int ziel = Minimap.KEIN_ZIEL;
+    /** Rechts gedrückt: Das Ziel ist eine Marke, die durchsichtig wird oder zurückkommt. */
+    private boolean rechts;
     private double x, y;
 
-    /** Drücken: Mit der linken Taste auf einem Ziel merkt es sich das Ziel; true, wenn eins getroffen ist. */
+    /**
+     * Drücken: Mit der linken Taste auf einem Ziel, mit der rechten auf einer Marke merkt es sich das Ziel; true, wenn
+     * eins getroffen ist. Siehe docs/rahmen.md, „Verzierungen“.
+     */
     boolean druecke(MouseButtonEvent e) {
-        ziel = e.button() == InputConstants.MOUSE_BUTTON_LEFT ? Minimap.INSTANZ.ziel(e.x(), e.y()) : Minimap.KEIN_ZIEL;
+        int z = Minimap.INSTANZ.ziel(e.x(), e.y());
+        rechts = e.button() == InputConstants.MOUSE_BUTTON_RIGHT;
+        ziel = e.button() == InputConstants.MOUSE_BUTTON_LEFT || rechts && z != Minimap.SPIELER ? z : Minimap.KEIN_ZIEL;
         x = e.x();
         y = e.y();
         return ziel != Minimap.KEIN_ZIEL;
@@ -45,7 +52,11 @@ final class MinimapKlick {
         int z = ziel;
         ziel = Minimap.KEIN_ZIEL;
         if (z != Minimap.KEIN_ZIEL && !gezogen(e) && Minimap.INSTANZ.ziel(e.x(), e.y()) == z) {
-            schalte(z);
+            if (rechts) {
+                Minimap.INSTANZ.schalteVerzierung(z);
+            } else {
+                schalte(z);
+            }
         }
         return z != Minimap.KEIN_ZIEL;
     }
@@ -79,6 +90,10 @@ final class MinimapKlick {
                 : "heroicmap.rahmen." + m.skin());
         List<FormattedCharSequence> zeilen = new ArrayList<>(font.split(
                 Component.translatable(spieler ? "heroicmap.menue.klick.spieler" : "heroicmap.menue.klick.rahmen", jetzt), TOOLTIP));
+        if (!spieler) {
+            zeilen.addAll(font.split(Component.translatable(m.verzierungAus(z) ? "heroicmap.menue.rechtsklick.zeigen"
+                    : "heroicmap.menue.rechtsklick.durchsichtig"), TOOLTIP));
+        }
         zeilen.addAll(font.split(Component.translatable(spieler ? "heroicmap.menue.spieler.beschreibung"
                 : "heroicmap.rahmen." + m.skin() + ".beschreibung").withStyle(ChatFormatting.GRAY), TOOLTIP));
         g.setTooltipForNextFrame(zeilen, mausX, mausY);

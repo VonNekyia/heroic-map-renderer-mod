@@ -47,7 +47,7 @@ steht unter „Kosten“.
 
 `/hmap` öffnet das Menü (`Einstellungen`):
 
-![Das Menü über der Szene des Gametests, die Minimap rund mit den Koordinaten darunter, links daneben der senkrechte Regler „Zoom der Minimap“, unter den Koordinaten der Regler „Auflösung“; „Minimap“ ganz breit; im Einzelspieler ohne Plugin steht „Mitspieler“ rot](bilder/menue.png)
+![Das Menü über der Szene des Gametests, die Minimap rund mit den Koordinaten darunter, um sie das L: links oben der Nordpfeil, darunter der senkrechte Regler „Zoom der Minimap“, in der Ecke das Symbol der Form, unter den Koordinaten der Regler „Auflösung“ und rechts das Raster; „Minimap“ ganz breit; im Einzelspieler ohne Plugin steht „Mitspieler“ rot](bilder/menue.png)
 
 | Einstellung | Vorgabe | tut |
 |---|---|---|
@@ -55,28 +55,36 @@ steht unter „Kosten“.
 | Zoom der Minimap | 2× | 1/32, 1/16, 1/8, 1/4, 1/2, 1, 2, 4 oder 8 Einheiten des GUI je Block: wie viel Gegend die Minimap zeigt; im Menü ein senkrechter Regler neben der Minimap mit einer Raste je Stufe, siehe unten; ab 1/4 aus den Kacheln, siehe „Weit heraus“ |
 | Auflösung | 2 px | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet; im Menü ein Regler unter der Minimap, siehe unten |
 | Koordinaten | xz | aus, `x z` oder `x y z` des Spielers unter der Minimap; im Menü ein Klick auf die Zeile, siehe „Koordinaten“ |
+| Form | eckig | eckig oder rund; im Menü das Symbol ◻/◯ in der Ecke des L, siehe „Symbole an der Minimap“ und „Form“ |
+| Drehen | an | die Minimap dreht mit der Blickrichtung; im Menü der Nordpfeil, siehe „Symbole an der Minimap“ und „Drehen“ |
+| Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte; im Menü das Raster, siehe „Symbole an der Minimap“ und „Chunklinien“ |
+| Verzierungen | alle an | jede Marke N, O, S, W des Rahmens für sich; im Menü ein Rechtsklick auf die Marke, siehe [Rahmen](rahmen.md), „Verzierungen“ |
 | Mitspieler | Simple Voice Chat | siehe „Mitspieler“ |
 | Knopf „Karte laden …“ | – | die Karten des Servers, wie in der [Vollbildkarte](vollbildkarte.md), „Bedienung“ |
 | Knopf „Kartenliste …“ | – | alle Karten auf der Platte mit Grösse und Summe in GB, mit Löschen, siehe [Download](download.md), „Kartenliste“ |
 | Knopf „Einstellungen …“ | – | das Untermenü für Vorlieben der Anzeige (`Anzeige`), siehe unten |
 
 Das Untermenü „Einstellungen …“ hält, was man selten ändert; das Hauptmenü
-bleibt so kurz. „Fertig“ führt zurück ins Menü:
+bleibt so kurz. Es ordnet in Gruppen mit hellgelber Überschrift, so hat es
+der User am 20.10. gewählt (mod#175): „Wegpunkte“, „In der Welt“ und
+„Technik“. „Technik“ ist ein Knopf über die ganze Breite, „▸ Technik“, der
+die Gruppe auf- und zuklappt; Vorgabe zu, gemerkt als `technik=auf` oder
+`zu` in `heroicmap.properties` (`Minimap.technikOffen`). Was die Minimap
+selbst angeht, stellt das Hauptmenü an ihr ein; eine Gruppe „Minimap“
+bliebe leer und fällt weg, so hat es der Reviewer entschieden. „Ebenen …“
+und „Fertig“ stehen unten ohne Überschrift. „Fertig“ führt zurück ins
+Menü:
 
-![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien, halben Marken auf dem Ring und den Koordinaten darunter; „Form“ neben „Bei F3“, „Chunklinien“ neben „Drehen“, „Verzierungen“ neben dem Regler „Todespunkte“, „Effekte in der Welt“ neben dem Regler „Schleier“, darunter „Ablage der Karten“ und „Neue Version melden“, unten „Ebenen …“ neben „Fertig“](bilder/anzeige.png)
+![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien und den Koordinaten darunter; unter „Wegpunkte“ der Regler „Todespunkte“, unter „In der Welt“ „Effekte in der Welt“ neben dem Regler „Schleier“, darunter der zugeklappte Knopf „Technik“, unten „Ebenen …“ neben „Fertig“](bilder/anzeige.png)
 
 | Einstellung | Vorgabe | tut |
 |---|---|---|
-| Form | eckig | eckig oder rund, siehe „Form“ |
-| Bei F3 | bleibt | was die Minimap tut, solange der Debug-Bildschirm offen ist: bleibt, weg oder waagrecht in die Mitte, siehe „Bei F3“ |
-| Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte, siehe „Chunklinien“ |
-| Drehen | an | die Minimap dreht mit der Blickrichtung, siehe „Drehen“ |
-| Verzierungen | an | die Marken N, O, S, W des Rahmens, aus nur Bänder oder Ring, siehe [Rahmen](rahmen.md), „Verzierungen“ |
-| Effekte in der Welt | an | der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen, siehe [Wegpunkte](wegpunkte.md), „Strahl“ und „Schleier“ |
+| Todespunkte, Gruppe „Wegpunkte“ | 1 | Regler aus, 1 bis 16, ganz breit: so viele Wegpunkte, wo der Spieler gestorben ist, der neueste angeheftet, siehe [Wegpunkte](wegpunkte.md), „Todespunkt“ |
+| Effekte in der Welt, Gruppe „In der Welt“ | an | der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen, siehe [Wegpunkte](wegpunkte.md), „Strahl“ und „Schleier“ |
 | Schleier | 4 Blöcke | Regler neben „Effekte in der Welt“: wie hoch und deckend der Schleier eigener Regionen steht, 4 bis 16 Blöcke, siehe [Wegpunkte](wegpunkte.md), „Schleier“ |
-| Todespunkte | 1 | Regler aus, 1 bis 16: so viele Wegpunkte, wo der Spieler gestorben ist, der neueste angeheftet, siehe [Wegpunkte](wegpunkte.md), „Todespunkt“ |
-| Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
-| Neue Version melden | an | fragt beim Start Modrinth nach einer neueren Version des Mods; der Tooltip sagt, dass Modrinth dabei die IP sieht; siehe [Vollbildkarte](vollbildkarte.md), „Neue Version“ |
+| Bei F3, Gruppe „Technik“ | bleibt | was die Minimap tut, solange der Debug-Bildschirm offen ist: bleibt, weg oder waagrecht in die Mitte, siehe „Bei F3“ |
+| Ablage der Karten, Gruppe „Technik“ | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
+| Neue Version melden, Gruppe „Technik“ | an | fragt beim Start Modrinth nach einer neueren Version des Mods; der Tooltip sagt, dass Modrinth dabei die IP sieht; siehe [Vollbildkarte](vollbildkarte.md), „Neue Version“ |
 | Knopf „Ebenen …“ | – | je Ebene vom Server an oder aus, siehe [Ebenen](ebenen.md), „Umschalten“ |
 
 Den eigenen Spieler und den Rahmen stellt ein Klick auf die Minimap ein,
@@ -132,22 +140,19 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
   stehen. Im Hauptmenü steht „Minimap“ allein in der ersten Zeile, ganz
   breit; dann teilen sich je zwei eine Zeile: „Karte laden …“ und
   „Kartenliste …“, „Einstellungen …“ und „Fertig“; im Untermenü
-  „Form“ und „Bei F3“, „Chunklinien“ und „Drehen“, „Verzierungen“ und der
-  Regler „Todespunkte“, „Effekte in der Welt“ und der Regler „Schleier“,
-  „Ebenen …“ und „Fertig“. „Auflösung“ und „Koordinaten“ stehen seit
-  mod#173 nicht mehr dort, sondern an der Minimap im Hauptmenü. Bei
-  GUI-Massstab 3 passt „Todespunkte“ mit dem breitesten Wert, 16, ganz in
-  seinen halben Knopf, 98 Einheiten breit; das prüft
-  der Gametest `Bedienung.kleinerSchirm`. „Ablage der Karten“ bleibt ganz
-  breit, halb passte sie in keiner Sprache; darunter ebenso „Neue Version
-  melden“. Bei GUI-Massstab 4 sind die
+  „Effekte in der Welt“ und der Regler „Schleier“, „Ebenen …“ und „Fertig“.
+  Ganz breit stehen dort der Regler „Todespunkte“, der Knopf „Technik“ und
+  in ihr „Bei F3“, „Ablage der Karten“ und „Neue Version melden“; „Ablage“
+  passte halb in keiner Sprache. „Auflösung“ und „Koordinaten“ (mod#173),
+  „Form“, „Drehen“, „Chunklinien“ und „Verzierungen“ (mod#175) stehen nicht
+  mehr dort, sondern an der Minimap im Hauptmenü. Bei GUI-Massstab 4 sind die
   halben Knöpfe rund 83 Einheiten breit; längere Texte lässt das Spiel
   dort laufen, auch bei den übrigen halben Knöpfen. So passen Menü und
   Untermenü auch bei grossem GUI-Massstab auf den Schirm, bis 240
   Einheiten Höhe, etwa 1280 × 720 bei GUI-Massstab 3. Das Untermenü
   beginnt dafür höchstens 74 Einheiten über der Mitte und mindestens 30
-  unter dem oberen Rand; bei 240 Einheiten endet „Fertig“ bei 214
-  (`Anzeige.oben`).
+  unter dem oberen Rand; bei 240 Einheiten endet „Fertig“ bei 166, mit
+  aufgeklappter „Technik“ bei 238 (`Anzeige.oben`).
 - **Koordinaten:** Im Menü stehen über der Minimap `x` und `z` des Blocks
   unter der Maus fest unten links, wie auf der Karte im Browser, genau wie
   gezeichnet; nicht beim Ziehen. Zum Umschauen dient die
@@ -173,7 +178,8 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
   Hauptmenü senkrecht neben der Minimap, so hat es der User gewünscht
   (mod#173, Plan vom Reviewer freigegeben am 20.10.):
   - **Aussehen:** wie die Regler der Spieleinstellungen, mit ihren Sprites,
-    nur quer; 20 Einheiten breit, so hoch wie die Minimap. Eine Raste je
+    nur quer; 20 Einheiten breit, so hoch wie die Minimap ohne den
+    Nordpfeil, siehe „Symbole an der Minimap“. Eine Raste je
     Stufe, oben die nächste; dazwischen gibt es keinen Zoom. Den Wert zeigt
     der Tooltip beim Schweben und Ziehen, etwa „Zoom der Minimap: 1/4×“;
     Brüche stehen als Bruch, „1/32×“ bis „1/2×“ (`Minimap.fach`), so
@@ -195,7 +201,7 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
   Hauptmenü waagrecht unter der Minimap, so hat es der User gewünscht
   (mod#173, Plan vom Reviewer freigegeben am 20.10.):
   - **Aussehen:** ein Regler des Spiels, 20 Einheiten hoch, so breit wie
-    die Minimap; eine Raste je Stufe, 1, 2, 4, 8 und 16 px. Er zeigt kurz
+    die Minimap ohne das Raster, siehe „Symbole an der Minimap“; eine Raste je Stufe, 1, 2, 4, 8 und 16 px. Er zeigt kurz
     „2 px“, so passt er auch unter die kleinste Minimap; den vollen Namen
     und was er tut, nennt der Tooltip.
   - **Bedienung:** Klick oder Ziehen stellt die nächste Raste, die
@@ -224,6 +230,52 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
   Karte nach unten; der Pfeil kreist deshalb um Gier + 180° gedreht um den
   Kopf. So hat es der User gewünscht.
 - **Wo ein Block liegt,** sagt die [Projektion](projektion.md).
+
+## Symbole an der Minimap
+
+Im Hauptmenü bilden die Bedienelemente an der Minimap ein L, so hat es der
+User am 20.10. gewählt (mod#175, Plan mit Bildern vom Reviewer freigegeben):
+
+- **Spalte:** der Regler „Zoom“ neben der Minimap, siehe „Bedienung“, an
+  seinem Ende fern der Reihe der Nordpfeil.
+- **Ecke** zwischen Spalte und Reihe: das Symbol der Form.
+- **Reihe:** der Regler „Auflösung“ hinter der Zeile der Koordinaten, an
+  seinem Ende fern der Spalte das Raster.
+
+Jedes Symbol ist ein Knopf des Spiels, 20 × 20 Einheiten
+(`Einstellungen.Symbol`), darin ein Sprite von 16 × 16 aus
+`textures/gui/sprites/menue/`, eigene Pixelkunst, weiss, vom Spiel gefärbt.
+Der Tooltip nennt Name, Zustand und den nächsten: „Drehen: An – Klick: Aus“.
+
+- **Form:** ◻ eckig, ◯ rund, wie jetzt; ein Klick wechselt.
+- **Nordpfeil:** ein Pfeil mit N. Genordet zeigt er fest nach oben; drehend
+  dreht er sich mit der Blickrichtung, wie die Marken des Rahmens auf der
+  gedrehten Karte (`Drehung.winkel`), auch im Menü, wo die Karte selbst
+  genordet steht. Ein Klick wechselt.
+- **Raster:** hell, wenn die Chunklinien an sind, dunkel, wenn aus; ein
+  Klick schaltet.
+
+**Lage** (`Einstellungen.lLage`): Das L erbt die Regeln von Zoom und
+Auflösung, siehe „Bedienung“. Steht ein Regler daneben, steht das L dort;
+liegt er im Rückfall innen, rückt der andere Schenkel um die Ecke weiter.
+So steht es bei GUI-Massstab 1 bis 4 in jeder Ecke ganz auf dem Schirm,
+nichts übereinander und nicht auf der Zeile der Koordinaten; das prüfen
+`EinstellungenTest.lUmDieMinimapBeiJedemMassstab` und der Gametest
+`Bedienung.symbole`. Zoom und Auflösung werden dafür um ein Symbol samt 2
+Einheiten Abstand kürzer; bei der kleinsten Minimap bleiben 42 Einheiten
+für die 9 Rasten des Zooms.
+
+**Der Nordpfeil sitzt in der Spalte, nicht über der Mitte der Minimap.**
+Das weicht vom Wortlaut des Wunsches ab, „oben an der Minimap“; der
+Reviewer hat es so freigegeben. Gründe:
+
+- Über der Mitte liegt schon die Marke N des Rahmens. Ein Linksklick dort
+  wechselt den Rahmen, ein Rechtsklick macht sie durchsichtig, siehe
+  [Rahmen](rahmen.md), „Verzierungen“. Ein Pfeil daneben wäre ein drittes
+  Ziel auf wenigen Einheiten.
+- Steht die Minimap oben am Schirm, ist über ihr kein Platz.
+- Steht die Minimap unten, liegt die Reihe über ihr und belegt die obere
+  Ecke; dann sitzt der Pfeil unten in der Spalte.
 
 ## Aussehen an der Minimap
 
@@ -261,7 +313,7 @@ hat es der User gewünscht (mod#105); das Menü wird kürzer.
 
 ## Chunklinien
 
-Mit dem Schalter im Untermenü „Einstellungen …“ zeichnen Minimap und
+Mit dem Raster an der Minimap im Menü, siehe „Symbole an der Minimap“, zeichnen Minimap und
 [Vollbildkarte](vollbildkarte.md) Linien auf den Grenzen der Chunks, je
 16 Blöcke; gespeichert als `chunklinien` in `heroicmap.properties`,
 Vorgabe aus. So hat es der User gewünscht. Auf der Minimap erst ab 1/2;
@@ -373,7 +425,7 @@ freigegeben.
 
 ## Drehen
 
-Mit dem Schalter „Drehen“ im Untermenü „Einstellungen …“ dreht die Minimap
+Mit dem Nordpfeil an der Minimap im Menü, siehe „Symbole an der Minimap“, dreht die Minimap
 mit der Blickrichtung: Was vor dem Spieler liegt, liegt oben. Nur die
 Minimap, die Vollbildkarte bleibt genordet. So hat es der User gewünscht,
 seit dem 10.10. als Vorgabe.
@@ -468,7 +520,7 @@ im Debug-Bildschirm des Spiels (`Mth.floor`). So hat es der User gewünscht.
 
 ## Bei F3
 
-Der Schalter „Bei F3“ im Untermenü „Einstellungen …“, neben „Form“, sagt,
+Der Schalter „Bei F3“ im Untermenü „Einstellungen …“, Gruppe „Technik“, sagt,
 was die Minimap tut, solange der Debug-Bildschirm des Spiels offen ist;
 dessen Text steht oben links und rechts. So hat es der User am 15.10.
 gewünscht.
