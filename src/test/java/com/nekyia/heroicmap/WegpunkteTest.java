@@ -450,7 +450,7 @@ class WegpunkteTest {
         Wegpunkte nachher = new Wegpunkte();
         nachher.lies(ordner);
         assertTrue(nachher.eigeneFormen().get(0).minecraft());
-        assertTrue(Wegpunkte.schrift(nachher.eigeneFormen().get(0), Wegpunkte.mitten(nachher.eigeneFormen().get(0))).minecraft());
+        assertTrue(Wegpunkte.schrift(nachher.eigeneFormen().get(0), Wegpunkte.kanten(nachher.eigeneFormen().get(0))).minecraft());
         // Stil, Anheften, Farbe und Ebene tragen sie mit.
         Wegpunkte.EigeneForm g = nachher.stil(nachher.eigeneFormen().get(0), 2, 30, 1);
         assertTrue(g.minecraft());
