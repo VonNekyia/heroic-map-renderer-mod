@@ -395,7 +395,7 @@ Reviewer in mod#155, Plan freigegeben am 19.10.; siehe
   `https://modrinth.com/mod/heroic-map/versions` (`NeueVersion.SEITE`);
   nichts aus der Antwort kommt in den Link. Kommt die Antwort, während die
   Karte offen ist, steht der Hinweis beim nächsten Öffnen da.
-- **Schalter** „Neue Version melden“ im Untermenü „Einstellungen …“,
+- **Schalter** „Neue Version melden“ im Untermenü „Einstellungen …“, Gruppe „Technik“,
   Vorgabe an, siehe [Minimap](minimap.md), „Bedienung“. Aus fragt der Mod
   nicht und zeigt keinen Hinweis. Wird er angeschaltet und hat der Mod in
   diesem Start noch nicht gefragt, fragt er gleich.

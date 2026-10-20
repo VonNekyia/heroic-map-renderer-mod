@@ -95,6 +95,7 @@ public final class Bedienung implements FabricClientGameTest {
             aussehen(context, maus, k);
             zoomNebenMinimap(context, maus, k);
             aufloesungUndKoordinaten(context, maus, k);
+            symbole(context, maus, k);
             context.runOnClient(mc -> mc.gui.setScreen(null));
             beiF3(context, maus);
             schleierRegler(context, maus, k);
@@ -4179,7 +4180,9 @@ public final class Bedienung implements FabricClientGameTest {
         try {
             Minimap.Rahmen r = rahmen(context);
             int[] z = zoomRegler(context);
-            if (z[0] + z[2] + rand != r.x() || z[1] != r.y() || z[3] != r.seite()) {
+            // Im L trägt die Spalte den Nordpfeil (mod#175), oben oder, liegt die Reihe über der Minimap, unten; der Zoom ist um ihn kürzer.
+            int pfeil = Einstellungen.SYMBOL + 2;
+            if (z[0] + z[2] + rand != r.x() || z[1] != r.y() + pfeil && z[1] != r.y() || z[3] != r.seite() - pfeil) {
                 throw new AssertionError("Regler „Zoom“ nicht links neben der Minimap " + r + ": " + Arrays.toString(z));
             }
 
@@ -4226,7 +4229,8 @@ public final class Bedienung implements FabricClientGameTest {
             int[] gehalten = zoomRegler(context);
             maus.releaseMouse(LINKS);
             context.waitTicks(2);
-            if (links.x() != rand || gehalten[0] != links.x() + links.seite() + rand || gehalten[1] != links.y()) {
+            if (links.x() != rand || gehalten[0] != links.x() + links.seite() + rand || gehalten[1] < links.y()
+                    || gehalten[1] >= links.y() + links.seite()) {
                 throw new AssertionError("Beim Ziehen an den linken Rand: Minimap " + links + ", Regler " + Arrays.toString(gehalten)
                         + " statt rechts daneben");
             }
@@ -4270,7 +4274,7 @@ public final class Bedienung implements FabricClientGameTest {
                             AbstractWidget w = zoomReglerWidget(mc);
                             boolean drauf = schneidet(w, m.x(), m.y(), m.seite(), m.seite());
                             boolean ganz = w.getX() >= 0 && w.getY() >= 0 && w.getX() + w.getWidth() <= b && w.getY() + w.getHeight() <= h;
-                            return ganz && !drauf && w.getHeight() == m.seite() ? null
+                            return ganz && !drauf && w.getHeight() >= 2 * Einstellungen.SYMBOL ? null
                                     : "Regler " + w.getX() + ", " + w.getY() + ", " + w.getWidth() + " × " + w.getHeight() + "; Minimap " + m
                                             + "; Schirm " + b + " × " + h;
                         });
@@ -4323,7 +4327,8 @@ public final class Bedienung implements FabricClientGameTest {
             Minimap.Rahmen r = rahmen(context);
             int[] kasten = context.computeOnClient(mc -> Minimap.INSTANZ.koordinatenKasten());
             int[] a = aufloesungRegler(context);
-            if (kasten == null || a[0] != r.x() || a[2] != r.seite() || a[1] != kasten[1] + kasten[3] + 2) {
+            // Im L trägt die Reihe rechts das Raster (mod#175); die Auflösung ist um es schmaler.
+            if (kasten == null || a[0] != r.x() || a[2] != r.seite() - Einstellungen.SYMBOL - 2 || a[1] != kasten[1] + kasten[3] + 2) {
                 throw new AssertionError("Regler „Auflösung“ nicht unter den Koordinaten " + Arrays.toString(kasten) + " bei " + r + ": "
                         + Arrays.toString(a));
             }
@@ -4451,6 +4456,227 @@ public final class Bedienung implements FabricClientGameTest {
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
+        }
+    }
+
+    /**
+     * Die Symbole im L um die Minimap und die Marken per Rechtsklick (mod#175), mit Klicks wie von Hand. Die Form sitzt in der
+     * Ecke zwischen Zoom und Auflösung; je ein Klick auf Form, Nordpfeil und Raster schaltet rund, drehen und Chunklinien und
+     * wieder zurück. Ein Rechtsklick auf N macht nur N durchsichtig, im Spiel fehlt sie im Bildschirmfoto; ein zweiter holt
+     * sie zurück. Rechts von N gezogen verschiebt nur, ein Linksklick wechselt weiter den Rahmen. Im Untermenü klappt
+     * „Technik“ auf und zu und bleibt so nach dem Schliessen. Bei GS 3 und 4 in jeder Ecke, klein und gross, steht das L
+     * ganz auf dem Schirm, nichts übereinander. Siehe docs/minimap.md, „Symbole an der Minimap“, und docs/rahmen.md,
+     * „Verzierungen“.
+     */
+    private static void symbole(ClientGameTestContext context, TestInput maus, int k) {
+        Path sicherung = FabricLoader.getInstance().getGameDir().resolve("heroicmap-symbole-test.properties");
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.schreibe(sicherung);
+            int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+            Minimap.INSTANZ.stelle(b, 0, Minimap.GROESSE, b, h);
+            Minimap.INSTANZ.setzeRund(false);
+            Minimap.INSTANZ.setzeDrehen(false);
+            Minimap.INSTANZ.setzeChunklinien(false);
+            Minimap.INSTANZ.setzeVerzierungen(true);
+            Minimap.INSTANZ.setzeSkin("holz");
+            Minimap.INSTANZ.setzeTechnikOffen(false);
+            mc.gui.setScreen(new Einstellungen());
+        });
+        context.waitTicks(3);
+        try {
+            // Die Form in der Ecke zwischen Zoom und Auflösung.
+            int[] form = symbol(context, Einstellungen.Symbol.FORM), zoom = zoomRegler(context), aufl = aufloesungRegler(context);
+            if (form[0] != zoom[0] || form[1] != aufl[1]) {
+                throw new AssertionError("Form nicht in der Ecke: " + Arrays.toString(form) + ", Zoom " + Arrays.toString(zoom) + ", Auflösung "
+                        + Arrays.toString(aufl));
+            }
+            // Je zwei Klicks: an und wieder aus.
+            for (Einstellungen.Symbol.Art art : new Einstellungen.Symbol.Art[] {Einstellungen.Symbol.FORM, Einstellungen.Symbol.NORD,
+                    Einstellungen.Symbol.RASTER}) {
+                for (boolean soll : new boolean[] {true, false}) {
+                    int[] s = symbol(context, art);
+                    spielerKlick(context, maus, k, s[0] + s[2] / 2.0, s[1] + s[3] / 2.0);
+                    boolean ist = context.computeOnClient(mc -> art == Einstellungen.Symbol.FORM ? Minimap.INSTANZ.rund()
+                            : art == Einstellungen.Symbol.NORD ? Minimap.INSTANZ.drehen() : Minimap.INSTANZ.chunklinien());
+                    if (ist != soll) {
+                        throw new AssertionError("Klick auf das Symbol " + context.computeOnClient(mc -> art.name().getString()) + ": " + ist + " statt " + soll);
+                    }
+                }
+            }
+
+            // Rechtsklick auf N: nur N durchsichtig; im Spiel fehlt sie.
+            Minimap.Rahmen r = rahmen(context);
+            double nx = r.x() + r.seite() / 2.0, ny = r.y() + baender(context) / 2.0;
+            BufferedImage da = imSpiel(context, "symbole-n-da");
+            rechtsZitternd(context, maus, k, nx, ny);
+            boolean[] aus = context.computeOnClient(mc -> new boolean[] {Minimap.INSTANZ.verzierungAus(0), Minimap.INSTANZ.verzierungAus(1),
+                    Minimap.INSTANZ.verzierungAus(2), Minimap.INSTANZ.verzierungAus(3)});
+            if (!aus[0] || aus[1] || aus[2] || aus[3]) {
+                throw new AssertionError("Rechtsklick auf N: durchsichtig " + Arrays.toString(aus) + " statt nur N");
+            }
+            BufferedImage weg = imSpiel(context, "symbole-n-weg");
+            int anders = 0;
+            // 16 × 16 Einheiten um N, soweit im Bild: Die Minimap steht oben am Schirm.
+            for (int y = Math.max(0, (int) ((ny - 8) * k)); y < Math.min(da.getHeight(), (ny + 8) * k); y++) {
+                for (int x = Math.max(0, (int) ((nx - 8) * k)); x < Math.min(da.getWidth(), (nx + 8) * k); x++) {
+                    anders += da.getRGB(x, y) != weg.getRGB(x, y) ? 1 : 0;
+                }
+            }
+            if (anders < 20) {
+                throw new AssertionError("Rechtsklick auf N: im Spiel nur " + anders + " Pixel bei N anders");
+            }
+            rechtsZitternd(context, maus, k, nx, ny);
+            if (!context.computeOnClient(mc -> Minimap.INSTANZ.verzierungen())) {
+                throw new AssertionError("Zweiter Rechtsklick auf N holte sie nicht zurück");
+            }
+            // Rechts von N gezogen: verschiebt nur.
+            ziehe(context, maus, RECHTS, nx, ny, -2 * k, 0);
+            Minimap.Rahmen gezogen = rahmen(context);
+            if (gezogen.x() >= r.x() || !context.computeOnClient(mc -> Minimap.INSTANZ.verzierungen())) {
+                throw new AssertionError("Rechts von N gezogen: " + r + " → " + gezogen + ", Marken alle da "
+                        + context.computeOnClient(mc -> Minimap.INSTANZ.verzierungen()));
+            }
+            // Ein Linksklick auf N wechselt weiter den Rahmen.
+            String skin = context.computeOnClient(mc -> Minimap.INSTANZ.skin());
+            Minimap.Rahmen g = rahmen(context);
+            spielerKlick(context, maus, k, g.x() + g.seite() / 2.0, g.y() + baender(context) / 2.0);
+            if (context.computeOnClient(mc -> Minimap.INSTANZ.skin()).equals(skin)) {
+                throw new AssertionError("Linksklick auf N wechselte den Rahmen nicht: " + skin);
+            }
+
+            // Technik im Untermenü: auf, nach dem Schliessen weiter auf, wieder zu.
+            for (boolean soll : new boolean[] {true, false}) {
+                context.runOnClient(mc -> mc.gui.setScreen(new Anzeige(null)));
+                context.waitTicks(2);
+                int[] technik = knopfMit(context, soll ? "▸" : "▾");
+                spielerKlick(context, maus, k, technik[0], technik[1]);
+                context.runOnClient(mc -> mc.gui.setScreen(null));
+                context.waitTicks(2);
+                String datei = Files.readString(HeroicMap.einstellungen());
+                context.runOnClient(mc -> mc.gui.setScreen(new Anzeige(null)));
+                context.waitTicks(2);
+                boolean beiF3 = context.computeOnClient(mc -> mc.gui.screen().children().stream().anyMatch(c -> c instanceof AbstractWidget w
+                        && w.getMessage().getString().startsWith(Component.translatable("heroicmap.menue.bei_f3").getString())));
+                if (beiF3 != soll || !datei.contains("technik=" + (soll ? "auf" : "zu"))) {
+                    throw new AssertionError("Technik " + (soll ? "auf" : "zu") + ": „Bei F3“ zu sehen " + beiF3 + ", Datei technik="
+                            + datei.lines().filter(z -> z.startsWith("technik=")).findFirst().orElse("fehlt"));
+                }
+            }
+            context.runOnClient(mc -> mc.gui.setScreen(new Einstellungen()));
+            context.waitTicks(3);
+
+            // Bei GS 3 und 4 auf dem kleinsten Schirm: das L in jeder Ecke ganz auf dem Schirm, nichts übereinander.
+            List<String> fehler = new ArrayList<>();
+            for (int gs = 3; gs <= 4; gs++) {
+                int gg = gs;
+                context.getInput().resizeWindow(1280, 240 * gs);
+                context.runOnClient(mc -> {
+                    mc.options.guiScale().set(gg);
+                    mc.resizeGui();
+                });
+                context.waitTicks(2);
+                for (int seite : new int[] {Minimap.KLEINSTE, Minimap.GROESSTE}) {
+                    for (int ecke = 0; ecke < 4; ecke++) {
+                        int e = ecke;
+                        context.runOnClient(mc -> {
+                            int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+                            Minimap.INSTANZ.stelle(e % 2 == 0 ? 0 : b, e < 2 ? 0 : h, seite, b, h);
+                        });
+                        context.waitTicks(3);
+                        String f = context.computeOnClient(mc -> {
+                            int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+                            List<AbstractWidget> l = new ArrayList<>();
+                            for (Object kind : mc.gui.screen().children()) {
+                                if (kind instanceof Einstellungen.Symbol || kind instanceof Einstellungen.ZoomRegler || kind instanceof Einstellungen.AufloesungRegler) {
+                                    l.add((AbstractWidget) kind);
+                                }
+                            }
+                            for (AbstractWidget w : l) {
+                                if (w.getX() < 0 || w.getY() < 0 || w.getX() + w.getWidth() > b || w.getY() + w.getHeight() > h) {
+                                    return w.getClass().getSimpleName() + " nicht ganz auf dem Schirm bei " + w.getX() + ", " + w.getY();
+                                }
+                                for (AbstractWidget v : l) {
+                                    if (v != w && schneidet(w, v.getX(), v.getY(), v.getWidth(), v.getHeight())) {
+                                        return w.getClass().getSimpleName() + " auf " + v.getClass().getSimpleName() + " bei " + w.getX() + ", " + w.getY();
+                                    }
+                                }
+                            }
+                            return l.size() == 5 ? null : l.size() + " statt 5 Teile im L";
+                        });
+                        if (f != null) {
+                            fehler.add("GS " + gg + ", Seite " + seite + ", Ecke " + e + ": " + f);
+                        }
+                    }
+                }
+            }
+            if (!fehler.isEmpty()) {
+                throw new AssertionError("Das L um die Minimap, " + fehler.size() + " Fälle: " + String.join(" | ", fehler));
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } finally {
+            context.getInput().resizeWindow(vorher[0], vorher[1]);
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(vorher[2]);
+                mc.resizeGui();
+                Minimap.INSTANZ.lies(sicherung);
+                mc.gui.setScreen(new Einstellungen());
+            });
+            context.waitTicks(2);
+            try {
+                Files.deleteIfExists(sicherung);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+    }
+
+    /** {x, y, Breite, Höhe} des Symbols {@code art} im offenen Menü. */
+    private static int[] symbol(ClientGameTestContext context, Einstellungen.Symbol.Art art) {
+        return context.computeOnClient(mc -> {
+            for (Object kind : mc.gui.screen().children()) {
+                if (kind instanceof Einstellungen.Symbol s && s.art() == art) {
+                    return new int[] {s.getX(), s.getY(), s.getWidth(), s.getHeight()};
+                }
+            }
+            throw new AssertionError("Kein Symbol " + art.name().getString() + " im Menü");
+        });
+    }
+
+    /** Die Mitte des Knopfs im offenen Schirm, dessen Text mit {@code anfang} beginnt. */
+    private static int[] knopfMit(ClientGameTestContext context, String anfang) {
+        return context.computeOnClient(mc -> {
+            for (Object kind : mc.gui.screen().children()) {
+                if (kind instanceof AbstractWidget w && w.getMessage().getString().startsWith(anfang)) {
+                    return new int[] {w.getX() + w.getWidth() / 2, w.getY() + w.getHeight() / 2};
+                }
+            }
+            throw new AssertionError("Kein Knopf „" + anfang + "…“");
+        });
+    }
+
+    /** Ein Rechtsklick wie {@link #spielerKlick}, mit Halten und Zittern wie von Hand. */
+    private static void rechtsZitternd(ClientGameTestContext context, TestInput maus, int k, double x, double y) {
+        warte250();
+        fahre(context, maus, k, x, y);
+        maus.holdMouse(RECHTS);
+        zittere(context, maus, x * k, y * k, 2);
+        maus.releaseMouse(RECHTS);
+        context.waitTicks(2);
+    }
+
+    /** Ein Bildschirmfoto im Spiel ohne Menü, danach wieder das Menü. */
+    private static BufferedImage imSpiel(ClientGameTestContext context, String name) {
+        context.runOnClient(mc -> mc.gui.setScreen(null));
+        context.waitTicks(3);
+        try {
+            BufferedImage bild = ImageIO.read(context.takeScreenshot(TestScreenshotOptions.of(name).disableCounterPrefix()).toFile());
+            context.runOnClient(mc -> mc.gui.setScreen(new Einstellungen()));
+            context.waitTicks(3);
+            return bild;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
@@ -4872,8 +5098,14 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Neue Version mit Schalter aus: " + anfragen.size() + " Fragen, Knopf " + knopf);
             }
             // Von Hand an im Untermenü; dann aus und wieder an, das fragt nicht noch einmal.
-            context.runOnClient(mc -> mc.gui.setScreen(new Anzeige(null)));
+            context.runOnClient(mc -> {
+                Minimap.INSTANZ.setzeTechnikOffen(false);
+                mc.gui.setScreen(new Anzeige(null));
+            });
             context.waitTicks(2);
+            // Der Schalter liegt in der Gruppe „Technik“ (mod#175); von Hand aufgeklappt.
+            int[] technik = knopfMit(context, "▸");
+            spielerKlick(context, maus, k, technik[0], technik[1]);
             int[] schalter = context.computeOnClient(mc -> {
                 String name = Component.translatable("heroicmap.menue.neue_version").getString();
                 AbstractWidget w = mc.gui.screen().children().stream().filter(c -> c instanceof CycleButton<?> b
