@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.gson.JsonParser;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -389,6 +391,38 @@ class WegpunkteTest {
         w.loesche(w.eigeneFormen().get(0));
         assertEquals(0, bund(w, 0, 0));
         felder(vorher, w.eigeneFormen().get(0));
+    }
+
+    /**
+     * Warum nicht verbinden (mod#169): je Grund der Schlüssel der Meldung, sonst null; kannVerbinden folgt ihm. Siehe
+     * docs/wegpunkte.md, „Verbinden“.
+     */
+    @Test
+    void warumNichtVerbinden() {
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        w.setzeForm(WELT, List.of(e(0, 0), e(10, 0)));
+        w.setzeForm(WELT, List.of(e(20, 0), e(30, 0)));
+        w.setzeForm("minecraft:the_nether", List.of(e(0, 0), e(5, 5)));
+        w.setzeForm(WELT, List.of(e(70, 70), e(80, 70)));
+        w.setzeForm(WELT, List.of(e(40, 40), e(45, 45)));
+        w.setze(WELT, 40, 40);
+        w.setze(WELT, 50, 50);
+        w.setzeTod(WELT, 60, 60, 1);
+        Wegpunkte.Glied p = Wegpunkte.Glied.von(w.punkte().get(0)), q = Wegpunkte.Glied.von(w.punkte().get(1));
+        assertNull(w.warumNicht(g(w, 0, 1), g(w, 1, 0)));
+        assertEquals("heroicmap.karte.verbinden_tod", w.warumNicht(g(w, 0, 0), Wegpunkte.Glied.von(w.tod())));
+        assertEquals("heroicmap.karte.verbinden_nicht", w.warumNicht(g(w, 0, 0), g(w, 2, 0)));
+        assertEquals("heroicmap.karte.verbinden_form", w.warumNicht(g(w, 0, 0), g(w, 0, 1)));
+        assertEquals("heroicmap.karte.verbinden_wegpunkte", w.warumNicht(p, q));
+        // Eine Ecke auf dem Block eines fremden Wegpunkts: Ohne Wegpunkt im Bund geht es.
+        assertNull(w.warumNicht(g(w, 0, 0), g(w, 4, 0)));
+        assertTrue(w.verbinde(g(w, 0, 1), g(w, 1, 0)));
+        assertEquals("heroicmap.karte.verbinden_nicht", w.warumNicht(g(w, 0, 1), g(w, 1, 0)));
+        // C0 im Bund mit q, dann auf Z0, auf dem p liegt: q träfe auf p, also „Dort liegt schon ein Wegpunkt“.
+        assertTrue(w.verbinde(g(w, 3, 0), Wegpunkte.Glied.von(w.punkte().get(1))));
+        assertEquals("heroicmap.karte.koordinaten_belegt", w.warumNicht(g(w, 3, 0), g(w, 4, 0)));
+        assertFalse(w.kannVerbinden(g(w, 0, 0), Wegpunkte.Glied.von(w.tod())));
     }
 
     private static void felder(Wegpunkte.EigeneForm soll, Wegpunkte.EigeneForm ist) {
@@ -1074,6 +1108,54 @@ class WegpunkteTest {
                 + "{\"dimension\":\"" + WELT + "\",\"x\":6,\"z\":6,\"minimap\":true}],"
                 + "\"tod\":{\"dimension\":\"" + WELT + "\",\"x\":6,\"z\":6,\"minimap\":true}}").getAsJsonObject());
         assertEquals(List.of(5, 6), beide.tode().stream().map(Wegpunkte.Punkt::x).toList());
+    }
+
+    /**
+     * Die Zeit unter dem Todespunkt (mod#166): am selben Tag nur die Uhrzeit, an einem früheren mit Datum, nach den Mustern der
+     * Sprache, auch über Mitternacht. In der Datei je Eintrag von tode als zeit, tod bleibt ohne; über den Neustart und das
+     * Anheften bleibt sie; die Folge kommt aus der Liste, nicht aus der Zeit; eine alte Datei ohne zeit gibt 0. Siehe
+     * docs/wegpunkte.md, „Todespunkt“.
+     */
+    @Test
+    void todesZeit(@TempDir Path ordner) throws Exception {
+        ZoneId zone = ZoneId.of("Europe/Berlin");
+        long jetzt = ZonedDateTime.of(2026, 10, 20, 14, 40, 0, 0, zone).toInstant().toEpochMilli();
+        long heute = ZonedDateTime.of(2026, 10, 20, 14, 32, 0, 0, zone).toInstant().toEpochMilli();
+        long frueher = ZonedDateTime.of(2026, 10, 18, 14, 32, 0, 0, zone).toInstant().toEpochMilli();
+        assertEquals("14:32", Wegpunkte.todZeit(heute, jetzt, zone, "HH:mm", "dd.MM. HH:mm"));
+        assertEquals("18.10. 14:32", Wegpunkte.todZeit(frueher, jetzt, zone, "HH:mm", "dd.MM. HH:mm"));
+        long spaet = ZonedDateTime.of(2026, 10, 19, 23, 59, 0, 0, zone).toInstant().toEpochMilli();
+        long frueh = ZonedDateTime.of(2026, 10, 20, 0, 1, 0, 0, zone).toInstant().toEpochMilli();
+        assertEquals("19.10. 23:59", Wegpunkte.todZeit(spaet, frueh, zone, "HH:mm", "dd.MM. HH:mm"));
+        // Ein Muster aus einem Ressourcenpaket, das nicht geht oder ein Feld nicht kennt, gibt das feste (Review von #172).
+        assertEquals("14:32", Wegpunkte.todZeit(heute, jetzt, zone, "HH:mm 'offen", "dd.MM. HH:mm"));
+        assertEquals("18.10. 14:32", Wegpunkte.todZeit(frueher, jetzt, zone, "HH:mm", "{dd}"));
+        assertEquals("18.10. 14:32", Wegpunkte.todZeit(frueher, jetzt, zone, "HH:mm", "dd.MM. bb"));
+        // In der Datei: zeit im Eintrag von tode, tod wie bisher ohne.
+        Wegpunkte w = new Wegpunkte();
+        w.lies(ordner);
+        w.setzeTod(WELT, 1, 1, 2, heute);
+        w.setzeTod(WELT, 2, 2, 2, frueher);
+        String json = Files.readString(ordner.resolve("wegpunkte.json"));
+        assertTrue(json.contains("\"x\":1,\"z\":1,\"minimap\":false,\"zeit\":" + heute + "}"), json);
+        assertTrue(json.contains("\"tod\":{\"dimension\":\"" + WELT + "\",\"x\":2,\"z\":2,\"minimap\":true}"), json);
+        Wegpunkte nachher = new Wegpunkte();
+        nachher.lies(ordner);
+        assertEquals(List.of(heute, frueher), nachher.tode().stream().map(Wegpunkte.Punkt::zeit).toList());
+        // Der zweite ist der neueste, obwohl seine Zeit früher ist: Die Folge kommt aus der Liste.
+        assertEquals(2, nachher.tod().x());
+        nachher.umschalten(nachher.tod());
+        assertEquals(frueher, nachher.tode().getLast().zeit());
+        // Eine alte Datei ohne zeit: unbekannt, also keine Schrift.
+        Wegpunkte alt = new Wegpunkte();
+        alt.lies(JsonParser.parseString("{\"tode\":[{\"dimension\":\"" + WELT + "\",\"x\":5,\"z\":5,\"minimap\":true}]}").getAsJsonObject());
+        assertEquals(0, alt.tod().zeit());
+        // Eine zeit, die keine ganze Zahl über 0 ist, ist unbekannt; der Todespunkt bleibt.
+        Wegpunkte kaputt = new Wegpunkte();
+        kaputt.lies(JsonParser.parseString("{\"tode\":[{\"dimension\":\"" + WELT + "\",\"x\":1,\"z\":1,\"minimap\":false,\"zeit\":\"gestern\"},"
+                + "{\"dimension\":\"" + WELT + "\",\"x\":2,\"z\":2,\"minimap\":false,\"zeit\":1.5},"
+                + "{\"dimension\":\"" + WELT + "\",\"x\":3,\"z\":3,\"minimap\":true,\"zeit\":-7}]}").getAsJsonObject());
+        assertEquals(List.of(0L, 0L, 0L), kaputt.tode().stream().map(Wegpunkte.Punkt::zeit).toList());
     }
 
     @Test

@@ -305,8 +305,8 @@ Reviewer freigegeben.
 - **Mehrere,** so viele, wie der Regler „Todespunkte“ sagt, 1 bis 16,
   gewünscht vom User am 19.10. (mod#151). Jeder Tod setzt einen neuen
   (`Wegpunkte.setzeTod`); sind es mehr, fallen die ältesten weg. Ihre
-  Folge ist die der Tode, der letzte der neueste; eine Zeit merkt sich der
-  Mod nicht, die Folge in der Liste reicht.
+  Folge ist die der Tode, der letzte der neueste. Sie kommt aus der Liste,
+  nicht aus der Zeit unter ihnen.
 - **Derselbe Block:** Stirbt der Spieler auf dem Block eines früheren
   Todespunkts, wird der der neueste. Liegt auf dem Block ein Wegpunkt, gibt
   es keinen; der Block ist schon markiert, und die übrigen bleiben.
@@ -325,6 +325,19 @@ Reviewer freigegeben.
   ein Nachstellen der Pixel zeigte (ein Pixel gilt, wenn seine Mitte im
   Viereck liegt). Eine Farbe aus der Liste nimmt er nicht; der nächste Wegpunkt
   bekommt sie, als gäbe es ihn nicht.
+- **Zeit des Todes** unter der Marke auf der Vollbildkarte, gewünscht vom
+  User am 20.10. (mod#166): im Stil der Namen von Nadeln (`Ebenen.name`),
+  am selben Tag nur die Uhrzeit, etwa „14:32“, an früheren Tagen mit
+  Datum, etwa „18.10. 14:32“ (`Wegpunkte.todZeit`, `Karte.todZeit`). Die
+  Muster kommen aus der Sprache des Spiels
+  (`heroicmap.karte.tod_zeit_heute`, `heroicmap.karte.tod_zeit`), die Zeit
+  aus der Uhr und der Zeitzone des Rechners. Ein Ressourcenpaket, auch vom
+  Server, kann die Muster überschreiben; eines, das nicht geht, gibt das
+  feste `HH:mm` bzw. `dd.MM. HH:mm`, gebaut einmal je Muster
+  (`Wegpunkte.format`, Review von #172). Nicht am Rand, wo die Marke
+  nur die Richtung zeigt, und nicht auf der Minimap; dort wäre sie zu
+  klein. Ein Todespunkt aus einer älteren Datei hat keine Zeit und also
+  keine Schrift.
 - **Im Chat** steht „Todespunkt gesetzt bei x z“, unterstrichen. Ein Klick
   darauf ruft `/hmap karte x z`, siehe [Download](download.md), „Befehle“;
   das Spiel schickt einen Klick im Chat über `sendUnattendedCommand`, und
@@ -342,7 +355,10 @@ Reviewer freigegeben.
   Liste `wegpunkte`, siehe „Ablage“. Dazu steht der neueste noch einmal als
   `tod`; so behält eine ältere Version, die nur `tod` kennt, ihren einen.
   Ohne `tode` liest der Mod `tod`, also eine alte Datei mit einem. Eine id
-  bekommt jeder beim Lesen wie ein Wegpunkt ohne.
+  bekommt jeder beim Lesen wie ein Wegpunkt ohne. Jeder Eintrag von `tode`
+  hat die Zeit des Todes als `zeit` in ms seit 1970 (`Wegpunkte.Punkt.zeit`);
+  `tod` bleibt, wie es war, ohne sie. Ist `zeit` keine ganze Zahl über 0, ist
+  sie unbekannt, und der Todespunkt bleibt (`Wegpunkte.zeit`).
 
 ## Menü je Objekt
 
@@ -380,9 +396,17 @@ Raute eines alten Rechtecks vor einer Ecke vor dem Griff einer Form.
 ## Einrasten
 
 Hält der Spieler beim Ziehen einer Ecke oder eines Wegpunkts `Strg`
-(auf dem Mac `⌘`, `Minecraft.hasControlDown`), rastet er auf ein nahes
-Ziel ein (`Karte.einrasten`), gewünscht vom User am 19.10. (mod#149): So
-schliessen Regionen sauber aneinander.
+(`Minecraft.hasControlDown`), rastet er auf ein nahes Ziel ein
+(`Karte.einrasten`), gewünscht vom User am 19.10. (mod#149): So schliessen
+Regionen sauber aneinander. Auch auf dem Mac ist es `Strg`, nicht `⌘`:
+`hasControlDown` prüft in 26.3 nur die Tasten 224 und 228, Strg links und
+rechts in den Scancodes von SDL, ohne Zweig für macOS (per javap). Mit
+`Alt` (auf dem Mac `⌥`, `Minecraft.hasAltDown`, die Tasten 226 und 230)
+rastet er ebenso ein und verbindet beim Loslassen, siehe „Verbinden“;
+`Strg` und `Alt` zugleich wie `Alt`, so verbindet auch `AltGr`, das unter
+Windows auf deutschen Tastaturen als `Strg`+`Alt` ankommt. Eine Belegung
+des Spiels liegt auf keiner der beiden Alt-Tasten (per javap,
+`Options`).
 
 - **Ziele:** die Ecken anderer eigener Formen und, für eine Ecke, die
   Wegpunkte, alle in Ebenen, die an sind, und in dieser Dimension.
@@ -403,8 +427,8 @@ schliessen Regionen sauber aneinander.
 - **Nicht** am Griff, wo die ganze Form hängt, nicht auf Objekte vom
   Server und nicht auf Glieder des eigenen Bunds, die ohnehin mitziehen,
   siehe „Verbinden“.
-- **Einrasten verbindet nicht:** Es legt nur auf denselben Block. Verbunden
-  wird von Hand, siehe „Verbinden“.
+- **Einrasten mit `Strg` verbindet nicht:** Es legt nur auf denselben
+  Block. Verbunden wird von Hand oder mit `Alt`, siehe „Verbinden“.
 
 ## Verbinden
 
@@ -419,14 +443,26 @@ ihm, D1 vom User bestätigt.
   lässt: Ecken verschiedener eigener Formen untereinander und eine Ecke mit
   einem Wegpunkt. Nicht zwei Wegpunkte, denn zwei liegen nie auf einem
   Block; keine Todespunkte; keine Objekte vom Server; keine Form zweimal in
-  einem Bund (`Wegpunkte.kannVerbinden`).
+  einem Bund; ein Wegpunkt im Bund nicht auf den Block eines anderen. Eine
+  Ecke darf auf dem Block eines fremden Wegpunkts liegen, das hinderte bis
+  0.2.61 auch das Verbinden zweier Ecken (mod#169). Den Grund nennt
+  `Wegpunkte.warumNicht`, als Meldung; `kannVerbinden` heisst: kein Grund.
 - **„Verbinden“** im Menü einer Ecke oder eines Wegpunkts nimmt den
   nächsten Punkt höchstens 8 Einheiten des GUI weg, gemessen an der Lage
   der Blöcke wie beim Einrasten, in Ebenen, die an sind (`Karte.verbindeZiel`).
   Der angeklickte springt samt seinem Bund auf den Block des Ziels, und
   beide Bünde werden einer (`Wegpunkte.verbinde`). Liegt keiner so nah,
   fehlt der Eintrag ganz, so hat es der User entschieden. Nie verbindet
-  etwas aus Versehen, auch nicht das Einrasten.
+  etwas aus Versehen, auch nicht das Einrasten mit `Strg`.
+- **Mit `Alt` beim Ziehen** einer Ecke oder eines Wegpunkts, gewünscht vom
+  User am 20.10. (mod#169): Er rastet ein wie mit `Strg`, auf dasselbe
+  Ziel im selben Radius, siehe „Einrasten“. Lässt sich das Ziel
+  verbinden, tragen beim Ziehen schon beide Ecken den hellen Kern, und
+  beim Loslassen springt der Punkt samt Bund wie mit „Verbinden“ auf den
+  Block des Ziels (`Karte.verbindeMitAlt`). Sonst rastet er nur ein, und
+  unten links steht der Grund: „Mit einem Todespunkt verbindet sich
+  nichts“, „Diese Form ist schon in dem Bund“, „Zwei Wegpunkte lassen sich
+  nicht verbinden“ oder „Dort liegt schon ein Wegpunkt“.
 - **„Lösen“** an einem verbundenen Punkt löst den ganzen Bund auf diesem
   Block, nicht nur den angeklickten (D2): Liegen Punkte gestapelt, sieht man
   nicht, welcher getroffen ist. Alle bleiben, wo sie sind (`Wegpunkte.loese`).
@@ -955,7 +991,7 @@ Schleier am Rand, siehe „Schleier“.
   `ebenen` sind die eigenen Ebenen und `ebene` die eines Eintrags, auch bei
   Formen und alten Rechtecken, siehe „Eigene Ebenen“;
   `farbe` ist ein Index in `Wegpunkte.FARBEN`, `minimap` heisst angeheftet,
-  `tode` sind die Todespunkte und `tod` der neueste, siehe „Todespunkt“, ohne `farbe` und `id`,
+  `tode` sind die Todespunkte mit `zeit` und `tod` der neueste, siehe „Todespunkt“, ohne `farbe` und `id`,
   `eigene_formen` nennt ihre Dimension und die Blöcke ihrer Ecken in Reihenfolge,
   dazu `name`, wenn sie einen hat, siehe „Namen“, und `hex`, wenn sie eine
   eigene Farbe hat, siehe „Farbe“; eine ältere Version des Mods überliest
@@ -1017,7 +1053,10 @@ Schleier am Rand, siehe „Schleier“.
   Datei wie zuvor, hin und zurück; ein verschobenes Glied wird lose, zwei
   Gruppen bekommen zwei Bünde; ein `bund`, das keine Zahl ist, macht lose,
   der Punkt bleibt), `folgendeFormBehaeltIhreFelder` (Gewicht, Schrift,
-  Biegung, Name und Farbe einer Form, deren Ecke einem Bund folgt). Zu Namen:
+  Biegung, Name und Farbe einer Form, deren Ecke einem Bund folgt),
+  `warumNichtVerbinden` (je Grund die Meldung; eine Ecke auf dem Block eines
+  fremden Wegpunkts verbindet; mit einem Wegpunkt im Bund „Dort liegt schon
+  ein Wegpunkt“). Zu Namen:
   `nameBereinigtUndGekappt`, `namenUeberstehenDenNeustartUndAenderungen`
   (auch ein Name, der kein Text ist), `namenEineSchrifthoeheNebenDemGriff`
   (Region, Linie in vier Richtungen, Höhe nach der Form und gekappt, ohne
@@ -1031,7 +1070,11 @@ Schleier am Rand, siehe „Schleier“.
   Zum Schleier: `eigeneFormenFuerDenSchleierErkannt`. Zum Todespunkt:
   `mehrereTodespunkte` (höchstens so viele, die ältesten fallen weg, nur der
   neueste angeheftet, derselbe Block frischt auf, weniger einstellen, `tode`
-  und `tod` in der Datei, eine alte Datei mit `tod`),
+  und `tod` in der Datei, eine alte Datei mit `tod`), `todesZeit` (heute
+  nur die Uhrzeit, ein früherer Tag mit Datum, auch über Mitternacht;
+  `zeit` in `tode`, nicht in `tod`; über den Neustart und das Anheften; die
+  Folge aus der Liste; eine alte Datei ohne `zeit`; eine `zeit`, die keine
+  ganze Zahl über 0 ist; ein Muster, das nicht geht, gibt das feste),
   `todespunktNurEinerAngeheftetUndEigensGespeichert` (mit einem: keine
   Farbe, eigens in der Datei, Lösen und Verschieben, nicht auf einem
   Wegpunkt, ein kaputter fehlt), `todMeldungOeffnetDieKarteDort`;
@@ -1166,7 +1209,12 @@ Schleier am Rand, siehe „Schleier“.
   gezogen, bleibt der Bund mit dem Hinweis; ohne Punkt in 8 Einheiten und
   mit nur einer Ecke der eigenen Form daneben fehlt „Verbinden“, an losen
   „Lösen“; den Wegpunkt gelöscht, bleibt die Ecke lose und ohne Kern
-  (`verbunden-geloescht.png`). Rechtsklick im Bau (`rechtsklickImBau`): mit einer Ecke der Hinweis,
+  (`verbunden-geloescht.png`). Alt verbindet (`altVerbindet`), mit
+  echten Tasten: `Strg` neben der Ecke einer anderen Form rastet nur ein;
+  `Alt` legt sie auf deren Block und verbindet, beim Ziehen mit hellem Kern
+  im Bild `alt-vorschau.png`; `Strg` und `Alt` zugleich verbinden; `Alt`
+  neben einem Todespunkt rastet nur ein, mit dem Hinweis; ein Wegpunkt mit
+  `Alt` neben einer Ecke liegt auf ihr, beide verbunden. Rechtsklick im Bau (`rechtsklickImBau`): mit einer Ecke der Hinweis,
   kein Menü und keine Form; mit zweien auf einem Wegpunkt eine Linie; mit
   vier auf freier Karte eine Region mit allen vieren; am Griff einer Form im
   Bau mit einer Ecke ihr Menü mit „Form abbrechen“ und ohne „Form fertig“;
@@ -1187,7 +1235,10 @@ Schleier am Rand, siehe „Schleier“.
   Menü hat genau „Hierher teleportieren“ und „Todespunkt löschen“, gehalten
   hängt er nicht an der Maus, und „Todespunkt löschen“ löscht ihn; mit zwei
   behaltenen bleiben nach drei Toden die zwei neuesten, nur der neueste
-  angeheftet; aus setzt ein Tod keinen. Regler „Todespunkte“ (`todRegler`):
+  angeheftet; aus setzt ein Tod keinen. Zeit des Todes (`todZeit`): nach
+  `kill @a` steht sie auf der Vollbildkarte unter dem Todespunkt, im Bild
+  `tod-zeit.png` deutlich mehr dunkle Schrift als derselbe Todespunkt ohne
+  Zeit; auf der Minimap ändert sie nichts. Regler „Todespunkte“ (`todRegler`):
   Klicks ans rechte Ende, ans linke und in die Mitte geben 16, aus und 8,
   gespeichert beim Schliessen; mit acht Todespunkten nehmen diese Klicks und
   ein Ziehen von 8 auf 1 und zurück keinen weg, nach `Esc` sind es acht; auf

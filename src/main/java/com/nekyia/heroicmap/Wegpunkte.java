@@ -12,6 +12,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.text.Normalizer;
+import java.time.DateTimeException;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -26,6 +32,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.ClickEvent;
@@ -50,12 +57,13 @@ final class Wegpunkte {
      * Ein Wegpunkt auf dem Block (x, z), mit einer festen {@code id}; {@code farbe} ist ein Index in {@link #FARBEN}. Mit
      * {@code tod} ein Todespunkt, ohne eigene Farbe; ihre Folge in der Liste ist die der Tode, der letzte der neueste. Siehe
      * docs/wegpunkte.md, „Todespunkt“. {@code bund} über 0 verbindet ihn mit den Ecken desselben Bunds, 0 heisst lose; siehe
-     * docs/wegpunkte.md, „Verbinden“.
+     * docs/wegpunkte.md, „Verbinden“. {@code zeit} ist bei einem Todespunkt die Zeit des Todes in ms der Uhr, 0 unbekannt; siehe
+     * docs/wegpunkte.md, „Todespunkt“.
      */
-    record Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet, boolean tod, int ebene, int bund) {
+    record Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet, boolean tod, int ebene, int bund, long zeit) {
 
         Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet, boolean tod, int ebene) {
-            this(id, dimension, x, z, farbe, angeheftet, tod, ebene, 0);
+            this(id, dimension, x, z, farbe, angeheftet, tod, ebene, 0, 0);
         }
     }
 
@@ -226,6 +234,8 @@ final class Wegpunkte {
     private int gebautEbenen, gebautStand;
     /** Die eigene Form, die die Vollbildkarte gerade zieht, oder null; und die, für die zuletzt gebaut wurde. */
     private List<EigeneForm> gezogen = List.of(), gebautGezogen = List.of();
+    /** Der Stand der {@link Ebenenreihe}, nach dem zuletzt gebaut wurde. */
+    private int gebautReihe = -1;
     private List<List<Ebenen.Form>> fuerKarte = List.of(), fuerMinimap = List.of();
     /** Das Gewicht je eigener Form auf der Minimap, nach Identität; für den Schleier. */
     private Map<Ebenen.Form, Integer> gewichte = new IdentityHashMap<>();
@@ -296,7 +306,7 @@ final class Wegpunkte {
                 int id = o.has("id") ? o.get("id").getAsInt() : 0;
                 Punkt p = new Punkt(id, o.get("dimension").getAsString(), o.get("x").getAsInt(), o.get("z").getAsInt(),
                         Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length), o.get("minimap").getAsBoolean(), false, ebeneAus(o),
-                        bund(o.get("bund")));
+                        bund(o.get("bund")), 0);
                 if (finde(p.dimension(), p.x(), p.z()) < 0) {
                     punkte.add(p);
                 }
@@ -313,8 +323,9 @@ final class Wegpunkte {
         for (JsonElement e : tode) {
             try {
                 JsonObject o = e.getAsJsonObject();
+                // Ohne zeit, etwa aus tod oder von vor mod#166, ist sie unbekannt; dann steht keine Zeit unter ihm.
                 Punkt p = new Punkt(0, o.get("dimension").getAsString(), o.get("x").getAsInt(), o.get("z").getAsInt(), 0,
-                        o.get("minimap").getAsBoolean(), true, BASE);
+                        o.get("minimap").getAsBoolean(), true, BASE, 0, zeit(o.get("zeit")));
                 if (finde(p.dimension(), p.x(), p.z()) < 0) {
                     punkte.add(p);
                 }
@@ -420,6 +431,18 @@ final class Wegpunkte {
         return d == Math.rint(d) && d > 0 && d <= Integer.MAX_VALUE ? (int) d : 0;
     }
 
+    /**
+     * Die Zeit eines Todes aus der Datei, in ms: eine ganze Zahl über 0; was fehlt oder keine ist, heisst unbekannt, und der
+     * Todespunkt bleibt, wie beim Bund. Siehe docs/wegpunkte.md, „Todespunkt“.
+     */
+    private static long zeit(JsonElement e) {
+        if (!(e instanceof JsonPrimitive p) || !p.isNumber()) {
+            return 0;
+        }
+        double d = p.getAsDouble();
+        return d == Math.rint(d) && d > 0 && d < Long.MAX_VALUE ? (long) d : 0;
+    }
+
     /** Die Ebene aus dem Feld {@code ebene} eines Eintrags, wenn es sie gibt; sonst Base. */
     private int ebeneAus(JsonObject o) {
         // Nur eine Zahl; was sonst dasteht, heisst Base, und der Eintrag bleibt.
@@ -445,7 +468,12 @@ final class Wegpunkte {
                 tod.addProperty("x", p.x());
                 tod.addProperty("z", p.z());
                 tod.addProperty("minimap", p.angeheftet());
-                tode.add(tod);
+                // tod bleibt, wie es war; die Zeit steht nur im Eintrag von tode.
+                JsonObject eintrag = tod.deepCopy();
+                if (p.zeit() > 0) {
+                    eintrag.addProperty("zeit", p.zeit());
+                }
+                tode.add(eintrag);
                 continue;
             }
             JsonObject o = new JsonObject();
@@ -738,7 +766,7 @@ final class Wegpunkte {
     }
 
     private static Punkt mitEbene(Punkt p, int ebene) {
-        return new Punkt(p.id(), p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), ebene, p.bund());
+        return new Punkt(p.id(), p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), ebene, p.bund(), p.zeit());
     }
 
     private static Region mitEbene(Region r, int ebene) {
@@ -773,6 +801,11 @@ final class Wegpunkte {
      * docs/wegpunkte.md, „Todespunkt“.
      */
     boolean setzeTod(String dimension, int x, int z, int hoechstens) {
+        return setzeTod(dimension, x, z, hoechstens, System.currentTimeMillis());
+    }
+
+    /** Wie {@link #setzeTod(String, int, int, int)}, mit der Zeit des Todes in ms der Uhr. Siehe docs/wegpunkte.md, „Todespunkt“. */
+    boolean setzeTod(String dimension, int x, int z, int hoechstens, long zeit) {
         punkte.removeIf(p -> p.tod() && p.dimension().equals(dimension) && p.x() == x && p.z() == z);
         boolean frei = finde(dimension, x, z) < 0;
         if (frei) {
@@ -780,7 +813,7 @@ final class Wegpunkte {
             if (voriger != null && voriger.angeheftet()) {
                 umschalten(voriger);
             }
-            punkte.add(new Punkt(naechsteId++, dimension, x, z, 0, true, true, BASE));
+            punkte.add(new Punkt(naechsteId++, dimension, x, z, 0, true, true, BASE, 0, zeit));
             kappe(hoechstens);
         }
         schreibe();
@@ -798,6 +831,39 @@ final class Wegpunkte {
         List<Punkt> weg = new ArrayList<>(tode());
         weg = weg.subList(0, Math.max(0, weg.size() - Math.max(0, hoechstens)));
         return punkte.removeAll(weg);
+    }
+
+    /** Die festen Muster der Zeit unter dem Todespunkt, wenn das der Sprache nicht taugt. */
+    static final String TOD_ZEIT_HEUTE = "HH:mm", TOD_ZEIT = "dd.MM. HH:mm";
+    /** Die Formatierer je Muster aus der Sprache, einmal gebaut statt in jedem Frame. */
+    private static final Map<String, DateTimeFormatter> FORMATE = new ConcurrentHashMap<>();
+
+    /**
+     * Die Zeit des Todes {@code zeit} unter dem Todespunkt, in der Zeitzone {@code zone}: am Tag von {@code jetzt} nach dem Muster
+     * {@code heute}, sonst nach {@code frueher}; die Muster kommen aus der Sprache des Spiels. Siehe docs/wegpunkte.md,
+     * „Todespunkt“.
+     */
+    static String todZeit(long zeit, long jetzt, ZoneId zone, String heute, String frueher) {
+        ZonedDateTime t = Instant.ofEpochMilli(zeit).atZone(zone);
+        boolean amTag = t.toLocalDate().equals(Instant.ofEpochMilli(jetzt).atZone(zone).toLocalDate());
+        return format(amTag ? heute : frueher, amTag ? TOD_ZEIT_HEUTE : TOD_ZEIT).format(t);
+    }
+
+    /**
+     * Der Formatierer für {@code muster}, einmal gebaut. Ein Ressourcenpaket, auch vom Server, kann die Sprache überschreiben; ein
+     * Muster, das nicht geht oder ein Feld der Zeit nicht kennt, gibt das feste {@code fest}, statt beim Zeichnen zu werfen
+     * (Review von #172).
+     */
+    private static DateTimeFormatter format(String muster, String fest) {
+        return FORMATE.computeIfAbsent(muster + "\n" + fest, k -> {
+            try {
+                DateTimeFormatter f = DateTimeFormatter.ofPattern(muster);
+                f.format(ZonedDateTime.ofInstant(Instant.EPOCH, ZoneOffset.UTC));
+                return f;
+            } catch (IllegalArgumentException | DateTimeException kaputt) {
+                return DateTimeFormatter.ofPattern(fest);
+            }
+        });
     }
 
     /** „Todespunkt gesetzt bei x z“ für den Chat; ein Klick darauf öffnet die Karte dort über {@code /hmap karte}. */
@@ -988,7 +1054,7 @@ final class Wegpunkte {
                 if (dort != null && !dort.equals(p)) {
                     return false;
                 }
-                punkte.set(i, new Punkt(p.id(), p.dimension(), x, z, p.farbe(), p.angeheftet(), p.tod(), p.ebene(), b));
+                punkte.set(i, new Punkt(p.id(), p.dimension(), x, z, p.farbe(), p.angeheftet(), p.tod(), p.ebene(), b, p.zeit()));
             }
         }
         for (int i = 0; i < eigene.size(); i++) {
@@ -1004,28 +1070,39 @@ final class Wegpunkte {
         return true;
     }
 
-    /**
-     * Darf {@code von} mit {@code ziel} verbunden werden? Nicht zwei Wegpunkte und keine Todespunkte, nur in einer Dimension,
-     * nicht, was schon verbunden ist, keine Form zweimal im neuen Bund, und ein Wegpunkt darin nicht auf den Block eines
-     * anderen. Siehe docs/wegpunkte.md, „Verbinden“.
-     */
+    /** Darf {@code von} mit {@code ziel} verbunden werden? Wenn {@link #warumNicht} keinen Grund findet. */
     boolean kannVerbinden(Glied von, Glied ziel) {
-        if (von.punkt() != null && von.punkt().tod() || ziel.punkt() != null && ziel.punkt().tod() || !von.dimension().equals(ziel.dimension())
-                || von.bund() > 0 && von.bund() == ziel.bund()) {
-            return false;
+        return warumNicht(von, ziel) == null;
+    }
+
+    /**
+     * Warum sich {@code von} nicht mit {@code ziel} verbinden lässt, als Schlüssel der Meldung, oder null, wenn es geht: kein
+     * Todespunkt; nur in einer Dimension und nicht, was schon verbunden ist; keine Form zweimal im neuen Bund; höchstens ein
+     * Wegpunkt darin, und der nicht auf dem Block eines anderen. Siehe docs/wegpunkte.md, „Verbinden“.
+     */
+    String warumNicht(Glied von, Glied ziel) {
+        if (von.punkt() != null && von.punkt().tod() || ziel.punkt() != null && ziel.punkt().tod()) {
+            return "heroicmap.karte.verbinden_tod";
+        }
+        if (!von.dimension().equals(ziel.dimension()) || von.bund() > 0 && von.bund() == ziel.bund()) {
+            return "heroicmap.karte.verbinden_nicht";
         }
         List<Glied> a = glieder(von), b = glieder(ziel);
         Set<EigeneForm> formen = new HashSet<>();
         a.stream().filter(g -> g.form() != null).forEach(g -> formen.add(g.form()));
         if (b.stream().anyMatch(g -> g.form() != null && formen.contains(g.form()))) {
-            return false;
+            return "heroicmap.karte.verbinden_form";
         }
         List<Punkt> wegpunkte = new ArrayList<>();
         a.stream().filter(g -> g.punkt() != null).forEach(g -> wegpunkte.add(g.punkt()));
         b.stream().filter(g -> g.punkt() != null).forEach(g -> wegpunkte.add(g.punkt()));
         // Höchstens ein Wegpunkt je Bund, denn zwei liegen nie auf einem Block; das schliesst auch zwei Wegpunkte miteinander aus.
+        if (wegpunkte.size() > 1) {
+            return "heroicmap.karte.verbinden_wegpunkte";
+        }
+        // Nur ein Wegpunkt im Bund kann auf einen anderen treffen; eine Ecke darf auf dem Block eines fremden liegen.
         Punkt dort = punktAuf(ziel.dimension(), ziel.x(), ziel.z());
-        return wegpunkte.size() <= 1 && (dort == null || wegpunkte.contains(dort));
+        return wegpunkte.isEmpty() || dort == null || wegpunkte.contains(dort) ? null : "heroicmap.karte.koordinaten_belegt";
     }
 
     /** Das Glied und alle anderen seines Bunds; lose nur es selbst. */
@@ -1093,7 +1170,7 @@ final class Wegpunkte {
     }
 
     private static Punkt mitBund(Punkt p, int b) {
-        return new Punkt(p.id(), p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), p.ebene(), b);
+        return new Punkt(p.id(), p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), p.ebene(), b, p.zeit());
     }
 
     private int neuerBund() {
@@ -1314,7 +1391,8 @@ final class Wegpunkte {
         for (int i = 0; i < punkte.size(); i++) {
             Punkt p = punkte.get(i);
             if (p.id() <= 0 || !gesehen.add(p.id())) {
-                punkte.set(i, new Punkt(naechsteId++, p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), p.ebene(), p.bund()));
+                punkte.set(i, new Punkt(naechsteId++, p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), p.ebene(), p.bund(),
+                        p.zeit()));
             }
         }
     }
@@ -1338,7 +1416,7 @@ final class Wegpunkte {
                 return false;
             }
         } else {
-            punkte.set(i, new Punkt(alt.id(), alt.dimension(), x, z, alt.farbe(), alt.angeheftet(), alt.tod(), alt.ebene()));
+            punkte.set(i, new Punkt(alt.id(), alt.dimension(), x, z, alt.farbe(), alt.angeheftet(), alt.tod(), alt.ebene(), 0, alt.zeit()));
         }
         schreibe();
         return true;
@@ -1349,7 +1427,8 @@ final class Wegpunkte {
         int i = finde(p.dimension(), p.x(), p.z());
         if (i >= 0) {
             Punkt alt = punkte.get(i);
-            punkte.set(i, new Punkt(alt.id(), alt.dimension(), alt.x(), alt.z(), alt.farbe(), !alt.angeheftet(), alt.tod(), alt.ebene(), alt.bund()));
+            punkte.set(i, new Punkt(alt.id(), alt.dimension(), alt.x(), alt.z(), alt.farbe(), !alt.angeheftet(), alt.tod(), alt.ebene(), alt.bund(),
+                    alt.zeit()));
             schreibe();
         }
     }
@@ -1547,16 +1626,21 @@ final class Wegpunkte {
     }
 
     private void baue(Ebenen e) {
-        if (e == gebautAus && e.stand() == gebautEbenen && stand == gebautStand && gezogen.equals(gebautGezogen)) {
+        Ebenenreihe reihe = Ebenenreihe.INSTANZ;
+        if (e == gebautAus && e.stand() == gebautEbenen && stand == gebautStand && gezogen.equals(gebautGezogen)
+                && reihe.stand() == gebautReihe) {
             return;
         }
         gebautAus = e;
         gebautEbenen = e.stand();
         gebautStand = stand;
         gebautGezogen = gezogen;
+        gebautReihe = reihe.stand();
         Map<String, Set<String>> je = new HashMap<>();
         formen.forEach(a -> je.computeIfAbsent(a.ebene(), k -> new HashSet<>()).add(a.id()));
-        List<List<Ebenen.Form>> karte = new ArrayList<>(), minimap = new ArrayList<>();
+        // Je sichtbare Ebene vom Server ihre Liste, angeheftete Formen und Nadeln, von unten nach oben.
+        Map<String, List<Ebenen.Form>> karteServer = new LinkedHashMap<>(), minimapServer = new LinkedHashMap<>();
+        Map<String, List<Ebenen.Ort>> orteServer = new LinkedHashMap<>();
         for (Ebenen.Eintrag eintrag : e.sichtbar()) {
             List<Ebenen.Form> alle = e.formen(eintrag.id());
             Set<String> ids = je.getOrDefault(eintrag.id(), Set.of());
@@ -1569,28 +1653,27 @@ final class Wegpunkte {
                     an.add(f);
                 }
             }
-            karte.add(breit == null ? alle : List.copyOf(breit));
+            karteServer.put(eintrag.id(), breit == null ? alle : List.copyOf(breit));
             if (!an.isEmpty()) {
-                minimap.add(List.copyOf(an));
+                minimapServer.put(eintrag.id(), List.copyOf(an));
             }
-        }
-        List<Ebenen.Ort> orte = new ArrayList<>();
-        for (Ebenen.Eintrag eintrag : e.sichtbar()) {
+            List<Ebenen.Ort> orte = new ArrayList<>();
             for (Ebenen.Ort o : e.nadeln(eintrag.id())) {
                 if (o.id() != null && nadeln.contains(new Anheftung(eintrag.id(), o.id()))) {
                     orte.add(o);
                 }
             }
+            orteServer.put(eintrag.id(), orte);
         }
-        fuerNadeln = List.copyOf(orte);
-        angeheftetOrte = Collections.newSetFromMap(new IdentityHashMap<>());
-        angeheftetOrte.addAll(orte);
-        // Je Gewicht eine Liste, leicht zuerst: Formen zeichnet jede ganz, Fläche, Rand und Name, so liegt die schwerere mit allem
-        // oben. Alle 0 gibt die eine Liste wie vor mod#163. Siehe docs/wegpunkte.md, „Gewicht“.
-        TreeMap<Integer, List<Ebenen.Form>> aufKarteJe = new TreeMap<>(), aufMinimapJe = new TreeMap<>();
+        // Eigene Formen je Gewicht eine Liste, leicht zuerst: Formen zeichnet jede ganz, Fläche, Rand und Name, so liegt die schwerere
+        // mit allem oben. Ohne Umstellen alle eigenen zusammen, alle 0 gibt die eine Liste wie vor mod#163; umgestellt je eigene Ebene.
+        // Siehe docs/wegpunkte.md, „Gewicht“.
+        // Siehe docs/vollbildkarte.md, „Reihe der Ebenen“.
+        boolean jeEbene = reihe.umgestellt();
+        Map<Integer, TreeMap<Integer, List<Ebenen.Form>>> karteEigen = new HashMap<>(), minimapEigen = new HashMap<>();
         IdentityHashMap<Ebenen.Form, Integer> gewichtJe = new IdentityHashMap<>();
-        regionen.stream().filter(r -> r.angeheftet() && an(r.ebene())).map(Wegpunkte::flaeche)
-                .forEach(fl -> aufMinimapJe.computeIfAbsent(0, g -> new ArrayList<>()).add(fl));
+        regionen.stream().filter(r -> r.angeheftet() && an(r.ebene()))
+                .forEach(r -> liste(minimapEigen, jeEbene ? r.ebene() : BASE, 0).add(flaeche(r)));
         for (EigeneForm f : this.eigene) {
             if (!an(f.ebene())) {
                 continue;
@@ -1598,16 +1681,17 @@ final class Wegpunkte {
             double[] p = mitten(f);
             Ebenen.Form form = form(f, p);
             Ebenen.Schrift name = schrift(f, p);
-            List<Ebenen.Form> aufKarte = aufKarteJe.computeIfAbsent(f.gewicht(), g -> new ArrayList<>());
-            List<Ebenen.Form> aufMinimap = aufMinimapJe.computeIfAbsent(f.gewicht(), g -> new ArrayList<>());
+            int schicht = jeEbene ? f.ebene() : BASE;
             // Die Form, die gerade gezogen wird, zeichnet die Vollbildkarte selbst, wo sie an der Maus steht.
             if (!gezogen.contains(f)) {
+                List<Ebenen.Form> aufKarte = liste(karteEigen, schicht, f.gewicht());
                 aufKarte.add(f.angeheftet() ? breiter(form) : form);
                 if (name != null) {
                     aufKarte.add(name);
                 }
             }
             if (f.angeheftet()) {
+                List<Ebenen.Form> aufMinimap = liste(minimapEigen, schicht, f.gewicht());
                 aufMinimap.add(form);
                 gewichtJe.put(form, f.gewicht());
                 if (name != null) {
@@ -1615,21 +1699,47 @@ final class Wegpunkte {
                 }
             }
         }
+        // Von unten nach oben: ohne Umstellen die vom Server nach order, darüber alle eigenen; umgestellt in der Reihe des Spielers.
+        List<Ebenenreihe.Schicht> schichten = new ArrayList<>();
+        if (jeEbene) {
+            schichten.addAll(reihe.wirksam(e.alle().reversed(), ebenen.stream().map(EigeneEbene::id).toList()).reversed());
+        } else {
+            karteServer.keySet().forEach(id -> schichten.add(Ebenenreihe.Schicht.vomServer(id)));
+            schichten.add(Ebenenreihe.Schicht.eigene(BASE));
+        }
+        List<List<Ebenen.Form>> karte = new ArrayList<>(), minimap = new ArrayList<>();
+        List<Ebenen.Ort> orte = new ArrayList<>();
         eigeneAufMinimap = Collections.newSetFromMap(new IdentityHashMap<>());
-        for (List<Ebenen.Form> l : aufKarteJe.values()) {
-            if (!l.isEmpty()) {
+        for (Ebenenreihe.Schicht s : schichten) {
+            if (s.server() != null) {
+                if (karteServer.containsKey(s.server())) {
+                    karte.add(karteServer.get(s.server()));
+                    orte.addAll(orteServer.get(s.server()));
+                }
+                if (minimapServer.containsKey(s.server())) {
+                    minimap.add(minimapServer.get(s.server()));
+                }
+                continue;
+            }
+            for (List<Ebenen.Form> l : karteEigen.getOrDefault(s.eigen(), new TreeMap<>()).values()) {
                 karte.add(List.copyOf(l));
             }
-        }
-        for (List<Ebenen.Form> l : aufMinimapJe.values()) {
-            if (!l.isEmpty()) {
+            for (List<Ebenen.Form> l : minimapEigen.getOrDefault(s.eigen(), new TreeMap<>()).values()) {
                 minimap.add(List.copyOf(l));
                 eigeneAufMinimap.addAll(l);
             }
         }
+        fuerNadeln = List.copyOf(orte);
+        angeheftetOrte = Collections.newSetFromMap(new IdentityHashMap<>());
+        angeheftetOrte.addAll(orte);
         gewichte = gewichtJe;
         fuerKarte = List.copyOf(karte);
         fuerMinimap = List.copyOf(minimap);
+    }
+
+    /** Die Liste der eigenen Formen der Schicht {@code schicht} mit dem Gewicht {@code gewicht}, neu, wenn es sie noch nicht gibt. */
+    private static List<Ebenen.Form> liste(Map<Integer, TreeMap<Integer, List<Ebenen.Form>>> je, int schicht, int gewicht) {
+        return je.computeIfAbsent(schicht, k -> new TreeMap<>()).computeIfAbsent(gewicht, g -> new ArrayList<>());
     }
 
     /**

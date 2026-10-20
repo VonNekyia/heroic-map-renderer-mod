@@ -14,6 +14,8 @@ code:
   - src/main/java/com/nekyia/heroicmap/Teleport.java
   - src/main/java/com/nekyia/heroicmap/Webkarte.java
   - src/test/java/com/nekyia/heroicmap/WebkarteTest.java
+  - src/main/java/com/nekyia/heroicmap/Ebenenreihe.java
+  - src/test/java/com/nekyia/heroicmap/EbenenreiheTest.java
   - src/main/java/com/nekyia/heroicmap/NeueVersion.java
   - src/test/java/com/nekyia/heroicmap/NeueVersionTest.java
   - src/test/java/com/nekyia/heroicmap/TeleportTest.java
@@ -116,12 +118,13 @@ auf den Namen heftet die ganze Ebene an (mod#103).
   zu. Beim ersten Öffnen ist sie zu; offen oder zu merkt sich die Karte in
   `karte.properties` unter `ebenen`, siehe „Lage merken“
   (`Kartenlage.ebenenOffen`).
-- **Liste:** zuerst die eigenen Ebenen, Base vorn, wenn es neben Base eine gibt oder Base aus ist, siehe
-  [Wegpunkte](wegpunkte.md), „Eigene Ebenen“; dann je Ebene vom Server eine
-  Zeile, die oberste zuerst, wie im Untermenü
-  „Ebenen …“, siehe [Ebenen](ebenen.md), „Umschalten“; dieselbe Wahl.
-  Rechts der Knopf „An“ oder „Aus“, 30 Einheiten breit (`Karte.AN_AUS`),
-  links davor der Name in der Sprache des Spiels als Überschrift, weiss
+- **Liste:** je Ebene eine Zeile, in der Reihe, wie gezeichnet wird, die
+  oberste zuerst, siehe „Reihe der Ebenen“. Ohne Umstellen zuerst die
+  eigenen Ebenen, Base vorn, wenn es neben Base eine gibt oder Base aus ist,
+  siehe [Wegpunkte](wegpunkte.md), „Eigene Ebenen“; dann die vom Server,
+  wie im Untermenü „Ebenen …“, siehe [Ebenen](ebenen.md), „Umschalten“;
+  dieselbe Wahl. Rechts der Knopf „An“ oder „Aus“, 30 Einheiten breit
+  (`Karte.AN_AUS`), davor „▲“ und „▼“, links davor der Name in der Sprache des Spiels als Überschrift, weiss
   mit Schatten, rechtsbündig. Ein langer Name ragt nach links über die
   Karte, statt abgeschnitten zu werden. Die Liste
   reicht bis über „Optionen …“; passen nicht alle, führt der letzte Knopf
@@ -149,6 +152,49 @@ auf den Namen heftet die ganze Ebene an (mod#103).
   Wegpunkte ändern (`Ebenen.stand`, `Wegpunkte.stand`).
 - **Über einem Knopf** geht keine Tafel auf; die Knöpfe gehen der Karte
   darunter vor.
+
+### Reihe der Ebenen
+
+Jeder Spieler kann die Reihe der Ebenen für sich umstellen: welche oben
+gezeichnet wird. Gewünscht vom User am 20.10. (renderer#317, Teil 4); Plan
+vom Reviewer freigegeben. Das Gewicht vom Server ist `order`, siehe
+[Ebenen](ebenen.md); am Format ändert sich nichts.
+
+- **Ohne Umstellen** wie vorher: die vom Server aufsteigend nach `order`,
+  bei Gleichstand nach `id` absteigend, darüber alle eigenen Formen, in
+  ihnen nach Gewicht, siehe [Wegpunkte](wegpunkte.md), „Gewicht“. Wer
+  nichts umstellt, sieht nichts anders; so hat es der Reviewer entschieden.
+- **Umstellen:** In der Liste der Ebenen je Zeile „▲“ und „▼“, 12 Einheiten
+  breit (`Karte.PFEIL`), vor „An“/„Aus“. Ein Klick rückt die Zeile eine
+  gezeigte Stelle hoch oder runter; oben heisst darüber gezeichnet.
+  „▲“ der obersten und „▼“ der untersten Zeile sind aus. Knöpfe statt
+  Ziehen: Auf dem Namen liegt schon der Doppelklick zum Anheften.
+- **Beim ersten Umstellen** gilt die sichtbare Reihe als Start, die eigenen
+  oben; nur die eine Zeile wandert. Base allein und an steht nicht in der
+  Liste; über sie springt eine Zeile hinweg, und sie bleibt, wo sie ist
+  (`Ebenenreihe.verschoben`).
+- **Umgestellt** ist jede eigene Ebene eine eigene Schicht, darin ihre
+  Formen nach Gewicht: Zuerst entscheidet die Ebene, dann das Gewicht der
+  Form. Gilt auf Vollbildkarte, Minimap und für den Schleier, ebenso für
+  die Nadeln der Ebenen vom Server (`Wegpunkte.baue`).
+- **Neue Ebenen** in einer umgestellten Reihe: Eine neue kommt direkt über
+  die oberste bekannte, deren `order` nicht höher ist; gibt es keine, ganz
+  unten. Eine eigene zählt dabei als `order` 0. Mehrere neue nacheinander,
+  erst die eigenen, dann die vom Server von oben nach unten; jede zählt die
+  vor ihr eingereihten mit (`Ebenenreihe.wirksam`).
+- **Verschwundene** überspringt der Mod; beim nächsten Speichern fallen sie
+  weg.
+- **„Reihe des Servers“:** Ist umgestellt, steht unter der letzten Zeile
+  dieser Knopf. Er löscht die eigene Reihe; dann gilt wieder `order`, die
+  eigenen oben.
+- **Gespeichert** gleich beim Umstellen in `ebenen-reihe.json` im Ordner der
+  Welt neben `ebenen.properties`, also je Welt eines Servers, wie An und
+  Aus: `{"reihe":[{"server":"<id>"},{"eigen":3},…]}`, von oben nach unten.
+  Kennungen vom Server sind freier Text; so verwechselt sich keine mit einer
+  eigenen. Ohne Datei oder unlesbar gilt `order`.
+- **Das Untermenü „Ebenen …“** zeigt die Ebenen vom Server in derselben
+  Reihe; die eigenen bleiben dort oben, wo ihre Knöpfe zum Verwalten
+  stehen, siehe [Ebenen](ebenen.md), „Umschalten“.
 
 ### Teleportieren
 

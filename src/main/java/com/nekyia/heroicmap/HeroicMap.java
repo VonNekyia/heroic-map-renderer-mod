@@ -114,6 +114,7 @@ public final class HeroicMap implements ClientModInitializer {
             Downloads.INSTANZ.weltBetreten();
             Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());
             Ebenen.INSTANZ.wechsel(Downloads.weltOrdner());
+            Ebenenreihe.INSTANZ.wechsel(Downloads.weltOrdner());
         });
         // Auch ein Wechsel des Backends hinter einem Proxy ist ein neuer Login, ohne DISCONNECT.
         ClientPlayConnectionEvents.INIT.register((listener, client) -> client.execute(() -> {
@@ -133,6 +134,7 @@ public final class HeroicMap implements ClientModInitializer {
             Tafeln.INSTANZ.leeren();
             Geheimbanner.INSTANZ.leeren();
             Wegpunkte.INSTANZ.leeren();
+            Ebenenreihe.INSTANZ.wechsel(null);
             Selbst.INSTANZ.leeren();
             Kartenlage.leeren();
         }));

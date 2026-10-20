@@ -107,6 +107,7 @@ public final class Bedienung implements FabricClientGameTest {
             imBrowser(context, maus, k);
             neueVersion(context, maus, k);
             tod(context, spiel.getServer(), maus, k);
+            todZeit(context, spiel.getServer(), k);
         } finally {
             context.runOnClient(mc -> Wegpunkte.INSTANZ.leeren());
             // Das Menü speichert beim Schliessen; danach wieder die Vorgabe.
@@ -175,12 +176,14 @@ public final class Bedienung implements FabricClientGameTest {
         menueJeObjekt(context, maus, k);
         einrasten(context, maus, k);
         verbinden(context, maus, k);
+        altVerbindet(context, maus, k);
         rechtsklickImBau(context, maus, k);
         entfernen(context, maus, k);
         eigeneEbenen(context, maus, k);
         ebenenTeilen(context, maus, k);
         knoepfe(context, maus, k);
         ebenen(context, maus, k);
+        reihe(context, maus, k);
         zumSpieler(context, maus, k);
         optionen(context, maus, k);
         verschieben(context, maus, k);
@@ -1751,6 +1754,15 @@ public final class Bedienung implements FabricClientGameTest {
      */
     private static double[] halteUndZiehe(ClientGameTestContext context, TestInput maus, int k, double[] von, double[] nach, boolean strg,
             int form, int index) {
+        return halteUndZiehe(context, maus, k, von, nach, strg, false, form, index);
+    }
+
+    /**
+     * Wie {@link #halteUndZiehe(ClientGameTestContext, TestInput, int, double[], double[], boolean, int, int)}, dazu mit {@code alt}
+     * die Taste Alt, nach dem Halten gedrückt und nach dem Loslassen gelöst wie {@code strg}.
+     */
+    private static double[] halteUndZiehe(ClientGameTestContext context, TestInput maus, int k, double[] von, double[] nach, boolean strg,
+            boolean alt, int form, int index) {
         warte250();
         maus.setCursorPos(von[0] * k, von[1] * k);
         context.waitTick();
@@ -1759,6 +1771,9 @@ public final class Bedienung implements FabricClientGameTest {
         zittereBis(context, maus, von[0] * k, von[1] * k, druck + 700);
         if (strg) {
             maus.holdControl();
+        }
+        if (alt) {
+            maus.holdAlt();
         }
         for (int i = 1; i <= 8; i++) {
             maus.setCursorPos((von[0] + (nach[0] - von[0]) * i / 8) * k, (von[1] + (nach[1] - von[1]) * i / 8) * k);
@@ -1771,7 +1786,123 @@ public final class Bedienung implements FabricClientGameTest {
         if (strg) {
             maus.releaseControl();
         }
+        if (alt) {
+            maus.releaseAlt();
+        }
         return gezeichnet;
+    }
+
+    /**
+     * Alt beim Ziehen verbindet (mod#169), mit echten Tasten: Strg 6 Einheiten neben die Ecke einer anderen Form rastet nur ein;
+     * Alt ebenso nah legt sie auf deren Block und verbindet beide, beim Ziehen mit hellem Kern an beiden im Bild
+     * `alt-vorschau.png`; Strg und Alt zugleich verbinden auch. Alt neben einem Todespunkt rastet nur ein, mit dem Hinweis, warum
+     * nicht. Ein Wegpunkt mit Alt neben einer Ecke liegt auf ihr, beide verbunden. Siehe docs/wegpunkte.md, „Verbinden“.
+     */
+    private static void altVerbindet(ClientGameTestContext context, TestInput maus, int k) {
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        int bx = mitte[0] - 34, bz = mitte[1] + 6;
+        List<Wegpunkte.Ecke> a = List.of(new Wegpunkte.Ecke(bx, bz), new Wegpunkte.Ecke(bx + 8, bz));
+        Wegpunkte.Ecke b0 = new Wegpunkte.Ecke(bx + 20, bz + 2);
+        try {
+            context.runOnClient(mc -> {
+                String dimension = mc.level.dimension().identifier().toString();
+                Wegpunkte.INSTANZ.setzeForm(dimension, a);
+                Wegpunkte.INSTANZ.setzeForm(dimension, List.of(b0, new Wegpunkte.Ecke(bx + 26, bz + 2)));
+                Wegpunkte.INSTANZ.setze(dimension, bx + 30, bz + 12);
+                Wegpunkte.INSTANZ.setzeTod(dimension, bx + 4, bz + 12, 1);
+            });
+            context.waitTicks(2);
+            frei(context, new double[][] {ecke(context, formen, 1), ecke(context, formen + 1, 0)});
+            String belegtNicht = context.computeOnClient(mc -> Component.translatable("heroicmap.karte.verbinden_tod").getString());
+
+            // Strg allein: A1 liegt auf B0, aber lose.
+            double[] b0s = ecke(context, formen + 1, 0);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 1), new double[] {b0s[0] - 6, b0s[1]}, true, false, -1, 0);
+            Wegpunkte.Ecke ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
+            if (ist.x() != b0.x() || ist.z() != b0.z() || ist.bund() != 0) {
+                throw new AssertionError("Strg allein neben B0: " + ist + " statt lose auf " + b0);
+            }
+            // Alt: auf B0 und verbunden; beim Ziehen beide mit hellem Kern.
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
+            context.waitTicks(2);
+            b0s = ecke(context, formen + 1, 0);
+            double[] neben = {b0s[0] - 6, b0s[1]}, a1s = ecke(context, formen, 1);
+            warte250();
+            maus.setCursorPos(a1s[0] * k, a1s[1] * k);
+            context.waitTick();
+            long druck = Util.getMillis();
+            maus.holdMouse(LINKS);
+            zittereBis(context, maus, a1s[0] * k, a1s[1] * k, druck + 700);
+            maus.holdAlt();
+            for (int i = 1; i <= 8; i++) {
+                maus.setCursorPos((a1s[0] + (neben[0] - a1s[0]) * i / 8) * k, (a1s[1] + (neben[1] - a1s[1]) * i / 8) * k);
+                context.waitTick();
+            }
+            context.waitTicks(2);
+            Path bild = context.takeScreenshot(TestScreenshotOptions.of("alt-vorschau").disableCounterPrefix());
+            b0s = ecke(context, formen + 1, 0);
+            maus.releaseMouse(LINKS);
+            context.waitTicks(2);
+            maus.releaseAlt();
+            List<Wegpunkte.Ecke> ab = context.computeOnClient(mc -> List.of(Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1),
+                    Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1).ecken().get(0)));
+            if (ab.get(0).x() != b0.x() || ab.get(0).z() != b0.z() || ab.get(0).bund() == 0 || ab.get(0).bund() != ab.get(1).bund()) {
+                throw new AssertionError("Alt neben B0: " + ab + " statt beide auf " + b0 + " in einem Bund");
+            }
+            int kern = weisse(bild, k, b0s, 1);
+            if (kern < 2 * k * k) {
+                throw new AssertionError("Alt beim Ziehen: " + kern + " weisse Pixel am Ziel, kein heller Kern als Vorschau");
+            }
+            // Strg und Alt zugleich verbinden auch.
+            context.runOnClient(mc -> {
+                Wegpunkte.INSTANZ.loese(Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1).ecken().get(0).bund());
+                Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a);
+            });
+            context.waitTicks(2);
+            b0s = ecke(context, formen + 1, 0);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 1), new double[] {b0s[0] - 6, b0s[1]}, true, true, -1, 0);
+            ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
+            if (ist.x() != b0.x() || ist.z() != b0.z() || ist.bund() == 0) {
+                throw new AssertionError("Strg und Alt neben B0: " + ist + " statt verbunden auf " + b0);
+            }
+            // Alt neben dem Todespunkt: A0 liegt auf seinem Block, lose, und unten links steht, warum.
+            Wegpunkte.Punkt tod = context.computeOnClient(mc -> Wegpunkte.INSTANZ.tod());
+            Karte.Marke tm = marke(context, tod);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 0), new double[] {tm.x() - 6, tm.y()}, false, true, -1, 0);
+            Wegpunkte.Ecke a0 = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(0));
+            String hinweis = context.computeOnClient(mc -> {
+                Component h = ((Karte) mc.gui.screen()).hinweis();
+                return h == null ? "" : h.getString();
+            });
+            if (a0.x() != tod.x() || a0.z() != tod.z() || a0.bund() != 0 || !hinweis.equals(belegtNicht)) {
+                throw new AssertionError("Alt neben dem Todespunkt: " + a0 + ", Hinweis „" + hinweis + "“ statt lose auf " + tod.x() + " "
+                        + tod.z() + " mit „" + belegtNicht + "“");
+            }
+            // Ein Wegpunkt mit Alt neben B1: auf B1, beide verbunden.
+            Wegpunkte.Punkt w = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
+            Karte.Marke wm = marke(context, w);
+            double[] b1s = ecke(context, formen + 1, 1);
+            halteUndZiehe(context, maus, k, new double[] {wm.x(), wm.y()}, new double[] {b1s[0] + 6, b1s[1]}, false, true, -1, 0);
+            Wegpunkte.Punkt wNach = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
+            Wegpunkte.Ecke b1 = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1).ecken().get(1));
+            if (wNach.x() != b1.x() || wNach.z() != b1.z() || wNach.bund() == 0 || wNach.bund() != b1.bund()) {
+                throw new AssertionError("Wegpunkt mit Alt neben B1: " + wNach + " und " + b1 + " statt verbunden auf einem Block");
+            }
+        } finally {
+            maus.releaseAlt();
+            maus.releaseControl();
+            context.runOnClient(mc -> {
+                List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                Wegpunkte.INSTANZ.kappeTode(0);
+            });
+            context.waitTicks(2);
+        }
     }
 
     /**
@@ -2439,6 +2570,62 @@ public final class Bedienung implements FabricClientGameTest {
             stirb(context, server);
             if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.tod()) != null) {
                 throw new AssertionError("Mit „Todespunkte: aus“ setzte ein Tod einen");
+            }
+        } finally {
+            context.runOnClient(mc -> {
+                Minimap.INSTANZ.setzeTodespunkte(1);
+                Wegpunkte.INSTANZ.kappeTode(0);
+                mc.gui.setScreen(null);
+            });
+            server.runCommand("tp @a 0.5 -30 0.5 0 90");
+            context.waitTicks(5);
+        }
+    }
+
+    /**
+     * Die Zeit des Todes (mod#166): Nach `kill @a` steht sie auf der Vollbildkarte unter dem Todespunkt, als dunkle Schrift im
+     * Bildschirmfoto; derselbe Todespunkt ohne Zeit hat dort deutlich weniger dunkle Pixel. Auf der Minimap ändert die Zeit
+     * nichts: dort mit und ohne Zeit gleich viele. Siehe docs/wegpunkte.md, „Todespunkt“.
+     */
+    private static void todZeit(ClientGameTestContext context, TestServerContext server, int k) {
+        server.runCommand("tp @a 40.5 -60 -30.5");
+        context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - 40.5) < 0.1, 200);
+        Path baum = Bilder.testsatz();
+        try {
+            stirb(context, server);
+            Wegpunkte.Punkt tod = context.computeOnClient(mc -> Wegpunkte.INSTANZ.tod());
+            if (tod == null || tod.x() != 40 || tod.z() != -31 || tod.zeit() <= 0) {
+                throw new AssertionError("Nach dem Tod bei 40 -31: Todespunkt " + tod + " ohne Zeit");
+            }
+            // Nah beim Todespunkt, so steht er auf der Minimap an seinem Ort.
+            server.runCommand("tp @a 44.5 -60 -30.5");
+            context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - 44.5) < 0.1, 200);
+            context.waitTicks(5);
+            Minimap.Rahmen r = rahmen(context);
+            double[] mitteMinimap = {r.x() + r.seite() / 2.0, r.y() + r.seite() / 2.0};
+            int minimapMit = dunkle(context.takeScreenshot(TestScreenshotOptions.of("tod-zeit-minimap").disableCounterPrefix()), k,
+                    mitteMinimap, r.seite() / 2);
+            context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum)).bei(40.5, -30.5)));
+            context.waitTicks(5);
+            Karte.Marke m = marke(context, tod);
+            double[] unter = {m.x(), m.y() + 9};
+            int mit = dunkle(context.takeScreenshot(TestScreenshotOptions.of("tod-zeit").disableCounterPrefix()), k, unter, 6);
+            // Derselbe Block ohne Zeit: so stand ein Todespunkt aus einer älteren Datei.
+            context.runOnClient(mc -> {
+                mc.gui.setScreen(null);
+                Wegpunkte.INSTANZ.setzeTod(tod.dimension(), tod.x(), tod.z(), 1, 0);
+            });
+            context.waitTicks(5);
+            int minimapOhne = dunkle(context.takeScreenshot(TestScreenshotOptions.of("tod-zeit-minimap-ohne").disableCounterPrefix()), k,
+                    mitteMinimap, r.seite() / 2);
+            context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum)).bei(40.5, -30.5)));
+            context.waitTicks(5);
+            int ohne = dunkle(context.takeScreenshot(TestScreenshotOptions.of("tod-zeit-ohne").disableCounterPrefix()), k, unter, 6);
+            if (mit < ohne + 4 * k * k) {
+                throw new AssertionError("Unter dem Todespunkt fehlt die Zeit: " + mit + " dunkle Pixel mit, " + ohne + " ohne");
+            }
+            if (minimapMit != minimapOhne) {
+                throw new AssertionError("Auf der Minimap ändert die Zeit etwas: " + minimapMit + " dunkle Pixel mit, " + minimapOhne + " ohne");
             }
         } finally {
             context.runOnClient(mc -> {
@@ -3124,6 +3311,108 @@ public final class Bedienung implements FabricClientGameTest {
             });
             context.waitTicks(3);
         }
+    }
+
+    /**
+     * Reihe der Ebenen je Spieler (renderer#317 Teil 4), mit Klicks von Hand. Eine eigene Ebene „Oben“ und eine vom Server
+     * „Reihe“, je mit einer Region auf derselben Stelle, die eigene blau, die vom Server rot. Ohne Umstellen liegt die eigene
+     * oben wie vorher, und „▲“ der obersten Zeile ist aus. „▼“ an „Oben“: Sie rückt unter „Reihe“, die Stelle wird im
+     * Bildschirmfoto röter, und die Reihe steht in ebenen-reihe.json. „Reihe des Servers“ stellt zurück und löscht die Datei.
+     * Siehe docs/vollbildkarte.md, „Reihe der Ebenen“.
+     */
+    private static void reihe(ClientGameTestContext context, TestInput maus, int k) {
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        // Links unter der Mitte, fern der Liste rechts und ihrer Überschriften.
+        int bx = mitte[0] - 30, bz = mitte[1] + 8;
+        int id = context.computeOnClient(mc -> {
+            int e = Wegpunkte.INSTANZ.neueEbene("Oben");
+            Wegpunkte.INSTANZ.setzeForm(mc.level.dimension().identifier().toString(), List.of(new Wegpunkte.Ecke(bx, bz),
+                    new Wegpunkte.Ecke(bx + 16, bz), new Wegpunkte.Ecke(bx + 16, bz + 16), new Wegpunkte.Ecke(bx, bz + 16)));
+            Wegpunkte.INSTANZ.ordne(Wegpunkte.INSTANZ.eigeneFormen().getLast(), e);
+            Wegpunkte.INSTANZ.faerbe(Wegpunkte.INSTANZ.eigeneFormen().getLast(), 0x3050E0);
+            Ebenen.INSTANZ.empfange(JsonParser.parseString("""
+                    {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:reihe","name":{"de":"Reihe","en":"Reihe"},"visible":true,
+                      "order":1,"version":"1"}]}""").getAsJsonObject());
+            Ebenen.INSTANZ.teil(Ebenen.Teil.lies("""
+                    {"v":1,"typ":"ebene","jetzt":1,"id":"test:reihe","version":"1","teil":1,"teile":1,"objects":[
+                      {"type":"region","fill":"#C04040C0","polygons":[{"outer":[[%d,%d],[%d,%d],[%d,%d],[%d,%d]]}]}]}"""
+                    .formatted(bx, bz, bx + 16, bz, bx + 16, bz + 16, bx, bz + 16)));
+            return e;
+        });
+        try {
+            context.waitTicks(3);
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eigenerSchalter("Oben")) == null) {
+                spielerKlick(context, maus, k, knopf(context, "heroicmap.karte.ebenen")[0], knopf(context, "heroicmap.karte.ebenen")[1]);
+            }
+            // Zwei Blöcke innen von der Ecke links oben der eigenen Region.
+            double[] ort = context.computeOnClient(mc -> {
+                Wegpunkte.EigeneForm f = Wegpunkte.INSTANZ.eigeneFormen().get(formen);
+                Karte.EckeAn e0 = ((Karte) mc.gui.screen()).ecken().stream().filter(e -> e.form().equals(f) && e.index() == 0)
+                        .findFirst().orElseThrow();
+                return new double[] {e0.x() + 8, e0.y() + 8};
+            });
+            frei(context, new double[][] {ort});
+            int vorher = rot(context, maus, k, ort, "reihe-vorher");
+            double[] runter = pfeil(context, "Oben", "▼");
+            double[] hochBase = pfeil(context, "Base", "▲");
+            if (hochBase[2] != 0 || context.computeOnClient(mc -> Ebenenreihe.INSTANZ.umgestellt())) {
+                throw new AssertionError("Ohne Umstellen: „▲“ der obersten Zeile an " + (hochBase[2] != 0) + ", umgestellt "
+                        + context.computeOnClient(mc -> Ebenenreihe.INSTANZ.umgestellt()));
+            }
+            spielerKlick(context, maus, k, runter[0], runter[1]);
+            Path datei = context.computeOnClient(mc -> Downloads.weltOrdner().resolve(Ebenenreihe.DATEI));
+            String json = Files.readString(datei, StandardCharsets.UTF_8);
+            int unten = rot(context, maus, k, ort, "reihe-umgestellt");
+            if (!context.computeOnClient(mc -> Ebenenreihe.INSTANZ.umgestellt())
+                    || json.indexOf("{\"server\":\"test:reihe\"}") > json.indexOf("{\"eigen\":" + id + "}") || unten < vorher + 15) {
+                throw new AssertionError("„▼“ an „Oben“: Rot " + vorher + " vorher, " + unten + " danach, Datei " + json);
+            }
+            double[] zurueck = knopf(context, "heroicmap.karte.reihe_server");
+            spielerKlick(context, maus, k, zurueck[0], zurueck[1]);
+            int wieder = rot(context, maus, k, ort, "reihe-zurueck");
+            if (context.computeOnClient(mc -> Ebenenreihe.INSTANZ.umgestellt()) || Files.exists(datei) || Math.abs(wieder - vorher) > 4) {
+                throw new AssertionError("„Reihe des Servers“: Rot " + wieder + " statt " + vorher + ", Datei da " + Files.exists(datei));
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } finally {
+            context.runOnClient(mc -> {
+                Ebenenreihe.INSTANZ.zuruecksetzen();
+                List<Wegpunkte.EigeneForm> alle = Wegpunkte.INSTANZ.eigeneFormen();
+                for (Wegpunkte.EigeneForm f : List.copyOf(alle.subList(Math.min(formen, alle.size()), alle.size()))) {
+                    Wegpunkte.INSTANZ.loesche(f);
+                }
+                Wegpunkte.INSTANZ.loescheEbene(id);
+                Ebenen.INSTANZ.leeren();
+            });
+            context.waitTicks(3);
+        }
+    }
+
+    /** Der Rotanteil im Bildschirmfoto bei {@code ort}, die Maus fern. */
+    private static int rot(ClientGameTestContext context, TestInput maus, int k, double[] ort, String name) throws IOException {
+        maus.setCursorPos(2 * k, 2 * k);
+        context.waitTicks(2);
+        BufferedImage bild = ImageIO.read(context.takeScreenshot(TestScreenshotOptions.of(name).disableCounterPrefix()).toFile());
+        return bild.getRGB((int) Math.round(ort[0] * k), (int) Math.round(ort[1] * k)) >> 16 & 0xFF;
+    }
+
+    /** „▲“ oder „▼“ in der Zeile der eigenen Ebene {@code name}: {x, y, an}. */
+    private static double[] pfeil(ClientGameTestContext context, String name, String pfeil) {
+        return context.computeOnClient(mc -> {
+            AbstractWidget zeile = ((Karte) mc.gui.screen()).eigenerSchalter(name);
+            if (zeile == null) {
+                throw new AssertionError("Keine Zeile „" + name + "“ in der Liste der Ebenen");
+            }
+            AbstractWidget w = mc.gui.screen().children().stream().filter(c -> c instanceof AbstractWidget a && a.getY() == zeile.getY()
+                    && a.getMessage().getString().equals(pfeil)).map(c -> (AbstractWidget) c).findFirst()
+                    .orElseThrow(() -> new AssertionError("Kein „" + pfeil + "“ in der Zeile „" + name + "“"));
+            return new double[] {w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0, w.active ? 1 : 0};
+        });
     }
 
     /** Eingabefeld, Regler „Schrift“, „Biegung“ und „Gewicht“ der offenen Karte: je {x, y, Breite, Höhe, an, Raste}, null ohne. */
