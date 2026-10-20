@@ -196,6 +196,206 @@ class WegpunkteTest {
         assertEquals(List.of(e(0, 0), e(10, 10)), w.eigeneFormen().get(0).ecken());
     }
 
+    private static Wegpunkte.Glied g(Wegpunkte w, int form, int index) {
+        return Wegpunkte.Glied.von(w.eigeneFormen().get(form), index);
+    }
+
+    private static int bund(Wegpunkte w, int form, int index) {
+        return w.eigeneFormen().get(form).ecken().get(index).bund();
+    }
+
+    /**
+     * Verbinden (mod#162): Ecke mit der Ecke einer anderen Form und mit einem Wegpunkt; der angeklickte springt samt seinem Bund
+     * auf den Block des Ziels, die Bünde werden einer. Nicht: zwei Wegpunkte, die eigene Form, ein Todespunkt, eine andere
+     * Dimension, schon verbunden, eine Form zweimal in einem Bund. Lösen löst den ganzen Bund, alle bleiben. Siehe
+     * docs/wegpunkte.md, „Verbinden“.
+     */
+    @Test
+    void verbindenUndLoesen() {
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        w.setzeForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10)));
+        w.setzeForm(WELT, List.of(e(11, 1), e(20, 1)));
+        w.setzeForm("minecraft:the_nether", List.of(e(0, 0), e(5, 5)));
+        w.setze(WELT, 30, 30);
+        w.setze(WELT, 40, 40);
+        w.setzeTod(WELT, 50, 50, 1);
+        Wegpunkte.Glied p = Wegpunkte.Glied.von(w.punkte().get(0)), q = Wegpunkte.Glied.von(w.punkte().get(1));
+        assertFalse(w.kannVerbinden(g(w, 0, 0), g(w, 0, 1)));
+        assertFalse(w.kannVerbinden(p, q));
+        assertFalse(w.kannVerbinden(g(w, 0, 0), Wegpunkte.Glied.von(w.tod())));
+        assertFalse(w.kannVerbinden(g(w, 0, 0), g(w, 2, 0)));
+        // Ecke mit Ecke: Die angeklickte springt auf den Block des Ziels.
+        assertTrue(w.verbinde(g(w, 0, 1), g(w, 1, 0)));
+        assertEquals(List.of(11, 1), List.of(w.eigeneFormen().get(0).ecken().get(1).x(), w.eigeneFormen().get(0).ecken().get(1).z()));
+        int b1 = bund(w, 0, 1);
+        assertTrue(b1 > 0);
+        assertEquals(b1, bund(w, 1, 0));
+        assertEquals(0, bund(w, 0, 0));
+        assertFalse(w.kannVerbinden(g(w, 0, 1), g(w, 1, 0)));
+        // Ecke mit Wegpunkt: Die Ecke springt auf seinen Block, er bleibt.
+        assertTrue(w.verbinde(g(w, 1, 1), p));
+        int b2 = w.punkte().get(0).bund();
+        assertTrue(b2 > 0 && b2 != b1);
+        assertEquals(new Wegpunkte.Ecke(30, 30, b2), w.eigeneFormen().get(1).ecken().get(1));
+        // Ein Wegpunkt springt auf den Block einer Ecke; der Bund des Ziels nimmt ihn auf. Zwei Wegpunkte in einem Bund nicht.
+        assertFalse(w.kannVerbinden(Wegpunkte.Glied.von(w.punkte().get(1)), g(w, 1, 1)));
+        // Die Ecke (10, 10) von A in den Bund von P: Die Formen sind verschieden, also geht es.
+        assertTrue(w.verbinde(g(w, 0, 2), Wegpunkte.Glied.von(w.punkte().get(0))));
+        assertEquals(b2, bund(w, 0, 2));
+        assertEquals(List.of(30, 30), List.of(w.eigeneFormen().get(0).ecken().get(2).x(), w.eigeneFormen().get(0).ecken().get(2).z()));
+        // Nun liegen A und B in beiden Bünden: Sie zu vereinen hiesse eine Form zweimal in einem Bund.
+        assertFalse(w.kannVerbinden(g(w, 0, 1), Wegpunkte.Glied.von(w.punkte().get(0))));
+        // Lösen löst den ganzen Bund; alle bleiben, wo sie sind.
+        w.loese(b2);
+        assertEquals(0, w.punkte().get(0).bund());
+        assertEquals(0, bund(w, 0, 2));
+        assertEquals(0, bund(w, 1, 1));
+        assertEquals(new Wegpunkte.Ecke(30, 30), w.eigeneFormen().get(1).ecken().get(1));
+        assertEquals(b1, bund(w, 1, 0));
+    }
+
+    /**
+     * Folgen (mod#162): Verschieben eines Wegpunkts, einer Ecke, am Griff und „Koordinaten setzen…“ ziehen alle Glieder des Bunds
+     * auf denselben Block; nur die gemeinsame Ecke einer anderen Form folgt, ihre übrigen bleiben (D1). Träfe ein Wegpunkt des
+     * Bunds auf einen anderen, bleibt alles (D7). Löschen nimmt nur dieses; wer allein bleibt, wird lose. Siehe docs/wegpunkte.md,
+     * „Verbinden“.
+     */
+    @Test
+    void verbundenesFolgt() {
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        w.setzeForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10)));
+        w.setzeForm(WELT, List.of(e(10, 0), e(20, 0)));
+        w.setze(WELT, 10, 10);
+        w.setze(WELT, 40, 40);
+        assertTrue(w.verbinde(g(w, 1, 0), g(w, 0, 1)));
+        assertTrue(w.verbinde(g(w, 0, 2), Wegpunkte.Glied.von(w.punkte().get(0))));
+        // Den Wegpunkt verschoben: Die Ecke (10, 10) von A folgt, die übrigen bleiben.
+        assertTrue(w.verschiebe(w.punkte().get(0), 12, 12));
+        assertEquals(List.of(e(0, 0), w.eigeneFormen().get(0).ecken().get(1), new Wegpunkte.Ecke(12, 12, bund(w, 0, 2))),
+                w.eigeneFormen().get(0).ecken());
+        assertEquals(List.of(12, 12), List.of(w.eigeneFormen().get(0).ecken().get(2).x(), w.eigeneFormen().get(0).ecken().get(2).z()));
+        // Die Ecke (10, 0) von B verschoben: Die von A folgt, das Ende von B bleibt.
+        List<Wegpunkte.Ecke> b = new java.util.ArrayList<>(w.eigeneFormen().get(1).ecken());
+        b.set(0, b.get(0).auf(5, -5));
+        assertTrue(w.ersetze(w.eigeneFormen().get(1), b));
+        assertEquals(List.of(5, -5), List.of(w.eigeneFormen().get(0).ecken().get(1).x(), w.eigeneFormen().get(0).ecken().get(1).z()));
+        assertEquals(List.of(20, 0), List.of(w.eigeneFormen().get(1).ecken().get(1).x(), w.eigeneFormen().get(1).ecken().get(1).z()));
+        // Am Griff ganz A um (1, 1): Die Glieder folgen, B mit einer Ecke, der Wegpunkt mit seiner.
+        assertTrue(w.ersetze(w.eigeneFormen().get(0), w.eigeneFormen().get(0).ecken().stream().map(c -> c.auf(c.x() + 1, c.z() + 1)).toList()));
+        assertEquals(List.of(6, -4), List.of(w.eigeneFormen().get(1).ecken().get(0).x(), w.eigeneFormen().get(1).ecken().get(0).z()));
+        assertEquals(List.of(13, 13), List.of(w.punkte().get(0).x(), w.punkte().get(0).z()));
+        // D7: Die Ecke des Wegpunkts auf den anderen Wegpunkt; der Bund bleibt ganz, wo er war. Ebenso der Wegpunkt selbst.
+        List<Wegpunkte.EigeneForm> vorher = List.copyOf(w.eigeneFormen());
+        List<Wegpunkte.Ecke> a = new java.util.ArrayList<>(w.eigeneFormen().get(0).ecken());
+        a.set(2, a.get(2).auf(40, 40));
+        assertFalse(w.ersetze(w.eigeneFormen().get(0), a));
+        assertFalse(w.verschiebe(w.punkte().get(0), 40, 40));
+        assertEquals(vorher, w.eigeneFormen());
+        assertEquals(List.of(13, 13), List.of(w.punkte().get(0).x(), w.punkte().get(0).z()));
+        // Den Wegpunkt gelöscht: Die Ecke bleibt und ist allein, also lose. Ebenso nach dem Löschen von B die Ecke von A.
+        w.loesche(w.punkte().get(0));
+        assertEquals(0, bund(w, 0, 2));
+        w.loesche(w.eigeneFormen().get(1));
+        assertEquals(0, bund(w, 0, 1));
+        assertEquals(List.of(e(1, 1), e(6, -4), e(13, 13)), w.eigeneFormen().get(0).ecken());
+    }
+
+    /**
+     * Bünde in der Datei (mod#162): die dritte Zahl einer Ecke und {@code bund} am Wegpunkt, nur wenn verbunden, so bleibt eine
+     * Datei ohne Verbindungen Byte für Byte, wie sie war. Beim Lesen gilt ein Bund nur für Glieder auf einem Block: Ein Glied, das
+     * eine ältere Version verschob, wird lose, und zwei Gruppen auf zwei Blöcken bekommen zwei Bünde. Siehe docs/wegpunkte.md,
+     * „Verbinden“ und „Ablage“.
+     */
+    @Test
+    void buendeInDerDatei(@TempDir Path ordner) throws Exception {
+        Wegpunkte w = new Wegpunkte();
+        w.lies(ordner);
+        w.setzeForm(WELT, List.of(e(0, 0), e(10, 0)));
+        w.setzeForm(WELT, List.of(e(10, 0), e(20, 0)));
+        w.setze(WELT, 30, 30);
+        String ohne = Files.readString(ordner.resolve("wegpunkte.json"));
+        assertFalse(ohne.contains("bund"), ohne);
+        assertTrue(ohne.contains("[[0,0],[10,0]]"), ohne);
+        assertTrue(w.verbinde(g(w, 1, 0), g(w, 0, 1)));
+        assertTrue(w.verbinde(g(w, 1, 1), Wegpunkte.Glied.von(w.punkte().getFirst())));
+        int b1 = bund(w, 0, 1), b2 = w.punkte().getFirst().bund();
+        String mit = Files.readString(ordner.resolve("wegpunkte.json"));
+        assertTrue(mit.contains("[[0,0],[10,0," + b1 + "]]"), mit);
+        assertTrue(mit.contains("\"bund\":" + b2), mit);
+        Wegpunkte nachher = new Wegpunkte();
+        nachher.lies(ordner);
+        assertEquals(w.eigeneFormen(), nachher.eigeneFormen());
+        assertEquals(w.punkte(), nachher.punkte());
+        // Wieder gelöst, steht die Datei wie ohne Bünde.
+        w.loese(b1);
+        w.loese(b2);
+        assertFalse(Files.readString(ordner.resolve("wegpunkte.json")).contains("bund"));
+        // Eine ältere Version verschob ein Glied: Es wird lose, und das andere auch, denn es bleibt allein. Zwei Gruppen eines Bunds
+        // auf zwei Blöcken bekommen zwei Bünde.
+        Wegpunkte alt = new Wegpunkte();
+        alt.lies(JsonParser.parseString("{\"eigene_formen\":["
+                + "{\"dimension\":\"" + WELT + "\",\"ecken\":[[0,0,7],[5,5,4]],\"farbe\":0,\"minimap\":false},"
+                + "{\"dimension\":\"" + WELT + "\",\"ecken\":[[1,1,7],[5,5,4],[9,9,4]],\"farbe\":0,\"minimap\":false},"
+                + "{\"dimension\":\"" + WELT + "\",\"ecken\":[[9,9,4],[8,8]],\"farbe\":0,\"minimap\":false}],"
+                + "\"wegpunkte\":[{\"id\":1,\"dimension\":\"" + WELT + "\",\"x\":3,\"z\":3,\"farbe\":0,\"minimap\":false,\"bund\":9}]}")
+                .getAsJsonObject());
+        assertEquals(0, bund(alt, 0, 0));
+        assertEquals(0, bund(alt, 1, 0));
+        assertEquals(0, alt.punkte().getFirst().bund());
+        assertEquals(4, bund(alt, 0, 1));
+        assertEquals(4, bund(alt, 1, 1));
+        assertTrue(bund(alt, 1, 2) > 0 && bund(alt, 1, 2) != 4);
+        assertEquals(bund(alt, 1, 2), bund(alt, 2, 0));
+        // Ein bund, das keine ganze Zahl über 0 ist, macht lose; Wegpunkt und Form bleiben (Review von #168).
+        Wegpunkte kaputt = new Wegpunkte();
+        kaputt.lies(JsonParser.parseString("{\"eigene_formen\":[{\"dimension\":\"" + WELT + "\",\"ecken\":[[0,0,\"x\"],[5,5,[1]],[9,0,1.5]],"
+                + "\"farbe\":0,\"minimap\":false}],\"wegpunkte\":["
+                + "{\"id\":1,\"dimension\":\"" + WELT + "\",\"x\":0,\"z\":0,\"farbe\":0,\"minimap\":false,\"bund\":\"zwei\"},"
+                + "{\"id\":2,\"dimension\":\"" + WELT + "\",\"x\":5,\"z\":5,\"farbe\":0,\"minimap\":false,\"bund\":1e30},"
+                + "{\"id\":3,\"dimension\":\"" + WELT + "\",\"x\":9,\"z\":0,\"farbe\":0,\"minimap\":false,\"bund\":-3}]}").getAsJsonObject());
+        assertEquals(1, kaputt.eigeneFormen().size());
+        assertEquals(List.of(0, 0, 0), kaputt.eigeneFormen().getFirst().ecken().stream().map(Wegpunkte.Ecke::bund).toList());
+        assertEquals(List.of(0, 0, 0), kaputt.punkte().stream().map(Wegpunkte.Punkt::bund).toList());
+    }
+
+    /**
+     * Folgt eine Ecke einem Bund, behält ihre Form alle übrigen Felder: Gewicht, Schrift, Biegung, Name und Farbe; ebenso beim
+     * Verbinden, beim Lösen und wenn ein Glied gelöscht wird (Review von #168, `EigeneForm.mitEcken`). Siehe docs/wegpunkte.md,
+     * „Verbinden“.
+     */
+    @Test
+    void folgendeFormBehaeltIhreFelder() {
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        w.setzeForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10)));
+        w.setzeForm(WELT, List.of(e(11, 1), e(20, 1), e(20, 10)));
+        w.benenne(w.eigeneFormen().get(1), "Hof");
+        w.faerbe(w.eigeneFormen().get(1), 0x3A7FD5);
+        w.stil(w.eigeneFormen().get(1), 2, 45, 7);
+        Wegpunkte.EigeneForm vorher = w.eigeneFormen().get(1);
+        assertEquals(7, vorher.gewicht());
+        assertTrue(w.verbinde(g(w, 1, 0), g(w, 0, 1)));
+        felder(vorher, w.eigeneFormen().get(1));
+        List<Wegpunkte.Ecke> a = new java.util.ArrayList<>(w.eigeneFormen().get(0).ecken());
+        a.set(1, a.get(1).auf(12, -3));
+        assertTrue(w.ersetze(w.eigeneFormen().get(0), a));
+        assertEquals(List.of(12, -3), List.of(w.eigeneFormen().get(1).ecken().get(0).x(), w.eigeneFormen().get(1).ecken().get(0).z()));
+        felder(vorher, w.eigeneFormen().get(1));
+        w.loese(bund(w, 1, 0));
+        felder(vorher, w.eigeneFormen().get(1));
+        assertTrue(w.verbinde(g(w, 1, 0), g(w, 0, 1)));
+        w.loesche(w.eigeneFormen().get(0));
+        assertEquals(0, bund(w, 0, 0));
+        felder(vorher, w.eigeneFormen().get(0));
+    }
+
+    private static void felder(Wegpunkte.EigeneForm soll, Wegpunkte.EigeneForm ist) {
+        assertEquals(List.of(soll.name(), soll.hex(), soll.schrift(), soll.biegung(), soll.gewicht(), soll.farbe(), soll.ebene()),
+                List.of(ist.name(), ist.hex(), ist.schrift(), ist.biegung(), ist.gewicht(), ist.farbe(), ist.ebene()));
+    }
+
     @Test
     void formenGrenzenUndAlteDatei() {
         Wegpunkte w = new Wegpunkte();
