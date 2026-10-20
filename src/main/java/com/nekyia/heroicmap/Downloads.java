@@ -179,7 +179,8 @@ final class Downloads {
     /** {@code karte} aus der Antwort auf show, wenn sie als Name einer Karte taugt; sonst null. */
     static String karteAus(JsonObject json) {
         JsonElement feld = json.get("karte");
-        return feld != null && feld.isJsonPrimitive() ? Kartenname.gueltig(feld.getAsString()) : null;
+        return feld != null && feld.isJsonPrimitive() && feld.getAsJsonPrimitive().isString()
+                ? Kartenname.gueltig(feld.getAsString()) : null;
     }
 
     /**
