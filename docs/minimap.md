@@ -47,7 +47,7 @@ steht unter „Kosten“.
 
 `/hmap` öffnet das Menü (`Einstellungen`):
 
-![Das Menü über der Szene des Gametests, die Minimap rund mit den Koordinaten darunter, links daneben der senkrechte Regler „Zoom der Minimap“; „Minimap“ ganz breit; im Einzelspieler ohne Plugin steht „Mitspieler“ rot](bilder/menue.png)
+![Das Menü über der Szene des Gametests, die Minimap rund mit den Koordinaten darunter, links daneben der senkrechte Regler „Zoom der Minimap“, unter den Koordinaten der Regler „Auflösung“; „Minimap“ ganz breit; im Einzelspieler ohne Plugin steht „Mitspieler“ rot](bilder/menue.png)
 
 | Einstellung | Vorgabe | tut |
 |---|---|---|
@@ -63,7 +63,7 @@ steht unter „Kosten“.
 Das Untermenü „Einstellungen …“ hält, was man selten ändert; das Hauptmenü
 bleibt so kurz. „Fertig“ führt zurück ins Menü:
 
-![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien, halben Marken auf dem Ring und den Koordinaten darunter; „Form“ neben „Bei F3“, „Chunklinien“ neben „Drehen“, „Effekte in der Welt“ neben dem Regler „Schleier“, darunter „Ablage der Karten“ und „Neue Version melden“, unten „Ebenen …“ neben „Fertig“](bilder/anzeige.png)
+![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien, halben Marken auf dem Ring und den Koordinaten darunter; „Form“ neben „Bei F3“, „Chunklinien“ neben „Drehen“, „Verzierungen“ neben dem Regler „Todespunkte“, „Effekte in der Welt“ neben dem Regler „Schleier“, darunter „Ablage der Karten“ und „Neue Version melden“, unten „Ebenen …“ neben „Fertig“](bilder/anzeige.png)
 
 | Einstellung | Vorgabe | tut |
 |---|---|---|
