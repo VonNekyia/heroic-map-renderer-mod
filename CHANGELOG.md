@@ -7,7 +7,7 @@ The release notes on GitHub and Modrinth come from here
 ## 0.2.67
 
 - **Syncs catch up more.** A sync may now load up to half of your map instead of a tenth, so after a longer break the map is up to date in one go. How much a sync brings is set by the server's plugin; with an older plugin it stays at a tenth. Without a saved map the mod still asks for a full download.
-- **Syncs show their progress.** While a sync runs, the full map shows the same box as the first download next to "Download map …": "Syncing map", how much of what the sync needs has arrived, speed and time left.
+- **Syncs show their progress.** While a sync runs, the full map shows the same box as the first download next to "Download map …": "Syncing map", how much of what the sync needs has arrived, speed and time left. Until the sync knows what it needs, the box shows "…"; if nothing is missing, there is no box.
 
 ## 0.2.66
 

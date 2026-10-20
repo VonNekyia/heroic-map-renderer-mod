@@ -508,7 +508,7 @@ final class Downloads {
             if (ergebnis == null) {
                 // Ein Abgleich zeigt den Kasten wie der Strom, der einzelne volle Download nicht. Siehe docs/vollbildkarte.md,
                 // „Fortschritt“.
-                fortschritt = f.abgleich() ? new Laden.Fortschritt(f.bytes(), true) : null;
+                fortschritt = f.abgleich() ? new Laden.Fortschritt(Laden.Fortschritt.UNBEKANNT, true) : null;
                 ergebnis = laden.lade(auftrag, ziel, fortschritt);
             }
             if (!ergebnis.gekappt()) {

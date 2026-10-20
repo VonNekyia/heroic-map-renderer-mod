@@ -192,6 +192,8 @@ final class Laden {
     static final class Fortschritt {
         /** Über so viele ms mittelt das Tempo. */
         static final long FENSTER_MS = 5000;
+        /** Gesamt, solange es nicht feststeht: beim Abgleich, bis das Manifest verglichen ist. */
+        static final long UNBEKANNT = -1;
         final AtomicLong empfangen = new AtomicLong();
         volatile long gesamt;
         /** Ein Abgleich statt eines Stroms; die Karte sagt es in Zeile 1. */
@@ -206,6 +208,16 @@ final class Laden {
         Fortschritt(long gesamt, boolean abgleich) {
             this.gesamt = gesamt;
             this.abgleich = abgleich;
+        }
+
+        /** Steht gesamt fest? Sonst zeigt die Karte „…“ statt Bytes und Prozent. */
+        boolean bekannt() {
+            return gesamt != UNBEKANNT;
+        }
+
+        /** Zeigt die Karte den Kasten? Nicht, wenn einem Abgleich nach dem Vergleich nichts fehlt. */
+        boolean zeigen() {
+            return gesamt != 0;
         }
 
         /** Der Anteil von 0 bis 1. */
@@ -262,8 +274,9 @@ final class Laden {
     }
 
     /**
-     * Wie {@link #lade(Auftrag, Path)}; zählt dazu in {@code fortschritt}, wenn nicht null: gesamt sind die Bytes der Kacheln,
-     * die laut Manifest fehlen, höchstens das gesamt von vorher, der Deckel; empfangen jedes Byte einer geholten Kachel.
+     * Wie {@link #lade(Auftrag, Path)}; zählt dazu in {@code fortschritt}, wenn nicht null: gesamt sind, sobald das Manifest
+     * verglichen ist, die Bytes der Kacheln, die fehlen, höchstens {@link Auftrag#grenze()}; empfangen jedes Byte einer geholten
+     * Kachel.
      */
     Ergebnis lade(Auftrag a, Path ziel, Fortschritt fortschritt) throws Fehler, IOException, InterruptedException {
         Path zwischen = ziel.resolve(ZWISCHEN);
@@ -285,7 +298,7 @@ final class Laden {
         }
         int gleich = soll.size() - fehlt.size();
         if (fortschritt != null) {
-            fortschritt.gesamt = Math.min(fortschritt.gesamt, fehlt.stream().mapToLong(Eintrag::groesse).sum());
+            fortschritt.gesamt = Math.min(a.grenze(), fehlt.stream().mapToLong(Eintrag::groesse).sum());
         }
         long grenze = a.grenze();
         AtomicLong reserviert = new AtomicLong(), geladenBytes = new AtomicLong();

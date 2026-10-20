@@ -42,7 +42,10 @@ Abgleichs zeigte die Vollbildkarte nichts.
   Zeile 1 „Karte wird abgeglichen“. Gesamt sind die Bytes der Kacheln,
   die laut Manifest fehlen, höchstens die `bytes` der `freigabe`;
   empfangen zählt jedes Byte einer geholten Kachel (`Laden.lade`). Tempo
-  und Restzeit wie beim Strom.
+  und Restzeit wie beim Strom. Bis das Manifest verglichen ist, steht
+  gesamt nicht fest, und der Kasten zeigt „…“ statt Prozent und Bytes,
+  nicht „0 von“ dem Deckel. Fehlt nichts, steht kein Kasten. So hat es der
+  Reviewer nachgeschärft, weil der User genau diesen Kasten wollte.
 - **Der einzelne volle Download** ohne Strom zeigt weiter keinen Kasten;
   er war nicht Teil des Wunschs.
 

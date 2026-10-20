@@ -520,14 +520,16 @@ final class Karte extends Screen {
         g.fill(x, y, x + b, y + 38, 0xB0000000);
         g.text(font, Component.translatable(f.abgleich ? "heroicmap.download.abgleich_laeuft" : "heroicmap.download.laeuft"), x + 5, y + 5,
                 TEXT);
-        Component prozent = Component.literal((int) (anteil * 100) + " %");
+        // Bis gesamt feststeht, beim Abgleich vor dem Vergleich des Manifests, „…“ statt Prozent und Bytes.
+        boolean bekannt = f.bekannt();
+        Component prozent = Component.literal(bekannt ? (int) (anteil * 100) + " %" : "…");
         g.text(font, prozent, x + b - 4 - font.width(prozent), y + 5, TEXT);
         // Wie der Ladebalken des Spiels: weisser Rand, weiss gefüllt.
         g.outline(x + 5, y + 16, b - 10, 7, TEXT);
         g.fill(x + 7, y + 18, x + 7 + (int) Math.round((b - 14) * anteil), y + 21, TEXT);
-        g.text(font, Component.translatable("heroicmap.download.stand", Downloads.zahl(empfangen, gesamt), Downloads.groesse(gesamt)),
-                x + 5, y + 27, GRAU);
-        Component rest = tempo <= 0 ? Component.literal("…") : Component.translatable("heroicmap.download.tempo",
+        g.text(font, bekannt ? Component.translatable("heroicmap.download.stand", Downloads.zahl(empfangen, gesamt), Downloads.groesse(gesamt))
+                : Component.literal("…"), x + 5, y + 27, GRAU);
+        Component rest = !bekannt || tempo <= 0 ? Component.literal("…") : Component.translatable("heroicmap.download.tempo",
                 Downloads.groesse((long) tempo), Downloads.dauer((long) Math.ceil((gesamt - empfangen) / tempo)));
         g.text(font, rest, x + b - 4 - font.width(rest), y + 27, GRAU);
     }
@@ -553,6 +555,10 @@ final class Karte extends Screen {
     public void extractRenderState(GuiGraphicsExtractor g, int mausX, int mausY, float delta) {
         g.fill(0, 0, width, height, HINTERGRUND);
         Laden.Fortschritt laeuft = Downloads.INSTANZ.fortschritt();
+        // Fehlt einem Abgleich nach dem Vergleich nichts, steht kein Kasten. Siehe docs/vollbildkarte.md, „Fortschritt“.
+        if (laeuft != null && !laeuft.zeigen()) {
+            laeuft = null;
+        }
         if (satz == null) {
             // Während eines Downloads sagt der Kasten oben, was los ist.
             if (laeuft == null) {

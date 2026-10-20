@@ -453,9 +453,12 @@ Abgleich wünschte der User am 20.10., siehe [0027](entscheidungen/0027-abgleich
 - **Nur aus Bytes** (`Laden.Fortschritt`): Empfangen zählt jedes Byte des
   Körpers, gesamt ist `X-Heroic-Bytes`, ohne den Header die `bytes` der
   `freigabe`, höchstens die Grenze des Stroms. Über 100 % geht der Anteil
-  nicht. Dateien zählen nicht. Beim Abgleich ist gesamt die Summe der
-  Kacheln, die laut Manifest fehlen, höchstens die `bytes` der `freigabe`;
-  empfangen zählt jedes Byte einer geholten Kachel (`Laden.lade`).
+  nicht. Dateien zählen nicht. Beim Abgleich steht gesamt erst fest, wenn
+  das Manifest verglichen ist (`Laden.Fortschritt.UNBEKANNT`); bis dahin
+  stehen statt Prozent und Bytes „…“. Dann ist es die Summe der Kacheln,
+  die laut Manifest fehlen, höchstens die `bytes` der `freigabe`, und
+  empfangen zählt jedes Byte einer geholten Kachel (`Laden.lade`). Fehlt
+  nichts, steht kein Kasten (`Laden.Fortschritt.zeigen`).
 - **Tempo** über die letzten 5 s (`Laden.Fortschritt.FENSTER_MS`), die
   Restzeit ist der Rest durch das Tempo. Vor der ersten Sekunde und
   solange nichts kommt, steht „…“.
