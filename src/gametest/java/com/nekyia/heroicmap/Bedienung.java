@@ -173,6 +173,7 @@ public final class Bedienung implements FabricClientGameTest {
         menueJeObjekt(context, maus, k);
         einrasten(context, maus, k);
         verbinden(context, maus, k);
+        altVerbindet(context, maus, k);
         rechtsklickImBau(context, maus, k);
         entfernen(context, maus, k);
         eigeneEbenen(context, maus, k);
@@ -1750,6 +1751,15 @@ public final class Bedienung implements FabricClientGameTest {
      */
     private static double[] halteUndZiehe(ClientGameTestContext context, TestInput maus, int k, double[] von, double[] nach, boolean strg,
             int form, int index) {
+        return halteUndZiehe(context, maus, k, von, nach, strg, false, form, index);
+    }
+
+    /**
+     * Wie {@link #halteUndZiehe(ClientGameTestContext, TestInput, int, double[], double[], boolean, int, int)}, dazu mit {@code alt}
+     * die Taste Alt, nach dem Halten gedrückt und nach dem Loslassen gelöst wie {@code strg}.
+     */
+    private static double[] halteUndZiehe(ClientGameTestContext context, TestInput maus, int k, double[] von, double[] nach, boolean strg,
+            boolean alt, int form, int index) {
         warte250();
         maus.setCursorPos(von[0] * k, von[1] * k);
         context.waitTick();
@@ -1758,6 +1768,9 @@ public final class Bedienung implements FabricClientGameTest {
         zittereBis(context, maus, von[0] * k, von[1] * k, druck + 700);
         if (strg) {
             maus.holdControl();
+        }
+        if (alt) {
+            maus.holdAlt();
         }
         for (int i = 1; i <= 8; i++) {
             maus.setCursorPos((von[0] + (nach[0] - von[0]) * i / 8) * k, (von[1] + (nach[1] - von[1]) * i / 8) * k);
@@ -1770,7 +1783,123 @@ public final class Bedienung implements FabricClientGameTest {
         if (strg) {
             maus.releaseControl();
         }
+        if (alt) {
+            maus.releaseAlt();
+        }
         return gezeichnet;
+    }
+
+    /**
+     * Alt beim Ziehen verbindet (mod#169), mit echten Tasten: Strg 6 Einheiten neben die Ecke einer anderen Form rastet nur ein;
+     * Alt ebenso nah legt sie auf deren Block und verbindet beide, beim Ziehen mit hellem Kern an beiden im Bild
+     * `alt-vorschau.png`; Strg und Alt zugleich verbinden auch. Alt neben einem Todespunkt rastet nur ein, mit dem Hinweis, warum
+     * nicht. Ein Wegpunkt mit Alt neben einer Ecke liegt auf ihr, beide verbunden. Siehe docs/wegpunkte.md, „Verbinden“.
+     */
+    private static void altVerbindet(ClientGameTestContext context, TestInput maus, int k) {
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        int bx = mitte[0] - 34, bz = mitte[1] + 6;
+        List<Wegpunkte.Ecke> a = List.of(new Wegpunkte.Ecke(bx, bz), new Wegpunkte.Ecke(bx + 8, bz));
+        Wegpunkte.Ecke b0 = new Wegpunkte.Ecke(bx + 20, bz + 2);
+        try {
+            context.runOnClient(mc -> {
+                String dimension = mc.level.dimension().identifier().toString();
+                Wegpunkte.INSTANZ.setzeForm(dimension, a);
+                Wegpunkte.INSTANZ.setzeForm(dimension, List.of(b0, new Wegpunkte.Ecke(bx + 26, bz + 2)));
+                Wegpunkte.INSTANZ.setze(dimension, bx + 30, bz + 12);
+                Wegpunkte.INSTANZ.setzeTod(dimension, bx + 4, bz + 12, 1);
+            });
+            context.waitTicks(2);
+            frei(context, new double[][] {ecke(context, formen, 1), ecke(context, formen + 1, 0)});
+            String belegtNicht = context.computeOnClient(mc -> Component.translatable("heroicmap.karte.verbinden_tod").getString());
+
+            // Strg allein: A1 liegt auf B0, aber lose.
+            double[] b0s = ecke(context, formen + 1, 0);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 1), new double[] {b0s[0] - 6, b0s[1]}, true, false, -1, 0);
+            Wegpunkte.Ecke ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
+            if (ist.x() != b0.x() || ist.z() != b0.z() || ist.bund() != 0) {
+                throw new AssertionError("Strg allein neben B0: " + ist + " statt lose auf " + b0);
+            }
+            // Alt: auf B0 und verbunden; beim Ziehen beide mit hellem Kern.
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
+            context.waitTicks(2);
+            b0s = ecke(context, formen + 1, 0);
+            double[] neben = {b0s[0] - 6, b0s[1]}, a1s = ecke(context, formen, 1);
+            warte250();
+            maus.setCursorPos(a1s[0] * k, a1s[1] * k);
+            context.waitTick();
+            long druck = Util.getMillis();
+            maus.holdMouse(LINKS);
+            zittereBis(context, maus, a1s[0] * k, a1s[1] * k, druck + 700);
+            maus.holdAlt();
+            for (int i = 1; i <= 8; i++) {
+                maus.setCursorPos((a1s[0] + (neben[0] - a1s[0]) * i / 8) * k, (a1s[1] + (neben[1] - a1s[1]) * i / 8) * k);
+                context.waitTick();
+            }
+            context.waitTicks(2);
+            Path bild = context.takeScreenshot(TestScreenshotOptions.of("alt-vorschau").disableCounterPrefix());
+            b0s = ecke(context, formen + 1, 0);
+            maus.releaseMouse(LINKS);
+            context.waitTicks(2);
+            maus.releaseAlt();
+            List<Wegpunkte.Ecke> ab = context.computeOnClient(mc -> List.of(Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1),
+                    Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1).ecken().get(0)));
+            if (ab.get(0).x() != b0.x() || ab.get(0).z() != b0.z() || ab.get(0).bund() == 0 || ab.get(0).bund() != ab.get(1).bund()) {
+                throw new AssertionError("Alt neben B0: " + ab + " statt beide auf " + b0 + " in einem Bund");
+            }
+            int kern = weisse(bild, k, b0s, 1);
+            if (kern < 2 * k * k) {
+                throw new AssertionError("Alt beim Ziehen: " + kern + " weisse Pixel am Ziel, kein heller Kern als Vorschau");
+            }
+            // Strg und Alt zugleich verbinden auch.
+            context.runOnClient(mc -> {
+                Wegpunkte.INSTANZ.loese(Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1).ecken().get(0).bund());
+                Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a);
+            });
+            context.waitTicks(2);
+            b0s = ecke(context, formen + 1, 0);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 1), new double[] {b0s[0] - 6, b0s[1]}, true, true, -1, 0);
+            ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
+            if (ist.x() != b0.x() || ist.z() != b0.z() || ist.bund() == 0) {
+                throw new AssertionError("Strg und Alt neben B0: " + ist + " statt verbunden auf " + b0);
+            }
+            // Alt neben dem Todespunkt: A0 liegt auf seinem Block, lose, und unten links steht, warum.
+            Wegpunkte.Punkt tod = context.computeOnClient(mc -> Wegpunkte.INSTANZ.tod());
+            Karte.Marke tm = marke(context, tod);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 0), new double[] {tm.x() - 6, tm.y()}, false, true, -1, 0);
+            Wegpunkte.Ecke a0 = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(0));
+            String hinweis = context.computeOnClient(mc -> {
+                Component h = ((Karte) mc.gui.screen()).hinweis();
+                return h == null ? "" : h.getString();
+            });
+            if (a0.x() != tod.x() || a0.z() != tod.z() || a0.bund() != 0 || !hinweis.equals(belegtNicht)) {
+                throw new AssertionError("Alt neben dem Todespunkt: " + a0 + ", Hinweis „" + hinweis + "“ statt lose auf " + tod.x() + " "
+                        + tod.z() + " mit „" + belegtNicht + "“");
+            }
+            // Ein Wegpunkt mit Alt neben B1: auf B1, beide verbunden.
+            Wegpunkte.Punkt w = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
+            Karte.Marke wm = marke(context, w);
+            double[] b1s = ecke(context, formen + 1, 1);
+            halteUndZiehe(context, maus, k, new double[] {wm.x(), wm.y()}, new double[] {b1s[0] + 6, b1s[1]}, false, true, -1, 0);
+            Wegpunkte.Punkt wNach = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
+            Wegpunkte.Ecke b1 = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1).ecken().get(1));
+            if (wNach.x() != b1.x() || wNach.z() != b1.z() || wNach.bund() == 0 || wNach.bund() != b1.bund()) {
+                throw new AssertionError("Wegpunkt mit Alt neben B1: " + wNach + " und " + b1 + " statt verbunden auf einem Block");
+            }
+        } finally {
+            maus.releaseAlt();
+            maus.releaseControl();
+            context.runOnClient(mc -> {
+                List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                Wegpunkte.INSTANZ.kappeTode(0);
+            });
+            context.waitTicks(2);
+        }
     }
 
     /**

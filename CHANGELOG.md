@@ -4,6 +4,11 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.64
+
+- **Alt connects while you drag.** Hold `Alt` (`⌥` on a Mac) while dragging a corner or waypoint: it snaps like with `Ctrl` and connects on release; both corners already show the light centre while you drag. If the target can't be connected, it only snaps and says why. `Ctrl` alone still only snaps, on a Mac too (`Ctrl`, not `⌘`).
+- A corner can now be connected even if an unrelated waypoint sits on the target's block.
+
 ## 0.2.63
 
 - **Reorder the layers.** In the layer list of the full map, ▲ and ▼ move a layer up or down; the upper one is drawn on top, on the full map and the minimap. Your order is kept per server world; "Server order" puts it back. Until you reorder, nothing changes.
