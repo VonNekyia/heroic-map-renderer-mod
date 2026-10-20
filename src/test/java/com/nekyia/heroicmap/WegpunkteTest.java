@@ -1114,6 +1114,12 @@ class WegpunkteTest {
         Wegpunkte alt = new Wegpunkte();
         alt.lies(JsonParser.parseString("{\"tode\":[{\"dimension\":\"" + WELT + "\",\"x\":5,\"z\":5,\"minimap\":true}]}").getAsJsonObject());
         assertEquals(0, alt.tod().zeit());
+        // Eine zeit, die keine ganze Zahl über 0 ist, ist unbekannt; der Todespunkt bleibt.
+        Wegpunkte kaputt = new Wegpunkte();
+        kaputt.lies(JsonParser.parseString("{\"tode\":[{\"dimension\":\"" + WELT + "\",\"x\":1,\"z\":1,\"minimap\":false,\"zeit\":\"gestern\"},"
+                + "{\"dimension\":\"" + WELT + "\",\"x\":2,\"z\":2,\"minimap\":false,\"zeit\":1.5},"
+                + "{\"dimension\":\"" + WELT + "\",\"x\":3,\"z\":3,\"minimap\":true,\"zeit\":-7}]}").getAsJsonObject());
+        assertEquals(List.of(0L, 0L, 0L), kaputt.tode().stream().map(Wegpunkte.Punkt::zeit).toList());
     }
 
     @Test

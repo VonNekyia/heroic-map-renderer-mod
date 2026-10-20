@@ -354,7 +354,8 @@ Reviewer freigegeben.
   Ohne `tode` liest der Mod `tod`, also eine alte Datei mit einem. Eine id
   bekommt jeder beim Lesen wie ein Wegpunkt ohne. Jeder Eintrag von `tode`
   hat die Zeit des Todes als `zeit` in ms seit 1970 (`Wegpunkte.Punkt.zeit`);
-  `tod` bleibt, wie es war, ohne sie.
+  `tod` bleibt, wie es war, ohne sie. Ist `zeit` keine ganze Zahl über 0, ist
+  sie unbekannt, und der Todespunkt bleibt (`Wegpunkte.zeit`).
 
 ## Menü je Objekt
 
@@ -1046,7 +1047,8 @@ Schleier am Rand, siehe „Schleier“.
   und `tod` in der Datei, eine alte Datei mit `tod`), `todesZeit` (heute
   nur die Uhrzeit, ein früherer Tag mit Datum, auch über Mitternacht;
   `zeit` in `tode`, nicht in `tod`; über den Neustart und das Anheften; die
-  Folge aus der Liste; eine alte Datei ohne `zeit`),
+  Folge aus der Liste; eine alte Datei ohne `zeit`; eine `zeit`, die keine
+  ganze Zahl über 0 ist),
   `todespunktNurEinerAngeheftetUndEigensGespeichert` (mit einem: keine
   Farbe, eigens in der Datei, Lösen und Verschieben, nicht auf einem
   Wegpunkt, ein kaputter fehlt), `todMeldungOeffnetDieKarteDort`;

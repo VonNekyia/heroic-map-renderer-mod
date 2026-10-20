@@ -320,7 +320,7 @@ final class Wegpunkte {
                 JsonObject o = e.getAsJsonObject();
                 // Ohne zeit, etwa aus tod oder von vor mod#166, ist sie unbekannt; dann steht keine Zeit unter ihm.
                 Punkt p = new Punkt(0, o.get("dimension").getAsString(), o.get("x").getAsInt(), o.get("z").getAsInt(), 0,
-                        o.get("minimap").getAsBoolean(), true, BASE, 0, o.has("zeit") ? Math.max(0, o.get("zeit").getAsLong()) : 0);
+                        o.get("minimap").getAsBoolean(), true, BASE, 0, zeit(o.get("zeit")));
                 if (finde(p.dimension(), p.x(), p.z()) < 0) {
                     punkte.add(p);
                 }
@@ -424,6 +424,18 @@ final class Wegpunkte {
         }
         double d = p.getAsDouble();
         return d == Math.rint(d) && d > 0 && d <= Integer.MAX_VALUE ? (int) d : 0;
+    }
+
+    /**
+     * Die Zeit eines Todes aus der Datei, in ms: eine ganze Zahl über 0; was fehlt oder keine ist, heisst unbekannt, und der
+     * Todespunkt bleibt, wie beim Bund. Siehe docs/wegpunkte.md, „Todespunkt“.
+     */
+    private static long zeit(JsonElement e) {
+        if (!(e instanceof JsonPrimitive p) || !p.isNumber()) {
+            return 0;
+        }
+        double d = p.getAsDouble();
+        return d == Math.rint(d) && d > 0 && d < Long.MAX_VALUE ? (long) d : 0;
     }
 
     /** Die Ebene aus dem Feld {@code ebene} eines Eintrags, wenn es sie gibt; sonst Base. */
