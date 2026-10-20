@@ -152,7 +152,8 @@ class WegpunkteTest {
         assertTrue(w.eigeneFormen().get(1).region());
         assertEquals(List.of(e(0, 0), e(10, 0), e(10, 10)), w.eigeneFormen().get(1).ecken());
         Ebenen.Flaeche f = (Ebenen.Flaeche) w.form(w.eigeneFormen().get(1));
-        assertArrayEquals(new double[] {0.5, 0.5, 10.5, 10.5}, f.box());
+        // Die Ecken liegen auf den Kreuzungen der Kanten, (0, 0) ist die Nordwestecke des Blocks (0, 0).
+        assertArrayEquals(new double[] {0, 0, 10, 10}, f.box());
         // Ein Wegpunkt auf einer Ecke: verschoben oder gelöscht, die Form bleibt, wie sie ist.
         w.verschiebe(w.punkte().getFirst(), 20, 20);
         w.loesche(w.punkte().getFirst());
@@ -405,7 +406,7 @@ class WegpunkteTest {
         w.setzeForm(WELT, List.of(e(20, 0), e(30, 0)));
         w.setzeForm("minecraft:the_nether", List.of(e(0, 0), e(5, 5)));
         w.setzeForm(WELT, List.of(e(70, 70), e(80, 70)));
-        w.setzeForm(WELT, List.of(e(40, 40), e(45, 45)));
+        w.setzeForm(WELT, List.of(e(41, 41), e(45, 45)));
         w.setze(WELT, 40, 40);
         w.setze(WELT, 50, 50);
         w.setzeTod(WELT, 60, 60, 1);
@@ -419,7 +420,8 @@ class WegpunkteTest {
         assertNull(w.warumNicht(g(w, 0, 0), g(w, 4, 0)));
         assertTrue(w.verbinde(g(w, 0, 1), g(w, 1, 0)));
         assertEquals("heroicmap.karte.verbinden_nicht", w.warumNicht(g(w, 0, 1), g(w, 1, 0)));
-        // C0 im Bund mit q, dann auf Z0, auf dem p liegt: q träfe auf p, also „Dort liegt schon ein Wegpunkt“.
+        // C0 kommt an die Ecke von q nächst (70, 70), die Südostecke (51, 51). Mit Z0 auf der Südostecke des Blocks von p zöge q
+        // um denselben Weg auf p (K3): „Dort liegt schon ein Wegpunkt“.
         assertTrue(w.verbinde(g(w, 3, 0), Wegpunkte.Glied.von(w.punkte().get(1))));
         assertEquals("heroicmap.karte.koordinaten_belegt", w.warumNicht(g(w, 3, 0), g(w, 4, 0)));
         assertFalse(w.kannVerbinden(g(w, 0, 0), Wegpunkte.Glied.von(w.tod())));
@@ -428,6 +430,76 @@ class WegpunkteTest {
     private static void felder(Wegpunkte.EigeneForm soll, Wegpunkte.EigeneForm ist) {
         assertEquals(List.of(soll.name(), soll.hex(), soll.schrift(), soll.biegung(), soll.gewicht(), soll.farbe(), soll.ebene()),
                 List.of(ist.name(), ist.hex(), ist.schrift(), ist.biegung(), ist.gewicht(), ist.farbe(), ist.ebene()));
+    }
+
+    /**
+     * Ecken zwischen den Blöcken (Kantenmodell): Eine Ecke (x, z) ist die Kreuzung (x, z), die Nordwestecke des Blocks (x, z); die
+     * Zahlen alter Dateien bleiben, die Formen rücken einen halben Block nach Nordwesten (K1, K5). Die Ecke eines Blocks nächst einem
+     * Punkt und der Block an einer Kreuzung nächst einem Punkt (K2). Siehe docs/wegpunkte.md, „Eigene Formen“.
+     */
+    @Test
+    void eckenZwischenDenBloecken() {
+        Wegpunkte.EigeneForm f = new Wegpunkte.EigeneForm(WELT, List.of(e(3, 4), e(9, 4), e(9, 7)), 0, false, null, Wegpunkte.KEIN_HEX,
+                Wegpunkte.BASE);
+        assertArrayEquals(new double[] {3, 4, 9, 4, 9, 7}, Wegpunkte.kanten(f), 1e-12);
+        // Eine alte Datei liest dieselben Zahlen: dieselben Ecken, jetzt auf den Kreuzungen.
+        Wegpunkte alt = new Wegpunkte();
+        alt.lies(JsonParser.parseString("{\"eigene_formen\":[{\"dimension\":\"" + WELT + "\",\"ecken\":[[3,4],[9,4],[9,7]],\"farbe\":0,"
+                + "\"minimap\":false}]}").getAsJsonObject());
+        assertEquals(List.of(e(3, 4), e(9, 4), e(9, 7)), alt.eigeneFormen().getFirst().ecken());
+        // Die Ecke des Blocks (5, 5) nächst einem Punkt: je nach Viertel eine der vier.
+        assertArrayEquals(new int[] {5, 5}, Wegpunkte.eckeDesBlocks(5, 5, 5.2, 5.4));
+        assertArrayEquals(new int[] {6, 5}, Wegpunkte.eckeDesBlocks(5, 5, 5.6, 5.1));
+        assertArrayEquals(new int[] {5, 6}, Wegpunkte.eckeDesBlocks(5, 5, 2, 9));
+        assertArrayEquals(new int[] {6, 6}, Wegpunkte.eckeDesBlocks(5, 5, 8, 8));
+        // Der Block an der Kreuzung (5, 5) nächst einem Punkt: der, in dessen Viertel er liegt.
+        assertArrayEquals(new int[] {4, 4}, Wegpunkte.blockAnEcke(5, 5, 4.9, 4.2));
+        assertArrayEquals(new int[] {5, 4}, Wegpunkte.blockAnEcke(5, 5, 5.3, 4.9));
+        assertArrayEquals(new int[] {4, 5}, Wegpunkte.blockAnEcke(5, 5, 1, 9));
+        assertArrayEquals(new int[] {5, 5}, Wegpunkte.blockAnEcke(5, 5, 5, 5));
+    }
+
+    /**
+     * Bünde im Kantenmodell (K3): Ecken eines Bunds liegen auf einer Kreuzung, ein Wegpunkt darin auf einem der vier Blöcke daran.
+     * Eine Ecke mit einem Wegpunkt verbunden kommt auf die Ecke seines Blocks nächst ihr; ein Wegpunkt mit einer Ecke auf den Block an
+     * ihr nächst seinem alten Ort. Gezogen ziehen alle um denselben Weg, so bleibt der Wegpunkt an derselben Ecke seines Blocks.
+     * Beim Lesen bleibt ein Wegpunkt neben seiner Kreuzung im Bund, einer weiter weg wird lose. Siehe docs/wegpunkte.md, „Verbinden“.
+     */
+    @Test
+    void buendeAnKreuzungen() {
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        w.setzeForm(WELT, List.of(e(0, 0), e(8, 0)));
+        w.setzeForm(WELT, List.of(e(20, 0), e(30, 0)));
+        w.setze(WELT, 10, 10);
+        w.setze(WELT, 40, 40);
+        // A1 (8, 0) mit dem Wegpunkt auf Block (10, 10): auf dessen Nordwestecke (10, 10), der Wegpunkt bleibt.
+        assertTrue(w.verbinde(g(w, 0, 1), Wegpunkte.Glied.von(w.punkte().get(0))));
+        assertEquals(new Wegpunkte.Ecke(10, 10, bund(w, 0, 1)), w.eigeneFormen().get(0).ecken().get(1));
+        assertEquals(List.of(10, 10), List.of(w.punkte().get(0).x(), w.punkte().get(0).z()));
+        // Der Wegpunkt auf Block (40, 40) mit B0 (20, 0): auf den Block an der Kreuzung (20, 0) nächst seinem alten Ort, (20, 0).
+        assertTrue(w.verbinde(Wegpunkte.Glied.von(w.punkte().get(1)), g(w, 1, 0)));
+        assertEquals(List.of(20, 0), List.of(w.punkte().get(1).x(), w.punkte().get(1).z()));
+        assertEquals(bund(w, 1, 0), w.punkte().get(1).bund());
+        // Den Wegpunkt von (10, 10) auf (13, 12) verschoben: A1 zieht um (3, 2) auf (13, 12), weiter seine Nordwestecke.
+        assertTrue(w.verschiebe(w.punkte().get(0), 13, 12));
+        assertEquals(List.of(13, 12), List.of(w.eigeneFormen().get(0).ecken().get(1).x(), w.eigeneFormen().get(0).ecken().get(1).z()));
+        // B0 auf (25, 5): Der Wegpunkt zieht um denselben Weg auf (25, 5).
+        List<Wegpunkte.Ecke> b = new java.util.ArrayList<>(w.eigeneFormen().get(1).ecken());
+        b.set(0, b.get(0).auf(25, 5));
+        assertTrue(w.ersetze(w.eigeneFormen().get(1), b));
+        assertEquals(List.of(25, 5), List.of(w.punkte().get(1).x(), w.punkte().get(1).z()));
+        // Beim Lesen: ein Wegpunkt an einer Ecke der Kreuzung bleibt im Bund, einer zwei Blöcke weiter wird lose.
+        Wegpunkte gelesen = new Wegpunkte();
+        gelesen.lies(JsonParser.parseString("{\"eigene_formen\":["
+                + "{\"dimension\":\"" + WELT + "\",\"ecken\":[[5,5,3],[9,9]],\"farbe\":0,\"minimap\":false},"
+                + "{\"dimension\":\"" + WELT + "\",\"ecken\":[[0,9,6],[7,9]],\"farbe\":0,\"minimap\":false}],\"wegpunkte\":["
+                + "{\"id\":1,\"dimension\":\"" + WELT + "\",\"x\":4,\"z\":4,\"farbe\":0,\"minimap\":false,\"bund\":3},"
+                + "{\"id\":2,\"dimension\":\"" + WELT + "\",\"x\":2,\"z\":9,\"farbe\":0,\"minimap\":false,\"bund\":6}]}").getAsJsonObject());
+        assertEquals(3, gelesen.punkte().get(0).bund());
+        assertEquals(3, bund(gelesen, 0, 0));
+        assertEquals(0, gelesen.punkte().get(1).bund());
+        assertEquals(0, bund(gelesen, 1, 0));
     }
 
     @Test
@@ -864,8 +936,8 @@ class WegpunkteTest {
     void namenEineSchrifthoeheNebenDemGriff() {
         // Region: waagrecht, ein Punkt eine Schrifthöhe unter dem Griff im Schwerpunkt; so hoch wie die halbe kürzere Seite, hier 5.
         Wegpunkte.EigeneForm region = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10), e(0, 10)), 0, false, "Hof", Wegpunkte.KEIN_HEX, Wegpunkte.BASE);
-        Ebenen.Schrift s = Wegpunkte.schrift(region, Wegpunkte.mitten(region));
-        assertArrayEquals(new double[] {5.5, 5.5 + 5}, s.pfad(), 1e-9);
+        Ebenen.Schrift s = Wegpunkte.schrift(region, Wegpunkte.kanten(region));
+        assertArrayEquals(new double[] {5, 5 + 5}, s.pfad(), 1e-9);
         assertEquals(5, s.groesse());
         assertEquals("Hof", s.text());
         assertEquals(Ebenen.SCHRIFTFARBE, s.farbe());
@@ -877,17 +949,17 @@ class WegpunkteTest {
         assertEquals(10, groesse(List.of(e(0, 0), e(40, 0))));
         // Linie: parallel daneben auf der Nordseite, in beiden Richtungen; 10 Blöcke lang, also 4 hoch und 4 weg.
         double g = Wegpunkte.NAME_KLEINSTE;
-        assertArrayEquals(new double[] {0.5, 0.5 - g, 10.5, 0.5 - g}, pfad(List.of(e(0, 0), e(10, 0))), 1e-9);
-        assertArrayEquals(new double[] {10.5, 0.5 - g, 0.5, 0.5 - g}, pfad(List.of(e(10, 0), e(0, 0))), 1e-9);
+        assertArrayEquals(new double[] {0, -g, 10, -g}, pfad(List.of(e(0, 0), e(10, 0))), 1e-9);
+        assertArrayEquals(new double[] {10, -g, 0, -g}, pfad(List.of(e(10, 0), e(0, 0))), 1e-9);
         // Schräg nach Nordosten: senkrecht zur Linie, nach Nordwesten.
         double d = g / Math.sqrt(2);
-        assertArrayEquals(new double[] {0.5 - d, 0.5 - d, 10.5 - d, -9.5 - d}, pfad(List.of(e(0, 0), e(10, -10))), 1e-9);
+        assertArrayEquals(new double[] {-d, -d, 10 - d, -10 - d}, pfad(List.of(e(0, 0), e(10, -10))), 1e-9);
         // Von Nord nach Süd und zurück: auf der Westseite.
-        assertArrayEquals(new double[] {0.5 - g, 0.5, 0.5 - g, 10.5}, pfad(List.of(e(0, 0), e(0, 10))), 1e-9);
-        assertArrayEquals(new double[] {0.5 - g, 10.5, 0.5 - g, 0.5}, pfad(List.of(e(0, 10), e(0, 0))), 1e-9);
+        assertArrayEquals(new double[] {-g, 0, -g, 10}, pfad(List.of(e(0, 0), e(0, 10))), 1e-9);
+        assertArrayEquals(new double[] {-g, 10, -g, 0}, pfad(List.of(e(0, 10), e(0, 0))), 1e-9);
         // Ohne Namen keine Schrift.
         Wegpunkte.EigeneForm ohne = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(10, 0)), 0, false, null, Wegpunkte.KEIN_HEX, Wegpunkte.BASE);
-        assertEquals(null, Wegpunkte.schrift(ohne, Wegpunkte.mitten(ohne)));
+        assertEquals(null, Wegpunkte.schrift(ohne, Wegpunkte.kanten(ohne)));
     }
 
     @Test
@@ -896,15 +968,15 @@ class WegpunkteTest {
         // Biegung im Bogenmass. Eine Linie biegt nicht; der Faktor gilt auch dort.
         Wegpunkte.EigeneForm region = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10), e(0, 10)), 0, false, "Hof",
                 Wegpunkte.KEIN_HEX, Wegpunkte.BASE, 2, 90);
-        Ebenen.Schrift s = Wegpunkte.schrift(region, Wegpunkte.mitten(region));
+        Ebenen.Schrift s = Wegpunkte.schrift(region, Wegpunkte.kanten(region));
         assertEquals(10, s.groesse());
-        assertArrayEquals(new double[] {5.5, 5.5 + 10}, s.pfad(), 1e-9);
+        assertArrayEquals(new double[] {5, 5 + 10}, s.pfad(), 1e-9);
         assertEquals(Math.PI / 2, s.biegung(), 1e-12);
         Wegpunkte.EigeneForm linie = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(40, 0)), 0, false, "Weg", Wegpunkte.KEIN_HEX,
                 Wegpunkte.BASE, 0.5, 90);
         assertEquals(0, linie.biegung());
-        assertEquals(5, Wegpunkte.schrift(linie, Wegpunkte.mitten(linie)).groesse());
-        assertEquals(0, Wegpunkte.schrift(linie, Wegpunkte.mitten(linie)).biegung());
+        assertEquals(5, Wegpunkte.schrift(linie, Wegpunkte.kanten(linie)).groesse());
+        assertEquals(0, Wegpunkte.schrift(linie, Wegpunkte.kanten(linie)).biegung());
         // Gespeichert nur ohne Vorgabe, und so gelesen; die Vorschau des Reglers allein speichert nicht.
         Wegpunkte w = new Wegpunkte();
         w.lies((Path) null);
@@ -994,12 +1066,12 @@ class WegpunkteTest {
 
     private static float groesse(List<Wegpunkte.Ecke> ecken) {
         Wegpunkte.EigeneForm f = new Wegpunkte.EigeneForm(WELT, ecken, 0, false, "Weg", Wegpunkte.KEIN_HEX, Wegpunkte.BASE);
-        return Wegpunkte.schrift(f, Wegpunkte.mitten(f)).groesse();
+        return Wegpunkte.schrift(f, Wegpunkte.kanten(f)).groesse();
     }
 
     private static double[] pfad(List<Wegpunkte.Ecke> ecken) {
         Wegpunkte.EigeneForm f = new Wegpunkte.EigeneForm(WELT, ecken, 0, false, "Weg", Wegpunkte.KEIN_HEX, Wegpunkte.BASE);
-        return Wegpunkte.schrift(f, Wegpunkte.mitten(f)).pfad();
+        return Wegpunkte.schrift(f, Wegpunkte.kanten(f)).pfad();
     }
 
     @Test

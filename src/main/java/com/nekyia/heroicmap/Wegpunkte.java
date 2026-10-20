@@ -1021,9 +1021,10 @@ final class Wegpunkte {
             eigene.remove(i);
         } else {
             eigene.set(i, f.mitEcken(gueltig));
+            // Eine verbundene Ecke, die nun anderswo liegt, nimmt die übrigen Glieder ihres Bunds um denselben Weg mit.
             for (Ecke c : gueltig) {
-                boolean blieb = f.ecken().stream().anyMatch(a -> a.bund() == c.bund() && a.x() == c.x() && a.z() == c.z());
-                if (c.bund() > 0 && !blieb && !zieheBund(c.bund(), f.dimension(), c.x(), c.z())) {
+                Ecke a = c.bund() > 0 ? f.ecken().stream().filter(e -> e.bund() == c.bund()).findFirst().orElse(null) : null;
+                if (a != null && (a.x() != c.x() || a.z() != c.z()) && !schiebeBund(c.bund(), f.dimension(), c.x() - a.x(), c.z() - a.z(), i)) {
                     zurueck(punkteVorher, eigeneVorher);
                     return false;
                 }
@@ -1042,25 +1043,26 @@ final class Wegpunkte {
     }
 
     /**
-     * Legt alle Glieder des Bunds {@code b} auf den Block (x, z) in {@code dimension}; auf dem Block einer Nachbarin wird eine
-     * Ecke mit ihr eine. False, sobald ein Wegpunkt des Bunds auf einen anderen träfe oder eine Form unter zwei Ecken fiele;
-     * dann ist ein Teil schon gezogen, und der Rufer setzt mit {@link #zurueck} zurück.
+     * Schiebt alle Glieder des Bunds {@code b} um (dx, dz) Blöcke, ausser denen der Form Nummer {@code ohne} (-1: keine); auf
+     * der Kreuzung einer Nachbarin wird eine Ecke mit ihr eine. So bleiben die Ecken auf einem Punkt und der Wegpunkt an derselben
+     * Ecke seines Blocks (K3). False, sobald ein Wegpunkt des Bunds auf einen anderen träfe oder eine Form unter zwei Ecken fiele;
+     * dann ist ein Teil schon geschoben, und der Rufer setzt mit {@link #zurueck} zurück. Siehe docs/wegpunkte.md, „Verbinden“.
      */
-    private boolean zieheBund(int b, String dimension, int x, int z) {
+    private boolean schiebeBund(int b, String dimension, int dx, int dz, int ohne) {
         for (int i = 0; i < punkte.size(); i++) {
             Punkt p = punkte.get(i);
             if (p.bund() == b) {
-                Punkt dort = punktAuf(dimension, x, z);
+                Punkt dort = punktAuf(dimension, p.x() + dx, p.z() + dz);
                 if (dort != null && !dort.equals(p)) {
                     return false;
                 }
-                punkte.set(i, new Punkt(p.id(), p.dimension(), x, z, p.farbe(), p.angeheftet(), p.tod(), p.ebene(), b, p.zeit()));
+                punkte.set(i, new Punkt(p.id(), p.dimension(), p.x() + dx, p.z() + dz, p.farbe(), p.angeheftet(), p.tod(), p.ebene(), b, p.zeit()));
             }
         }
         for (int i = 0; i < eigene.size(); i++) {
             EigeneForm f = eigene.get(i);
-            if (f.ecken().stream().anyMatch(c -> c.bund() == b)) {
-                List<Ecke> neu = gueltig(f.ecken().stream().map(c -> c.bund() == b ? c.auf(x, z) : c).toList());
+            if (i != ohne && f.ecken().stream().anyMatch(c -> c.bund() == b)) {
+                List<Ecke> neu = gueltig(f.ecken().stream().map(c -> c.bund() == b ? c.auf(c.x() + dx, c.z() + dz) : c).toList());
                 if (neu == null) {
                     return false;
                 }
@@ -1068,6 +1070,49 @@ final class Wegpunkte {
             }
         }
         return true;
+    }
+
+    /**
+     * Die Ecke des Blocks (bx, bz), die dem Punkt (x, z) der Welt am nächsten liegt: eine der vier Kreuzungen seiner Kanten.
+     * Siehe docs/wegpunkte.md, „Eigene Formen“.
+     */
+    static int[] eckeDesBlocks(int bx, int bz, double x, double z) {
+        return new int[] {x >= bx + 0.5 ? bx + 1 : bx, z >= bz + 0.5 ? bz + 1 : bz};
+    }
+
+    /** Der der vier Blöcke an der Kreuzung (x, z), der dem Punkt (wx, wz) der Welt am nächsten liegt (K2). */
+    static int[] blockAnEcke(int x, int z, double wx, double wz) {
+        return new int[] {wx < x ? x - 1 : x, wz < z ? z - 1 : z};
+    }
+
+    /** Die Kreuzung, auf der die Ecken des Glieds {@code g} und seines Bunds liegen, oder null bei einem losen Wegpunkt. */
+    private int[] kreuzung(Glied g) {
+        if (g.punkt() == null) {
+            return new int[] {g.x(), g.z()};
+        }
+        return glieder(g).stream().filter(e -> e.form() != null).findFirst().map(e -> new int[] {e.x(), e.z()}).orElse(null);
+    }
+
+    /**
+     * Um wie viele Blöcke {@code von} samt Bund zieht, wenn es sich mit {@code ziel} verbindet: Ecken auf die Kreuzung des Ziels;
+     * auf einen losen Wegpunkt auf die Ecke seines Blocks, die {@code nahe} am nächsten liegt; ein loser Wegpunkt auf den der vier
+     * Blöcke an der Kreuzung des Ziels, der {@code nahe} am nächsten liegt (K2). {@code nahe} ist beim Ziehen die Maus, sonst
+     * null, dann der alte Ort von {@code von}. Null, wenn beide lose Wegpunkte sind.
+     */
+    private int[] weg(Glied von, Glied ziel, double[] nahe) {
+        int[] a = kreuzung(von), z = kreuzung(ziel);
+        if (a != null && z != null) {
+            return new int[] {z[0] - a[0], z[1] - a[1]};
+        }
+        if (a != null) {
+            int[] e = nahe != null ? eckeDesBlocks(ziel.x(), ziel.z(), nahe[0], nahe[1]) : eckeDesBlocks(ziel.x(), ziel.z(), a[0], a[1]);
+            return new int[] {e[0] - a[0], e[1] - a[1]};
+        }
+        if (z != null) {
+            int[] blk = nahe != null ? blockAnEcke(z[0], z[1], nahe[0], nahe[1]) : blockAnEcke(z[0], z[1], von.x() + 0.5, von.z() + 0.5);
+            return new int[] {blk[0] - von.x(), blk[1] - von.z()};
+        }
+        return null;
     }
 
     /** Darf {@code von} mit {@code ziel} verbunden werden? Wenn {@link #warumNicht} keinen Grund findet. */
@@ -1081,6 +1126,11 @@ final class Wegpunkte {
      * Wegpunkt darin, und der nicht auf dem Block eines anderen. Siehe docs/wegpunkte.md, „Verbinden“.
      */
     String warumNicht(Glied von, Glied ziel) {
+        return warumNicht(von, ziel, null);
+    }
+
+    /** Wie {@link #warumNicht(Glied, Glied)}, beim Ziehen mit der Maus bei {@code nahe} in der Welt (siehe {@link #weg}). */
+    String warumNicht(Glied von, Glied ziel, double[] nahe) {
         if (von.punkt() != null && von.punkt().tod() || ziel.punkt() != null && ziel.punkt().tod()) {
             return "heroicmap.karte.verbinden_tod";
         }
@@ -1100,9 +1150,14 @@ final class Wegpunkte {
         if (wegpunkte.size() > 1) {
             return "heroicmap.karte.verbinden_wegpunkte";
         }
-        // Nur ein Wegpunkt im Bund kann auf einen anderen treffen; eine Ecke darf auf dem Block eines fremden liegen.
-        Punkt dort = punktAuf(ziel.dimension(), ziel.x(), ziel.z());
-        return wegpunkte.isEmpty() || dort == null || wegpunkte.contains(dort) ? null : "heroicmap.karte.koordinaten_belegt";
+        // Nur ein Wegpunkt, der mitzieht, kann auf einen anderen treffen; eine Ecke darf auf dem Block eines fremden liegen.
+        Punkt mit = a.stream().filter(g -> g.punkt() != null).map(Glied::punkt).findFirst().orElse(null);
+        int[] w = weg(von, ziel, nahe);
+        if (mit == null || w == null) {
+            return null;
+        }
+        Punkt dort = punktAuf(ziel.dimension(), mit.x() + w[0], mit.z() + w[1]);
+        return dort == null || dort.equals(mit) ? null : "heroicmap.karte.koordinaten_belegt";
     }
 
     /** Das Glied und alle anderen seines Bunds; lose nur es selbst. */
@@ -1123,22 +1178,33 @@ final class Wegpunkte {
     }
 
     /**
-     * Verbindet {@code von} mit {@code ziel}: {@code von} springt samt seinem Bund auf den Block von {@code ziel}, und beide
-     * Bünde werden einer. False, wenn es eins nicht mehr gibt oder sie sich nicht verbinden lassen ({@link #kannVerbinden}).
-     * Siehe docs/wegpunkte.md, „Verbinden“.
+     * Verbindet {@code von} mit {@code ziel}: {@code von} zieht samt seinem Bund um den {@link #weg} zum Ziel, und beide Bünde
+     * werden einer. False, wenn es eins nicht mehr gibt oder sie sich nicht verbinden lassen ({@link #kannVerbinden}). Siehe
+     * docs/wegpunkte.md, „Verbinden“.
      */
     boolean verbinde(Glied von, Glied ziel) {
-        if (!da(von) || !da(ziel) || !kannVerbinden(von, ziel)) {
+        return verbinde(von, ziel, null);
+    }
+
+    /** Wie {@link #verbinde(Glied, Glied)}, beim Ziehen mit der Maus bei {@code nahe} in der Welt (siehe {@link #weg}). */
+    boolean verbinde(Glied von, Glied ziel, double[] nahe) {
+        if (!da(von) || !da(ziel) || warumNicht(von, ziel, nahe) != null) {
             return false;
         }
-        int b = ziel.bund() > 0 ? ziel.bund() : von.bund() > 0 ? von.bund() : neuerBund();
+        int[] w = weg(von, ziel, nahe);
         List<Punkt> punkteVorher = List.copyOf(punkte);
         List<EigeneForm> eigeneVorher = List.copyOf(eigene);
-        binde(von, b);
-        binde(ziel, b);
-        if (!zieheBund(b, ziel.dimension(), ziel.x(), ziel.z())) {
+        // Erst bekommt der eigene Bund eine Zahl, dann zieht er; das Ziel bleibt dabei, wie es ist.
+        int eigener = von.bund() > 0 ? von.bund() : neuerBund();
+        binde(von, eigener);
+        if (!schiebeBund(eigener, von.dimension(), w[0], w[1], -1)) {
             zurueck(punkteVorher, eigeneVorher);
             return false;
+        }
+        if (ziel.bund() > 0) {
+            nenneUm(eigener, ziel.bund());
+        } else {
+            binde(ziel, eigener);
         }
         schreibe();
         return true;
@@ -1149,6 +1215,13 @@ final class Wegpunkte {
         return g.punkt() != null ? punkte.contains(g.punkt()) : eigene.contains(g.form()) && g.index() >= 0 && g.index() < g.form().ecken().size();
     }
 
+    /** Gibt allen Gliedern des Bunds {@code alt} die Zahl {@code b}. */
+    private void nenneUm(int alt, int b) {
+        punkte.replaceAll(p -> p.bund() == alt ? mitBund(p, b) : p);
+        eigene.replaceAll(f -> f.ecken().stream().noneMatch(c -> c.bund() == alt) ? f
+                : f.mitEcken(f.ecken().stream().map(c -> c.bund() == alt ? new Ecke(c.x(), c.z(), b) : c).toList()));
+    }
+
     /** Legt das Glied in den Bund {@code b}, mit seinem ganzen bisherigen Bund. */
     private void binde(Glied g, int b) {
         int alt = g.bund();
@@ -1156,9 +1229,7 @@ final class Wegpunkte {
             return;
         }
         if (alt > 0) {
-            punkte.replaceAll(p -> p.bund() == alt ? mitBund(p, b) : p);
-            eigene.replaceAll(f -> f.ecken().stream().noneMatch(c -> c.bund() == alt) ? f
-                    : f.mitEcken(f.ecken().stream().map(c -> c.bund() == alt ? new Ecke(c.x(), c.z(), b) : c).toList()));
+            nenneUm(alt, b);
         } else if (g.punkt() != null) {
             punkte.set(punkte.indexOf(g.punkt()), mitBund(g.punkt(), b));
         } else {
@@ -1193,17 +1264,18 @@ final class Wegpunkte {
     }
 
     /**
-     * Ordnet die Bünde: Ein Bund gilt nur für Glieder auf demselben Block; liegen sie auf mehreren, behält der erste Block die
-     * Zahl, jeder weitere bekommt eine neue, und wer allein bleibt, wird lose. Sonst bleiben die Zahlen, so trifft ein „Lösen“
-     * aus dem offenen Menü den richtigen Bund. So hält die Invariante nach jedem Löschen und nach einer älteren Version, die ein
-     * Glied verschob. Siehe docs/wegpunkte.md, „Verbinden“.
+     * Ordnet die Bünde: Die Ecken eines Bunds liegen auf einer Kreuzung, ein Wegpunkt darin auf einem der vier Blöcke daran (K3).
+     * Liegen Ecken auf mehreren Kreuzungen, behält die erste die Zahl, jede weitere bekommt eine neue; ein Wegpunkt ohne Kreuzung
+     * daneben und wer allein bleibt, wird lose. Sonst bleiben die Zahlen, so trifft ein „Lösen“ aus dem offenen Menü den richtigen
+     * Bund. So hält die Invariante nach jedem Löschen und nach einer älteren Version, die ein Glied verschob. Siehe
+     * docs/wegpunkte.md, „Verbinden“.
      */
     private void ordneBuende() {
         Map<List<Object>, Integer> zahl = new LinkedHashMap<>();
-        punkte.stream().filter(p -> p.bund() > 0).forEach(p -> zahl.merge(List.of(p.bund(), p.dimension(), p.x(), p.z()), 1, Integer::sum));
         for (EigeneForm f : eigene) {
             f.ecken().stream().filter(c -> c.bund() > 0).forEach(c -> zahl.merge(List.of(c.bund(), f.dimension(), c.x(), c.z()), 1, Integer::sum));
         }
+        punkte.stream().filter(p -> p.bund() > 0).forEach(p -> zahl.merge(schluessel(p, zahl.keySet()), 1, Integer::sum));
         Map<List<Object>, Integer> neu = new HashMap<>();
         Set<Integer> vergeben = new HashSet<>();
         int naechster = neuerBund();
@@ -1217,10 +1289,27 @@ final class Wegpunkte {
         if (gleich) {
             return;
         }
-        punkte.replaceAll(p -> p.bund() == 0 ? p : mitBund(p, neu.getOrDefault(List.of(p.bund(), p.dimension(), p.x(), p.z()), 0)));
+        Set<List<Object>> kreuzungen = Set.copyOf(zahl.keySet());
+        punkte.replaceAll(p -> p.bund() == 0 ? p : mitBund(p, neu.getOrDefault(schluessel(p, kreuzungen), 0)));
         eigene.replaceAll(f -> f.ecken().stream().allMatch(c -> c.bund() == 0) ? f : f.mitEcken(f.ecken().stream()
                 .map(c -> c.bund() == 0 ? c : new Ecke(c.x(), c.z(), neu.getOrDefault(List.of(c.bund(), f.dimension(), c.x(), c.z()), 0)))
                 .toList()));
+    }
+
+    /**
+     * Der Schlüssel eines verbundenen Wegpunkts in {@link #ordneBuende}: die Kreuzung seines Bunds an einer Ecke seines Blocks,
+     * wenn es eine unter {@code kreuzungen} gibt; sonst einer nur für ihn, der allein bleibt.
+     */
+    private static List<Object> schluessel(Punkt p, Set<List<Object>> kreuzungen) {
+        for (int dx = 0; dx <= 1; dx++) {
+            for (int dz = 0; dz <= 1; dz++) {
+                List<Object> k = List.of(p.bund(), p.dimension(), p.x() + dx, p.z() + dz);
+                if (kreuzungen.contains(k)) {
+                    return k;
+                }
+            }
+        }
+        return List.of(p.bund(), p.dimension(), "wegpunkt", p.x(), p.z());
     }
 
     void loesche(EigeneForm f) {
@@ -1411,7 +1500,7 @@ final class Wegpunkte {
         if (alt.bund() > 0) {
             List<Punkt> punkteVorher = List.copyOf(punkte);
             List<EigeneForm> eigeneVorher = List.copyOf(eigene);
-            if (!zieheBund(alt.bund(), alt.dimension(), x, z)) {
+            if (!schiebeBund(alt.bund(), alt.dimension(), x - alt.x(), z - alt.z(), -1)) {
                 zurueck(punkteVorher, eigeneVorher);
                 return false;
             }
@@ -1678,7 +1767,7 @@ final class Wegpunkte {
             if (!an(f.ebene())) {
                 continue;
             }
-            double[] p = mitten(f);
+            double[] p = kanten(f);
             Ebenen.Form form = form(f, p);
             Ebenen.Schrift name = schrift(f, p);
             int schicht = jeEbene ? f.ebene() : BASE;
@@ -1747,7 +1836,7 @@ final class Wegpunkte {
      * Farbe zu 25 % mit 1 Einheit Rand, eine Linie 2 Einheiten breit.
      */
     Ebenen.Form form(EigeneForm f) {
-        return form(f, mitten(f));
+        return form(f, kanten(f));
     }
 
     /**
@@ -1797,11 +1886,11 @@ final class Wegpunkte {
     }
 
     /** Die Mitten der Blöcke der Ecken, x und z abwechselnd. */
-    static double[] mitten(EigeneForm f) {
+    static double[] kanten(EigeneForm f) {
         double[] p = new double[2 * f.ecken().size()];
         for (int i = 0; i < f.ecken().size(); i++) {
-            p[2 * i] = f.ecken().get(i).x() + 0.5;
-            p[2 * i + 1] = f.ecken().get(i).z() + 0.5;
+            p[2 * i] = f.ecken().get(i).x();
+            p[2 * i + 1] = f.ecken().get(i).z();
         }
         return p;
     }
