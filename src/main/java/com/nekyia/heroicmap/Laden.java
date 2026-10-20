@@ -976,9 +976,10 @@ final class Laden {
 
     /**
      * Zählt den Bestand unter {@code wurzel} in einem Durchlauf. Ein Baum ist ein Ordner mit
-     * {@code massstab.txt} oder {@code satz.json}, bis zu drei Ebenen tief: {@code <welt>/<baum>},
-     * {@code <server>/<welt>/<baum>} und {@code <server>/<baum>} aus der Ablage vor dem Hash des
-     * Seeds. Was sich nicht lesen lässt, fällt weg; einer Verbindung folgt er nicht. Gibt
+     * {@code massstab.txt} oder {@code satz.json}, bis zu vier Ebenen tief: {@code <welt>/<baum>},
+     * {@code <server>/<welt>/<baum>}, mit einer Karte vom Plugin {@code karte-<karte>/<welt>/<baum>}
+     * und {@code <server>/karte-<karte>/<welt>/<baum>}, und {@code <server>/<baum>} aus der Ablage vor
+     * dem Hash des Seeds. Was sich nicht lesen lässt, fällt weg; einer Verbindung folgt er nicht. Gibt
      * {@code abbruch} wahr, endet er und gibt null.
      */
     static Bestand bestand(Path wurzel, BooleanSupplier abbruch) throws IOException {
@@ -988,7 +989,7 @@ final class Laden {
         // Ist heroicmap/ selbst eine Verbindung, etwa auf ein anderes Laufwerk, läuft der Durchlauf über ihr Ziel;
         // die Pfade rechnet er auf die Wurzel zurück, wie Downloads sie kennt.
         Path echt = wurzel.toRealPath();
-        // Bytes je Ordner der ersten drei Ebenen; ein Baum liegt höchstens dort.
+        // Bytes je Ordner der ersten vier Ebenen; ein Baum liegt höchstens dort.
         Map<Path, long[]> jeOrdner = new HashMap<>();
         Set<Path> baeume = new HashSet<>();
         long[] summe = {0};
@@ -1009,11 +1010,11 @@ final class Laden {
                 }
                 Path relativ = echt.relativize(datei);
                 String name = datei.getFileName().toString();
-                if (relativ.getNameCount() >= 2 && relativ.getNameCount() <= 4 && (name.equals("massstab.txt") || name.equals("satz.json"))) {
+                if (relativ.getNameCount() >= 2 && relativ.getNameCount() <= 5 && (name.equals("massstab.txt") || name.equals("satz.json"))) {
                     baeume.add(wurzel.resolve(relativ.getParent().toString()));
                 }
                 summe[0] += a.size();
-                for (int i = 1; i < relativ.getNameCount() && i <= 3; i++) {
+                for (int i = 1; i < relativ.getNameCount() && i <= 4; i++) {
                     jeOrdner.computeIfAbsent(wurzel.resolve(relativ.subpath(0, i).toString()), k -> new long[1])[0] += a.size();
                 }
                 return FileVisitResult.CONTINUE;

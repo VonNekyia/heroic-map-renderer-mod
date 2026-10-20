@@ -6,13 +6,14 @@ The release notes on GitHub and Modrinth come from here
 
 ## 0.2.66
 
+- **The minimap zooms out one step further,** to 0.5×: it shows four times the area, one pixel per block at GUI scale 2.
+- **Minimap zoom is a slider** in the menu, standing upright right next to the minimap, with one notch per step; up is closer, and the tooltip names the level. The mouse wheel over the minimap or the slider steps one notch. The zoom key still steps through all levels.
+- **The menu buttons move aside:** after you drag the minimap or resize it, the buttons go to the free side next to it.
 - **Zoom the minimap much further out,** down to 1/32: the slider now has nine notches from 1/32× to 8×. From 1/4× on, the minimap shows the tiles of your map, like the full map: from a download it then looks like the web map, and nearby changes appear once the tiles have them. Without a map it shows just the loaded chunks in the middle.
 
 ## 0.2.65
 
-- **The minimap zooms out one step further,** to 0.5×: it shows four times the area, one pixel per block at GUI scale 2.
-- **Minimap zoom is a slider** in the menu, standing upright right next to the minimap, with one notch per step; up is closer, and the tooltip names the level. The mouse wheel over the minimap or the slider steps one notch. The zoom key still steps through all levels.
-- **The menu buttons move aside:** after you drag the minimap or resize it, the buttons go to the free side next to it.
+- **One map folder per server behind a proxy.** With the plugin from 0.14.0 on, the server names its map, and the mod keeps each server's map, waypoints and layers in its own folder, even when two servers share a world. A server that shows another server's map uses that server's folder. Existing folders move once on the first join. From the second join on, the mod remembers the map and uses the right folder right away.
 
 ## 0.2.64
 
