@@ -45,41 +45,33 @@ final class Anzeige extends Screen {
                 .withValues(Minimap.BeiF3.values())
                 .withTooltip(f -> Tooltip.create(Component.translatable("heroicmap.menue.bei_f3.beschreibung")))
                 .create(x + breite - halb, y, halb, 20, Component.translatable("heroicmap.menue.bei_f3"), (b, f) -> m.setzeBeiF3(f)));
-        // Kurz, so passt neben ihr der Todespunkt; der volle Text steht im Tooltip. Siehe docs/minimap.md, „Bedienung“.
-        addRenderableWidget(CycleButton.builder((Integer px) -> Component.translatable("heroicmap.menue.px_kurz", px), m.aufloesung())
-                .withValues(1, 2, 4, 8, 16)
-                .withTooltip(px -> Tooltip.create(Component.translatable("heroicmap.menue.aufloesung.beschreibung")))
-                .create(x, y + 24, halb, 20, Component.translatable("heroicmap.menue.aufloesung"), (b, px) -> m.setzeScale(px)));
-        addRenderableWidget(new TodRegler(x + breite - halb, y + 24, halb));
+        // Auflösung und Koordinaten stellt das Hauptmenü an der Minimap ein (mod#173). Siehe docs/minimap.md, „Bedienung“.
         addRenderableWidget(CycleButton.onOffBuilder(m.chunklinien())
-                .create(x, y + 48, halb, 20, Component.translatable("heroicmap.menue.chunklinien"), (b, an) -> m.setzeChunklinien(an)));
+                .create(x, y + 24, halb, 20, Component.translatable("heroicmap.menue.chunklinien"), (b, an) -> m.setzeChunklinien(an)));
         addRenderableWidget(CycleButton.onOffBuilder(m.drehen())
-                .create(x + breite - halb, y + 48, halb, 20, Component.translatable("heroicmap.menue.drehen"), (b, an) -> m.setzeDrehen(an)));
+                .create(x + breite - halb, y + 24, halb, 20, Component.translatable("heroicmap.menue.drehen"), (b, an) -> m.setzeDrehen(an)));
         addRenderableWidget(CycleButton.onOffBuilder(m.verzierungen())
                 .withTooltip(an -> Tooltip.create(Component.translatable("heroicmap.menue.verzierungen.beschreibung")))
-                .create(x, y + 72, halb, 20, Component.translatable("heroicmap.menue.verzierungen"), (b, an) -> m.setzeVerzierungen(an)));
-        addRenderableWidget(CycleButton.builder((Minimap.Koordinaten k) -> Component.translatable(
-                        "heroicmap.menue.koordinaten." + k.name().toLowerCase(Locale.ROOT)), m.koordinaten())
-                .withValues(Minimap.Koordinaten.values())
-                .create(x + breite - halb, y + 72, halb, 20, Component.translatable("heroicmap.menue.koordinaten"), (b, k) -> m.setzeKoordinaten(k)));
+                .create(x, y + 48, halb, 20, Component.translatable("heroicmap.menue.verzierungen"), (b, an) -> m.setzeVerzierungen(an)));
+        addRenderableWidget(new TodRegler(x + breite - halb, y + 48, halb));
         addRenderableWidget(CycleButton.onOffBuilder(m.effekte())
                 .withTooltip(an -> Tooltip.create(Component.translatable("heroicmap.menue.effekte.beschreibung")))
-                .create(x, y + 96, halb, 20, Component.translatable("heroicmap.menue.effekte"), (b, an) -> m.setzeEffekte(an)));
-        addRenderableWidget(new SchleierRegler(x + breite - halb, y + 96, halb));
+                .create(x, y + 72, halb, 20, Component.translatable("heroicmap.menue.effekte"), (b, an) -> m.setzeEffekte(an)));
+        addRenderableWidget(new SchleierRegler(x + breite - halb, y + 72, halb));
         addRenderableWidget(CycleButton.builder((Downloads.Ablage a) -> Component.translatable(
                         "heroicmap.menue.ablage." + a.name().toLowerCase(Locale.ROOT)), m.ablage())
                 .withValues(Downloads.Ablage.values())
-                .create(x, y + 120, breite, 20, Component.translatable("heroicmap.menue.ablage"), (b, a) -> m.setzeAblage(a)));
+                .create(x, y + 96, breite, 20, Component.translatable("heroicmap.menue.ablage"), (b, a) -> m.setzeAblage(a)));
         addRenderableWidget(CycleButton.onOffBuilder(m.neueVersion())
                 .withTooltip(an -> Tooltip.create(Component.translatable("heroicmap.menue.neue_version.beschreibung")))
-                .create(x, y + 144, breite, 20, Component.translatable("heroicmap.menue.neue_version"), (b, an) -> {
+                .create(x, y + 120, breite, 20, Component.translatable("heroicmap.menue.neue_version"), (b, an) -> {
                     m.setzeNeueVersion(an);
                     // Angeschaltet fragt der Mod, wenn er in diesem Start noch nicht gefragt hat. Siehe docs/vollbildkarte.md, „Neue Version“.
                     NeueVersion.frage();
                 }));
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.menue.ebenen"),
-                b -> minecraft.gui.setScreen(new EbenenMenue(this))).bounds(x, y + 172, halb, 20).build());
-        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x + breite - halb, y + 172, halb, 20).build());
+                b -> minecraft.gui.setScreen(new EbenenMenue(this))).bounds(x, y + 148, halb, 20).build());
+        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x + breite - halb, y + 148, halb, 20).build());
     }
 
     /** Der Regler für die Höhe des Schleiers eigener Regionen, in ganzen Blöcken. Siehe docs/wegpunkte.md, „Schleier“. */

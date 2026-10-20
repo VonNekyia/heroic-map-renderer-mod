@@ -27,6 +27,31 @@ class EinstellungenTest {
     }
 
     @Test
+    void aufloesungHinterDenKoordinaten() {
+        int h = Einstellungen.REGLER_HOEHE;
+        Minimap.Rahmen r = new Minimap.Rahmen(100, RAND, 128);
+        // Die Zeile unter der Minimap: der Regler 2 darunter, so breit wie die Minimap.
+        int[] unten = {120, RAND + 128 + RAND + 2, 80, 9};
+        assertArrayEquals(new int[] {100, unten[1] + 9 + 2, 128}, Einstellungen.aufloesungLage(r, unten, RAND, 480));
+        // Unter der Zeile kein Platz mehr: über der Minimap, wenn dort Platz ist, sonst innen an ihrem unteren Rand.
+        Minimap.Rahmen mitte = new Minimap.Rahmen(100, 60, 128);
+        int[] zeile = {120, 60 + 128 + RAND + 2, 80, 9};
+        int hoehe = zeile[1] + 9 + 2 + h - 1;
+        assertEquals(60 - RAND - 2 - h, Einstellungen.aufloesungLage(mitte, zeile, RAND, hoehe)[1]);
+        assertEquals(RAND + 128 - h, Einstellungen.aufloesungLage(r, unten, RAND, unten[1] + 9 + 2 + h - 1)[1]);
+        // Die Zeile über der Minimap, die unten steht: der Regler über der Zeile.
+        Minimap.Rahmen tief = new Minimap.Rahmen(100, 300 - RAND - 128, 128);
+        int[] oben = {120, tief.y() - RAND - 2 - 9, 80, 9};
+        assertEquals(oben[1] - 2 - h, Einstellungen.aufloesungLage(tief, oben, RAND, 300)[1]);
+        // Ohne Zeile, etwa vor dem ersten Frame: unter der Minimap im Abstand des Randes.
+        assertEquals(RAND + 128 + RAND + 2, Einstellungen.aufloesungLage(r, null, RAND, 480)[1]);
+        // Die Zeile liegt unten auf einer Minimap, die fast die ganze Höhe nimmt: innen, über der Zeile.
+        Minimap.Rahmen gross = new Minimap.Rahmen(100, RAND, 232);
+        int[] drauf = {120, 240 - 9, 80, 9};
+        assertEquals(drauf[1] - 2 - h, Einstellungen.aufloesungLage(gross, drauf, RAND, 240)[1]);
+    }
+
+    @Test
     void ganzAufDemSchirmBeiJedemMassstab() {
         // Fenster 854 × 480, 1280 × 720 und 1920 × 1080, GUI-Massstab 1 bis 4; die Minimap in jeder Ecke, in der Mitte und
         // mittig am Rand, klein, mittel und so gross, wie sie der Schirm erlaubt.

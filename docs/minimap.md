@@ -47,12 +47,14 @@ steht unter „Kosten“.
 
 `/hmap` öffnet das Menü (`Einstellungen`):
 
-![Das Menü über der Szene des Gametests, die Minimap rund mit den Koordinaten darunter, links daneben der senkrechte Regler „Zoom der Minimap“; „Minimap“ ganz breit; im Einzelspieler ohne Plugin steht „Mitspieler“ rot](bilder/menue.png)
+![Das Menü über der Szene des Gametests, die Minimap rund mit den Koordinaten darunter, links daneben der senkrechte Regler „Zoom der Minimap“, unter den Koordinaten der Regler „Auflösung“; „Minimap“ ganz breit; im Einzelspieler ohne Plugin steht „Mitspieler“ rot](bilder/menue.png)
 
 | Einstellung | Vorgabe | tut |
 |---|---|---|
 | Minimap | an | blendet die Minimap aus und ein |
 | Zoom der Minimap | 2× | 1/32, 1/16, 1/8, 1/4, 1/2, 1, 2, 4 oder 8 Einheiten des GUI je Block: wie viel Gegend die Minimap zeigt; im Menü ein senkrechter Regler neben der Minimap mit einer Raste je Stufe, siehe unten; ab 1/4 aus den Kacheln, siehe „Weit heraus“ |
+| Auflösung | 2 px | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet; im Menü ein Regler unter der Minimap, siehe unten |
+| Koordinaten | xz | aus, `x z` oder `x y z` des Spielers unter der Minimap; im Menü ein Klick auf die Zeile, siehe „Koordinaten“ |
 | Mitspieler | Simple Voice Chat | siehe „Mitspieler“ |
 | Knopf „Karte laden …“ | – | die Karten des Servers, wie in der [Vollbildkarte](vollbildkarte.md), „Bedienung“ |
 | Knopf „Kartenliste …“ | – | alle Karten auf der Platte mit Grösse und Summe in GB, mit Löschen, siehe [Download](download.md), „Kartenliste“ |
@@ -61,19 +63,17 @@ steht unter „Kosten“.
 Das Untermenü „Einstellungen …“ hält, was man selten ändert; das Hauptmenü
 bleibt so kurz. „Fertig“ führt zurück ins Menü:
 
-![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien, halben Marken auf dem Ring und den Koordinaten darunter; „Form“ neben „Bei F3“, „Chunklinien“ neben „Drehen“, „Effekte in der Welt“ neben dem Regler „Schleier“, darunter „Ablage der Karten“ und „Neue Version melden“, unten „Ebenen …“ neben „Fertig“](bilder/anzeige.png)
+![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien, halben Marken auf dem Ring und den Koordinaten darunter; „Form“ neben „Bei F3“, „Chunklinien“ neben „Drehen“, „Verzierungen“ neben dem Regler „Todespunkte“, „Effekte in der Welt“ neben dem Regler „Schleier“, darunter „Ablage der Karten“ und „Neue Version melden“, unten „Ebenen …“ neben „Fertig“](bilder/anzeige.png)
 
 | Einstellung | Vorgabe | tut |
 |---|---|---|
 | Form | eckig | eckig oder rund, siehe „Form“ |
 | Bei F3 | bleibt | was die Minimap tut, solange der Debug-Bildschirm offen ist: bleibt, weg oder waagrecht in die Mitte, siehe „Bei F3“ |
-| Auflösung | 2 px | 1, 2, 4, 8 oder 16 Pixel je Block in den Texturen: wie fein sie höchstens zeichnet; der volle Text „Auflösung der Minimap“ steht im Tooltip |
 | Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte, siehe „Chunklinien“ |
 | Drehen | an | die Minimap dreht mit der Blickrichtung, siehe „Drehen“ |
 | Verzierungen | an | die Marken N, O, S, W des Rahmens, aus nur Bänder oder Ring, siehe [Rahmen](rahmen.md), „Verzierungen“ |
 | Effekte in der Welt | an | der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen, siehe [Wegpunkte](wegpunkte.md), „Strahl“ und „Schleier“ |
 | Schleier | 4 Blöcke | Regler neben „Effekte in der Welt“: wie hoch und deckend der Schleier eigener Regionen steht, 4 bis 16 Blöcke, siehe [Wegpunkte](wegpunkte.md), „Schleier“ |
-| Koordinaten | xz | aus, `x z` oder `x y z` des Spielers unter der Minimap, siehe „Koordinaten“ |
 | Todespunkte | 1 | Regler aus, 1 bis 16: so viele Wegpunkte, wo der Spieler gestorben ist, der neueste angeheftet, siehe [Wegpunkte](wegpunkte.md), „Todespunkt“ |
 | Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
 | Neue Version melden | an | fragt beim Start Modrinth nach einer neueren Version des Mods; der Tooltip sagt, dass Modrinth dabei die IP sieht; siehe [Vollbildkarte](vollbildkarte.md), „Neue Version“ |
@@ -132,11 +132,12 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
   stehen. Im Hauptmenü steht „Minimap“ allein in der ersten Zeile, ganz
   breit; dann teilen sich je zwei eine Zeile: „Karte laden …“ und
   „Kartenliste …“, „Einstellungen …“ und „Fertig“; im Untermenü
-  „Chunklinien“ und „Drehen“, „Verzierungen“ und „Koordinaten“, „Effekte in
-  der Welt“ und der Regler „Schleier“, „Auflösung“ und der Regler
-  „Todespunkte“, „Ebenen …“ und „Fertig“. Bei GUI-Massstab 3 passen
-  „Auflösung“ und „Todespunkte“ mit dem breitesten Wert, 16, ganz in ihren
-  halben Knopf, 98 Einheiten breit; das prüft
+  „Form“ und „Bei F3“, „Chunklinien“ und „Drehen“, „Verzierungen“ und der
+  Regler „Todespunkte“, „Effekte in der Welt“ und der Regler „Schleier“,
+  „Ebenen …“ und „Fertig“. „Auflösung“ und „Koordinaten“ stehen seit
+  mod#173 nicht mehr dort, sondern an der Minimap im Hauptmenü. Bei
+  GUI-Massstab 3 passt „Todespunkte“ mit dem breitesten Wert, 16, ganz in
+  seinen halben Knopf, 98 Einheiten breit; das prüft
   der Gametest `Bedienung.kleinerSchirm`. „Ablage der Karten“ bleibt ganz
   breit, halb passte sie in keiner Sprache; darunter ebenso „Neue Version
   melden“. Bei GUI-Massstab 4 sind die
@@ -145,7 +146,7 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
   Untermenü auch bei grossem GUI-Massstab auf den Schirm, bis 240
   Einheiten Höhe, etwa 1280 × 720 bei GUI-Massstab 3. Das Untermenü
   beginnt dafür höchstens 74 Einheiten über der Mitte und mindestens 30
-  unter dem oberen Rand; bei 240 Einheiten endet „Fertig“ bei 238
+  unter dem oberen Rand; bei 240 Einheiten endet „Fertig“ bei 214
   (`Anzeige.oben`).
 - **Koordinaten:** Im Menü stehen über der Minimap `x` und `z` des Blocks
   unter der Maus fest unten links, wie auf der Karte im Browser, genau wie
@@ -190,6 +191,25 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
     Seite.
   - **Beim Ziehen** folgt er der Minimap in jedem Frame. Ist die Minimap
     aus, fehlt er.
+- **Der Regler „Auflösung“** (`Einstellungen.AufloesungRegler`) steht im
+  Hauptmenü waagrecht unter der Minimap, so hat es der User gewünscht
+  (mod#173, Plan vom Reviewer freigegeben am 20.10.):
+  - **Aussehen:** ein Regler des Spiels, 20 Einheiten hoch, so breit wie
+    die Minimap; eine Raste je Stufe, 1, 2, 4, 8 und 16 px. Er zeigt kurz
+    „2 px“, so passt er auch unter die kleinste Minimap; den vollen Namen
+    und was er tut, nennt der Tooltip.
+  - **Bedienung:** Klick oder Ziehen stellt die nächste Raste, die
+    Pfeiltasten und das Mausrad über ihm gehen je eine.
+  - **Lage** (`Einstellungen.aufloesungLage`): auf der Seite der
+    Koordinaten, 2 Einheiten hinter ihrer Zeile, also unter der Minimap;
+    steht die Zeile darüber, weil die Minimap unten ist, dann über der
+    Zeile. Passt er dort nicht auf den Schirm, steht er auf der anderen
+    Seite der Minimap; passt er auch dort nicht, liegt er innen an ihrem
+    unteren Rand, über der Zeile, wenn diese auf ihr liegt. Das geschieht
+    nur bei grossem GUI-Massstab und einer Minimap fast so hoch wie der
+    Schirm, wie bei den Koordinaten.
+  - **Beim Ziehen** folgt er der Minimap und ihrer Zeile in jedem Frame. Ist
+    die Minimap aus, fehlt er.
 - **Reichweite:** Die Minimap zeichnet die Chunks, die sie zeigt, plus 2,
   höchstens bis zur Sichtweite des Clients plus 2 (`Minimap.reichweite`).
   Weiter hat der Client keine Chunks; bei 1/32 und 128 Einheiten wären es
@@ -408,10 +428,18 @@ seit dem 10.10. als Vorgabe.
 Unter der Minimap stehen die Blockkoordinaten des Spielers, abgerundet wie
 im Debug-Bildschirm des Spiels (`Mth.floor`). So hat es der User gewünscht.
 
-- **Schalter** „Koordinaten“ im Untermenü: aus, `xz` oder `xyz`, Vorgabe
-  `xz` (`Minimap.Koordinaten`). Gespeichert als `koordinaten` in
-  `heroicmap.properties`, `aus`, `xz` oder `xyz`; ein anderer Wert gilt als
-  Vorgabe.
+- **Stil:** aus, `xz` oder `xyz`, Vorgabe `xz` (`Minimap.Koordinaten`).
+  Gespeichert als `koordinaten` in `heroicmap.properties`, `aus`, `xz` oder
+  `xyz`; ein anderer Wert gilt als Vorgabe.
+- **Im Menü per Klick** (mod#173, so hat es der User gewünscht): Ein
+  Linksklick auf die Zeile wechselt den Stil reihum, aus → `xz` → `xyz` →
+  aus (`Einstellungen.naechste`). Einen Knopf im Untermenü gibt es dafür
+  nicht mehr.
+  - **Bei „aus“** steht die Zeile im Menü grau als „Koordinaten aus“, an
+    derselben Stelle; so lässt sich der Stil zurückholen. Im Spiel fehlt
+    sie wie bisher. So hat es der Reviewer am 20.10. entschieden.
+  - **Unter der Maus** steht die Zeile gelb, und ein Tooltip nennt den
+    Stil und den nächsten: „Koordinaten: xz – Klick: xyz“.
 - **Lage:** mittig unter der Minimap, in der Schrift des Spiels, weiss mit
   Schatten. 2 Einheiten Abstand unter dem Ring, mit Rahmen unter den
   Ornamenten, die halb über die Ecken ragen, so weit wie der Abstand zum

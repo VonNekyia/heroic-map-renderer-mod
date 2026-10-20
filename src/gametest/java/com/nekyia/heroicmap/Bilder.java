@@ -1002,6 +1002,9 @@ public final class Bilder implements FabricClientGameTest {
 
     /** Die Minimap rund bei 4 px, dann das Menü über der Szene. Siehe docs/minimap.md, „Bedienung“. */
     private static void menue(ClientGameTestContext context) {
+        // Die Maus in die Ecke und ohne Fokus, sonst stünde ein Tooltip oder ein heller Knopf im Bild: Nach Tasten in
+        // früheren Tests fokussiert das Spiel beim Öffnen einen Knopf.
+        context.getInput().setCursorPos(0, 0);
         context.runOnClient(mc -> Minimap.INSTANZ.setzeRund(true));
         context.waitTicks(2);
         Path rund = context.takeScreenshot(TestScreenshotOptions.of("minimap-rund").disableCounterPrefix());
@@ -1009,6 +1012,7 @@ public final class Bilder implements FabricClientGameTest {
             // Die Meldung zum Spielmodus läge sonst über den Knöpfen.
             mc.gui.hud.getChat().clearMessages(false);
             mc.gui.setScreen(new Einstellungen());
+            mc.gui.screen().setFocused(null);
         });
         context.waitTicks(5);
         Path menue = context.takeScreenshot(TestScreenshotOptions.of("menue").disableCounterPrefix());
@@ -1016,6 +1020,7 @@ public final class Bilder implements FabricClientGameTest {
         context.runOnClient(mc -> {
             Minimap.INSTANZ.setzeChunklinien(true);
             mc.gui.setScreen(new Anzeige(mc.gui.screen()));
+            mc.gui.screen().setFocused(null);
         });
         context.waitTicks(5);
         Path anzeige = context.takeScreenshot(TestScreenshotOptions.of("anzeige").disableCounterPrefix());
