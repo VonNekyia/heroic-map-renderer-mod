@@ -1,5 +1,7 @@
 package com.nekyia.heroicmap;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractSliderButton;
@@ -21,9 +23,18 @@ import net.minecraft.network.chat.Component;
 final class Anzeige extends Screen {
 
     private static final int TEXT = 0xFFFFFFFF;
+    /** Überschriften der Gruppen, hellgelb. */
+    private static final int UEBERSCHRIFT = 0xFFFFFFA0;
 
     private final Screen zurueck;
     private final MinimapKlick klick = new MinimapKlick();
+    /** Höhe einer Überschrift über ihrer Gruppe. */
+    private static final int GRUPPE = 12;
+    /** Eine Überschrift und wo sie steht. */
+    private record Gruppe(Component text, int y) {
+    }
+
+    private final List<Gruppe> gruppen = new ArrayList<>();
 
     Anzeige(Screen zurueck) {
         super(Component.translatable("heroicmap.anzeige.titel"));
@@ -37,41 +48,51 @@ final class Anzeige extends Screen {
         int x = s[0], breite = s[1], y = oben();
         // Je zwei Schalter teilen sich eine Zeile, so passt das Untermenü auch bei 240 Einheiten Höhe.
         int halb = (breite - 4) / 2;
-        addRenderableWidget(CycleButton.booleanBuilder(Component.translatable("heroicmap.menue.rund"),
-                        Component.translatable("heroicmap.menue.eckig"), m.rund())
-                .create(x, y, halb, 20, Component.translatable("heroicmap.menue.form"), (b, rund) -> m.setzeRund(rund)));
-        addRenderableWidget(CycleButton.builder((Minimap.BeiF3 f) -> Component.translatable(
-                        "heroicmap.menue.bei_f3." + f.name().toLowerCase(Locale.ROOT)), m.beiF3())
-                .withValues(Minimap.BeiF3.values())
-                .withTooltip(f -> Tooltip.create(Component.translatable("heroicmap.menue.bei_f3.beschreibung")))
-                .create(x + breite - halb, y, halb, 20, Component.translatable("heroicmap.menue.bei_f3"), (b, f) -> m.setzeBeiF3(f)));
-        // Auflösung und Koordinaten stellt das Hauptmenü an der Minimap ein (mod#173). Siehe docs/minimap.md, „Bedienung“.
-        addRenderableWidget(CycleButton.onOffBuilder(m.chunklinien())
-                .create(x, y + 24, halb, 20, Component.translatable("heroicmap.menue.chunklinien"), (b, an) -> m.setzeChunklinien(an)));
-        addRenderableWidget(CycleButton.onOffBuilder(m.drehen())
-                .create(x + breite - halb, y + 24, halb, 20, Component.translatable("heroicmap.menue.drehen"), (b, an) -> m.setzeDrehen(an)));
-        addRenderableWidget(CycleButton.onOffBuilder(m.verzierungen())
-                .withTooltip(an -> Tooltip.create(Component.translatable("heroicmap.menue.verzierungen.beschreibung")))
-                .create(x, y + 48, halb, 20, Component.translatable("heroicmap.menue.verzierungen"), (b, an) -> m.setzeVerzierungen(an)));
-        addRenderableWidget(new TodRegler(x + breite - halb, y + 48, halb));
+        // In Gruppen mit Überschrift; was die Minimap selbst angeht, stellt das Hauptmenü an ihr ein (mod#173, mod#175).
+        // „Technik“ ist ein Knopf zum Auf- und Zuklappen, gemerkt in heroicmap.properties. Siehe docs/minimap.md, „Bedienung“.
+        gruppen.clear();
+        gruppen.add(new Gruppe(Component.translatable("heroicmap.anzeige.gruppe.wegpunkte"), y));
+        y += GRUPPE;
+        addRenderableWidget(new TodRegler(x, y, breite));
+        y += 24;
+        gruppen.add(new Gruppe(Component.translatable("heroicmap.anzeige.gruppe.welt"), y));
+        y += GRUPPE;
         addRenderableWidget(CycleButton.onOffBuilder(m.effekte())
                 .withTooltip(an -> Tooltip.create(Component.translatable("heroicmap.menue.effekte.beschreibung")))
-                .create(x, y + 72, halb, 20, Component.translatable("heroicmap.menue.effekte"), (b, an) -> m.setzeEffekte(an)));
-        addRenderableWidget(new SchleierRegler(x + breite - halb, y + 72, halb));
-        addRenderableWidget(CycleButton.builder((Downloads.Ablage a) -> Component.translatable(
-                        "heroicmap.menue.ablage." + a.name().toLowerCase(Locale.ROOT)), m.ablage())
-                .withValues(Downloads.Ablage.values())
-                .create(x, y + 96, breite, 20, Component.translatable("heroicmap.menue.ablage"), (b, a) -> m.setzeAblage(a)));
-        addRenderableWidget(CycleButton.onOffBuilder(m.neueVersion())
-                .withTooltip(an -> Tooltip.create(Component.translatable("heroicmap.menue.neue_version.beschreibung")))
-                .create(x, y + 120, breite, 20, Component.translatable("heroicmap.menue.neue_version"), (b, an) -> {
-                    m.setzeNeueVersion(an);
-                    // Angeschaltet fragt der Mod, wenn er in diesem Start noch nicht gefragt hat. Siehe docs/vollbildkarte.md, „Neue Version“.
-                    NeueVersion.frage();
-                }));
+                .create(x, y, halb, 20, Component.translatable("heroicmap.menue.effekte"), (b, an) -> m.setzeEffekte(an)));
+        addRenderableWidget(new SchleierRegler(x + breite - halb, y, halb));
+        y += 24;
+        addRenderableWidget(Button.builder(Component.translatable(m.technikOffen() ? "heroicmap.anzeige.gruppe.technik.auf"
+                : "heroicmap.anzeige.gruppe.technik.zu"), b -> {
+            m.setzeTechnikOffen(!m.technikOffen());
+            rebuildWidgets();
+        }).bounds(x, y, breite, 20).build());
+        y += 24;
+        if (m.technikOffen()) {
+            addRenderableWidget(CycleButton.builder((Minimap.BeiF3 f) -> Component.translatable(
+                            "heroicmap.menue.bei_f3." + f.name().toLowerCase(Locale.ROOT)), m.beiF3())
+                    .withValues(Minimap.BeiF3.values())
+                    .withTooltip(f -> Tooltip.create(Component.translatable("heroicmap.menue.bei_f3.beschreibung")))
+                    .create(x, y, breite, 20, Component.translatable("heroicmap.menue.bei_f3"), (b, f) -> m.setzeBeiF3(f)));
+            y += 24;
+            addRenderableWidget(CycleButton.builder((Downloads.Ablage a) -> Component.translatable(
+                            "heroicmap.menue.ablage." + a.name().toLowerCase(Locale.ROOT)), m.ablage())
+                    .withValues(Downloads.Ablage.values())
+                    .create(x, y, breite, 20, Component.translatable("heroicmap.menue.ablage"), (b, a) -> m.setzeAblage(a)));
+            y += 24;
+            addRenderableWidget(CycleButton.onOffBuilder(m.neueVersion())
+                    .withTooltip(an -> Tooltip.create(Component.translatable("heroicmap.menue.neue_version.beschreibung")))
+                    .create(x, y, breite, 20, Component.translatable("heroicmap.menue.neue_version"), (b, an) -> {
+                        m.setzeNeueVersion(an);
+                        // Angeschaltet fragt der Mod, wenn er in diesem Start noch nicht gefragt hat. Siehe docs/vollbildkarte.md, „Neue Version“.
+                        NeueVersion.frage();
+                    }));
+            y += 24;
+        }
+        y += 4;
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.menue.ebenen"),
-                b -> minecraft.gui.setScreen(new EbenenMenue(this))).bounds(x, y + 148, halb, 20).build());
-        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x + breite - halb, y + 148, halb, 20).build());
+                b -> minecraft.gui.setScreen(new EbenenMenue(this))).bounds(x, y, halb, 20).build());
+        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x + breite - halb, y, halb, 20).build());
     }
 
     /** Der Regler für die Höhe des Schleiers eigener Regionen, in ganzen Blöcken. Siehe docs/wegpunkte.md, „Schleier“. */
@@ -133,6 +154,9 @@ final class Anzeige extends Screen {
         super.extractRenderState(g, mausX, mausY, delta);
         int[] s = Einstellungen.spalte(width, height);
         g.centeredText(font, title, s[0] + s[1] / 2, oben() - 14, TEXT);
+        for (Gruppe gruppe : gruppen) {
+            g.text(font, gruppe.text(), s[0], gruppe.y() + 1, UEBERSCHRIFT, true);
+        }
         klick.zeichne(g, font, mausX, mausY, true);
     }
 
