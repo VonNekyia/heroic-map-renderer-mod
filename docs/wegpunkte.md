@@ -713,19 +713,39 @@ am 18.10. (mod#128); Plan, Farbe und Ort hat der Reviewer freigegeben.
     zum Bogen. Die Rechnung je Zeichen teilt er mit dem Namen eines
     Banners (`Ebenen.bogen`); dessen Bogen bleibt bytegleich. Nach unten
     gewölbt umfasst der Name den Griff, statt ihn zu kreuzen.
-  - **Bedienung** (`Karte.benennen`): Die Regler sind grau, solange das
-    Feld leer ist; so lassen sich Schrift und Biegung schon beim ersten
-    Benennen stellen. Ein Regler wirkt gleich auf Karte und Minimap, nur
-    im Speicher (`Wegpunkte.stil`). Enter speichert Name, Schrift und
-    Biegung. `Esc`, ein Klick neben Feld und Regler und ein neuer Aufbau
-    des Schirms nehmen Schrift und Biegung zurück. Ein Klick auf einen
+  - **Schriftart:** unter den Reglern ein Knopf „Schriftart: Karte |
+    Minecraft“, gewünscht vom User am 20.10. (mod#171); Plan mit Bildern
+    vom Reviewer freigegeben, F1 bis F4. „Minecraft“ ist die Schrift des
+    Spiels ohne eigene Schrift; mit „Unicode-Schrift erzwingen“ zeichnet
+    das Spiel dann die Unicode-Schrift. Grösse und Biegung gelten wie mit
+    der Kartenschrift, und die Grossbuchstaben stehen in allen dreien gleich
+    hoch (F1, `Formen.schriftKappe`): Kartenschrift `Formen.KAPPE`, die
+    Schrift des Spiels 7 ihrer Einheiten, die Unicode-Schrift 5, denn ihr H
+    ist 10 von 16 Pixeln hoch, und ihre Glyphen stehen halb so gross
+    (`getOversample` 2, per javap an 26.3). Welche gilt, liest
+    `Formen.neuGeladen` nach jedem Wechsel der Schrift aus der Option. Nur
+    eigene Formen (F2): Schrift vom Server, Nadeln und Banner bleiben in der
+    Kartenschrift, und das Format des Plugins ändert sich nicht. Ein Knopf
+    mit zwei Zuständen, kein Kästchen (F3).
+  - **Bedienung** (`Karte.benennen`): Die Regler und der Knopf sind grau,
+    solange das Feld leer ist; so lassen sich Schrift, Biegung und
+    Schriftart schon beim ersten Benennen stellen. Ein Regler wirkt gleich auf Karte und Minimap, nur
+    im Speicher (`Wegpunkte.stil`, `Wegpunkte.schriftart`). Enter speichert
+    Name, Schrift, Biegung und Schriftart. `Esc`, ein Klick neben Feld und
+    Regler und ein neuer Aufbau des Schirms nehmen sie zurück. Ein Klick auf einen
     Regler, auch einen grauen, schliesst das Feld nicht; die Tasten
     gehören weiter dem Feld.
   - **Auf dem Schirm:** Das Feld öffnet an der Stelle des Menüs der Form,
     und das rückt mit mindestens fünf Einträgen, 70 Einheiten hoch, so weit
-    nach oben, dass darunter Feld und Regler Platz haben: mit zwei Reglern
-    64 Einheiten, an einer Linie 42. Bei GUI-Massstab 3 und 4 prüft der
+    nach oben, dass darunter Platz ist. Feld, Regler und Knopf brauchen an
+    einer Region 86 Einheiten, an einer Linie 64; reicht der Platz unter dem
+    Menü nicht, rückt das Feld höher. Bei GUI-Massstab 3 und 4 prüft der
     Gametest das am unteren Rand.
+  - **Schriftart gespeichert** als `"schriftart": "minecraft"` an der Form
+    in `wegpunkte.json`, nur mit der Minecraft-Schrift; ohne das Feld, mit
+    einer anderen Schriftart oder einem Wert, der kein Text ist, gilt die
+    Kartenschrift, und die Form bleibt (`Wegpunkte.SCHRIFTART_MINECRAFT`).
+    Ältere Versionen überlesen das Feld.
   - **Gespeichert** in `wegpunkte.json` als `schrift` und `biegung` an der
     Form, nur ohne Vorgabe; alte Dateien bleiben gleich. Gelesen auf die
     nächste Raste; ausserhalb der Grenzen oder ohne Zahl gilt die
@@ -880,8 +900,9 @@ bei einem anderen Spieler als neue Ebene an. Gewünscht vom User am 18.10.
   Form der Index oder ihre eigene Farbe als `#RRGGBB`, siehe „Farbe“; mit
   eigener Farbe steht kein Index darin, eingefügt ist er 0. `schrift` und
   `biegung` wie in der Datei, siehe „Namen“, ebenso `gewicht`, siehe
-  „Gewicht“, nur ohne Vorgabe; ältere Versionen überlesen sie, `v` bleibt
-  1.
+  „Gewicht“, und `schriftart`, nur ohne Vorgabe; ältere Versionen
+  überlesen sie, `v` bleibt 1. Eine `schriftart`, die kein Text ist, ist
+  kaputt; eine unbekannte heisst die Kartenschrift.
 - **Nicht darin:** Angeheftetes, Mitspieler, Formen vom Server, der
   Todespunkt, alte Rechtecke und Verbindungen, siehe „Verbinden“. Eine
   Ecke hat im Code genau zwei Zahlen, denn ältere Versionen lehnen eine mit
@@ -1103,7 +1124,9 @@ Schleier am Rand, siehe „Schleier“.
   Namen), `schriftUndBiegungJeForm` (Faktor und Bogenmass, eine Linie
   biegt nicht, nur ohne Vorgabe gespeichert, Rasten und Vorgabe beim
   Lesen), `gewichtLegtFormenUebereinander` (eine Liste je Gewicht,
-  aufsteigend, alle 0 wie vorher, Datei und Grenzen),
+  aufsteigend, alle 0 wie vorher, Datei und Grenzen), `schriftartMinecraft`
+  (im Speicher, gespeichert mit dem Namen, in der Datei nur „minecraft“,
+  eine andere oder kaputte gibt die Kartenschrift, Kopien tragen sie mit),
   `trefferNachGewicht`. Zur Farbe: `hexFarbeLesenSchreibenUndUeberall` (gültig und
   ungültig, auch Ziffern anderer Schriften; Rand und Füllung; über die
   Datei, mit dem Index daneben; weggenommen; eine Farbe, die keine ist).
@@ -1131,7 +1154,9 @@ Schleier am Rand, siehe „Schleier“.
   Lesen jede Grenze, eine Bombe, ein halber Code, falsche Felder und
   unbekannte, die es überliest (`lesenPrueftAllesOderNichts`); Schrift und
   Biegung hin und zurück, auf die Raste, falsche Werte kaputt
-  (`schriftUndBiegungImCode`), ebenso das Gewicht; tief
+  (`schriftUndBiegungImCode`), ebenso das Gewicht; die Schriftart hin und
+  zurück, eine unbekannte als Kartenschrift, eine Zahl kaputt
+  (`schriftartImCode`); tief
   verschachteltes JSON und eine Zahl mit 200 000 Ziffern
   (`boesartigeCodesSindKaputtOhneZuWerfen`); verbundene Formen gehen ohne
   Bünde in den Code, mit zwei Zahlen je Ecke (`codeOhneBuende`).
@@ -1216,8 +1241,14 @@ Schleier am Rand, siehe „Schleier“.
   beide auf eine Raste geklickt, wirkt es gleich, in der Datei steht es
   erst nach Enter. Wieder geöffnet stehen sie auf den Rasten; die Biegung
   verstellt und `Esc` nimmt sie zurück. An einer Linie nur „Schrift“. Bei
-  GUI-Massstab 3 und 4 liegen Feld und Regler am unteren Rand ganz auf
-  dem Schirm. Gewicht (`gewicht`): zwei überlappende Regionen, A rot, B
+  GUI-Massstab 3 und 4 liegen Feld, Regler und der Knopf „Schriftart“ am
+  unteren Rand ganz auf dem Schirm. Schriftart (`schriftart`): Ein Klick von
+  Hand auf den Knopf schaltet gleich auf die Minecraft-Schrift, in der Datei
+  steht sie erst nach Enter; im Bild `schriftart-minecraft.png` ist der Name
+  unter dem Griff anders als in `schriftart-karte.png`; mit „Unicode-Schrift
+  erzwingen“ (`schriftart-unicode.png`) stehen die Grossbuchstaben auf eine
+  Einheit so hoch wie ohne; zurückgeschaltet und `Esc` gibt wieder die
+  Minecraft-Schrift. Gewicht (`gewicht`): zwei überlappende Regionen, A rot, B
   blau; „Farbe…“ an A, der Regler „Gewicht“ auf +2, und im Bildschirmfoto
   wird der Rand von B in A röter, denn die Fläche von A liegt jetzt
   darüber; in der Datei erst nach Enter; −3 und `Esc` nimmt zurück; bei

@@ -357,7 +357,34 @@ class FormenTest {
 
     private static Ebenen.Schrift schrift(String text, float kontur) {
         return new Ebenen.Schrift(Ebenen.UEBERWELT, text, new double[] {0, 0, 100, 0}, 16, 0, 0xFF2B2B2B, 0xFFF2E8D0, kontur,
-                new double[] {0, 0, 100, 0}, 0);
+                new double[] {0, 0, 100, 0}, 0, false);
+    }
+
+    /**
+     * Die Höhe der Grossbuchstaben je Schrift (mod#171): Kartenschrift {@code KAPPE}, Minecraft-Schrift 7, mit „Unicode-Schrift
+     * erzwingen“ 5; danach richtet sich der Massstab der Glyphen, so stehen die Grossbuchstaben in allen gleich hoch.
+     */
+    @Test
+    void hoeheDerGrossbuchstabenJeSchrift() {
+        Ebenen.Schrift karte = schrift("AB", 0);
+        Ebenen.Schrift mc = new Ebenen.Schrift(Ebenen.UEBERWELT, "AB", new double[] {0, 0, 100, 0}, 16, 0, 0xFF2B2B2B, 0xFFF2E8D0, 0,
+                new double[] {0, 0, 100, 0}, 0, true);
+        float vorher = Formen.minecraftKappe;
+        try {
+            assertEquals(Formen.KAPPE, Formen.schriftKappe(karte));
+            Formen.minecraftKappe = Formen.MINECRAFT_KAPPE;
+            assertEquals(7, Formen.schriftKappe(mc));
+            double[] p = {0, 0, 100, 0};
+            float[] kasten = {-1000, -1000, 1000, -1000, 1000, 1000, -1000, 1000};
+            double massstab = Formen.glyphen(mc, p, new double[] {8, 8}, 14, 1, kasten, new int[] {Formen.MAX_ZEICHEN}).getFirst().massstab();
+            assertEquals(2, massstab, 1e-9);
+            Formen.minecraftKappe = Formen.UNICODE_KAPPE;
+            assertEquals(5, Formen.schriftKappe(mc));
+            massstab = Formen.glyphen(mc, p, new double[] {8, 8}, 14, 1, kasten, new int[] {Formen.MAX_ZEICHEN}).getFirst().massstab();
+            assertEquals(14 / 5.0, massstab, 1e-9);
+        } finally {
+            Formen.minecraftKappe = vorher;
+        }
     }
 
     @Test
@@ -412,13 +439,13 @@ class FormenTest {
         float[] kasten = Drehung.rechteck(-1000, -1000, 1000, 1000);
         // Kontur mit Alpha 0: nur die zwei Füllungen, zwei Glyphen vom Budget.
         int[] rest = {Formen.MAX_ZEICHEN};
-        List<Formen.Glyphe> ohneKontur = Formen.glyphen(new Ebenen.Schrift(Ebenen.UEBERWELT, "AB", p, 16, 0, 0xFF2B2B2B, 0x00F2E8D0, 1, p, 0),
+        List<Formen.Glyphe> ohneKontur = Formen.glyphen(new Ebenen.Schrift(Ebenen.UEBERWELT, "AB", p, 16, 0, 0xFF2B2B2B, 0x00F2E8D0, 1, p, 0, false),
                 p, new double[] {8, 8}, 16, 1, kasten, rest);
         assertEquals(2, ohneKontur.size());
         assertEquals(0xFF2B2B2B, ohneKontur.getFirst().farbe());
         assertEquals(Formen.MAX_ZEICHEN - 2, rest[0]);
         // Füllung mit Alpha 0: nur die 2 · 8 Kopien der Kontur.
-        List<Formen.Glyphe> ohneFuellung = Formen.glyphen(new Ebenen.Schrift(Ebenen.UEBERWELT, "AB", p, 16, 0, 0x002B2B2B, 0xFFF2E8D0, 1, p, 0),
+        List<Formen.Glyphe> ohneFuellung = Formen.glyphen(new Ebenen.Schrift(Ebenen.UEBERWELT, "AB", p, 16, 0, 0x002B2B2B, 0xFFF2E8D0, 1, p, 0, false),
                 p, new double[] {8, 8}, 16, 1, kasten, rest);
         assertEquals(16, ohneFuellung.size());
         assertTrue(ohneFuellung.stream().allMatch(gl -> gl.farbe() == 0xFFF2E8D0));
@@ -444,9 +471,9 @@ class FormenTest {
         // Der Pfad liegt links neben der Welt, der lange Text reicht hinein; ein kurzer nicht.
         Formen.Ansicht a = ansicht(Minimap.abbild(1, 1, 0, 0, Drehung.Lage.von(0, 0, 0, 0, 0)));
         Ebenen.Schrift lang = new Ebenen.Schrift(Ebenen.UEBERWELT, "x".repeat(64), new double[] {-200, 30}, 16, 0, 0, 0, 0,
-                new double[] {-200, 30, -200, 30}, 0);
+                new double[] {-200, 30, -200, 30}, 0, false);
         Ebenen.Schrift kurz = new Ebenen.Schrift(Ebenen.UEBERWELT, "x", new double[] {-200, 30}, 16, 0, 0, 0, 0,
-                new double[] {-200, 30, -200, 30}, 0);
+                new double[] {-200, 30, -200, 30}, 0, false);
         assertTrue(Formen.sichtbar(a, lang));
         assertFalse(Formen.sichtbar(a, kurz));
     }

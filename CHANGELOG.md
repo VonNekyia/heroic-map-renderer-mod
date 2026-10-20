@@ -4,6 +4,14 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.66
+
+- **The minimap zooms out one step further,** to 0.5×: it shows four times the area, one pixel per block at GUI scale 2.
+- **Minimap zoom is a slider** in the menu, standing upright right next to the minimap, with one notch per step; up is closer, and the tooltip names the level. The mouse wheel over the minimap or the slider steps one notch. The zoom key still steps through all levels.
+- **The menu buttons move aside:** after you drag the minimap or resize it, the buttons go to the free side next to it.
+- **Zoom the minimap much further out,** down to 1/32: the slider now has nine notches from 1/32× to 8×. From 1/4× on, the minimap shows the tiles of your map, like the full map: from a download it then looks like the web map, and nearby changes appear once the tiles have them. Without a map it shows just the loaded chunks in the middle.
+- **Minecraft font for names.** Under the size and curve sliders of a shape's name sits a "Font" button: Map or Minecraft. It shows right away on the full map and the minimap; Enter saves, Esc undoes. With "Force Unicode Font" the game draws its Unicode font; capital letters stay the same height in all fonts. Only your own shapes; names from the server stay in the map font.
+
 ## 0.2.65
 
 - **Lines and regions now sit between blocks.** Corners of your own lines and regions lie on the edges between blocks instead of in the middle of a block, so two joined regions share an exact border. Waypoints stay on blocks; a corner at a waypoint sits on the nearest corner of its block. **Existing shapes move half a block north-west:** the saved numbers stay the same and now mean the north-west corner of their block, so nothing needs converting and shapes that touched still touch. Older versions show the same shapes half a block south-east.

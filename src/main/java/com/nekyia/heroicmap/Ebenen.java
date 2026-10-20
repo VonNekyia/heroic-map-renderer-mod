@@ -204,7 +204,7 @@ public final class Ebenen {
      * Pfad aus einem Punkt, sonst 0. Vom Server immer 0. Siehe docs/wegpunkte.md, „Namen“.
      */
     record Schrift(String dimension, String text, double[] pfad, float groesse, float sperrung, int farbe, int konturFarbe, float konturBreite,
-            double[] box, double biegung) implements Form {
+            double[] box, double biegung, boolean minecraft) implements Form {
     }
 
     /** Schild und Nadel einer Grösse: Feld zum Tönen und Rahmen mit Nadel, gleich gross, der Fuss unten in der Mitte. */
@@ -726,7 +726,7 @@ public final class Ebenen {
             float b = zahl(k, "width", 0);
             konturBreite = b > 0 ? Math.min(b, MAX_BREITE) : 0;
         }
-        return new Schrift(dimension, text, pfad, groesse, sperrung, farbe, konturFarbe, konturBreite, box(List.of(pfad)), 0);
+        return new Schrift(dimension, text, pfad, groesse, sperrung, farbe, konturFarbe, konturBreite, box(List.of(pfad)), 0, false);
     }
 
     /** Die Punkte [[x, z], …] als {x0, z0, …}; mit weniger als {@code mindestens} oder mehr als {@link #MAX_PUNKTE} wirft sie. */

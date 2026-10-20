@@ -428,8 +428,45 @@ class WegpunkteTest {
     }
 
     private static void felder(Wegpunkte.EigeneForm soll, Wegpunkte.EigeneForm ist) {
-        assertEquals(List.of(soll.name(), soll.hex(), soll.schrift(), soll.biegung(), soll.gewicht(), soll.farbe(), soll.ebene()),
-                List.of(ist.name(), ist.hex(), ist.schrift(), ist.biegung(), ist.gewicht(), ist.farbe(), ist.ebene()));
+        assertEquals(List.of(soll.name(), soll.hex(), soll.schrift(), soll.biegung(), soll.gewicht(), soll.farbe(), soll.ebene(), soll.minecraft()),
+                List.of(ist.name(), ist.hex(), ist.schrift(), ist.biegung(), ist.gewicht(), ist.farbe(), ist.ebene(), ist.minecraft()));
+    }
+
+    /**
+     * Die Schriftart eines Namens (mod#171): im Speicher wie Schrift und Biegung, gespeichert mit dem Namen; in der Datei nur
+     * „minecraft“, so bleibt eine Datei ohne sie gleich; eine andere oder kaputte gibt die Kartenschrift; Anheften, Ebene, Stil und
+     * Farbe tragen sie mit; die Schrift auf der Karte weiss sie. Siehe docs/wegpunkte.md, „Namen“.
+     */
+    @Test
+    void schriftartMinecraft(@TempDir Path ordner) throws Exception {
+        Wegpunkte w = new Wegpunkte();
+        w.lies(ordner);
+        w.setzeForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10)));
+        assertFalse(Files.readString(ordner.resolve("wegpunkte.json")).contains("schriftart"));
+        Wegpunkte.EigeneForm f = w.schriftart(w.eigeneFormen().get(0), true);
+        assertTrue(f.minecraft());
+        w.benenne(f, "Hof");
+        assertTrue(Files.readString(ordner.resolve("wegpunkte.json")).contains("\"schriftart\":\"minecraft\""));
+        Wegpunkte nachher = new Wegpunkte();
+        nachher.lies(ordner);
+        assertTrue(nachher.eigeneFormen().get(0).minecraft());
+        assertTrue(Wegpunkte.schrift(nachher.eigeneFormen().get(0), Wegpunkte.mitten(nachher.eigeneFormen().get(0))).minecraft());
+        // Stil, Anheften, Farbe und Ebene tragen sie mit.
+        Wegpunkte.EigeneForm g = nachher.stil(nachher.eigeneFormen().get(0), 2, 30, 1);
+        assertTrue(g.minecraft());
+        assertTrue(nachher.umschalten(g));
+        nachher.faerbe(nachher.eigeneFormen().get(0), 0x123456);
+        nachher.ordne(nachher.eigeneFormen().get(0), nachher.neueEbene("E"));
+        assertTrue(nachher.eigeneFormen().get(0).minecraft());
+        // Zurück zur Kartenschrift: das Feld fällt weg.
+        nachher.benenne(nachher.schriftart(nachher.eigeneFormen().get(0), false), "Hof");
+        assertFalse(Files.readString(ordner.resolve("wegpunkte.json")).contains("schriftart"));
+        // Eine andere Schriftart, auch eine spätere, und eine kaputte geben die Kartenschrift; die Form bleibt.
+        Wegpunkte alt = new Wegpunkte();
+        alt.lies(JsonParser.parseString("{\"eigene_formen\":["
+                + "{\"dimension\":\"" + WELT + "\",\"ecken\":[[0,0],[5,5]],\"farbe\":0,\"minimap\":false,\"schriftart\":\"gotisch\"},"
+                + "{\"dimension\":\"" + WELT + "\",\"ecken\":[[0,9],[5,9]],\"farbe\":0,\"minimap\":false,\"schriftart\":7}]}").getAsJsonObject());
+        assertEquals(List.of(false, false), alt.eigeneFormen().stream().map(Wegpunkte.EigeneForm::minecraft).toList());
     }
 
     /**

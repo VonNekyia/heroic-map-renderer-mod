@@ -44,6 +44,51 @@ public final class Messung implements FabricClientGameTest {
     private static final String RAHMEN = System.getProperty("heroicmap.messung.rahmen", Skin.OHNE);
     /** Mit {@code -PmessungEffekte=true} nur die Läufe zu den Effekten in der Welt, siehe docs/wegpunkte.md, „Strahl“. */
     private static final boolean NUR_EFFEKTE = Boolean.getBoolean("heroicmap.messung.effekte");
+    /**
+     * Mit {@code -PmessungZoom=true} nur die Läufe zum Zoom 0,5 gegen 2, mit einer Stufe wie {@code -PmessungZoom=0.03125} zu
+     * ihr gegen 2; ab 1/4 mit einem Satz aus Rauschen. Siehe docs/minimap.md, „Kosten“.
+     */
+    private static final String ZOOM = System.getProperty("heroicmap.messung.zoom", "false");
+    private static final boolean NUR_ZOOM = !ZOOM.equals("false");
+    /**
+     * Ein Satz aus Rauschen für den Kachelmodus, 4 px, Stufen 0 bis 8, in den Ordner der Welt: nur die Stufen bis eine feiner
+     * als die, die die Minimap bei {@code zoom} und dem GUI-Massstab nimmt, je ±8192 Blöcke um den Ursprung.
+     */
+    private static void rauschsatz(ClientGameTestContext context, double zoom) {
+        int k = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+        Path welt = context.computeOnClient(mc -> Downloads.weltOrdner());
+        int bis = Math.min(8, Minimap.kachelStufe(4, 0, 8, 8, zoom, k) + 1);
+        Path baum = welt.resolve("rauschen");
+        try {
+            Path wurzel = baum.resolve("4");
+            Files.createDirectories(wurzel);
+            Files.writeString(wurzel.resolve("map.json"), "{\"tileSize\":256,\"scale\":4,\"minZoom\":0,\"maxZoom\":8}");
+            for (int z = 0; z <= bis; z++) {
+                int bloecke = 64 << (8 - z), n = Math.max(1, 8192 / bloecke);
+                for (int tx = -n; tx < n; tx++) {
+                    for (int ty = -n; ty < n; ty++) {
+                        java.awt.image.BufferedImage b = new java.awt.image.BufferedImage(256, 256, java.awt.image.BufferedImage.TYPE_INT_RGB);
+                        for (int y = 0; y < 256; y++) {
+                            for (int x = 0; x < 256; x++) {
+                                int h = (tx * 256 + x) * 73856093 ^ (ty * 256 + y) * 19349663 ^ z * 83492791;
+                                h ^= h >>> 13;
+                                h *= 0x5bd1e995;
+                                int v = 40 + 25 * ((h ^ h >>> 15) & 7);
+                                b.setRGB(x, y, v << 16 | (v + 20) << 8 | v);
+                            }
+                        }
+                        Path datei = wurzel.resolve(String.valueOf(z)).resolve(String.valueOf(tx)).resolve(ty + ".png");
+                        Files.createDirectories(datei.getParent());
+                        javax.imageio.ImageIO.write(b, "png", datei.toFile());
+                    }
+                }
+            }
+            Satz.schreibe(baum, "Rauschen", "minecraft:overworld", 4);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     /** Mit {@code -PmessungRegionen=<n>} so viele angeheftete Regionen für den Schleier, gleich verteilt bis 188 Blöcke halbe Seite. */
     private static final int REGIONEN = Integer.getInteger("heroicmap.messung.regionen", 47);
     private static final int SICHTWEITE = 12;
@@ -113,6 +158,11 @@ public final class Messung implements FabricClientGameTest {
                 schreibe();
                 return;
             }
+            if (NUR_ZOOM) {
+                zoom(context, server);
+                schreibe();
+                return;
+            }
             atlas(context);
             for (int scale : new int[] {1, 2, 4, 8, 16}) {
                 for (int runde = 1; runde <= RUNDEN; runde++) {
@@ -164,6 +214,56 @@ public final class Messung implements FabricClientGameTest {
 
         }
         schreibe();
+    }
+
+    /**
+     * Was ein Zoom kostet gegen 2, Vorgabe 0,5: 2 px, freie Bildrate, eckig, genordet; zuerst die Zeit nach dem Wechsel, bis
+     * die Minimap ganz gezeichnet ist, dann Frametime ohne und mit Minimap und die Zeit im HUD, im Stand und im Flug. Ab 1/4
+     * zeichnet sie Kacheln; dafür legt die Messung einen Satz aus Rauschen in den Ordner der Welt.
+     */
+    private void zoom(ClientGameTestContext context, TestServerContext server) {
+        double weit = ZOOM.equals("true") ? 0.5 : Double.parseDouble(ZOOM);
+        if (Minimap.stufe(weit) < 0) {
+            throw new IllegalArgumentException("Keine Stufe des Zooms: " + ZOOM);
+        }
+        if (weit <= Minimap.KACHELN_AB) {
+            rauschsatz(context, weit);
+        }
+        flug(context, server, true);
+        flug(context, server, false);
+        boolean hin = true;
+        for (double zoom : new double[] {2, weit}) {
+            context.runOnClient(mc -> {
+                mc.options.framerateLimit().set(260);
+                Minimap.INSTANZ.setzeScale(2);
+                Minimap.INSTANZ.setzeZoom(zoom == 2 ? 1 : 2);
+                Minimap.INSTANZ.setzeRund(false);
+                Minimap.INSTANZ.setzeDrehen(false);
+            });
+            zeige(context, true);
+            context.waitFor(mc -> Minimap.INSTANZ.fertig(), 2400);
+            long start = System.nanoTime();
+            context.runOnClient(mc -> Minimap.INSTANZ.setzeZoom(zoom));
+            context.waitFor(mc -> Minimap.INSTANZ.fertig(), 2400);
+            zeile("zoom=%s voll_gezeichnet_ms=%.0f chunks_je_richtung=%d", zoom, (System.nanoTime() - start) / 1e6,
+                    context.computeOnClient(mc -> Minimap.INSTANZ.reichweite()));
+            String art = "fps=frei scale=2 zoom=" + zoom + " form=eckig";
+            warteAufFreieFrames(context, art);
+            for (int runde = 1; runde <= RUNDEN; runde++) {
+                for (boolean an : new boolean[] {false, true}) {
+                    zeige(context, an);
+                    frames(context, art + " stand", an, runde, () -> context.waitTicks(STAND_TICKS));
+                }
+            }
+            for (int runde = 1; runde <= RUNDEN; runde++) {
+                for (boolean an : new boolean[] {false, true}) {
+                    zeige(context, an);
+                    boolean richtung = hin;
+                    frames(context, art + " flug", an, runde, () -> flug(context, server, richtung));
+                    hin = !hin;
+                }
+            }
+        }
     }
 
     private void schreibe() {

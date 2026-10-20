@@ -26,6 +26,86 @@ class MinimapTest {
         assertEquals(3, Minimap.reichweite(4, 128));
         assertEquals(10, Minimap.reichweite(1, 256));
         assertEquals(3, Minimap.reichweite(8, 128));
+        // Zoom 0,5: 128 Blöcke je Richtung, ±8 Chunks; bei der grössten Seite ±16.
+        assertEquals(10, Minimap.reichweite(0.5, 128));
+        assertEquals(18, Minimap.reichweite(0.5, 256));
+    }
+
+    @Test
+    void zoomStufenTasteUndDatei(@TempDir Path ordner) throws Exception {
+        Minimap m = new Minimap();
+        // Die Taste geht reihum, nach 8 wieder 1/32; eine Stufe ausserhalb gilt nicht.
+        double[] reihe = new double[10];
+        for (int i = 0; i < reihe.length; i++) {
+            reihe[i] = m.zoom();
+            m.naechsterZoom();
+        }
+        assertArrayEquals(new double[] {2, 4, 8, 1.0 / 32, 1.0 / 16, 1.0 / 8, 1.0 / 4, 1.0 / 2, 1, 2}, reihe);
+        double vor = m.zoom();
+        m.setzeZoom(3);
+        assertEquals(vor, m.zoom());
+        // Brüche stehen als Dezimalzahl in der Datei, ganze Stufen wie bisher als ganze Zahl.
+        Path datei = ordner.resolve("heroicmap.properties");
+        m.setzeZoom(0.5);
+        m.schreibe(datei);
+        assertTrue(Files.readString(datei).contains("zoom=0.5"));
+        Minimap gelesen = new Minimap();
+        gelesen.lies(datei);
+        assertEquals(0.5, gelesen.zoom());
+        m.setzeZoom(1.0 / 32);
+        m.schreibe(datei);
+        assertTrue(Files.readString(datei).contains("zoom=0.03125"));
+        gelesen.lies(datei);
+        assertEquals(1.0 / 32, gelesen.zoom());
+        m.setzeZoom(4);
+        m.schreibe(datei);
+        java.util.Properties p = new java.util.Properties();
+        try (var r = Files.newBufferedReader(datei)) {
+            p.load(r);
+        }
+        assertEquals("4", p.getProperty("zoom"));
+        // Ein Wert, den es nicht gibt, gilt als Vorgabe.
+        Files.writeString(datei, "zoom=3");
+        gelesen.lies(datei);
+        assertEquals(2, gelesen.zoom());
+    }
+
+    @Test
+    void kachelnAbEinemViertel() {
+        // Satz mit 4 px, maxZoom 8, minZoom 0, feinste Stufe 8: Stufe z hat 4 / 2^(8 - z) Pixel je Block.
+        // GS 2: bei 1/4 0,5 Pixel je Block auf dem Schirm, also die Stufe mit 0,5, z = 5; bei 1/32 1/16, z = 2.
+        assertEquals(5, Minimap.kachelStufe(4, 0, 8, 8, 1.0 / 4, 2));
+        assertEquals(2, Minimap.kachelStufe(4, 0, 8, 8, 1.0 / 32, 2));
+        // GS 3: 0,75 Pixel je Block; die gröbste mit mindestens so vielen hat 1, z = 6, nie gröber als 0,75 auf dem Schirm.
+        assertEquals(6, Minimap.kachelStufe(4, 0, 8, 8, 1.0 / 4, 3));
+        // Nie gröber als minZoom, nie feiner als die feinste Stufe des Massstabs.
+        assertEquals(3, Minimap.kachelStufe(4, 3, 8, 8, 1.0 / 32, 2));
+        assertEquals(6, Minimap.kachelStufe(4, 0, 8, 6, 1.0 / 4, 4));
+        // Eine Kachel von 256 Pixeln der Stufe 2 deckt 4096 Blöcke, bei 1/32 und GS 2 also 256 Pixel des Schirms.
+        Satz satz = new Satz(Path.of("satz"), "Satz", "minecraft:overworld", 4, 256, 0, 8, 4);
+        assertEquals(256, Minimap.kachelSeite(satz, 2, 1.0 / 32, 2));
+        assertEquals(256, Minimap.kachelSeite(satz, 5, 1.0 / 4, 2));
+        assertEquals(192, Minimap.kachelSeite(satz, 6, 1.0 / 4, 3));
+    }
+
+    @Test
+    void reichweiteHoechstensSichtweite() {
+        // Bei 1/32 und 128 Einheiten wären es ±130 Chunks; geladen hat der Client bei Sichtweite 12 nur ±12.
+        assertEquals(130, Minimap.reichweite(1.0 / 32, 128));
+        assertEquals(12 + Minimap.VORRAT, Minimap.reichweite(1.0 / 32, 128, 12));
+        assertEquals(Minimap.reichweite(2, 128), Minimap.reichweite(2, 128, 12));
+    }
+
+    @Test
+    void beschriftungAlsBruch() {
+        String[] erwartet = {"heroicmap.menue.fach_bruch:32", "heroicmap.menue.fach_bruch:16", "heroicmap.menue.fach_bruch:8",
+            "heroicmap.menue.fach_bruch:4", "heroicmap.menue.fach_bruch:2", "heroicmap.menue.fach:1", "heroicmap.menue.fach:2",
+            "heroicmap.menue.fach:4", "heroicmap.menue.fach:8"};
+        for (int i = 0; i < Minimap.ZOOMS.length; i++) {
+            net.minecraft.network.chat.contents.TranslatableContents t =
+                    (net.minecraft.network.chat.contents.TranslatableContents) Minimap.fach(Minimap.ZOOMS[i]).getContents();
+            assertEquals(erwartet[i], t.getKey() + ":" + t.getArgs()[0]);
+        }
     }
 
     @Test
@@ -356,6 +436,11 @@ class MinimapTest {
         // Zoom 8 bei GUI-Massstab 2: 16 Pixel je Block, 16 px gehen ganz auf.
         assertEquals(16, Minimap.effektiv(16, 8, 2));
         assertEquals(8, Minimap.effektiv(16, 4, 2));
+        // Zoom 0,5: bei GUI-Massstab 2 ein Pixel je Block, bei 4 zwei; bei 3 sind es 1,5, dann 1 px je Block.
+        assertEquals(1, Minimap.effektiv(4, 0.5, 2));
+        assertEquals(2, Minimap.effektiv(4, 0.5, 4));
+        assertEquals(1, Minimap.effektiv(4, 0.5, 3));
+        assertEquals(1, Minimap.effektiv(4, 0.5, 1));
         for (int a : new int[] {1, 2, 4, 8, 16}) {
             for (int z : new int[] {1, 2, 4, 8}) {
                 for (int k = 1; k <= 8; k++) {
