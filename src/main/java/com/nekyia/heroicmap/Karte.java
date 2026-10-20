@@ -8,10 +8,12 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.IntConsumer;
+import java.util.function.IntFunction;
 import java.util.function.Predicate;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.MouseHandler;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
@@ -133,8 +135,18 @@ final class Karte extends Screen {
     private EditBox eingabe;
     private Predicate<String> beiEnter;
     private Component eingabeHinweis;
+    /**
+     * Unter dem Namensfeld einer Form die Regler „Schrift“ und, bei einer Region, „Biegung“, sonst null; dazu die Form, wie sie
+     * jetzt ist, und wie sie vorher war, null nach Enter. Siehe docs/wegpunkte.md, „Namen“.
+     */
+    private Raster schriftRegler, biegungRegler;
+    private Wegpunkte.EigeneForm stilForm, stilVorher;
     /** So breit ist das Eingabefeld, in Einheiten des GUI. */
     private static final int EINGABE_BREITE = 160;
+    /** Ein Regler unter dem Namensfeld samt Abstand, in Einheiten des GUI. */
+    static final int REGLER_ZEILE = 22;
+    /** Die Rasten von {@link Wegpunkte#SCHRIFTEN} als Text. */
+    private static final String[] SCHRIFT_TEXTE = {"¼", "⅓", "½", "⅔", "1", "1½", "2", "3", "4"};
     /** Die Schrift im Eingabefeld, wenn Enter den Text nicht nimmt. */
     private static final int UNGUELTIG = 0xFFFF5555;
     /** Was die Maus gerade hervorhebt, höchstens eins davon; siehe {@link #schwebe}. */
@@ -248,9 +260,12 @@ final class Karte extends Screen {
 
     @Override
     protected void init() {
-        // Ein neuer Aufbau, etwa bei einer anderen Fenstergrösse, nimmt alle Elemente weg, auch das Eingabefeld.
+        // Ein neuer Aufbau, etwa bei einer anderen Fenstergrösse, nimmt alle Elemente weg, auch das Eingabefeld und seine Regler.
+        stilZurueck();
         eingabe = null;
         beiEnter = null;
+        schriftRegler = null;
+        biegungRegler = null;
         LocalPlayer spieler = minecraft.player;
         // Wie beim letzten Schliessen, je Satz; sonst der Spieler in der Mitte. Siehe docs/vollbildkarte.md, „Lage merken“.
         if (blick != null && spieler != null && !gestellt) {
@@ -987,6 +1002,11 @@ final class Karte extends Screen {
         return eingabe == null ? null : eingabe.getValue();
     }
 
+    /** Für den Gametest: das Eingabefeld und seine Regler „Schrift“ und „Biegung“, je null ohne. */
+    AbstractWidget[] eingabeWidgets() {
+        return new AbstractWidget[] {eingabe, schriftRegler, biegungRegler};
+    }
+
     /** Für den Gametest: der Hinweis unten links, oder null. */
     Component hinweis() {
         return hinweis;
@@ -1336,9 +1356,10 @@ final class Karte extends Screen {
         gezogen = 0;
         druckX = e.x();
         druckY = e.y();
-        // Ein Klick neben das Eingabefeld bricht die Eingabe ab und tut sonst nichts; einer darauf setzt den Cursor.
+        // Ein Klick neben das Eingabefeld und seine Regler bricht die Eingabe ab und tut sonst nichts; einer darauf setzt den Cursor
+        // oder schiebt den Regler.
         if (eingabe != null) {
-            if (eingabe.isMouseOver(e.x(), e.y())) {
+            if (eingabe.isMouseOver(e.x(), e.y()) || auf(schriftRegler, e.x(), e.y()) || auf(biegungRegler, e.x(), e.y())) {
                 super.mouseClicked(e, doppelt);
             } else {
                 schliesseEingabe();
@@ -1444,6 +1465,10 @@ final class Karte extends Screen {
     @Override
     public boolean mouseReleased(MouseButtonEvent e) {
         boolean knopf = super.mouseReleased(e);
+        // Nach einem Regler gehören die Tasten wieder dem Feld.
+        if (eingabe != null) {
+            setFocused(eingabe);
+        }
         Marke m = gedrueckt;
         gedrueckt = null;
         taste = false;
@@ -1826,10 +1851,7 @@ final class Karte extends Screen {
         neu.add(new Eintrag(Component.translatable(f.angeheftet() ? "heroicmap.karte.loesen" : "heroicmap.karte.anheften"),
                 () -> anheften(Wegpunkte.INSTANZ.umschalten(f), "heroicmap.karte.angeheftet_voll", Wegpunkte.MAX_ANGEHEFTET)));
         neu.add(new Eintrag(Component.translatable(f.name() == null ? "heroicmap.karte.name" : "heroicmap.karte.name_aendern"),
-                () -> oeffne(f.name() == null ? "" : f.name(), Wegpunkte.MAX_NAME, "heroicmap.karte.name_hinweis", t -> {
-                    Wegpunkte.INSTANZ.benenne(f, t);
-                    return true;
-                })));
+                () -> benennen(f)));
         neu.add(new Eintrag(Component.translatable("heroicmap.karte.ebene"), () -> ebenenWahl(f.ebene(), id -> Wegpunkte.INSTANZ.ordne(f, id))));
         // Leer heisst zurück zur Farbe aus der Liste; was keine Farbe ist, nimmt Enter nicht. Siehe docs/wegpunkte.md, „Farbe“.
         neu.add(new Eintrag(Component.translatable("heroicmap.karte.farbe"), () -> oeffne(Wegpunkte.hex(f.argb()), 7,
@@ -1859,7 +1881,10 @@ final class Karte extends Screen {
         eingabe.setMaxLength(laenge);
         eingabe.setValue(wert);
         // Was Enter nicht nahm, steht rot, bis der Spieler es ändert.
-        eingabe.setResponder(t -> eingabe.setTextColor(EditBox.DEFAULT_TEXT_COLOR));
+        eingabe.setResponder(t -> {
+            eingabe.setTextColor(EditBox.DEFAULT_TEXT_COLOR);
+            reglerStand();
+        });
         this.beiEnter = beiEnter;
         eingabeHinweis = Component.translatable(hinweis);
         addRenderableWidget(eingabe);
@@ -1867,9 +1892,120 @@ final class Karte extends Screen {
     }
 
     private void schliesseEingabe() {
+        stilZurueck();
         removeWidget(eingabe);
+        if (schriftRegler != null) {
+            removeWidget(schriftRegler);
+        }
+        if (biegungRegler != null) {
+            removeWidget(biegungRegler);
+        }
         eingabe = null;
         beiEnter = null;
+        schriftRegler = null;
+        biegungRegler = null;
+    }
+
+    /**
+     * Das Feld für den Namen von {@code f}, darunter die Regler „Schrift“ und, bei einer Region, „Biegung“. Sie wirken gleich
+     * auf Karte und Minimap und sind grau, solange das Feld leer ist. Enter speichert Name, Schrift und Biegung; Esc und ein
+     * Klick daneben nehmen alles zurück. Siehe docs/wegpunkte.md, „Namen“.
+     */
+    private void benennen(Wegpunkte.EigeneForm f) {
+        stilForm = f;
+        stilVorher = f;
+        // Das Feld öffnet an der Stelle des Menüs der Form, und das ist mit mindestens fünf Einträgen 70 Einheiten hoch: Darunter
+        // ist Platz für die Regler, ganz auf dem Schirm.
+        oeffne(f.name() == null ? "" : f.name(), Wegpunkte.MAX_NAME, "heroicmap.karte.name_hinweis", t -> {
+            Wegpunkte.INSTANZ.benenne(stilForm, t);
+            stilVorher = null;
+            return true;
+        });
+        int x = eingabe.getX(), y = eingabe.getY() + REGLER_ZEILE, b = eingabe.getWidth();
+        schriftRegler = addRenderableWidget(new Raster(x, y, b, Wegpunkte.SCHRIFTEN.length, raste(f.schrift()),
+                i -> Component.translatable("heroicmap.karte.schrift", SCHRIFT_TEXTE[i]),
+                i -> stilForm = Wegpunkte.INSTANZ.stil(stilForm, Wegpunkte.SCHRIFTEN[i], stilForm.biegung())));
+        if (f.region()) {
+            int mitte = Wegpunkte.MAX_BIEGUNG / Wegpunkte.BIEGUNG_SCHRITT;
+            biegungRegler = addRenderableWidget(new Raster(x, y + REGLER_ZEILE, b, 2 * mitte + 1, mitte + f.biegung() / Wegpunkte.BIEGUNG_SCHRITT,
+                    i -> biegungText((i - mitte) * Wegpunkte.BIEGUNG_SCHRITT),
+                    i -> stilForm = Wegpunkte.INSTANZ.stil(stilForm, stilForm.schrift(), (i - mitte) * Wegpunkte.BIEGUNG_SCHRITT)));
+        }
+        reglerStand();
+    }
+
+    /** Liegt (x, y) auf {@code w}, auch wenn es grau ist? {@code isMouseOver} zählt nur, was an ist. */
+    private static boolean auf(AbstractWidget w, double x, double y) {
+        return w != null && x >= w.getX() && x < w.getX() + w.getWidth() && y >= w.getY() && y < w.getY() + w.getHeight();
+    }
+
+    /** Die Raste von {@link Wegpunkte#SCHRIFTEN} mit dem Faktor {@code f}. */
+    private static int raste(double f) {
+        int i = 0;
+        while (i < Wegpunkte.SCHRIFTEN.length - 1 && Wegpunkte.SCHRIFTEN[i] < f) {
+            i++;
+        }
+        return i;
+    }
+
+    static Component biegungText(int grad) {
+        return grad == 0 ? Component.translatable("heroicmap.karte.biegung_gerade")
+                : Component.translatable(grad > 0 ? "heroicmap.karte.biegung_oben" : "heroicmap.karte.biegung_unten", Math.abs(grad));
+    }
+
+    /** Die Regler sind grau, solange das Namensfeld leer ist. */
+    private void reglerStand() {
+        boolean an = eingabe != null && !eingabe.getValue().isBlank();
+        for (Raster r : new Raster[] {schriftRegler, biegungRegler}) {
+            if (r != null) {
+                r.active = an;
+            }
+        }
+    }
+
+    /** Nicht gespeichert: Schrift und Biegung der Form wieder, wie sie vorher waren. */
+    private void stilZurueck() {
+        if (stilVorher != null && stilForm != null) {
+            Wegpunkte.INSTANZ.stil(stilForm, stilVorher.schrift(), stilVorher.biegung());
+        }
+        stilForm = null;
+        stilVorher = null;
+    }
+
+    /** Ein Regler mit {@code anzahl} Rasten; {@code text} beschriftet die Raste, {@code setze} wirkt, sobald eine andere erreicht ist. */
+    static final class Raster extends AbstractSliderButton {
+
+        private final int anzahl;
+        private final IntFunction<Component> text;
+        private final IntConsumer setze;
+        private int raste;
+
+        Raster(int x, int y, int breite, int anzahl, int raste, IntFunction<Component> text, IntConsumer setze) {
+            super(x, y, breite, 20, Component.empty(), raste / (double) (anzahl - 1));
+            this.anzahl = anzahl;
+            this.text = text;
+            this.setze = setze;
+            this.raste = raste;
+            updateMessage();
+        }
+
+        int raste() {
+            return raste;
+        }
+
+        @Override
+        protected void updateMessage() {
+            setMessage(text.apply((int) Math.round(value * (anzahl - 1))));
+        }
+
+        @Override
+        protected void applyValue() {
+            int r = (int) Math.round(value * (anzahl - 1));
+            if (r != raste) {
+                raste = r;
+                setze.accept(r);
+            }
+        }
     }
 
     /**
@@ -2078,6 +2214,10 @@ final class Karte extends Screen {
 
     @Override
     public boolean mouseDragged(MouseButtonEvent ereignis, double dx, double dy) {
+        // Bei offenem Eingabefeld zieht die Maus nur einen Regler, nie die Karte.
+        if (eingabe != null) {
+            return super.mouseDragged(ereignis, dx, dy);
+        }
         // Ein Zug, der in der Tafel beginnt, oder einer mit einem Wegpunkt an der Maus schiebt die Karte nicht.
         if (klickVerbraucht || haengt != null || eckeHaengt != null || griffHaengt != null) {
             return true;

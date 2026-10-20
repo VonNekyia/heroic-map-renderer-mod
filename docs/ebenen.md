@@ -499,7 +499,9 @@ in der Schrift IM Fell English SC (`Formen.glyphen`, `Formen.texte`).
   liegt bei jeder Schrift des Spiels 7 Einheiten unter dem Anfang der
   Zeile (`GlyphBitmap.getTop`, per javap). Der Text steht mittig auf dem
   Pfad. Ist der Pfad kürzer, läuft die Schrift in Richtung des ersten und
-  letzten Stücks weiter; ein einzelner Punkt heisst waagrecht.
+  letzten Stücks weiter; ein einzelner Punkt heisst waagrecht. Den Namen
+  einer eigenen Region kann der Spieler dort im Bogen stellen, siehe
+  [Wegpunkte](wegpunkte.md), „Namen“; Schrift vom Server bleibt gerade.
 - **Nie auf dem Kopf:** Läuft der Pfad im Bild nach links, etwa auf der
   gedrehten Minimap, gilt er umgekehrt.
 - **Reihenfolge:** je Ebene nach `order` erst die Füllungen, dann Ränder
