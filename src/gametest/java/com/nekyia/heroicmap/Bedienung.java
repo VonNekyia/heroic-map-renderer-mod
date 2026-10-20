@@ -160,6 +160,7 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("Links klicken öffnete das Teleport-Menü");
         }
 
+        String anfang = stand(context);
         wegpunkt(context, maus, k, x, y);
         anheften(context, maus, k);
         form(context, maus, k);
@@ -180,6 +181,7 @@ public final class Bedienung implements FabricClientGameTest {
         einrasten(context, maus, k);
         verbinden(context, maus, k);
         altVerbindet(context, maus, k);
+        bundLoeschen(context, maus, k);
         chunklinien(context, maus, k);
         rechtsklickImBau(context, maus, k);
         entfernen(context, maus, k);
@@ -192,6 +194,12 @@ public final class Bedienung implements FabricClientGameTest {
         optionen(context, maus, k);
         verschieben(context, maus, k);
         lageGemerkt(context, maus, k);
+        // Jeder Test räumt weg, was er anlegte; so hängt keiner von der Reihenfolge ab. Siehe docs/entwicklung.md, „Gametests“.
+        String ende = stand(context);
+        if (!ende.equals(anfang)) {
+            throw new AssertionError("Die Tests der Karte liessen etwas liegen: " + ende + " statt " + anfang + "; Formen "
+                    + context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().stream().map(f -> f.ecken().toString()).toList()));
+        }
         maus.setCursorPos(x * k, y * k);
         context.waitTick();
 
@@ -1916,6 +1924,94 @@ public final class Bedienung implements FabricClientGameTest {
                 Wegpunkte.INSTANZ.kappeTode(0);
             });
             context.waitTicks(2);
+        }
+    }
+
+    /**
+     * Verbundene Formen löschen wie ein Spieler: A und B mit Alt verbunden. Bei offenem Menü am Griff von B löscht Entf über dem
+     * Griff von A nichts; „Form löschen“ nimmt B, A bleibt mit loser Ecke; dann nimmt Entf A. Beide sind weg, auch aus
+     * `wegpunkte.json`. So hält das Menü nie eine Form, deren Bund inzwischen zerfiel; ihr Löschen ginge ins Leere. Siehe
+     * docs/wegpunkte.md, „Verbinden“.
+     */
+    private static void bundLoeschen(ClientGameTestContext context, TestInput maus, int k) {
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        Path datei = context.computeOnClient(mc -> Downloads.weltOrdner().resolve("wegpunkte.json"));
+        int inDatei = formenInDatei(datei);
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        int bx = mitte[0] - 34, bz = mitte[1] + 6;
+        List<Wegpunkte.Ecke> a = List.of(new Wegpunkte.Ecke(bx, bz), new Wegpunkte.Ecke(bx + 8, bz));
+        Wegpunkte.Ecke b0 = new Wegpunkte.Ecke(bx + 20, bz + 2);
+        try {
+            context.runOnClient(mc -> {
+                String dimension = mc.level.dimension().identifier().toString();
+                Wegpunkte.INSTANZ.setzeForm(dimension, a);
+                Wegpunkte.INSTANZ.setzeForm(dimension, List.of(b0, new Wegpunkte.Ecke(bx + 26, bz + 2)));
+            });
+            context.waitTicks(2);
+            frei(context, new double[][] {ecke(context, formen, 1), ecke(context, formen + 1, 0)});
+
+            // A1 mit Alt neben B0: auf B0 und verbunden.
+            double[] b0s = ecke(context, formen + 1, 0);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 1), new double[] {b0s[0] - 6, b0s[1]}, false, true, -1, 0);
+            int[] buende = context.computeOnClient(mc -> new int[] {Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1).bund(),
+                Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1).ecken().get(0).bund()});
+            if (buende[0] == 0 || buende[0] != buende[1]) {
+                throw new AssertionError("A1 mit Alt neben B0 nicht verbunden: Bünde " + Arrays.toString(buende));
+            }
+
+            // Das Menü am Griff von B; bei offenem Menü Entf über dem Griff von A, dann „Form löschen“.
+            double[] griffA = griff(context, formen), griffB = griff(context, formen + 1);
+            warte250();
+            maus.setCursorPos(griffB[0] * k, griffB[1] * k);
+            context.waitTick();
+            maus.pressMouse(RECHTS);
+            context.waitTicks(2);
+            String loeschen = context.computeOnClient(mc -> Component.translatable("heroicmap.karte.form_loeschen").getString());
+            int zeile = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eintraege().stream().map(Component::getString).toList())
+                    .indexOf(loeschen);
+            int[] lage = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).menueLage());
+            if (zeile < 0) {
+                throw new AssertionError("Kein „" + loeschen + "“ im Menü am Griff von B");
+            }
+            fahre(context, maus, k, griffA[0], griffA[1]);
+            maus.pressKey(InputConstants.KEY_DELETE);
+            context.waitTicks(2);
+            fahre(context, maus, k, lage[0] + 6, lage[1] + zeile * 14 + 6);
+            maus.pressMouse(LINKS);
+            context.waitTicks(2);
+            List<Wegpunkte.EigeneForm> nachMenue = context.computeOnClient(mc -> List.copyOf(
+                    Wegpunkte.INSTANZ.eigeneFormen().subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size())));
+            if (nachMenue.size() != 1 || !nachMenue.getFirst().ecken().getFirst().equals(a.getFirst()) || nachMenue.getFirst().ecken().get(1).bund() != 0) {
+                throw new AssertionError("Nach „Form löschen“ an B, Entf über A bei offenem Menü: " + nachMenue + " statt nur A mit loser Ecke");
+            }
+
+            // Entf über dem Griff von A, nun ohne Menü: A ist weg, auch aus der Datei.
+            double[] griffNeu = griff(context, formen);
+            warte250();
+            fahre(context, maus, k, griffNeu[0], griffNeu[1]);
+            maus.pressKey(InputConstants.KEY_DELETE);
+            context.waitTicks(2);
+            int danach = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+            if (danach != formen || formenInDatei(datei) != inDatei) {
+                throw new AssertionError("Entf über A: " + (danach - formen) + " Formen bleiben, in der Datei " + formenInDatei(datei)
+                        + " statt " + inDatei);
+            }
+        } finally {
+            context.runOnClient(mc -> bisFormen(formen));
+            context.waitTicks(2);
+        }
+    }
+
+    /** Wie viele eigene Formen in {@code datei} stehen, `wegpunkte.json`. */
+    private static int formenInDatei(Path datei) {
+        try {
+            JsonObject json = JsonParser.parseString(Files.readString(datei, StandardCharsets.UTF_8)).getAsJsonObject();
+            return json.has("formen") ? json.getAsJsonArray("formen").size() : 0;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
@@ -3758,6 +3854,12 @@ public final class Bedienung implements FabricClientGameTest {
         while (Wegpunkte.INSTANZ.eigeneFormen().size() > formen) {
             Wegpunkte.INSTANZ.loesche(Wegpunkte.INSTANZ.eigeneFormen().getLast());
         }
+    }
+
+    /** Wie viele Wegpunkte, eigene Formen und alte Rechtecke es gibt. */
+    private static String stand(ClientGameTestContext context) {
+        return context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size() + " Wegpunkte, " + Wegpunkte.INSTANZ.eigeneFormen().size()
+                + " Formen, " + Wegpunkte.INSTANZ.regionen().size() + " Rechtecke");
     }
 
     /** Wirft, wenn bei einem der Orte eine Marke liegt; der Test braucht dort freie Karte. */

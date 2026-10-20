@@ -1297,7 +1297,11 @@ Schleier am Rand, siehe „Schleier“.
   `Alt` legt sie auf deren Block und verbindet, beim Ziehen mit hellem Kern
   im Bild `alt-vorschau.png`; `Strg` und `Alt` zugleich verbinden; `Alt`
   neben einem Todespunkt rastet nur ein, mit dem Hinweis; ein Wegpunkt mit
-  `Alt` neben einer Ecke liegt auf ihr, beide verbunden. Chunklinien
+  `Alt` neben einer Ecke liegt auf ihr, beide verbunden. Verbundene
+  Formen löschen (`bundLoeschen`): A und B mit `Alt` verbunden; bei offenem
+  Menü am Griff von B löscht `Entf` über A nichts, „Form löschen“ nimmt B,
+  A bleibt mit loser Ecke, `Entf` nimmt dann A; beide sind auch aus
+  `wegpunkte.json` weg. Chunklinien
   (`chunklinien`), mit echten Tasten: eine Ecke mit `Strg` 1¼ Blöcke neben
   einer senkrechten Chunklinie liegt auf ihr, z wie ohne `Strg`, und die
   Linie ist im Bild `chunklinie.png` beim Ziehen weiss, danach nicht; nahe
