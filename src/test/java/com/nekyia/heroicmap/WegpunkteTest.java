@@ -812,6 +812,48 @@ class WegpunkteTest {
         assertEquals(null, Wegpunkte.schrift(ohne, Wegpunkte.mitten(ohne)));
     }
 
+    @Test
+    void schriftUndBiegungJeForm() {
+        // Faktor und Biegung (mod#150): Eine Region 10 × 10 heisst 5 hoch, mal 2 also 10, eine Schrifthöhe unter dem Griff, die
+        // Biegung im Bogenmass. Eine Linie biegt nicht; der Faktor gilt auch dort.
+        Wegpunkte.EigeneForm region = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10), e(0, 10)), 0, false, "Hof",
+                Wegpunkte.KEIN_HEX, Wegpunkte.BASE, 2, 90);
+        Ebenen.Schrift s = Wegpunkte.schrift(region, Wegpunkte.mitten(region));
+        assertEquals(10, s.groesse());
+        assertArrayEquals(new double[] {5.5, 5.5 + 10}, s.pfad(), 1e-9);
+        assertEquals(Math.PI / 2, s.biegung(), 1e-12);
+        Wegpunkte.EigeneForm linie = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(40, 0)), 0, false, "Weg", Wegpunkte.KEIN_HEX,
+                Wegpunkte.BASE, 0.5, 90);
+        assertEquals(0, linie.biegung());
+        assertEquals(5, Wegpunkte.schrift(linie, Wegpunkte.mitten(linie)).groesse());
+        assertEquals(0, Wegpunkte.schrift(linie, Wegpunkte.mitten(linie)).biegung());
+        // Gespeichert nur ohne Vorgabe, und so gelesen; die Vorschau des Reglers allein speichert nicht.
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        w.setzeForm(WELT, region.ecken());
+        w.setzeForm(WELT, List.of(e(0, 20), e(10, 20), e(10, 30)));
+        w.benenne(w.stil(w.eigeneFormen().get(0), 2, -45), "Hof");
+        String json = w.json().toString();
+        assertTrue(json.contains("\"schrift\":2.0") && json.contains("\"biegung\":-45"), json);
+        assertEquals(1, json.split("\"schrift\"", -1).length - 1, json);
+        assertEquals(1, json.split("\"biegung\"", -1).length - 1, json);
+        Wegpunkte zurueck = new Wegpunkte();
+        zurueck.lies(JsonParser.parseString(json).getAsJsonObject());
+        assertEquals(w.eigeneFormen(), zurueck.eigeneFormen());
+        // Ausserhalb der Grenzen oder ohne Zahl: die Vorgabe, die Form bleibt; Zwischenwerte auf die nächste Raste.
+        Wegpunkte kaputt = new Wegpunkte();
+        kaputt.lies(JsonParser.parseString("""
+                {"eigene_formen":[
+                  {"dimension":"minecraft:overworld","ecken":[[0,0],[9,0],[9,9]],"farbe":0,"minimap":false,"schrift":5,"biegung":200},
+                  {"dimension":"minecraft:overworld","ecken":[[0,20],[9,20],[9,29]],"farbe":0,"minimap":false,"schrift":"2","biegung":"90"},
+                  {"dimension":"minecraft:overworld","ecken":[[0,40],[9,40],[9,49]],"farbe":0,"minimap":false,"schrift":0.3,"biegung":37},
+                  {"dimension":"minecraft:overworld","ecken":[[0,60],[9,60]],"farbe":0,"minimap":false,"schrift":1.5,"biegung":90}]}
+                """).getAsJsonObject());
+        List<Wegpunkte.EigeneForm> k = kaputt.eigeneFormen();
+        assertEquals(List.of(1.0, 1.0, 1.0 / 3, 1.5), k.stream().map(Wegpunkte.EigeneForm::schrift).toList());
+        assertEquals(List.of(0, 0, 30, 0), k.stream().map(Wegpunkte.EigeneForm::biegung).toList());
+    }
+
     private static float groesse(List<Wegpunkte.Ecke> ecken) {
         Wegpunkte.EigeneForm f = new Wegpunkte.EigeneForm(WELT, ecken, 0, false, "Weg", Wegpunkte.KEIN_HEX, Wegpunkte.BASE);
         return Wegpunkte.schrift(f, Wegpunkte.mitten(f)).groesse();

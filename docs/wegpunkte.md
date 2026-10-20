@@ -627,6 +627,52 @@ am 18.10. (mod#128); Plan, Farbe und Ort hat der Reviewer freigegeben.
   Kartenschrift höchstens ein Zehntel ihrer Seite hoch.
 - **Bleibt** beim Ziehen, wo er der Form an der Maus folgt, beim Ändern der
   Ecken und beim Anheften (`Wegpunkte.ersetze`, `Wegpunkte.umschalten`).
+- **Schrift und Biegung** unter dem Feld, zwei Regler, je so breit wie das
+  Feld. Gewünscht vom User am 19.10. (mod#150); Plan vom Reviewer
+  freigegeben am 20.10.
+  - **Schrift:** ein Faktor auf die Höhe nach der Form, Rasten ¼, ⅓, ½,
+    ⅔, 1, 1½, 2, 3 und 4, Vorgabe 1 (`Wegpunkte.SCHRIFTEN`). Die Höhe ist
+    also 1 bis 64 Blöcke. Die Grenzen auf dem Schirm bleiben: Unter 8
+    Einheiten fehlt der Name, über 96 bleibt er 96 hoch, auf der Minimap
+    höchstens ein Zehntel ihrer Seite. Ein Faktor statt einer festen
+    Höhe: So folgt der Name weiter der Form, wenn sie grösser wird.
+  - **Biegung,** nur bei Regionen: der Winkel, den der Name auf seinem
+    Bogen überspannt, −180° bis +180° in Schritten zu 15°, Vorgabe 0,
+    gerade (`Wegpunkte.MAX_BIEGUNG`, `Wegpunkte.BIEGUNG_SCHRITT`). + ist
+    nach oben gewölbt (∩), − nach unten (∪) wie der Name eines Banners.
+    Oben gilt zu den Buchstaben, auch auf der gedrehten Minimap. Über den
+    Winkel statt einen Radius, so biegt sich ein kurzer Name wie ein
+    langer.
+  - **An einer Linie** fehlt der Regler „Biegung“: Der Name folgt ihr
+    schon, und ein Bogen auf einem Pfad aus mehreren Stücken wäre nicht
+    klar bestimmt. So hat es der Reviewer entschieden.
+  - **Gezeichnet** in `Formen.anordnung`, die die Länge L des Textes
+    kennt: auf einem Bogen mit dem Radius L geteilt durch den Winkel, die
+    Mitte des Textes, wo der gerade Name stünde, jedes Zeichen aufrecht
+    zum Bogen. Die Rechnung je Zeichen teilt er mit dem Namen eines
+    Banners (`Ebenen.bogen`); dessen Bogen bleibt bytegleich. Nach unten
+    gewölbt umfasst der Name den Griff, statt ihn zu kreuzen.
+  - **Bedienung** (`Karte.benennen`): Die Regler sind grau, solange das
+    Feld leer ist; so lassen sich Schrift und Biegung schon beim ersten
+    Benennen stellen. Ein Regler wirkt gleich auf Karte und Minimap, nur
+    im Speicher (`Wegpunkte.stil`). Enter speichert Name, Schrift und
+    Biegung. `Esc`, ein Klick neben Feld und Regler und ein neuer Aufbau
+    des Schirms nehmen Schrift und Biegung zurück. Ein Klick auf einen
+    Regler, auch einen grauen, schliesst das Feld nicht; die Tasten
+    gehören weiter dem Feld.
+  - **Auf dem Schirm:** Das Feld öffnet an der Stelle des Menüs der Form,
+    und das rückt mit mindestens fünf Einträgen, 70 Einheiten hoch, so weit
+    nach oben, dass darunter Feld und Regler Platz haben: mit zwei Reglern
+    64 Einheiten, an einer Linie 42. Bei GUI-Massstab 3 und 4 prüft der
+    Gametest das am unteren Rand.
+  - **Gespeichert** in `wegpunkte.json` als `schrift` und `biegung` an der
+    Form, nur ohne Vorgabe; alte Dateien bleiben gleich. Gelesen auf die
+    nächste Raste; ausserhalb der Grenzen oder ohne Zahl gilt die
+    Vorgabe, die Form bleibt. Ältere Versionen lesen nur ihre Felder;
+    speichert eine ältere Version die Datei neu, fallen Schrift und
+    Biegung weg.
+
+  ![Links die Minimap mit „Westmark“, ⅔× und 90° nach unten, angeheftet; rechts die Vollbildkarte mit „Hafenstadt“, ½× und 60° nach oben, und „Westmark“](bilder/namen-bogen.png)
 
 ## Farbe
 
@@ -727,12 +773,15 @@ bei einem anderen Spieler als neue Ebene an. Gewünscht vom User am 18.10.
   ```json
   {"v":1,"name":"Farmen",
    "wegpunkte":[{"dimension":"minecraft:overworld","x":12,"z":-40,"farbe":0}],
-   "formen":[{"dimension":"minecraft:overworld","ecken":[[12,-40],[30,-40],[30,-20]],"farbe":"#3A7FD5","name":"Hof"}]}
+   "formen":[{"dimension":"minecraft:overworld","ecken":[[12,-40],[30,-40],[30,-20]],"farbe":"#3A7FD5","name":"Hof",
+     "schrift":1.5,"biegung":-90}]}
   ```
 
   `farbe` ist bei einem Wegpunkt der Index in `Wegpunkte.FARBEN`, bei einer
   Form der Index oder ihre eigene Farbe als `#RRGGBB`, siehe „Farbe“; mit
-  eigener Farbe steht kein Index darin, eingefügt ist er 0.
+  eigener Farbe steht kein Index darin, eingefügt ist er 0. `schrift` und
+  `biegung` wie in der Datei, siehe „Namen“, nur ohne Vorgabe; ältere
+  Versionen überlesen sie, `v` bleibt 1.
 - **Nicht darin:** Angeheftetes, Mitspieler, Formen vom Server, der
   Todespunkt, alte Rechtecke und Verbindungen, siehe „Verbinden“. Eine
   Ecke hat im Code genau zwei Zahlen, denn ältere Versionen lehnen eine mit
@@ -759,7 +808,9 @@ bei einem anderen Spieler als neue Ebene an. Gewünscht vom User am 18.10.
   und `"1"` nicht); eine Dimension, die nicht wie `ns:pfad` aus
   Kleinbuchstaben, Ziffern und `_.-/` aussieht oder länger als 64 Zeichen
   ist; eine Farbe ausser 0 bis 7 und `#RRGGBB`; weniger als 2 oder mehr als
-  64 Ecken. Die Grenze von 256 KiB entpackt fängt eine Bombe: wenig Text,
+  64 Ecken; eine `schrift`, die keine Zahl von 0,25 bis 4 ist; eine
+  `biegung`, die keine ganze Zahl von −180 bis 180 ist. Die Grenze von
+  256 KiB entpackt fängt eine Bombe: wenig Text,
   der entpackt riesig würde (`EbenenCode.MAX_ENTPACKT`). Tief
   verschachteltes JSON, etwa 100 000 öffnende Klammern, und eine Zahl mit
   200 000 Ziffern sind kaputt, ohne dass das Lesen einen Fehler wirft, der
@@ -936,7 +987,9 @@ Schleier am Rand, siehe „Schleier“.
   `nameBereinigtUndGekappt`, `namenUeberstehenDenNeustartUndAenderungen`
   (auch ein Name, der kein Text ist), `namenEineSchrifthoeheNebenDemGriff`
   (Region, Linie in vier Richtungen, Höhe nach der Form und gekappt, ohne
-  Namen). Zur Farbe: `hexFarbeLesenSchreibenUndUeberall` (gültig und
+  Namen), `schriftUndBiegungJeForm` (Faktor und Bogenmass, eine Linie
+  biegt nicht, nur ohne Vorgabe gespeichert, Rasten und Vorgabe beim
+  Lesen). Zur Farbe: `hexFarbeLesenSchreibenUndUeberall` (gültig und
   ungültig, auch Ziffern anderer Schriften; Rand und Füllung; über die
   Datei, mit dem Index daneben; weggenommen; eine Farbe, die keine ist).
   Zum Schleier: `eigeneFormenFuerDenSchleierErkannt`. Zum Todespunkt:
@@ -960,7 +1013,9 @@ Schleier am Rand, siehe „Schleier“.
   bleibt (`gleicherNameBekommtEineZahlUndBelegteBloeckeBleiben`); die
   Grenzen der Welt beim Einfügen (`grenzenBeimEinfuegenInDieWelt`); beim
   Lesen jede Grenze, eine Bombe, ein halber Code, falsche Felder und
-  unbekannte, die es überliest (`lesenPrueftAllesOderNichts`); tief
+  unbekannte, die es überliest (`lesenPrueftAllesOderNichts`); Schrift und
+  Biegung hin und zurück, auf die Raste, falsche Werte kaputt
+  (`schriftUndBiegungImCode`); tief
   verschachteltes JSON und eine Zahl mit 200 000 Ziffern
   (`boesartigeCodesSindKaputtOhneZuWerfen`); verbundene Formen gehen ohne
   Bünde in den Code, mit zwei Zahlen je Ecke (`codeOhneBuende`).
@@ -1039,7 +1094,14 @@ Schleier am Rand, siehe „Schleier“.
   Bildschirmfoto mindestens 100 Pixel mehr in der Farbe der Kartenschrift
   als vorher. Am Griff gezogen behält sie den Namen. „Name ändern…“ zeigt
   den Namen, ein Klick neben das Feld lässt ihn, leer gemacht und Enter
-  nimmt ihn weg. Danach steht unten links kein Hinweis. Farbe
+  nimmt ihn weg. Danach steht unten links kein Hinweis. Schrift und
+  Biegung (`schriftUndBiegung`): „Name…“ an einer Region zeigt beide
+  Regler, grau; ein Klick auf einen grauen schliesst nichts. Getippt und
+  beide auf eine Raste geklickt, wirkt es gleich, in der Datei steht es
+  erst nach Enter. Wieder geöffnet stehen sie auf den Rasten; die Biegung
+  verstellt und `Esc` nimmt sie zurück. An einer Linie nur „Schrift“. Bei
+  GUI-Massstab 3 und 4 liegen Feld und Regler am unteren Rand ganz auf
+  dem Schirm. Farbe
   (`farbe`): „Farbe…“ am Griff zeigt die Farbe der Region als `#RRGGBB`;
   „#3A7FDG“ nimmt Enter nicht, das Feld bleibt offen; „3a7fd5“ und Enter
   färben sie, und im Bildschirmfoto steht ihr Rand in `#3A7FD5`; leer und

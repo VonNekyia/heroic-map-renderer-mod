@@ -124,6 +124,7 @@ public final class Bilder implements FabricClientGameTest {
             fenster(context);
             vollbildkarte(context);
             formen(context, server);
+            namenImBogen(context);
             orte(context, server);
             strahl(context, server);
             schleier(context, server);
@@ -940,6 +941,49 @@ public final class Bilder implements FabricClientGameTest {
             Minimap.INSTANZ.setzeRund(false);
         });
         context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getYRot()) < 0.1f && Minimap.INSTANZ.fertig(), 1200);
+    }
+
+    /**
+     * Namen eigener Regionen im Bogen (mod#150): „Hafenstadt“ ½× und 60° nach oben, „Westmark“ ⅔× und 90° nach unten, angeheftet;
+     * die Minimap und die Vollbildkarte. Mit -Pbilder nebeneinander als namen-bogen.png. Siehe docs/wegpunkte.md, „Namen“.
+     */
+    private static void namenImBogen(ClientGameTestContext context) {
+        int vorher = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        context.runOnClient(mc -> {
+            Wegpunkte w = Wegpunkte.INSTANZ;
+            w.setzeForm(Ebenen.UEBERWELT, List.of(new Wegpunkte.Ecke(-34, -26), new Wegpunkte.Ecke(-10, -26), new Wegpunkte.Ecke(-10, -14),
+                    new Wegpunkte.Ecke(-34, -14)));
+            w.benenne(w.stil(w.eigeneFormen().getLast(), 0.5, 60), "Hafenstadt");
+            w.setzeForm(Ebenen.UEBERWELT, List.of(new Wegpunkte.Ecke(6, 2), new Wegpunkte.Ecke(30, 2), new Wegpunkte.Ecke(30, 18),
+                    new Wegpunkte.Ecke(6, 18)));
+            w.benenne(w.stil(w.eigeneFormen().getLast(), 2.0 / 3, -90), "Westmark");
+            w.umschalten(w.eigeneFormen().getLast());
+            Minimap.INSTANZ.setzeScale(4);
+            Minimap.INSTANZ.setzeZoom(2);
+        });
+        context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
+        context.waitTicks(2);
+        BufferedImage minimap = mitRand(context, context.takeScreenshot(TestScreenshotOptions.of("namen-bogen-minimap").disableCounterPrefix()));
+        Path baum = testsatz();
+        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
+        context.waitTicks(40);
+        Path karte = context.takeScreenshot(TestScreenshotOptions.of("namen-bogen-karte").disableCounterPrefix());
+        try {
+            if (!AUSGABE.isEmpty()) {
+                ImageIO.write(nebeneinander(0, minimap, ImageIO.read(karte.toFile())), "png", Path.of(AUSGABE, "namen-bogen.png").toFile());
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } finally {
+            context.runOnClient(mc -> {
+                mc.gui.setScreen(null);
+                List<Wegpunkte.EigeneForm> alle = Wegpunkte.INSTANZ.eigeneFormen();
+                for (Wegpunkte.EigeneForm f : List.copyOf(alle.subList(vorher, alle.size()))) {
+                    Wegpunkte.INSTANZ.loesche(f);
+                }
+                Minimap.INSTANZ.setzeZoom(2);
+            });
+        }
     }
 
     /** Die Minimap rund bei 4 px, dann das Menü über der Szene. Siehe docs/minimap.md, „Bedienung“. */

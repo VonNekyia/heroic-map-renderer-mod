@@ -200,9 +200,11 @@ public final class Ebenen {
      * Eine Kartenschrift: {@code text} entlang des Pfads {x0, z0, …}; {@code groesse} die Höhe der
      * Grossbuchstaben in Blöcken, {@code sperrung} der Abstand zwischen den Zeichen in Anteilen davon;
      * Farbe mit Alpha; Kontur in Einheiten des GUI, Breite 0 ohne. {@code box} {x0, z0, x1, z1} des Pfads.
+     * {@code biegung} der Winkel im Bogenmass, den der Text auf einem Bogen überspannt, + nach oben gewölbt; nur bei einem
+     * Pfad aus einem Punkt, sonst 0. Vom Server immer 0. Siehe docs/wegpunkte.md, „Namen“.
      */
     record Schrift(String dimension, String text, double[] pfad, float groesse, float sperrung, int farbe, int konturFarbe, float konturBreite,
-            double[] box) implements Form {
+            double[] box, double biegung) implements Form {
     }
 
     /** Schild und Nadel einer Grösse: Feld zum Tönen und Rahmen mit Nadel, gleich gross, der Fuss unten in der Mitte. */
@@ -724,7 +726,7 @@ public final class Ebenen {
             float b = zahl(k, "width", 0);
             konturBreite = b > 0 ? Math.min(b, MAX_BREITE) : 0;
         }
-        return new Schrift(dimension, text, pfad, groesse, sperrung, farbe, konturFarbe, konturBreite, box(List.of(pfad)));
+        return new Schrift(dimension, text, pfad, groesse, sperrung, farbe, konturFarbe, konturBreite, box(List.of(pfad)), 0);
     }
 
     /** Die Punkte [[x, z], …] als {x0, z0, …}; mit weniger als {@code mindestens} oder mehr als {@link #MAX_PUNKTE} wirft sie. */
@@ -1133,7 +1135,12 @@ public final class Ebenen {
 
     /** Die Länge eines Namens auf dem Bogen: die Vorschübe aller Zeichen und die Sperrung dazwischen. */
     static double laenge(double[] breiten) {
-        double l = Math.max(0, breiten.length - 1) * BOGEN_SPERRUNG;
+        return laenge(breiten, BOGEN_SPERRUNG);
+    }
+
+    /** Die Länge eines Textes: die Vorschübe aller Zeichen und {@code luecke} dazwischen. */
+    static double laenge(double[] breiten, double luecke) {
+        double l = Math.max(0, breiten.length - 1) * luecke;
         for (double b : breiten) {
             l += b;
         }
@@ -1151,14 +1158,23 @@ public final class Ebenen {
      * Bogen. {@code breiten} sind die Vorschübe in Einheiten des GUI.
      */
     static double[] bogen(double[] breiten, double r) {
+        return bogen(breiten, BOGEN_SPERRUNG, r, BOGEN_TIEF - r, false);
+    }
+
+    /**
+     * Je Zeichen {x, y, winkel} auf dem Bogen mit Radius {@code r} um (0, {@code mitte}), y nach unten, {@code luecke}
+     * zwischen den Zeichen, die Mitte des Textes bei x = 0: {@code oben} nach oben gewölbt (∩), der Mittelpunkt unter dem
+     * Text, sonst nach unten (∪); jedes Zeichen aufrecht zum Bogen. Für den Namen eines Banners und den einer eigenen Form.
+     */
+    static double[] bogen(double[] breiten, double luecke, double r, double mitte, boolean oben) {
         double[] aus = new double[3 * breiten.length];
-        double s = -laenge(breiten) / 2, mitte = BOGEN_TIEF - r;
+        double s = -laenge(breiten, luecke) / 2;
         for (int i = 0; i < breiten.length; i++) {
             double phi = (s + breiten[i] / 2) / r;
             aus[3 * i] = r * Math.sin(phi);
-            aus[3 * i + 1] = mitte + r * Math.cos(phi);
-            aus[3 * i + 2] = -phi;
-            s += breiten[i] + BOGEN_SPERRUNG;
+            aus[3 * i + 1] = oben ? mitte - r * Math.cos(phi) : mitte + r * Math.cos(phi);
+            aus[3 * i + 2] = oben ? phi : -phi;
+            s += breiten[i] + luecke;
         }
         return aus;
     }
