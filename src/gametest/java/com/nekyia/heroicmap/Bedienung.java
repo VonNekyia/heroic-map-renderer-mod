@@ -104,6 +104,7 @@ public final class Bedienung implements FabricClientGameTest {
             imBrowser(context, maus, k);
             neueVersion(context, maus, k);
             tod(context, spiel.getServer(), maus, k);
+            todZeit(context, spiel.getServer(), k);
         } finally {
             context.runOnClient(mc -> Wegpunkte.INSTANZ.leeren());
             // Das Menü speichert beim Schliessen; danach wieder die Vorgabe.
@@ -2436,6 +2437,62 @@ public final class Bedienung implements FabricClientGameTest {
             stirb(context, server);
             if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.tod()) != null) {
                 throw new AssertionError("Mit „Todespunkte: aus“ setzte ein Tod einen");
+            }
+        } finally {
+            context.runOnClient(mc -> {
+                Minimap.INSTANZ.setzeTodespunkte(1);
+                Wegpunkte.INSTANZ.kappeTode(0);
+                mc.gui.setScreen(null);
+            });
+            server.runCommand("tp @a 0.5 -30 0.5 0 90");
+            context.waitTicks(5);
+        }
+    }
+
+    /**
+     * Die Zeit des Todes (mod#166): Nach `kill @a` steht sie auf der Vollbildkarte unter dem Todespunkt, als dunkle Schrift im
+     * Bildschirmfoto; derselbe Todespunkt ohne Zeit hat dort deutlich weniger dunkle Pixel. Auf der Minimap ändert die Zeit
+     * nichts: dort mit und ohne Zeit gleich viele. Siehe docs/wegpunkte.md, „Todespunkt“.
+     */
+    private static void todZeit(ClientGameTestContext context, TestServerContext server, int k) {
+        server.runCommand("tp @a 40.5 -60 -30.5");
+        context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - 40.5) < 0.1, 200);
+        Path baum = Bilder.testsatz();
+        try {
+            stirb(context, server);
+            Wegpunkte.Punkt tod = context.computeOnClient(mc -> Wegpunkte.INSTANZ.tod());
+            if (tod == null || tod.x() != 40 || tod.z() != -31 || tod.zeit() <= 0) {
+                throw new AssertionError("Nach dem Tod bei 40 -31: Todespunkt " + tod + " ohne Zeit");
+            }
+            // Nah beim Todespunkt, so steht er auf der Minimap an seinem Ort.
+            server.runCommand("tp @a 44.5 -60 -30.5");
+            context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - 44.5) < 0.1, 200);
+            context.waitTicks(5);
+            Minimap.Rahmen r = rahmen(context);
+            double[] mitteMinimap = {r.x() + r.seite() / 2.0, r.y() + r.seite() / 2.0};
+            int minimapMit = dunkle(context.takeScreenshot(TestScreenshotOptions.of("tod-zeit-minimap").disableCounterPrefix()), k,
+                    mitteMinimap, r.seite() / 2);
+            context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum)).bei(40.5, -30.5)));
+            context.waitTicks(5);
+            Karte.Marke m = marke(context, tod);
+            double[] unter = {m.x(), m.y() + 9};
+            int mit = dunkle(context.takeScreenshot(TestScreenshotOptions.of("tod-zeit").disableCounterPrefix()), k, unter, 6);
+            // Derselbe Block ohne Zeit: so stand ein Todespunkt aus einer älteren Datei.
+            context.runOnClient(mc -> {
+                mc.gui.setScreen(null);
+                Wegpunkte.INSTANZ.setzeTod(tod.dimension(), tod.x(), tod.z(), 1, 0);
+            });
+            context.waitTicks(5);
+            int minimapOhne = dunkle(context.takeScreenshot(TestScreenshotOptions.of("tod-zeit-minimap-ohne").disableCounterPrefix()), k,
+                    mitteMinimap, r.seite() / 2);
+            context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum)).bei(40.5, -30.5)));
+            context.waitTicks(5);
+            int ohne = dunkle(context.takeScreenshot(TestScreenshotOptions.of("tod-zeit-ohne").disableCounterPrefix()), k, unter, 6);
+            if (mit < ohne + 4 * k * k) {
+                throw new AssertionError("Unter dem Todespunkt fehlt die Zeit: " + mit + " dunkle Pixel mit, " + ohne + " ohne");
+            }
+            if (minimapMit != minimapOhne) {
+                throw new AssertionError("Auf der Minimap ändert die Zeit etwas: " + minimapMit + " dunkle Pixel mit, " + minimapOhne + " ohne");
             }
         } finally {
             context.runOnClient(mc -> {

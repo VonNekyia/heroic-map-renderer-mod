@@ -305,8 +305,8 @@ Reviewer freigegeben.
 - **Mehrere,** so viele, wie der Regler „Todespunkte“ sagt, 1 bis 16,
   gewünscht vom User am 19.10. (mod#151). Jeder Tod setzt einen neuen
   (`Wegpunkte.setzeTod`); sind es mehr, fallen die ältesten weg. Ihre
-  Folge ist die der Tode, der letzte der neueste; eine Zeit merkt sich der
-  Mod nicht, die Folge in der Liste reicht.
+  Folge ist die der Tode, der letzte der neueste. Sie kommt aus der Liste,
+  nicht aus der Zeit unter ihnen.
 - **Derselbe Block:** Stirbt der Spieler auf dem Block eines früheren
   Todespunkts, wird der der neueste. Liegt auf dem Block ein Wegpunkt, gibt
   es keinen; der Block ist schon markiert, und die übrigen bleiben.
@@ -325,6 +325,19 @@ Reviewer freigegeben.
   ein Nachstellen der Pixel zeigte (ein Pixel gilt, wenn seine Mitte im
   Viereck liegt). Eine Farbe aus der Liste nimmt er nicht; der nächste Wegpunkt
   bekommt sie, als gäbe es ihn nicht.
+- **Zeit des Todes** unter der Marke auf der Vollbildkarte, gewünscht vom
+  User am 20.10. (mod#166): im Stil der Namen von Nadeln (`Ebenen.name`),
+  am selben Tag nur die Uhrzeit, etwa „14:32“, an früheren Tagen mit
+  Datum, etwa „18.10. 14:32“ (`Wegpunkte.todZeit`, `Karte.todZeit`). Die
+  Muster kommen aus der Sprache des Spiels
+  (`heroicmap.karte.tod_zeit_heute`, `heroicmap.karte.tod_zeit`), die Zeit
+  aus der Uhr und der Zeitzone des Rechners. Ein Ressourcenpaket, auch vom
+  Server, kann die Muster überschreiben; eines, das nicht geht, gibt das
+  feste `HH:mm` bzw. `dd.MM. HH:mm`, gebaut einmal je Muster
+  (`Wegpunkte.format`, Review von #172). Nicht am Rand, wo die Marke
+  nur die Richtung zeigt, und nicht auf der Minimap; dort wäre sie zu
+  klein. Ein Todespunkt aus einer älteren Datei hat keine Zeit und also
+  keine Schrift.
 - **Im Chat** steht „Todespunkt gesetzt bei x z“, unterstrichen. Ein Klick
   darauf ruft `/hmap karte x z`, siehe [Download](download.md), „Befehle“;
   das Spiel schickt einen Klick im Chat über `sendUnattendedCommand`, und
@@ -342,7 +355,10 @@ Reviewer freigegeben.
   Liste `wegpunkte`, siehe „Ablage“. Dazu steht der neueste noch einmal als
   `tod`; so behält eine ältere Version, die nur `tod` kennt, ihren einen.
   Ohne `tode` liest der Mod `tod`, also eine alte Datei mit einem. Eine id
-  bekommt jeder beim Lesen wie ein Wegpunkt ohne.
+  bekommt jeder beim Lesen wie ein Wegpunkt ohne. Jeder Eintrag von `tode`
+  hat die Zeit des Todes als `zeit` in ms seit 1970 (`Wegpunkte.Punkt.zeit`);
+  `tod` bleibt, wie es war, ohne sie. Ist `zeit` keine ganze Zahl über 0, ist
+  sie unbekannt, und der Todespunkt bleibt (`Wegpunkte.zeit`).
 
 ## Menü je Objekt
 
@@ -955,7 +971,7 @@ Schleier am Rand, siehe „Schleier“.
   `ebenen` sind die eigenen Ebenen und `ebene` die eines Eintrags, auch bei
   Formen und alten Rechtecken, siehe „Eigene Ebenen“;
   `farbe` ist ein Index in `Wegpunkte.FARBEN`, `minimap` heisst angeheftet,
-  `tode` sind die Todespunkte und `tod` der neueste, siehe „Todespunkt“, ohne `farbe` und `id`,
+  `tode` sind die Todespunkte mit `zeit` und `tod` der neueste, siehe „Todespunkt“, ohne `farbe` und `id`,
   `eigene_formen` nennt ihre Dimension und die Blöcke ihrer Ecken in Reihenfolge,
   dazu `name`, wenn sie einen hat, siehe „Namen“, und `hex`, wenn sie eine
   eigene Farbe hat, siehe „Farbe“; eine ältere Version des Mods überliest
@@ -1031,7 +1047,11 @@ Schleier am Rand, siehe „Schleier“.
   Zum Schleier: `eigeneFormenFuerDenSchleierErkannt`. Zum Todespunkt:
   `mehrereTodespunkte` (höchstens so viele, die ältesten fallen weg, nur der
   neueste angeheftet, derselbe Block frischt auf, weniger einstellen, `tode`
-  und `tod` in der Datei, eine alte Datei mit `tod`),
+  und `tod` in der Datei, eine alte Datei mit `tod`), `todesZeit` (heute
+  nur die Uhrzeit, ein früherer Tag mit Datum, auch über Mitternacht;
+  `zeit` in `tode`, nicht in `tod`; über den Neustart und das Anheften; die
+  Folge aus der Liste; eine alte Datei ohne `zeit`; eine `zeit`, die keine
+  ganze Zahl über 0 ist; ein Muster, das nicht geht, gibt das feste),
   `todespunktNurEinerAngeheftetUndEigensGespeichert` (mit einem: keine
   Farbe, eigens in der Datei, Lösen und Verschieben, nicht auf einem
   Wegpunkt, ein kaputter fehlt), `todMeldungOeffnetDieKarteDort`;
@@ -1187,7 +1207,10 @@ Schleier am Rand, siehe „Schleier“.
   Menü hat genau „Hierher teleportieren“ und „Todespunkt löschen“, gehalten
   hängt er nicht an der Maus, und „Todespunkt löschen“ löscht ihn; mit zwei
   behaltenen bleiben nach drei Toden die zwei neuesten, nur der neueste
-  angeheftet; aus setzt ein Tod keinen. Regler „Todespunkte“ (`todRegler`):
+  angeheftet; aus setzt ein Tod keinen. Zeit des Todes (`todZeit`): nach
+  `kill @a` steht sie auf der Vollbildkarte unter dem Todespunkt, im Bild
+  `tod-zeit.png` deutlich mehr dunkle Schrift als derselbe Todespunkt ohne
+  Zeit; auf der Minimap ändert sie nichts. Regler „Todespunkte“ (`todRegler`):
   Klicks ans rechte Ende, ans linke und in die Mitte geben 16, aus und 8,
   gespeichert beim Schliessen; mit acht Todespunkten nehmen diese Klicks und
   ein Ziehen von 8 auf 1 und zurück keinen weg, nach `Esc` sind es acht; auf

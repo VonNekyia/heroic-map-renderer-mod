@@ -12,6 +12,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.text.Normalizer;
+import java.time.DateTimeException;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -26,6 +32,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.ClickEvent;
@@ -50,12 +57,13 @@ final class Wegpunkte {
      * Ein Wegpunkt auf dem Block (x, z), mit einer festen {@code id}; {@code farbe} ist ein Index in {@link #FARBEN}. Mit
      * {@code tod} ein Todespunkt, ohne eigene Farbe; ihre Folge in der Liste ist die der Tode, der letzte der neueste. Siehe
      * docs/wegpunkte.md, „Todespunkt“. {@code bund} über 0 verbindet ihn mit den Ecken desselben Bunds, 0 heisst lose; siehe
-     * docs/wegpunkte.md, „Verbinden“.
+     * docs/wegpunkte.md, „Verbinden“. {@code zeit} ist bei einem Todespunkt die Zeit des Todes in ms der Uhr, 0 unbekannt; siehe
+     * docs/wegpunkte.md, „Todespunkt“.
      */
-    record Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet, boolean tod, int ebene, int bund) {
+    record Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet, boolean tod, int ebene, int bund, long zeit) {
 
         Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet, boolean tod, int ebene) {
-            this(id, dimension, x, z, farbe, angeheftet, tod, ebene, 0);
+            this(id, dimension, x, z, farbe, angeheftet, tod, ebene, 0, 0);
         }
     }
 
@@ -296,7 +304,7 @@ final class Wegpunkte {
                 int id = o.has("id") ? o.get("id").getAsInt() : 0;
                 Punkt p = new Punkt(id, o.get("dimension").getAsString(), o.get("x").getAsInt(), o.get("z").getAsInt(),
                         Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length), o.get("minimap").getAsBoolean(), false, ebeneAus(o),
-                        bund(o.get("bund")));
+                        bund(o.get("bund")), 0);
                 if (finde(p.dimension(), p.x(), p.z()) < 0) {
                     punkte.add(p);
                 }
@@ -313,8 +321,9 @@ final class Wegpunkte {
         for (JsonElement e : tode) {
             try {
                 JsonObject o = e.getAsJsonObject();
+                // Ohne zeit, etwa aus tod oder von vor mod#166, ist sie unbekannt; dann steht keine Zeit unter ihm.
                 Punkt p = new Punkt(0, o.get("dimension").getAsString(), o.get("x").getAsInt(), o.get("z").getAsInt(), 0,
-                        o.get("minimap").getAsBoolean(), true, BASE);
+                        o.get("minimap").getAsBoolean(), true, BASE, 0, zeit(o.get("zeit")));
                 if (finde(p.dimension(), p.x(), p.z()) < 0) {
                     punkte.add(p);
                 }
@@ -420,6 +429,18 @@ final class Wegpunkte {
         return d == Math.rint(d) && d > 0 && d <= Integer.MAX_VALUE ? (int) d : 0;
     }
 
+    /**
+     * Die Zeit eines Todes aus der Datei, in ms: eine ganze Zahl über 0; was fehlt oder keine ist, heisst unbekannt, und der
+     * Todespunkt bleibt, wie beim Bund. Siehe docs/wegpunkte.md, „Todespunkt“.
+     */
+    private static long zeit(JsonElement e) {
+        if (!(e instanceof JsonPrimitive p) || !p.isNumber()) {
+            return 0;
+        }
+        double d = p.getAsDouble();
+        return d == Math.rint(d) && d > 0 && d < Long.MAX_VALUE ? (long) d : 0;
+    }
+
     /** Die Ebene aus dem Feld {@code ebene} eines Eintrags, wenn es sie gibt; sonst Base. */
     private int ebeneAus(JsonObject o) {
         // Nur eine Zahl; was sonst dasteht, heisst Base, und der Eintrag bleibt.
@@ -445,7 +466,12 @@ final class Wegpunkte {
                 tod.addProperty("x", p.x());
                 tod.addProperty("z", p.z());
                 tod.addProperty("minimap", p.angeheftet());
-                tode.add(tod);
+                // tod bleibt, wie es war; die Zeit steht nur im Eintrag von tode.
+                JsonObject eintrag = tod.deepCopy();
+                if (p.zeit() > 0) {
+                    eintrag.addProperty("zeit", p.zeit());
+                }
+                tode.add(eintrag);
                 continue;
             }
             JsonObject o = new JsonObject();
@@ -738,7 +764,7 @@ final class Wegpunkte {
     }
 
     private static Punkt mitEbene(Punkt p, int ebene) {
-        return new Punkt(p.id(), p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), ebene, p.bund());
+        return new Punkt(p.id(), p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), ebene, p.bund(), p.zeit());
     }
 
     private static Region mitEbene(Region r, int ebene) {
@@ -773,6 +799,11 @@ final class Wegpunkte {
      * docs/wegpunkte.md, „Todespunkt“.
      */
     boolean setzeTod(String dimension, int x, int z, int hoechstens) {
+        return setzeTod(dimension, x, z, hoechstens, System.currentTimeMillis());
+    }
+
+    /** Wie {@link #setzeTod(String, int, int, int)}, mit der Zeit des Todes in ms der Uhr. Siehe docs/wegpunkte.md, „Todespunkt“. */
+    boolean setzeTod(String dimension, int x, int z, int hoechstens, long zeit) {
         punkte.removeIf(p -> p.tod() && p.dimension().equals(dimension) && p.x() == x && p.z() == z);
         boolean frei = finde(dimension, x, z) < 0;
         if (frei) {
@@ -780,7 +811,7 @@ final class Wegpunkte {
             if (voriger != null && voriger.angeheftet()) {
                 umschalten(voriger);
             }
-            punkte.add(new Punkt(naechsteId++, dimension, x, z, 0, true, true, BASE));
+            punkte.add(new Punkt(naechsteId++, dimension, x, z, 0, true, true, BASE, 0, zeit));
             kappe(hoechstens);
         }
         schreibe();
@@ -798,6 +829,39 @@ final class Wegpunkte {
         List<Punkt> weg = new ArrayList<>(tode());
         weg = weg.subList(0, Math.max(0, weg.size() - Math.max(0, hoechstens)));
         return punkte.removeAll(weg);
+    }
+
+    /** Die festen Muster der Zeit unter dem Todespunkt, wenn das der Sprache nicht taugt. */
+    static final String TOD_ZEIT_HEUTE = "HH:mm", TOD_ZEIT = "dd.MM. HH:mm";
+    /** Die Formatierer je Muster aus der Sprache, einmal gebaut statt in jedem Frame. */
+    private static final Map<String, DateTimeFormatter> FORMATE = new ConcurrentHashMap<>();
+
+    /**
+     * Die Zeit des Todes {@code zeit} unter dem Todespunkt, in der Zeitzone {@code zone}: am Tag von {@code jetzt} nach dem Muster
+     * {@code heute}, sonst nach {@code frueher}; die Muster kommen aus der Sprache des Spiels. Siehe docs/wegpunkte.md,
+     * „Todespunkt“.
+     */
+    static String todZeit(long zeit, long jetzt, ZoneId zone, String heute, String frueher) {
+        ZonedDateTime t = Instant.ofEpochMilli(zeit).atZone(zone);
+        boolean amTag = t.toLocalDate().equals(Instant.ofEpochMilli(jetzt).atZone(zone).toLocalDate());
+        return format(amTag ? heute : frueher, amTag ? TOD_ZEIT_HEUTE : TOD_ZEIT).format(t);
+    }
+
+    /**
+     * Der Formatierer für {@code muster}, einmal gebaut. Ein Ressourcenpaket, auch vom Server, kann die Sprache überschreiben; ein
+     * Muster, das nicht geht oder ein Feld der Zeit nicht kennt, gibt das feste {@code fest}, statt beim Zeichnen zu werfen
+     * (Review von #172).
+     */
+    private static DateTimeFormatter format(String muster, String fest) {
+        return FORMATE.computeIfAbsent(muster + "\n" + fest, k -> {
+            try {
+                DateTimeFormatter f = DateTimeFormatter.ofPattern(muster);
+                f.format(ZonedDateTime.ofInstant(Instant.EPOCH, ZoneOffset.UTC));
+                return f;
+            } catch (IllegalArgumentException | DateTimeException kaputt) {
+                return DateTimeFormatter.ofPattern(fest);
+            }
+        });
     }
 
     /** „Todespunkt gesetzt bei x z“ für den Chat; ein Klick darauf öffnet die Karte dort über {@code /hmap karte}. */
@@ -988,7 +1052,7 @@ final class Wegpunkte {
                 if (dort != null && !dort.equals(p)) {
                     return false;
                 }
-                punkte.set(i, new Punkt(p.id(), p.dimension(), x, z, p.farbe(), p.angeheftet(), p.tod(), p.ebene(), b));
+                punkte.set(i, new Punkt(p.id(), p.dimension(), x, z, p.farbe(), p.angeheftet(), p.tod(), p.ebene(), b, p.zeit()));
             }
         }
         for (int i = 0; i < eigene.size(); i++) {
@@ -1093,7 +1157,7 @@ final class Wegpunkte {
     }
 
     private static Punkt mitBund(Punkt p, int b) {
-        return new Punkt(p.id(), p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), p.ebene(), b);
+        return new Punkt(p.id(), p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), p.ebene(), b, p.zeit());
     }
 
     private int neuerBund() {
@@ -1314,7 +1378,8 @@ final class Wegpunkte {
         for (int i = 0; i < punkte.size(); i++) {
             Punkt p = punkte.get(i);
             if (p.id() <= 0 || !gesehen.add(p.id())) {
-                punkte.set(i, new Punkt(naechsteId++, p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), p.ebene(), p.bund()));
+                punkte.set(i, new Punkt(naechsteId++, p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), p.ebene(), p.bund(),
+                        p.zeit()));
             }
         }
     }
@@ -1338,7 +1403,7 @@ final class Wegpunkte {
                 return false;
             }
         } else {
-            punkte.set(i, new Punkt(alt.id(), alt.dimension(), x, z, alt.farbe(), alt.angeheftet(), alt.tod(), alt.ebene()));
+            punkte.set(i, new Punkt(alt.id(), alt.dimension(), x, z, alt.farbe(), alt.angeheftet(), alt.tod(), alt.ebene(), 0, alt.zeit()));
         }
         schreibe();
         return true;
@@ -1349,7 +1414,8 @@ final class Wegpunkte {
         int i = finde(p.dimension(), p.x(), p.z());
         if (i >= 0) {
             Punkt alt = punkte.get(i);
-            punkte.set(i, new Punkt(alt.id(), alt.dimension(), alt.x(), alt.z(), alt.farbe(), !alt.angeheftet(), alt.tod(), alt.ebene(), alt.bund()));
+            punkte.set(i, new Punkt(alt.id(), alt.dimension(), alt.x(), alt.z(), alt.farbe(), !alt.angeheftet(), alt.tod(), alt.ebene(), alt.bund(),
+                    alt.zeit()));
             schreibe();
         }
     }
