@@ -42,8 +42,9 @@ Minuten der CI kosten nichts.
 
 ## Folgen
 
-- Die Gametests laufen in der CI in Software (Mesa) und dauern dort gut
-  3 min statt gut 2 min, siehe „CI“; dafür wartet niemand mehr.
+- Die Gametests laufen in der CI in Software (Mesa) und dauern dort
+  länger als lokal, siehe [Bauen und testen](../entwicklung.md), „CI“;
+  dafür wartet niemand mehr.
 - Ein Branch muss `main` ab dieser Änderung enthalten, sonst kennt seine
   `ci.yml` keinen Dispatch.
 - Mutierter Code steht kurz auf einem öffentlichen Branch `probe/…`.
