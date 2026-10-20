@@ -58,7 +58,8 @@ tasks.jar {
 
 // Bilder der Minimap: ./gradlew runClientGameTest -Pbilder=docs/bilder schreibt sie dorthin.
 // Die Messung läuft nur mit -Pmessung=<datei>, siehe docs/minimap.md, „Kosten“; die Übernahme der
-// Kacheln der Vollbildkarte nur mit -Puebernahme=<datei>, siehe docs/vollbildkarte.md, „Kacheln“.
+// Kacheln der Vollbildkarte nur mit -Puebernahme=<datei>, siehe docs/vollbildkarte.md, „Kacheln“; die Stufen der
+// eigenen Karte als Bilder nur mit -PselbstZoom=<ordner>, siehe docs/selbst.md, „Pyramide“.
 fabricApi {
     configureTests {
         createSourceSet = true
@@ -71,6 +72,7 @@ fabricApi {
 val bilder = providers.gradleProperty("bilder").map { file(it).absolutePath }.orElse("")
 val messung = providers.gradleProperty("messung").map { file(it).absolutePath }.orElse("")
 val uebernahme = providers.gradleProperty("uebernahme").map { file(it).absolutePath }.orElse("")
+val selbstZoom = providers.gradleProperty("selbstZoom").map { file(it).absolutePath }.orElse("")
 val server = providers.gradleProperty("server").orElse("")
 val mitSodium = providers.gradleProperty("sodium").isPresent
 val mitBetterF3 = providers.gradleProperty("betterf3").isPresent
@@ -92,6 +94,7 @@ tasks.matching { it.name == "runClientGameTest" }.configureEach {
     systemProperty("heroicmap.messung.zoom", providers.gradleProperty("messungZoom").orElse("false").get())
     systemProperty("heroicmap.messung.regionen", providers.gradleProperty("messungRegionen").orElse("47").get())
     systemProperty("heroicmap.uebernahme", uebernahme.get())
+    systemProperty("heroicmap.selbstzoom", selbstZoom.get())
     systemProperty("heroicmap.server", server.get())
     // Die Gametests fragen Modrinth nie; den Hinweis prüfen sie gegen einen Server auf loopback.
     systemProperty("heroicmap.ohne_modrinth", "true")
