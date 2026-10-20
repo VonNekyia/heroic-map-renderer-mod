@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
@@ -58,6 +59,8 @@ final class Karte extends Screen {
     private static final int KNOPF = 90;
     /** Breite des Knopfs „An“/„Aus“ einer Ebene; ihr Name steht links daneben. */
     private static final int AN_AUS = 30;
+    /** So breit sind „▲“ und „▼“ vor „An“/„Aus“. Siehe docs/vollbildkarte.md, „Reihe der Ebenen“. */
+    private static final int PFEIL = 12;
     /** Höhe eines Eintrags im Menü nach Rechtsklick. */
     private static final int ZEILE = 14;
     /** Abstand der Marken vom Rand des Schirms; Platz für den Namen über einem Kopf. */
@@ -250,7 +253,7 @@ final class Karte extends Screen {
     private int eigeneStand;
 
     /** Ein Schalter der Liste; {@code ebene} ist die Kennung einer Ebene vom Server, null bei einer eigenen. */
-    private record Schalter(CycleButton<Boolean> knopf, String ebene, Component name) {
+    private record Schalter(CycleButton<Boolean> knopf, String ebene, Component name, int links) {
     }
 
     /** Öffnet sich mit (x, z) in Blöcken in der Mitte, Stufe und Lupe wie beim letzten Schliessen; für {@code /hmap karte}. */
@@ -363,37 +366,65 @@ final class Karte extends Screen {
             return unterster;
         }
         boolean deutsch = minecraft.getLanguageManager().getSelected().startsWith("de");
-        List<Ebenen.Eintrag> alle = Ebenen.INSTANZ.alle();
-        // Base allein und an steht nicht in der Liste; so bleibt sie, wie sie war, für wen keine eigenen Ebenen hat. Aus steht sie da,
-        // sonst fände man sie auf der Karte nicht wieder.
-        List<Wegpunkte.EigeneEbene> eigene = eigeneZeigen ? Wegpunkte.INSTANZ.ebenen() : List.of();
+        Map<String, Ebenen.Eintrag> vomServer = new HashMap<>();
+        Ebenen.INSTANZ.alle().forEach(e -> vomServer.put(e.id(), e));
+        Map<Integer, Wegpunkte.EigeneEbene> eigene = new HashMap<>();
+        Wegpunkte.INSTANZ.ebenen().forEach(e -> eigene.put(e.id(), e));
+        // In der Reihe, wie gezeichnet wird, die oberste zuerst; ohne Umstellen die eigenen oben. Base allein und an steht nicht in der
+        // Liste; so bleibt sie, wie sie war, für wen keine eigenen Ebenen hat. Aus steht sie da, sonst fände man sie auf der Karte
+        // nicht wieder. Siehe docs/vollbildkarte.md, „Reihe der Ebenen“.
+        List<Ebenenreihe.Schicht> reihe = Ebenenreihe.INSTANZ.wirksam(Ebenen.INSTANZ.alle().reversed(),
+                Wegpunkte.INSTANZ.ebenen().stream().map(Wegpunkte.EigeneEbene::id).toList());
+        List<Ebenenreihe.Schicht> zeilen = reihe.stream().filter(s -> s.server() != null || eigeneZeigen).toList();
+        Set<Ebenenreihe.Schicht> gezeigt = Set.copyOf(zeilen);
+        boolean umgestellt = Ebenenreihe.INSTANZ.umgestellt();
         // Platz bis über „Optionen …“ unten rechts, mit dem Kanal bis über „Im Browser öffnen“, je Schalter 22 Einheiten.
         int platz = Math.max(1, (height - (Webkarte.kanal.getAsBoolean() ? 52 : 28) - (unterster.getY() + unterster.getHeight())) / 22);
-        int gesamt = eigene.size() + alle.size(), n = gesamt <= platz ? gesamt : platz - 1;
+        int zurueck = umgestellt ? 1 : 0, gesamt = zeilen.size(), n = gesamt + zurueck <= platz ? gesamt : Math.max(0, platz - 1 - zurueck);
         for (int i = 0; i < n; i++) {
+            Ebenenreihe.Schicht s = zeilen.get(i);
+            int y = unterster.getY() + 22;
             Component name;
             CycleButton<Boolean> k;
             String id = null;
-            if (i < eigene.size()) {
-                Wegpunkte.EigeneEbene e = eigene.get(i);
+            if (s.server() == null) {
+                Wegpunkte.EigeneEbene e = eigene.get(s.eigen());
                 name = Component.literal(e.name());
                 k = addRenderableWidget(CycleButton.onOffBuilder(e.an()).displayOnlyValue()
-                        .create(x + KNOPF - AN_AUS, unterster.getY() + 22, AN_AUS, 20, name, (b, an) -> Wegpunkte.INSTANZ.schalteEbene(e.id(), an)));
+                        .create(x + KNOPF - AN_AUS, y, AN_AUS, 20, name, (b, an) -> Wegpunkte.INSTANZ.schalteEbene(e.id(), an)));
             } else {
-                Ebenen.Eintrag e = alle.get(i - eigene.size());
+                Ebenen.Eintrag e = vomServer.get(s.server());
                 name = Component.literal(e.name(deutsch));
                 id = e.id();
                 k = addRenderableWidget(CycleButton.onOffBuilder(Ebenen.INSTANZ.an(e)).displayOnlyValue()
-                        .create(x + KNOPF - AN_AUS, unterster.getY() + 22, AN_AUS, 20, name, (b, an) -> Ebenen.INSTANZ.setze(e.id(), an)));
+                        .create(x + KNOPF - AN_AUS, y, AN_AUS, 20, name, (b, an) -> Ebenen.INSTANZ.setze(e.id(), an)));
             }
-            schalter.add(new Schalter(k, id, name));
+            Button runter = addRenderableWidget(Button.builder(Component.literal("▼"), b -> stelleUm(reihe, gezeigt, s, 1))
+                    .tooltip(Tooltip.create(Component.translatable("heroicmap.karte.reihe_runter"))).bounds(x + KNOPF - AN_AUS - PFEIL - 1, y, PFEIL, 20).build());
+            Button hoch = addRenderableWidget(Button.builder(Component.literal("▲"), b -> stelleUm(reihe, gezeigt, s, -1))
+                    .tooltip(Tooltip.create(Component.translatable("heroicmap.karte.reihe_hoch"))).bounds(runter.getX() - PFEIL - 1, y, PFEIL, 20).build());
+            hoch.active = i > 0;
+            runter.active = i < gesamt - 1;
+            schalter.add(new Schalter(k, id, name, hoch.getX()));
             unterster = k;
+        }
+        if (umgestellt) {
+            unterster = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.reihe_server"), b -> {
+                Ebenenreihe.INSTANZ.zuruecksetzen();
+                rebuildWidgets();
+            }).bounds(x, unterster.getY() + 22, KNOPF, 20).build());
         }
         if (n < gesamt) {
             unterster = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.ebenen_mehr"),
                     b -> minecraft.gui.setScreen(new EbenenMenue(this))).bounds(x, unterster.getY() + 22, KNOPF, 20).build());
         }
         return unterster;
+    }
+
+    /** Rückt die Zeile {@code s} eine gezeigte Stelle hoch (−1) oder runter (+1) und baut die Liste neu. */
+    private void stelleUm(List<Ebenenreihe.Schicht> reihe, Set<Ebenenreihe.Schicht> gezeigt, Ebenenreihe.Schicht s, int schritt) {
+        Ebenenreihe.INSTANZ.verschiebe(reihe, gezeigt, s, schritt);
+        rebuildWidgets();
     }
 
     /** Ob „Im Browser öffnen“ geht, und sonst warum, als Tooltip; nur bei einem anderen Grund neu. */
@@ -487,7 +518,7 @@ final class Karte extends Screen {
     private int[] ueberschrift(Schalter s) {
         CycleButton<Boolean> k = s.knopf();
         int breite = font.width(s.name()) + 6;
-        return new int[] {k.getX() - 4 - breite, k.getY(), breite, k.getHeight()};
+        return new int[] {s.links() - 4 - breite, k.getY(), breite, k.getHeight()};
     }
 
     /** Die Zeile, deren Überschrift unter (x, y) liegt, oder null. */
