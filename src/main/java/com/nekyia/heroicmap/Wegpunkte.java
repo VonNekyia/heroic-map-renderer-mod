@@ -121,7 +121,7 @@ final class Wegpunkte {
      * „Eigene Formen“.
      */
     record EigeneForm(String dimension, List<Ecke> ecken, int farbe, boolean angeheftet, String name, int hex, int ebene, double schrift,
-            int biegung, int gewicht) {
+            int biegung, int gewicht, boolean minecraft) {
 
         /** Eine Linie biegt ihren Namen nicht; er folgt ihr schon. Siehe docs/wegpunkte.md, „Namen“. */
         EigeneForm {
@@ -131,13 +131,13 @@ final class Wegpunkte {
 
         /** Mit Schrift 1, ohne Biegung und mit Gewicht 0, wie vor mod#150. */
         EigeneForm(String dimension, List<Ecke> ecken, int farbe, boolean angeheftet, String name, int hex, int ebene) {
-            this(dimension, ecken, farbe, angeheftet, name, hex, ebene, 1, 0, 0);
+            this(dimension, ecken, farbe, angeheftet, name, hex, ebene, 1, 0, 0, false);
         }
 
         /** Mit Gewicht 0, wie vor mod#163. */
         EigeneForm(String dimension, List<Ecke> ecken, int farbe, boolean angeheftet, String name, int hex, int ebene, double schrift,
                 int biegung) {
-            this(dimension, ecken, farbe, angeheftet, name, hex, ebene, schrift, biegung, 0);
+            this(dimension, ecken, farbe, angeheftet, name, hex, ebene, schrift, biegung, 0, false);
         }
 
         /** Die Farbe der Form, deckend: die eigene, sonst die aus {@link #FARBEN}. Siehe docs/wegpunkte.md, „Farbe“. */
@@ -151,7 +151,7 @@ final class Wegpunkte {
 
         /** Dieselbe Form mit anderen Ecken, alle übrigen Felder gleich; so trägt sich jedes neue Feld selbst mit (Review von #168). */
         EigeneForm mitEcken(List<Ecke> ecken) {
-            return new EigeneForm(dimension, ecken, farbe, angeheftet, name, hex, ebene, schrift, biegung, gewicht);
+            return new EigeneForm(dimension, ecken, farbe, angeheftet, name, hex, ebene, schrift, biegung, gewicht, minecraft);
         }
     }
 
@@ -202,6 +202,8 @@ final class Wegpunkte {
     static final int MAX_BIEGUNG = 180, BIEGUNG_SCHRITT = 15;
     /** Das Gewicht einer Form, ganzzahlig von −{@link #MAX_GEWICHT} bis {@link #MAX_GEWICHT}, Vorgabe 0; schwerer liegt oben. Siehe docs/wegpunkte.md, „Gewicht“. */
     static final int MAX_GEWICHT = 9;
+    /** Der Wert von {@code schriftart} in Datei und Code für die Minecraft-Schrift; ohne das Feld gilt die Kartenschrift. */
+    static final String SCHRIFTART_MINECRAFT = "minecraft";
     /** So viele Regionen und Kreise je Welt angeheftet, eigene und vom Server zusammen; darüber heftet der Mod keine an. */
     static final int MAX_ANGEHEFTET = 64;
     /** So viele Nadeln und Banner je Welt angeheftet, eine eigene Grenze; darüber heftet der Mod keine an. */
@@ -398,8 +400,11 @@ final class Wegpunkte {
                     int biegung = o.get("biegung") instanceof JsonPrimitive b && b.isNumber() && Math.abs(b.getAsDouble()) <= MAX_BIEGUNG
                             ? biegung(b.getAsDouble()) : 0;
                     int gewicht = o.get("gewicht") instanceof JsonPrimitive g && g.isNumber() && gewichtGilt(g.getAsDouble()) ? g.getAsInt() : 0;
+                    // Eine andere Schriftart als „minecraft“, auch eine spätere, heisst die Kartenschrift.
+                    boolean minecraft = o.get("schriftart") instanceof JsonPrimitive a && a.isString() && SCHRIFTART_MINECRAFT.equals(a.getAsString());
                     eigene.add(new EigeneForm(dimension, gueltig, Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length),
-                            o.get("minimap").getAsBoolean() && angeheftet() < MAX_ANGEHEFTET, name, hex, ebeneAus(o), schrift, biegung, gewicht));
+                            o.get("minimap").getAsBoolean() && angeheftet() < MAX_ANGEHEFTET, name, hex, ebeneAus(o), schrift, biegung, gewicht,
+                            minecraft));
                 }
             } catch (RuntimeException kaputt) {
                 // Nur dieser Eintrag fällt weg.
@@ -556,6 +561,9 @@ final class Wegpunkte {
             }
             if (f.gewicht() != 0) {
                 o.addProperty("gewicht", f.gewicht());
+            }
+            if (f.minecraft()) {
+                o.addProperty("schriftart", SCHRIFTART_MINECRAFT);
             }
             o.addProperty("ebene", f.ebene());
             zuege.add(o);
@@ -714,7 +722,8 @@ final class Wegpunkte {
             }
         }
         for (EbenenCode.Form f : inhalt.formen()) {
-            eigene.add(new EigeneForm(f.dimension(), f.ecken(), f.farbe(), false, f.name(), f.hex(), id, f.schrift(), f.biegung(), f.gewicht()));
+            eigene.add(new EigeneForm(f.dimension(), f.ecken(), f.farbe(), false, f.name(), f.hex(), id, f.schrift(), f.biegung(), f.gewicht(),
+                    f.minecraft()));
         }
         schreibe();
         return new Eingefuegt(id, n, inhalt.formen().size(), null);
@@ -774,7 +783,8 @@ final class Wegpunkte {
     }
 
     private static EigeneForm mitEbene(EigeneForm f, int ebene) {
-        return new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), f.hex(), ebene, f.schrift(), f.biegung(), f.gewicht());
+        return new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), f.hex(), ebene, f.schrift(), f.biegung(), f.gewicht(),
+                f.minecraft());
     }
 
     /** Der Wegpunkt auf dem Block (x, z) in {@code dimension}, sichtbar oder nicht, oder null. */
@@ -1239,7 +1249,7 @@ final class Wegpunkte {
             return false;
         }
         eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), !f.angeheftet(), f.name(), f.hex(), f.ebene(), f.schrift(),
-                f.biegung(), f.gewicht()));
+                f.biegung(), f.gewicht(), f.minecraft()));
         schreibe();
         return true;
     }
@@ -1249,7 +1259,7 @@ final class Wegpunkte {
         int i = eigene.indexOf(f);
         if (i >= 0) {
             eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), name(name), f.hex(), f.ebene(), f.schrift(),
-                    f.biegung(), f.gewicht()));
+                    f.biegung(), f.gewicht(), f.minecraft()));
             schreibe();
         }
     }
@@ -1265,7 +1275,23 @@ final class Wegpunkte {
             return f;
         }
         EigeneForm neu = new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), f.hex(), f.ebene(), schrift, biegung,
-                gewicht);
+                gewicht, f.minecraft());
+        eigene.set(i, neu);
+        stand++;
+        return neu;
+    }
+
+    /**
+     * Gibt der eigenen Form {@code f} die Minecraft-Schrift oder die Kartenschrift, nur im Speicher wie {@link #stil}; gespeichert
+     * wird mit dem Namen. Gibt die Form zurück, wie sie danach ist. Siehe docs/wegpunkte.md, „Namen“.
+     */
+    EigeneForm schriftart(EigeneForm f, boolean minecraft) {
+        int i = eigene.indexOf(f);
+        if (i < 0 || f.minecraft() == minecraft) {
+            return f;
+        }
+        EigeneForm neu = new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), f.hex(), f.ebene(), f.schrift(),
+                f.biegung(), f.gewicht(), minecraft);
         eigene.set(i, neu);
         stand++;
         return neu;
@@ -1315,7 +1341,8 @@ final class Wegpunkte {
     void faerbe(EigeneForm f, int hex) {
         int i = eigene.indexOf(f);
         if (i >= 0) {
-            eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), hex, f.ebene(), f.schrift(), f.biegung(), f.gewicht()));
+            eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), hex, f.ebene(), f.schrift(), f.biegung(), f.gewicht(),
+                    f.minecraft()));
             schreibe();
         }
     }
@@ -1785,7 +1812,7 @@ final class Wegpunkte {
             pfad = new double[] {p[0] + s * dz, p[1] - s * dx, p[2] + s * dz, p[3] - s * dx};
         }
         return new Ebenen.Schrift(f.dimension(), f.name(), pfad, groesse, 0, Ebenen.SCHRIFTFARBE, Ebenen.KONTURFARBE, NAME_KONTUR, box(pfad),
-                Math.toRadians(f.biegung()));
+                Math.toRadians(f.biegung()), f.minecraft());
     }
 
     /**

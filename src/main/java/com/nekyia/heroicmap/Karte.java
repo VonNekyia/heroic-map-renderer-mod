@@ -149,6 +149,8 @@ final class Karte extends Screen {
      * jetzt ist, und wie sie vorher war, null nach Enter. Siehe docs/wegpunkte.md, „Namen“.
      */
     private Raster schriftRegler, biegungRegler;
+    /** Am Namensfeld der Knopf „Schriftart: Karte | Minecraft“ (mod#171), sonst null. */
+    private CycleButton<Boolean> schriftartKnopf;
     /** Unter dem Farbfeld einer Form der Regler „Gewicht“, sonst null. Siehe docs/wegpunkte.md, „Gewicht“. */
     private Raster gewichtRegler;
     private Wegpunkte.EigeneForm stilForm, stilVorher;
@@ -281,6 +283,7 @@ final class Karte extends Screen {
         beiEnter = null;
         schriftRegler = null;
         biegungRegler = null;
+        schriftartKnopf = null;
         gewichtRegler = null;
         LocalPlayer spieler = minecraft.player;
         // Wie beim letzten Schliessen, je Satz; sonst der Spieler in der Mitte. Siehe docs/vollbildkarte.md, „Lage merken“.
@@ -1135,7 +1138,7 @@ final class Karte extends Screen {
 
     /** Für den Gametest: das Eingabefeld und seine Regler „Schrift“, „Biegung“ und „Gewicht“, je null ohne. */
     AbstractWidget[] eingabeWidgets() {
-        return new AbstractWidget[] {eingabe, schriftRegler, biegungRegler, gewichtRegler};
+        return new AbstractWidget[] {eingabe, schriftRegler, biegungRegler, gewichtRegler, schriftartKnopf};
     }
 
     /** Für den Gametest: der Hinweis unten links, oder null. */
@@ -1525,7 +1528,7 @@ final class Karte extends Screen {
         // oder schiebt den Regler.
         if (eingabe != null) {
             if (eingabe.isMouseOver(e.x(), e.y()) || auf(schriftRegler, e.x(), e.y()) || auf(biegungRegler, e.x(), e.y())
-                    || auf(gewichtRegler, e.x(), e.y())) {
+                    || auf(gewichtRegler, e.x(), e.y()) || auf(schriftartKnopf, e.x(), e.y())) {
                 super.mouseClicked(e, doppelt);
             } else {
                 schliesseEingabe();
@@ -2075,6 +2078,9 @@ final class Karte extends Screen {
         if (biegungRegler != null) {
             removeWidget(biegungRegler);
         }
+        if (schriftartKnopf != null) {
+            removeWidget(schriftartKnopf);
+        }
         if (gewichtRegler != null) {
             removeWidget(gewichtRegler);
         }
@@ -2082,13 +2088,14 @@ final class Karte extends Screen {
         beiEnter = null;
         schriftRegler = null;
         biegungRegler = null;
+        schriftartKnopf = null;
         gewichtRegler = null;
     }
 
     /**
-     * Das Feld für den Namen von {@code f}, darunter die Regler „Schrift“ und, bei einer Region, „Biegung“. Sie wirken gleich
-     * auf Karte und Minimap und sind grau, solange das Feld leer ist. Enter speichert Name, Schrift und Biegung; Esc und ein
-     * Klick daneben nehmen alles zurück. Siehe docs/wegpunkte.md, „Namen“.
+     * Das Feld für den Namen von {@code f}, darunter die Regler „Schrift“ und, bei einer Region, „Biegung“, und der Knopf
+     * „Schriftart“ (mod#171). Sie wirken gleich auf Karte und Minimap und sind grau, solange das Feld leer ist. Enter speichert
+     * Name, Schrift, Biegung und Schriftart; Esc und ein Klick daneben nehmen alles zurück. Siehe docs/wegpunkte.md, „Namen“.
      */
     private void benennen(Wegpunkte.EigeneForm f) {
         stilForm = f;
@@ -2100,6 +2107,8 @@ final class Karte extends Screen {
             stilVorher = null;
             return true;
         });
+        // Feld, Regler und Knopf ganz auf dem Schirm: Reicht der Platz unter dem Menü nicht, rückt das Feld höher.
+        eingabe.setY(Math.max(0, Math.min(eingabe.getY(), height - 20 - (f.region() ? 3 : 2) * REGLER_ZEILE)));
         int x = eingabe.getX(), y = eingabe.getY() + REGLER_ZEILE, b = eingabe.getWidth();
         schriftRegler = addRenderableWidget(new Raster(x, y, b, Wegpunkte.SCHRIFTEN.length, raste(f.schrift()),
                 i -> Component.translatable("heroicmap.karte.schrift", SCHRIFT_TEXTE[i]),
@@ -2111,6 +2120,9 @@ final class Karte extends Screen {
                     i -> stilForm = Wegpunkte.INSTANZ.stil(stilForm, stilForm.schrift(), (i - mitte) * Wegpunkte.BIEGUNG_SCHRITT,
                             stilForm.gewicht())));
         }
+        schriftartKnopf = addRenderableWidget(CycleButton.booleanBuilder(Component.translatable("heroicmap.karte.schriftart_minecraft"),
+                Component.translatable("heroicmap.karte.schriftart_karte"), f.minecraft()).create(x, y + (f.region() ? 2 : 1) * REGLER_ZEILE, b, 20,
+                Component.translatable("heroicmap.karte.schriftart"), (knopf, mc) -> stilForm = Wegpunkte.INSTANZ.schriftart(stilForm, mc)));
         reglerStand();
     }
 
@@ -2166,17 +2178,18 @@ final class Karte extends Screen {
     /** Die Regler sind grau, solange das Namensfeld leer ist. */
     private void reglerStand() {
         boolean an = eingabe != null && !eingabe.getValue().isBlank();
-        for (Raster r : new Raster[] {schriftRegler, biegungRegler}) {
+        for (AbstractWidget r : new AbstractWidget[] {schriftRegler, biegungRegler, schriftartKnopf}) {
             if (r != null) {
                 r.active = an;
             }
         }
     }
 
-    /** Nicht gespeichert: Schrift, Biegung und Gewicht der Form wieder, wie sie vorher waren. */
+    /** Nicht gespeichert: Schrift, Biegung, Gewicht und Schriftart der Form wieder, wie sie vorher waren. */
     private void stilZurueck() {
         if (stilVorher != null && stilForm != null) {
-            Wegpunkte.INSTANZ.stil(stilForm, stilVorher.schrift(), stilVorher.biegung(), stilVorher.gewicht());
+            Wegpunkte.INSTANZ.schriftart(Wegpunkte.INSTANZ.stil(stilForm, stilVorher.schrift(), stilVorher.biegung(), stilVorher.gewicht()),
+                    stilVorher.minecraft());
         }
         stilForm = null;
         stilVorher = null;

@@ -35,7 +35,8 @@ final class EbenenCode {
     }
 
     /** Eine Form im Code; {@code hex}, {@code schrift} und {@code biegung} wie bei {@link Wegpunkte.EigeneForm}, {@code name} null ohne. */
-    record Form(String dimension, List<Wegpunkte.Ecke> ecken, int farbe, int hex, String name, double schrift, int biegung, int gewicht) {
+    record Form(String dimension, List<Wegpunkte.Ecke> ecken, int farbe, int hex, String name, double schrift, int biegung, int gewicht,
+            boolean minecraft) {
     }
 
     /** Was ein Code enthält. */
@@ -98,6 +99,9 @@ final class EbenenCode {
             }
             if (f.gewicht() != 0) {
                 q.addProperty("gewicht", f.gewicht());
+            }
+            if (f.minecraft()) {
+                q.addProperty("schriftart", Wegpunkte.SCHRIFTART_MINECRAFT);
             }
             formen.add(q);
         }
@@ -253,7 +257,16 @@ final class EbenenCode {
                 throw new IllegalArgumentException("Gewicht " + gewicht);
             }
         }
-        return new Form(dimension(q), gueltig, index, hex, name, schrift, biegung, gewicht);
+        // Eine andere Schriftart, auch eine spätere, heisst die Kartenschrift; was kein Text ist, ist kaputt.
+        boolean minecraft = false;
+        if (q.has("schriftart")) {
+            JsonElement a = q.get("schriftart");
+            if (!a.isJsonPrimitive() || !a.getAsJsonPrimitive().isString()) {
+                throw new IllegalArgumentException("Schriftart");
+            }
+            minecraft = Wegpunkte.SCHRIFTART_MINECRAFT.equals(a.getAsString());
+        }
+        return new Form(dimension(q), gueltig, index, hex, name, schrift, biegung, gewicht, minecraft);
     }
 
     private static Gelesen fehler(String schluessel) {
