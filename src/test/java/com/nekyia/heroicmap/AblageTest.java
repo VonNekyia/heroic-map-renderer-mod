@@ -66,9 +66,9 @@ class AblageTest {
         welten.merke(server, "minecraft:overworld", 1);
         welten.merke(server, "plugin:farmwelt", 2);
         assertEquals(wurzel.resolve("mc.example.com/welt-0000000000000001/survival"),
-                Downloads.ordner(wurzel, Downloads.Ablage.IP, "mc.example.com", null, welten, "minecraft:overworld", "survival"));
+                Downloads.ordner(wurzel, Downloads.Ablage.IP, "mc.example.com", null, null, welten, "minecraft:overworld", "survival"));
         // Eine Dimension, die der Spieler nie betreten hat: kein Ordner, der Download wartet.
-        assertNull(Downloads.ordner(wurzel, Downloads.Ablage.IP, "mc.example.com", null, welten, "minecraft:the_end", "ende"));
+        assertNull(Downloads.ordner(wurzel, Downloads.Ablage.IP, "mc.example.com", null, null, welten, "minecraft:the_end", "ende"));
         // Gespeichert: Nach einem Neustart wählt das erste Level die Gruppe, dann ist die Farmwelt wieder bekannt.
         Welten nachher = new Welten(wurzel.resolve("welten.properties"));
         assertNull(nachher.hash(server, "plugin:farmwelt"));
