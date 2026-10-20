@@ -17,6 +17,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -46,13 +47,61 @@ final class Wegpunkte {
     /**
      * Ein Wegpunkt auf dem Block (x, z), mit einer festen {@code id}; {@code farbe} ist ein Index in {@link #FARBEN}. Mit
      * {@code tod} ein Todespunkt, ohne eigene Farbe; ihre Folge in der Liste ist die der Tode, der letzte der neueste. Siehe
-     * docs/wegpunkte.md, „Todespunkt“.
+     * docs/wegpunkte.md, „Todespunkt“. {@code bund} über 0 verbindet ihn mit den Ecken desselben Bunds, 0 heisst lose; siehe
+     * docs/wegpunkte.md, „Verbinden“.
      */
-    record Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet, boolean tod, int ebene) {
+    record Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet, boolean tod, int ebene, int bund) {
+
+        Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet, boolean tod, int ebene) {
+            this(id, dimension, x, z, farbe, angeheftet, tod, ebene, 0);
+        }
     }
 
-    /** Eine Ecke einer eigenen Form auf dem Block (x, z). */
-    record Ecke(int x, int z) {
+    /**
+     * Eine Ecke einer eigenen Form auf dem Block (x, z). {@code bund} über 0 verbindet sie mit allen Punkten desselben Bunds, 0
+     * heisst lose. Siehe docs/wegpunkte.md, „Verbinden“.
+     */
+    record Ecke(int x, int z, int bund) {
+
+        Ecke(int x, int z) {
+            this(x, z, 0);
+        }
+
+        /** Dieselbe Ecke auf dem Block (x, z), mit ihrem Bund. */
+        Ecke auf(int x, int z) {
+            return new Ecke(x, z, bund);
+        }
+    }
+
+    /**
+     * Ein Punkt, der sich verbinden lässt: ein Wegpunkt, oder mit {@code punkt} null die Ecke {@code index} der eigenen Form
+     * {@code form}. Siehe docs/wegpunkte.md, „Verbinden“.
+     */
+    record Glied(Punkt punkt, EigeneForm form, int index) {
+
+        static Glied von(Punkt p) {
+            return new Glied(p, null, -1);
+        }
+
+        static Glied von(EigeneForm f, int index) {
+            return new Glied(null, f, index);
+        }
+
+        String dimension() {
+            return punkt != null ? punkt.dimension() : form.dimension();
+        }
+
+        int x() {
+            return punkt != null ? punkt.x() : form.ecken().get(index).x();
+        }
+
+        int z() {
+            return punkt != null ? punkt.z() : form.ecken().get(index).z();
+        }
+
+        int bund() {
+            return punkt != null ? punkt.bund() : form.ecken().get(index).bund();
+        }
     }
 
     /**
@@ -149,7 +198,7 @@ final class Wegpunkte {
     private Ebenen gebautAus;
     private int gebautEbenen, gebautStand;
     /** Die eigene Form, die die Vollbildkarte gerade zieht, oder null; und die, für die zuletzt gebaut wurde. */
-    private EigeneForm gezogen, gebautGezogen;
+    private List<EigeneForm> gezogen = List.of(), gebautGezogen = List.of();
     private List<List<Ebenen.Form>> fuerKarte = List.of(), fuerMinimap = List.of();
     private List<Ebenen.Ort> fuerNadeln = List.of();
     /** Dieselben Nadeln und Banner nach Identität, so prüft die Vollbildkarte je Nadel ohne Allokation. */
@@ -217,7 +266,8 @@ final class Wegpunkte {
                 // Eine Datei von vor mod#79 nennt keine id; dann vergibt der Mod sie unten.
                 int id = o.has("id") ? o.get("id").getAsInt() : 0;
                 Punkt p = new Punkt(id, o.get("dimension").getAsString(), o.get("x").getAsInt(), o.get("z").getAsInt(),
-                        Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length), o.get("minimap").getAsBoolean(), false, ebeneAus(o));
+                        Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length), o.get("minimap").getAsBoolean(), false, ebeneAus(o),
+                        o.has("bund") ? Math.max(0, o.get("bund").getAsInt()) : 0);
                 if (finde(p.dimension(), p.x(), p.z()) < 0) {
                     punkte.add(p);
                 }
@@ -283,8 +333,10 @@ final class Wegpunkte {
                 String dimension = o.has("dimension") ? o.get("dimension").getAsString() : null;
                 List<Ecke> ecken = new ArrayList<>();
                 if (o.has("ecken")) {
+                    // Die dritte Zahl ist der Bund, nur an verbundenen Ecken; ältere Versionen lesen nur die ersten zwei.
                     for (JsonElement e : o.getAsJsonArray("ecken")) {
-                        ecken.add(new Ecke(e.getAsJsonArray().get(0).getAsInt(), e.getAsJsonArray().get(1).getAsInt()));
+                        JsonArray xz = e.getAsJsonArray();
+                        ecken.add(new Ecke(xz.get(0).getAsInt(), xz.get(1).getAsInt(), xz.size() > 2 ? Math.max(0, xz.get(2).getAsInt()) : 0));
                     }
                 } else {
                     for (JsonElement id : o.getAsJsonArray("punkte")) {
@@ -318,6 +370,7 @@ final class Wegpunkte {
                 // Nur dieser Eintrag fällt weg.
             }
         }
+        ordneBuende();
     }
 
     /** Die Ebene aus dem Feld {@code ebene} eines Eintrags, wenn es sie gibt; sonst Base. */
@@ -356,6 +409,9 @@ final class Wegpunkte {
             o.addProperty("farbe", p.farbe());
             o.addProperty("minimap", p.angeheftet());
             o.addProperty("ebene", p.ebene());
+            if (p.bund() != 0) {
+                o.addProperty("bund", p.bund());
+            }
             liste.add(o);
         }
         JsonArray rechtecke = new JsonArray();
@@ -402,6 +458,9 @@ final class Wegpunkte {
                 JsonArray xz = new JsonArray();
                 xz.add(e.x());
                 xz.add(e.z());
+                if (e.bund() != 0) {
+                    xz.add(e.bund());
+                }
                 ecken.add(xz);
             }
             o.add("ecken", ecken);
@@ -622,7 +681,7 @@ final class Wegpunkte {
     }
 
     private static Punkt mitEbene(Punkt p, int ebene) {
-        return new Punkt(p.id(), p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), ebene);
+        return new Punkt(p.id(), p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), ebene, p.bund());
     }
 
     private static Region mitEbene(Region r, int ebene) {
@@ -823,7 +882,9 @@ final class Wegpunkte {
 
     /**
      * Gibt der eigenen Form {@code f} neue Ecken, an ihrer Stelle, mit Farbe und Anheften. Bleiben weniger als zwei,
-     * fällt die Form weg; mehr als {@link #MAX_PUNKTE_FORM} nimmt sie nicht. False, wenn sich nichts änderte.
+     * fällt die Form weg; mehr als {@link #MAX_PUNKTE_FORM} nimmt sie nicht. Eine verbundene Ecke, die nun anderswo liegt,
+     * zieht ihren Bund mit (siehe docs/wegpunkte.md, „Verbinden“). False, wenn sich nichts änderte, auch wenn ein Wegpunkt des
+     * Bunds auf einen anderen träfe.
      */
     boolean ersetze(EigeneForm f, List<Ecke> ecken) {
         int i = eigene.indexOf(f);
@@ -831,13 +892,204 @@ final class Wegpunkte {
             return false;
         }
         List<Ecke> gueltig = gueltig(ecken);
+        List<Punkt> punkteVorher = List.copyOf(punkte);
+        List<EigeneForm> eigeneVorher = List.copyOf(eigene);
         if (gueltig == null) {
             eigene.remove(i);
         } else {
-            eigene.set(i, new EigeneForm(f.dimension(), gueltig, f.farbe(), f.angeheftet(), f.name(), f.hex(), f.ebene()));
+            eigene.set(i, mitEcken(f, gueltig));
+            for (Ecke c : gueltig) {
+                boolean blieb = f.ecken().stream().anyMatch(a -> a.bund() == c.bund() && a.x() == c.x() && a.z() == c.z());
+                if (c.bund() > 0 && !blieb && !zieheBund(c.bund(), f.dimension(), c.x(), c.z())) {
+                    zurueck(punkteVorher, eigeneVorher);
+                    return false;
+                }
+            }
         }
         schreibe();
         return true;
+    }
+
+    private static EigeneForm mitEcken(EigeneForm f, List<Ecke> ecken) {
+        return new EigeneForm(f.dimension(), ecken, f.farbe(), f.angeheftet(), f.name(), f.hex(), f.ebene());
+    }
+
+    /** Setzt Wegpunkte und eigene Formen auf einen früheren Stand, wenn eine Änderung mit Bünden nicht ganz ging. */
+    private void zurueck(List<Punkt> punkteVorher, List<EigeneForm> eigeneVorher) {
+        punkte.clear();
+        punkte.addAll(punkteVorher);
+        eigene.clear();
+        eigene.addAll(eigeneVorher);
+    }
+
+    /**
+     * Legt alle Glieder des Bunds {@code b} auf den Block (x, z) in {@code dimension}; auf dem Block einer Nachbarin wird eine
+     * Ecke mit ihr eine. False, sobald ein Wegpunkt des Bunds auf einen anderen träfe oder eine Form unter zwei Ecken fiele;
+     * dann ist ein Teil schon gezogen, und der Rufer setzt mit {@link #zurueck} zurück.
+     */
+    private boolean zieheBund(int b, String dimension, int x, int z) {
+        for (int i = 0; i < punkte.size(); i++) {
+            Punkt p = punkte.get(i);
+            if (p.bund() == b) {
+                Punkt dort = punktAuf(dimension, x, z);
+                if (dort != null && !dort.equals(p)) {
+                    return false;
+                }
+                punkte.set(i, new Punkt(p.id(), p.dimension(), x, z, p.farbe(), p.angeheftet(), p.tod(), p.ebene(), b));
+            }
+        }
+        for (int i = 0; i < eigene.size(); i++) {
+            EigeneForm f = eigene.get(i);
+            if (f.ecken().stream().anyMatch(c -> c.bund() == b)) {
+                List<Ecke> neu = gueltig(f.ecken().stream().map(c -> c.bund() == b ? c.auf(x, z) : c).toList());
+                if (neu == null) {
+                    return false;
+                }
+                eigene.set(i, mitEcken(f, neu));
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Darf {@code von} mit {@code ziel} verbunden werden? Nicht zwei Wegpunkte und keine Todespunkte, nur in einer Dimension,
+     * nicht, was schon verbunden ist, keine Form zweimal im neuen Bund, und ein Wegpunkt darin nicht auf den Block eines
+     * anderen. Siehe docs/wegpunkte.md, „Verbinden“.
+     */
+    boolean kannVerbinden(Glied von, Glied ziel) {
+        if (von.punkt() != null && ziel.punkt() != null || von.punkt() != null && von.punkt().tod() || ziel.punkt() != null && ziel.punkt().tod()
+                || !von.dimension().equals(ziel.dimension()) || von.bund() > 0 && von.bund() == ziel.bund()) {
+            return false;
+        }
+        List<Glied> a = glieder(von), b = glieder(ziel);
+        Set<EigeneForm> formen = new HashSet<>();
+        a.stream().filter(g -> g.form() != null).forEach(g -> formen.add(g.form()));
+        if (b.stream().anyMatch(g -> g.form() != null && formen.contains(g.form()))) {
+            return false;
+        }
+        List<Punkt> wegpunkte = new ArrayList<>();
+        a.stream().filter(g -> g.punkt() != null).forEach(g -> wegpunkte.add(g.punkt()));
+        b.stream().filter(g -> g.punkt() != null).forEach(g -> wegpunkte.add(g.punkt()));
+        Punkt dort = punktAuf(ziel.dimension(), ziel.x(), ziel.z());
+        return wegpunkte.size() <= 1 && (dort == null || wegpunkte.contains(dort));
+    }
+
+    /** Das Glied und alle anderen seines Bunds; lose nur es selbst. */
+    private List<Glied> glieder(Glied g) {
+        if (g.bund() == 0) {
+            return List.of(g);
+        }
+        List<Glied> aus = new ArrayList<>();
+        punkte.stream().filter(p -> p.bund() == g.bund()).forEach(p -> aus.add(Glied.von(p)));
+        for (EigeneForm f : eigene) {
+            for (int i = 0; i < f.ecken().size(); i++) {
+                if (f.ecken().get(i).bund() == g.bund()) {
+                    aus.add(Glied.von(f, i));
+                }
+            }
+        }
+        return aus;
+    }
+
+    /**
+     * Verbindet {@code von} mit {@code ziel}: {@code von} springt samt seinem Bund auf den Block von {@code ziel}, und beide
+     * Bünde werden einer. False, wenn es eins nicht mehr gibt oder sie sich nicht verbinden lassen ({@link #kannVerbinden}).
+     * Siehe docs/wegpunkte.md, „Verbinden“.
+     */
+    boolean verbinde(Glied von, Glied ziel) {
+        if (!da(von) || !da(ziel) || !kannVerbinden(von, ziel)) {
+            return false;
+        }
+        int b = ziel.bund() > 0 ? ziel.bund() : von.bund() > 0 ? von.bund() : neuerBund();
+        List<Punkt> punkteVorher = List.copyOf(punkte);
+        List<EigeneForm> eigeneVorher = List.copyOf(eigene);
+        binde(von, b);
+        binde(ziel, b);
+        if (!zieheBund(b, ziel.dimension(), ziel.x(), ziel.z())) {
+            zurueck(punkteVorher, eigeneVorher);
+            return false;
+        }
+        schreibe();
+        return true;
+    }
+
+    /** Gibt es das Glied so noch? */
+    private boolean da(Glied g) {
+        return g.punkt() != null ? punkte.contains(g.punkt()) : eigene.contains(g.form()) && g.index() >= 0 && g.index() < g.form().ecken().size();
+    }
+
+    /** Legt das Glied in den Bund {@code b}, mit seinem ganzen bisherigen Bund. */
+    private void binde(Glied g, int b) {
+        int alt = g.bund();
+        if (alt == b) {
+            return;
+        }
+        if (alt > 0) {
+            punkte.replaceAll(p -> p.bund() == alt ? mitBund(p, b) : p);
+            eigene.replaceAll(f -> f.ecken().stream().noneMatch(c -> c.bund() == alt) ? f
+                    : mitEcken(f, f.ecken().stream().map(c -> c.bund() == alt ? new Ecke(c.x(), c.z(), b) : c).toList()));
+        } else if (g.punkt() != null) {
+            punkte.set(punkte.indexOf(g.punkt()), mitBund(g.punkt(), b));
+        } else {
+            List<Ecke> ecken = new ArrayList<>(g.form().ecken());
+            Ecke c = ecken.get(g.index());
+            ecken.set(g.index(), new Ecke(c.x(), c.z(), b));
+            eigene.set(eigene.indexOf(g.form()), mitEcken(g.form(), ecken));
+        }
+    }
+
+    private static Punkt mitBund(Punkt p, int b) {
+        return new Punkt(p.id(), p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), p.ebene(), b);
+    }
+
+    private int neuerBund() {
+        int hoechster = punkte.stream().mapToInt(Punkt::bund).max().orElse(0);
+        for (EigeneForm f : eigene) {
+            hoechster = Math.max(hoechster, f.ecken().stream().mapToInt(Ecke::bund).max().orElse(0));
+        }
+        return hoechster + 1;
+    }
+
+    /** Löst den Bund {@code b}: Alle seine Glieder werden lose und bleiben, wo sie sind. Siehe docs/wegpunkte.md, „Verbinden“. */
+    void loese(int b) {
+        if (b <= 0) {
+            return;
+        }
+        punkte.replaceAll(p -> p.bund() == b ? mitBund(p, 0) : p);
+        eigene.replaceAll(f -> f.ecken().stream().noneMatch(c -> c.bund() == b) ? f
+                : mitEcken(f, f.ecken().stream().map(c -> c.bund() == b ? new Ecke(c.x(), c.z()) : c).toList()));
+        schreibe();
+    }
+
+    /**
+     * Ordnet die Bünde: Ein Bund gilt nur für Glieder auf demselben Block; liegen sie auf mehreren, behält der erste Block die
+     * Zahl, jeder weitere bekommt eine neue, und wer allein bleibt, wird lose. Sonst bleiben die Zahlen, so trifft ein „Lösen“
+     * aus dem offenen Menü den richtigen Bund. So hält die Invariante nach jedem Löschen und nach einer älteren Version, die ein
+     * Glied verschob. Siehe docs/wegpunkte.md, „Verbinden“.
+     */
+    private void ordneBuende() {
+        Map<List<Object>, Integer> zahl = new LinkedHashMap<>();
+        punkte.stream().filter(p -> p.bund() > 0).forEach(p -> zahl.merge(List.of(p.bund(), p.dimension(), p.x(), p.z()), 1, Integer::sum));
+        for (EigeneForm f : eigene) {
+            f.ecken().stream().filter(c -> c.bund() > 0).forEach(c -> zahl.merge(List.of(c.bund(), f.dimension(), c.x(), c.z()), 1, Integer::sum));
+        }
+        Map<List<Object>, Integer> neu = new HashMap<>();
+        Set<Integer> vergeben = new HashSet<>();
+        int naechster = neuerBund();
+        boolean gleich = true;
+        for (Map.Entry<List<Object>, Integer> e : zahl.entrySet()) {
+            int b = (Integer) e.getKey().getFirst();
+            int n = e.getValue() < 2 ? 0 : vergeben.add(b) ? b : naechster++;
+            neu.put(e.getKey(), n);
+            gleich &= n == b;
+        }
+        if (gleich) {
+            return;
+        }
+        punkte.replaceAll(p -> p.bund() == 0 ? p : mitBund(p, neu.getOrDefault(List.of(p.bund(), p.dimension(), p.x(), p.z()), 0)));
+        eigene.replaceAll(f -> f.ecken().stream().allMatch(c -> c.bund() == 0) ? f : mitEcken(f, f.ecken().stream()
+                .map(c -> c.bund() == 0 ? c : new Ecke(c.x(), c.z(), neu.getOrDefault(List.of(c.bund(), f.dimension(), c.x(), c.z()), 0)))
+                .toList()));
     }
 
     void loesche(EigeneForm f) {
@@ -909,21 +1161,30 @@ final class Wegpunkte {
     }
 
     /**
-     * Die Ecken ohne einen Block zweimal hintereinander; null, wenn weniger als zwei bleiben oder es mehr als
-     * {@link #MAX_PUNKTE_FORM} sind.
+     * Die Ecken ohne einen Block zweimal hintereinander; von zweien auf einem Block bleibt eine verbundene. Null, wenn weniger
+     * als zwei bleiben oder es mehr als {@link #MAX_PUNKTE_FORM} sind.
      */
     static List<Ecke> gueltig(List<Ecke> ecken) {
         List<Ecke> aus = new ArrayList<>();
         for (Ecke e : ecken) {
-            if (aus.isEmpty() || !aus.getLast().equals(e)) {
+            if (aus.isEmpty() || !aufEinemBlock(aus.getLast(), e)) {
                 aus.add(e);
+            } else if (aus.getLast().bund() == 0) {
+                aus.set(aus.size() - 1, e);
             }
         }
-        // Eine letzte Ecke gleich der ersten schliesst nur, sie zählt nicht doppelt.
-        if (aus.size() > 2 && aus.getLast().equals(aus.getFirst())) {
-            aus.removeLast();
+        // Eine letzte Ecke auf dem Block der ersten schliesst nur, sie zählt nicht doppelt.
+        if (aus.size() > 2 && aufEinemBlock(aus.getLast(), aus.getFirst())) {
+            Ecke letzte = aus.removeLast();
+            if (aus.getFirst().bund() == 0) {
+                aus.set(0, letzte);
+            }
         }
         return aus.size() < 2 || aus.size() > MAX_PUNKTE_FORM ? null : aus;
+    }
+
+    private static boolean aufEinemBlock(Ecke a, Ecke b) {
+        return a.x() == b.x() && a.z() == b.z();
     }
 
     /** Vergibt jedem Wegpunkt ohne gültige oder mit doppelter id eine neue; danach die nächste freie. */
@@ -940,14 +1201,15 @@ final class Wegpunkte {
         for (int i = 0; i < punkte.size(); i++) {
             Punkt p = punkte.get(i);
             if (p.id() <= 0 || !gesehen.add(p.id())) {
-                punkte.set(i, new Punkt(naechsteId++, p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), p.ebene()));
+                punkte.set(i, new Punkt(naechsteId++, p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), p.ebene(), p.bund()));
             }
         }
     }
 
     /**
-     * Legt den Wegpunkt auf den Block (x, z) seiner Dimension, mit Farbe und Anheften; false, wenn es ihn
-     * nicht gibt oder dort schon einer liegt, dann bleibt alles.
+     * Legt den Wegpunkt auf den Block (x, z) seiner Dimension, mit Farbe und Anheften, verbunden samt seinem Bund (siehe
+     * docs/wegpunkte.md, „Verbinden“); false, wenn es ihn nicht gibt, dort schon einer liegt oder eine Form des Bunds unter zwei
+     * Ecken fiele, dann bleibt alles.
      */
     boolean verschiebe(Punkt p, int x, int z) {
         int i = finde(p.dimension(), p.x(), p.z());
@@ -955,7 +1217,16 @@ final class Wegpunkte {
             return false;
         }
         Punkt alt = punkte.get(i);
-        punkte.set(i, new Punkt(alt.id(), alt.dimension(), x, z, alt.farbe(), alt.angeheftet(), alt.tod(), alt.ebene()));
+        if (alt.bund() > 0) {
+            List<Punkt> punkteVorher = List.copyOf(punkte);
+            List<EigeneForm> eigeneVorher = List.copyOf(eigene);
+            if (!zieheBund(alt.bund(), alt.dimension(), x, z)) {
+                zurueck(punkteVorher, eigeneVorher);
+                return false;
+            }
+        } else {
+            punkte.set(i, new Punkt(alt.id(), alt.dimension(), x, z, alt.farbe(), alt.angeheftet(), alt.tod(), alt.ebene()));
+        }
         schreibe();
         return true;
     }
@@ -965,7 +1236,7 @@ final class Wegpunkte {
         int i = finde(p.dimension(), p.x(), p.z());
         if (i >= 0) {
             Punkt alt = punkte.get(i);
-            punkte.set(i, new Punkt(alt.id(), alt.dimension(), alt.x(), alt.z(), alt.farbe(), !alt.angeheftet(), alt.tod(), alt.ebene()));
+            punkte.set(i, new Punkt(alt.id(), alt.dimension(), alt.x(), alt.z(), alt.farbe(), !alt.angeheftet(), alt.tod(), alt.ebene(), alt.bund()));
             schreibe();
         }
     }
@@ -1154,13 +1425,16 @@ final class Wegpunkte {
         return angeheftetOrte.contains(o);
     }
 
-    /** Lässt die eigene Form {@code f} aus den Formen der Vollbildkarte weg, solange sie gezogen wird; null zeigt wieder alle. */
-    void ziehe(EigeneForm f) {
-        gezogen = f;
+    /**
+     * Lässt die eigenen Formen {@code fs} aus den Formen der Vollbildkarte weg, solange sie gezogen werden oder einer gezogenen
+     * folgen; leer zeigt wieder alle.
+     */
+    void ziehe(List<EigeneForm> fs) {
+        gezogen = List.copyOf(fs);
     }
 
     private void baue(Ebenen e) {
-        if (e == gebautAus && e.stand() == gebautEbenen && stand == gebautStand && gezogen == gebautGezogen) {
+        if (e == gebautAus && e.stand() == gebautEbenen && stand == gebautStand && gezogen.equals(gebautGezogen)) {
             return;
         }
         gebautAus = e;
@@ -1208,7 +1482,7 @@ final class Wegpunkte {
             Ebenen.Form form = form(f, p);
             Ebenen.Schrift name = schrift(f, p);
             // Die Form, die gerade gezogen wird, zeichnet die Vollbildkarte selbst, wo sie an der Maus steht.
-            if (f != gezogen) {
+            if (!gezogen.contains(f)) {
                 aufKarte.add(f.angeheftet() ? breiter(form) : form);
                 if (name != null) {
                     aufKarte.add(name);
@@ -1400,8 +1674,9 @@ final class Wegpunkte {
         return -1;
     }
 
-    /** Nach jeder Änderung; über eine Zwischendatei, so liegt nie eine halbe Datei da. */
+    /** Nach jeder Änderung; ordnet erst die Bünde, dann über eine Zwischendatei, so liegt nie eine halbe Datei da. */
     private void schreibe() {
+        ordneBuende();
         stand++;
         if (datei == null) {
             return;

@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.60
+
+- **Connect points.** Right-click a corner of your own line or region, or a waypoint, and choose "Connect": it snaps onto the nearest point within a short distance, and from then on they move together. Drag one, move it with "Set coordinates…" or move a shape by its handle, and the connected corners and waypoint follow; only the shared corner of another shape moves, the rest of that shape stays. "Disconnect" releases all points on that spot. Connected corners have a light centre. Shared layer codes don't carry connections.
+
 ## 0.2.58
 
 - **Several death points.** "Death points" under "Settings …" is now a slider: off, or keep 1 to 16. Each death adds one where you died; the oldest drop off. Lowering the slider removes the oldest when you close the menu, not while you drag. Only the newest is pinned, so the beam leads to your last death. Death points can't be dragged any more; delete them from the right-click menu or with `Delete`.

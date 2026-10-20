@@ -1,6 +1,6 @@
 ---
 title: Wegpunkte
-description: Wegpunkte auf der Vollbildkarte setzen und löschen, auch an eingetippten Koordinaten, der Todespunkt, eigene Linien und Regionen mit eigenen Ecken, Namen und Farben, eigene Ebenen zum An- und Ausschalten und zum Teilen als Code, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
+description: Wegpunkte auf der Vollbildkarte setzen und löschen, auch an eingetippten Koordinaten, der Todespunkt, eigene Linien und Regionen mit eigenen Ecken, Namen und Farben, Ecken und Wegpunkte verbinden und lösen, eigene Ebenen zum An- und Ausschalten und zum Teilen als Code, alte Rechtecke, Marken für Wegpunkte, Spieler und Mitspieler am Rand, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen, Kreise, Nadeln und Banner vom Server, höchstens 64 angeheftete Regionen und 64 Nadeln, der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen in der Welt, Grösse der Köpfe, Ablage in wegpunkte.json je Welt und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Wegpunkte.java
   - src/main/java/com/nekyia/heroicmap/Karte.java
@@ -350,9 +350,9 @@ Raute eines alten Rechtecks vor einer Ecke vor dem Griff einer Form.
 
 | Objekt | Einträge |
 |---|---|
-| Wegpunkt | „Hierher teleportieren“, „Koordinaten setzen…“, „Linie/Region von hier“ auf seinem Block, „Ebene …“, „Wegpunkt löschen“ |
+| Wegpunkt | „Hierher teleportieren“, „Koordinaten setzen…“, „Verbinden“ und „Lösen“ (siehe „Verbinden“), „Linie/Region von hier“ auf seinem Block, „Ebene …“, „Wegpunkt löschen“ |
 | Todespunkt | „Hierher teleportieren“, „Todespunkt löschen“; er bleibt, wo er ist, und in Base |
-| Ecke einer eigenen Form | „Koordinaten setzen…“, „Eckpunkt hinzufügen“, „Eckpunkt löschen“ |
+| Ecke einer eigenen Form | „Koordinaten setzen…“, „Verbinden“ und „Lösen“ (siehe „Verbinden“), „Eckpunkt hinzufügen“, „Eckpunkt löschen“ |
 | Raute eines alten Rechtecks | „Ebene …“, „Region löschen“ |
 | Griff einer eigenen Form | ihr Menü, siehe „Eigene Formen“, „Menü am Griff“ |
 | freie Karte, auch in einer Fläche | „Hierher teleportieren“, „Wegpunkt setzen“, „Wegpunkt bei …“, „Linie/Region von hier“ |
@@ -397,8 +397,59 @@ schliessen Regionen sauber aneinander.
   wie bisher.
 - **Beim Loslassen** zählt, ob `Strg` dann gedrückt ist: mit dem Ziel auf
   dessen Block (`Karte.ablage`), sonst auf dem Block unter der Maus.
-- **Nicht** am Griff, wo die ganze Form hängt, und nicht auf Objekte vom
-  Server.
+- **Nicht** am Griff, wo die ganze Form hängt, nicht auf Objekte vom
+  Server und nicht auf Glieder des eigenen Bunds, die ohnehin mitziehen,
+  siehe „Verbinden“.
+- **Einrasten verbindet nicht:** Es legt nur auf denselben Block. Verbunden
+  wird von Hand, siehe „Verbinden“.
+
+## Verbinden
+
+Ecken eigener Formen und Wegpunkte lassen sich verbinden und wieder lösen;
+verbundene Punkte bewegen sich immer zusammen. Gewünscht vom User am 20.10.
+(mod#162); Plan vom Reviewer freigegeben, die Entscheide D1 bis D7 von
+ihm, D1 vom User bestätigt.
+
+- **Ein Bund** ist eine Zahl über 0 an jedem verbundenen Punkt
+  (`Wegpunkte.Ecke.bund`, `Wegpunkte.Punkt.bund`), 0 heisst lose. Alle
+  Glieder eines Bunds liegen immer auf demselben Block. Was sich verbinden
+  lässt: Ecken verschiedener eigener Formen untereinander und eine Ecke mit
+  einem Wegpunkt. Nicht zwei Wegpunkte, denn zwei liegen nie auf einem
+  Block; keine Todespunkte; keine Objekte vom Server; keine Form zweimal in
+  einem Bund (`Wegpunkte.kannVerbinden`).
+- **„Verbinden“** im Menü einer Ecke oder eines Wegpunkts nimmt den
+  nächsten Punkt höchstens 8 Einheiten des GUI weg, gemessen an der Lage
+  der Blöcke wie beim Einrasten, in Ebenen, die an sind (`Karte.verbindeZiel`).
+  Der angeklickte springt samt seinem Bund auf den Block des Ziels, und
+  beide Bünde werden einer (`Wegpunkte.verbinde`). Liegt keiner so nah,
+  fehlt der Eintrag ganz, so hat es der User entschieden. Nie verbindet
+  etwas aus Versehen, auch nicht das Einrasten.
+- **„Lösen“** an einem verbundenen Punkt löst den ganzen Bund auf diesem
+  Block, nicht nur den angeklickten (D2): Liegen Punkte gestapelt, sieht man
+  nicht, welcher getroffen ist. Alle bleiben, wo sie sind (`Wegpunkte.loese`).
+- **Folgen:** Ziehen, „Koordinaten setzen…“ und Verschieben am Griff legen
+  alle Glieder des Bunds auf den neuen Block (`Wegpunkte.ersetze`,
+  `Wegpunkte.verschiebe`), schon beim Ziehen gezeichnet (`Karte.zuege`);
+  `Esc` setzt alle zurück. Von einer anderen Form folgt nur die verbundene
+  Ecke, ihre übrigen bleiben, und ihre Linien folgen der Ecke (D1, vom User
+  bestätigt). Sonst liesse sich eine gemeinsame Grenze zweier Regionen nie
+  bearbeiten. Am Griff folgen nur die Glieder der verschobenen Ecken (D6).
+- **Konflikt:** Läge ein Wegpunkt des Bunds danach auf dem Block eines
+  anderen Wegpunkts, bleibt der ganze Bund, wo er war, und unten links
+  steht „Dort liegt schon ein Wegpunkt“ (D7). Ebenso, wenn eine Form dabei
+  unter zwei Ecken fiele.
+- **Ebenen:** Ein Bund reicht über Ebenen. Ein Glied in einer Ebene, die
+  aus ist, zieht trotzdem mit, ist aber kein Ziel für „Verbinden“ (D4).
+- **Löschen** einer Ecke, eines Wegpunkts oder einer Form nimmt nur diese.
+  Bleibt ein Glied allein, wird es lose (`Wegpunkte.ordneBuende`, nach jeder
+  Änderung).
+- **Aussehen:** Eine verbundene Ecke ist eine Nummer grösser und hat einen
+  hellen Kern wie der Griff (`Karte.raute`, D5); der helle Rand bleibt für
+  „unter der Maus“. Ein verbundener Wegpunkt sieht aus wie sonst: Auf ihm
+  liegt immer eine verbundene Ecke, und die zeigt es. Nur auf der
+  Vollbildkarte.
+- **Datei:** siehe „Ablage“. **Code zum Teilen:** ohne Bünde, siehe
+  „Ebenen teilen“ (D3).
 
 ## Eigene Formen
 
@@ -671,7 +722,11 @@ bei einem anderen Spieler als neue Ebene an. Gewünscht vom User am 18.10.
   Form der Index oder ihre eigene Farbe als `#RRGGBB`, siehe „Farbe“; mit
   eigener Farbe steht kein Index darin, eingefügt ist er 0.
 - **Nicht darin:** Angeheftetes, Mitspieler, Formen vom Server, der
-  Todespunkt und alte Rechtecke. Ein altes Rechteck als Form durch die
+  Todespunkt, alte Rechtecke und Verbindungen, siehe „Verbinden“. Eine
+  Ecke hat im Code genau zwei Zahlen, denn ältere Versionen lehnen eine mit
+  drei ab (`EbenenCode.form`), und ein Bund kann über die geteilte Ebene
+  hinausreichen (D3). Die Formen kommen auf denselben Blöcken an und lassen
+  sich von Hand verbinden. Ein altes Rechteck als Form durch die
   Mitten seiner Eckblöcke wäre einen halben Block kleiner als es selbst;
   so bleibt es, wie es ist, zu Hause.
 - **Geprüft beim Einfügen,** alles oder nichts, mit einer Meldung unter
@@ -810,7 +865,15 @@ Schleier am Rand, siehe „Schleier“.
   `eigene_formen` nennt ihre Dimension und die Blöcke ihrer Ecken in Reihenfolge,
   dazu `name`, wenn sie einen hat, siehe „Namen“, und `hex`, wenn sie eine
   eigene Farbe hat, siehe „Farbe“; eine ältere Version des Mods überliest
-  beide und verliert sie beim nächsten Speichern,
+  beide und verliert sie beim nächsten Speichern. Eine verbundene Ecke hat
+  als dritte Zahl ihren Bund, `[x, z, bund]`, ein verbundener Wegpunkt das
+  Feld `bund`, siehe „Verbinden“; ohne Verbindungen bleibt die Datei, wie
+  sie war. Eine ältere Version liest nur die ersten zwei Zahlen und
+  überliest `bund`; speichert sie, sind nur die Verbindungen weg. Beim
+  Lesen gilt ein Bund nur für Glieder auf demselben Block: Hat eine ältere
+  Version eines verschoben, wird es lose, und liegen zwei Gruppen eines
+  Bunds auf zwei Blöcken, bekommt die zweite einen neuen
+  (`Wegpunkte.ordneBuende`),
   `spieler` sind die angehefteten Mitspieler, `formen` die angehefteten
   Flächen und Kreise vom Server, `nadeln` die angehefteten Nadeln und
   Banner. Eine Region nennt die Blöcke ihrer Ecken,
@@ -848,7 +911,16 @@ Schleier am Rand, siehe „Schleier“.
   ändert keine Form), `eckeLoeschenUndEinfuegen` (Region mit drei Ecken wird
   Linie, Linie mit zwei fällt weg, über 64 nicht) und
   `formenGrenzenUndAlteDatei` (Umzug von `punkte` zu `ecken`),
-  `griffAufHalberLaengeOderImSchwerpunkt`. Zu Namen:
+  `griffAufHalberLaengeOderImSchwerpunkt`. Zum Verbinden:
+  `verbindenUndLoesen` (Ecke mit Ecke und mit Wegpunkt, der Sprung, Bünde
+  vereint; nicht zwei Wegpunkte, die eigene Form, ein Todespunkt, eine
+  andere Dimension, schon verbunden, eine Form zweimal; Lösen löst den
+  ganzen Bund), `verbundenesFolgt` (Wegpunkt, Ecke und Griff ziehen ihren
+  Bund mit, nur die gemeinsame Ecke einer anderen Form; ein Wegpunkt auf
+  einem anderen lässt alles stehen; Löschen macht den Rest lose),
+  `buendeInDerDatei` (dritte Zahl und `bund` nur verbunden, ohne Bünde die
+  Datei wie zuvor, hin und zurück; ein verschobenes Glied wird lose, zwei
+  Gruppen bekommen zwei Bünde). Zu Namen:
   `nameBereinigtUndGekappt`, `namenUeberstehenDenNeustartUndAenderungen`
   (auch ein Name, der kein Text ist), `namenEineSchrifthoeheNebenDemGriff`
   (Region, Linie in vier Richtungen, Höhe nach der Form und gekappt, ohne
@@ -875,7 +947,8 @@ Schleier am Rand, siehe „Schleier“.
   Lesen jede Grenze, eine Bombe, ein halber Code, falsche Felder und
   unbekannte, die es überliest (`lesenPrueftAllesOderNichts`); tief
   verschachteltes JSON und eine Zahl mit 200 000 Ziffern
-  (`boesartigeCodesSindKaputtOhneZuWerfen`).
+  (`boesartigeCodesSindKaputtOhneZuWerfen`); verbundene Formen gehen ohne
+  Bünde in den Code, mit zwei Zahlen je Ecke (`codeOhneBuende`).
 - `SchleierTest`: Teilen an jeder ganzen Zahl, auch rückwärts und durch
   eine Ecke; ein Rechteck ein Stück je Block, nur im Kasten; ein Kreis in
   Sehnen über den Bogen, ein Kreis von 100 000 Blöcken nur beim Kasten;
@@ -969,7 +1042,17 @@ Schleier am Rand, siehe „Schleier“.
   weg und neben einer Ecke der eigenen Form rastet nichts ein; ein Wegpunkt
   mit `Strg` neben einer Ecke liegt auf ihr, das Bild `einrasten.png` zeigt
   ihn beim Ziehen dort; neben der Marke eines fernen Wegpunkts am Rand rastet
-  eine Ecke nicht ein. Rechtsklick im Bau (`rechtsklickImBau`): mit einer Ecke der Hinweis,
+  eine Ecke nicht ein. Verbinden (`verbinden`): „Verbinden“ an einer Ecke
+  einen Block schräg neben der Ecke einer anderen Form legt sie auf deren
+  Block, im Bildschirmfoto `verbunden.png` mit hellem Kern, eine lose ohne;
+  die andere gehalten und gezogen, folgt sie schon beim Ziehen und danach,
+  die übrigen Ecken bleiben; nach „Lösen“ folgt sie nicht mehr; „Verbinden“
+  am Wegpunkt legt ihn auf eine Ecke, und gezogen nimmt er sie mit; am Griff
+  folgt die verbundene Ecke der anderen Form, schon beim Ziehen; auf einen anderen Wegpunkt
+  gezogen, bleibt der Bund mit dem Hinweis; ohne Punkt in 8 Einheiten und
+  mit nur einer Ecke der eigenen Form daneben fehlt „Verbinden“, an losen
+  „Lösen“; den Wegpunkt gelöscht, bleibt die Ecke lose und ohne Kern
+  (`verbunden-geloescht.png`). Rechtsklick im Bau (`rechtsklickImBau`): mit einer Ecke der Hinweis,
   kein Menü und keine Form; mit zweien auf einem Wegpunkt eine Linie; mit
   vier auf freier Karte eine Region mit allen vieren; am Griff einer Form im
   Bau mit einer Ecke ihr Menü mit „Form abbrechen“ und ohne „Form fertig“;

@@ -68,6 +68,26 @@ class EbenenCodeTest {
         assertEquals(0x3A7FD5, andere.eigeneFormen().get(0).hex());
     }
 
+    /**
+     * Der Code trägt keine Bünde (mod#162, D3): Eine Ecke hat dort genau zwei Zahlen, denn ältere Versionen lehnen eine mit drei
+     * ab ({@code EbenenCode.form}). Siehe docs/wegpunkte.md, „Ebenen teilen“.
+     */
+    @Test
+    void codeOhneBuende() {
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        w.setzeForm(WELT, List.of(e(0, 0), e(5, 5)));
+        w.setzeForm(WELT, List.of(e(5, 5), e(9, 0)));
+        w.setze(WELT, 0, 0);
+        assertTrue(w.verbinde(Wegpunkte.Glied.von(w.eigeneFormen().get(1), 0), Wegpunkte.Glied.von(w.eigeneFormen().get(0), 1)));
+        assertTrue(w.verbinde(Wegpunkte.Glied.von(w.eigeneFormen().get(0), 0), Wegpunkte.Glied.von(w.punkte().getFirst())));
+        assertTrue(w.eigeneFormen().get(0).ecken().stream().allMatch(c -> c.bund() > 0));
+        EbenenCode.Gelesen g = EbenenCode.lies(EbenenCode.schreibe(w, Wegpunkte.BASE));
+        assertNull(g.fehler());
+        assertEquals(List.of(List.of(e(0, 0), e(5, 5)), List.of(e(5, 5), e(9, 0))),
+                g.inhalt().formen().stream().map(EbenenCode.Form::ecken).toList());
+    }
+
     @Test
     void gleicherNameBekommtEineZahlUndBelegteBloeckeBleiben() {
         Wegpunkte w = new Wegpunkte();
