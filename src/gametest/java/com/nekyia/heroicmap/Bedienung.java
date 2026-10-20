@@ -97,6 +97,7 @@ public final class Bedienung implements FabricClientGameTest {
             zoomNebenMinimap(context, maus, k);
             aufloesungUndKoordinaten(context, maus, k);
             symbole(context, maus, k);
+            knoepfeUeberDemL(context, maus);
             context.runOnClient(mc -> mc.gui.setScreen(null));
             beiF3(context, maus);
             schleierRegler(context, maus, k);
@@ -4791,6 +4792,87 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new UncheckedIOException(e);
             }
         }
+    }
+
+    /**
+     * Bei GS 4 und grosser Minimap ist neben ihr weniger Platz als die 120 Einheiten der Knöpfe; dann liegen sie über dem
+     * Regler „Zoom“. Im Bildschirmfoto steht „Minimap“ dort über dem Regler: Auf seiner oberen Zeile, im Rand des Knopfs, ist
+     * die Stelle über dem Regler so hell wie die daneben. Ein Klick von Hand auf die Stelle, an der „Fertig“ über dem Regler
+     * liegt, schliesst das Menü und lässt den Zoom, wie vorher über der Minimap. Siehe docs/minimap.md, „Bedienung“.
+     */
+    private static void knoepfeUeberDemL(ClientGameTestContext context, TestInput maus) {
+        Path sicherung = FabricLoader.getInstance().getGameDir().resolve("heroicmap-knoepfe-test.properties");
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        context.runOnClient(mc -> Minimap.INSTANZ.schreibe(sicherung));
+        context.getInput().resizeWindow(1280, 960);
+        context.runOnClient(mc -> {
+            mc.options.guiScale().set(4);
+            mc.resizeGui();
+            int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+            Minimap.INSTANZ.stelle(b, 0, Minimap.GROESSTE, b, h);
+            // Der Knauf ganz unten, fern der Knöpfe: Sonst träfe die Prüfung des Bilds seinen hellen Griff statt der Spur.
+            Minimap.INSTANZ.setzeZoom(Minimap.ZOOMS[0]);
+            mc.gui.setScreen(new Einstellungen());
+        });
+        context.waitTicks(3);
+        try {
+            // Vor mod#183 war „Minimap“ unter dem Regler gezeichnet, denn es kam vor dem L, und „Fertig“ bekam den Klick nicht,
+            // denn es kam danach. Darum Zeichnen an „Minimap“, Klick an „Fertig“.
+            double[] bildOrt = context.computeOnClient(mc -> ueberZoom(mc, Component.translatable("heroicmap.menue.minimap").getString()));
+            double[] ort = context.computeOnClient(mc -> ueberZoom(mc, CommonComponents.GUI_DONE.getString()));
+            maus.setCursorPos(0, 0);
+            context.waitTicks(2);
+            try {
+                BufferedImage bild = ImageIO.read(context.takeScreenshot(TestScreenshotOptions.of("knoepfe-ueber-dem-l").disableCounterPrefix()).toFile());
+                int ueber = bild.getRGB((int) Math.round(bildOrt[0] * 4), (int) Math.round(bildOrt[3] * 4) + 1);
+                int daneben = bild.getRGB((int) Math.round(bildOrt[2] * 4), (int) Math.round(bildOrt[3] * 4) + 1);
+                int hell = (ueber >> 16 & 0xFF) + (ueber >> 8 & 0xFF) + (ueber & 0xFF), hellDaneben = (daneben >> 16 & 0xFF) + (daneben >> 8 & 0xFF) + (daneben & 0xFF);
+                if (Math.abs(hell - hellDaneben) > 30) {
+                    throw new AssertionError("„Minimap“ steht im Bild nicht über dem Regler „Zoom“: Helligkeit " + hell + " über dem Regler, " + hellDaneben
+                            + " daneben auf dem Knopf");
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            spielerKlick(context, maus, 4, ort[0], ort[1]);
+            boolean zu = context.computeOnClient(mc -> mc.gui.screen() == null);
+            double zoom = context.computeOnClient(mc -> Minimap.INSTANZ.zoom());
+            if (!zu || zoom != Minimap.ZOOMS[0]) {
+                throw new AssertionError("Klick auf „Fertig“ über dem Regler „Zoom“: Menü zu " + zu + ", Zoom " + zoom + " statt " + Minimap.ZOOMS[0]);
+            }
+        } finally {
+            context.getInput().resizeWindow(vorher[0], vorher[1]);
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(vorher[2]);
+                mc.resizeGui();
+                Minimap.INSTANZ.lies(sicherung);
+                mc.gui.setScreen(new Einstellungen());
+            });
+            context.waitTicks(2);
+            try {
+                Files.deleteIfExists(sicherung);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+    }
+
+    /**
+     * Für den Knopf, dessen Text mit {@code anfang} beginnt und der über dem Regler „Zoom“ liegt: {x, y} der Mitte der
+     * Überdeckung, ein x auf dem Knopf daneben und die obere Zeile im Rand des Knopfs.
+     */
+    private static double[] ueberZoom(Minecraft mc, String anfang) {
+        AbstractWidget knopf = mc.gui.screen().children().stream().filter(c -> c instanceof AbstractWidget w && !(w instanceof Einstellungen.ZoomRegler)
+                && w.getMessage().getString().startsWith(anfang)).map(c -> (AbstractWidget) c).findFirst().orElseThrow();
+        AbstractWidget zoom = zoomReglerWidget(mc);
+        int x0 = Math.max(knopf.getX(), zoom.getX()), x1 = Math.min(knopf.getX() + knopf.getWidth(), zoom.getX() + zoom.getWidth());
+        int y0 = Math.max(knopf.getY(), zoom.getY()), y1 = Math.min(knopf.getY() + knopf.getHeight(), zoom.getY() + zoom.getHeight());
+        if (x0 >= x1 || y0 >= y1) {
+            throw new AssertionError("Bei GS 4 und grosser Minimap liegt „" + anfang + "“ nicht über dem Regler „Zoom“: Knopf " + knopf.getX() + ", "
+                    + knopf.getY() + "; Zoom " + zoom.getX() + ", " + zoom.getY());
+        }
+        int frei = knopf.getX() + 3 < x0 ? knopf.getX() + 3 : knopf.getX() + knopf.getWidth() - 4;
+        return new double[] {(x0 + x1) / 2.0, (y0 + y1) / 2.0, frei, knopf.getY() + 2};
     }
 
     /** {x, y, Breite, Höhe} des Symbols {@code art} im offenen Menü. */

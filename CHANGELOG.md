@@ -7,7 +7,6 @@ The release notes on GitHub and Modrinth come from here
 ## 0.2.66
 
 - **Your own map stays sharp when you zoom out.** Each coarser level of the self-drawn map now keeps one pixel of every 2 × 2, like the maps from the server, instead of averaging them; averaged, it got blurrier with every level. Maps drawn with earlier versions are rebuilt once in the background, while you play in that dimension.
-
 - **The minimap zooms out one step further,** to 0.5×: it shows four times the area, one pixel per block at GUI scale 2.
 - **Minimap zoom is a slider** in the menu, standing upright right next to the minimap, with one notch per step; up is closer, and the tooltip names the level. The mouse wheel over the minimap or the slider steps one notch. The zoom key still steps through all levels.
 - **The menu buttons move aside:** after you drag the minimap or resize it, the buttons go to the free side next to it.
@@ -18,9 +17,7 @@ The release notes on GitHub and Modrinth come from here
 - **Click the coordinates** under the minimap in the menu to switch their style: x z, x y z, off. When off, the menu shows a grey "Coordinates off" line so you can click it back on; in the game it stays hidden. Both settings left the settings submenu.
 - **Settings right at the minimap.** In the menu, the controls around the minimap form an L: the zoom slider with a north arrow on top, the resolution slider with a grid symbol at its end, and a ◻/◯ symbol in the corner between them. Click the symbol to switch square or round, the north arrow to switch rotating, the grid for chunk lines. Right-click a mark N, E, S or W on the frame to make just that mark see-through; right-click it again to bring it back. The settings submenu is grouped into Waypoints, In the world and a collapsible Technical group.
 - **Ctrl snaps to chunk lines.** While you drag a corner or waypoint with `Ctrl`, it snaps onto a chunk line within reach, x or z, both near a chunk corner; the line lights up while you drag. A corner or waypoint within reach still wins. Only when the full map shows chunk lines. With `Alt` it only snaps, there is nothing to connect.
-
-## 0.2.65
-
+- At GUI scale 4 with a large minimap, the menu buttons lie over the zoom slider and take the click, as they did over the minimap before.
 - **One map folder per server behind a proxy.** With the plugin from 0.14.0 on, the server names its map, and the mod keeps each server's map, waypoints and layers in its own folder, even when two servers share a world. A server that shows another server's map uses that server's folder. Existing folders move once on the first join. From the second join on, the mod remembers the map and uses the right folder right away.
 
 ## 0.2.64
