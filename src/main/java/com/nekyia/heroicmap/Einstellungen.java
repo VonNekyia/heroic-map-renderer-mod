@@ -6,12 +6,17 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.components.AbstractSliderButton;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.InputWithModifiers;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.player.LocalPlayer;
@@ -30,8 +35,8 @@ import org.joml.Matrix3x2fStack;
  * auf der Platte, dazu das Untermenü „Einstellungen …“ für Vorlieben der Anzeige ({@link Anzeige}).
  * Die Minimap im HUD bleibt sichtbar; Ziehen verschiebt sie, der Griff an der Ecke zur Mitte des
  * Schirms zieht sie grösser oder kleiner, mit der linken wie der rechten Taste. Neben ihr steht der
- * Zoom als senkrechter Regler ({@link ZoomRegler}), darunter die Auflösung ({@link AufloesungRegler}); ein Klick
- * auf die Koordinaten wechselt ihren Stil. Ein Klick auf den Spieler oder eine Marke stellt ihr Aussehen ein
+ * Zoom als senkrechter Regler ({@link ZoomRegler}), darunter die Auflösung ({@link AufloesungRegler}), im L um sie
+ * dazu Nordpfeil, Form und Raster ({@link Symbol}, {@link #lLage}); ein Klick auf die Koordinaten wechselt ihren Stil. Ein Klick auf den Spieler oder eine Marke stellt ihr Aussehen ein
  * ({@link MinimapKlick}). Die Knöpfe passen sich dem Platz an und gehen nach dem
  * Ziehen auf die freie Seite. Gespeichert wird beim Schliessen.
  * Siehe docs/minimap.md, „Bedienung“.
@@ -47,6 +52,8 @@ final class Einstellungen extends Screen {
     static final int ZOOM_BREITE = 20;
     /** Höhe des Reglers „Auflösung“, wie ein Regler des Spiels. */
     static final int REGLER_HOEHE = 20;
+    /** Seite eines Symbols an der Minimap, so breit wie der Regler „Zoom“. */
+    static final int SYMBOL = 20;
 
     /** KLICK: gedrückt auf Spieler oder Marke; wandert die Maus weiter als {@link MinimapKlick#WEG}, wird daraus LAGE. */
     private enum Zug { KEINER, KLICK, LAGE, GROESSE }
@@ -65,6 +72,7 @@ final class Einstellungen extends Screen {
     private int spalte, oben, breite;
     private ZoomRegler zoom;
     private AufloesungRegler aufloesung;
+    private Symbol nord, form, raster;
 
     /** Wohin „Fertig“ und Escape führen: die Vollbildkarte, von der das Menü kam, oder null fürs Spiel. */
     private final Screen zurueck;
@@ -99,7 +107,10 @@ final class Einstellungen extends Screen {
         zoom.visible = m.sichtbar();
         int[] a = aufloesungLage(m.rahmen(width, height), m.koordinatenKasten(), m.rand(), height);
         aufloesung = addRenderableWidget(new AufloesungRegler(a[0], a[1], a[2], m));
-        aufloesung.visible = m.sichtbar();
+        nord = addRenderableWidget(new Symbol(Symbol.NORD));
+        form = addRenderableWidget(new Symbol(Symbol.FORM));
+        raster = addRenderableWidget(new Symbol(Symbol.RASTER));
+        lege();
         // Gehen Mitspieler hier nicht, steht der Knopf rot und trägt den Grund als Tooltip.
         grund = Mitspieler.grund(Kanal.offen(), Mitspieler.INSTANZ.verweigert());
         CycleButton<Boolean> show = addRenderableWidget(CycleButton.booleanBuilder(rot(Component.translatable("heroicmap.menue.show.simplevoicechat")),
@@ -166,6 +177,50 @@ final class Einstellungen extends Screen {
         return new int[] {r.x(), y, r.seite()};
     }
 
+    /** Legt das L um die Minimap ({@link #lLage}); ist sie aus, fehlt es. */
+    private void lege() {
+        Minimap m = Minimap.INSTANZ;
+        int[][] l = lLage(m.rahmen(width, height), m.koordinatenKasten(), m.rand(), width, height);
+        AbstractWidget[] w = {nord, zoom, form, aufloesung, raster};
+        for (int i = 0; i < w.length; i++) {
+            w[i].setRectangle(l[i][2], l[i][3], l[i][0], l[i][1]);
+            w[i].visible = m.sichtbar();
+        }
+    }
+
+    /**
+     * Das L um die Minimap {@code r} im Menü, je {x, y, Breite, Höhe}: Nordpfeil, Zoom, Form, Auflösung, Raster. Die
+     * Spalte des Zooms ({@link #zoomLage}) trägt an ihrem Ende fern der Reihe den Nordpfeil, die Reihe der Auflösung
+     * ({@link #aufloesungLage}) an ihrem Ende fern der Spalte das Raster; in der Ecke zwischen beiden die Form. Liegt die
+     * Spalte innen in der Reihe oder die Reihe innen in der Spalte, rückt die andere um die Ecke weiter. Siehe
+     * docs/minimap.md, „Symbole an der Minimap“.
+     */
+    static int[][] lLage(Minimap.Rahmen r, int[] kasten, int rand, int width, int height) {
+        int[] z = zoomLage(r, rand, width), a = aufloesungLage(r, kasten, rand, height);
+        int s = SYMBOL + 2;
+        // Waagrecht: die Reihe ohne die Ecke, wenn die Spalte in ihr liegt; das Raster am Ende fern der Spalte.
+        boolean eckeInReihe = z[0] >= a[0] && z[0] < a[0] + a[2];
+        int von = eckeInReihe ? a[0] + s : a[0], bis = a[0] + a[2];
+        boolean rasterRechts = z[0] <= a[0];
+        // Senkrecht ebenso: die Spalte ohne die Ecke, wenn die Reihe in ihr liegt; der Nordpfeil am Ende fern der Reihe.
+        int oben = z[1], unten = z[1] + z[2];
+        boolean nordOben = a[1] + REGLER_HOEHE / 2 >= z[1] + z[2] / 2;
+        if (a[1] >= z[1] && a[1] < z[1] + z[2]) {
+            if (nordOben) {
+                unten = a[1] - 2;
+            } else {
+                oben = a[1] + REGLER_HOEHE + 2;
+            }
+        }
+        return new int[][] {
+            {z[0], nordOben ? oben : unten - SYMBOL, SYMBOL, SYMBOL},
+            {z[0], nordOben ? oben + s : oben, ZOOM_BREITE, unten - oben - s},
+            {z[0], a[1], SYMBOL, SYMBOL},
+            {rasterRechts ? von : von + s, a[1], bis - von - s, REGLER_HOEHE},
+            {rasterRechts ? bis - SYMBOL : von, a[1], SYMBOL, SYMBOL},
+        };
+    }
+
     /** Der nächste Stil der Koordinaten im Kreis: aus, xz, xyz. */
     static Minimap.Koordinaten naechste(Minimap.Koordinaten k) {
         Minimap.Koordinaten[] alle = Minimap.Koordinaten.values();
@@ -194,17 +249,10 @@ final class Einstellungen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mausX, int mausY, float delta) {
-        // Der Regler folgt der Minimap schon beim Ziehen; die Knöpfe erst nach dem Loslassen.
+        // Das L folgt der Minimap schon beim Ziehen; die Knöpfe erst nach dem Loslassen.
         Minimap m = Minimap.INSTANZ;
-        int[] z = zoomLage(m.rahmen(width, height), m.rand(), width);
-        zoom.setPosition(z[0], z[1]);
-        zoom.setHeight(z[2]);
-        zoom.visible = m.sichtbar();
+        lege();
         zoom.folge(m.zoom());
-        int[] a = aufloesungLage(m.rahmen(width, height), m.koordinatenKasten(), m.rand(), height);
-        aufloesung.setPosition(a[0], a[1]);
-        aufloesung.setWidth(a[2]);
-        aufloesung.visible = m.sichtbar();
         aufloesung.folge(m.aufloesung());
         // Die Zeile der Koordinaten unter der Maus steht gelb, ab dem nächsten Frame, und nennt ihren Stil.
         boolean aufZeile = m.sichtbar() && zug == Zug.KEINER && imKasten(m.koordinatenKasten(), mausX, mausY);
@@ -452,6 +500,163 @@ final class Einstellungen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    /**
+     * Ein Symbol an der Minimap im Menü: ein Knopf des Spiels, {@link #SYMBOL} breit und hoch, darin ein Sprite aus
+     * {@code menue/}, weiss oder zum Zustand gefärbt. Der Tooltip nennt Name, Zustand und was ein Klick tut. Siehe
+     * docs/minimap.md, „Symbole an der Minimap“.
+     */
+    static final class Symbol extends AbstractButton {
+
+        /** Was ein Symbol zeigt und schaltet. */
+        interface Art {
+            /** Das Sprite, gedreht um {@link #winkel} und gefärbt mit {@link #farbe}. */
+            Identifier sprite(Minimap m);
+
+            default float winkel(Minimap m) {
+                return 0;
+            }
+
+            default int farbe(Minimap m) {
+                return 0xFFFFFFFF;
+            }
+
+            Component name();
+
+            Component zustand(Minimap m);
+
+            Component naechster(Minimap m);
+
+            void schalte(Minimap m);
+        }
+
+        private final Art art;
+
+        Symbol(Art art) {
+            super(0, 0, SYMBOL, SYMBOL, art.name());
+            this.art = art;
+            tooltip();
+        }
+
+        Art art() {
+            return art;
+        }
+
+        private void tooltip() {
+            Minimap m = Minimap.INSTANZ;
+            setTooltip(Tooltip.create(Component.translatable("heroicmap.menue.symbol.klick", art.name(), art.zustand(m), art.naechster(m))));
+        }
+
+        @Override
+        public void onPress(InputWithModifiers e) {
+            art.schalte(Minimap.INSTANZ);
+            tooltip();
+        }
+
+        @Override
+        protected void extractContents(GuiGraphicsExtractor g, int mausX, int mausY, float delta) {
+            extractDefaultSprite(g);
+            Minimap m = Minimap.INSTANZ;
+            // 16 × 16 in der Mitte, um seine Mitte gedreht.
+            g.pose().pushMatrix();
+            g.pose().translate(getX() + SYMBOL / 2f, getY() + SYMBOL / 2f);
+            g.pose().rotate(art.winkel(m));
+            g.blitSprite(RenderPipelines.GUI_TEXTURED, art.sprite(m), -8, -8, 16, 16, art.farbe(m));
+            g.pose().popMatrix();
+        }
+
+        @Override
+        protected void updateWidgetNarration(NarrationElementOutput ausgabe) {
+            defaultButtonNarrationText(ausgabe);
+        }
+
+        private static Identifier bild(String name) {
+            return Identifier.fromNamespaceAndPath(HeroicMap.ID, "menue/" + name);
+        }
+
+        private static Component an(boolean an) {
+            return an ? CommonComponents.OPTION_ON : CommonComponents.OPTION_OFF;
+        }
+
+        /** Die Form, ◻ oder ◯ wie jetzt; ein Klick wechselt. */
+        static final Art FORM = new Art() {
+            public Identifier sprite(Minimap m) {
+                return bild(m.rund() ? "form_rund" : "form_eckig");
+            }
+
+            public Component name() {
+                return Component.translatable("heroicmap.menue.form");
+            }
+
+            public Component zustand(Minimap m) {
+                return Component.translatable(m.rund() ? "heroicmap.menue.rund" : "heroicmap.menue.eckig");
+            }
+
+            public Component naechster(Minimap m) {
+                return Component.translatable(m.rund() ? "heroicmap.menue.eckig" : "heroicmap.menue.rund");
+            }
+
+            public void schalte(Minimap m) {
+                m.setzeRund(!m.rund());
+            }
+        };
+
+        /** Der Nordpfeil: genordet fest nach oben, drehend dreht er sich mit dem Blick, auch im Menü. */
+        static final Art NORD = new Art() {
+            public Identifier sprite(Minimap m) {
+                return bild("nord");
+            }
+
+            public float winkel(Minimap m) {
+                LocalPlayer p = Minecraft.getInstance().player;
+                // Wie die Marken des Rahmens, starr mit der gedrehten Karte (Drehung.winkel).
+                return m.drehen() && p != null ? (float) Drehung.winkel(p.getYRot()) : 0;
+            }
+
+            public Component name() {
+                return Component.translatable("heroicmap.menue.drehen");
+            }
+
+            public Component zustand(Minimap m) {
+                return an(m.drehen());
+            }
+
+            public Component naechster(Minimap m) {
+                return an(!m.drehen());
+            }
+
+            public void schalte(Minimap m) {
+                m.setzeDrehen(!m.drehen());
+            }
+        };
+
+        /** Das Raster der Chunklinien: hell an, dunkel aus. */
+        static final Art RASTER = new Art() {
+            public Identifier sprite(Minimap m) {
+                return bild("raster");
+            }
+
+            public int farbe(Minimap m) {
+                return m.chunklinien() ? 0xFFFFFFFF : 0xFF404040;
+            }
+
+            public Component name() {
+                return Component.translatable("heroicmap.menue.chunklinien");
+            }
+
+            public Component zustand(Minimap m) {
+                return an(m.chunklinien());
+            }
+
+            public Component naechster(Minimap m) {
+                return an(!m.chunklinien());
+            }
+
+            public void schalte(Minimap m) {
+                m.setzeChunklinien(!m.chunklinien());
+            }
+        };
     }
 
     /**

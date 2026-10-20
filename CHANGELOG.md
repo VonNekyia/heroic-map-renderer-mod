@@ -14,6 +14,7 @@ The release notes on GitHub and Modrinth come from here
 - **Lines and regions now sit between blocks.** Corners of your own lines and regions lie on the edges between blocks instead of in the middle of a block, so two joined regions share an exact border. Waypoints stay on blocks; a corner at a waypoint sits on the nearest corner of its block. **Existing shapes move half a block north-west:** the saved numbers stay the same and now mean the north-west corner of their block, so nothing needs converting and shapes that touched still touch. Older versions show the same shapes half a block south-east.
 - **Resolution is a slider under the minimap** in the menu, one notch per step from 1 to 16 px; the mouse wheel over it steps one notch.
 - **Click the coordinates** under the minimap in the menu to switch their style: x z, x y z, off. When off, the menu shows a grey "Coordinates off" line so you can click it back on; in the game it stays hidden. Both settings left the settings submenu.
+- **Settings right at the minimap.** In the menu, the controls around the minimap form an L: the zoom slider with a north arrow on top, the resolution slider with a grid symbol at its end, and a ◻/◯ symbol in the corner between them. Click the symbol to switch square or round, the north arrow to switch rotating, the grid for chunk lines. Right-click a mark N, E, S or W on the frame to make just that mark see-through; right-click it again to bring it back. The settings submenu is grouped into Waypoints, In the world and a collapsible Technical group.
 
 ## 0.2.65
 

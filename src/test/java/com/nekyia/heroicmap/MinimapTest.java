@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -17,6 +18,38 @@ import org.junit.jupiter.api.io.TempDir;
  * Form, Lage und Einstellungen: siehe docs/minimap.md, „Bedienung“.
  */
 class MinimapTest {
+
+    @Test
+    void verzierungenJeMarkeUndAlteDatei(@TempDir Path ordner) throws Exception {
+        // Text hin und zurück; Unbekanntes zählt nicht.
+        assertEquals("N,S", Minimap.marken(0b0101));
+        assertEquals("", Minimap.marken(0));
+        assertEquals(0b1010, Minimap.marken("O, W,x,NN"));
+        // Eine Datei von vor mod#175: verzierungen=false heisst alle vier durchsichtig, sonst keine.
+        Path alt = ordner.resolve("alt.properties");
+        Files.writeString(alt, "verzierungen=false");
+        Minimap m = new Minimap();
+        m.lies(alt);
+        assertFalse(m.verzierungen());
+        for (int i = 0; i < 4; i++) {
+            assertTrue(m.verzierungAus(i));
+        }
+        Files.writeString(alt, "verzierungen=true");
+        m.lies(alt);
+        assertTrue(m.verzierungen());
+        // Rechtsklick hin und zurück.
+        m.schalteVerzierung(3);
+        assertTrue(m.verzierungAus(3) && !m.verzierungAus(0));
+        m.schalteVerzierung(3);
+        assertTrue(m.verzierungen());
+        // Ohne N zeichnet der Rahmen drei Marken, nicht oben.
+        Minimap.Rahmen r = new Minimap.Rahmen(0, 0, 128);
+        List<Minimap.Ornament> drei = Minimap.ornamente(r, 2, false, false, null, 2, 1, -1, false, -1);
+        assertEquals(3, drei.size());
+        for (Minimap.Ornament o : drei) {
+            assertTrue(o.y() > 2, "Marke oben trotz N durchsichtig: " + o);
+        }
+    }
 
     @Test
     void reichweiteJeMassstab() {
@@ -239,14 +272,19 @@ class MinimapTest {
         vorher.setzeChunklinien(true);
         vorher.setzeEffekte(false);
         vorher.setzeDrehen(true);
-        vorher.setzeVerzierungen(false);
+        vorher.schalteVerzierung(0);
+        vorher.schalteVerzierung(2);
+        vorher.setzeTechnikOffen(true);
         vorher.stelle(20, 30, 200, 640, 360);
         vorher.schreibe(datei);
 
         Minimap nachher = new Minimap();
         assertTrue(nachher.verzierungen(), "Vorgabe an");
+        assertFalse(nachher.technikOffen(), "Vorgabe zu");
         nachher.lies(datei);
-        assertFalse(nachher.verzierungen());
+        // N und S durchsichtig, O und W nicht; Technik offen (mod#175).
+        assertTrue(nachher.verzierungAus(0) && !nachher.verzierungAus(1) && nachher.verzierungAus(2) && !nachher.verzierungAus(3));
+        assertTrue(nachher.technikOffen());
         assertFalse(nachher.sichtbar());
         assertEquals(4, nachher.aufloesung());
         assertEquals(1, nachher.zoom());
