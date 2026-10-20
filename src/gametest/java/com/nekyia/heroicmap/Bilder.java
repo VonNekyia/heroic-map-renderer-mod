@@ -1002,6 +1002,8 @@ public final class Bilder implements FabricClientGameTest {
 
     /** Die Minimap rund bei 4 px, dann das Menü über der Szene. Siehe docs/minimap.md, „Bedienung“. */
     private static void menue(ClientGameTestContext context) {
+        // Die Maus in die Ecke, sonst stünde ein Tooltip oder ein heller Knopf im Bild.
+        context.getInput().setCursorPos(0, 0);
         context.runOnClient(mc -> Minimap.INSTANZ.setzeRund(true));
         context.waitTicks(2);
         Path rund = context.takeScreenshot(TestScreenshotOptions.of("minimap-rund").disableCounterPrefix());
