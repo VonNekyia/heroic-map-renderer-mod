@@ -3995,12 +3995,12 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("Am Griff gezogen: " + gezogen + " → " + groesser);
         }
 
-        // Der Regler „Zoom“ senkrecht neben der Minimap: Ein Klick wie von Hand auf jede Raste stellt ihre Stufe, auch 0,5, und
+        // Der Regler „Zoom“ senkrecht neben der Minimap: Ein Klick wie von Hand auf jede Raste stellt ihre Stufe, auch 1/32, und
         // schaltet sonst nichts; zuletzt wieder die Stufe von vorher. Siehe docs/minimap.md, „Bedienung“.
         double zoom = context.computeOnClient(mc -> Minimap.INSTANZ.zoom());
         int[] regler = zoomRegler(context);
         int rasten = Minimap.ZOOMS.length - 1;
-        for (int i : new int[] {4, 0, 1, 3, 2, Minimap.stufe(zoom)}) {
+        for (int i : new int[] {8, 0, 4, 1, 7, 3, 5, 2, 6, Minimap.stufe(zoom)}) {
             // Die Mitte des Knaufs liegt bei y + 4 + (1 − Wert) × (Höhe − 8), oben die nächste Stufe.
             spielerKlick(context, maus, k, regler[0] + regler[2] / 2.0, regler[1] + 4 + (regler[3] - 8) * (1 - (double) i / rasten));
             aussehenIst(context, Minimap.Darstellung.PFEIL, Skin.BIOM, "Klick auf den Regler Zoom");

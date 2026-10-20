@@ -421,9 +421,7 @@ final class Einstellungen extends Screen {
 
         @Override
         protected void updateMessage() {
-            double z = Minimap.ZOOMS[raste()];
-            Component fach = z == 0.5 ? Component.translatable("heroicmap.menue.fach_halb") : Component.translatable("heroicmap.menue.fach", (int) z);
-            setMessage(CommonComponents.optionNameValue(Component.translatable("heroicmap.menue.zoom"), fach));
+            setMessage(CommonComponents.optionNameValue(Component.translatable("heroicmap.menue.zoom"), Minimap.fach(Minimap.ZOOMS[raste()])));
             setTooltip(Tooltip.create(getMessage()));
         }
 

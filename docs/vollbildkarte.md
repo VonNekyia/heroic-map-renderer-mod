@@ -514,7 +514,10 @@ Reviewer nach einem Entwurf entschieden.
   Öffnen. 160 Kacheln, ein Schirm in 4K bei GUI-Massstab 1, kosten ihn
   zusammen rund 8 ms, verteilt über eine knappe halbe Sekunde.
 - **Behalten:** die 192 zuletzt gezeigten Texturen, bei 256² Pixeln rund
-  48 MiB auf der Grafikkarte. Die älteste gibt der Mod frei.
+  48 MiB auf der Grafikkarte (`Kacheln.MAX`). Die älteste gibt der Mod frei.
+  Weit herausgezoomt hat die Minimap eigene Kacheln, höchstens 64, siehe
+  [Minimap](minimap.md), „Weit heraus“; einen fertigen Download und neue
+  Kacheln der eigenen Karte erfahren alle offenen.
 - **Fehlt eine Kachel** oder lässt sie sich nicht lesen, merkt sich die
   Karte das und fragt nicht wieder, bis sie neu öffnet oder ein Download
   fertig ist.

@@ -88,6 +88,7 @@ tasks.matching { it.name == "runClientGameTest" }.configureEach {
     systemProperty("heroicmap.messung.drehen", providers.gradleProperty("messungDrehen").orElse("false").get())
     systemProperty("heroicmap.messung.rahmen", providers.gradleProperty("messungRahmen").orElse("ohne").get())
     systemProperty("heroicmap.messung.effekte", providers.gradleProperty("messungEffekte").orElse("false").get())
+    // true misst 0,5 gegen 2, eine Stufe wie 0.03125 sie gegen 2.
     systemProperty("heroicmap.messung.zoom", providers.gradleProperty("messungZoom").orElse("false").get())
     systemProperty("heroicmap.messung.regionen", providers.gradleProperty("messungRegionen").orElse("47").get())
     systemProperty("heroicmap.uebernahme", uebernahme.get())
