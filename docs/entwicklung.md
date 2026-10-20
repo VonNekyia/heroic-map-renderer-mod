@@ -313,12 +313,10 @@ drei Jobs:
     und wird rot, statt bis zum Limit zu hängen.
   - **Hänger** beendet die Wache, siehe „Gametests“. Ihre Zeile
     „Gametest hängt“ hängt der Schritt als Fehler an die PR.
-  - **Dauer,** Stand 11.10., Lauf von `e6c0706`: der Schritt 3 min 35 s
-    ohne, 3 min 20 s mit Sodium; lokal sind es gut 2 min. Davon rund 55 s
-    bis zur ersten Welt, `Bilder` rund 52 s, `Bedienung` rund 60 s, die
-    übrigen Gametests je 5 bis 15 s. Zugeordnet nach den Welten im Log in
-    der Reihenfolge der Einträge in `fabric.mod.json`. Das Limit am Schritt
-    sind 10 min.
+  - **Dauer,** Stand 20.10., Läufe 39440328811 und 39441712950: der
+    Schritt 8 min 26 s und 10 min 13 s ohne, 9 min 21 s und 8 min 10 s mit
+    Sodium; am 11.10. waren es gut 3 min. Das Limit am Schritt sind 20 min,
+    seit der zweite Lauf an mod#184 das alte von 10 min riss.
   - **In Software** riss keine Prüfung am Bildschirmfoto; keine Schwelle
     ist dafür gelockert.
   - Scheitert ein Lauf, lädt er Log und Bildschirmfotos als Artefakt hoch.
