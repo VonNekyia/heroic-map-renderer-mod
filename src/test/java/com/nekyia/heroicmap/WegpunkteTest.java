@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.gson.JsonParser;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -926,6 +928,44 @@ class WegpunkteTest {
                 + "{\"dimension\":\"" + WELT + "\",\"x\":6,\"z\":6,\"minimap\":true}],"
                 + "\"tod\":{\"dimension\":\"" + WELT + "\",\"x\":6,\"z\":6,\"minimap\":true}}").getAsJsonObject());
         assertEquals(List.of(5, 6), beide.tode().stream().map(Wegpunkte.Punkt::x).toList());
+    }
+
+    /**
+     * Die Zeit unter dem Todespunkt (mod#166): am selben Tag nur die Uhrzeit, an einem früheren mit Datum, nach den Mustern der
+     * Sprache, auch über Mitternacht. In der Datei je Eintrag von tode als zeit, tod bleibt ohne; über den Neustart und das
+     * Anheften bleibt sie; die Folge kommt aus der Liste, nicht aus der Zeit; eine alte Datei ohne zeit gibt 0. Siehe
+     * docs/wegpunkte.md, „Todespunkt“.
+     */
+    @Test
+    void todesZeit(@TempDir Path ordner) throws Exception {
+        ZoneId zone = ZoneId.of("Europe/Berlin");
+        long jetzt = ZonedDateTime.of(2026, 10, 20, 14, 40, 0, 0, zone).toInstant().toEpochMilli();
+        long heute = ZonedDateTime.of(2026, 10, 20, 14, 32, 0, 0, zone).toInstant().toEpochMilli();
+        long frueher = ZonedDateTime.of(2026, 10, 18, 14, 32, 0, 0, zone).toInstant().toEpochMilli();
+        assertEquals("14:32", Wegpunkte.todZeit(heute, jetzt, zone, "HH:mm", "dd.MM. HH:mm"));
+        assertEquals("18.10. 14:32", Wegpunkte.todZeit(frueher, jetzt, zone, "HH:mm", "dd.MM. HH:mm"));
+        long spaet = ZonedDateTime.of(2026, 10, 19, 23, 59, 0, 0, zone).toInstant().toEpochMilli();
+        long frueh = ZonedDateTime.of(2026, 10, 20, 0, 1, 0, 0, zone).toInstant().toEpochMilli();
+        assertEquals("19.10. 23:59", Wegpunkte.todZeit(spaet, frueh, zone, "HH:mm", "dd.MM. HH:mm"));
+        // In der Datei: zeit im Eintrag von tode, tod wie bisher ohne.
+        Wegpunkte w = new Wegpunkte();
+        w.lies(ordner);
+        w.setzeTod(WELT, 1, 1, 2, heute);
+        w.setzeTod(WELT, 2, 2, 2, frueher);
+        String json = Files.readString(ordner.resolve("wegpunkte.json"));
+        assertTrue(json.contains("\"x\":1,\"z\":1,\"minimap\":false,\"zeit\":" + heute + "}"), json);
+        assertTrue(json.contains("\"tod\":{\"dimension\":\"" + WELT + "\",\"x\":2,\"z\":2,\"minimap\":true}"), json);
+        Wegpunkte nachher = new Wegpunkte();
+        nachher.lies(ordner);
+        assertEquals(List.of(heute, frueher), nachher.tode().stream().map(Wegpunkte.Punkt::zeit).toList());
+        // Der zweite ist der neueste, obwohl seine Zeit früher ist: Die Folge kommt aus der Liste.
+        assertEquals(2, nachher.tod().x());
+        nachher.umschalten(nachher.tod());
+        assertEquals(frueher, nachher.tode().getLast().zeit());
+        // Eine alte Datei ohne zeit: unbekannt, also keine Schrift.
+        Wegpunkte alt = new Wegpunkte();
+        alt.lies(JsonParser.parseString("{\"tode\":[{\"dimension\":\"" + WELT + "\",\"x\":5,\"z\":5,\"minimap\":true}]}").getAsJsonObject());
+        assertEquals(0, alt.tod().zeit());
     }
 
     @Test

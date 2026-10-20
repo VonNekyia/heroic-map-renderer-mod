@@ -1208,7 +1208,7 @@ public final class Ebenen {
      * Der Name mittig unter dem Fuss, wie die Kartenschrift: erst die Kontur als acht versetzte Kopien,
      * dann die Schrift. Siehe docs/ebenen.md, „Nadeln“.
      */
-    private static void name(GuiGraphicsExtractor g, Font font, String name) {
+    static void name(GuiGraphicsExtractor g, Font font, String name) {
         Component c = Component.literal(name).withStyle(Formen.STIL);
         float m = (float) NAME_MASSSTAB, breite = font.width(c) * m;
         double r = NAME_KONTUR / m;
