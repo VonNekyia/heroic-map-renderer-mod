@@ -329,6 +329,9 @@ weiter heraus stünden die Linien dichter als ein Pixel.
   die Regionen (`Minimap.linien`, gleich `Minimap.pixel` für Block 16·c);
   auf der Vollbildkarte von der ganzzahligen Kante aus `Kartenblick`, wie
   Kacheln und Marken (`Kartenblick.linien`, `Kartenblick.rasterX`).
+- **Einrasten:** Auf der Vollbildkarte rastet eine gezogene Ecke oder ein
+  Wegpunkt mit `Strg` auf die Linien ein, siehe
+  [Wegpunkte](wegpunkte.md), „Einrasten“.
 - **Kreuzungen:** Die waagrechten Linien sparen die Spalten der
   senkrechten aus (`Gitter.rechtecke`). So ist eine Kreuzung so dunkel wie
   die Linie, nicht 51 % statt 30 %; so ist es im Review entschieden.
