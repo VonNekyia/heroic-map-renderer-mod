@@ -216,8 +216,18 @@ final class Karte extends Screen {
     record GriffAn(Wegpunkte.EigeneForm form, float x, float y) {
     }
 
-    /** Wohin, was an der Maus hängt, mit Strg einrastet: der Block und die Ecke oder der Wegpunkt dort. */
-    private record Rast(int x, int z, EckeAn ecke, Marke marke) {
+    /**
+     * Wohin, was an der Maus hängt, mit Strg einrastet: der Block und die Ecke oder der Wegpunkt dort; oder, mit beiden null, die
+     * Chunklinien {@code linieX} und {@code linieZ}, je {@link Kartenblick#KEINE_LINIE}, wenn nicht.
+     */
+    private record Rast(int x, int z, EckeAn ecke, Marke marke, int linieX, int linieZ) {
+        Rast(int x, int z, EckeAn ecke, Marke marke) {
+            this(x, z, ecke, marke, Kartenblick.KEINE_LINIE, Kartenblick.KEINE_LINIE);
+        }
+
+        boolean linie() {
+            return ecke == null && marke == null;
+        }
     }
 
     /** Die Ecke {@code index} der eigenen Form {@code form}, auf dem Schirm bei (x, y) in Einheiten des GUI. */
@@ -574,12 +584,12 @@ final class Karte extends Screen {
         schwebe(mausX, mausY);
         // Mit Strg oder Alt steht das Ziel des Einrastens hell wie unter der Maus.
         rast = einrasten(mausX, mausY);
-        if (rast != null) {
+        if (rast != null && !rast.linie()) {
             ueberEcke = rast.ecke();
             ueberMarke = rast.marke();
         }
         // Mit Alt und einem Ziel, das sich verbinden lässt, tragen beide schon den hellen Kern (E2 von mod#169).
-        Wegpunkte.Glied[] paar = rast != null && minecraft.hasAltDown() ? paar(rast) : null;
+        Wegpunkte.Glied[] paar = rast != null && !rast.linie() && minecraft.hasAltDown() ? paar(rast) : null;
         vorschau = paar != null && Wegpunkte.INSTANZ.warumNicht(paar[0], paar[1], welt(mausX, mausY)) == null ? paar : null;
         // Die gezogene Form und die, die ihr über einen Bund folgen, zeichnet die Karte selbst an der Maus; an ihrem alten Ort
         // fallen sie solange weg. Erst nach dem Einrasten, denn die Züge stehen dann auf dessen Ziel.
@@ -605,7 +615,7 @@ final class Karte extends Screen {
                 }
             }
         }
-        if (Minimap.INSTANZ.chunklinien() && blick.chunklinien(satz.scale(), minecraft.getWindow().getGuiScale())) {
+        if (linienAn()) {
             linien(g);
         }
         formen(g, mausX, mausY);
@@ -720,7 +730,8 @@ final class Karte extends Screen {
      * für eine Ecke, der nächste Wegpunkt, höchstens {@link #EINRASTEN} von der Maus, nach den Lagen des letzten Frames; sonst null.
      * Ein Wegpunkt rastet nur auf Ecken ein, denn zwei Wegpunkte liegen nie auf einem Block. Eine Ecke kommt auf die Kreuzung des
      * Ziels, auf einem Wegpunkt auf die Ecke seines Blocks nächst der Maus; ein Wegpunkt auf den der vier Blöcke an der Kreuzung
-     * nächst der Maus (K2). Siehe docs/wegpunkte.md, „Einrasten“.
+     * nächst der Maus (K2). Liegt kein Punkt so nah, rastet x oder z auf eine sichtbare Chunklinie ebenso nah, an einer Ecke des
+     * Chunks beide (mod#170). Siehe docs/wegpunkte.md, „Einrasten“.
      */
     private Rast einrasten(double mx, double my) {
         if (haengt == null && eckeHaengt == null || !minecraft.hasControlDown() && !minecraft.hasAltDown()) {
@@ -756,7 +767,23 @@ final class Karte extends Screen {
                 }
             }
         }
+        if (beste == null && linienAn()) {
+            double reichweite = EINRASTEN * 16 / blick.chunkAbstand(satz.scale());
+            int lx = Kartenblick.chunklinie(w[0], reichweite), lz = Kartenblick.chunklinie(w[1], reichweite);
+            if (lx != Kartenblick.KEINE_LINIE || lz != Kartenblick.KEINE_LINIE) {
+                int[] k = haengt != null ? block(mx, my) : kante(mx, my);
+                int x = lx != Kartenblick.KEINE_LINIE ? lx : k[0], z = lz != Kartenblick.KEINE_LINIE ? lz : k[1];
+                // Eine Ecke auf die Linie, ein Wegpunkt auf den Block an ihr auf der Seite der Maus; die andere Achse wie ohne Strg.
+                int[] ort = haengt != null ? Wegpunkte.blockAnEcke(x, z, w[0], w[1]) : new int[] {x, z};
+                beste = new Rast(ort[0], ort[1], null, null, lx, lz);
+            }
+        }
         return beste;
+    }
+
+    /** Zeichnet die Karte Chunklinien? Nur dann rastet Strg auf sie ein. */
+    private boolean linienAn() {
+        return Minimap.INSTANZ.chunklinien() && blick.chunklinien(satz.scale(), minecraft.getWindow().getGuiScale());
     }
 
     /** Das Glied an der Maus und das Ziel des Einrastens {@code r}. */
@@ -773,7 +800,8 @@ final class Karte extends Screen {
      */
     private boolean verbindeMitAlt(double x, double y) {
         Rast r = minecraft.hasAltDown() ? einrasten(x, y) : null;
-        if (r == null) {
+        // Auf eine Chunklinie rastet Alt nur ein, ohne Hinweis: Dort gibt es nichts zu verbinden.
+        if (r == null || r.linie()) {
             return false;
         }
         Wegpunkte.Glied[] p = paar(r);
@@ -887,9 +915,20 @@ final class Karte extends Screen {
         return new double[] {blick.basisRasterX(x, width) / satz.scale(), blick.basisRasterZ(y, height) / satz.scale()};
     }
 
-    /** Chunklinien je 16 Blöcke als ein Element des GUI. Siehe docs/minimap.md, „Chunklinien“. */
+    /**
+     * Chunklinien je 16 Blöcke als ein Element des GUI; die, auf die Strg gerade einrastet, hell darüber. Siehe docs/minimap.md,
+     * „Chunklinien“, und docs/wegpunkte.md, „Einrasten“.
+     */
     private void linien(GuiGraphicsExtractor g) {
         Gitter.zeichne(g, 0, 0, 1, Minimap.LINIE, blick.linien(satz.scale(), width, height));
+        if (rast != null && rast.linieX() != Kartenblick.KEINE_LINIE) {
+            int x = (int) Math.floor(blick.rasterX(Projektion.zuPixel(rast.linieX(), satz.scale()), width));
+            g.fill(x, 0, x + 1, height, HELL);
+        }
+        if (rast != null && rast.linieZ() != Kartenblick.KEINE_LINIE) {
+            int y = (int) Math.floor(blick.rasterY(Projektion.zuPixel(rast.linieZ(), satz.scale()), height));
+            g.fill(0, y, width, y + 1, HELL);
+        }
     }
 
     /**

@@ -152,6 +152,23 @@ class KartenblickTest {
     }
 
     @Test
+    void chunklinieNaechstDerMaus() {
+        // Die Linie 16·c nächst dem Ort, auf beiden Seiten und unter null; die Reichweite zählt mit.
+        assertEquals(16, Kartenblick.chunklinie(15.6, 0.5));
+        assertEquals(16, Kartenblick.chunklinie(16.4, 0.5));
+        assertEquals(0, Kartenblick.chunklinie(-0.3, 0.5));
+        assertEquals(-16, Kartenblick.chunklinie(-16.4, 0.5));
+        assertEquals(-32, Kartenblick.chunklinie(-24.1, 8));
+        assertEquals(16, Kartenblick.chunklinie(14, 2));
+        assertEquals(Kartenblick.KEINE_LINIE, Kartenblick.chunklinie(13.9, 2));
+        assertEquals(Kartenblick.KEINE_LINIE, Kartenblick.chunklinie(-18.1, 2));
+        assertEquals(Kartenblick.KEINE_LINIE, Kartenblick.chunklinie(8, 0.5));
+        // Weiter als einen halben Chunk reicht es nie: Die nächste Linie gewinnt.
+        assertEquals(32, Kartenblick.chunklinie(25, 100));
+        assertEquals(1_600_000, Kartenblick.chunklinie(1_599_999.5, 1));
+    }
+
+    @Test
     void markeWeichtDenKnoepfenAus() {
         // Schirm 400 × 200, Rand 14, Knöpfe ab x 306 bis y 48, halbe Marke 4.
         double[] oben = Kartenblick.marke(1700, -900, 400, 200, 14, 4, 306, 48);

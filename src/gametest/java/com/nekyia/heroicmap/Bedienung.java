@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiPredicate;
 import java.util.function.IntPredicate;
 import java.util.zip.Deflater;
 import javax.imageio.ImageIO;
@@ -178,6 +179,7 @@ public final class Bedienung implements FabricClientGameTest {
         einrasten(context, maus, k);
         verbinden(context, maus, k);
         altVerbindet(context, maus, k);
+        chunklinien(context, maus, k);
         rechtsklickImBau(context, maus, k);
         entfernen(context, maus, k);
         eigeneEbenen(context, maus, k);
@@ -1905,6 +1907,165 @@ public final class Bedienung implements FabricClientGameTest {
             });
             context.waitTicks(2);
         }
+    }
+
+    /**
+     * Strg rastet auf Chunklinien ein (mod#170), mit echten Tasten: Eine Ecke 1¼ Blöcke neben einer senkrechten Chunklinie liegt
+     * nach dem Loslassen auf ihr, z wie ohne Strg; beim Ziehen ist die Linie hell, danach nicht mehr. Nahe einer Ecke des Chunks
+     * rasten x und z ein. Eine Ecke einer anderen Form in Reichweite gewinnt, auch wenn die Linie näher liegt. Mit Alt rastet die
+     * Ecke nur ein, ohne Bund und ohne Hinweis. Ein Wegpunkt kommt auf den Block an der Linie auf der Seite der Maus. Sind die
+     * Chunklinien aus, rastet nichts auf sie ein. Siehe docs/wegpunkte.md, „Einrasten“.
+     */
+    private static void chunklinien(ClientGameTestContext context, TestInput maus, int k) {
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        boolean linienVorher = context.computeOnClient(mc -> Minimap.INSTANZ.chunklinien());
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        // Eine senkrechte Chunklinie bei lx nahe der Mitte, eine waagrechte bei lz unter ihr. Frühere Tests lassen Formen liegen;
+        // so gilt die erste Ecke des Chunks, an deren Aufbau keine Ecke und kein Wegpunkt in Reichweite der Ziele liegt.
+        int[] stelle = context.computeOnClient(mc -> {
+            int lz0 = 16 * Math.floorDiv(mitte[1], 16) + 16;
+            for (int dx : new int[] {0, 16, -16}) {
+                int lx0 = 16 * Math.floorDiv(mitte[0], 16) + dx;
+                BiPredicate<Integer, Integer> imAufbau = (x, z) -> x >= lx0 - 12 && x <= lx0 + 4 && z >= lz0 - 20 && z <= lz0 + 4;
+                if (Wegpunkte.INSTANZ.eigeneFormen().stream().flatMap(f -> f.ecken().stream()).noneMatch(c -> imAufbau.test(c.x(), c.z()))
+                        && Wegpunkte.INSTANZ.punkte().stream().noneMatch(q -> imAufbau.test(q.x(), q.z()))) {
+                    return new int[] {lx0, lz0};
+                }
+            }
+            throw new AssertionError("Keine freie Ecke eines Chunks nahe der Mitte für den Test");
+        });
+        int lx = stelle[0], lz = stelle[1];
+        List<Wegpunkte.Ecke> a = List.of(new Wegpunkte.Ecke(lx - 6, lz - 6), new Wegpunkte.Ecke(lx - 10, lz - 6));
+        Wegpunkte.Ecke b0 = new Wegpunkte.Ecke(lx - 2, lz - 14);
+        try {
+            context.runOnClient(mc -> {
+                String dimension = mc.level.dimension().identifier().toString();
+                Minimap.INSTANZ.setzeChunklinien(true);
+                Wegpunkte.INSTANZ.setzeForm(dimension, a);
+                Wegpunkte.INSTANZ.setzeForm(dimension, List.of(b0, new Wegpunkte.Ecke(lx - 2, lz - 18)));
+                Wegpunkte.INSTANZ.setze(dimension, lx - 8, lz - 10);
+            });
+            context.waitTicks(2);
+            Wegpunkte.Punkt w = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
+            frei(context, new double[][] {ecke(context, formen, 0), ecke(context, formen + 1, 0)});
+            // Einheiten je Block, gemessen an A, die vier Blöcke lang ist.
+            double e = (ecke(context, formen, 0)[0] - ecke(context, formen, 1)[0]) / 4;
+
+            // Ecke 0 von A mit Strg 1¼ Blöcke links neben die senkrechte Linie, 5 Blöcke über der waagrechten: x auf die Linie, z
+            // gerundet wie ohne Strg. Ein Bild beim Ziehen zeigt die Linie 3 Blöcke über der waagrechten hell, eines danach nicht.
+            double[] von = ecke(context, formen, 0);
+            double[] nach = schirmVon(context, formen, a.get(1), e, lx - 1.25, lz - 5);
+            double[] linie = schirmVon(context, formen, a.get(1), e, lx, lz - 3);
+            warte250();
+            maus.setCursorPos(von[0] * k, von[1] * k);
+            context.waitTick();
+            long druck = Util.getMillis();
+            maus.holdMouse(LINKS);
+            zittereBis(context, maus, von[0] * k, von[1] * k, druck + 700);
+            maus.holdControl();
+            for (int i = 1; i <= 8; i++) {
+                maus.setCursorPos((von[0] + (nach[0] - von[0]) * i / 8) * k, (von[1] + (nach[1] - von[1]) * i / 8) * k);
+                context.waitTick();
+            }
+            context.waitTicks(2);
+            int an = weisse(context.takeScreenshot(TestScreenshotOptions.of("chunklinie").disableCounterPrefix()), k, linie, 2);
+            maus.releaseMouse(LINKS);
+            context.waitTicks(2);
+            maus.releaseControl();
+            context.waitTicks(2);
+            int aus = weisse(context.takeScreenshot(TestScreenshotOptions.of("chunklinie-aus").disableCounterPrefix()), k, linie, 2);
+            Wegpunkte.Ecke ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(0));
+            if (ist.x() != lx || ist.z() != lz - 5) {
+                throw new AssertionError("Ecke mit Strg neben der Chunklinie x = " + lx + ": " + ist + " statt " + lx + " " + (lz - 5));
+            }
+            if (an < aus + 2 * k * k) {
+                throw new AssertionError("Chunklinie beim Einrasten nicht hell: " + an + " weisse Pixel, danach " + aus);
+            }
+
+            // Nahe der Ecke des Chunks: x und z.
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
+            context.waitTicks(2);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 0), schirmVon(context, formen, a.get(1), e, lx - 1.25, lz + 1.25), true, -1, 0);
+            ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(0));
+            if (ist.x() != lx || ist.z() != lz) {
+                throw new AssertionError("Ecke mit Strg nahe der Ecke des Chunks: " + ist + " statt " + lx + " " + lz);
+            }
+
+            // Ein halber Block neben der Linie, 1½ Blöcke neben B0: B0 gewinnt, obwohl die Linie näher liegt.
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
+            context.waitTicks(2);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 0), schirmVon(context, formen, a.get(1), e, lx - 0.5, lz - 14), true, -1, 0);
+            ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(0));
+            if (ist.x() != b0.x() || ist.z() != b0.z()) {
+                throw new AssertionError("Ecke mit Strg zwischen B0 und der Chunklinie: " + ist + " statt auf " + b0);
+            }
+
+            // Mit Alt neben der Linie: auf die Linie, ohne Bund und ohne Hinweis. Erst ist der letzte Hinweis weg.
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
+            context.waitFor(mc -> ((Karte) mc.gui.screen()).hinweis() == null, 200);
+            context.waitTicks(2);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 0), schirmVon(context, formen, a.get(1), e, lx - 1.25, lz - 9), false, true,
+                    -1, 0);
+            ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(0));
+            String hinweis = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).hinweis() == null ? null
+                    : ((Karte) mc.gui.screen()).hinweis().getString());
+            if (ist.x() != lx || ist.z() != lz - 9 || ist.bund() != 0 || hinweis != null) {
+                throw new AssertionError("Ecke mit Alt neben der Chunklinie: " + ist + " statt lose auf " + lx + " " + (lz - 9)
+                        + ", Hinweis " + hinweis);
+            }
+
+            // Der Wegpunkt mit Strg links neben die Linie: auf den Block links an ihr; dann rechts daneben: auf den Block rechts.
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
+            context.waitTicks(2);
+            Karte.Marke wm = marke(context, w);
+            halteUndZiehe(context, maus, k, new double[] {wm.x(), wm.y()}, schirmVon(context, formen, a.get(1), e, lx - 1.25, lz - 9.5), true,
+                    -1, 0);
+            Wegpunkte.Punkt links = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
+            if (links.x() != lx - 1 || links.z() != lz - 10) {
+                throw new AssertionError("Wegpunkt mit Strg links neben der Chunklinie: " + links + " statt auf " + (lx - 1) + " " + (lz - 10));
+            }
+            wm = marke(context, links);
+            halteUndZiehe(context, maus, k, new double[] {wm.x(), wm.y()}, schirmVon(context, formen, a.get(1), e, lx + 1.25, lz - 9.5), true,
+                    -1, 0);
+            Wegpunkte.Punkt rechts = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
+            if (rechts.x() != lx || rechts.z() != lz - 10) {
+                throw new AssertionError("Wegpunkt mit Strg rechts neben der Chunklinie: " + rechts + " statt auf " + lx + " " + (lz - 10));
+            }
+
+            // Chunklinien aus: Strg rastet nicht auf die Linie ein, die Ecke liegt wie ohne Strg.
+            context.runOnClient(mc -> {
+                Minimap.INSTANZ.setzeChunklinien(false);
+                Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a);
+            });
+            context.waitTicks(2);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 0), schirmVon(context, formen, a.get(1), e, lx - 1.25, lz - 5), true, -1, 0);
+            ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(0));
+            if (ist.x() != lx - 1 || ist.z() != lz - 5) {
+                throw new AssertionError("Ecke mit Strg ohne Chunklinien: " + ist + " statt wie ohne Strg auf " + (lx - 1) + " " + (lz - 5));
+            }
+        } finally {
+            maus.releaseAlt();
+            maus.releaseControl();
+            context.runOnClient(mc -> {
+                Minimap.INSTANZ.setzeChunklinien(linienVorher);
+                List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+            });
+            context.waitTicks(2);
+        }
+    }
+
+    /**
+     * Der Ort (x, z) der Welt auf dem Schirm, gemessen an der Ecke {@code an}, Nummer 1 der Form {@code form}, wie zuletzt
+     * gezeichnet, bei {@code e} Einheiten je Block.
+     */
+    private static double[] schirmVon(ClientGameTestContext context, int form, Wegpunkte.Ecke an, double e, double x, double z) {
+        double[] s = ecke(context, form, 1);
+        return new double[] {s[0] + (x - an.x()) * e, s[1] + (z - an.z()) * e};
     }
 
     /**
