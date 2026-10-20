@@ -94,6 +94,7 @@ public final class Bedienung implements FabricClientGameTest {
             }
             aussehen(context, maus, k);
             zoomNebenMinimap(context, maus, k);
+            aufloesungUndKoordinaten(context, maus, k);
             context.runOnClient(mc -> mc.gui.setScreen(null));
             beiF3(context, maus);
             schleierRegler(context, maus, k);
@@ -4298,6 +4299,211 @@ public final class Bedienung implements FabricClientGameTest {
         }
     }
 
+    /**
+     * Der Regler „Auflösung“ unter der Minimap und der Klick auf ihre Koordinaten im Menü (mod#173), mit Maus und Mausrad wie
+     * von Hand. Der Regler steht 2 Einheiten unter der Zeile der Koordinaten, so breit wie die Minimap; ein Klick auf jede
+     * Raste stellt ihre Auflösung, das Mausrad je eine. Die Zeile steht unter der Maus gelb; ein Klick geht reihum xz, xyz,
+     * aus und zurück; bei „aus“ steht sie im Menü grau und lässt sich anklicken, im Spiel fehlt sie. Bei GS 3 und 4 in jeder
+     * Ecke, klein und gross: der Regler ganz auf dem Schirm, nicht auf der Zeile und nicht auf dem Regler „Zoom“. Siehe
+     * docs/minimap.md, „Bedienung“ und „Koordinaten“.
+     */
+    private static void aufloesungUndKoordinaten(ClientGameTestContext context, TestInput maus, int k) {
+        Path sicherung = FabricLoader.getInstance().getGameDir().resolve("heroicmap-aufloesung-test.properties");
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.schreibe(sicherung);
+            Minimap.INSTANZ.setzeKoordinaten(Minimap.Koordinaten.XZ);
+            // Oben rechts, 128 Einheiten: Unter der Zeile der Koordinaten ist Platz für den Regler.
+            int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+            Minimap.INSTANZ.stelle(b, 0, Minimap.GROESSE, b, h);
+            mc.gui.setScreen(new Einstellungen());
+        });
+        context.waitTicks(3);
+        try {
+            Minimap.Rahmen r = rahmen(context);
+            int[] kasten = context.computeOnClient(mc -> Minimap.INSTANZ.koordinatenKasten());
+            int[] a = aufloesungRegler(context);
+            if (kasten == null || a[0] != r.x() || a[2] != r.seite() || a[1] != kasten[1] + kasten[3] + 2) {
+                throw new AssertionError("Regler „Auflösung“ nicht unter den Koordinaten " + Arrays.toString(kasten) + " bei " + r + ": "
+                        + Arrays.toString(a));
+            }
+            // Jede Raste von Hand; die Mitte des Knaufs liegt bei x + 4 + Wert × (Breite − 8), wie im Spiel.
+            int px = context.computeOnClient(mc -> Minimap.INSTANZ.aufloesung());
+            int[] stufen = Einstellungen.AufloesungRegler.STUFEN;
+            int rasten = stufen.length - 1;
+            int alt = Arrays.stream(stufen).boxed().toList().indexOf(px);
+            for (int i : new int[] {4, 0, 2, 1, 3, alt}) {
+                spielerKlick(context, maus, k, a[0] + 4 + (a[2] - 8) * (double) i / rasten, a[1] + a[3] / 2.0);
+                int jetzt = context.computeOnClient(mc -> Minimap.INSTANZ.aufloesung());
+                String text = context.computeOnClient(mc -> aufloesungReglerWidget(mc).getMessage().getString());
+                if (jetzt != stufen[i] || !text.startsWith(stufen[i] + " ")) {
+                    throw new AssertionError("Klick auf die Raste " + i + " des Reglers „Auflösung“: " + jetzt + " px, „" + text + "“ statt "
+                            + stufen[i]);
+                }
+            }
+            // Das Mausrad über dem Regler: je Schritt eine Raste.
+            spielerKlick(context, maus, k, a[0] + 4 + (a[2] - 8) * 1.0 / rasten, a[1] + a[3] / 2.0);
+            maus.setCursorPos((a[0] + a[2] / 2.0) * k, (a[1] + a[3] / 2.0) * k);
+            context.waitTick();
+            maus.scroll(1);
+            context.waitTick();
+            int feiner = context.computeOnClient(mc -> Minimap.INSTANZ.aufloesung());
+            maus.scroll(-1);
+            context.waitTick();
+            int zurueck = context.computeOnClient(mc -> Minimap.INSTANZ.aufloesung());
+            if (feiner != 4 || zurueck != 2) {
+                throw new AssertionError("Mausrad über „Auflösung“: " + feiner + " und " + zurueck + " statt 4 und 2");
+            }
+            spielerKlick(context, maus, k, a[0] + 4 + (a[2] - 8) * (double) alt / rasten, a[1] + a[3] / 2.0);
+
+            // Die Zeile der Koordinaten: unter der Maus gelb, daneben weiss.
+            maus.setCursorPos((kasten[0] + kasten[2] / 2.0) * k, (kasten[1] + kasten[3] / 2.0) * k);
+            context.waitTicks(2);
+            int hell = gelb(context, "koordinaten-hell", kasten, k);
+            maus.setCursorPos(2 * k, 2 * k);
+            context.waitTicks(2);
+            int dunkel = gelb(context, "koordinaten-weiss", kasten, k);
+            if (hell < 20 || dunkel > 0) {
+                throw new AssertionError("Koordinaten unter der Maus: " + hell + " gelbe Pixel, daneben " + dunkel);
+            }
+            // Ein Klick nach dem anderen: xyz, aus, xz. Bei „aus“ steht die Zeile grau und bleibt anklickbar.
+            for (Minimap.Koordinaten soll : new Minimap.Koordinaten[] {Minimap.Koordinaten.XYZ, Minimap.Koordinaten.AUS, Minimap.Koordinaten.XZ}) {
+                int[] z = context.computeOnClient(mc -> Minimap.INSTANZ.koordinatenKasten());
+                if (z == null) {
+                    throw new AssertionError("Im Menü fehlt die Zeile der Koordinaten vor " + soll);
+                }
+                spielerKlick(context, maus, k, z[0] + z[2] / 2.0, z[1] + z[3] / 2.0);
+                context.waitTicks(2);
+                Minimap.Koordinaten ist = context.computeOnClient(mc -> Minimap.INSTANZ.koordinaten());
+                if (ist != soll) {
+                    throw new AssertionError("Klick auf die Koordinaten: " + ist + " statt " + soll);
+                }
+                if (soll == Minimap.Koordinaten.AUS) {
+                    maus.setCursorPos(2 * k, 2 * k);
+                    context.waitTicks(2);
+                    int[] grau = context.computeOnClient(mc -> Minimap.INSTANZ.koordinatenKasten());
+                    if (grau == null || grau(context, "koordinaten-aus", grau, k) < 20) {
+                        throw new AssertionError("Bei „aus“ steht im Menü keine graue Zeile: " + Arrays.toString(grau));
+                    }
+                    // Im Spiel fehlt sie.
+                    context.runOnClient(mc -> mc.gui.setScreen(null));
+                    context.waitTicks(2);
+                    if (context.computeOnClient(mc -> Minimap.INSTANZ.koordinatenKasten()) != null) {
+                        throw new AssertionError("Bei „aus“ steht im Spiel eine Zeile der Koordinaten");
+                    }
+                    context.runOnClient(mc -> mc.gui.setScreen(new Einstellungen()));
+                    context.waitTicks(3);
+                }
+            }
+
+            // Bei GS 3 und 4 auf dem kleinsten Schirm, 240 Einheiten hoch: in jeder Ecke, klein und gross.
+            List<String> fehler = new ArrayList<>();
+            for (int gs = 3; gs <= 4; gs++) {
+                int g = gs;
+                context.getInput().resizeWindow(1280, 240 * gs);
+                context.runOnClient(mc -> {
+                    mc.options.guiScale().set(g);
+                    mc.resizeGui();
+                });
+                context.waitTicks(2);
+                for (int seite : new int[] {Minimap.KLEINSTE, Minimap.GROESSTE}) {
+                    for (int ecke = 0; ecke < 4; ecke++) {
+                        int e = ecke;
+                        context.runOnClient(mc -> {
+                            int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+                            Minimap.INSTANZ.stelle(e % 2 == 0 ? 0 : b, e < 2 ? 0 : h, seite, b, h);
+                        });
+                        context.waitTicks(3);
+                        String f = context.computeOnClient(mc -> {
+                            int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+                            Minimap.Rahmen m = Minimap.INSTANZ.rahmen(b, h);
+                            int[] z = Minimap.INSTANZ.koordinatenKasten();
+                            AbstractWidget w = aufloesungReglerWidget(mc), zw = zoomReglerWidget(mc);
+                            boolean ganz = w.getX() >= 0 && w.getY() >= 0 && w.getX() + w.getWidth() <= b && w.getY() + w.getHeight() <= h;
+                            boolean aufZeile = z != null && schneidet(w, z[0], z[1], z[2], z[3]);
+                            boolean aufZoom = schneidet(w, zw.getX(), zw.getY(), zw.getWidth(), zw.getHeight());
+                            // Auf der Minimap nur, wenn weder darüber noch darunter Platz ist.
+                            boolean aufMinimap = schneidet(w, m.x(), m.y(), m.seite(), m.seite())
+                                    && m.y() >= 2 * Einstellungen.REGLER_HOEHE && m.y() + m.seite() + 2 * Einstellungen.REGLER_HOEHE <= h;
+                            return ganz && !aufZeile && !aufZoom && !aufMinimap ? null
+                                    : "Regler " + w.getX() + ", " + w.getY() + ", " + w.getWidth() + "; Zeile " + Arrays.toString(z) + "; Minimap " + m
+                                            + "; Schirm " + b + " × " + h;
+                        });
+                        if (f != null) {
+                            fehler.add("GS " + g + ", Seite " + seite + ", Ecke " + e + ": " + f);
+                        }
+                    }
+                }
+            }
+            if (!fehler.isEmpty()) {
+                throw new AssertionError("Regler „Auflösung“ nicht frei auf dem Schirm, " + fehler.size() + " Fälle: " + String.join(" | ", fehler));
+            }
+        } finally {
+            context.getInput().resizeWindow(vorher[0], vorher[1]);
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(vorher[2]);
+                mc.resizeGui();
+                Minimap.INSTANZ.lies(sicherung);
+            });
+            context.waitTicks(2);
+            try {
+                Files.deleteIfExists(sicherung);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+    }
+
+    /** Der Regler „Auflösung“ des offenen Menüs. */
+    private static Einstellungen.AufloesungRegler aufloesungReglerWidget(Minecraft mc) {
+        for (Object kind : mc.gui.screen().children()) {
+            if (kind instanceof Einstellungen.AufloesungRegler w) {
+                return w;
+            }
+        }
+        throw new AssertionError("Kein Regler „Auflösung“ im Menü");
+    }
+
+    /** {x, y, Breite, Höhe} des Reglers „Auflösung“ im offenen Menü. */
+    private static int[] aufloesungRegler(ClientGameTestContext context) {
+        return context.computeOnClient(mc -> {
+            AbstractWidget w = aufloesungReglerWidget(mc);
+            return new int[] {w.getX(), w.getY(), w.getWidth(), w.getHeight()};
+        });
+    }
+
+    /** Wie viele Pixel im Kasten {x, y, Breite, Höhe} des GUI gelb sind, im Bildschirmfoto {@code name}. */
+    private static int gelb(ClientGameTestContext context, String name, int[] kasten, int k) {
+        return zaehle(context, name, kasten, k, (rot, gruen, blau) -> rot > 200 && gruen > 200 && blau < 140);
+    }
+
+    /** Wie viele Pixel im Kasten grau sind wie die Zeile bei „aus“, 0xA0 in jedem Kanal. */
+    private static int grau(ClientGameTestContext context, String name, int[] kasten, int k) {
+        return zaehle(context, name, kasten, k, (rot, gruen, blau) -> Math.abs(rot - 0xA0) < 8 && Math.abs(gruen - 0xA0) < 8 && Math.abs(blau - 0xA0) < 8);
+    }
+
+    private interface Farbe {
+        boolean passt(int rot, int gruen, int blau);
+    }
+
+    private static int zaehle(ClientGameTestContext context, String name, int[] kasten, int k, Farbe farbe) {
+        try {
+            BufferedImage bild = ImageIO.read(context.takeScreenshot(TestScreenshotOptions.of(name).disableCounterPrefix()).toFile());
+            int n = 0;
+            for (int y = kasten[1] * k; y < (kasten[1] + kasten[3]) * k && y < bild.getHeight(); y++) {
+                for (int x = kasten[0] * k; x < (kasten[0] + kasten[2]) * k && x < bild.getWidth(); x++) {
+                    int c = bild.getRGB(x, y);
+                    if (farbe.passt(c >> 16 & 0xFF, c >> 8 & 0xFF, c & 0xFF)) {
+                        n++;
+                    }
+                }
+            }
+            return n;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     /** Der Regler „Zoom“ des offenen Menüs. */
     private static Einstellungen.ZoomRegler zoomReglerWidget(Minecraft mc) {
         for (Object kind : mc.gui.screen().children()) {
@@ -4835,8 +5041,8 @@ public final class Bedienung implements FabricClientGameTest {
             String f = passt(context);
             fehler = fehler != null ? fehler : f == null ? null : (unter ? "Untermenü: " : "") + f;
         }
-        // Bei GS 3 stehen „Auflösung“ und „Todespunkt“, je halb breit, ganz in ihrem Knopf (mod#129). Bei GS 4 sind die halben
-        // Knöpfe schmaler, auch die übrigen laufen dort; davon bleibt das Bild.
+        // Bei GS 3 steht „Todespunkte“, halb breit, ganz in seinem Knopf (mod#129); „Auflösung“ ist seit mod#173 ein Regler an
+        // der Minimap. Bei GS 4 sind die halben Knöpfe schmaler, auch die übrigen laufen dort; davon bleibt das Bild.
         for (int gs : new int[] {3, 4}) {
             context.getInput().resizeWindow(1280, 240 * gs);
             context.runOnClient(mc -> {
@@ -4848,7 +5054,7 @@ public final class Bedienung implements FabricClientGameTest {
             context.takeScreenshot(TestScreenshotOptions.of("anzeige-gs" + gs).disableCounterPrefix());
             String f = context.computeOnClient(mc -> {
                 // Der Regler der Todespunkte mit seinem breitesten Text, „16“ (mod#151).
-                for (String schluessel : gs == 3 ? new String[] {"heroicmap.menue.aufloesung", "heroicmap.menue.todespunkte"} : new String[0]) {
+                for (String schluessel : gs == 3 ? new String[] {"heroicmap.menue.todespunkte"} : new String[0]) {
                     String name = Component.translatable(schluessel, "").getString();
                     AbstractWidget w = mc.gui.screen().children().stream().filter(c -> c instanceof AbstractWidget a
                             && a.getMessage().getString().startsWith(name)).map(c -> (AbstractWidget) c).findFirst().orElse(null);

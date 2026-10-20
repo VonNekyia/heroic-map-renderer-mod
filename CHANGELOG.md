@@ -12,6 +12,8 @@ The release notes on GitHub and Modrinth come from here
 - **Zoom the minimap much further out,** down to 1/32: the slider now has nine notches from 1/32× to 8×. From 1/4× on, the minimap shows the tiles of your map, like the full map: from a download it then looks like the web map, and nearby changes appear once the tiles have them. Without a map it shows just the loaded chunks in the middle.
 - **Minecraft font for names.** Under the size and curve sliders of a shape's name sits a "Font" button: Map or Minecraft. It shows right away on the full map and the minimap; Enter saves, Esc undoes. With "Force Unicode Font" the game draws its Unicode font; capital letters stay the same height in all fonts. Only your own shapes; names from the server stay in the map font.
 - **Lines and regions now sit between blocks.** Corners of your own lines and regions lie on the edges between blocks instead of in the middle of a block, so two joined regions share an exact border. Waypoints stay on blocks; a corner at a waypoint sits on the nearest corner of its block. **Existing shapes move half a block north-west:** the saved numbers stay the same and now mean the north-west corner of their block, so nothing needs converting and shapes that touched still touch. Older versions show the same shapes half a block south-east.
+- **Resolution is a slider under the minimap** in the menu, one notch per step from 1 to 16 px; the mouse wheel over it steps one notch.
+- **Click the coordinates** under the minimap in the menu to switch their style: x z, x y z, off. When off, the menu shows a grey "Coordinates off" line so you can click it back on; in the game it stays hidden. Both settings left the settings submenu.
 
 ## 0.2.65
 

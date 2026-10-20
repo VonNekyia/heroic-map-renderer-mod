@@ -73,6 +73,8 @@ public final class Minimap {
     /** Farbe der Chunklinien: Schwarz, zu 30 % deckend, so bleibt die Karte darunter lesbar. */
     static final int LINIE = 0x4D000000;
     private static final int TEXT = 0xFFFFFFFF;
+    /** Die Zeile der Koordinaten im Menü: gelb unter der Maus wie ein Verweis im Chat, grau bei „aus“. */
+    private static final int KOORDINATEN_HELL = 0xFFFFFF55, KOORDINATEN_AUS = 0xFFA0A0A0;
     /** Chunks je Seite einer Region, einer Textur. */
     static final int CHUNKS_JE_REGION = 8;
     /** Zeit je Frame auf dem Render-Thread für Abzüge und fertige Bilder. */
@@ -159,6 +161,8 @@ public final class Minimap {
     private Rahmen zuletzt;
     /** Wo die Zeile der Koordinaten im letzten Frame stand: x, y, Breite, Höhe; null ohne Zeile. Für die Gametests. */
     private int[] koordinatenKasten;
+    /** Im Menü liegt die Maus auf der Zeile der Koordinaten; dann steht sie gelb. */
+    private boolean koordinatenHell;
     /** Wie der eigene Spieler aussieht, auf Minimap und Vollbildkarte. Siehe docs/minimap.md, „Spieler“. */
     enum Darstellung { KOPF, PFEIL, DURCHSICHTIG }
 
@@ -403,6 +407,10 @@ public final class Minimap {
 
     int[] koordinatenKasten() {
         return koordinatenKasten;
+    }
+
+    void koordinatenHell(boolean an) {
+        koordinatenHell = an;
     }
 
     Rahmen zuletzt() {
@@ -920,8 +928,12 @@ public final class Minimap {
         }
         Object[] werte = werte(koordinaten, spieler.getX(), spieler.getY(), spieler.getZ());
         koordinatenKasten = null;
-        if (werte != null) {
-            Component text = Component.translatable(werte.length == 3 ? "heroicmap.koordinaten_xyz" : "heroicmap.koordinaten", werte);
+        // Im Menü steht die Zeile auch bei „aus“, grau; ein Klick darauf holt sie zurück. Siehe docs/minimap.md, „Koordinaten“.
+        boolean klickbar = mc.gui.screen() instanceof Einstellungen;
+        if (werte != null || klickbar) {
+            Component text = werte == null ? Component.translatable("heroicmap.koordinaten_aus")
+                    : Component.translatable(werte.length == 3 ? "heroicmap.koordinaten_xyz" : "heroicmap.koordinaten", werte);
+            int farbe = klickbar && koordinatenHell ? KOORDINATEN_HELL : werte == null ? KOORDINATEN_AUS : TEXT;
             int abstand = rand();
             float f = koordinatenMassstab(g.guiWidth(), abstand, mc.font.width(text));
             int breite = Mth.ceil(mc.font.width(text) * f), zeile = Mth.ceil(mc.font.lineHeight * f);
@@ -930,7 +942,7 @@ public final class Minimap {
             g.pose().pushMatrix();
             g.pose().translate(wo[0], wo[1]);
             g.pose().scale(f);
-            g.text(mc.font, text, 0, 0, TEXT, true);
+            g.text(mc.font, text, 0, 0, farbe, true);
             g.pose().popMatrix();
             koordinatenKasten = new int[] {wo[0], wo[1], breite, zeile};
         }
