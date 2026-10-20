@@ -330,8 +330,10 @@ Reviewer freigegeben.
   einer anderen gestorben ist, sieht den Todespunkt erst dort.
 - **Regler** „Todespunkte: aus, 1 … 16“ im Untermenü „Einstellungen …“,
   neben „Auflösung“, Vorgabe 1 (`Anzeige.TodRegler`, `Minimap.todespunkte`,
-  gespeichert als `todespunkte`). Weniger nimmt gleich die ältesten weg
-  (`Wegpunkte.kappeTode`), aus alle; dann setzt ein Tod keinen. Bis 0.2.57
+  gespeichert als `todespunkte`). Weniger nimmt die ältesten weg, aus alle,
+  aber erst beim Schliessen des Untermenüs (`Anzeige.removed`,
+  `Wegpunkte.kappeTode`): So löscht der Regler beim Ziehen keinen, von 8
+  auf 1 und zurück bleiben 8 (Review von #164). Aus setzt ein Tod keinen. Bis 0.2.57
   war es ein Schalter `todespunkt`: aus wird 0, an oder ohne Eintrag 1.
 - **Datei:** eigens als Liste `tode`, der älteste zuerst, nicht in der
   Liste `wegpunkte`, siehe „Ablage“. Dazu steht der neueste noch einmal als
@@ -988,9 +990,11 @@ Schleier am Rand, siehe „Schleier“.
   Menü hat genau „Hierher teleportieren“ und „Todespunkt löschen“, gehalten
   hängt er nicht an der Maus, und „Todespunkt löschen“ löscht ihn; mit zwei
   behaltenen bleiben nach drei Toden die zwei neuesten, nur der neueste
-  angeheftet; einer eingestellt, bleibt der neueste; aus setzt ein Tod
-  keinen. Regler „Todespunkte“ (`todRegler`): Klicks ans rechte Ende, ans
-  linke und in die Mitte geben 16, aus und 8, gespeichert beim Schliessen. Eigene Ebenen (`eigeneEbenen`): Rechtsklick auf einen
+  angeheftet; aus setzt ein Tod keinen. Regler „Todespunkte“ (`todRegler`):
+  Klicks ans rechte Ende, ans linke und in die Mitte geben 16, aus und 8,
+  gespeichert beim Schliessen; mit acht Todespunkten nehmen diese Klicks und
+  ein Ziehen von 8 auf 1 und zurück keinen weg, nach `Esc` sind es acht; auf
+  2 gestellt, bleiben nach `Esc` die zwei neuesten. Eigene Ebenen (`eigeneEbenen`): Rechtsklick auf einen
   Wegpunkt, „Ebene …“ zeigt „• Base“ und „Neue Ebene …“; darüber „Farmen“
   angelegt, liegt er in ihr; ihr Knopf in der Liste der Karte schaltet sie
   aus, und der Wegpunkt fehlt auf der Karte, wieder an steht er da; im

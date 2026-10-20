@@ -354,12 +354,11 @@ public final class Minimap {
     }
 
     /**
-     * Wie viele Todespunkte der Mod behält, 0 bis {@link #MAX_TODESPUNKTE}; weniger nimmt gleich die ältesten weg, 0 alle. Siehe
-     * docs/wegpunkte.md, „Todespunkt“.
+     * Wie viele Todespunkte der Mod behält, 0 bis {@link #MAX_TODESPUNKTE}. Nur die Zahl: Die ältesten nimmt erst das Schliessen
+     * des Untermenüs weg ({@link Anzeige#removed}), so löscht der Regler beim Ziehen keinen. Siehe docs/wegpunkte.md, „Todespunkt“.
      */
     void setzeTodespunkte(int n) {
         todespunkte = Math.clamp(n, 0, MAX_TODESPUNKTE);
-        Wegpunkte.INSTANZ.kappeTode(todespunkte);
     }
 
     /** Setzt die Höhe des Schleiers eigener Regionen, gekappt auf {@link Schleier#HOEHE} bis {@link Schleier#MAX_HOEHE}. */

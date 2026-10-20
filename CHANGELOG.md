@@ -6,7 +6,7 @@ The release notes on GitHub and Modrinth come from here
 
 ## 0.2.58
 
-- **Several death points.** "Death points" under "Settings …" is now a slider: off, or keep 1 to 16. Each death adds one where you died; the oldest drop off. Only the newest is pinned, so the beam leads to your last death. Death points can't be dragged any more; delete them from the right-click menu or with `Delete`.
+- **Several death points.** "Death points" under "Settings …" is now a slider: off, or keep 1 to 16. Each death adds one where you died; the oldest drop off. Lowering the slider removes the oldest when you close the menu, not while you drag. Only the newest is pinned, so the beam leads to your last death. Death points can't be dragged any more; delete them from the right-click menu or with `Delete`.
 
 ## 0.2.57
 

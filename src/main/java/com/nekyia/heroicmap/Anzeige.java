@@ -158,6 +158,8 @@ final class Anzeige extends Screen {
     public void removed() {
         Minimap.INSTANZ.hervor(Minimap.KEIN_ZIEL);
         Minimap.INSTANZ.schreibe(HeroicMap.einstellungen());
+        // Erst hier, nicht beim Ziehen des Reglers: Von 8 auf 1 und zurück nimmt sonst sieben weg.
+        Wegpunkte.INSTANZ.kappeTode(Minimap.INSTANZ.todespunkte());
         // Eine andere Ablage heisst ein anderer Ordner der Welt, auch für Wegpunkte und Ebenen.
         Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());
         Ebenen.INSTANZ.wechsel(Downloads.weltOrdner());
