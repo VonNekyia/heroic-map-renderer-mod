@@ -3,6 +3,7 @@ package com.nekyia.heroicmap;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.cursor.CursorTypes;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -29,8 +30,9 @@ import org.joml.Matrix3x2fStack;
  * auf der Platte, dazu das Untermenü „Einstellungen …“ für Vorlieben der Anzeige ({@link Anzeige}).
  * Die Minimap im HUD bleibt sichtbar; Ziehen verschiebt sie, der Griff an der Ecke zur Mitte des
  * Schirms zieht sie grösser oder kleiner, mit der linken wie der rechten Taste. Neben ihr steht der
- * Zoom als senkrechter Regler ({@link ZoomRegler}). Ein Klick auf den Spieler oder eine Marke stellt
- * ihr Aussehen ein ({@link MinimapKlick}). Die Knöpfe passen sich dem Platz an und gehen nach dem
+ * Zoom als senkrechter Regler ({@link ZoomRegler}), darunter die Auflösung ({@link AufloesungRegler}); ein Klick
+ * auf die Koordinaten wechselt ihren Stil. Ein Klick auf den Spieler oder eine Marke stellt ihr Aussehen ein
+ * ({@link MinimapKlick}). Die Knöpfe passen sich dem Platz an und gehen nach dem
  * Ziehen auf die freie Seite. Gespeichert wird beim Schliessen.
  * Siehe docs/minimap.md, „Bedienung“.
  */
@@ -43,6 +45,8 @@ final class Einstellungen extends Screen {
     private static final int BREITE = 200;
     /** Breite des senkrechten Reglers „Zoom“, so breit wie ein Regler des Spiels hoch ist. */
     static final int ZOOM_BREITE = 20;
+    /** Höhe des Reglers „Auflösung“, wie ein Regler des Spiels. */
+    static final int REGLER_HOEHE = 20;
 
     /** KLICK: gedrückt auf Spieler oder Marke; wandert die Maus weiter als {@link MinimapKlick#WEG}, wird daraus LAGE. */
     private enum Zug { KEINER, KLICK, LAGE, GROESSE }
@@ -60,6 +64,7 @@ final class Einstellungen extends Screen {
     /** Linker Rand, Oberkante und Breite der Knöpfe. */
     private int spalte, oben, breite;
     private ZoomRegler zoom;
+    private AufloesungRegler aufloesung;
 
     /** Wohin „Fertig“ und Escape führen: die Vollbildkarte, von der das Menü kam, oder null fürs Spiel. */
     private final Screen zurueck;
@@ -92,6 +97,9 @@ final class Einstellungen extends Screen {
         int[] z = zoomLage(m.rahmen(width, height), m.rand(), width);
         zoom = addRenderableWidget(new ZoomRegler(z[0], z[1], z[2], m));
         zoom.visible = m.sichtbar();
+        int[] a = aufloesungLage(m.rahmen(width, height), m.koordinatenKasten(), m.rand(), height);
+        aufloesung = addRenderableWidget(new AufloesungRegler(a[0], a[1], a[2], m));
+        aufloesung.visible = m.sichtbar();
         // Gehen Mitspieler hier nicht, steht der Knopf rot und trägt den Grund als Tooltip.
         grund = Mitspieler.grund(Kanal.offen(), Mitspieler.INSTANZ.verweigert());
         CycleButton<Boolean> show = addRenderableWidget(CycleButton.booleanBuilder(rot(Component.translatable("heroicmap.menue.show.simplevoicechat")),
@@ -141,6 +149,34 @@ final class Einstellungen extends Screen {
     }
 
     /**
+     * Wo der Regler „Auflösung“ steht, {x, y, Breite}: so breit wie die Minimap {@code r}, auf der Seite der Zeile der
+     * Koordinaten {@code kasten} hinter ihr, 2 Einheiten Abstand; ohne Zeile unter der Minimap im Abstand {@code abstand}.
+     * Passt er dort nicht auf den Schirm, steht er auf der anderen Seite; passt er auch dort nicht, innen an ihrem unteren
+     * Rand, über der Zeile, wenn diese auf ihr liegt. Siehe docs/minimap.md, „Bedienung“.
+     */
+    static int[] aufloesungLage(Minimap.Rahmen r, int[] kasten, int abstand, int hoehe) {
+        boolean zeileOben = kasten != null && kasten[1] + kasten[3] <= r.y();
+        boolean zeileUnten = kasten != null && kasten[1] >= r.y() + r.seite();
+        int unten = zeileUnten ? kasten[1] + kasten[3] + 2 : r.y() + r.seite() + abstand + 2;
+        int oben = (zeileOben ? kasten[1] : r.y() - abstand) - 2 - REGLER_HOEHE;
+        int innen = (kasten != null && !zeileOben && !zeileUnten ? Math.min(kasten[1] - 2, r.y() + r.seite()) : r.y() + r.seite())
+                - REGLER_HOEHE;
+        boolean untenPasst = unten + REGLER_HOEHE <= hoehe, obenPasst = oben >= 0;
+        int y = zeileOben ? (obenPasst ? oben : untenPasst ? unten : innen) : untenPasst ? unten : obenPasst ? oben : innen;
+        return new int[] {r.x(), y, r.seite()};
+    }
+
+    /** Der nächste Stil der Koordinaten im Kreis: aus, xz, xyz. */
+    static Minimap.Koordinaten naechste(Minimap.Koordinaten k) {
+        Minimap.Koordinaten[] alle = Minimap.Koordinaten.values();
+        return alle[(k.ordinal() + 1) % alle.length];
+    }
+
+    private static boolean imKasten(int[] kasten, double x, double y) {
+        return kasten != null && x >= kasten[0] && x < kasten[0] + kasten[2] && y >= kasten[1] && y < kasten[1] + kasten[3];
+    }
+
+    /**
      * Wo der Regler „Zoom“ neben der Minimap {@code r} steht, {x, y, Höhe}: so hoch wie sie, links im Abstand {@code rand}
      * wie ihre Koordinaten; passt er dort nicht auf den Schirm, ebenso rechts; passt er auf keiner Seite, innen an ihrem
      * linken Rand. Siehe docs/minimap.md, „Bedienung“.
@@ -165,6 +201,18 @@ final class Einstellungen extends Screen {
         zoom.setHeight(z[2]);
         zoom.visible = m.sichtbar();
         zoom.folge(m.zoom());
+        int[] a = aufloesungLage(m.rahmen(width, height), m.koordinatenKasten(), m.rand(), height);
+        aufloesung.setPosition(a[0], a[1]);
+        aufloesung.setWidth(a[2]);
+        aufloesung.visible = m.sichtbar();
+        aufloesung.folge(m.aufloesung());
+        // Die Zeile der Koordinaten unter der Maus steht gelb, ab dem nächsten Frame, und nennt ihren Stil.
+        boolean zeile = m.sichtbar() && zug == Zug.KEINER && imKasten(m.koordinatenKasten(), mausX, mausY);
+        m.koordinatenHell(zeile);
+        if (zeile) {
+            g.setTooltipForNextFrame(Component.translatable("heroicmap.menue.koordinaten.klick", stil(m.koordinaten()), stil(naechste(m.koordinaten()))),
+                    mausX, mausY);
+        }
         super.extractRenderState(g, mausX, mausY, delta);
         // Titel und Hinweis über den Knöpfen; unten läge der Chat darüber.
         int mitte = spalte + breite / 2;
@@ -220,15 +268,23 @@ final class Einstellungen extends Screen {
         g.text(font, Component.translatable("heroicmap.koordinaten", bx, bz), 4, height - 12, TEXT);
     }
 
+    private static Component stil(Minimap.Koordinaten k) {
+        return Component.translatable("heroicmap.menue.koordinaten." + k.name().toLowerCase(Locale.ROOT));
+    }
+
     /** Liegt (x, y) auf der Minimap {@code r}, rund im Kreis? */
     private static boolean auf(Minimap.Rahmen r, double x, double y) {
         double h = r.seite() / 2.0, dx = x - (r.x() + h), dz = y - (r.y() + h);
         return Minimap.INSTANZ.rund() ? dx * dx + dz * dz <= h * h : r.enthaelt(x, y);
     }
 
-    /** Das Mausrad über der Minimap oder dem Regler „Zoom“: je Schritt eine Raste, nach vorn näher. */
+    /** Das Mausrad über der Minimap oder dem Regler „Zoom“: je Schritt eine Raste, nach vorn näher; über „Auflösung“ ebenso. */
     @Override
     public boolean mouseScrolled(double x, double y, double weitX, double weitY) {
+        if (weitY != 0 && zug == Zug.KEINER && aufloesung.isMouseOver(x, y)) {
+            aufloesung.schritt(weitY > 0 ? 1 : -1);
+            return true;
+        }
         if (weitY != 0 && zug == Zug.KEINER && Minimap.INSTANZ.sichtbar()
                 && (zoom.isMouseOver(x, y) || auf(Minimap.INSTANZ.rahmen(width, height), x, y))) {
             zoom.schritt(weitY > 0 ? 1 : -1);
@@ -244,6 +300,11 @@ final class Einstellungen extends Screen {
         }
         if (!Minimap.INSTANZ.sichtbar()) {
             return false;
+        }
+        // Ein Linksklick auf die Zeile der Koordinaten wechselt ihren Stil, auch von „aus“ zurück.
+        if (e.button() == InputConstants.MOUSE_BUTTON_LEFT && imKasten(Minimap.INSTANZ.koordinatenKasten(), e.x(), e.y())) {
+            Minimap.INSTANZ.setzeKoordinaten(naechste(Minimap.INSTANZ.koordinaten()));
+            return true;
         }
         Minimap.Rahmen r = Minimap.INSTANZ.rahmen(width, height);
         // Links wie rechts: Ziehen greift die ganze Minimap, am Griff ihre Grösse.
@@ -382,6 +443,7 @@ final class Einstellungen extends Screen {
     public void removed() {
         Minimap.INSTANZ.griff(-1, false);
         Minimap.INSTANZ.hervor(Minimap.KEIN_ZIEL);
+        Minimap.INSTANZ.koordinatenHell(false);
         Minimap.INSTANZ.schreibe(HeroicMap.einstellungen());
         // Eine andere Ablage heisst ein anderer Ordner der Welt, auch für die Wegpunkte.
         Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());
@@ -390,6 +452,77 @@ final class Einstellungen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    /**
+     * Die Auflösung der Minimap als Schieberegler unter ihr, eine Raste je Stufe aus {@link #STUFEN}; kurz beschriftet,
+     * „2 px“, den vollen Namen nennt der Tooltip. Die Pfeiltasten und das Mausrad gehen je eine Raste. Siehe
+     * docs/minimap.md, „Bedienung“.
+     */
+    static final class AufloesungRegler extends AbstractSliderButton {
+
+        /** Pixel je Block, die die Minimap höchstens zeichnet. */
+        static final int[] STUFEN = {1, 2, 4, 8, 16};
+        private static final int RASTEN = STUFEN.length - 1;
+        private final Minimap minimap;
+
+        AufloesungRegler(int x, int y, int breite, Minimap minimap) {
+            super(x, y, breite, REGLER_HOEHE, Component.empty(), (double) Math.max(0, stufe(minimap.aufloesung())) / RASTEN);
+            this.minimap = minimap;
+            updateMessage();
+        }
+
+        private static int stufe(int px) {
+            for (int i = 0; i < STUFEN.length; i++) {
+                if (STUFEN[i] == px) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        private int raste() {
+            return (int) Math.round(value * RASTEN);
+        }
+
+        @Override
+        protected void updateMessage() {
+            Component px = Component.translatable("heroicmap.menue.px_kurz", STUFEN[raste()]);
+            setMessage(px);
+            setTooltip(Tooltip.create(Component.empty().append(CommonComponents.optionNameValue(Component.translatable("heroicmap.menue.aufloesung"), px))
+                    .append(CommonComponents.NEW_LINE).append(Component.translatable("heroicmap.menue.aufloesung.beschreibung"))));
+        }
+
+        @Override
+        protected void applyValue() {
+            // Nur auf den Rasten: Dazwischen gibt es keine Auflösung.
+            value = (double) raste() / RASTEN;
+            minimap.setzeScale(STUFEN[raste()]);
+        }
+
+        /** Stellt den Knauf auf {@code px}, ohne ihn anzuwenden. */
+        void folge(int px) {
+            double v = (double) Math.max(0, stufe(px)) / RASTEN;
+            if (v != value) {
+                value = v;
+                updateMessage();
+            }
+        }
+
+        /** Eine Raste feiner (+1) oder gröber (−1), am Ende bleibt er stehen. */
+        void schritt(int schritt) {
+            setValue((double) Math.clamp(raste() + schritt, 0, RASTEN) / RASTEN);
+        }
+
+        @Override
+        public boolean keyPressed(KeyEvent ereignis) {
+            int schritt = ereignis.key() == InputConstants.KEY_LEFT ? -1 : ereignis.key() == InputConstants.KEY_RIGHT ? 1 : 0;
+            if (schritt != 0 && active) {
+                schritt(schritt);
+                return true;
+            }
+            return super.keyPressed(ereignis);
+        }
     }
 
     /**

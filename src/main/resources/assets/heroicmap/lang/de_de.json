@@ -148,6 +148,8 @@
   "heroicmap.menue.koordinaten": "Koordinaten",
   "heroicmap.menue.koordinaten.aus": "aus",
   "heroicmap.menue.koordinaten.xz": "xz",
+  "heroicmap.koordinaten_aus": "Koordinaten aus",
+  "heroicmap.menue.koordinaten.klick": "Koordinaten: %s – Klick: %s",
   "heroicmap.menue.koordinaten.xyz": "xyz",
   "heroicmap.menue.bei_f3": "Bei F3",
   "heroicmap.menue.bei_f3.bleibt": "bleibt",

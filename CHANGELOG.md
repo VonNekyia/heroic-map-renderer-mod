@@ -4,6 +4,11 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.67
+
+- **Resolution is a slider under the minimap** in the menu, one notch per step from 1 to 16 px; the mouse wheel over it steps one notch.
+- **Click the coordinates** under the minimap in the menu to switch their style: x z, x y z, off. When off, the menu shows a grey "Coordinates off" line so you can click it back on; in the game it stays hidden. Both settings left the settings submenu.
+
 ## 0.2.66
 
 - **Zoom the minimap much further out,** down to 1/32: the slider now has nine notches from 1/32× to 8×. From 1/4× on, the minimap shows the tiles of your map, like the full map: from a download it then looks like the web map, and nearby changes appear once the tiles have them. Without a map it shows just the loaded chunks in the middle.
