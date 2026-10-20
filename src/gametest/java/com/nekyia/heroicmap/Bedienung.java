@@ -165,6 +165,7 @@ public final class Bedienung implements FabricClientGameTest {
         namen(context, maus, k);
         schriftUndBiegung(context, maus, k);
         farbe(context, maus, k);
+        gewicht(context, maus, k);
         hinweisWeg(context, maus, k);
         wegpunktBei(context, maus, k);
         menueJeObjekt(context, maus, k);
@@ -2791,7 +2792,8 @@ public final class Bedienung implements FabricClientGameTest {
                 int[] schirm = context.computeOnClient(mc -> new int[] {mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight(),
                     mc.getWindow().getGuiScale()});
                 int[][] ws = eingabeWidgets(context);
-                for (int[] x : ws) {
+                // Feld, Schrift und Biegung; „Gewicht“ gehört zur Farbe.
+                for (int[] x : Arrays.copyOf(ws, 3)) {
                     if (schirm[2] != gs || x == null || x[0] < 0 || x[1] < 0 || x[0] + x[2] > schirm[0] || x[1] + x[3] > schirm[1]) {
                         throw new AssertionError("GS " + schirm[2] + " statt " + gs + ", Schirm " + schirm[0] + " × " + schirm[1] + ": "
                                 + Arrays.deepToString(ws));
@@ -2816,7 +2818,142 @@ public final class Bedienung implements FabricClientGameTest {
         }
     }
 
-    /** Eingabefeld, Regler „Schrift“ und „Biegung“ der offenen Karte: je {x, y, Breite, Höhe, an, Raste}, null ohne. */
+    /**
+     * Gewicht (mod#163), mit Klicks von Hand. Zwei Regionen, die sich überdecken, A rot, B blau darüber, beide Gewicht 0: Auf
+     * dem Rand von B in A steht Blau. „Farbe…“ an A, darunter der Regler „Gewicht“ auf +2: Gleich liegt die Fläche von A über
+     * dem Rand von B, der Rand wird röter; in der Datei steht es erst nach Enter. Wieder geöffnet, −3 und Esc: wieder +2. Bei
+     * GS 3 und 4 am unteren Rand liegen Feld und Regler ganz auf dem Schirm. Siehe docs/wegpunkte.md, „Gewicht“.
+     */
+    private static void gewicht(ClientGameTestContext context, TestInput maus, int k) {
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        // Unter der Mitte, A links, B um 8 Blöcke nach rechts, beide 16 × 16.
+        int ax = mitte[0] - 20, bx = mitte[0] - 12, z = mitte[1] + 8;
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        try {
+            context.runOnClient(mc -> {
+                String dimension = mc.level.dimension().identifier().toString();
+                for (int x : new int[] {ax, bx}) {
+                    Wegpunkte.INSTANZ.setzeForm(dimension, List.of(new Wegpunkte.Ecke(x, z), new Wegpunkte.Ecke(x + 16, z),
+                            new Wegpunkte.Ecke(x + 16, z + 16), new Wegpunkte.Ecke(x, z + 16)));
+                }
+                Wegpunkte.INSTANZ.faerbe(Wegpunkte.INSTANZ.eigeneFormen().get(formen), 0xE03030);
+                Wegpunkte.INSTANZ.faerbe(Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1), 0x3050E0);
+            });
+            context.waitTicks(3);
+            // Auf der linken Kante von B, anderthalb Blöcke unter ihrer oberen Ecke: in A, über dem Feld, das am Griff von A öffnet.
+            double[] ort = context.computeOnClient(mc -> {
+                Wegpunkte.EigeneForm b = Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1);
+                Karte.EckeAn e0 = ((Karte) mc.gui.screen()).ecken().stream().filter(e -> e.form().equals(b) && e.index() == 0)
+                        .findFirst().orElseThrow();
+                return new double[] {e0.x(), e0.y() + 6};
+            });
+            frei(context, new double[][] {ort});
+            maus.setCursorPos(2 * k, 2 * k);
+            context.waitTicks(2);
+            BufferedImage vor = ImageIO.read(context.takeScreenshot(TestScreenshotOptions.of("gewicht-vorher").disableCounterPrefix()).toFile());
+            // Der blaueste Pixel um die Kante ist ihr Rand; danach derselbe Pixel.
+            int py = (int) Math.round(ort[1] * k), px = -1, besteBlau = Integer.MIN_VALUE;
+            for (int x = (int) Math.round(ort[0] * k) - 2 * k; x <= (int) Math.round(ort[0] * k) + 2 * k; x++) {
+                int c = vor.getRGB(x, py), blau = (c & 0xFF) - (c >> 16 & 0xFF);
+                if (blau > besteBlau) {
+                    besteBlau = blau;
+                    px = x;
+                }
+            }
+            int vorRot = vor.getRGB(px, py) >> 16 & 0xFF;
+
+            double[] g = griff(context, formen);
+            eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.farbe");
+            int[][] w = eingabeWidgets(context);
+            if (w[3] == null || w[3][4] != 1 || w[3][5] != Wegpunkte.MAX_GEWICHT || w[1] != null || w[2] != null) {
+                throw new AssertionError("„Farbe…“: Regler „Gewicht“ fehlt, ist grau oder nicht auf 0, " + Arrays.deepToString(w));
+            }
+            raste(context, maus, k, w[3], Wegpunkte.MAX_GEWICHT + 2, 2 * Wegpunkte.MAX_GEWICHT + 1);
+            Path datei = context.computeOnClient(mc -> Downloads.weltOrdner().resolve("wegpunkte.json"));
+            if (form(context, formen).gewicht() != 2 || Files.readString(datei, StandardCharsets.UTF_8).contains("\"gewicht\"")) {
+                throw new AssertionError("Vor Enter: " + form(context, formen));
+            }
+            maus.setCursorPos(2 * k, 2 * k);
+            context.waitTicks(2);
+            BufferedImage live = ImageIO.read(context.takeScreenshot(TestScreenshotOptions.of("gewicht-live").disableCounterPrefix()).toFile());
+            int liveRot = live.getRGB(px, py) >> 16 & 0xFF;
+            if (liveRot < vorRot + 30) {
+                throw new AssertionError("Die Fläche von A liegt nicht über dem Rand von B: Rot " + vorRot + " vorher, " + liveRot + " mit Gewicht 2");
+            }
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            if (form(context, formen).gewicht() != 2 || !Files.readString(datei, StandardCharsets.UTF_8).contains("\"gewicht\":2")) {
+                throw new AssertionError("Nach Enter: " + form(context, formen));
+            }
+
+            // Wieder geöffnet steht der Regler auf +2; −3 und Esc nimmt es zurück.
+            g = griff(context, formen);
+            eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.farbe");
+            w = eingabeWidgets(context);
+            if (w[3][5] != Wegpunkte.MAX_GEWICHT + 2) {
+                throw new AssertionError("Wieder geöffnet steht „Gewicht“ auf Raste " + w[3][5]);
+            }
+            raste(context, maus, k, w[3], Wegpunkte.MAX_GEWICHT - 3, 2 * Wegpunkte.MAX_GEWICHT + 1);
+            if (form(context, formen).gewicht() != -3) {
+                throw new AssertionError("Der Regler wirkt nicht gleich: " + form(context, formen));
+            }
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTicks(2);
+            if (form(context, formen).gewicht() != 2) {
+                throw new AssertionError("Esc nahm nicht zurück: " + form(context, formen));
+            }
+
+            // Bei GS 3 und 4 am unteren Rand: Feld und Regler ganz auf dem Schirm.
+            for (int gs : new int[] {3, 4}) {
+                context.getInput().resizeWindow(1280, 240 * gs);
+                context.runOnClient(mc -> {
+                    mc.options.guiScale().set(gs);
+                    mc.resizeGui();
+                });
+                context.waitTicks(3);
+                int nummer = context.computeOnClient(mc -> {
+                    int breite = mc.getWindow().getGuiScaledWidth(), hoehe = mc.getWindow().getGuiScaledHeight();
+                    int[] b = ((Karte) mc.gui.screen()).blockUnter(breite / 2 + 40, hoehe - 16);
+                    Wegpunkte.INSTANZ.setzeForm(mc.level.dimension().identifier().toString(), List.of(new Wegpunkte.Ecke(b[0] - 1, b[1] - 1),
+                            new Wegpunkte.Ecke(b[0] + 1, b[1] - 1), new Wegpunkte.Ecke(b[0] + 1, b[1] + 1), new Wegpunkte.Ecke(b[0] - 1, b[1] + 1)));
+                    return Wegpunkte.INSTANZ.eigeneFormen().size() - 1;
+                });
+                context.waitTicks(2);
+                double[] ge = griff(context, nummer);
+                eintrag(context, maus, gs, ge[0], ge[1], "heroicmap.karte.farbe");
+                int[] schirm = context.computeOnClient(mc -> new int[] {mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight(),
+                    mc.getWindow().getGuiScale()});
+                int[][] ws = eingabeWidgets(context);
+                for (int[] x : new int[][] {ws[0], ws[3]}) {
+                    if (schirm[2] != gs || x == null || x[0] < 0 || x[1] < 0 || x[0] + x[2] > schirm[0] || x[1] + x[3] > schirm[1]) {
+                        throw new AssertionError("GS " + schirm[2] + " statt " + gs + ", Schirm " + schirm[0] + " × " + schirm[1] + ": "
+                                + Arrays.deepToString(ws));
+                    }
+                }
+                maus.pressKey(InputConstants.KEY_ESCAPE);
+                context.waitTicks(2);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } finally {
+            context.getInput().resizeWindow(vorher[0], vorher[1]);
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(vorher[2]);
+                mc.resizeGui();
+                List<Wegpunkte.EigeneForm> alle = Wegpunkte.INSTANZ.eigeneFormen();
+                for (Wegpunkte.EigeneForm f : List.copyOf(alle.subList(Math.min(formen, alle.size()), alle.size()))) {
+                    Wegpunkte.INSTANZ.loesche(f);
+                }
+            });
+            context.waitTicks(3);
+        }
+    }
+
+    /** Eingabefeld, Regler „Schrift“, „Biegung“ und „Gewicht“ der offenen Karte: je {x, y, Breite, Höhe, an, Raste}, null ohne. */
     private static int[][] eingabeWidgets(ClientGameTestContext context) {
         return context.computeOnClient(mc -> {
             AbstractWidget[] w = ((Karte) mc.gui.screen()).eingabeWidgets();

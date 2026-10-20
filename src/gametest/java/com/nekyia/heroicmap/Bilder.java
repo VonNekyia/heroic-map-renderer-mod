@@ -953,10 +953,10 @@ public final class Bilder implements FabricClientGameTest {
             Wegpunkte w = Wegpunkte.INSTANZ;
             w.setzeForm(Ebenen.UEBERWELT, List.of(new Wegpunkte.Ecke(-34, -26), new Wegpunkte.Ecke(-10, -26), new Wegpunkte.Ecke(-10, -14),
                     new Wegpunkte.Ecke(-34, -14)));
-            w.benenne(w.stil(w.eigeneFormen().getLast(), 0.5, 60), "Hafenstadt");
+            w.benenne(w.stil(w.eigeneFormen().getLast(), 0.5, 60, 0), "Hafenstadt");
             w.setzeForm(Ebenen.UEBERWELT, List.of(new Wegpunkte.Ecke(6, 2), new Wegpunkte.Ecke(30, 2), new Wegpunkte.Ecke(30, 18),
                     new Wegpunkte.Ecke(6, 18)));
-            w.benenne(w.stil(w.eigeneFormen().getLast(), 2.0 / 3, -90), "Westmark");
+            w.benenne(w.stil(w.eigeneFormen().getLast(), 2.0 / 3, -90, 0), "Westmark");
             w.umschalten(w.eigeneFormen().getLast());
             Minimap.INSTANZ.setzeScale(4);
             Minimap.INSTANZ.setzeZoom(2);

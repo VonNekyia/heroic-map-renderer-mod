@@ -676,7 +676,7 @@ class WegpunkteTest {
         w.lies((Path) null);
         w.setzeForm(WELT, region.ecken());
         w.setzeForm(WELT, List.of(e(0, 20), e(10, 20), e(10, 30)));
-        w.benenne(w.stil(w.eigeneFormen().get(0), 2, -45), "Hof");
+        w.benenne(w.stil(w.eigeneFormen().get(0), 2, -45, 0), "Hof");
         String json = w.json().toString();
         assertTrue(json.contains("\"schrift\":2.0") && json.contains("\"biegung\":-45"), json);
         assertEquals(1, json.split("\"schrift\"", -1).length - 1, json);
@@ -696,6 +696,66 @@ class WegpunkteTest {
         List<Wegpunkte.EigeneForm> k = kaputt.eigeneFormen();
         assertEquals(List.of(1.0, 1.0, 1.0 / 3, 1.5), k.stream().map(Wegpunkte.EigeneForm::schrift).toList());
         assertEquals(List.of(0, 0, 30, 0), k.stream().map(Wegpunkte.EigeneForm::biegung).toList());
+    }
+
+    @Test
+    void gewichtLegtFormenUebereinander() {
+        // Je Gewicht eine Liste, leicht zuerst, nach den Ebenen vom Server; in einer Liste die Reihenfolge wie bisher (mod#163).
+        Ebenen e = ebene("b:wald", "v1", FLAECHE);
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        for (int i = 0; i < 4; i++) {
+            w.setzeForm(WELT, List.of(e(10 * i, 0), e(10 * i + 5, 0), e(10 * i + 5, 5)));
+        }
+        // Alle 0: eine Liste wie vor mod#163, nach der Ebene vom Server.
+        assertEquals(2, w.karte(e).size());
+        assertEquals(4, w.karte(e).get(1).size());
+        List<Wegpunkte.EigeneForm> f = w.eigeneFormen();
+        w.stil(f.get(0), 1, 0, 2);
+        w.stil(f.get(2), 1, 0, -1);
+        List<List<Ebenen.Form>> karte = w.karte(e);
+        // Ebene vom Server, dann −1, 0 (zwei, in ihrer Reihenfolge), 2.
+        assertEquals(4, karte.size());
+        assertEquals(List.of(1, 2, 1), karte.subList(1, 4).stream().map(List::size).toList());
+        assertArrayEquals(((Ebenen.Flaeche) w.form(w.eigeneFormen().get(2))).box(), ((Ebenen.Flaeche) karte.get(1).getFirst()).box(), 1e-9);
+        assertArrayEquals(((Ebenen.Flaeche) w.form(w.eigeneFormen().get(1))).box(), ((Ebenen.Flaeche) karte.get(2).get(0)).box(), 1e-9);
+        assertArrayEquals(((Ebenen.Flaeche) w.form(w.eigeneFormen().get(3))).box(), ((Ebenen.Flaeche) karte.get(2).get(1)).box(), 1e-9);
+        assertArrayEquals(((Ebenen.Flaeche) w.form(w.eigeneFormen().get(0))).box(), ((Ebenen.Flaeche) karte.get(3).getFirst()).box(), 1e-9);
+        // Auf der Minimap ebenso, mit dem Gewicht je Form für den Schleier.
+        w.umschalten(w.eigeneFormen().get(0));
+        w.umschalten(w.eigeneFormen().get(2));
+        List<List<Ebenen.Form>> minimap = w.minimap(e);
+        assertEquals(2, minimap.size());
+        assertEquals(-1, w.gewicht(minimap.get(0).getFirst()));
+        assertEquals(2, w.gewicht(minimap.get(1).getFirst()));
+        // Gespeichert nur ohne Vorgabe; gelesen ganzzahlig bis ±9, sonst 0.
+        w.faerbe(w.eigeneFormen().get(0), Wegpunkte.KEIN_HEX);
+        String json = w.json().toString();
+        assertEquals(2, json.split("\"gewicht\"", -1).length - 1, json);
+        Wegpunkte zurueck = new Wegpunkte();
+        zurueck.lies(JsonParser.parseString(json).getAsJsonObject());
+        assertEquals(List.of(2, 0, -1, 0), zurueck.eigeneFormen().stream().map(Wegpunkte.EigeneForm::gewicht).toList());
+        Wegpunkte kaputt = new Wegpunkte();
+        kaputt.lies(JsonParser.parseString("""
+                {"eigene_formen":[
+                  {"dimension":"minecraft:overworld","ecken":[[0,0],[9,0],[9,9]],"farbe":0,"minimap":false,"gewicht":10},
+                  {"dimension":"minecraft:overworld","ecken":[[0,20],[9,20],[9,29]],"farbe":0,"minimap":false,"gewicht":1.5},
+                  {"dimension":"minecraft:overworld","ecken":[[0,40],[9,40],[9,49]],"farbe":0,"minimap":false,"gewicht":"3"},
+                  {"dimension":"minecraft:overworld","ecken":[[0,60],[9,60]],"farbe":0,"minimap":false,"gewicht":-9}]}
+                """).getAsJsonObject());
+        assertEquals(List.of(0, 0, 0, -9), kaputt.eigeneFormen().stream().map(Wegpunkte.EigeneForm::gewicht).toList());
+    }
+
+    @Test
+    void trefferNachGewicht() {
+        // Näher gewinnt; bei gleichem Abstand das schwerere, bei gleichem Gewicht die spätere wie bisher; ohne beste bis zur Grenze.
+        assertTrue(Wegpunkte.trifftEher(3, -9, 4, 9));
+        assertFalse(Wegpunkte.trifftEher(4, 9, 3, -9));
+        assertTrue(Wegpunkte.trifftEher(3, 2, 3, 1));
+        assertFalse(Wegpunkte.trifftEher(3, 1, 3, 2));
+        assertTrue(Wegpunkte.trifftEher(3, 0, 3, 0));
+        assertTrue(Wegpunkte.trifftEher(4, -9, 4, Integer.MIN_VALUE));
+        assertFalse(Wegpunkte.trifftEher(4.1, 9, 4, Integer.MIN_VALUE));
     }
 
     private static float groesse(List<Wegpunkte.Ecke> ecken) {
