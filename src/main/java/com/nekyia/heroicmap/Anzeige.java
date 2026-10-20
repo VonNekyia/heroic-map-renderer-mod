@@ -163,6 +163,7 @@ final class Anzeige extends Screen {
         // Eine andere Ablage heisst ein anderer Ordner der Welt, auch für Wegpunkte und Ebenen.
         Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());
         Ebenen.INSTANZ.wechsel(Downloads.weltOrdner());
+        Ebenenreihe.INSTANZ.wechsel(Downloads.weltOrdner());
     }
 
     @Override

@@ -234,6 +234,8 @@ final class Wegpunkte {
     private int gebautEbenen, gebautStand;
     /** Die eigene Form, die die Vollbildkarte gerade zieht, oder null; und die, für die zuletzt gebaut wurde. */
     private List<EigeneForm> gezogen = List.of(), gebautGezogen = List.of();
+    /** Der Stand der {@link Ebenenreihe}, nach dem zuletzt gebaut wurde. */
+    private int gebautReihe = -1;
     private List<List<Ebenen.Form>> fuerKarte = List.of(), fuerMinimap = List.of();
     /** Das Gewicht je eigener Form auf der Minimap, nach Identität; für den Schleier. */
     private Map<Ebenen.Form, Integer> gewichte = new IdentityHashMap<>();
@@ -1624,16 +1626,21 @@ final class Wegpunkte {
     }
 
     private void baue(Ebenen e) {
-        if (e == gebautAus && e.stand() == gebautEbenen && stand == gebautStand && gezogen.equals(gebautGezogen)) {
+        Ebenenreihe reihe = Ebenenreihe.INSTANZ;
+        if (e == gebautAus && e.stand() == gebautEbenen && stand == gebautStand && gezogen.equals(gebautGezogen)
+                && reihe.stand() == gebautReihe) {
             return;
         }
         gebautAus = e;
         gebautEbenen = e.stand();
         gebautStand = stand;
         gebautGezogen = gezogen;
+        gebautReihe = reihe.stand();
         Map<String, Set<String>> je = new HashMap<>();
         formen.forEach(a -> je.computeIfAbsent(a.ebene(), k -> new HashSet<>()).add(a.id()));
-        List<List<Ebenen.Form>> karte = new ArrayList<>(), minimap = new ArrayList<>();
+        // Je sichtbare Ebene vom Server ihre Liste, angeheftete Formen und Nadeln, von unten nach oben.
+        Map<String, List<Ebenen.Form>> karteServer = new LinkedHashMap<>(), minimapServer = new LinkedHashMap<>();
+        Map<String, List<Ebenen.Ort>> orteServer = new LinkedHashMap<>();
         for (Ebenen.Eintrag eintrag : e.sichtbar()) {
             List<Ebenen.Form> alle = e.formen(eintrag.id());
             Set<String> ids = je.getOrDefault(eintrag.id(), Set.of());
@@ -1646,28 +1653,27 @@ final class Wegpunkte {
                     an.add(f);
                 }
             }
-            karte.add(breit == null ? alle : List.copyOf(breit));
+            karteServer.put(eintrag.id(), breit == null ? alle : List.copyOf(breit));
             if (!an.isEmpty()) {
-                minimap.add(List.copyOf(an));
+                minimapServer.put(eintrag.id(), List.copyOf(an));
             }
-        }
-        List<Ebenen.Ort> orte = new ArrayList<>();
-        for (Ebenen.Eintrag eintrag : e.sichtbar()) {
+            List<Ebenen.Ort> orte = new ArrayList<>();
             for (Ebenen.Ort o : e.nadeln(eintrag.id())) {
                 if (o.id() != null && nadeln.contains(new Anheftung(eintrag.id(), o.id()))) {
                     orte.add(o);
                 }
             }
+            orteServer.put(eintrag.id(), orte);
         }
-        fuerNadeln = List.copyOf(orte);
-        angeheftetOrte = Collections.newSetFromMap(new IdentityHashMap<>());
-        angeheftetOrte.addAll(orte);
-        // Je Gewicht eine Liste, leicht zuerst: Formen zeichnet jede ganz, Fläche, Rand und Name, so liegt die schwerere mit allem
-        // oben. Alle 0 gibt die eine Liste wie vor mod#163. Siehe docs/wegpunkte.md, „Gewicht“.
-        TreeMap<Integer, List<Ebenen.Form>> aufKarteJe = new TreeMap<>(), aufMinimapJe = new TreeMap<>();
+        // Eigene Formen je Gewicht eine Liste, leicht zuerst: Formen zeichnet jede ganz, Fläche, Rand und Name, so liegt die schwerere
+        // mit allem oben. Ohne Umstellen alle eigenen zusammen, alle 0 gibt die eine Liste wie vor mod#163; umgestellt je eigene Ebene.
+        // Siehe docs/wegpunkte.md, „Gewicht“.
+        // Siehe docs/vollbildkarte.md, „Reihe der Ebenen“.
+        boolean jeEbene = reihe.umgestellt();
+        Map<Integer, TreeMap<Integer, List<Ebenen.Form>>> karteEigen = new HashMap<>(), minimapEigen = new HashMap<>();
         IdentityHashMap<Ebenen.Form, Integer> gewichtJe = new IdentityHashMap<>();
-        regionen.stream().filter(r -> r.angeheftet() && an(r.ebene())).map(Wegpunkte::flaeche)
-                .forEach(fl -> aufMinimapJe.computeIfAbsent(0, g -> new ArrayList<>()).add(fl));
+        regionen.stream().filter(r -> r.angeheftet() && an(r.ebene()))
+                .forEach(r -> liste(minimapEigen, jeEbene ? r.ebene() : BASE, 0).add(flaeche(r)));
         for (EigeneForm f : this.eigene) {
             if (!an(f.ebene())) {
                 continue;
@@ -1675,16 +1681,17 @@ final class Wegpunkte {
             double[] p = mitten(f);
             Ebenen.Form form = form(f, p);
             Ebenen.Schrift name = schrift(f, p);
-            List<Ebenen.Form> aufKarte = aufKarteJe.computeIfAbsent(f.gewicht(), g -> new ArrayList<>());
-            List<Ebenen.Form> aufMinimap = aufMinimapJe.computeIfAbsent(f.gewicht(), g -> new ArrayList<>());
+            int schicht = jeEbene ? f.ebene() : BASE;
             // Die Form, die gerade gezogen wird, zeichnet die Vollbildkarte selbst, wo sie an der Maus steht.
             if (!gezogen.contains(f)) {
+                List<Ebenen.Form> aufKarte = liste(karteEigen, schicht, f.gewicht());
                 aufKarte.add(f.angeheftet() ? breiter(form) : form);
                 if (name != null) {
                     aufKarte.add(name);
                 }
             }
             if (f.angeheftet()) {
+                List<Ebenen.Form> aufMinimap = liste(minimapEigen, schicht, f.gewicht());
                 aufMinimap.add(form);
                 gewichtJe.put(form, f.gewicht());
                 if (name != null) {
@@ -1692,21 +1699,47 @@ final class Wegpunkte {
                 }
             }
         }
+        // Von unten nach oben: ohne Umstellen die vom Server nach order, darüber alle eigenen; umgestellt in der Reihe des Spielers.
+        List<Ebenenreihe.Schicht> schichten = new ArrayList<>();
+        if (jeEbene) {
+            schichten.addAll(reihe.wirksam(e.alle().reversed(), ebenen.stream().map(EigeneEbene::id).toList()).reversed());
+        } else {
+            karteServer.keySet().forEach(id -> schichten.add(Ebenenreihe.Schicht.vomServer(id)));
+            schichten.add(Ebenenreihe.Schicht.eigene(BASE));
+        }
+        List<List<Ebenen.Form>> karte = new ArrayList<>(), minimap = new ArrayList<>();
+        List<Ebenen.Ort> orte = new ArrayList<>();
         eigeneAufMinimap = Collections.newSetFromMap(new IdentityHashMap<>());
-        for (List<Ebenen.Form> l : aufKarteJe.values()) {
-            if (!l.isEmpty()) {
+        for (Ebenenreihe.Schicht s : schichten) {
+            if (s.server() != null) {
+                if (karteServer.containsKey(s.server())) {
+                    karte.add(karteServer.get(s.server()));
+                    orte.addAll(orteServer.get(s.server()));
+                }
+                if (minimapServer.containsKey(s.server())) {
+                    minimap.add(minimapServer.get(s.server()));
+                }
+                continue;
+            }
+            for (List<Ebenen.Form> l : karteEigen.getOrDefault(s.eigen(), new TreeMap<>()).values()) {
                 karte.add(List.copyOf(l));
             }
-        }
-        for (List<Ebenen.Form> l : aufMinimapJe.values()) {
-            if (!l.isEmpty()) {
+            for (List<Ebenen.Form> l : minimapEigen.getOrDefault(s.eigen(), new TreeMap<>()).values()) {
                 minimap.add(List.copyOf(l));
                 eigeneAufMinimap.addAll(l);
             }
         }
+        fuerNadeln = List.copyOf(orte);
+        angeheftetOrte = Collections.newSetFromMap(new IdentityHashMap<>());
+        angeheftetOrte.addAll(orte);
         gewichte = gewichtJe;
         fuerKarte = List.copyOf(karte);
         fuerMinimap = List.copyOf(minimap);
+    }
+
+    /** Die Liste der eigenen Formen der Schicht {@code schicht} mit dem Gewicht {@code gewicht}, neu, wenn es sie noch nicht gibt. */
+    private static List<Ebenen.Form> liste(Map<Integer, TreeMap<Integer, List<Ebenen.Form>>> je, int schicht, int gewicht) {
+        return je.computeIfAbsent(schicht, k -> new TreeMap<>()).computeIfAbsent(gewicht, g -> new ArrayList<>());
     }
 
     /**
