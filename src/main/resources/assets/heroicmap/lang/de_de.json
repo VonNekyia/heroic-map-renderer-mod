@@ -94,6 +94,7 @@
   "heroicmap.menue.minimap": "Minimap",
   "heroicmap.menue.zoom": "Zoom der Minimap",
   "heroicmap.menue.fach": "%s×",
+  "heroicmap.menue.fach_halb": "0,5×",
   "heroicmap.menue.aufloesung": "Auflösung",
   "heroicmap.menue.aufloesung.beschreibung": "Auflösung der Minimap: wie viele Pixel je Block sie höchstens zeichnet",
   "heroicmap.menue.px_kurz": "%s px",

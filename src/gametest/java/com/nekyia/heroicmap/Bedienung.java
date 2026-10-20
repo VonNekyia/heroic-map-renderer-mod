@@ -30,6 +30,8 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
+import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.MouseHandler;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -91,6 +93,7 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Ziehen vom Spieler aus schaltete die Darstellung");
             }
             aussehen(context, maus, k);
+            zoomNebenMinimap(context, maus, k);
             context.runOnClient(mc -> mc.gui.setScreen(null));
             beiF3(context, maus);
             schleierRegler(context, maus, k);
@@ -3992,21 +3995,19 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("Am Griff gezogen: " + gezogen + " → " + groesser);
         }
 
-        // Der Zoom schaltet nur den Zoom.
-        int zoom = context.computeOnClient(mc -> Minimap.INSTANZ.zoom());
-        double[] knopf = context.computeOnClient(mc -> {
-            String text = Component.translatable("heroicmap.menue.zoom").getString();
-            for (Object kind : mc.gui.screen().children()) {
-                if (kind instanceof AbstractWidget w && w.getMessage().getString().startsWith(text)) {
-                    return new double[] {w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0};
-                }
+        // Der Regler „Zoom“ senkrecht neben der Minimap: Ein Klick wie von Hand auf jede Raste stellt ihre Stufe, auch 0,5, und
+        // schaltet sonst nichts; zuletzt wieder die Stufe von vorher. Siehe docs/minimap.md, „Bedienung“.
+        double zoom = context.computeOnClient(mc -> Minimap.INSTANZ.zoom());
+        int[] regler = zoomRegler(context);
+        int rasten = Minimap.ZOOMS.length - 1;
+        for (int i : new int[] {4, 0, 1, 3, 2, Minimap.stufe(zoom)}) {
+            // Die Mitte des Knaufs liegt bei y + 4 + (1 − Wert) × (Höhe − 8), oben die nächste Stufe.
+            spielerKlick(context, maus, k, regler[0] + regler[2] / 2.0, regler[1] + 4 + (regler[3] - 8) * (1 - (double) i / rasten));
+            aussehenIst(context, Minimap.Darstellung.PFEIL, Skin.BIOM, "Klick auf den Regler Zoom");
+            double jetzt = context.computeOnClient(mc -> Minimap.INSTANZ.zoom());
+            if (jetzt != Minimap.ZOOMS[i]) {
+                throw new AssertionError("Klick auf die Raste " + i + " des Reglers Zoom: " + jetzt + " statt " + Minimap.ZOOMS[i]);
             }
-            throw new AssertionError("Kein Knopf „Zoom“ im Menü");
-        });
-        spielerKlick(context, maus, k, knopf[0], knopf[1]);
-        aussehenIst(context, Minimap.Darstellung.PFEIL, Skin.BIOM, "Klick auf Zoom");
-        if (context.computeOnClient(mc -> Minimap.INSTANZ.zoom()) == zoom) {
-            throw new AssertionError("Der Klick auf Zoom schaltete den Zoom nicht");
         }
 
         // Im Untermenü „Einstellungen …“ ebenso, ohne die Knöpfe „Spieler“ und „Rahmen“.
@@ -4018,6 +4019,175 @@ public final class Bedienung implements FabricClientGameTest {
         spielerKlick(context, maus, k, u.x() + u.seite() / 2.0, u.y() + u.seite() - baender(context) / 2.0);
         aussehenIst(context, Minimap.Darstellung.DURCHSICHTIG, "grau", "Untermenü, Klick auf S");
         warte250();
+    }
+
+    /**
+     * Der Regler „Zoom“ neben der Minimap im Menü (mod#139, Plan zu mod#173), mit Maus und Mausrad wie von Hand. Links im
+     * Abstand des Randes, so hoch wie sie. Beim Ziehen folgt er ihr schon vor dem Loslassen; an den linken Rand gezogen steht
+     * er rechts, und nach dem Loslassen liegt kein Knopf auf ihr oder ihm. Das Mausrad über der Minimap und über dem Regler
+     * geht je Schritt eine Raste, daneben nichts. Bei GS 3 und 4 in jeder Ecke, klein und gross, ganz auf dem Schirm und
+     * nicht auf der Minimap. Siehe docs/minimap.md, „Bedienung“.
+     */
+    private static void zoomNebenMinimap(ClientGameTestContext context, TestInput maus, int k) {
+        Path sicherung = FabricLoader.getInstance().getGameDir().resolve("heroicmap-zoomregler-test.properties");
+        // Vorher stand das Untermenü offen.
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.schreibe(sicherung);
+            mc.gui.setScreen(new Einstellungen());
+        });
+        context.waitTicks(2);
+        int rand = context.computeOnClient(mc -> Minimap.INSTANZ.rand());
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        try {
+            Minimap.Rahmen r = rahmen(context);
+            int[] z = zoomRegler(context);
+            if (z[0] + z[2] + rand != r.x() || z[1] != r.y() || z[3] != r.seite()) {
+                throw new AssertionError("Regler „Zoom“ nicht links neben der Minimap " + r + ": " + Arrays.toString(z));
+            }
+
+            // Das Mausrad: über der Minimap und über dem Regler je Schritt eine Raste, nach vorn näher; daneben nichts.
+            context.runOnClient(mc -> Minimap.INSTANZ.setzeZoom(2));
+            double[][] orte = {{r.x() + r.seite() / 2.0, r.y() + r.seite() / 4.0}, {z[0] + z[2] / 2.0, z[1] + z[3] / 2.0}};
+            double[] erwartet = {4, 2};
+            for (int i = 0; i < orte.length; i++) {
+                maus.setCursorPos(orte[i][0] * k, orte[i][1] * k);
+                context.waitTick();
+                maus.scroll(i == 0 ? 1 : -1);
+                context.waitTick();
+                double jetzt = context.computeOnClient(mc -> Minimap.INSTANZ.zoom());
+                if (jetzt != erwartet[i]) {
+                    throw new AssertionError("Mausrad " + (i == 0 ? "vor über der Minimap" : "zurück über dem Regler") + ": " + jetzt
+                            + " statt " + erwartet[i]);
+                }
+            }
+            String text = context.computeOnClient(mc -> zoomReglerWidget(mc).getMessage().getString());
+            if (!text.endsWith("2×")) {
+                throw new AssertionError("Der Tooltip des Reglers zeigt „" + text + "“ statt 2×");
+            }
+            int[] schirm = context.computeOnClient(mc -> new int[] {mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight()});
+            maus.setCursorPos((schirm[0] / 2.0) * k, (schirm[1] - 2) * k);
+            context.waitTick();
+            maus.scroll(1);
+            context.waitTick();
+            if (context.computeOnClient(mc -> Minimap.INSTANZ.zoom()) != 2) {
+                throw new AssertionError("Mausrad unten am Schirm, fern der Minimap, änderte den Zoom");
+            }
+
+            // An den linken Rand gezogen, die Taste noch gehalten: Der Regler steht schon rechts daneben.
+            int weg = r.x() - rand + 20;
+            maus.setCursorPos((r.x() + r.seite() / 2.0) * k, (r.y() + r.seite() / 2.0) * k);
+            context.waitTick();
+            maus.holdMouse(LINKS);
+            context.waitTick();
+            for (int i = 0; i < 10; i++) {
+                maus.moveCursor(-weg * k / 10.0, 0);
+                context.waitTick();
+            }
+            context.waitTicks(2);
+            Minimap.Rahmen links = rahmen(context);
+            int[] gehalten = zoomRegler(context);
+            maus.releaseMouse(LINKS);
+            context.waitTicks(2);
+            if (links.x() != rand || gehalten[0] != links.x() + links.seite() + rand || gehalten[1] != links.y()) {
+                throw new AssertionError("Beim Ziehen an den linken Rand: Minimap " + links + ", Regler " + Arrays.toString(gehalten)
+                        + " statt rechts daneben");
+            }
+            // Nach dem Loslassen liegt kein Knopf auf Minimap oder Regler.
+            String ueber = context.computeOnClient(mc -> {
+                Minimap.Rahmen m = Minimap.INSTANZ.rahmen(mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+                int[] zr = zoomLage(mc);
+                for (Object kind : mc.gui.screen().children()) {
+                    if (kind instanceof AbstractWidget w && !(w instanceof Einstellungen.ZoomRegler) && w.visible
+                            && (schneidet(w, m.x(), m.y(), m.seite(), m.seite()) || schneidet(w, zr[0], zr[1], zr[2], zr[3]))) {
+                        return w.getMessage().getString() + " bei " + w.getX() + ", " + w.getY();
+                    }
+                }
+                return null;
+            });
+            if (ueber != null) {
+                throw new AssertionError("Nach dem Ziehen liegt ein Knopf auf Minimap oder Regler: " + ueber);
+            }
+
+            // Bei GS 3 und 4 auf dem kleinsten Schirm, 240 Einheiten hoch: in jeder Ecke, klein und gross, ganz auf dem Schirm.
+            List<String> fehler = new ArrayList<>();
+            for (int gs = 3; gs <= 4; gs++) {
+                int g = gs;
+                context.getInput().resizeWindow(1280, 240 * gs);
+                context.runOnClient(mc -> {
+                    mc.options.guiScale().set(g);
+                    mc.resizeGui();
+                });
+                context.waitTicks(2);
+                for (int seite : new int[] {Minimap.KLEINSTE, Minimap.GROESSTE}) {
+                    for (int ecke = 0; ecke < 4; ecke++) {
+                        int e = ecke;
+                        context.runOnClient(mc -> {
+                            int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+                            Minimap.INSTANZ.stelle(e % 2 == 0 ? 0 : b, e < 2 ? 0 : h, seite, b, h);
+                        });
+                        context.waitTicks(2);
+                        String f = context.computeOnClient(mc -> {
+                            int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+                            Minimap.Rahmen m = Minimap.INSTANZ.rahmen(b, h);
+                            AbstractWidget w = zoomReglerWidget(mc);
+                            boolean drauf = schneidet(w, m.x(), m.y(), m.seite(), m.seite());
+                            boolean ganz = w.getX() >= 0 && w.getY() >= 0 && w.getX() + w.getWidth() <= b && w.getY() + w.getHeight() <= h;
+                            return ganz && !drauf && w.getHeight() == m.seite() ? null
+                                    : "Regler " + w.getX() + ", " + w.getY() + ", " + w.getWidth() + " × " + w.getHeight() + "; Minimap " + m
+                                            + "; Schirm " + b + " × " + h;
+                        });
+                        if (f != null) {
+                            fehler.add("GS " + g + ", Seite " + seite + ", Ecke " + e + ": " + f);
+                        }
+                    }
+                }
+            }
+            if (!fehler.isEmpty()) {
+                throw new AssertionError("Regler „Zoom“ nicht ganz neben der Minimap, " + fehler.size() + " Fälle: " + String.join(" | ", fehler));
+            }
+        } finally {
+            context.getInput().resizeWindow(vorher[0], vorher[1]);
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(vorher[2]);
+                mc.resizeGui();
+                Minimap.INSTANZ.lies(sicherung);
+            });
+            context.waitTicks(2);
+            try {
+                Files.deleteIfExists(sicherung);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+    }
+
+    /** Der Regler „Zoom“ des offenen Menüs. */
+    private static Einstellungen.ZoomRegler zoomReglerWidget(Minecraft mc) {
+        for (Object kind : mc.gui.screen().children()) {
+            if (kind instanceof Einstellungen.ZoomRegler w) {
+                return w;
+            }
+        }
+        throw new AssertionError("Kein Regler „Zoom“ im Menü");
+    }
+
+    /** {x, y, Breite, Höhe} des Reglers „Zoom“ im offenen Menü. */
+    private static int[] zoomRegler(ClientGameTestContext context) {
+        return context.computeOnClient(mc -> {
+            AbstractWidget w = zoomReglerWidget(mc);
+            return new int[] {w.getX(), w.getY(), w.getWidth(), w.getHeight()};
+        });
+    }
+
+    /** Wie {@link #zoomRegler}, auf dem Client-Thread. */
+    private static int[] zoomLage(Minecraft mc) {
+        AbstractWidget w = zoomReglerWidget(mc);
+        return new int[] {w.getX(), w.getY(), w.getWidth(), w.getHeight()};
+    }
+
+    /** Überdeckt das Widget {@code w} das Rechteck (x, y, Breite, Höhe)? */
+    private static boolean schneidet(AbstractWidget w, int x, int y, int breite, int hoehe) {
+        return w.getX() < x + breite && x < w.getX() + w.getWidth() && w.getY() < y + hoehe && y < w.getY() + w.getHeight();
     }
 
     /** Darstellung und Rahmen wie erwartet, sonst ein Fehler mit {@code was}. */

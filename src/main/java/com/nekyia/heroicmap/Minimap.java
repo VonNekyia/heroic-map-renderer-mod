@@ -110,8 +110,10 @@ public final class Minimap {
     private int aufloesung = 2;
     /** Pixel je Block in den Texturen, wie gezeichnet: siehe {@link #effektiv}. */
     private int scale = 2;
-    /** Zoom: Einheiten des GUI je Block, 1, 2, 4 oder 8; wie viel Gegend die Minimap zeigt. */
-    private int zoom = 2;
+    /** Die Stufen des Zooms, Einheiten des GUI je Block, der Reihe nach. Siehe docs/minimap.md, „Bedienung“. */
+    static final double[] ZOOMS = {0.5, 1, 2, 4, 8};
+    /** Zoom: Einheiten des GUI je Block, einer aus {@link #ZOOMS}; wie viel Gegend die Minimap zeigt. */
+    private double zoom = 2;
     private boolean rund;
     /** Die Wahl {@code show}: Mitspieler über Simple Voice Chat zeigen und gezeigt werden, oder versteckt. */
     private boolean show = true;
@@ -265,21 +267,31 @@ public final class Minimap {
         return sichtbar;
     }
 
-    /** Zoom 1, 2, 4 oder 8 Einheiten je Block, der Reihe nach. */
+    /** Die nächste Stufe aus {@link #ZOOMS}, nach der grössten wieder die kleinste. */
     void naechsterZoom() {
-        setzeZoom(zoom == 8 ? 1 : zoom * 2);
+        setzeZoom(ZOOMS[(stufe(zoom) + 1) % ZOOMS.length]);
     }
 
-    /** Ein anderer Zoom ändert nur den Bereich; die Texturen behalten ihre Auflösung. */
-    void setzeZoom(int zoom) {
-        if (zoom != this.zoom) {
+    /** Ein anderer Zoom ändert nur den Bereich; die Texturen behalten ihre Auflösung. Nur Stufen aus {@link #ZOOMS}. */
+    void setzeZoom(double zoom) {
+        if (zoom != this.zoom && stufe(zoom) >= 0) {
             this.zoom = zoom;
             mitte = null;
         }
     }
 
-    int zoom() {
+    double zoom() {
         return zoom;
+    }
+
+    /** Die Stelle von {@code zoom} in {@link #ZOOMS}, oder -1. */
+    static int stufe(double zoom) {
+        for (int i = 0; i < ZOOMS.length; i++) {
+            if (ZOOMS[i] == zoom) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /**
@@ -304,11 +316,11 @@ public final class Minimap {
     /**
      * Die Auflösung, mit der gezeichnet wird: die grösste Zweierpotenz von Pixeln je Block bis zur
      * gewählten, die in die Pixel eines Blocks auf dem Schirm, Zoom mal GUI-Massstab, ganz aufgeht.
-     * So wird nie verkleinert, also nie unscharf, und jeder Texel ist gleich gross.
-     * Siehe docs/minimap.md, „Bedienung“.
+     * So wird nie verkleinert, also nie unscharf, und jeder Texel ist gleich gross; nur bei Zoom 0,5 und
+     * ungeradem GUI-Massstab ist ein Block 1,5 oder 0,5 Pixel, dann 1 px je Block. Siehe docs/minimap.md, „Bedienung“.
      */
-    static int effektiv(int aufloesung, int zoom, int guiMassstab) {
-        int schirm = zoom * guiMassstab;
+    static int effektiv(int aufloesung, double zoom, int guiMassstab) {
+        double schirm = zoom * guiMassstab;
         for (int r = aufloesung; r > 1; r /= 2) {
             if (schirm % r == 0) {
                 return r;
@@ -583,8 +595,8 @@ public final class Minimap {
         int s = zahl(p.getProperty("massstab"), 2);
         aufloesung = s == 1 || s == 4 || s == 8 || s == 16 ? s : 2;
         // Vor dem Zoom galt der Massstab für beides; ohne zoom bleibt der Ausschnitt so.
-        int z = zahl(p.getProperty("zoom"), aufloesung);
-        zoom = z == 1 || z == 4 || z == 8 ? z : 2;
+        double z = dezimal(p.getProperty("zoom"), aufloesung);
+        zoom = stufe(z) >= 0 ? z : 2;
         rund = "rund".equals(p.getProperty("form"));
         show = !"hidden".equals(p.getProperty("show"));
         chunklinien = "true".equals(p.getProperty("chunklinien"));
@@ -635,7 +647,8 @@ public final class Minimap {
         Properties p = new Properties();
         p.setProperty("minimap", Boolean.toString(sichtbar));
         p.setProperty("massstab", Integer.toString(aufloesung));
-        p.setProperty("zoom", Integer.toString(zoom));
+        // Ganze Stufen wie bisher als ganze Zahl; eine ältere Version liest 0.5 nicht und nimmt 2.
+        p.setProperty("zoom", zoom == Math.rint(zoom) ? Integer.toString((int) zoom) : Double.toString(zoom));
         p.setProperty("form", rund ? "rund" : "eckig");
         p.setProperty("show", show ? "simplevoicechat" : "hidden");
         p.setProperty("chunklinien", Boolean.toString(chunklinien));
@@ -668,6 +681,14 @@ public final class Minimap {
             }
         } catch (IOException e) {
             LOGGER.warn("Heroic Map: Einstellungen {} nicht geschrieben", datei, e);
+        }
+    }
+
+    private static double dezimal(String text, double vorgabe) {
+        try {
+            return text == null ? vorgabe : Double.parseDouble(text.trim());
+        } catch (NumberFormatException e) {
+            return vorgabe;
         }
     }
 
@@ -726,8 +747,8 @@ public final class Minimap {
         return drehen && !rund ? (int) Math.ceil(groesse * Math.sqrt(2)) : groesse;
     }
 
-    static int reichweite(int zoom, int groesse) {
-        return Mth.ceil(groesse / 2f / (16f * zoom)) + VORRAT;
+    static int reichweite(double zoom, int groesse) {
+        return Mth.ceil(groesse / 2.0 / (16.0 * zoom)) + VORRAT;
     }
 
     private boolean imBereich(int x, int z) {
@@ -956,7 +977,7 @@ public final class Minimap {
     }
 
     /** Wie die Formen einen Punkt der Welt in die Pixel der Minimap legen: wie die Karte, mit {@code lage} gedreht. */
-    static Formen.Abbild abbild(int zoom, int k, int links, int oben, Drehung.Lage lage) {
+    static Formen.Abbild abbild(double zoom, int k, int links, int oben, Drehung.Lage lage) {
         return (wx, wz, aus) -> {
             double bx = Projektion.zuPixel(wx, zoom) * k - links, by = Projektion.zuPixel(wz, zoom) * k - oben;
             aus[0] = lage.x(bx, by);
@@ -1014,7 +1035,7 @@ public final class Minimap {
      * {@code klemmen} am Rand der Form in seiner Richtung, sonst null. Mit {@code lage} gedreht um den
      * Spieler, dann ohne Raster. Siehe docs/wegpunkte.md, „Am Rand“.
      */
-    static float[] marke(Rahmen r, double x, double z, int links, int oben, int k, int zoom, boolean rund, double innen, boolean klemmen,
+    static float[] marke(Rahmen r, double x, double z, int links, int oben, int k, double zoom, boolean rund, double innen, boolean klemmen,
             Drehung.Lage lage) {
         double h = r.seite() / 2.0, mx, my;
         if (lage == null) {
@@ -1039,7 +1060,7 @@ public final class Minimap {
      * ist die Kante des Bildes aus {@link #ecke}. Mit derselben Kante wie die Karte wackelt eine
      * Marke beim Laufen nicht gegen sie.
      */
-    static int pixel(double welt, int zoom, int k, int links) {
+    static int pixel(double welt, double zoom, int k, int links) {
         return (int) Math.round(Projektion.zuPixel(welt, zoom) * k) - links;
     }
 
@@ -1058,7 +1079,7 @@ public final class Minimap {
      * {@code neu} beim Anteil {@code a} eines Ticks, auf ganze Pixel. {@code k} ist der GUI-Massstab,
      * {@code n} die Seite in Pixeln.
      */
-    static int ecke(double alt, double neu, float a, int zoom, int k, int n) {
+    static int ecke(double alt, double neu, float a, double zoom, int k, int n) {
         return Mth.floor(Projektion.zuPixel(Mth.lerp(a, alt, neu), zoom) * k) - n / 2;
     }
 
@@ -1087,7 +1108,7 @@ public final class Minimap {
      * genau zwischen zwei Ticks, auf der Mitte der Minimap, die Blickrichtung {@code gier} oben.
      * Siehe docs/minimap.md, „Drehen“.
      */
-    static Drehung.Lage lage(Rahmen r, double x, double z, float gier, int zoom, int k, int links, int oben) {
+    static Drehung.Lage lage(Rahmen r, double x, double z, float gier, double zoom, int k, int links, int oben) {
         // Die Mitte auf ganzen Pixeln, wie ungedreht der Kopf.
         int n = r.seite() * k;
         return Drehung.Lage.von(Drehung.winkel(gier), r.x() * k + n / 2, r.y() * k + n / 2,
@@ -1137,7 +1158,8 @@ public final class Minimap {
      */
     private void male(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k, Drehung.Lage lage, double[] bereich, float[] form,
             boolean umriss) {
-        int s = CHUNKS_JE_REGION * 16 * zoom * k, n = r.seite() * k, x0 = r.x() * k, y0 = r.y() * k;
+        // Auch bei Zoom 0,5 ganz: 128 Blöcke einer Region sind 64 Einheiten.
+        int s = (int) (CHUNKS_JE_REGION * 16 * zoom * k), n = r.seite() * k, x0 = r.x() * k, y0 = r.y() * k;
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.scale(1f / k);
@@ -1228,7 +1250,7 @@ public final class Minimap {
         pose.pushMatrix();
         pose.scale(1f / k);
         Gitter.zeichne(g, bx, by, new ScreenRectangle(r.x() * k, r.y() * k, n, n), k, LINIE,
-                linien(seite, links + bx, oben + by, 16 * zoom * k, k), lage, form);
+                linien(seite, links + bx, oben + by, (int) (16 * zoom * k), k), lage, form);
         pose.popMatrix();
     }
 
