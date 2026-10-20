@@ -363,10 +363,6 @@ public final class Schleier {
     }
 
     /**
-     * Die Indizes der höchstens {@code max} kleinsten Abstände, die nächsten zuerst. Erst ausgewählt, dann nur die
-     * gewählten sortiert: dasselbe wie alles zu sortieren, denn jeder Schlüssel trägt seinen Index und ist einzig.
-     */
-    /**
      * Welche Stücke wegfallen: ein eigenes, das ein anderes eigenes mit höherem Gewicht genau teilt, gleich in welcher
      * Richtung, auf ein Millionstel Block. Bei gleichem Gewicht bleiben beide. Haben alle eigenen dasselbe Gewicht, fällt
      * nichts weg, ohne Rechnung.
@@ -405,6 +401,10 @@ public final class Schleier {
         return ax < bx || ax == bx && az <= bz ? List.of(ax, az, bx, bz) : List.of(bx, bz, ax, az);
     }
 
+    /**
+     * Die Indizes der höchstens {@code max} kleinsten Abstände, die nächsten zuerst. Erst ausgewählt, dann nur die
+     * gewählten sortiert: dasselbe wie alles zu sortieren, denn jeder Schlüssel trägt seinen Index und ist einzig.
+     */
     static int[] naechste(double[] abstand, int n, int max) {
         long[] schluessel = new long[n];
         for (int i = 0; i < n; i++) {
