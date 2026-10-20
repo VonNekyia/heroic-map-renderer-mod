@@ -1,9 +1,12 @@
 name: CI
 
+# Per Dispatch auf jedem Branch, ohne PR: so laufen Gametests und Gegenproben in der CI nebeneinander.
+# Siehe docs/entwicklung.md, „Gametests in der CI“, und docs/entscheidungen/0026-gametests-und-gegenproben-in-der-ci.md.
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   gradle:

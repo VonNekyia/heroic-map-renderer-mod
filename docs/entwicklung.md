@@ -142,6 +142,41 @@ eines Debuggers greift sie genauso.
 | `Zoomstufen` | Verkleinern statt vergrössern: ein Satz ohne Stufe 1 auf der Platte und mit roter Stufe 0, eine Stufe heraus von der feinsten; wo die Stufe 2 Kacheln hat, steht sie verkleinert da, kein Pixel ist dort rot oder dunkel; am Rand bleibt die Stufe 0. Siehe [Vollbildkarte](vollbildkarte.md), „Kacheln“ (mod#132) |
 | `Uebernahme` | nur mit `-Puebernahme=<datei>`: was eine Kachel der Vollbildkarte den Render-Thread kostet, siehe [Vollbildkarte](vollbildkarte.md), „Kacheln“ |
 
+### Gametests in der CI
+
+Gametests und Gegenproben laufen in der CI, nicht lokal; lokal laufen nur
+die Unit-Tests (`./gradlew build`). Ein lokaler Gametest ist nur für die
+Fehlersuche und für Bilder (`-Pbilder`) da und läuft unter der
+gemeinsamen Sperre. Warum, steht in
+[0026](entscheidungen/0026-gametests-und-gegenproben-in-der-ci.md).
+
+- **Ein Branch ohne PR:** `ci.yml` hat `workflow_dispatch`. Gepusht und
+  gestartet läuft die ganze CI auf dem Branch, nebeneinander mit allen
+  anderen:
+
+  ```bash
+  git push origin <branch>
+  gh workflow run ci.yml --ref <branch>
+  gh run list --workflow ci.yml --branch <branch> --event workflow_dispatch --limit 1
+  gh run watch <id> --exit-status
+  ```
+
+  Der Branch muss `workflow_dispatch` in seiner eigenen `ci.yml` tragen,
+  also einen Stand von `main` mit 0026. An einer offenen PR läuft die CI
+  ohnehin bei jedem Push.
+- **Gegenproben:** je Mutation ein Branch `probe/<pr>-<n>`, ein Commit mit
+  genau der Mutation auf dem Kopf der PR, gepusht und per Dispatch
+  gestartet; alle zugleich. Gefangen ist die Mutation, wenn der Lauf rot
+  ist und der erwartete Test fällt: bei Gametests die erste Zeile mit
+  `AssertionError` in `gh run view <id> --log-failed`, bei Unit-Tests die
+  Zeile `FAILED` im Job „Gradle“. Danach weg mit dem Branch:
+  `git push origin --delete probe/<pr>-<n>`.
+- **Sonst startet nichts:** Ein Push auf einen anderen Branch als `main`
+  startet keinen Workflow, ein Dispatch von `ci.yml` nur sie. Der Job
+  „Release-Entwurf“ in `release.yml` läuft nur auf einem Tag
+  (`if: startsWith(github.ref, 'refs/tags/')`), `modrinth.yml` nur auf ein
+  veröffentlichtes Release oder von Hand mit einem Tag.
+
 ### Schliessen der Welt
 
 Jede Einzelspielerwelt der Gametests schliesst mit
@@ -243,7 +278,9 @@ aus Pixeln. Bis 0.2.14 war es die Insel aus dem Banner des Hauptrepositorys.
 
 ## CI
 
-`.github/workflows/ci.yml` hat drei Jobs:
+`.github/workflows/ci.yml` läuft auf jedem Push nach `main`, an jeder PR
+und per Dispatch auf jedem Branch, siehe „Gametests in der CI“. Sie hat
+drei Jobs:
 
 - **Gradle:** `./gradlew build compileGametestJava` unter Ubuntu mit
   Java 25. Die Gametests kompiliert er nur, laufen tun sie im nächsten Job.
