@@ -13,7 +13,8 @@ import net.minecraft.network.chat.Component;
 
 /**
  * Das Untermenü „Einstellungen …“ für Vorlieben der Anzeige: Form, Bei F3, Auflösung, Todespunkt, Chunklinien, Drehen, Verzierungen, Effekte in der
- * Welt, der Schleier eigener Regionen, die Ablage der Karten, die Koordinaten unter der Minimap und das Untermenü „Ebenen …“. Die Minimap im HUD bleibt sichtbar,
+ * Welt, der Schleier eigener Regionen, die Ablage der Karten, die Koordinaten unter der Minimap, die Frage nach einer neuen Version
+ * und das Untermenü „Ebenen …“. Die Minimap im HUD bleibt sichtbar,
  * jede Wahl wirkt gleich; den Spieler und den Rahmen stellt ein Klick auf die Minimap ein ({@link MinimapKlick}).
  * Gespeichert wird beim Schliessen. Siehe docs/minimap.md, „Bedienung“.
  */
@@ -49,9 +50,7 @@ final class Anzeige extends Screen {
                 .withValues(1, 2, 4, 8, 16)
                 .withTooltip(px -> Tooltip.create(Component.translatable("heroicmap.menue.aufloesung.beschreibung")))
                 .create(x, y + 24, halb, 20, Component.translatable("heroicmap.menue.aufloesung"), (b, px) -> m.setzeScale(px)));
-        addRenderableWidget(CycleButton.onOffBuilder(m.todespunkt())
-                .withTooltip(an -> Tooltip.create(Component.translatable("heroicmap.menue.todespunkt.beschreibung")))
-                .create(x + breite - halb, y + 24, halb, 20, Component.translatable("heroicmap.menue.todespunkt"), (b, an) -> m.setzeTodespunkt(an)));
+        addRenderableWidget(new TodRegler(x + breite - halb, y + 24, halb));
         addRenderableWidget(CycleButton.onOffBuilder(m.chunklinien())
                 .create(x, y + 48, halb, 20, Component.translatable("heroicmap.menue.chunklinien"), (b, an) -> m.setzeChunklinien(an)));
         addRenderableWidget(CycleButton.onOffBuilder(m.drehen())
@@ -71,9 +70,16 @@ final class Anzeige extends Screen {
                         "heroicmap.menue.ablage." + a.name().toLowerCase(Locale.ROOT)), m.ablage())
                 .withValues(Downloads.Ablage.values())
                 .create(x, y + 120, breite, 20, Component.translatable("heroicmap.menue.ablage"), (b, a) -> m.setzeAblage(a)));
+        addRenderableWidget(CycleButton.onOffBuilder(m.neueVersion())
+                .withTooltip(an -> Tooltip.create(Component.translatable("heroicmap.menue.neue_version.beschreibung")))
+                .create(x, y + 144, breite, 20, Component.translatable("heroicmap.menue.neue_version"), (b, an) -> {
+                    m.setzeNeueVersion(an);
+                    // Angeschaltet fragt der Mod, wenn er in diesem Start noch nicht gefragt hat. Siehe docs/vollbildkarte.md, „Neue Version“.
+                    NeueVersion.frage();
+                }));
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.menue.ebenen"),
-                b -> minecraft.gui.setScreen(new EbenenMenue(this))).bounds(x, y + 148, halb, 20).build());
-        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x + breite - halb, y + 148, halb, 20).build());
+                b -> minecraft.gui.setScreen(new EbenenMenue(this))).bounds(x, y + 172, halb, 20).build());
+        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x + breite - halb, y + 172, halb, 20).build());
     }
 
     /** Der Regler für die Höhe des Schleiers eigener Regionen, in ganzen Blöcken. Siehe docs/wegpunkte.md, „Schleier“. */
@@ -98,9 +104,31 @@ final class Anzeige extends Screen {
         }
     }
 
-    /** Oben so weit, dass alles mittig steht, aber Platz für den Titel bleibt; bei 240 Einheiten Höhe reicht „Fertig“ bis 228. */
+    /** Der Regler, wie viele Todespunkte der Mod behält: aus, 1 bis 16. Siehe docs/wegpunkte.md, „Todespunkt“. */
+    static final class TodRegler extends AbstractSliderButton {
+
+        TodRegler(int x, int y, int breite) {
+            super(x, y, breite, 20, Component.empty(), (double) Minimap.INSTANZ.todespunkte() / Minimap.MAX_TODESPUNKTE);
+            setTooltip(Tooltip.create(Component.translatable("heroicmap.menue.todespunkt.beschreibung")));
+            updateMessage();
+        }
+
+        @Override
+        protected void updateMessage() {
+            int n = Minimap.INSTANZ.todespunkte();
+            setMessage(Component.translatable("heroicmap.menue.todespunkte", n == 0 ? Component.translatable("options.off") : Component.literal(
+                    Integer.toString(n))));
+        }
+
+        @Override
+        protected void applyValue() {
+            Minimap.INSTANZ.setzeTodespunkte((int) Math.round(value * Minimap.MAX_TODESPUNKTE));
+        }
+    }
+
+    /** Oben so weit, dass alles mittig steht, aber Platz für den Titel bleibt; bei 240 Einheiten Höhe reicht „Fertig“ bis 238. */
     private int oben() {
-        return Math.max(30, height / 2 - 60);
+        return Math.max(30, height / 2 - 74);
     }
 
     /** Ohne Unschärfe und Abdunkeln, damit die Minimap im HUD zu sehen ist. */
@@ -130,6 +158,8 @@ final class Anzeige extends Screen {
     public void removed() {
         Minimap.INSTANZ.hervor(Minimap.KEIN_ZIEL);
         Minimap.INSTANZ.schreibe(HeroicMap.einstellungen());
+        // Erst hier, nicht beim Ziehen des Reglers: Von 8 auf 1 und zurück nimmt sonst sieben weg.
+        Wegpunkte.INSTANZ.kappeTode(Minimap.INSTANZ.todespunkte());
         // Eine andere Ablage heisst ein anderer Ordner der Welt, auch für Wegpunkte und Ebenen.
         Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());
         Ebenen.INSTANZ.wechsel(Downloads.weltOrdner());

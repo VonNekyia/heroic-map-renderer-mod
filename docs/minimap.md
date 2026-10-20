@@ -61,7 +61,7 @@ steht unter „Kosten“.
 Das Untermenü „Einstellungen …“ hält, was man selten ändert; das Hauptmenü
 bleibt so kurz. „Fertig“ führt zurück ins Menü:
 
-![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien, halben Marken auf dem Ring und den Koordinaten darunter; „Form“ neben „Bei F3“, „Chunklinien“ neben „Drehen“, „Effekte in der Welt“ neben dem Regler „Schleier“, unten „Ebenen …“ neben „Fertig“](bilder/anzeige.png)
+![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien, halben Marken auf dem Ring und den Koordinaten darunter; „Form“ neben „Bei F3“, „Chunklinien“ neben „Drehen“, „Effekte in der Welt“ neben dem Regler „Schleier“, darunter „Ablage der Karten“ und „Neue Version melden“, unten „Ebenen …“ neben „Fertig“](bilder/anzeige.png)
 
 | Einstellung | Vorgabe | tut |
 |---|---|---|
@@ -74,8 +74,9 @@ bleibt so kurz. „Fertig“ führt zurück ins Menü:
 | Effekte in der Welt | an | der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen, siehe [Wegpunkte](wegpunkte.md), „Strahl“ und „Schleier“ |
 | Schleier | 4 Blöcke | Regler neben „Effekte in der Welt“: wie hoch und deckend der Schleier eigener Regionen steht, 4 bis 16 Blöcke, siehe [Wegpunkte](wegpunkte.md), „Schleier“ |
 | Koordinaten | xz | aus, `x z` oder `x y z` des Spielers unter der Minimap, siehe „Koordinaten“ |
-| Todespunkt | an | beim Tod ein angehefteter Wegpunkt, wo der Spieler gestorben ist, siehe [Wegpunkte](wegpunkte.md), „Todespunkt“ |
+| Todespunkte | 1 | Regler aus, 1 bis 16: so viele Wegpunkte, wo der Spieler gestorben ist, der neueste angeheftet, siehe [Wegpunkte](wegpunkte.md), „Todespunkt“ |
 | Ablage der Karten | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
+| Neue Version melden | an | fragt beim Start Modrinth nach einer neueren Version des Mods; der Tooltip sagt, dass Modrinth dabei die IP sieht; siehe [Vollbildkarte](vollbildkarte.md), „Neue Version“ |
 | Knopf „Ebenen …“ | – | je Ebene vom Server an oder aus, siehe [Ebenen](ebenen.md), „Umschalten“ |
 
 Den eigenen Spieler und den Rahmen stellt ein Klick auf die Minimap ein,
@@ -127,17 +128,19 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
   je zwei eine Zeile: „Minimap“ und der Regler „Zoom der Minimap“, „Karte laden …“ und
   „Kartenliste …“, „Einstellungen …“ und „Fertig“; im Untermenü
   „Chunklinien“ und „Drehen“, „Verzierungen“ und „Koordinaten“, „Effekte in
-  der Welt“ und der Regler „Schleier“, „Auflösung“ und „Todespunkt“,
-  „Ebenen …“ und „Fertig“. Bei GUI-Massstab 3 passen „Auflösung“ und
-  „Todespunkt“ ganz in ihren halben Knopf, 98 Einheiten breit; das prüft
+  der Welt“ und der Regler „Schleier“, „Auflösung“ und der Regler
+  „Todespunkte“, „Ebenen …“ und „Fertig“. Bei GUI-Massstab 3 passen
+  „Auflösung“ und „Todespunkte“ mit dem breitesten Wert, 16, ganz in ihren
+  halben Knopf, 98 Einheiten breit; das prüft
   der Gametest `Bedienung.kleinerSchirm`. „Ablage der Karten“ bleibt ganz
-  breit, halb passte sie in keiner Sprache. Bei GUI-Massstab 4 sind die
+  breit, halb passte sie in keiner Sprache; darunter ebenso „Neue Version
+  melden“. Bei GUI-Massstab 4 sind die
   halben Knöpfe rund 83 Einheiten breit; längere Texte lässt das Spiel
   dort laufen, auch bei den übrigen halben Knöpfen. So passen Menü und
   Untermenü auch bei grossem GUI-Massstab auf den Schirm, bis 240
   Einheiten Höhe, etwa 1280 × 720 bei GUI-Massstab 3. Das Untermenü
-  beginnt dafür höchstens 108 Einheiten über der Mitte und mindestens 20
-  unter dem oberen Rand; bei 240 Einheiten endet „Fertig“ bei 236
+  beginnt dafür höchstens 74 Einheiten über der Mitte und mindestens 30
+  unter dem oberen Rand; bei 240 Einheiten endet „Fertig“ bei 238
   (`Anzeige.oben`).
 - **Koordinaten:** Im Menü stehen über der Minimap `x` und `z` des Blocks
   unter der Maus fest unten links, wie auf der Karte im Browser, genau wie
@@ -333,9 +336,26 @@ im Debug-Bildschirm des Spiels (`Mth.floor`). So hat es der User gewünscht.
 - **Lage:** mittig unter der Minimap, in der Schrift des Spiels, weiss mit
   Schatten. 2 Einheiten Abstand unter dem Ring, mit Rahmen unter den
   Ornamenten, die halb über die Ecken ragen, so weit wie der Abstand zum
-  Rand (`Minimap.rand`). Sie folgt
-  Grösse und Lage der Minimap. Ist unten kein Platz mehr, steht die Zeile
-  ebenso über der Minimap (`Minimap.koordinatenLage`).
+  Rand (`Minimap.rand`). Sie folgt Grösse und Lage der Minimap
+  (`Minimap.koordinatenLage`).
+- **Immer ganz auf dem Schirm** (mod#157, Plan vom Reviewer freigegeben am
+  19.10.):
+  - **Waagrecht** rückt die Zeile zum Schirm hin, bis zum selben Abstand vom
+    Rand wie die Minimap (`Minimap.rand`). In einer Ecke endet sie darum
+    bündig mit der Aussenkante der Minimap; breiter als die Minimap darf sie
+    sein. Mit `y` am Rand der Welt ist sie 180 Einheiten breit, bei jedem
+    GUI-Massstab; jede Minimap unter dieser Seite schob sie vorher in einer
+    Ecke über den Rand, bei Seite 64 um 58 Einheiten.
+  - **Senkrecht** steht sie unter der Minimap; ist dort kein Platz, darüber.
+    Passt sie auch dort nicht, steht sie unten am Schirm, auf dem unteren
+    Rand der Minimap. Das geschieht nur, wenn die Minimap fast die ganze
+    Höhe einnimmt, etwa bei GUI-Massstab 4 und mehr als 220 Einheiten Seite.
+  - **Zwei Zeilen** braucht es nicht: Das Spiel wählt den GUI-Massstab so,
+    dass der Schirm mindestens 320 Einheiten breit ist. Nur eine breitere
+    Schrift aus einem Pack könnte mehr brauchen; dann wird die Zeile kleiner,
+    bis sie zwischen die Ränder passt.
+
+![Die Koordinaten am Rand der Welt bei GUI-Massstab 4, links vorher, rechts nachher; oben die kleinste Minimap oben links und oben rechts, je über die ganze Breite des Schirms, unten die grösste oben links](bilder/koordinaten-vergleich.png)
 - **Nicht gedreht:** Die Zeile bleibt waagrecht, auch wenn die Minimap
   dreht.
 

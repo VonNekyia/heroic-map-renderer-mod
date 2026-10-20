@@ -2,21 +2,26 @@ package com.nekyia.heroicmap;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.IntConsumer;
+import java.util.function.IntFunction;
 import java.util.function.Predicate;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.MouseHandler;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
+import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -26,6 +31,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.FormattedText;
 import net.minecraft.network.chat.Style;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.ARGB;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.minecraft.util.Util;
@@ -43,6 +49,8 @@ final class Karte extends Screen {
     private static final int TEXT = 0xFFFFFFFF;
     /** Die zweite Zeile im Kasten des Downloads. */
     private static final int GRAU = 0xFFC0C0C0;
+    /** Der Rand des Hinweises auf eine neue Version pulsiert in dieser Zeit einmal von Gold nach Weiss und zurück. */
+    static final int GOLD = 0xFFFFAA00, PULS_MS = 2000;
     /** Breite der Knöpfe in Einheiten des GUI. */
     private static final int KNOPF = 90;
     /** Breite des Knopfs „An“/„Aus“ einer Ebene; ihr Name steht links daneben. */
@@ -61,6 +69,8 @@ final class Karte extends Screen {
     private static final int VORSCHAU = 0xCCFFFFFF;
     /** So weit von der Mitte einer Ecke trifft ein Klick sie noch, in Einheiten des GUI; von zweien die nähere. */
     private static final double ECKE_TREFFER = 3;
+    /** So nah an der Maus, in Einheiten des GUI, rastet mit Strg eine gezogene Ecke oder ein gezogener Wegpunkt ein (Reviewer). */
+    private static final double EINRASTEN = 8;
 
     private final Satz satz;
     private final Kacheln kacheln;
@@ -72,6 +82,10 @@ final class Karte extends Screen {
     private int tafelX, tafelY, tafelScroll;
     private long tafelSeit;
     private int[] tafelKasten;
+    /** Die zuletzt gezeichnete Tafel: ihr Satz, ihr Kasten {x, y, Breite, Höhe} in Einheiten der Tafel und deren Grösse in Einheiten des GUI. */
+    private Tafel.Satz tafelGesetzt;
+    private int[] tafelEinheiten;
+    private float tafelM;
     /** Ist die Tafel höher als ihr Platz? Nur dann scrollt das Rad sie statt die Karte zu zoomen. */
     private boolean tafelZuHoch;
     /** Der Klick schloss oder traf die Tafel oder das Menü; sein Loslassen hält keine neue, sein Ziehen schiebt nicht. */
@@ -94,6 +108,11 @@ final class Karte extends Screen {
     static final long HINWEIS_MS = 5000;
     /** Wo die Knöpfe rechts oben beginnen und enden; Marken und Namen weichen ihnen aus. */
     private int knopfX, knopfUnten;
+    /** Der Knopf „Im Browser öffnen“, oder null ohne Kanal; und der Grund, mit dem er zuletzt aus war, leer, wenn er ging. */
+    private Button web;
+    private String webAus;
+    /** Der Hinweis auf eine neue Version oben links, sonst null. */
+    private Button neueVersion;
     /** {@link Downloads#stufen()} beim letzten Nachsehen; ohne Satz sieht die Karte nach, wenn es sich ändert. */
     private int stufen = Downloads.INSTANZ.stufen();
     /** Der Knopf für den Abgleich, oder null ohne Satz vom Server; er ist aus, bis ein Abgleich wieder geht. */
@@ -117,13 +136,27 @@ final class Karte extends Screen {
     private EditBox eingabe;
     private Predicate<String> beiEnter;
     private Component eingabeHinweis;
+    /**
+     * Unter dem Namensfeld einer Form die Regler „Schrift“ und, bei einer Region, „Biegung“, sonst null; dazu die Form, wie sie
+     * jetzt ist, und wie sie vorher war, null nach Enter. Siehe docs/wegpunkte.md, „Namen“.
+     */
+    private Raster schriftRegler, biegungRegler;
+    /** Unter dem Farbfeld einer Form der Regler „Gewicht“, sonst null. Siehe docs/wegpunkte.md, „Gewicht“. */
+    private Raster gewichtRegler;
+    private Wegpunkte.EigeneForm stilForm, stilVorher;
     /** So breit ist das Eingabefeld, in Einheiten des GUI. */
     private static final int EINGABE_BREITE = 160;
+    /** Ein Regler unter dem Namensfeld samt Abstand, in Einheiten des GUI. */
+    static final int REGLER_ZEILE = 22;
+    /** Die Rasten von {@link Wegpunkte#SCHRIFTEN} als Text. */
+    private static final String[] SCHRIFT_TEXTE = {"¼", "⅓", "½", "⅔", "1", "1½", "2", "3", "4"};
     /** Die Schrift im Eingabefeld, wenn Enter den Text nicht nimmt. */
     private static final int UNGUELTIG = 0xFFFF5555;
     /** Was die Maus gerade hervorhebt, höchstens eins davon; siehe {@link #schwebe}. */
     private Marke ueberMarke;
     private EckeAn ueberEcke;
+    /** Wohin, was an der Maus hängt, in diesem Frame einrastet, oder null. */
+    private Rast rast;
     private GriffAn ueberGriff;
     /** Der helle Rand von dem, was unter der Maus liegt. */
     private static final int HELL = 0xFFFFFFFF;
@@ -165,6 +198,10 @@ final class Karte extends Screen {
 
     /** Der Griff in der Mitte einer eigenen Form auf dem Schirm, in Einheiten des GUI. */
     record GriffAn(Wegpunkte.EigeneForm form, float x, float y) {
+    }
+
+    /** Wohin, was an der Maus hängt, mit Strg einrastet: der Block und die Ecke oder der Wegpunkt dort. */
+    private record Rast(int x, int z, EckeAn ecke, Marke marke) {
     }
 
     /** Die Ecke {@code index} der eigenen Form {@code form}, auf dem Schirm bei (x, y) in Einheiten des GUI. */
@@ -226,9 +263,13 @@ final class Karte extends Screen {
 
     @Override
     protected void init() {
-        // Ein neuer Aufbau, etwa bei einer anderen Fenstergrösse, nimmt alle Elemente weg, auch das Eingabefeld.
+        // Ein neuer Aufbau, etwa bei einer anderen Fenstergrösse, nimmt alle Elemente weg, auch das Eingabefeld und seine Regler.
+        stilZurueck();
         eingabe = null;
         beiEnter = null;
+        schriftRegler = null;
+        biegungRegler = null;
+        gewichtRegler = null;
         LocalPlayer spieler = minecraft.player;
         // Wie beim letzten Schliessen, je Satz; sonst der Spieler in der Mitte. Siehe docs/vollbildkarte.md, „Lage merken“.
         if (blick != null && spieler != null && !gestellt) {
@@ -266,9 +307,26 @@ final class Karte extends Screen {
         unterster = ebenen(x, unterster);
         knopfX = x;
         knopfUnten = unterster.getY() + unterster.getHeight();
+        // Darüber die Webkarte im Browser, nur mit dem Kanal zum Plugin. Siehe docs/vollbildkarte.md, „Im Browser öffnen“.
+        web = null;
+        if (Webkarte.kanal.getAsBoolean()) {
+            web = addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.web"),
+                    b -> zeige(Webkarte.INSTANZ.klick(Symbole.INSTANZ.basis(), Util.getMillis()))).bounds(x, height - 48, KNOPF, 20).build());
+            webAus = null;
+            webStand();
+        }
         // Unten rechts das Menü von /hmap; „Fertig“ dort führt zurück auf die Karte. Siehe docs/vollbildkarte.md, „Bedienung“.
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.karte.optionen"),
                 b -> minecraft.gui.setScreen(new Einstellungen(this))).bounds(x, height - 24, KNOPF, 20).build());
+        // Oben links der Hinweis auf eine neue Version, solange der Schalter an ist; der Link ist fest. Siehe docs/vollbildkarte.md, „Neue Version“.
+        neueVersion = null;
+        String neu = NeueVersion.neu;
+        if (neu != null && Minimap.INSTANZ.neueVersion()) {
+            Component text = Component.translatable("heroicmap.karte.neue_version", neu);
+            neueVersion = addRenderableWidget(Button.builder(text, ConfirmLinkScreen.confirmLink(this, NeueVersion.SEITE))
+                    .tooltip(Tooltip.create(Component.translatable("heroicmap.karte.neue_version.beschreibung", neu, NeueVersion.eigene())))
+                    .bounds(4, 4, font.width(text) + 12, 20).build());
+        }
     }
 
     /**
@@ -302,8 +360,8 @@ final class Karte extends Screen {
         // Base allein und an steht nicht in der Liste; so bleibt sie, wie sie war, für wen keine eigenen Ebenen hat. Aus steht sie da,
         // sonst fände man sie auf der Karte nicht wieder.
         List<Wegpunkte.EigeneEbene> eigene = eigeneZeigen ? Wegpunkte.INSTANZ.ebenen() : List.of();
-        // Platz bis über „Optionen …“ unten rechts, je Schalter 22 Einheiten.
-        int platz = Math.max(1, (height - 28 - (unterster.getY() + unterster.getHeight())) / 22);
+        // Platz bis über „Optionen …“ unten rechts, mit dem Kanal bis über „Im Browser öffnen“, je Schalter 22 Einheiten.
+        int platz = Math.max(1, (height - (Webkarte.kanal.getAsBoolean() ? 52 : 28) - (unterster.getY() + unterster.getHeight())) / 22);
         int gesamt = eigene.size() + alle.size(), n = gesamt <= platz ? gesamt : platz - 1;
         for (int i = 0; i < n; i++) {
             Component name;
@@ -331,9 +389,23 @@ final class Karte extends Screen {
         return unterster;
     }
 
+    /** Ob „Im Browser öffnen“ geht, und sonst warum, als Tooltip; nur bei einem anderen Grund neu. */
+    private void webStand() {
+        Component aus = Webkarte.INSTANZ.aus(Symbole.INSTANZ.basis(), Util.getMillis());
+        String schluessel = aus == null ? "" : aus.getString();
+        if (!schluessel.equals(webAus)) {
+            webAus = schluessel;
+            web.active = aus == null;
+            web.setTooltip(aus == null ? null : Tooltip.create(aus));
+        }
+    }
+
     /** Kommen andere Ebenen vom Server, während die Karte offen ist, baut sie die Liste neu. */
     @Override
     public void tick() {
+        if (web != null) {
+            webStand();
+        }
         // Ohne Satz während eines Stroms: Sobald die gröbste Stufe daliegt, zeigt sich die Karte. Siehe docs/vollbildkarte.md, „Fortschritt“.
         if (satz == null && Downloads.INSTANZ.stufen() != stufen && minecraft.level != null) {
             stufen = Downloads.INSTANZ.stufen();
@@ -431,13 +503,16 @@ final class Karte extends Screen {
                 g.centeredText(font, Component.translatable("heroicmap.karte.keine"), width / 2, height / 2, TEXT);
             }
             super.extractRenderState(g, mausX, mausY, delta);
+            leuchte(g);
             if (laeuft != null) {
                 fortschritt(g, laeuft);
             }
             return;
         }
-        // Still gehalten auf einem Wegpunkt hängt er nach HALTEN_MS an der Maus. Siehe docs/wegpunkte.md, „Bedienung“.
-        if (haengt == null && taste && gedrueckt != null && gedrueckt.punkt() != null && !doppelklick && gezogen <= ZUG
+        // Still gehalten auf einem Wegpunkt hängt er nach HALTEN_MS an der Maus, ein Todespunkt nicht. Siehe docs/wegpunkte.md,
+        // „Bedienung“.
+        if (haengt == null && taste && gedrueckt != null && gedrueckt.punkt() != null && !gedrueckt.punkt().tod() && !doppelklick
+                && gezogen <= ZUG
                 && Util.getMillis() - gedruecktSeit >= HALTEN_MS) {
             haengt = gedrueckt.punkt();
             wartend = null;
@@ -454,6 +529,12 @@ final class Karte extends Screen {
         // Die gezogene Form zeichnet die Karte selbst an der Maus; an ihrem alten Ort fällt sie solange weg.
         Wegpunkte.INSTANZ.ziehe(gezogeneForm());
         schwebe(mausX, mausY);
+        // Mit Strg steht das Ziel des Einrastens hell wie unter der Maus.
+        rast = einrasten(mausX, mausY);
+        if (rast != null) {
+            ueberEcke = rast.ecke();
+            ueberMarke = rast.marke();
+        }
         // Ein Klick auf eine Marke zentriert erst, wenn kein zweiter folgt; so bewegt ein Doppelklick die Karte nicht.
         if (wartend != null && Util.getMillis() - wartendSeit >= MouseHandler.DOUBLE_CLICK_THRESHOLD_MS) {
             zentriere(wartend.weltX(), wartend.weltZ());
@@ -502,13 +583,15 @@ final class Karte extends Screen {
                     : Component.translatable("heroicmap.karte.abgleich_ab", Downloads.uhr(ab)));
         }
         super.extractRenderState(g, mausX, mausY, delta);
+        leuchte(g);
         ueberschriften(g);
         if (laeuft != null) {
             fortschritt(g, laeuft);
         }
         if (haengt != null) {
-            // Der Wegpunkt, der an der Maus hängt, unter dem Zeiger.
-            Minimap.wegpunkt(g, mausX, mausY, Minimap.KOPF, haengt, 0);
+            // Der Wegpunkt, der an der Maus hängt, unter dem Zeiger, mit Strg auf dem Ziel des Einrastens.
+            float[] s = rast != null ? schirm(rast.x() + 0.5, rast.z() + 0.5) : new float[] {mausX, mausY};
+            Minimap.wegpunkt(g, s[0], s[1], Minimap.KOPF, haengt, 0);
         }
         tafel(g, mausX, mausY);
         if (ziel != null) {
@@ -558,6 +641,70 @@ final class Karte extends Screen {
         ueberGriff = frei && m == null && ueberEcke == null ? griffUnter(mausX, mausY) : null;
     }
 
+    /**
+     * Löscht, was {@link #schwebe} hervorhebt, wie „… löschen“ im Menü: einen Wegpunkt, auch den Todespunkt, die Raute eines
+     * alten Rechtecks, eine Ecke oder am Griff die ganze Form. False, wenn nichts hervorgehoben ist.
+     */
+    private boolean loescheUnterMaus() {
+        if (ueberMarke != null && ueberMarke.punkt() != null) {
+            Wegpunkte.INSTANZ.loesche(ueberMarke.punkt());
+        } else if (ueberMarke != null && ueberMarke.region() != null) {
+            Wegpunkte.INSTANZ.loesche(ueberMarke.region());
+        } else if (ueberEcke != null) {
+            loescheEcke(ueberEcke);
+        } else if (ueberGriff != null) {
+            Wegpunkte.INSTANZ.loesche(ueberGriff.form());
+        } else {
+            return false;
+        }
+        ueberMarke = null;
+        ueberEcke = null;
+        ueberGriff = null;
+        return true;
+    }
+
+    /**
+     * Mit gedrückter Strg, solange eine Ecke oder ein Wegpunkt an der Maus hängt: die nächste Ecke einer anderen eigenen Form oder,
+     * für eine Ecke, der nächste Wegpunkt, höchstens {@link #EINRASTEN} von der Maus, nach den Lagen des letzten Frames; sonst null.
+     * Ein Wegpunkt rastet nur auf Ecken ein, denn zwei Wegpunkte liegen nie auf einem Block. Siehe docs/wegpunkte.md, „Einrasten“.
+     */
+    private Rast einrasten(double mx, double my) {
+        if (haengt == null && eckeHaengt == null || !minecraft.hasControlDown()) {
+            return null;
+        }
+        Rast beste = null;
+        double abstand = EINRASTEN;
+        for (EckeAn e : ecken) {
+            double d = Math.hypot(mx - e.x(), my - e.y());
+            if ((eckeHaengt == null || e.form() != eckeHaengt.form()) && d <= abstand) {
+                Wegpunkte.Ecke c = e.form().ecken().get(e.index());
+                beste = new Rast(c.x(), c.z(), e, null);
+                abstand = d;
+            }
+        }
+        if (eckeHaengt != null) {
+            for (Marke m : marken) {
+                if (m.punkt() == null) {
+                    continue;
+                }
+                // An der Lage des Blocks, nicht an der Marke: Die eines fernen Wegpunkts steht am Rand (Review von #161).
+                float[] s = schirm(m.punkt().x() + 0.5, m.punkt().z() + 0.5);
+                double d = Math.hypot(mx - s[0], my - s[1]);
+                if (d <= abstand) {
+                    beste = new Rast(m.punkt().x(), m.punkt().z(), null, m);
+                    abstand = d;
+                }
+            }
+        }
+        return beste;
+    }
+
+    /** Der Block, auf den beim Loslassen kommt, was an der Maus hängt: mit Strg das Ziel des Einrastens, sonst der darunter. */
+    private int[] ablage(double x, double y) {
+        Rast r = einrasten(x, y);
+        return r != null ? new int[] {r.x(), r.z()} : block(x, y);
+    }
+
     /** Die eigene Form, die gerade an einer Ecke oder am Griff an der Maus hängt, oder null. */
     private Wegpunkte.EigeneForm gezogeneForm() {
         return eckeHaengt != null ? eckeHaengt.form() : griffHaengt != null ? griffHaengt.form() : null;
@@ -570,7 +717,7 @@ final class Karte extends Screen {
     private double[] punkte(Wegpunkte.EigeneForm f, double mausX, double mausY) {
         double[] p = Wegpunkte.mitten(f);
         if (eckeHaengt != null && eckeHaengt.form() == f) {
-            double[] w = welt(mausX, mausY);
+            double[] w = rast != null ? new double[] {rast.x() + 0.5, rast.z() + 0.5} : welt(mausX, mausY);
             p[2 * eckeHaengt.index()] = w[0];
             p[2 * eckeHaengt.index() + 1] = w[1];
         } else if (griffHaengt != null && griffHaengt.form() == f) {
@@ -761,6 +908,28 @@ final class Karte extends Screen {
         return tafelKasten == null ? null : tafelKasten.clone();
     }
 
+    /** Für die Gametests: die Knöpfe der offenen Tafel, wie gesetzt. */
+    List<Tafel.Knopfstueck> knopfStuecke() {
+        return tafelGesetzt == null ? List.of() : tafelGesetzt.stuecke().stream().filter(s -> s instanceof Tafel.Knopfstueck)
+                .map(s -> (Tafel.Knopfstueck) s).toList();
+    }
+
+    /** Für die Gametests: der Kasten des Knopfs {@code id} der offenen Tafel {x, y, Breite, Höhe} in Einheiten des GUI, gescrollt; oder null. */
+    int[] knopfKasten(String id) {
+        for (Tafel.Knopfstueck k : knopfStuecke()) {
+            if (k.knopf().id().equals(id)) {
+                int x = tafelEinheiten[0] + Tafel.INNEN + k.x(), y = tafelEinheiten[1] + Tafel.INNEN + k.y() - tafelScroll;
+                return new int[] {Math.round(x * tafelM), Math.round(y * tafelM), Math.round(k.breite() * tafelM), Math.round(k.hoehe() * tafelM)};
+            }
+        }
+        return null;
+    }
+
+    /** Für die Gametests: das Ziel einer Tafel bei (x, y) in Einheiten des GUI, oder null. */
+    Tafeln.Ziel zielBei(double x, double y) {
+        return tafelUnter(x, y);
+    }
+
     /** Für den Gametest Bedienung: die Mitte des Blicks in Pixeln der Basis, das offene Menü, oder null, und die Marken. */
     double[] blickMitte() {
         return blick == null ? null : new double[] {blick.mx, blick.mz};
@@ -785,6 +954,24 @@ final class Karte extends Screen {
         int k = minecraft.getWindow().getGuiScale();
         return new float[] {aufPixel(blick.rasterX(Projektion.zuPixel(o.x(), satz.scale()), width), k),
             aufPixel(blick.rasterY(Projektion.zuPixel(o.z(), satz.scale()), height), k)};
+    }
+
+    /** Für den Gametest: der Knopf „Im Browser öffnen“, oder null. */
+    Button webKnopf() {
+        return web;
+    }
+
+    Button neueVersionKnopf() {
+        return neueVersion;
+    }
+
+    /** Ein Rand um den Hinweis auf eine neue Version, der zwischen Gold und Weiss pulsiert. */
+    private void leuchte(GuiGraphicsExtractor g) {
+        if (neueVersion != null) {
+            float t = (float) (1 - Math.cos(2 * Math.PI * (Util.getMillis() % PULS_MS) / PULS_MS)) / 2;
+            g.outline(neueVersion.getX() - 1, neueVersion.getY() - 1, neueVersion.getWidth() + 2, neueVersion.getHeight() + 2,
+                    ARGB.srgbLerp(t, GOLD, TEXT));
+        }
     }
 
     /** Für den Gametest: die Ecken der Form im Bau, oder null. */
@@ -817,6 +1004,11 @@ final class Karte extends Screen {
     /** Für den Gametest: der Text im Eingabefeld, oder null, wenn es zu ist. */
     String eingabe() {
         return eingabe == null ? null : eingabe.getValue();
+    }
+
+    /** Für den Gametest: das Eingabefeld und seine Regler „Schrift“, „Biegung“ und „Gewicht“, je null ohne. */
+    AbstractWidget[] eingabeWidgets() {
+        return new AbstractWidget[] {eingabe, schriftRegler, biegungRegler, gewichtRegler};
     }
 
     /** Für den Gametest: der Hinweis unten links, oder null. */
@@ -961,13 +1153,13 @@ final class Karte extends Screen {
         g.pose().popMatrix();
     }
 
-    /** Der Griff einer eigenen Form unter (x, y): der nächste, höchstens {@link #ECKE_TREFFER} weg, oder null. */
+    /** Der Griff einer eigenen Form unter (x, y): der nächste, höchstens {@link #ECKE_TREFFER} weg, bei gleichem Abstand der schwerere; oder null. */
     private GriffAn griffUnter(double x, double y) {
         GriffAn beste = null;
         double abstand = ECKE_TREFFER;
         for (GriffAn gr : griffe) {
             double d = Math.hypot(x - gr.x(), y - gr.y());
-            if (d <= abstand) {
+            if (Wegpunkte.trifftEher(d, gr.form().gewicht(), abstand, beste == null ? Integer.MIN_VALUE : beste.form().gewicht())) {
                 beste = gr;
                 abstand = d;
             }
@@ -990,13 +1182,13 @@ final class Karte extends Screen {
         g.pose().popMatrix();
     }
 
-    /** Die Ecke einer eigenen Form unter (x, y): die nächste, höchstens {@link #ECKE_TREFFER} weg, oder null. */
+    /** Die Ecke einer eigenen Form unter (x, y): die nächste, höchstens {@link #ECKE_TREFFER} weg, bei gleichem Abstand die schwerere; oder null. */
     private EckeAn eckeUnter(double x, double y) {
         EckeAn beste = null;
         double abstand = ECKE_TREFFER;
         for (EckeAn e : ecken) {
             double d = Math.hypot(x - e.x(), y - e.y());
-            if (d <= abstand) {
+            if (Wegpunkte.trifftEher(d, e.form().gewicht(), abstand, beste == null ? Integer.MIN_VALUE : beste.form().gewicht())) {
                 beste = e;
                 abstand = d;
             }
@@ -1100,9 +1292,10 @@ final class Karte extends Screen {
         double wx = blick.basisRasterX(mx, width) / scale, wz = blick.basisRasterZ(my, height) / scale;
         // So viele Blöcke sind 3 Einheiten des GUI auf dieser Stufe.
         double nah = 3 / (blick.rasterX(Projektion.zuPixel(1, scale), width) - blick.rasterX(0, width));
-        List<Wegpunkte.EigeneForm> alle = Wegpunkte.INSTANZ.eigeneFormen();
-        for (int i = alle.size() - 1; i >= 0; i--) {
-            Wegpunkte.EigeneForm f = alle.get(i);
+        // Von oben nach unten: die schwerere zuerst, bei gleichem Gewicht die spätere. Siehe docs/wegpunkte.md, „Gewicht“.
+        List<Wegpunkte.EigeneForm> alle = new ArrayList<>(Wegpunkte.INSTANZ.eigeneFormen().reversed());
+        alle.sort(Comparator.comparingInt(Wegpunkte.EigeneForm::gewicht).reversed());
+        for (Wegpunkte.EigeneForm f : alle) {
             Ebenen.Form form = Wegpunkte.INSTANZ.form(f);
             if (form == null || !dimension.equals(form.dimension()) || !Wegpunkte.INSTANZ.an(f.ebene())) {
                 continue;
@@ -1168,9 +1361,11 @@ final class Karte extends Screen {
         gezogen = 0;
         druckX = e.x();
         druckY = e.y();
-        // Ein Klick neben das Eingabefeld bricht die Eingabe ab und tut sonst nichts; einer darauf setzt den Cursor.
+        // Ein Klick neben das Eingabefeld und seine Regler bricht die Eingabe ab und tut sonst nichts; einer darauf setzt den Cursor
+        // oder schiebt den Regler.
         if (eingabe != null) {
-            if (eingabe.isMouseOver(e.x(), e.y())) {
+            if (eingabe.isMouseOver(e.x(), e.y()) || auf(schriftRegler, e.x(), e.y()) || auf(biegungRegler, e.x(), e.y())
+                    || auf(gewichtRegler, e.x(), e.y())) {
                 super.mouseClicked(e, doppelt);
             } else {
                 schliesseEingabe();
@@ -1191,8 +1386,12 @@ final class Karte extends Screen {
             klickVerbraucht = true;
             return true;
         }
-        // Ein Klick in die Tafel wirkt nicht auf die Karte.
+        // Ein Klick in die Tafel wirkt nicht auf die Karte; links auf einen Knopf drückt ihn, solange die Tafel gilt.
         if (drin(tafelKasten, e.x(), e.y())) {
+            Tafel.Knopfstueck k = taste ? knopfUnter(e.x(), e.y()) : null;
+            if (k != null && Tafeln.gilt(Ebenen.INSTANZ, tafelOffen)) {
+                Tafeln.INSTANZ.druecke(tafelOffen, k.knopf(), Util.getMillis());
+            }
             klickVerbraucht = true;
             return true;
         }
@@ -1252,6 +1451,16 @@ final class Karte extends Screen {
             return true;
         }
         if (e.button() == InputConstants.MOUSE_BUTTON_RIGHT) {
+            // Im Bau schliesst er die Form ab, ausser am Griff, wo nichts darüber liegt: dort das Menü der Form. Siehe
+            // docs/wegpunkte.md, „Eigene Formen“.
+            if (zug != null && (m != null || eckeUnter(e.x(), e.y()) != null || griffUnter(e.x(), e.y()) == null)) {
+                if (zug.size() < 2) {
+                    zeige(Component.translatable("heroicmap.karte.form_zwei"));
+                } else {
+                    fertig();
+                }
+                return true;
+            }
             menue(e.x(), e.y(), m != null ? m.punkt() : null, m != null ? m.region() : null);
             return true;
         }
@@ -1262,6 +1471,10 @@ final class Karte extends Screen {
     @Override
     public boolean mouseReleased(MouseButtonEvent e) {
         boolean knopf = super.mouseReleased(e);
+        // Nach einem Regler gehören die Tasten wieder dem Feld.
+        if (eingabe != null) {
+            setFocused(eingabe);
+        }
         Marke m = gedrueckt;
         gedrueckt = null;
         taste = false;
@@ -1272,16 +1485,16 @@ final class Karte extends Screen {
         EckeAn ecke = eckeGedrueckt;
         eckeGedrueckt = null;
         griffGedrueckt = null;
-        // Der Wegpunkt an der Maus kommt auf den Block unter ihr, mit Farbe und Anheften.
+        // Der Wegpunkt an der Maus kommt auf den Block unter ihr, mit Strg auf den, wo er einrastet, mit Farbe und Anheften.
         if (haengt != null) {
-            int[] b = block(e.x(), e.y());
+            int[] b = ablage(e.x(), e.y());
             Wegpunkte.INSTANZ.verschiebe(haengt, b[0], b[1]);
             haengt = null;
             return true;
         }
         // Ebenso die Ecke an der Maus; liegt sie dann auf dem Block ihrer Nachbarin, werden beide eine.
         if (eckeHaengt != null) {
-            int[] b = block(e.x(), e.y());
+            int[] b = ablage(e.x(), e.y());
             List<Wegpunkte.Ecke> neu = new ArrayList<>(eckeHaengt.form().ecken());
             neu.set(eckeHaengt.index(), new Wegpunkte.Ecke(b[0], b[1]));
             Wegpunkte.INSTANZ.ersetze(eckeHaengt.form(), neu);
@@ -1343,6 +1556,9 @@ final class Karte extends Screen {
      */
     private void tafel(GuiGraphicsExtractor g, int mausX, int mausY) {
         long ms = Util.getMillis();
+        if (Tafeln.INSTANZ.takt(ms, z -> Tafeln.gilt(Ebenen.INSTANZ, z)) > 0) {
+            zeige(Component.translatable("heroicmap.tafel.keine_antwort"));
+        }
         // Solange eine Form im Bau ist, geht keine Tafel auf: Sie ginge dort auf, wo das Menü war, und läge über
         // den Stellen, die der Spieler anklickt. Siehe docs/wegpunkte.md, „Eigene Formen“.
         if (zug != null && zeigen.offen() != null) {
@@ -1365,8 +1581,12 @@ final class Karte extends Screen {
             tafelY = mausY;
             tafelScroll = 0;
             tafelSeit = ms;
+            if (offen != null) {
+                Tafeln.INSTANZ.aufgegangen(offen, ms);
+            }
         }
         tafelKasten = null;
+        tafelGesetzt = null;
         tafelZuHoch = false;
         if (offen == null || t == null && ms - tafelSeit < Tafeln.LAEDT_MS) {
             return;
@@ -1384,6 +1604,10 @@ final class Karte extends Screen {
         y = Math.max(4, Math.min(y, hoehe - h - 4));
         tafelZuHoch = voll > h;
         tafelScroll = Math.max(0, Math.min(tafelScroll, voll - h));
+        tafelGesetzt = s;
+        tafelEinheiten = new int[] {x, y, w, h};
+        tafelM = m;
+        Tafel.Knopfstueck drauf = knopfUnter(mausX, mausY);
         g.pose().pushMatrix();
         g.pose().scale(m);
         g.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.fromNamespaceAndPath(HeroicMap.ID, "rahmen/" + tafelSkin() + "/tafel"), x, y, w, h);
@@ -1395,6 +1619,20 @@ final class Karte extends Screen {
                 case Tafel.Punkt p -> {
                     int px = x + Tafel.INNEN + p.x(), py = y + Tafel.INNEN + p.y() - tafelScroll;
                     g.fill(px, py, px + p.seite(), py + p.seite(), p.farbe());
+                }
+                case Tafel.Knopfstueck k -> {
+                    int kx = x + Tafel.INNEN + k.x(), ky = y + Tafel.INNEN + k.y() - tafelScroll;
+                    boolean gesperrt = Tafeln.INSTANZ.gesperrt(offen, k.knopf().id()), hell = k == drauf && !gesperrt;
+                    int schrift = gesperrt ? Tafel.GEDAEMPFT : Tafel.SCHRIFT, grund = hell ? Tafel.KNOPF_HELL : Tafel.KNOPF;
+                    g.fill(kx, ky, kx + k.breite(), ky + k.hoehe(), hell ? Tafel.KNOPF_RAHMEN_HELL : Tafel.KNOPF_RAHMEN);
+                    g.fill(kx + 1, ky + 1, kx + k.breite() - 1, ky + k.hoehe() - 1, grund);
+                    // Das Quadrat mit Rahmen in der Schrift, gefüllt, wenn der Knopf an ist.
+                    int qx = kx + Tafel.KNOPF_LINKS, qy = ky + (k.hoehe() - Tafel.QUADRAT) / 2;
+                    g.fill(qx, qy, qx + Tafel.QUADRAT, qy + Tafel.QUADRAT, schrift);
+                    if (!k.knopf().an()) {
+                        g.fill(qx + 1, qy + 1, qx + Tafel.QUADRAT - 1, qy + Tafel.QUADRAT - 1, grund);
+                    }
+                    g.text(font, k.label(), kx + Tafel.KNOPF_TEXT, ky + Tafel.KNOPF_RAND + 1, schrift, false);
                 }
                 case Tafel.Bildstueck b -> {
                     int bx = x + Tafel.INNEN + b.x(), by = y + Tafel.INNEN + b.y() - tafelScroll;
@@ -1430,6 +1668,24 @@ final class Karte extends Screen {
         tafelKasten = new int[] {Math.round(x * m), Math.round(y * m), Math.round(w * m), Math.round(h * m)};
     }
 
+    /** Der Knopf der zuletzt gezeichneten Tafel unter (mx, my) in Einheiten des GUI, nur im sichtbaren Inhalt; sonst null. */
+    private Tafel.Knopfstueck knopfUnter(double mx, double my) {
+        if (tafelGesetzt == null) {
+            return null;
+        }
+        double u = mx / tafelM - tafelEinheiten[0] - Tafel.INNEN, v = my / tafelM - tafelEinheiten[1] - Tafel.INNEN;
+        if (v < 0 || v >= tafelEinheiten[3] - 2 * Tafel.INNEN) {
+            return null;
+        }
+        for (Tafel.Stueck s : tafelGesetzt.stuecke()) {
+            if (s instanceof Tafel.Knopfstueck k && u >= k.x() && u < k.x() + k.breite() && v + tafelScroll >= k.y()
+                    && v + tafelScroll < k.y() + k.hoehe()) {
+                return k;
+            }
+        }
+        return null;
+    }
+
     /** Die kleine Tafel, solange die Antwort des Plugins aussteht. */
     private Tafel.Satz laedt() {
         String text = Component.translatable("heroicmap.tafel.laedt").getString();
@@ -1443,7 +1699,7 @@ final class Karte extends Screen {
             satzVon = t;
             satzGs = gs;
             satzGeneration = Formen.generation;
-            tafelSatz = Tafel.setze(t, masse());
+            tafelSatz = Tafel.setze(t, masse(), minecraft.getLanguageManager().getSelected().startsWith("de"));
         }
         return tafelSatz;
     }
@@ -1560,22 +1816,31 @@ final class Karte extends Screen {
     }
 
     /**
-     * Öffnet das Menü an (x, y) für den Block dort, oder für den Wegpunkt {@code punkt}; auf dem Griff einer eigenen Form
-     * nur ihr Menü. Siehe docs/wegpunkte.md, „Eigene Formen“.
+     * Öffnet das Menü an (x, y) für das, was dort liegt, im Vorrang wie beim Zeigen: ein Wegpunkt oder die Raute eines alten
+     * Rechtecks vor einer Ecke vor dem Griff einer Form; auf freier Karte das allgemeine Menü. Solange eine Form im Bau ist,
+     * kommt es nur am Griff, mit „Form fertig“ und „Form abbrechen“. Siehe docs/wegpunkte.md, „Menü je Objekt“.
      */
     private void menue(double x, double y, Wegpunkte.Punkt punkt, Wegpunkte.Region marke) {
         int[] z = punkt != null ? new int[] {punkt.x(), punkt.z()} : block(x, y);
         String dimension = minecraft.level.dimension().identifier().toString();
         List<Eintrag> neu = new ArrayList<>();
-        GriffAn griff = punkt == null && marke == null && eckeUnter(x, y) == null ? griffUnter(x, y) : null;
+        EckeAn ecke = punkt == null && marke == null ? eckeUnter(x, y) : null;
+        GriffAn griff = punkt == null && marke == null && ecke == null ? griffUnter(x, y) : null;
         if (griff != null) {
             formMenue(griff.form(), neu);
             if (zug != null) {
                 // Im Bau bleibt die Form im Bau zu beenden, auch am Griff einer anderen.
                 bauEnde(neu);
             }
+        } else if (zug == null && punkt != null) {
+            punktMenue(punkt, dimension, neu);
+        } else if (zug == null && marke != null) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ebene"), () -> ebenenWahl(marke.ebene(), id -> Wegpunkte.INSTANZ.ordne(marke, id))));
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_loeschen"), () -> Wegpunkte.INSTANZ.loesche(marke)));
+        } else if (zug == null && ecke != null) {
+            eckMenue(ecke, neu);
         } else {
-            allgemein(x, y, z, dimension, punkt, marke, neu);
+            allgemein(z, dimension, neu);
         }
         ziel = z;
         eintraege = neu;
@@ -1592,22 +1857,10 @@ final class Karte extends Screen {
         neu.add(new Eintrag(Component.translatable(f.angeheftet() ? "heroicmap.karte.loesen" : "heroicmap.karte.anheften"),
                 () -> anheften(Wegpunkte.INSTANZ.umschalten(f), "heroicmap.karte.angeheftet_voll", Wegpunkte.MAX_ANGEHEFTET)));
         neu.add(new Eintrag(Component.translatable(f.name() == null ? "heroicmap.karte.name" : "heroicmap.karte.name_aendern"),
-                () -> oeffne(f.name() == null ? "" : f.name(), Wegpunkte.MAX_NAME, "heroicmap.karte.name_hinweis", t -> {
-                    Wegpunkte.INSTANZ.benenne(f, t);
-                    return true;
-                })));
+                () -> benennen(f)));
         neu.add(new Eintrag(Component.translatable("heroicmap.karte.ebene"), () -> ebenenWahl(f.ebene(), id -> Wegpunkte.INSTANZ.ordne(f, id))));
         // Leer heisst zurück zur Farbe aus der Liste; was keine Farbe ist, nimmt Enter nicht. Siehe docs/wegpunkte.md, „Farbe“.
-        neu.add(new Eintrag(Component.translatable("heroicmap.karte.farbe"), () -> oeffne(Wegpunkte.hex(f.argb()), 7,
-                "heroicmap.karte.farbe_hinweis", t -> {
-                    int hex = Wegpunkte.hex(t);
-                    if (hex == Wegpunkte.KEIN_HEX && !t.isBlank()) {
-                        eingabe.setTextColor(UNGUELTIG);
-                        return false;
-                    }
-                    Wegpunkte.INSTANZ.faerbe(f, hex);
-                    return true;
-                })));
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.farbe"), () -> faerben(f)));
         if (zug == null) {
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> bearbeite(new EckeAn(f, f.ecken().size() - 1, 0, 0))));
         }
@@ -1625,7 +1878,10 @@ final class Karte extends Screen {
         eingabe.setMaxLength(laenge);
         eingabe.setValue(wert);
         // Was Enter nicht nahm, steht rot, bis der Spieler es ändert.
-        eingabe.setResponder(t -> eingabe.setTextColor(EditBox.DEFAULT_TEXT_COLOR));
+        eingabe.setResponder(t -> {
+            eingabe.setTextColor(EditBox.DEFAULT_TEXT_COLOR);
+            reglerStand();
+        });
         this.beiEnter = beiEnter;
         eingabeHinweis = Component.translatable(hinweis);
         addRenderableWidget(eingabe);
@@ -1633,9 +1889,155 @@ final class Karte extends Screen {
     }
 
     private void schliesseEingabe() {
+        stilZurueck();
         removeWidget(eingabe);
+        if (schriftRegler != null) {
+            removeWidget(schriftRegler);
+        }
+        if (biegungRegler != null) {
+            removeWidget(biegungRegler);
+        }
+        if (gewichtRegler != null) {
+            removeWidget(gewichtRegler);
+        }
         eingabe = null;
         beiEnter = null;
+        schriftRegler = null;
+        biegungRegler = null;
+        gewichtRegler = null;
+    }
+
+    /**
+     * Das Feld für den Namen von {@code f}, darunter die Regler „Schrift“ und, bei einer Region, „Biegung“. Sie wirken gleich
+     * auf Karte und Minimap und sind grau, solange das Feld leer ist. Enter speichert Name, Schrift und Biegung; Esc und ein
+     * Klick daneben nehmen alles zurück. Siehe docs/wegpunkte.md, „Namen“.
+     */
+    private void benennen(Wegpunkte.EigeneForm f) {
+        stilForm = f;
+        stilVorher = f;
+        // Das Feld öffnet an der Stelle des Menüs der Form, und das ist mit mindestens fünf Einträgen 70 Einheiten hoch: Darunter
+        // ist Platz für die Regler, ganz auf dem Schirm.
+        oeffne(f.name() == null ? "" : f.name(), Wegpunkte.MAX_NAME, "heroicmap.karte.name_hinweis", t -> {
+            Wegpunkte.INSTANZ.benenne(stilForm, t);
+            stilVorher = null;
+            return true;
+        });
+        int x = eingabe.getX(), y = eingabe.getY() + REGLER_ZEILE, b = eingabe.getWidth();
+        schriftRegler = addRenderableWidget(new Raster(x, y, b, Wegpunkte.SCHRIFTEN.length, raste(f.schrift()),
+                i -> Component.translatable("heroicmap.karte.schrift", SCHRIFT_TEXTE[i]),
+                i -> stilForm = Wegpunkte.INSTANZ.stil(stilForm, Wegpunkte.SCHRIFTEN[i], stilForm.biegung(), stilForm.gewicht())));
+        if (f.region()) {
+            int mitte = Wegpunkte.MAX_BIEGUNG / Wegpunkte.BIEGUNG_SCHRITT;
+            biegungRegler = addRenderableWidget(new Raster(x, y + REGLER_ZEILE, b, 2 * mitte + 1, mitte + f.biegung() / Wegpunkte.BIEGUNG_SCHRITT,
+                    i -> biegungText((i - mitte) * Wegpunkte.BIEGUNG_SCHRITT),
+                    i -> stilForm = Wegpunkte.INSTANZ.stil(stilForm, stilForm.schrift(), (i - mitte) * Wegpunkte.BIEGUNG_SCHRITT,
+                            stilForm.gewicht())));
+        }
+        reglerStand();
+    }
+
+    /** Liegt (x, y) auf {@code w}, auch wenn es grau ist? {@code isMouseOver} zählt nur, was an ist. */
+    private static boolean auf(AbstractWidget w, double x, double y) {
+        return w != null && x >= w.getX() && x < w.getX() + w.getWidth() && y >= w.getY() && y < w.getY() + w.getHeight();
+    }
+
+    /**
+     * Das Feld für die Farbe von {@code f}, darunter der Regler „Gewicht“. Er wirkt gleich auf Karte und Minimap; Enter
+     * speichert Farbe und Gewicht, Esc und ein Klick daneben nehmen das Gewicht zurück. Leer heisst zurück zur Farbe aus der
+     * Liste; was keine Farbe ist, nimmt Enter nicht. Platz darunter wie bei {@link #benennen}. Siehe docs/wegpunkte.md,
+     * „Farbe“ und „Gewicht“.
+     */
+    private void faerben(Wegpunkte.EigeneForm f) {
+        stilForm = f;
+        stilVorher = f;
+        oeffne(Wegpunkte.hex(f.argb()), 7, "heroicmap.karte.farbe_hinweis", t -> {
+            int hex = Wegpunkte.hex(t);
+            if (hex == Wegpunkte.KEIN_HEX && !t.isBlank()) {
+                eingabe.setTextColor(UNGUELTIG);
+                return false;
+            }
+            Wegpunkte.INSTANZ.faerbe(stilForm, hex);
+            stilVorher = null;
+            return true;
+        });
+        int m = Wegpunkte.MAX_GEWICHT;
+        gewichtRegler = addRenderableWidget(new Raster(eingabe.getX(), eingabe.getY() + REGLER_ZEILE, eingabe.getWidth(), 2 * m + 1,
+                m + f.gewicht(), i -> Component.translatable("heroicmap.karte.gewicht", gewichtText(i - m)),
+                i -> stilForm = Wegpunkte.INSTANZ.stil(stilForm, stilForm.schrift(), stilForm.biegung(), i - m)));
+    }
+
+    /** Ein Gewicht mit Vorzeichen: „+3“, „0“, „−2“. */
+    static String gewichtText(int g) {
+        return g > 0 ? "+" + g : g < 0 ? "−" + -g : "0";
+    }
+
+    /** Die Raste von {@link Wegpunkte#SCHRIFTEN} mit dem Faktor {@code f}. */
+    private static int raste(double f) {
+        int i = 0;
+        while (i < Wegpunkte.SCHRIFTEN.length - 1 && Wegpunkte.SCHRIFTEN[i] < f) {
+            i++;
+        }
+        return i;
+    }
+
+    static Component biegungText(int grad) {
+        return grad == 0 ? Component.translatable("heroicmap.karte.biegung_gerade")
+                : Component.translatable(grad > 0 ? "heroicmap.karte.biegung_oben" : "heroicmap.karte.biegung_unten", Math.abs(grad));
+    }
+
+    /** Die Regler sind grau, solange das Namensfeld leer ist. */
+    private void reglerStand() {
+        boolean an = eingabe != null && !eingabe.getValue().isBlank();
+        for (Raster r : new Raster[] {schriftRegler, biegungRegler}) {
+            if (r != null) {
+                r.active = an;
+            }
+        }
+    }
+
+    /** Nicht gespeichert: Schrift, Biegung und Gewicht der Form wieder, wie sie vorher waren. */
+    private void stilZurueck() {
+        if (stilVorher != null && stilForm != null) {
+            Wegpunkte.INSTANZ.stil(stilForm, stilVorher.schrift(), stilVorher.biegung(), stilVorher.gewicht());
+        }
+        stilForm = null;
+        stilVorher = null;
+    }
+
+    /** Ein Regler mit {@code anzahl} Rasten; {@code text} beschriftet die Raste, {@code setze} wirkt, sobald eine andere erreicht ist. */
+    static final class Raster extends AbstractSliderButton {
+
+        private final int anzahl;
+        private final IntFunction<Component> text;
+        private final IntConsumer setze;
+        private int raste;
+
+        Raster(int x, int y, int breite, int anzahl, int raste, IntFunction<Component> text, IntConsumer setze) {
+            super(x, y, breite, 20, Component.empty(), raste / (double) (anzahl - 1));
+            this.anzahl = anzahl;
+            this.text = text;
+            this.setze = setze;
+            this.raste = raste;
+            updateMessage();
+        }
+
+        int raste() {
+            return raste;
+        }
+
+        @Override
+        protected void updateMessage() {
+            setMessage(text.apply((int) Math.round(value * (anzahl - 1))));
+        }
+
+        @Override
+        protected void applyValue() {
+            int r = (int) Math.round(value * (anzahl - 1));
+            if (r != raste) {
+                raste = r;
+                setze.accept(r);
+            }
+        }
     }
 
     /**
@@ -1695,24 +2097,78 @@ final class Karte extends Screen {
     }
 
     /**
-     * Das allgemeine Menü an (x, y): Teleport, Wegpunkt, Formen beginnen und bauen, die Einträge einer Ecke dort und eines alten
-     * Rechtecks, wenn seine Raute {@code marke} getroffen ist. Die Fläche einer eigenen Form hat hier keine Einträge mehr.
+     * Das Menü eines Wegpunkts: Teleport, „Koordinaten setzen…“, „Linie/Region von hier“ auf seinem Block, „Ebene …“ und Löschen;
+     * der Todespunkt nur Teleport und Löschen, er bleibt, wo er ist, und in Base. Siehe docs/wegpunkte.md, „Menü je Objekt“.
      */
-    private void allgemein(double x, double y, int[] z, String dimension, Wegpunkte.Punkt punkt, Wegpunkte.Region region, List<Eintrag> neu) {
+    private void punktMenue(Wegpunkte.Punkt punkt, String dimension, List<Eintrag> neu) {
+        if (minecraft.getConnection() != null) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.teleport", punkt.x(), punkt.z()), () -> {
+                Teleport.los(minecraft, satz, dimension, punkt.x(), punkt.z());
+                onClose();
+            }));
+        }
+        if (!punkt.tod()) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.koordinaten"), () -> koordinaten(punkt.x(), punkt.z(), k -> {
+                // Auf dem eigenen Block bleibt er; auf einem belegten nimmt Enter nichts.
+                if (k[0] == punkt.x() && k[1] == punkt.z() || Wegpunkte.INSTANZ.verschiebe(punkt, k[0], k[1])) {
+                    return true;
+                }
+                zeige(Component.translatable("heroicmap.karte.koordinaten_belegt"));
+                return false;
+            })));
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_von_hier"), () -> beginne(punkt.x(), punkt.z())));
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ebene"), () -> ebenenWahl(punkt.ebene(), id -> Wegpunkte.INSTANZ.ordne(punkt, id))));
+        }
+        neu.add(new Eintrag(Component.translatable(punkt.tod() ? "heroicmap.karte.tod_loeschen" : "heroicmap.karte.wegpunkt_loeschen"),
+                () -> Wegpunkte.INSTANZ.loesche(punkt)));
+    }
+
+    /** Das Menü einer Ecke: „Koordinaten setzen…“, „Eckpunkt hinzufügen“ und „Eckpunkt löschen“. */
+    private void eckMenue(EckeAn ecke, List<Eintrag> neu) {
+        Wegpunkte.Ecke e = ecke.form().ecken().get(ecke.index());
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.koordinaten"), () -> koordinaten(e.x(), e.z(), k -> {
+            // Wie beim Loslassen: Auf dem Block ihrer Nachbarin werden beide eine.
+            List<Wegpunkte.Ecke> neueEcken = new ArrayList<>(ecke.form().ecken());
+            neueEcken.set(ecke.index(), new Wegpunkte.Ecke(k[0], k[1]));
+            Wegpunkte.INSTANZ.ersetze(ecke.form(), neueEcken);
+            return true;
+        })));
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> bearbeite(ecke)));
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_loeschen"), () -> loescheEcke(ecke)));
+    }
+
+    /** Nimmt die Ecke aus ihrer Form: Aus einer Region mit drei Ecken wird eine Linie, eine Linie mit zwei fällt weg. */
+    private void loescheEcke(EckeAn ecke) {
+        List<Wegpunkte.Ecke> rest = new ArrayList<>(ecke.form().ecken());
+        rest.remove(ecke.index());
+        Wegpunkte.INSTANZ.ersetze(ecke.form(), rest);
+    }
+
+    /**
+     * Öffnet das Feld „Koordinaten setzen…“ mit {@code x z}; Enter nimmt {@code x z}, {@code x, z} oder {@code x y z} wie „Wegpunkt
+     * bei …“, gibt sie an {@code setze} und legt den Ort in die Mitte, wenn es sie nahm. Was keine Koordinaten sind, steht rot.
+     */
+    private void koordinaten(int x, int z, Predicate<int[]> setze) {
+        oeffne(x + " " + z, 40, "heroicmap.karte.koordinaten_hinweis", t -> {
+            int[] k = Wegpunkte.koordinaten(t);
+            if (k == null || !setze.test(k)) {
+                eingabe.setTextColor(UNGUELTIG);
+                return false;
+            }
+            zentriere(k[0] + 0.5, k[1] + 0.5);
+            return true;
+        });
+    }
+
+    /** Das allgemeine Menü auf freier Karte am Block {@code z}: Teleport, „Wegpunkt setzen“, „Wegpunkt bei …“, eine Form beginnen. */
+    private void allgemein(int[] z, String dimension, List<Eintrag> neu) {
         if (minecraft.getConnection() != null) {
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.teleport", z[0], z[1]), () -> {
                 Teleport.los(minecraft, satz, dimension, z[0], z[1]);
                 onClose();
             }));
         }
-        neu.add(punkt != null
-                ? new Eintrag(Component.translatable(punkt.tod() ? "heroicmap.karte.tod_loeschen" : "heroicmap.karte.wegpunkt_loeschen"),
-                        () -> Wegpunkte.INSTANZ.loesche(punkt))
-                : new Eintrag(Component.translatable("heroicmap.karte.wegpunkt"), () -> setzeWegpunkt(dimension, z[0], z[1])));
-        // Der Todespunkt bleibt in Base; die Datei kennt für ihn keine Ebene. Siehe docs/wegpunkte.md, „Eigene Ebenen“.
-        if (punkt != null && !punkt.tod()) {
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ebene"), () -> ebenenWahl(punkt.ebene(), id -> Wegpunkte.INSTANZ.ordne(punkt, id))));
-        }
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.wegpunkt"), () -> setzeWegpunkt(dimension, z[0], z[1])));
         // Ein Wegpunkt an eingetippten Koordinaten, dann in der Mitte. Siehe docs/wegpunkte.md, „Bedienung“.
         neu.add(new Eintrag(Component.translatable("heroicmap.karte.wegpunkt_bei"), () -> oeffne(z[0] + " " + z[1], 40,
                 "heroicmap.karte.wegpunkt_bei_hinweis", t -> {
@@ -1725,28 +2181,8 @@ final class Karte extends Screen {
                     zentriere(k[0] + 0.5, k[1] + 0.5);
                     return true;
                 })));
-        // Eigene Formen: ohne Form im Bau beginnt hier eine, auf einer Ecke kommen neue danach oder sie geht; im Bau eine
-        // Ecke hier, „Form fertig“ und „Form abbrechen“. Siehe docs/wegpunkte.md, „Eigene Formen“.
-        EckeAn ecke = zug == null ? eckeUnter(x, y) : null;
-        if (zug == null) {
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_von_hier"), () -> beginne(z[0], z[1])));
-        } else {
-            int[] b = punkt != null ? z : eckBlock(x, y, null);
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> hinzu(b[0], b[1])));
-            bauEnde(neu);
-        }
-        if (ecke != null) {
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> bearbeite(ecke)));
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_loeschen"), () -> {
-                List<Wegpunkte.Ecke> rest = new ArrayList<>(ecke.form().ecken());
-                rest.remove(ecke.index());
-                Wegpunkte.INSTANZ.ersetze(ecke.form(), rest);
-            }));
-        }
-        if (region != null) {
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.ebene"), () -> ebenenWahl(region.ebene(), id -> Wegpunkte.INSTANZ.ordne(region, id))));
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.region_loeschen"), () -> Wegpunkte.INSTANZ.loesche(region)));
-        }
+        // Eine eigene Form beginnt hier. Siehe docs/wegpunkte.md, „Eigene Formen“.
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_von_hier"), () -> beginne(z[0], z[1])));
     }
 
     /**
@@ -1810,6 +2246,10 @@ final class Karte extends Screen {
 
     @Override
     public boolean mouseDragged(MouseButtonEvent ereignis, double dx, double dy) {
+        // Bei offenem Eingabefeld zieht die Maus nur einen Regler, nie die Karte.
+        if (eingabe != null) {
+            return super.mouseDragged(ereignis, dx, dy);
+        }
         // Ein Zug, der in der Tafel beginnt, oder einer mit einem Wegpunkt an der Maus schiebt die Karte nicht.
         if (klickVerbraucht || haengt != null || eckeHaengt != null || griffHaengt != null) {
             return true;
@@ -1879,6 +2319,13 @@ final class Karte extends Screen {
         // Escape bricht dann eine Region ab, die der Spieler setzt.
         if (ereignis.key() == InputConstants.KEY_ESCAPE && zug != null) {
             zug = null;
+            return true;
+        }
+        // Entf oder ⌫ löscht, was unter der Maus hervorgehoben steht; ⌫, weil die Taste auf dem Mac so heisst. Nicht im Bau, nicht
+        // bei gedrückter Taste und nicht bei offenem Menü: Die Hervorhebung des letzten Frames stünde dann noch. Siehe
+        // docs/wegpunkte.md, „Bedienung“.
+        if ((ereignis.key() == InputConstants.KEY_DELETE || ereignis.key() == InputConstants.KEY_BACKSPACE) && zug == null && !taste
+                && ziel == null && loescheUnterMaus()) {
             return true;
         }
         if (HeroicMap.karte != null && HeroicMap.karte.matches(ereignis)) {

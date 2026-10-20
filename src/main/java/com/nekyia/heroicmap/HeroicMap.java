@@ -28,6 +28,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
+import net.minecraft.util.Util;
 import org.slf4j.Logger;
 
 /** Meldet Minimap, Download, Tasten, Befehle, Menü und Ereignisse an. Siehe docs/minimap.md, docs/download.md. */
@@ -74,6 +75,8 @@ public final class HeroicMap implements ClientModInitializer {
         // Client-Mods mit Entrypoint heroicmap legen ihre Ebenen an, sobald der Client läuft. Siehe docs/api.md.
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> FabricLoader.getInstance()
                 .getEntrypoints(ID, HeroicMapClientApi.Listener.class).forEach(HeroicMapClientApi.Listener::ready));
+        // Einmal je Start im Hintergrund, nach den Einstellungen. Siehe docs/vollbildkarte.md, „Neue Version“.
+        ClientLifecycleEvents.CLIENT_STARTED.register(client -> NeueVersion.frage());
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             Teleport.tick(client);
             boolean geaendert = false;
@@ -91,7 +94,7 @@ public final class HeroicMap implements ClientModInitializer {
             Selbst.INSTANZ.arbeite(client);
             // Beim Wechsel ins Sterben einmal der Todespunkt. Siehe docs/wegpunkte.md, „Todespunkt“.
             boolean tot = client.player != null && client.player.isDeadOrDying();
-            if (tot && !warTot && client.level != null && Minimap.INSTANZ.todespunkt()) {
+            if (tot && !warTot && client.level != null && Minimap.INSTANZ.todespunkte() > 0) {
                 gestorben(client);
             }
             warTot = tot;
@@ -124,6 +127,7 @@ public final class HeroicMap implements ClientModInitializer {
             Minimap.INSTANZ.leeren();
             Downloads.INSTANZ.leeren();
             Mitspieler.INSTANZ.leeren();
+            Webkarte.INSTANZ.leeren();
             Ebenen.INSTANZ.leeren();
             Symbole.INSTANZ.leeren();
             Tafeln.INSTANZ.leeren();
@@ -140,6 +144,7 @@ public final class HeroicMap implements ClientModInitializer {
                 ClientCommands.literal("hmap")
                         .executes(HeroicMap::menue)
                         .then(ClientCommands.literal("angebot").executes(HeroicMap::angebot))
+                        .then(ClientCommands.literal("web").executes(HeroicMap::web))
                         .then(ClientCommands.literal("karte")
                                 .then(ClientCommands.argument("x", IntegerArgumentType.integer(-Wegpunkte.MAX_KOORDINATE, Wegpunkte.MAX_KOORDINATE))
                                         .then(ClientCommands.argument("z", IntegerArgumentType.integer(-Wegpunkte.MAX_KOORDINATE, Wegpunkte.MAX_KOORDINATE))
@@ -151,6 +156,12 @@ public final class HeroicMap implements ClientModInitializer {
                         .then(ClientCommands.literal("abgleich")
                                 .then(ClientCommands.argument("baum", StringArgumentType.word())
                                         .executes(HeroicMap::abgleich)))));
+    }
+
+    /** Öffnet die Webkarte im Browser wie der Knopf auf der Karte. Siehe docs/vollbildkarte.md, „Im Browser öffnen“. */
+    private static int web(CommandContext<FabricClientCommandSource> c) {
+        c.getSource().sendFeedback(Webkarte.INSTANZ.klick(Symbole.INSTANZ.basis(), Util.getMillis()));
+        return 1;
     }
 
     /** Öffnet das Menü; nach einem Befehl schliesst der Chat noch, das Menü kommt danach. */
@@ -166,7 +177,7 @@ public final class HeroicMap implements ClientModInitializer {
      */
     static void gestorben(Minecraft mc) {
         int x = mc.player.getBlockX(), z = mc.player.getBlockZ();
-        Wegpunkte.INSTANZ.setzeTod(mc.level.dimension().identifier().toString(), x, z);
+        Wegpunkte.INSTANZ.setzeTod(mc.level.dimension().identifier().toString(), x, z, Minimap.INSTANZ.todespunkte());
         mc.player.sendSystemMessage(Wegpunkte.todMeldung(x, z));
     }
 

@@ -38,7 +38,7 @@ class EbenenCodeTest {
             w.ordne(f, farmen);
         }
         // Der Todespunkt und was in Base liegt, gehören nicht in den Code.
-        w.setzeTod(WELT, 50, 50);
+        w.setzeTod(WELT, 50, 50, 1);
         w.setze(WELT, 60, 60);
         // Aus Base kopiert: der Wegpunkt dort, der Todespunkt nicht.
         assertEquals(List.of(new EbenenCode.Ort(WELT, 60, 60, w.punkte().getLast().farbe())),
@@ -51,8 +51,8 @@ class EbenenCodeTest {
         assertEquals(List.of(new EbenenCode.Ort(WELT, 12, -40, w.punkte().get(0).farbe()),
                 new EbenenCode.Ort("minecraft:the_nether", 3, 4, w.punkte().get(1).farbe())), g.inhalt().orte());
         // Mit eigener Farbe steht im Code nur „#RRGGBB“, kein Index; gelesen ist er 0.
-        assertEquals(List.of(new EbenenCode.Form(WELT, List.of(e(0, 0), e(10, 0), e(10, 10)), 0, 0x3A7FD5, "Hof"),
-                new EbenenCode.Form(WELT, List.of(e(0, 20), e(10, 20)), w.eigeneFormen().get(1).farbe(), Wegpunkte.KEIN_HEX, null)),
+        assertEquals(List.of(new EbenenCode.Form(WELT, List.of(e(0, 0), e(10, 0), e(10, 10)), 0, 0x3A7FD5, "Hof", 1, 0, 0),
+                new EbenenCode.Form(WELT, List.of(e(0, 20), e(10, 20)), w.eigeneFormen().get(1).farbe(), Wegpunkte.KEIN_HEX, null, 1, 0, 0)),
                 g.inhalt().formen());
         // Eingefügt in eine andere Welt: eine neue Ebene, an, nichts angeheftet.
         Wegpunkte andere = new Wegpunkte();
@@ -100,9 +100,49 @@ class EbenenCodeTest {
             voll.setzeForm(WELT, List.of(e(i, 0), e(i, 5)));
         }
         EbenenCode.Inhalt eine = new EbenenCode.Inhalt("X", List.of(),
-                List.of(new EbenenCode.Form(WELT, List.of(e(0, 9), e(5, 9)), 0, Wegpunkte.KEIN_HEX, null)));
+                List.of(new EbenenCode.Form(WELT, List.of(e(0, 9), e(5, 9)), 0, Wegpunkte.KEIN_HEX, null, 1, 0, 0)));
         assertEquals("formen_voll", voll.fuegeEin(eine).fehler());
         assertEquals(1, voll.ebenen().size());
+    }
+
+    @Test
+    void schriftUndBiegungImCode() {
+        // Schrift und Biegung einer Form gehen mit (mod#150); ohne Vorgabe stehen sie nicht im Code.
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        w.setzeForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10)));
+        w.setzeForm(WELT, List.of(e(0, 20), e(10, 20)));
+        w.benenne(w.stil(w.eigeneFormen().get(0), 0.5, 120, -4), "Hof");
+        EbenenCode.Gelesen g = EbenenCode.lies(EbenenCode.schreibe(w, Wegpunkte.BASE));
+        assertEquals(List.of(0.5, 1.0), g.inhalt().formen().stream().map(EbenenCode.Form::schrift).toList());
+        assertEquals(List.of(120, 0), g.inhalt().formen().stream().map(EbenenCode.Form::biegung).toList());
+        // Das Gewicht ebenso (mod#163).
+        assertEquals(List.of(-4, 0), g.inhalt().formen().stream().map(EbenenCode.Form::gewicht).toList());
+        Wegpunkte andere = new Wegpunkte();
+        andere.lies((Path) null);
+        assertNull(andere.fuegeEin(g.inhalt()).fehler());
+        assertEquals(0.5, andere.eigeneFormen().get(0).schrift());
+        assertEquals(120, andere.eigeneFormen().get(0).biegung());
+        assertEquals(-4, andere.eigeneFormen().get(0).gewicht());
+        // Zwischenwerte auf die nächste Raste; falscher Typ oder ausserhalb der Grenzen macht den Code kaputt.
+        String gut = "{\"v\":1,\"name\":\"N\",\"formen\":[{\"dimension\":\"minecraft:overworld\",\"ecken\":[[0,0],[5,0],[5,5]],"
+                + "\"farbe\":0,\"schrift\":0.3,\"biegung\":37}]}";
+        EbenenCode.Form f = EbenenCode.lies(EbenenCode.packe(gut)).inhalt().formen().get(0);
+        assertEquals(1.0 / 3, f.schrift());
+        assertEquals(30, f.biegung());
+        for (String[] falsch : new String[][] {
+            {"\"schrift\":0.3", "\"schrift\":5"},
+            {"\"schrift\":0.3", "\"schrift\":\"2\""},
+            {"\"schrift\":0.3", "\"schrift\":null"},
+            {"\"biegung\":37", "\"biegung\":181"},
+            {"\"biegung\":37", "\"biegung\":1.5"},
+            {"\"biegung\":37", "\"biegung\":\"90\""},
+            {"\"biegung\":37", "\"biegung\":37,\"gewicht\":10"},
+            {"\"biegung\":37", "\"biegung\":37,\"gewicht\":1.5"},
+            {"\"biegung\":37", "\"biegung\":37,\"gewicht\":\"2\""},
+        }) {
+            assertEquals("kaputt", EbenenCode.lies(EbenenCode.packe(gut.replace(falsch[0], falsch[1]))).fehler(), falsch[1]);
+        }
     }
 
     @Test

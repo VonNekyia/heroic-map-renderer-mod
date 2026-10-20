@@ -4,10 +4,46 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
-## 0.2.54
+## 0.2.62
 
 - **The minimap zooms out one step further,** to 0.5×: it shows four times the area, one pixel per block at GUI scale 2.
 - **Minimap zoom is a slider** in the menu, with one notch per step, like the sliders in the game's options. The zoom key still steps through all levels.
+
+## 0.2.60
+
+- **Which shape lies on top.** Under "Color…" on a shape's handle sits a weight slider from −9 to +9. A heavier shape is drawn above lighter ones, fill, border and name, on the full map and the minimap; clicks hit the shape on top. Where two pinned regions share an edge, only the heavier one's veil shows.
+
+## 0.2.59
+
+- **Bigger, smaller and curved names.** When you name a shape, two sliders sit under the field: text size from ¼× to 4×, and for regions a curve of up to 180° upward or downward. The map shows them right away; Enter keeps them, Esc undoes them. Shared codes carry them along.
+
+## 0.2.58
+
+- **Several death points.** "Death points" under "Settings …" is now a slider: off, or keep 1 to 16. Each death adds one where you died; the oldest drop off. Lowering the slider removes the oldest when you close the menu, not while you drag. Only the newest is pinned, so the beam leads to your last death. Death points can't be dragged any more; delete them from the right-click menu or with `Delete`.
+
+## 0.2.57
+
+- **New version hint.** When Modrinth has a newer Heroic Map for your game version, the full map shows it top left. A click opens the Modrinth page after the game's usual link prompt. Turn it off with "Report new version" under "Settings …"; then the mod doesn't ask Modrinth at all.
+- **Snap with Ctrl.** Hold `Ctrl` (`⌘` on a Mac) while you drag a corner or a waypoint on the full map, and it snaps onto a nearby corner of another shape or, for a corner, onto a waypoint. Regions now meet cleanly.
+
+## 0.2.56
+
+- **Coordinates stay on screen.** The line under the minimap no longer runs off the edge with large numbers and the height shown: it moves toward the screen and ends flush with the minimap in a corner. If there is room neither below nor above the minimap, it sits at the bottom of the screen.
+
+## 0.2.55
+
+- **A menu for what you click.** Right-click a waypoint, a corner or the diamond of an old rectangle on the full map, and the menu shows only what concerns it. The free map keeps the general menu.
+- **Set coordinates.** "Set coordinates…" on a waypoint or a corner moves it to the `x z` you type.
+- **Delete with a key.** `Delete` or `Backspace` removes the waypoint, corner, shape (at its handle) or old rectangle under the mouse.
+- **Right-click finishes a shape.** While you build a line or region on the full map, a right-click finishes it: two corners make a line, more make a region. With only one corner, a note says so. Right-click a shape's handle to get its menu, including "Cancel shape"; `Esc` cancels as before.
+
+## 0.2.54
+
+- **Open the web map in your browser, already logged in.** "Open in browser" on the full map, or `/hmap web`, opens the server's web map and logs you in, so it knows exactly who you are and lets you click there too. It needs a server with a matching Heroic Map plugin; otherwise the button is grey and says why.
+
+## 0.2.53
+
+- **Buttons in info panels.** A server plugin can put buttons under the info panel of a place on the full map, for example "Ship" at every town. Click one to switch it on or off for you; the square on the left is filled while it is on. If the server does not answer within a few seconds, the button is free again and a note says so.
 
 ## 0.2.52
 

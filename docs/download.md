@@ -58,12 +58,14 @@ der Mod mit den Kacheln zeigt, steht unter [Vollbildkarte](vollbildkarte.md).
   „Mitspieler“. `ebenen` und `ebene` bringen die Ebenen, `tafel` die Tafel
   eines Objekts, siehe [Ebenen](ebenen.md), „Infotafel“, `banner` das
   Sprite eines geheimen Banners, siehe [Ebenen](ebenen.md), „Geheime
-  Banner“; `ebene`, `tafel` und `banner` liest schon der Thread des Netzes. Nachrichten mit einem anderen
+  Banner“; `ebene`, `tafel` und `banner` liest schon der Thread des Netzes.
+  `web` bringt das Token für die Webkarte, siehe „Webkarte“ unten. Nachrichten mit einem anderen
   `v` als 1 oder über 1 MiB verwirft er; so gross wird nur ein Teil einer
   Ebene.
-- **Senden:** `anfrage`, `show`, `tafel` und `banner` nur, wenn
+- **Senden:** `anfrage`, `show`, `tafel`, `knopf`, `banner` und `web` nur, wenn
   `ClientPlayNetworking.canSend` wahr ist, also wenn das Plugin den Kanal
-  angemeldet hat. Zu `show` siehe [Minimap](minimap.md), „Mitspieler“.
+  angemeldet hat. Zu `show` siehe [Minimap](minimap.md), „Mitspieler“, zu
+  `knopf` [Ebenen](ebenen.md), „Knöpfe“.
 - **`neu: true`** steht in der `anfrage` eines vollen Downloads, wenn es
   für den Massstab keinen Stand zum Fortsetzen gibt, also kein `etags.txt`
   im Ordner des Massstabs (`Laden.hatStand`), etwa nachdem die Karte
@@ -84,6 +86,27 @@ der Mod mit den Kacheln zeigt, steht unter [Vollbildkarte](vollbildkarte.md).
   der IP der Verbindung ist das Ziel der Spielserver selbst. So hat es der
   Reviewer auf Wunsch des Users entschieden.
 
+- **Webkarte** (heroic-map-renderer-plugin#85), siehe [Vollbildkarte](vollbildkarte.md),
+  „Im Browser öffnen“:
+
+  ```json
+  {"v":1,"typ":"web"}
+  {"v":1,"typ":"web","jetzt":1760000000,"erlaubt":true,"token":"…"}
+  {"v":1,"typ":"web","jetzt":1760000000,"erlaubt":false,"grund":"rate","wieder":12}
+  ```
+
+  - `grund` ist `permission`, `webserver`, `rate` oder `sonst`; einen
+    anderen liest der Mod wie `sonst`.
+  - `wieder` sind bei `web` die Sekunden bis zum nächsten Link, anders als
+    bei `abgelehnt`, wo es eine Uhrzeit ist.
+  - Die Antwort auf `show` trägt `"web": true` oder `false`: ob der Spieler
+    jetzt einen Link bekäme. Fehlt das Feld, ist das Plugin alt, und der
+    Mod fragt nicht.
+  - Die Liste `ebenen` kommt mit `url` oder `port`, sobald der Webserver
+    eine Adresse hat, auch leer, `"ebenen":[]`. Aus ihr nimmt der Mod die
+    Basis, siehe [Ebenen](ebenen.md), „Symbole“.
+  - Eine Antwort `web` ohne offene Frage übergeht der Mod.
+
 ## Befehle
 
 | Befehl | tut |
@@ -91,6 +114,7 @@ der Mod mit den Kacheln zeigt, steht unter [Vollbildkarte](vollbildkarte.md).
 | `/hmap angebot` | die angebotenen Karten mit Dimension und Grösse je Massstab |
 | `/hmap laden <baum> <1, 2 oder 4>` | fragt erst im Dialog nach Grösse und Massstab, dann einen vollen Download an, siehe „Zustimmung und Grösse“ |
 | `/hmap karte <x> <z>` | öffnet die Vollbildkarte der jetzigen Dimension mit dem Block (x, z) in der Mitte, Stufe und Lupe wie beim letzten Schliessen (`Karte.bei`); das ruft der Klick auf den Todespunkt im Chat, siehe [Wegpunkte](wegpunkte.md), „Todespunkt“ |
+| `/hmap web` | öffnet die Webkarte im Browser und meldet dort an, wie der Knopf „Im Browser öffnen“, siehe [Vollbildkarte](vollbildkarte.md), „Im Browser öffnen“; was nicht geht, steht im Chat |
 | `/hmap abgleich <baum>` | fragt einen Abgleich von Hand an, im gespeicherten Massstab; nach einer Ablehnung mit `wieder` erst ab dann wieder |
 
 Dieselben Wege gehen über die Knöpfe der [Vollbildkarte](vollbildkarte.md), „Bedienung“.

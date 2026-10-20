@@ -7,15 +7,19 @@ import com.sun.net.httpserver.HttpServer;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.IntPredicate;
 import java.util.zip.Deflater;
 import javax.imageio.ImageIO;
@@ -26,11 +30,17 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContex
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
 import net.minecraft.client.MouseHandler;
+import net.minecraft.SharedConstants;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.screens.ConfirmLinkScreen;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Util;
 import net.minecraft.util.Mth;
@@ -83,9 +93,15 @@ public final class Bedienung implements FabricClientGameTest {
             context.runOnClient(mc -> mc.gui.setScreen(null));
             beiF3(context, maus);
             schleierRegler(context, maus, k);
+            todRegler(context, maus, k);
 
             karte(context, maus, k);
+            // Vor tod: Der lässt den Spieler am Ende fallen, und ein toter Spieler hat statt der Karte den Todesschirm.
+            knoepfeGross(context, maus);
             teleport(context, spiel.getServer(), maus, k);
+            // Vor tod: Der lässt den Spieler am Ende in der Luft, er fällt.
+            imBrowser(context, maus, k);
+            neueVersion(context, maus, k);
             tod(context, spiel.getServer(), maus, k);
         } finally {
             context.runOnClient(mc -> Wegpunkte.INSTANZ.leeren());
@@ -147,11 +163,18 @@ public final class Bedienung implements FabricClientGameTest {
         formenZiehen(context, maus, k);
         schweben(context, maus, k);
         namen(context, maus, k);
+        schriftUndBiegung(context, maus, k);
         farbe(context, maus, k);
+        gewicht(context, maus, k);
         hinweisWeg(context, maus, k);
         wegpunktBei(context, maus, k);
+        menueJeObjekt(context, maus, k);
+        einrasten(context, maus, k);
+        rechtsklickImBau(context, maus, k);
+        entfernen(context, maus, k);
         eigeneEbenen(context, maus, k);
         ebenenTeilen(context, maus, k);
+        knoepfe(context, maus, k);
         ebenen(context, maus, k);
         zumSpieler(context, maus, k);
         optionen(context, maus, k);
@@ -294,9 +317,7 @@ public final class Bedienung implements FabricClientGameTest {
         double[] vorDoppel = mitte(context);
         maus.setCursorPos(mittig.x() * k, mittig.y() * k);
         context.waitTick();
-        maus.pressMouse(LINKS);
-        context.waitTick();
-        maus.pressMouse(LINKS);
+        doppelklick(maus);
         context.waitTicks(2);
         warte250();
         context.waitTicks(2);
@@ -378,11 +399,18 @@ public final class Bedienung implements FabricClientGameTest {
         if (kreisAngeheftet(context)) {
             throw new AssertionError("Ein Klick heftete den Kreis an");
         }
+        // Zwei Klicks mit 300 ms Abstand nach der Uhr sind keiner: Den Abstand hält der Test selbst.
+        warte250();
+        maus.pressMouse(LINKS);
+        schlafe(300);
+        maus.pressMouse(LINKS);
+        context.waitTicks(2);
+        if (kreisAngeheftet(context)) {
+            throw new AssertionError("Zwei Klicks 300 ms auseinander hefteten den Kreis an");
+        }
         for (boolean an : new boolean[] {true, false}) {
             warte250();
-            maus.pressMouse(LINKS);
-            context.waitTick();
-            maus.pressMouse(LINKS);
+            doppelklick(maus);
             context.waitTicks(2);
             if (kreisAngeheftet(context) != an) {
                 throw new AssertionError("Doppelklick auf den Kreis: angeheftet " + !an + " statt " + an);
@@ -392,9 +420,7 @@ public final class Bedienung implements FabricClientGameTest {
         warte250();
         maus.setCursorPos(breite / 2.0 * k, ny * k);
         context.waitTick();
-        maus.pressMouse(LINKS);
-        context.waitTick();
-        maus.pressMouse(LINKS);
+        doppelklick(maus);
         context.waitTicks(2);
         if (!context.computeOnClient(mc -> Wegpunkte.INSTANZ.nadelAngeheftet("test:anheften", "hafen"))) {
             throw new AssertionError("Doppelklick auf die Nadel heftet sie nicht an");
@@ -405,15 +431,384 @@ public final class Bedienung implements FabricClientGameTest {
                 .filter(m -> m.region() != null).findFirst().orElseThrow(() -> new AssertionError("Keine Raute der Region")));
         maus.setCursorPos(raute.x() * k, raute.y() * k);
         context.waitTick();
-        maus.pressMouse(LINKS);
-        context.waitTick();
-        maus.pressMouse(LINKS);
+        doppelklick(maus);
         context.waitTicks(2);
         if (!context.computeOnClient(mc -> Wegpunkte.INSTANZ.regionen().getFirst().angeheftet())) {
             throw new AssertionError("Doppelklick auf die Raute heftet die Region nicht an");
         }
         context.runOnClient(mc -> Ebenen.INSTANZ.leeren());
         warte250();
+    }
+
+    /** Die Tafel der Stadt, wie das Plugin sie schickt: Titel, eine Zeile und dahinter die Knöpfe „Schiff“ und „Zug“ mit Zustand. */
+    private static String stadtTafel(String version, boolean schiff, boolean zug) {
+        return """
+                {"v":1,"typ":"tafel","jetzt":1,"ebene":"test:knopf","version":"%s","id":"stadt","panel":{"blocks":[
+                  {"type":"title","text":"Hafenstadt"},
+                  {"type":"lines","lines":["Routen per Schiff"]},
+                  {"type":"button","id":"beispiel:schiff","label":{"de":"Schiff","en":"Ship"},"on":%s},
+                  {"type":"button","id":"beispiel:zug","label":{"de":"Zug","en":"Train"},"on":%s}]}}""".formatted(version, schiff, zug);
+    }
+
+    /** Die Ebene test:knopf mit den Nadeln „stadt“, „dorf“ und „voll“, je mit dem Fuss an der Stelle des Schirms; ein Block sind 4 Einheiten. */
+    private static void knopfEbene(ClientGameTestContext context, String version, double[]... fuesse) {
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+        double[] mitte = mitte(context);
+        String[] ids = {"stadt", "dorf", "voll"};
+        StringBuilder nadeln = new StringBuilder();
+        for (int i = 0; i < fuesse.length; i++) {
+            nadeln.append(i == 0 ? "" : ",").append("{\"type\":\"pin\",\"id\":\"%s\",\"at\":[%s,%s],\"name\":\"%s\"}".formatted(ids[i],
+                    (mitte[0] + fuesse[i][0] - breite / 2.0) / 4, (mitte[1] + fuesse[i][1] - hoehe / 2.0) / 4, ids[i]));
+        }
+        context.runOnClient(mc -> {
+            Ebenen.INSTANZ.empfange(JsonParser.parseString("""
+                    {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:knopf","visible":true,"version":"%s"}]}""".formatted(version))
+                    .getAsJsonObject());
+            Ebenen.INSTANZ.teil(Ebenen.Teil.lies("""
+                    {"v":1,"typ":"ebene","jetzt":1,"id":"test:knopf","version":"%s","teil":1,"teile":1,"objects":[%s]}"""
+                    .formatted(version, nadeln)));
+        });
+        context.waitTick();
+    }
+
+    /**
+     * Fährt wie die Hand auf die Nadel mit dem Fuss bei {@code fuss}, bis der Mod ihre Tafel fragt, und antwortet wie das
+     * Plugin; dann steht die Tafel mit ihren Knöpfen. Wo das Schild liegt, sagt die Karte selbst.
+     */
+    private static double[] oeffne(ClientGameTestContext context, TestInput maus, int k, double[] fuss, Tafeln.Ziel ziel,
+            List<Tafeln.Ziel> fragen, String antwort) {
+        double[] auf = null;
+        for (int dy = 0; dy <= 24 && auf == null; dy += 2) {
+            double y = fuss[1] - dy;
+            if (ziel.equals(context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zielBei(fuss[0], y)))) {
+                auf = new double[] {fuss[0], y};
+            }
+        }
+        if (auf == null) {
+            throw new AssertionError("Keine Nadel „" + ziel.id() + "“ über " + fuss[0] + "," + fuss[1]);
+        }
+        // Stand der Zeiger schon auf ihr, als die Ebene kam, ging die Frage schon hinaus; darum jede Frage nach diesem Ziel.
+        fahre(context, maus, k, auf[0], auf[1]);
+        for (int i = 0; i < 40 && !fragen.contains(ziel); i++) {
+            context.waitTick();
+        }
+        if (!fragen.contains(ziel)) {
+            double[] ort = auf;
+            throw new AssertionError("Keine Frage nach " + ziel + ": " + context.computeOnClient(mc -> {
+                Karte karte = (Karte) mc.gui.screen();
+                double x = mc.mouseHandler.xpos() / mc.getWindow().getGuiScale(), y = mc.mouseHandler.ypos() / mc.getWindow().getGuiScale();
+                return "GS " + mc.getWindow().getGuiScale() + ", Fenster " + mc.getWindow().getWidth() + " × " + mc.getWindow().getHeight()
+                        + ", Zeiger " + x + "," + y + " statt " + ort[0] + "," + ort[1] + ", Ziel dort " + karte.zielBei(x, y) + ", Tafel "
+                        + karte.tafelOffen() + ", Menü " + Arrays.toString(karte.ziel()) + ", Knopf " + karte.getChildAt(x, y).isPresent()
+                        + ", Fragen " + fragen;
+            }));
+        }
+        antworte(context, antwort);
+        context.waitFor(mc -> !((Karte) mc.gui.screen()).knopfStuecke().isEmpty(), 20);
+        return auf;
+    }
+
+    /**
+     * Ein schneller Schwung des Zeigers in die offene Tafel, 4 Einheiten in ihre linke obere Ecke, in einem Frame wie eine
+     * Hand, die zielt: So geht sie auch auf einem langsamen Runner nicht zu, weil der Zeiger zu lange über keinem Ziel steht.
+     */
+    private static void rein(ClientGameTestContext context, TestInput maus, int k) {
+        int[] t = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelKasten());
+        maus.setCursorPos((t[0] + 4) * k, (t[1] + 4) * k);
+        context.waitTick();
+    }
+
+    private static void antworte(ClientGameTestContext context, String antwort) {
+        context.runOnClient(mc -> Tafeln.INSTANZ.antwort(Tafeln.Antwort.lies(antwort)));
+        context.waitTicks(2);
+    }
+
+    /** Der Zustand des Knopfs {@code id} in der offenen Tafel, wie gezeichnet, oder null ohne ihn. */
+    private static Boolean knopfAn(ClientGameTestContext context, String id) {
+        return context.computeOnClient(mc -> ((Karte) mc.gui.screen()).knopfStuecke().stream().filter(s -> s.knopf().id().equals(id))
+                .map(s -> s.knopf().an()).findFirst().orElse(null));
+    }
+
+    private static double[] mitteDes(ClientGameTestContext context, String id) {
+        int[] b = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).knopfKasten(id));
+        if (b == null) {
+            throw new AssertionError("Kein Knopf " + id + " in der Tafel");
+        }
+        return new double[] {b[0] + b[2] / 2.0, b[1] + b[3] / 2.0};
+    }
+
+    /**
+     * Knöpfe in der Tafel (#294 Teil 6), mit Klicks wie von Hand. Das Plugin spielt der Test: Er merkt jede Frage und
+     * jeden Klick und antwortet wie das Plugin. Siehe docs/ebenen.md, „Knöpfe“.
+     */
+    private static void knoepfe(ClientGameTestContext context, TestInput maus, int k) {
+        List<Tafeln.Ziel> fragen = new CopyOnWriteArrayList<>();
+        List<String> klicks = new CopyOnWriteArrayList<>();
+        Tafeln.fragen = fragen::add;
+        Tafeln.druecken = (z, knopf) -> klicks.add(z.id() + "@" + z.version() + " " + knopf);
+        try {
+            knoepfeSchritte(context, maus, k, fragen, klicks);
+        } finally {
+            Tafeln.fragen = Kanal::frageTafel;
+            Tafeln.druecken = Kanal::drueckeKnopf;
+            context.runOnClient(mc -> {
+                Ebenen.INSTANZ.leeren();
+                Tafeln.INSTANZ.leeren();
+            });
+        }
+    }
+
+    private static void knoepfeSchritte(ClientGameTestContext context, TestInput maus, int k, List<Tafeln.Ziel> fragen, List<String> klicks) {
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+        double cx = breite / 2.0, cy = hoehe / 2.0;
+        // Links oben und links unten, damit die Tafeln rechts davon aufgehen; die volle rechts unten.
+        double[] stadt = {cx - 150, cy - 70}, dorf = {cx - 150, cy + 40}, voll = {cx + 40, cy + 60};
+        for (double[] o : new double[][] {stadt, dorf, voll}) {
+            boolean frei = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).marken().stream()
+                    .noneMatch(m -> Math.abs(m.x() - o[0]) < 16 && Math.abs(m.y() - o[1]) < 16));
+            if (!frei) {
+                throw new AssertionError("Eine Marke liegt bei " + o[0] + "," + o[1] + "; der Test braucht dort freie Karte");
+            }
+        }
+        knopfEbene(context, "1", stadt, dorf, voll);
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        Tafeln.Ziel ziel = new Tafeln.Ziel("test:knopf", "1", "stadt");
+        String schiff = "beispiel:schiff", zug = "beispiel:zug";
+
+        // Die Tafel mit zwei Knöpfen unter dem Inhalt: Schiff aus, Zug an.
+        double[] aufStadt = oeffne(context, maus, k, stadt, ziel, fragen, stadtTafel("1", false, true));
+        if (!Boolean.FALSE.equals(knopfAn(context, schiff)) || !Boolean.TRUE.equals(knopfAn(context, zug))) {
+            throw new AssertionError("Tafel der Stadt: Schiff " + knopfAn(context, schiff) + ", Zug " + knopfAn(context, zug));
+        }
+        context.takeScreenshot(TestScreenshotOptions.of("knoepfe").disableCounterPrefix());
+
+        // Ein Klick auf „Schiff“: genau ein knopf mit Objekt, version und Knopf; danach ist er gesperrt, ein Doppelklick schickt nichts.
+        rein(context, maus, k);
+        double[] s = mitteDes(context, schiff);
+        spielerKlick(context, maus, k, s[0], s[1]);
+        if (!klicks.equals(List.of("stadt@1 " + schiff)) || !context.computeOnClient(mc -> Tafeln.INSTANZ.gesperrt(ziel, schiff))) {
+            throw new AssertionError("Klick auf „Schiff“: " + klicks + ", gesperrt "
+                    + context.computeOnClient(mc -> Tafeln.INSTANZ.gesperrt(ziel, schiff)));
+        }
+        doppelklick(maus);
+        context.waitTicks(2);
+        if (klicks.size() != 1) {
+            throw new AssertionError("Doppelklick auf den gesperrten Knopf: " + klicks);
+        }
+        // Nach dem Ereignis schickt das Plugin die Tafel, hier noch mit dem alten Zustand: gesperrt, der Mod fragt neu.
+        int vorher = fragen.size();
+        antworte(context, stadtTafel("1", false, true));
+        context.waitFor(mc -> fragen.size() > vorher, 40);
+        if (!context.computeOnClient(mc -> Tafeln.INSTANZ.gesperrt(ziel, schiff))) {
+            throw new AssertionError("Die Tafel mit dem alten Zustand gab den Knopf frei");
+        }
+        // Die Antwort auf die Nachfrage mit dem neuen Zustand: das Quadrat gefüllt, der Knopf frei.
+        antworte(context, stadtTafel("1", true, true));
+        if (!Boolean.TRUE.equals(knopfAn(context, schiff)) || context.computeOnClient(mc -> Tafeln.INSTANZ.gesperrt(ziel, schiff))) {
+            throw new AssertionError("Neuer Zustand: Schiff " + knopfAn(context, schiff) + ", gesperrt "
+                    + context.computeOnClient(mc -> Tafeln.INSTANZ.gesperrt(ziel, schiff)));
+        }
+        context.takeScreenshot(TestScreenshotOptions.of("knoepfe-an").disableCounterPrefix());
+
+        // Ohne Antwort: Klick auf „Zug“. Der Mod fragt nach 0,3, 0,8, 1,5 und 3 s, nach 3,5 s ist der Knopf frei, mit Hinweis.
+        double[] z = mitteDes(context, zug);
+        int vorZug = fragen.size();
+        spielerKlick(context, maus, k, z[0], z[1]);
+        long seit = Util.getMillis();
+        context.waitFor(mc -> !Tafeln.INSTANZ.gesperrt(ziel, zug), 400);
+        long dauer = Util.getMillis() - seit;
+        String hinweis = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).hinweis() == null ? null
+                : ((Karte) mc.gui.screen()).hinweis().getString());
+        String erwartet = context.computeOnClient(mc -> Component.translatable("heroicmap.tafel.keine_antwort").getString());
+        if (klicks.size() != 2 || fragen.size() - vorZug != Tafeln.NACHFRAGEN.length || dauer < 3000 || !erwartet.equals(hinweis)
+                || !Boolean.TRUE.equals(knopfAn(context, zug))) {
+            throw new AssertionError("Ohne Antwort: " + klicks + ", " + (fragen.size() - vorZug) + " Nachfragen, frei nach " + dauer
+                    + " ms, Hinweis „" + hinweis + "“, Zug " + knopfAn(context, zug));
+        }
+
+        // Kein Klick in die Tafel wirkt auf die Karte: kein Wegpunkt, nichts angeheftet, kein Menü.
+        if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size()) != punkte
+                || context.computeOnClient(mc -> Wegpunkte.INSTANZ.nadelAngeheftet("test:knopf", "stadt"))
+                || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).ziel()) != null) {
+            throw new AssertionError("Ein Klick auf einen Knopf wirkte auf die Karte");
+        }
+
+        // Wieder aufgehen: Eine Tafel mit Knöpfen fragt der Mod neu und zeigt bis zur Antwort die gemerkte; ein Zustand von
+        // anderswo, etwa von der Webkarte, steht danach.
+        tafelZu(context, maus, k);
+        int vorAuf = fragen.size();
+        fahre(context, maus, k, aufStadt[0], aufStadt[1]);
+        for (int i = 0; i < 40 && !(fragen.size() > vorAuf && context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelOffen())); i++) {
+            context.waitTick();
+        }
+        if (fragen.size() <= vorAuf || !fragen.getLast().equals(ziel) || !Boolean.TRUE.equals(knopfAn(context, schiff))) {
+            throw new AssertionError("Wieder aufgegangen: gefragt " + fragen.subList(vorAuf, fragen.size()) + ", Schiff " + knopfAn(context, schiff));
+        }
+        antworte(context, stadtTafel("1", false, true));
+        if (!Boolean.FALSE.equals(knopfAn(context, schiff))) {
+            throw new AssertionError("Der Zustand von anderswo steht nicht: Schiff " + knopfAn(context, schiff));
+        }
+        // Rechts auf einen Knopf: kein knopf, kein Menü.
+        rein(context, maus, k);
+        double[] rechts = mitteDes(context, schiff);
+        fahre(context, maus, k, rechts[0], rechts[1]);
+        maus.pressMouse(RECHTS);
+        context.waitTicks(2);
+        if (klicks.size() != 2 || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).ziel()) != null) {
+            throw new AssertionError("Rechtsklick auf einen Knopf: " + klicks);
+        }
+
+        // Eine neue version der Ebene, ehe die Tafel zugeht: Ein Klick im selben Augenblick schickt nichts (Review),
+        // und nach dem Zugehen auch einer mit der Hand nicht.
+        rein(context, maus, k);
+        double[] alt = mitteDes(context, schiff);
+        int[] kasten = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelKasten());
+        context.runOnClient(mc -> {
+            Ebenen.INSTANZ.empfange(JsonParser.parseString("""
+                    {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:knopf","visible":true,"version":"2"}]}""").getAsJsonObject());
+            Ebenen.INSTANZ.teil(Ebenen.Teil.lies("""
+                    {"v":1,"typ":"ebene","jetzt":1,"id":"test:knopf","version":"2","teil":1,"teile":1,"objects":[]}"""));
+            mc.gui.screen().mouseClicked(new MouseButtonEvent(alt[0], alt[1], new MouseButtonInfo(LINKS, 0)), false);
+        });
+        context.waitTicks(2);
+        if (kasten == null || klicks.size() != 2) {
+            throw new AssertionError("Klick auf die Tafel einer alten version: Tafel " + Arrays.toString(kasten) + ", " + klicks);
+        }
+        if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelOffen())) {
+            throw new AssertionError("Die Tafel der alten version blieb offen");
+        }
+        spielerKlick(context, maus, k, alt[0], alt[1]);
+        if (klicks.size() != 2) {
+            throw new AssertionError("Klick mit der Hand nach der neuen version: " + klicks);
+        }
+
+        // Ein Objekt ohne Tafel mit einem Knopf: eine Tafel nur mit dem Knopf.
+        knopfEbene(context, "3", stadt, dorf, voll);
+        Tafeln.Ziel dorfZiel = new Tafeln.Ziel("test:knopf", "3", "dorf");
+        oeffne(context, maus, k, dorf, dorfZiel, fragen, """
+                {"v":1,"typ":"tafel","jetzt":1,"ebene":"test:knopf","version":"3","id":"dorf","panel":{"blocks":[
+                  {"type":"button","id":"beispiel:schiff","label":{"de":"Schiff","en":"Ship"},"on":false}]}}""");
+        int[] nurTafel = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelKasten());
+        int[] nurKnopf = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).knopfKasten(schiff));
+        if (nurTafel == null || nurKnopf == null || nurTafel[3] > nurKnopf[3] + 2 * Tafel.INNEN + 2) {
+            throw new AssertionError("Tafel nur mit dem Knopf: Tafel " + Arrays.toString(nurTafel) + ", Knopf " + Arrays.toString(nurKnopf));
+        }
+        tafelZu(context, maus, k);
+
+        // Eine volle Tafel, 64 Bausteine, und dahinter 5 Knöpfe: Die ersten 4 stehen darunter, gescrollt ist der letzte zu sehen.
+        StringBuilder bloecke = new StringBuilder();
+        for (int i = 0; i < Tafel.MAX_BAUSTEINE; i++) {
+            bloecke.append("{\"type\":\"lines\",\"lines\":[\"Zeile ").append(i).append("\"]},");
+        }
+        for (int i = 0; i < 5; i++) {
+            bloecke.append(i == 0 ? "" : ",").append("{\"type\":\"button\",\"id\":\"beispiel:k").append(i)
+                    .append("\",\"label\":{\"de\":\"Knopf ").append(i).append("\"},\"on\":false}");
+        }
+        oeffne(context, maus, k, voll, new Tafeln.Ziel("test:knopf", "3", "voll"), fragen,
+                "{\"v\":1,\"typ\":\"tafel\",\"jetzt\":1,\"ebene\":\"test:knopf\",\"version\":\"3\",\"id\":\"voll\",\"panel\":{\"blocks\":["
+                + bloecke + "]}}");
+        List<String> vier = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).knopfStuecke().stream().map(x -> x.knopf().id()).toList());
+        if (!vier.equals(List.of("beispiel:k0", "beispiel:k1", "beispiel:k2", "beispiel:k3"))) {
+            throw new AssertionError("Volle Tafel: Knöpfe " + vier);
+        }
+        int[] tafel = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelKasten());
+        rein(context, maus, k);
+        fahre(context, maus, k, tafel[0] + tafel[2] / 2.0, tafel[1] + tafel[3] / 2.0);
+        maus.scroll(-200);
+        context.waitTicks(2);
+        int[] letzter = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).knopfKasten("beispiel:k3"));
+        if (letzter == null || letzter[1] < tafel[1] || letzter[1] + letzter[3] > tafel[1] + tafel[3]) {
+            throw new AssertionError("Volle Tafel gescrollt: letzter Knopf " + Arrays.toString(letzter) + ", Tafel " + Arrays.toString(tafel));
+        }
+        // Gescrollt trifft ein Klick den Knopf, der dort zu sehen ist.
+        spielerKlick(context, maus, k, letzter[0] + letzter[2] / 2.0, letzter[1] + letzter[3] / 2.0);
+        if (!klicks.getLast().equals("voll@3 beispiel:k3")) {
+            throw new AssertionError("Klick auf den letzten Knopf der gescrollten Tafel: " + klicks);
+        }
+        // Review von #147: Blendet der Spieler die Ebene aus, während der Knopf wartet, fällt er still weg, ohne
+        // Nachfrage und ohne „Noch keine Antwort“; das Plugin antwortet darauf ohnehin nicht.
+        Tafeln.Ziel vollZiel = new Tafeln.Ziel("test:knopf", "3", "voll");
+        context.runOnClient(mc -> Ebenen.INSTANZ.setze("test:knopf", false));
+        int nachAus = fragen.size();
+        long bis = Util.getMillis() + Tafeln.GESPERRT_MS + 500;
+        while (Util.getMillis() < bis) {
+            context.waitTick();
+        }
+        String danach = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).hinweis() == null ? null
+                : ((Karte) mc.gui.screen()).hinweis().getString());
+        boolean wartet = context.computeOnClient(mc -> Tafeln.INSTANZ.gesperrt(vollZiel, "beispiel:k3"));
+        context.runOnClient(mc -> Ebenen.INSTANZ.setze("test:knopf", true));
+        if (fragen.size() != nachAus || wartet || erwartet.equals(danach)) {
+            throw new AssertionError("Ebene ausgeblendet, während der Knopf wartet: " + (fragen.size() - nachAus) + " Nachfragen, wartet "
+                    + wartet + ", Hinweis „" + danach + "“");
+        }
+        tafelZu(context, maus, k);
+    }
+
+    /**
+     * Bei GUI-Massstab 3 und 4 steht die Tafel mit Knöpfen ganz auf dem Schirm, jeder Knopf in ihr, mit vollem Label. Die
+     * Tafel hat ihren eigenen Massstab (0020); davon bleiben die Bilder. Siehe docs/ebenen.md, „Knöpfe“.
+     */
+    private static void knoepfeGross(ClientGameTestContext context, TestInput maus) {
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(),
+                mc.options.guiScale().get()});
+        List<Tafeln.Ziel> fragen = new CopyOnWriteArrayList<>();
+        Tafeln.fragen = fragen::add;
+        String fehler = null;
+        try {
+            for (int gs : new int[] {3, 4}) {
+                fragen.clear();
+                context.getInput().resizeWindow(1280, 240 * gs);
+                context.runOnClient(mc -> {
+                    mc.options.guiScale().set(gs);
+                    mc.resizeGui();
+                    mc.gui.setScreen(new Karte(Satz.lies(Bilder.testsatz())));
+                });
+                context.waitTicks(5);
+                int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+                int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+                double[] stadt = {breite / 2.0 - 80, hoehe / 2.0 - 50};
+                knopfEbene(context, "1", stadt);
+                oeffne(context, maus, gs, stadt, new Tafeln.Ziel("test:knopf", "1", "stadt"), fragen, stadtTafel("1", true, false));
+                context.takeScreenshot(TestScreenshotOptions.of("knoepfe-gs" + gs).disableCounterPrefix());
+                String f = context.computeOnClient(mc -> {
+                    Karte karte = (Karte) mc.gui.screen();
+                    int[] t = karte.tafelKasten();
+                    if (t[0] < 0 || t[1] < 0 || t[0] + t[2] > breite || t[1] + t[3] > hoehe) {
+                        return "Tafel " + Arrays.toString(t) + " nicht ganz auf dem Schirm " + breite + " × " + hoehe;
+                    }
+                    for (Tafel.Knopfstueck s : karte.knopfStuecke()) {
+                        int[] b = karte.knopfKasten(s.knopf().id());
+                        if (b[0] < t[0] || b[1] < t[1] || b[0] + b[2] > t[0] + t[2] || b[1] + b[3] > t[1] + t[3]) {
+                            return s.knopf().id() + " " + Arrays.toString(b) + " nicht in der Tafel " + Arrays.toString(t);
+                        }
+                        if (!s.label().equals(s.knopf().label(mc.getLanguageManager().getSelected().startsWith("de")))) {
+                            return "Label gekürzt: „" + s.label() + "“";
+                        }
+                    }
+                    return karte.knopfStuecke().size() == 2 ? null : karte.knopfStuecke().size() + " Knöpfe";
+                });
+                fehler = fehler != null ? fehler : f == null ? null : "GS " + gs + ": " + f;
+                context.runOnClient(mc -> {
+                    Ebenen.INSTANZ.leeren();
+                    Tafeln.INSTANZ.leeren();
+                });
+            }
+        } finally {
+            Tafeln.fragen = Kanal::frageTafel;
+            context.getInput().resizeWindow(vorher[0], vorher[1]);
+            context.runOnClient(mc -> {
+                mc.gui.setScreen(null);
+                mc.options.guiScale().set(vorher[2]);
+                mc.resizeGui();
+            });
+            context.waitTicks(2);
+        }
+        if (fehler != null) {
+            throw new AssertionError("Knöpfe: " + fehler);
+        }
     }
 
     /** Die Antwort des Plugins auf die Frage nach der Tafel der grossen Region unter den Wegpunkten. */
@@ -499,7 +894,7 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("Linksklick auf den ersten Punkt schloss keine Region: " + region);
         }
 
-        // Linie aus zwei Punkten: „Linie/Region von hier“, Linksklick auf den zweiten, dann „Form fertig“.
+        // Linie aus zwei Punkten: „Linie/Region von hier“, Linksklick auf den zweiten, dann ein Rechtsklick (mod#149).
         warte250();
         Karte.Marke d = marke(context, neu.get(3));
         eintrag(context, maus, k, d.x(), d.y(), "heroicmap.karte.form_von_hier");
@@ -507,36 +902,41 @@ public final class Bedienung implements FabricClientGameTest {
         tafelDerRegion(context);
         Karte.Marke e = marke(context, neu.get(4));
         spielerKlick(context, maus, k, e.x(), e.y());
-        eintrag(context, maus, k, mx + 60, my + 40, "heroicmap.karte.form_fertig");
+        rechtsKlick(context, maus, k, mx + 60, my + 40);
         Wegpunkte.EigeneForm linie = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().getLast());
         if (linie.region() || linie.ecken().size() != 2) {
-            throw new AssertionError("„Form fertig“ mit zwei Punkten gab keine Linie: " + linie);
+            throw new AssertionError("Rechtsklick mit zwei Punkten gab keine Linie: " + linie);
         }
 
-        // Ein Doppelklick in die Region heftet sie an; „Form löschen“ löscht sie.
+        // Ein Doppelklick in die Region heftet sie an; „Form löschen“ löscht sie. Erst geht die Tafel der Region vom Server zu,
+        // die nach dem Abschliessen am Ort des Rechtsklicks aufging; sonst nähme sie die Klicks.
+        tafelZu(context, maus, k);
         warte250();
         double ix = (orte[0][0] + orte[1][0] + orte[2][0]) / 3, iy = (orte[0][1] + orte[1][1] + orte[2][1]) / 3;
         fahre(context, maus, k, ix, iy);
-        maus.pressMouse(LINKS);
-        context.waitTick();
-        maus.pressMouse(LINKS);
+        doppelklick(maus);
         context.waitTicks(2);
         if (!context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).angeheftet())
                 || context.computeOnClient(mc -> Wegpunkte.INSTANZ.angeheftet("test:land", "land"))) {
+            int[] tafelDa = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelKasten());
+            int[] menueDa = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).ziel());
             throw new AssertionError("Doppelklick in die eigene Region heftete nicht sie an: eigene "
                     + context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).angeheftet()) + ", vom Server "
-                    + context.computeOnClient(mc -> Wegpunkte.INSTANZ.angeheftet("test:land", "land")));
+                    + context.computeOnClient(mc -> Wegpunkte.INSTANZ.angeheftet("test:land", "land")) + "; bei " + ix + "," + iy + " Tafel "
+                    + Arrays.toString(tafelDa) + ", Menü " + Arrays.toString(menueDa) + ", im Bau "
+                    + context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug()));
         }
         // Ein Doppelklick von Hand auf einen Wegpunkt in der Region heftet ihn an, die Karte bleibt stehen (mod#75).
         double[] stand = mitte(context);
         Karte.Marke b = marke(context, neu.get(1));
         warte250();
         fahre(context, maus, k, b.x(), b.y());
+        // Halten und Pause nach der Uhr, nicht nach Ticks; siehe doppelklick.
         for (int i = 0; i < 2; i++) {
             maus.holdMouse(LINKS);
-            context.waitTick();
+            schlafe(DOPPELKLICK_MS / 2);
             maus.releaseMouse(LINKS);
-            context.waitTick();
+            schlafe(DOPPELKLICK_MS / 2);
         }
         warte250();
         context.waitTicks(2);
@@ -704,7 +1104,7 @@ public final class Bedienung implements FabricClientGameTest {
             double[] neuOrt = {erste[0] + 12, erste[1] + 40};
             frei(context, new double[][] {neuOrt});
             tempoKlick(context, maus, k, neuOrt[0], neuOrt[1], 0, 0);
-            eintrag(context, maus, k, neuOrt[0] + 30, neuOrt[1], "heroicmap.karte.form_fertig");
+            rechtsKlick(context, maus, k, neuOrt[0] + 30, neuOrt[1]);
             context.waitTicks(2);
             List<Wegpunkte.Ecke> nachEinfuegen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken());
             if (nachEinfuegen.size() != 3 || !nachEinfuegen.get(0).equals(a) || !nachEinfuegen.get(2).equals(c)) {
@@ -734,14 +1134,14 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Gehaltene Ecke verschoben nach " + verschoben + " statt 2 bis 3 Blöcke östlich von " + c);
             }
 
-            // Im Bau gelöscht: „Form fertig“ speichert nichts und sagt es, statt die neuen Ecken still zu verwerfen.
+            // Im Bau gelöscht: Der Rechtsklick, der abschliesst, speichert nichts und sagt es, statt die neuen Ecken still zu verwerfen.
             double[] start = ecke(context, formen, 0);
             eintrag(context, maus, k, start[0], start[1], "heroicmap.karte.ecke_hinzu");
             tempoKlick(context, maus, k, neuOrt[0], neuOrt[1] + 20, 0, 0);
             // „Form löschen“ in der Region, an der Mitte ihrer drei Ecken.
             double[] e1 = ecke(context, formen, 1), e2 = ecke(context, formen, 2);
             eintrag(context, maus, k, (start[0] + e1[0] + e2[0]) / 3, (start[1] + e1[1] + e2[1]) / 3, "heroicmap.karte.form_loeschen");
-            long fertig = eintrag(context, maus, k, neuOrt[0] + 30, neuOrt[1], "heroicmap.karte.form_fertig");
+            long fertig = rechtsKlick(context, maus, k, neuOrt[0] + 30, neuOrt[1]);
             context.waitTicks(2);
             String hinweis = context.computeOnClient(mc -> {
                 Component h = ((Karte) mc.gui.screen()).hinweis();
@@ -1243,11 +1643,541 @@ public final class Bedienung implements FabricClientGameTest {
         }
     }
 
+    /** Ein Rechtsklick wie von Hand bei (x, y), ohne einen Eintrag zu wählen; gibt die Zeit des Drückens. */
+    private static long rechtsKlick(ClientGameTestContext context, TestInput maus, int k, double x, double y) {
+        warte250();
+        maus.setCursorPos(x * k, y * k);
+        context.waitTick();
+        long druck = Util.getMillis();
+        maus.pressMouse(RECHTS);
+        context.waitTicks(2);
+        return druck;
+    }
+
+    /**
+     * Ein Rechtsklick im Bau schliesst die Form ab (mod#149): mit einer Ecke nur der Hinweis, mit zweien eine Linie, auch auf
+     * einem Wegpunkt; mit vier eine Region. Am Griff einer Form kommt ihr Menü, mit einer Ecke im Bau mit „Form abbrechen“ und
+     * ohne „Form fertig“, und „Form abbrechen“ verwirft die Form im Bau. Im Bau sonst kein Menü. Siehe docs/wegpunkte.md,
+     * „Eigene Formen“.
+     */
+    private static void rechtsklickImBau(ClientGameTestContext context, TestInput maus, int k) {
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+        double mx = breite / 2.0, my = hoehe / 2.0;
+        double[][] orte = {{mx - 120, my + 30}, {mx - 80, my + 30}, {mx - 80, my + 70}, {mx - 120, my + 70}, {mx - 40, my + 50}};
+        frei(context, orte);
+        try {
+            // Ein Wegpunkt als Ziel des zweiten Rechtsklicks.
+            context.runOnClient(mc -> {
+                int[] b = ((Karte) mc.gui.screen()).blockUnter(orte[4][0], orte[4][1]);
+                Wegpunkte.INSTANZ.setze(mc.level.dimension().identifier().toString(), b[0], b[1]);
+            });
+            context.waitTicks(2);
+            Karte.Marke wegpunkt = marke(context, context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte)));
+
+            // Eine Ecke: Der Rechtsklick sagt es und lässt die Form im Bau.
+            eintrag(context, maus, k, orte[0][0], orte[0][1], "heroicmap.karte.form_von_hier");
+            rechtsKlick(context, maus, k, orte[2][0], orte[2][1]);
+            String hinweis = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).hinweis() == null ? null
+                    : ((Karte) mc.gui.screen()).hinweis().getString());
+            List<Wegpunkte.Ecke> zug = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug());
+            if (!texte(context, "heroicmap.karte.form_zwei").getFirst().equals(hinweis) || zug == null || zug.size() != 1
+                    || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eintraege()).size() != 0
+                    || context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size()) != formen) {
+                throw new AssertionError("Rechtsklick mit einer Ecke: Hinweis „" + hinweis + "“, im Bau " + zug);
+            }
+            // Eine zweite Ecke, dann der Rechtsklick auf den Wegpunkt: eine Linie, kein Menü.
+            spielerKlick(context, maus, k, orte[1][0], orte[1][1]);
+            rechtsKlick(context, maus, k, wegpunkt.x(), wegpunkt.y());
+            List<Wegpunkte.EigeneForm> alle = context.computeOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()));
+            if (alle.size() != formen + 1 || alle.getLast().region() || alle.getLast().ecken().size() != 2
+                    || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug()) != null
+                    || !context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eintraege()).isEmpty()) {
+                throw new AssertionError("Rechtsklick auf einen Wegpunkt mit zwei Ecken: " + (alle.size() > formen ? alle.getLast() : null));
+            }
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.loesche(Wegpunkte.INSTANZ.eigeneFormen().getLast()));
+            context.waitTicks(2);
+
+            // Vier Ecken, dann der Rechtsklick auf freie Karte: eine Region mit allen vier.
+            eintrag(context, maus, k, orte[0][0], orte[0][1], "heroicmap.karte.form_von_hier");
+            for (int i = 1; i < 4; i++) {
+                spielerKlick(context, maus, k, orte[i][0], orte[i][1]);
+            }
+            rechtsKlick(context, maus, k, mx + 40, my - 40);
+            alle = context.computeOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()));
+            if (alle.size() != formen + 1 || !alle.getLast().region() || alle.getLast().ecken().size() != 4) {
+                throw new AssertionError("Rechtsklick mit vier Ecken gab keine Region mit vieren: " + (alle.size() > formen ? alle.getLast() : null));
+            }
+
+            // Im Bau mit einer Ecke am Griff dieser Region: ihr Menü mit „Form abbrechen“, ohne „Form fertig“, das es erst ab zwei Ecken
+            // gibt; „Form abbrechen“ verwirft den Bau.
+            double[] griff = griff(context, formen);
+            eintrag(context, maus, k, orte[4][0] + 30, orte[4][1] + 30, "heroicmap.karte.form_von_hier");
+            List<String> menue = eintraegeBei(context, maus, k, griff[0], griff[1]);
+            if (!menue.contains(texte(context, "heroicmap.karte.form_abbrechen").getFirst())
+                    || menue.contains(texte(context, "heroicmap.karte.form_fertig").getFirst())
+                    || !menue.contains(texte(context, "heroicmap.karte.form_loeschen").getFirst())) {
+                throw new AssertionError("Rechtsklick am Griff im Bau: " + menue);
+            }
+            eintrag(context, maus, k, griff[0], griff[1], "heroicmap.karte.form_abbrechen");
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug()) != null
+                    || context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size()) != formen + 1) {
+                throw new AssertionError("„Form abbrechen“ am Griff liess die Form im Bau");
+            }
+        } finally {
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zug()) != null) {
+                maus.pressKey(InputConstants.KEY_ESCAPE);
+                context.waitTick();
+            }
+            context.runOnClient(mc -> {
+                List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+            });
+            context.waitTicks(2);
+        }
+    }
+
+    /**
+     * Hält wie die Hand 0,7 s still auf {@code von}, fährt dann in acht Schritten nach {@code nach}, auf Wunsch mit gehaltener
+     * Strg, wartet und lässt los. Gibt den Ort der gezogenen Ecke der Form {@code form} an der Stelle {@code index}, wie er
+     * kurz vor dem Loslassen gezeichnet stand, oder null, wenn {@code form} kleiner 0.
+     */
+    private static double[] halteUndZiehe(ClientGameTestContext context, TestInput maus, int k, double[] von, double[] nach, boolean strg,
+            int form, int index) {
+        warte250();
+        maus.setCursorPos(von[0] * k, von[1] * k);
+        context.waitTick();
+        long druck = Util.getMillis();
+        maus.holdMouse(LINKS);
+        zittereBis(context, maus, von[0] * k, von[1] * k, druck + 700);
+        if (strg) {
+            maus.holdControl();
+        }
+        for (int i = 1; i <= 8; i++) {
+            maus.setCursorPos((von[0] + (nach[0] - von[0]) * i / 8) * k, (von[1] + (nach[1] - von[1]) * i / 8) * k);
+            context.waitTick();
+        }
+        context.waitTicks(2);
+        double[] gezeichnet = form < 0 ? null : ecke(context, form, index);
+        maus.releaseMouse(LINKS);
+        context.waitTicks(2);
+        if (strg) {
+            maus.releaseControl();
+        }
+        return gezeichnet;
+    }
+
+    /**
+     * Einrasten mit Strg (mod#149): Eine Ecke, 0,7 s gehalten und mit Strg 6 Einheiten neben die Ecke einer anderen Form
+     * gezogen, liegt nach dem Loslassen auf deren Block und stand schon beim Ziehen dort; ohne Strg auf dem Block unter der
+     * Maus. Ebenso auf einen Wegpunkt. Ein Wegpunkt rastet auf eine Ecke ein. 12 Einheiten weg rastet nichts ein, die
+     * Ecken der eigenen Form zählen nicht, und neben der Marke eines fernen Wegpunkts am Rand rastet nichts ein. Siehe
+     * docs/wegpunkte.md, „Einrasten“.
+     */
+    private static void einrasten(ClientGameTestContext context, TestInput maus, int k) {
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        int bx = mitte[0] - 34, bz = mitte[1] + 6;
+        // Form A, ein Viereck, links; Form B, eine Linie, rechts davon; ein Wegpunkt darunter. Ein Block sind 4 Einheiten.
+        List<Wegpunkte.Ecke> a = List.of(new Wegpunkte.Ecke(bx, bz), new Wegpunkte.Ecke(bx + 8, bz), new Wegpunkte.Ecke(bx + 8, bz + 8),
+                new Wegpunkte.Ecke(bx, bz + 8));
+        Wegpunkte.Ecke b0 = new Wegpunkte.Ecke(bx + 20, bz + 2);
+        try {
+            context.runOnClient(mc -> {
+                String dimension = mc.level.dimension().identifier().toString();
+                Wegpunkte.INSTANZ.setzeForm(dimension, a);
+                Wegpunkte.INSTANZ.setzeForm(dimension, List.of(b0, new Wegpunkte.Ecke(bx + 26, bz + 2)));
+                Wegpunkte.INSTANZ.setze(dimension, bx + 20, bz + 12);
+            });
+            context.waitTicks(2);
+            Wegpunkte.Punkt w = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
+            double[] zielB = ecke(context, formen + 1, 0);
+            frei(context, new double[][] {ecke(context, formen, 1), zielB});
+
+            // Ecke 1 von A mit Strg 6 Einheiten neben B0: auf B0, schon beim Ziehen dort gezeichnet.
+            double[] a1 = ecke(context, formen, 1);
+            double[] daneben = {zielB[0] - 6, zielB[1]};
+            double[] gezeichnet = halteUndZiehe(context, maus, k, a1, daneben, true, formen, 1);
+            // Das Zittern beim Halten kann die Karte um eine Einheit schieben; verglichen wird mit der Lage von B0 danach.
+            double[] zielJetzt = ecke(context, formen + 1, 0);
+            Wegpunkte.Ecke ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
+            if (!ist.equals(b0) || Math.abs(gezeichnet[0] - zielJetzt[0]) > 0.5 || Math.abs(gezeichnet[1] - zielJetzt[1]) > 0.5) {
+                throw new AssertionError("Ecke mit Strg neben die Ecke einer anderen Form: " + ist + " statt " + b0 + ", gezeichnet bei "
+                        + Arrays.toString(gezeichnet) + " statt " + Arrays.toString(zielJetzt));
+            }
+            // Zurück, dann ohne Strg dasselbe: auf dem Block unter der Maus, nicht auf B0.
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
+            context.waitTicks(2);
+            // Die Lage von B0 von jetzt; das Halten schiebt die Karte dann noch um bis zu eine Einheit, also höchstens einen Block.
+            a1 = ecke(context, formen, 1);
+            double[] b0Ohne = ecke(context, formen + 1, 0);
+            double[] nebenOhne = {b0Ohne[0] - 6, b0Ohne[1]};
+            int[] unter = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blockUnter(nebenOhne[0], nebenOhne[1]));
+            halteUndZiehe(context, maus, k, a1, nebenOhne, false, -1, 0);
+            ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
+            if (ist.equals(b0) || Math.abs(ist.x() - unter[0]) > 1 || Math.abs(ist.z() - unter[1]) > 1) {
+                throw new AssertionError("Ecke ohne Strg: " + ist + " statt bei " + unter[0] + " " + unter[1] + ", nicht auf " + b0);
+            }
+
+            // Ecke 2 von A mit Strg 6 Einheiten neben den Wegpunkt: auf seinem Block.
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
+            context.waitTicks(2);
+            Karte.Marke wm = marke(context, w);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 2), new double[] {wm.x() - 6, wm.y()}, true, -1, 0);
+            ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(2));
+            if (!ist.equals(new Wegpunkte.Ecke(w.x(), w.z()))) {
+                throw new AssertionError("Ecke mit Strg neben einen Wegpunkt: " + ist + " statt " + w.x() + " " + w.z());
+            }
+
+            // 12 Einheiten neben B0: kein Einrasten. Ecke 0 von A mit Strg neben ihre eigene Ecke 2: kein Einrasten.
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
+            context.waitTicks(2);
+            double[] b0Jetzt = ecke(context, formen + 1, 0);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 1), new double[] {b0Jetzt[0] - 12, b0Jetzt[1]}, true, -1, 0);
+            ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
+            if (ist.equals(b0)) {
+                throw new AssertionError("Ecke mit Strg 12 Einheiten neben B0 rastete ein");
+            }
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
+            context.waitTicks(2);
+            double[] a2 = ecke(context, formen, 2);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 0), new double[] {a2[0] - 6, a2[1]}, true, -1, 0);
+            ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(0));
+            if (ist.equals(a.get(2))) {
+                throw new AssertionError("Ecke mit Strg rastete auf eine Ecke der eigenen Form ein");
+            }
+
+            // Der Wegpunkt mit Strg 6 Einheiten neben B0: auf B0. Ein Bild beim Ziehen zeigt ihn dort. Jedes Halten mit Zittern
+            // schiebt die Karte um bis zu eine Einheit; darum gilt die Lage von B0 von jetzt.
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a));
+            context.waitTicks(2);
+            wm = marke(context, w);
+            double[] b0Neu = ecke(context, formen + 1, 0);
+            double[] nebenB0 = {b0Neu[0] - 6, b0Neu[1]};
+            warte250();
+            maus.setCursorPos(wm.x() * k, wm.y() * k);
+            context.waitTick();
+            long druck = Util.getMillis();
+            maus.holdMouse(LINKS);
+            zittereBis(context, maus, wm.x() * k, wm.y() * k, druck + 700);
+            maus.holdControl();
+            for (int i = 1; i <= 8; i++) {
+                maus.setCursorPos((wm.x() + (nebenB0[0] - wm.x()) * i / 8) * k, (wm.y() + (nebenB0[1] - wm.y()) * i / 8) * k);
+                context.waitTick();
+            }
+            context.waitTicks(2);
+            context.takeScreenshot(TestScreenshotOptions.of("einrasten").disableCounterPrefix());
+            maus.releaseMouse(LINKS);
+            context.waitTicks(2);
+            maus.releaseControl();
+            Wegpunkte.Punkt nach = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
+            if (nach.x() != b0.x() || nach.z() != b0.z()) {
+                throw new AssertionError("Wegpunkt mit Strg neben die Ecke einer Form: " + nach + " statt " + b0);
+            }
+
+            // Ein Wegpunkt 400 Blöcke links steht als Marke am Rand. Eine Ecke mit Strg 6 Einheiten neben dieser Marke rastet nicht
+            // auf ihn ein, denn gemessen wird an seinem Block (Review von #161).
+            context.runOnClient(mc -> {
+                Wegpunkte.INSTANZ.ersetze(Wegpunkte.INSTANZ.eigeneFormen().get(formen), a);
+                Wegpunkte.INSTANZ.setze(mc.level.dimension().identifier().toString(), bx - 400, bz + 2);
+            });
+            context.waitTicks(2);
+            Wegpunkte.Punkt fern = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().getLast());
+            Karte.Marke rand = marke(context, fern);
+            double[] nebenRand = {rand.x() + 6, rand.y()};
+            int[] unterRand = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blockUnter(nebenRand[0], nebenRand[1]));
+            halteUndZiehe(context, maus, k, ecke(context, formen, 1), nebenRand, true, -1, 0);
+            ist = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
+            if (ist.x() == fern.x() || Math.abs(ist.x() - unterRand[0]) > 1 || Math.abs(ist.z() - unterRand[1]) > 1) {
+                throw new AssertionError("Ecke mit Strg neben der Marke eines fernen Wegpunkts am Rand (" + rand.x() + "," + rand.y() + "): "
+                        + ist + " statt bei " + unterRand[0] + " " + unterRand[1]);
+            }
+        } finally {
+            maus.releaseControl();
+            context.runOnClient(mc -> {
+                List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+            });
+            context.waitTicks(2);
+        }
+    }
+
+    /** Die Texte der Einträge mit diesen Schlüsseln, ohne Argumente, wie das Menü sie zeigt. */
+    private static List<String> texte(ClientGameTestContext context, String... schluessel) {
+        return context.computeOnClient(mc -> Arrays.stream(schluessel).map(s -> Component.translatable(s).getString()).toList());
+    }
+
+    /**
+     * Das Menü je Objekt (mod#149) mit Rechtsklicks wie von Hand: an einem Wegpunkt nur seine Einträge, auch wenn er auf einer
+     * Ecke liegt; an einer Ecke, an der Raute eines alten Rechtecks und auf freier Karte je ihre; im Bau das Menü zum Bauen.
+     * Dann „Koordinaten setzen…“: an einer Ecke, an einem Wegpunkt auf einen belegten Block und auf einen freien, mit Text, der
+     * keine Koordinaten sind. Siehe docs/wegpunkte.md, „Menü je Objekt“.
+     */
+    private static void menueJeObjekt(ClientGameTestContext context, TestInput maus, int k) {
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int rechtecke = context.computeOnClient(mc -> Wegpunkte.INSTANZ.regionen().size());
+        // Links unter der Mitte, wo sonst nichts liegt; ein Block sind 4 Einheiten.
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        int bx = mitte[0] - 30, bz = mitte[1] + 8;
+        List<Wegpunkte.Ecke> ecken = List.of(new Wegpunkte.Ecke(bx, bz), new Wegpunkte.Ecke(bx + 10, bz), new Wegpunkte.Ecke(bx + 10, bz + 8),
+                new Wegpunkte.Ecke(bx, bz + 8));
+        try {
+            context.runOnClient(mc -> {
+                String dimension = mc.level.dimension().identifier().toString();
+                Wegpunkte.INSTANZ.setzeForm(dimension, ecken);
+                // Ein Wegpunkt auf der ersten Ecke, einer frei daneben, ein altes Rechteck darunter.
+                Wegpunkte.INSTANZ.setze(dimension, bx, bz);
+                Wegpunkte.INSTANZ.setze(dimension, bx + 16, bz + 4);
+                Wegpunkte.INSTANZ.setze(dimension, bx + 2, bz + 14, bx + 4, bz + 16);
+            });
+            context.waitTicks(2);
+            Wegpunkte.Punkt aufEcke = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
+            Wegpunkte.Punkt frei = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte + 1));
+            Karte.Marke raute = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).marken().stream()
+                    .filter(m -> m.region() != null && m.region().x0() == bx + 2).findFirst().orElseThrow(() -> new AssertionError("Keine Raute")));
+            double[] zweite = ecke(context, formen, 1);
+            frei(context, new double[][] {zweite});
+
+            String teleport = context.computeOnClient(mc -> Component.translatable("heroicmap.karte.teleport", frei.x(), frei.z()).getString());
+            List<String> punktSoll = new java.util.ArrayList<>(List.of(teleport));
+            punktSoll.addAll(texte(context, "heroicmap.karte.koordinaten", "heroicmap.karte.form_von_hier", "heroicmap.karte.ebene",
+                    "heroicmap.karte.wegpunkt_loeschen"));
+            Karte.Marke m = marke(context, frei);
+            List<String> ist = eintraegeBei(context, maus, k, m.x(), m.y());
+            if (!ist.equals(punktSoll)) {
+                throw new AssertionError("Menü am Wegpunkt: " + ist + " statt " + punktSoll);
+            }
+            // Ein Wegpunkt auf einer Ecke: nur seine Einträge, wie beim Klick.
+            Karte.Marke aufE = marke(context, aufEcke);
+            ist = eintraegeBei(context, maus, k, aufE.x(), aufE.y());
+            if (!ist.contains(texte(context, "heroicmap.karte.wegpunkt_loeschen").getFirst())
+                    || ist.contains(texte(context, "heroicmap.karte.ecke_loeschen").getFirst())) {
+                throw new AssertionError("Menü am Wegpunkt auf einer Ecke: " + ist);
+            }
+            ist = eintraegeBei(context, maus, k, zweite[0], zweite[1]);
+            List<String> eckSoll = texte(context, "heroicmap.karte.koordinaten", "heroicmap.karte.ecke_hinzu", "heroicmap.karte.ecke_loeschen");
+            if (!ist.equals(eckSoll)) {
+                throw new AssertionError("Menü an der Ecke: " + ist + " statt " + eckSoll);
+            }
+            ist = eintraegeBei(context, maus, k, raute.x(), raute.y());
+            List<String> rautenSoll = texte(context, "heroicmap.karte.ebene", "heroicmap.karte.region_loeschen");
+            if (!ist.equals(rautenSoll)) {
+                throw new AssertionError("Menü an der Raute: " + ist + " statt " + rautenSoll);
+            }
+            // Freie Karte, mitten in der Region: das allgemeine Menü, ohne Einträge der Form.
+            double[] innen = {zweite[0] - 8, zweite[1] + 16};
+            frei(context, new double[][] {innen});
+            int[] block = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blockUnter(innen[0], innen[1]));
+            ist = eintraegeBei(context, maus, k, innen[0], innen[1]);
+            String hier = context.computeOnClient(mc -> Component.translatable("heroicmap.karte.teleport", block[0], block[1]).getString());
+            List<String> allgemeinSoll = new java.util.ArrayList<>(List.of(hier));
+            allgemeinSoll.addAll(texte(context, "heroicmap.karte.wegpunkt", "heroicmap.karte.wegpunkt_bei", "heroicmap.karte.form_von_hier"));
+            if (!ist.equals(allgemeinSoll)) {
+                throw new AssertionError("Menü auf freier Karte: " + ist + " statt " + allgemeinSoll);
+            }
+
+            // „Koordinaten setzen…“ an der zweiten Ecke: Das Feld zeigt sie; was keine Koordinaten sind, nimmt Enter nicht.
+            eintrag(context, maus, k, zweite[0], zweite[1], "heroicmap.karte.koordinaten");
+            String feld = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe());
+            if (!((bx + 10) + " " + bz).equals(feld)) {
+                throw new AssertionError("„Koordinaten setzen…“ an der Ecke zeigt „" + feld + "“");
+            }
+            leeren(maus, feld.length());
+            maus.typeChars("Burg");
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe()) == null) {
+                throw new AssertionError("Enter nahm „Burg“ als Koordinaten");
+            }
+            leeren(maus, 4);
+            maus.typeChars((bx + 12) + ", " + (bz - 3));
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            List<Wegpunkte.Ecke> nachher = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken());
+            if (!nachher.get(1).equals(new Wegpunkte.Ecke(bx + 12, bz - 3)) || nachher.size() != 4) {
+                throw new AssertionError("„Koordinaten setzen…“ an der Ecke: " + nachher);
+            }
+
+            // Am freien Wegpunkt auf den Block des anderen: Enter nimmt es nicht und sagt warum; auf einen freien Block: dort.
+            m = marke(context, frei);
+            eintrag(context, maus, k, m.x(), m.y(), "heroicmap.karte.koordinaten");
+            leeren(maus, context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe()).length());
+            maus.typeChars(bx + " " + bz);
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            String hinweis = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).hinweis() == null ? null
+                    : ((Karte) mc.gui.screen()).hinweis().getString());
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe()) == null
+                    || !texte(context, "heroicmap.karte.koordinaten_belegt").getFirst().equals(hinweis)) {
+                throw new AssertionError("Wegpunkt auf einen belegten Block: Feld " + context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe())
+                        + ", Hinweis „" + hinweis + "“");
+            }
+            leeren(maus, (bx + " " + bz).length());
+            maus.typeChars((bx + 20) + " 70 " + (bz + 1));
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            Wegpunkte.Punkt verschoben = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte + 1));
+            if (verschoben.x() != bx + 20 || verschoben.z() != bz + 1 || context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size()) != punkte + 2) {
+                throw new AssertionError("„Koordinaten setzen…“ am Wegpunkt: " + verschoben);
+            }
+            // Danach in der Mitte, wie bei „Wegpunkt bei …“.
+            Karte.Marke neu = marke(context, verschoben);
+            double[] schirm = context.computeOnClient(mc -> new double[] {mc.getWindow().getGuiScaledWidth() / 2.0, mc.getWindow().getGuiScaledHeight() / 2.0});
+            if (Math.abs(neu.x() - schirm[0]) > 1 || Math.abs(neu.y() - schirm[1]) > 1) {
+                throw new AssertionError("Der verschobene Wegpunkt steht bei " + neu.x() + "," + neu.y() + ", nicht in der Mitte");
+            }
+        } finally {
+            context.runOnClient(mc -> {
+                List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                List.copyOf(Wegpunkte.INSTANZ.regionen()).subList(rechtecke, Wegpunkte.INSTANZ.regionen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+            });
+            context.waitTicks(2);
+        }
+    }
+
+    /**
+     * `Entf` und `⌫` (mod#149): Der Zeiger fährt wie die Hand auf das Ziel, dann die Taste. Ein Wegpunkt, eine Ecke, am Griff
+     * die ganze Form und die Raute eines alten Rechtecks gehen; auf freier Karte, im offenen Feld und im Bau geht nichts.
+     * Siehe docs/wegpunkte.md, „Bedienung“.
+     */
+    private static void entfernen(ClientGameTestContext context, TestInput maus, int k) {
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int rechtecke = context.computeOnClient(mc -> Wegpunkte.INSTANZ.regionen().size());
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        int bx = mitte[0] - 30, bz = mitte[1] + 8;
+        try {
+            context.runOnClient(mc -> {
+                String dimension = mc.level.dimension().identifier().toString();
+                Wegpunkte.INSTANZ.setzeForm(dimension, List.of(new Wegpunkte.Ecke(bx, bz), new Wegpunkte.Ecke(bx + 10, bz),
+                        new Wegpunkte.Ecke(bx + 10, bz + 8), new Wegpunkte.Ecke(bx, bz + 8)));
+                Wegpunkte.INSTANZ.setze(dimension, bx + 16, bz + 4);
+                Wegpunkte.INSTANZ.setze(dimension, bx + 2, bz + 14, bx + 4, bz + 16);
+            });
+            context.waitTicks(2);
+            Wegpunkte.Punkt p = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
+            Karte.Marke m = marke(context, p);
+
+            // Auf freier Karte: nichts.
+            double[] leer = {m.x() + 30, m.y() + 30};
+            frei(context, new double[][] {leer});
+            fahre(context, maus, k, leer[0], leer[1]);
+            maus.pressKey(InputConstants.KEY_DELETE);
+            context.waitTicks(2);
+            if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size()) != punkte + 1
+                    || context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size()) != formen + 1) {
+                throw new AssertionError("Entf auf freier Karte löschte etwas");
+            }
+            // Bei offenem Menü: nichts, auch wenn die Maus danach über dem Wegpunkt steht (Review von #153).
+            warte250();
+            maus.setCursorPos(leer[0] * k, leer[1] * k);
+            context.waitTick();
+            maus.pressMouse(RECHTS);
+            context.waitTicks(2);
+            fahre(context, maus, k, m.x(), m.y());
+            boolean menueOffen = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).ziel()) != null;
+            maus.pressKey(InputConstants.KEY_DELETE);
+            context.waitTicks(2);
+            boolean nachMenue = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size()) == punkte + 1;
+            // Ein Klick neben das Menü schliesst es und tut sonst nichts.
+            warte250();
+            maus.setCursorPos((leer[0] - 10) * k, (leer[1] - 10) * k);
+            context.waitTick();
+            maus.pressMouse(LINKS);
+            context.waitTicks(2);
+            if (!menueOffen || !nachMenue) {
+                throw new AssertionError("Entf bei offenem Menü: Menü offen " + menueOffen + ", Wegpunkt noch da " + nachMenue);
+            }
+            // Im Bau: nichts, auch auf dem Wegpunkt.
+            eintrag(context, maus, k, leer[0], leer[1], "heroicmap.karte.form_von_hier");
+            fahre(context, maus, k, m.x(), m.y());
+            maus.pressKey(InputConstants.KEY_DELETE);
+            context.waitTicks(2);
+            boolean nochDa = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size()) == punkte + 1;
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTicks(2);
+            if (!nochDa) {
+                throw new AssertionError("Entf im Bau löschte den Wegpunkt");
+            }
+            // Im offenen Feld gehört die Taste dem Feld.
+            eintrag(context, maus, k, m.x(), m.y(), "heroicmap.karte.koordinaten");
+            String vorher = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe());
+            maus.pressKey(InputConstants.KEY_BACKSPACE);
+            context.waitTicks(2);
+            String danach = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe());
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTicks(2);
+            if (danach == null || danach.length() != vorher.length() - 1 || context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size()) != punkte + 1) {
+                throw new AssertionError("⌫ im Feld: „" + vorher + "“ → „" + danach + "“, Wegpunkte " + context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size()));
+            }
+
+            // Der Wegpunkt mit Entf.
+            warte250();
+            fahre(context, maus, k, m.x(), m.y());
+            maus.pressKey(InputConstants.KEY_DELETE);
+            context.waitTicks(2);
+            if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size()) != punkte) {
+                throw new AssertionError("Entf auf dem Wegpunkt liess ihn stehen");
+            }
+            // Eine Ecke mit ⌫: aus vier werden drei.
+            double[] zweite = ecke(context, formen, 1);
+            fahre(context, maus, k, zweite[0], zweite[1]);
+            maus.pressKey(InputConstants.KEY_BACKSPACE);
+            context.waitTicks(2);
+            List<Wegpunkte.Ecke> rest = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken());
+            if (rest.size() != 3 || rest.contains(new Wegpunkte.Ecke(bx + 10, bz))) {
+                throw new AssertionError("⌫ auf der zweiten Ecke: " + rest);
+            }
+            // Am Griff die ganze Form.
+            double[] griff = griff(context, formen);
+            fahre(context, maus, k, griff[0], griff[1]);
+            maus.pressKey(InputConstants.KEY_DELETE);
+            context.waitTicks(2);
+            if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size()) != formen) {
+                throw new AssertionError("Entf am Griff liess die Form stehen");
+            }
+            // Die Raute eines alten Rechtecks.
+            Karte.Marke raute = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).marken().stream()
+                    .filter(r -> r.region() != null && r.region().x0() == bx + 2).findFirst().orElseThrow(() -> new AssertionError("Keine Raute")));
+            fahre(context, maus, k, raute.x(), raute.y());
+            maus.pressKey(InputConstants.KEY_DELETE);
+            context.waitTicks(2);
+            if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.regionen().size()) != rechtecke) {
+                throw new AssertionError("Entf auf der Raute liess das Rechteck stehen");
+            }
+        } finally {
+            context.runOnClient(mc -> {
+                List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(Math.min(punkte, Wegpunkte.INSTANZ.punkte().size()), Wegpunkte.INSTANZ.punkte().size())
+                        .forEach(Wegpunkte.INSTANZ::loesche);
+                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(Math.min(formen, Wegpunkte.INSTANZ.eigeneFormen().size()),
+                        Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                List.copyOf(Wegpunkte.INSTANZ.regionen()).subList(Math.min(rechtecke, Wegpunkte.INSTANZ.regionen().size()),
+                        Wegpunkte.INSTANZ.regionen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+            });
+            context.waitTicks(2);
+        }
+    }
+
     /**
      * Der Todespunkt (mod#129): Stirbt der Spieler, steht auf seinem Block ein angehefteter Todespunkt. Nach dem Respawn öffnet
      * der Weg des Klicks im Chat, `sendUnattendedCommand` mit `hmap karte x z`, die Karte mit ihm als Ziel; mit dem Testsatz
-     * steht er dort in der Mitte, dunkel mit hellem ✕, und ein Rechtsklick auf ihn bietet „Todespunkt löschen“, der ihn
-     * löscht. Mit dem Schalter aus setzt ein Tod keinen. Siehe docs/wegpunkte.md, „Todespunkt“.
+     * steht er dort in der Mitte, dunkel mit hellem ✕; gehalten hängt er nicht an der Maus (mod#151), und ein Rechtsklick auf
+     * ihn bietet „Todespunkt löschen“, der ihn löscht. Mit zwei behaltenen Todespunkten bleiben nach drei Toden die zwei
+     * neuesten, nur der neueste angeheftet; aus setzt ein Tod keinen. Siehe docs/wegpunkte.md, „Todespunkt“.
      */
     private static void tod(ClientGameTestContext context, TestServerContext server, TestInput maus, int k) {
         server.runCommand("tp @a 40.5 -60 -30.5");
@@ -1285,29 +2215,62 @@ public final class Bedienung implements FabricClientGameTest {
             if (!kreuz) {
                 throw new AssertionError("Mitten im Todespunkt fehlt das helle ✕");
             }
-            // Am Todespunkt kein „Ebene …“: Er bleibt in Base (Review von #143).
+            // Gehalten wie von Hand hängt er nicht an der Maus: Ein Todespunkt bleibt, wo er ist (mod#151).
+            warte250();
+            maus.setCursorPos(m.x() * k, m.y() * k);
+            context.waitTick();
+            long druck = Util.getMillis();
+            maus.holdMouse(LINKS);
+            zittereBis(context, maus, m.x() * k, m.y() * k, druck + 700);
+            boolean haengt = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).haengt()) != null;
+            maus.releaseMouse(LINKS);
+            context.waitTicks(2);
+            if (haengt) {
+                throw new AssertionError("Ein gehaltener Todespunkt hing an der Maus");
+            }
+            m = marke(context, tod);
+            // Am Todespunkt nur Teleport und Löschen: kein „Ebene …“, er bleibt in Base (Review von #143), und keine Koordinaten, er
+            // bleibt, wo er ist (mod#151).
             List<String> menue = eintraegeBei(context, maus, k, m.x(), m.y());
-            if (menue.contains(context.computeOnClient(mc -> Component.translatable("heroicmap.karte.ebene").getString()))) {
-                throw new AssertionError("Am Todespunkt steht „Ebene …“: " + menue);
+            List<String> soll = context.computeOnClient(mc -> List.of(Component.translatable("heroicmap.karte.teleport", tod.x(), tod.z()).getString(),
+                    Component.translatable("heroicmap.karte.tod_loeschen").getString()));
+            if (!menue.equals(soll)) {
+                throw new AssertionError("Menü am Todespunkt: " + menue + " statt " + soll);
             }
             eintrag(context, maus, k, m.x(), m.y(), "heroicmap.karte.tod_loeschen");
             if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.tod()) != null) {
                 throw new AssertionError("„Todespunkt löschen“ liess ihn stehen");
             }
             context.runOnClient(mc -> mc.gui.setScreen(null));
-            // Mit dem Schalter aus kein Todespunkt. Erst an eine freie Stelle: Am Ort des Respawns kann ein Wegpunkt eines
-            // früheren Schritts liegen, und dort gäbe es auch ohne Schalter keinen.
-            context.runOnClient(mc -> Minimap.INSTANZ.setzeTodespunkt(false));
+            // Zwei behalten, drei Tode an drei Stellen: die zwei neuesten, nur der neueste angeheftet. Dann einer: der neueste.
+            context.runOnClient(mc -> Minimap.INSTANZ.setzeTodespunkte(2));
+            for (int i = 0; i < 3; i++) {
+                double tx = 40.5 + 3 * i;
+                server.runCommand("tp @a " + tx + " -60 -30.5");
+                context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - tx) < 0.1, 200);
+                stirb(context, server);
+            }
+            List<Wegpunkte.Punkt> tode = context.computeOnClient(mc -> Wegpunkte.INSTANZ.tode());
+            if (!tode.stream().map(Wegpunkte.Punkt::x).toList().equals(List.of(43, 46))
+                    || !tode.stream().map(Wegpunkte.Punkt::angeheftet).toList().equals(List.of(false, true))) {
+                throw new AssertionError("Zwei behalten, drei Tode: " + tode);
+            }
+            // Aus: Ein Tod setzt keinen. Erst an eine freie Stelle: Am Ort des Respawns kann ein Wegpunkt eines früheren Schritts
+            // liegen, und dort gäbe es auch ohne Regler keinen. Das Kappen beim Schliessen des Menüs prüft todRegler.
+            context.runOnClient(mc -> {
+                Minimap.INSTANZ.setzeTodespunkte(0);
+                Wegpunkte.INSTANZ.kappeTode(0);
+            });
             server.runCommand("tp @a 44.5 -60 -36.5");
             context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - 44.5) < 0.1, 200);
             stirb(context, server);
             if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.tod()) != null) {
-                throw new AssertionError("Mit „Todespunkt“ aus setzte ein Tod einen");
+                throw new AssertionError("Mit „Todespunkte: aus“ setzte ein Tod einen");
             }
         } finally {
             context.runOnClient(mc -> {
-                Minimap.INSTANZ.setzeTodespunkt(true);
-                Wegpunkte.INSTANZ.loescheTod();
+                Minimap.INSTANZ.setzeTodespunkte(1);
+                Wegpunkte.INSTANZ.kappeTode(0);
                 mc.gui.setScreen(null);
             });
             server.runCommand("tp @a 0.5 -30 0.5 0 90");
@@ -1607,6 +2570,99 @@ public final class Bedienung implements FabricClientGameTest {
         });
     }
 
+    /**
+     * Der Regler „Todespunkte“ (mod#151): Klicks wie von Hand ans rechte Ende, ans linke und in die Mitte geben 16, aus und 8,
+     * gespeichert beim Schliessen. Gekappt wird erst beim Schliessen (Review von #164): Mit acht Todespunkten nehmen die Klicks
+     * und ein Ziehen von 8 auf 1 und zurück keinen weg, nach `Esc` sind es acht; auf 2 gestellt, bleiben nach `Esc` die zwei
+     * neuesten. Siehe docs/wegpunkte.md, „Todespunkt“.
+     */
+    private static void todRegler(ClientGameTestContext context, TestInput maus, int k) {
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeTodespunkte(8);
+            Wegpunkte.INSTANZ.kappeTode(0);
+            String welt = mc.level.dimension().identifier().toString();
+            for (int i = 0; i < 8; i++) {
+                Wegpunkte.INSTANZ.setzeTod(welt, 1000 + i, -1000, 8);
+            }
+        });
+        try {
+            int[] r = oeffneTodRegler(context);
+            double y = r[1] + r[3] / 2.0;
+            for (double[] klick : new double[][] {{r[0] + r[2] - 2, Minimap.MAX_TODESPUNKTE}, {r[0] + 2, 0}, {r[0] + r[2] / 2.0, 8}}) {
+                spielerKlick(context, maus, k, klick[0], y);
+                int ist = context.computeOnClient(mc -> Minimap.INSTANZ.todespunkte());
+                if (ist != (int) klick[1]) {
+                    throw new AssertionError("Klick auf den Regler „Todespunkte“ bei " + klick[0] + ": " + ist + " statt " + (int) klick[1]);
+                }
+            }
+            String text = context.computeOnClient(mc -> mc.gui.screen().children().stream().filter(c -> c instanceof Anzeige.TodRegler)
+                    .map(c -> ((Anzeige.TodRegler) c).getMessage().getString()).findFirst().orElse(""));
+            if (!text.endsWith("8")) {
+                throw new AssertionError("Der Regler zeigt „" + text + "“");
+            }
+            // Gezogen wie von Hand von 8 auf 1 und zurück: Auf 1 sind noch alle acht da. Die Stufe n liegt bei x + 4 + (Breite - 8) · n / 16.
+            double acht = r[0] + 4 + (r[2] - 8) * 8 / 16.0, eins = r[0] + 4 + (r[2] - 8) / 16.0;
+            warte250();
+            maus.setCursorPos(acht * k, y * k);
+            context.waitTick();
+            maus.holdMouse(LINKS);
+            for (int i = 1; i <= 8; i++) {
+                maus.setCursorPos((acht + (eins - acht) * i / 8) * k, y * k);
+                context.waitTick();
+            }
+            int[] aufEins = context.computeOnClient(mc -> new int[] {Minimap.INSTANZ.todespunkte(), Wegpunkte.INSTANZ.tode().size()});
+            for (int i = 1; i <= 8; i++) {
+                maus.setCursorPos((eins + (acht - eins) * i / 8) * k, y * k);
+                context.waitTick();
+            }
+            maus.releaseMouse(LINKS);
+            context.waitTicks(2);
+            if (aufEins[0] != 1 || aufEins[1] != 8) {
+                throw new AssertionError("Auf 1 gezogen: Regler " + aufEins[0] + " und " + aufEins[1] + " Todespunkte statt 1 und 8");
+            }
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTicks(2);
+            int[] zu = context.computeOnClient(mc -> {
+                Minimap neu = new Minimap();
+                neu.lies(HeroicMap.einstellungen());
+                return new int[] {mc.gui.screen() == null ? 0 : 1, neu.todespunkte(), Wegpunkte.INSTANZ.tode().size()};
+            });
+            if (zu[0] != 0 || zu[1] != 8 || zu[2] != 8) {
+                throw new AssertionError("Nach 8, 1, 8 und Esc: Schirm offen " + zu[0] + ", gespeichert " + zu[1] + ", " + zu[2]
+                        + " Todespunkte statt zu, 8 und 8");
+            }
+            // Auf 2 gestellt: Nach Esc bleiben die zwei neuesten.
+            r = oeffneTodRegler(context);
+            spielerKlick(context, maus, k, r[0] + 4 + (r[2] - 8) * 2 / 16.0, y);
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTicks(2);
+            List<Integer> zwei = context.computeOnClient(mc -> Wegpunkte.INSTANZ.tode().stream().map(Wegpunkte.Punkt::x).toList());
+            if (!zwei.equals(List.of(1006, 1007))) {
+                throw new AssertionError("Auf 2 gestellt und Esc: " + zwei + " statt [1006, 1007]");
+            }
+        } finally {
+            context.runOnClient(mc -> {
+                mc.gui.setScreen(null);
+                Minimap.INSTANZ.setzeTodespunkte(1);
+                Wegpunkte.INSTANZ.kappeTode(0);
+            });
+        }
+    }
+
+    /** Öffnet das Untermenü und gibt x, y, Breite und Höhe des Reglers „Todespunkte“ in Einheiten des GUI. */
+    private static int[] oeffneTodRegler(ClientGameTestContext context) {
+        context.runOnClient(mc -> mc.gui.setScreen(new Anzeige(null)));
+        context.waitTicks(2);
+        return context.computeOnClient(mc -> {
+            for (Object kind : mc.gui.screen().children()) {
+                if (kind instanceof Anzeige.TodRegler w) {
+                    return new int[] {w.getX(), w.getY(), w.getWidth(), w.getHeight()};
+                }
+            }
+            throw new AssertionError("Kein Regler „Todespunkte“ im Untermenü");
+        });
+    }
+
     private static String name(ClientGameTestContext context, int form) {
         return context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(form).name());
     }
@@ -1626,6 +2682,299 @@ public final class Bedienung implements FabricClientGameTest {
                     .orElseThrow(() -> new AssertionError("Kein Griff von " + f + " auf dem Schirm"));
             return new double[] {g.x(), g.y()};
         });
+    }
+
+    /**
+     * Schrift und Biegung beim Namen (mod#150), mit Klicks von Hand. „Name…“ an einer Region: unter dem Feld die Regler
+     * „Schrift“ und „Biegung“, grau, solange es leer ist; ein Klick auf einen grauen Regler schliesst nichts. Getippt und beide
+     * Regler auf eine Raste geklickt: Die Form zeigt es gleich, in der Datei steht es erst nach Enter. Noch einmal geöffnet,
+     * die Biegung verstellt, Esc: wieder wie gespeichert. An einer Linie nur „Schrift“. Bei GS 3 und 4 am unteren Rand, rechts
+     * der Mitte, wo das Feld nach oben und bei GS 4 auch nach links rückt, liegen Feld und Regler ganz auf dem Schirm. In der Ecke
+     * selbst liegt „Optionen …“. Siehe docs/wegpunkte.md, „Namen“.
+     */
+    private static void schriftUndBiegung(ClientGameTestContext context, TestInput maus, int k) {
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        // Rechts oben neben der Region aus namen, und eine Linie darunter.
+        int bx = mitte[0] + 12, bz = mitte[1] - 24;
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        try {
+            context.runOnClient(mc -> {
+                String dimension = mc.level.dimension().identifier().toString();
+                Wegpunkte.INSTANZ.setzeForm(dimension, List.of(new Wegpunkte.Ecke(bx, bz), new Wegpunkte.Ecke(bx + 16, bz),
+                        new Wegpunkte.Ecke(bx + 16, bz + 16), new Wegpunkte.Ecke(bx, bz + 16)));
+                Wegpunkte.INSTANZ.setzeForm(dimension, List.of(new Wegpunkte.Ecke(bx, bz + 20), new Wegpunkte.Ecke(bx + 16, bz + 20)));
+            });
+            context.waitTicks(2);
+            double[] g = griff(context, formen);
+            eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.name");
+            int[][] w = eingabeWidgets(context);
+            if (w[1] == null || w[2] == null || w[1][4] != 0 || w[2][4] != 0) {
+                throw new AssertionError("„Name…“ an einer Region: Regler fehlen oder sind nicht grau, " + Arrays.deepToString(w));
+            }
+            spielerKlick(context, maus, k, w[2][0] + w[2][2] / 2.0, w[2][1] + 10);
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe()) == null) {
+                throw new AssertionError("Ein Klick auf den grauen Regler schloss das Feld");
+            }
+            maus.typeChars("Hof");
+            context.waitTicks(2);
+            w = eingabeWidgets(context);
+            if (w[1][4] != 1 || w[2][4] != 1) {
+                throw new AssertionError("Mit Namen sind die Regler nicht an: " + Arrays.deepToString(w));
+            }
+            // Schrift auf 2 (Raste 6 von 9), Biegung auf 90° nach oben (Raste 18 von 25).
+            raste(context, maus, k, w[1], 6, Wegpunkte.SCHRIFTEN.length);
+            raste(context, maus, k, w[2], 18, 25);
+            Path datei = context.computeOnClient(mc -> Downloads.weltOrdner().resolve("wegpunkte.json"));
+            Wegpunkte.EigeneForm live = form(context, formen);
+            String vorEnter = Files.readString(datei, StandardCharsets.UTF_8);
+            if (live.schrift() != 2 || live.biegung() != 90 || live.name() != null || vorEnter.contains("\"biegung\"")) {
+                throw new AssertionError("Vor Enter: " + live + ", in der Datei " + vorEnter.contains("\"biegung\""));
+            }
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            Wegpunkte.EigeneForm gespeichert = form(context, formen);
+            String nachEnter = Files.readString(datei, StandardCharsets.UTF_8);
+            if (!"Hof".equals(gespeichert.name()) || gespeichert.schrift() != 2 || gespeichert.biegung() != 90
+                    || !nachEnter.contains("\"schrift\":2.0") || !nachEnter.contains("\"biegung\":90")) {
+                throw new AssertionError("Nach Enter: " + gespeichert);
+            }
+            context.takeScreenshot(TestScreenshotOptions.of("namen-bogen").disableCounterPrefix());
+
+            // Noch einmal: die Regler stehen auf den gespeicherten Rasten; Biegung auf 90° nach unten, Esc nimmt es zurück.
+            g = griff(context, formen);
+            eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.name_aendern");
+            w = eingabeWidgets(context);
+            if (w[1][5] != 6 || w[2][5] != 18) {
+                throw new AssertionError("Wieder geöffnet stehen die Regler auf " + w[1][5] + " und " + w[2][5]);
+            }
+            raste(context, maus, k, w[2], 6, 25);
+            if (form(context, formen).biegung() != -90) {
+                throw new AssertionError("Die Biegung wirkt nicht gleich: " + form(context, formen));
+            }
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTicks(2);
+            if (!form(context, formen).equals(gespeichert) || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe()) != null) {
+                throw new AssertionError("Esc nahm nicht zurück: " + form(context, formen));
+            }
+
+            // An der Linie nur „Schrift“.
+            double[] gl = griff(context, formen + 1);
+            eintrag(context, maus, k, gl[0], gl[1], "heroicmap.karte.name");
+            w = eingabeWidgets(context);
+            if (w[1] == null || w[2] != null) {
+                throw new AssertionError("An einer Linie: Schrift " + (w[1] != null) + ", Biegung " + (w[2] != null));
+            }
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTicks(2);
+
+            // Bei GS 3 und 4 eine kleine Region am unteren Rand: Feld und Regler ganz auf dem Schirm.
+            for (int gs : new int[] {3, 4}) {
+                context.getInput().resizeWindow(1280, 240 * gs);
+                context.runOnClient(mc -> {
+                    mc.options.guiScale().set(gs);
+                    mc.resizeGui();
+                });
+                context.waitTicks(3);
+                int nummer = context.computeOnClient(mc -> {
+                    int breite = mc.getWindow().getGuiScaledWidth(), hoehe = mc.getWindow().getGuiScaledHeight();
+                    int[] b = ((Karte) mc.gui.screen()).blockUnter(breite / 2 + 40, hoehe - 16);
+                    Wegpunkte.INSTANZ.setzeForm(mc.level.dimension().identifier().toString(), List.of(new Wegpunkte.Ecke(b[0] - 1, b[1] - 1),
+                            new Wegpunkte.Ecke(b[0] + 1, b[1] - 1), new Wegpunkte.Ecke(b[0] + 1, b[1] + 1), new Wegpunkte.Ecke(b[0] - 1, b[1] + 1)));
+                    return Wegpunkte.INSTANZ.eigeneFormen().size() - 1;
+                });
+                context.waitTicks(2);
+                double[] ge = griff(context, nummer);
+                eintrag(context, maus, gs, ge[0], ge[1], "heroicmap.karte.name");
+                int[] schirm = context.computeOnClient(mc -> new int[] {mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight(),
+                    mc.getWindow().getGuiScale()});
+                int[][] ws = eingabeWidgets(context);
+                // Feld, Schrift und Biegung; „Gewicht“ gehört zur Farbe.
+                for (int[] x : Arrays.copyOf(ws, 3)) {
+                    if (schirm[2] != gs || x == null || x[0] < 0 || x[1] < 0 || x[0] + x[2] > schirm[0] || x[1] + x[3] > schirm[1]) {
+                        throw new AssertionError("GS " + schirm[2] + " statt " + gs + ", Schirm " + schirm[0] + " × " + schirm[1] + ": "
+                                + Arrays.deepToString(ws));
+                    }
+                }
+                maus.pressKey(InputConstants.KEY_ESCAPE);
+                context.waitTicks(2);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } finally {
+            context.getInput().resizeWindow(vorher[0], vorher[1]);
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(vorher[2]);
+                mc.resizeGui();
+                List<Wegpunkte.EigeneForm> alle = Wegpunkte.INSTANZ.eigeneFormen();
+                for (Wegpunkte.EigeneForm f : List.copyOf(alle.subList(Math.min(formen, alle.size()), alle.size()))) {
+                    Wegpunkte.INSTANZ.loesche(f);
+                }
+            });
+            context.waitTicks(3);
+        }
+    }
+
+    /**
+     * Gewicht (mod#163), mit Klicks von Hand. Zwei Regionen, die sich überdecken, A rot, B blau darüber, beide Gewicht 0: Auf
+     * dem Rand von B in A steht Blau. „Farbe…“ an A, darunter der Regler „Gewicht“ auf +2: Gleich liegt die Fläche von A über
+     * dem Rand von B, der Rand wird röter; in der Datei steht es erst nach Enter. Wieder geöffnet, −3 und Esc: wieder +2. Bei
+     * GS 3 und 4 am unteren Rand liegen Feld und Regler ganz auf dem Schirm. Siehe docs/wegpunkte.md, „Gewicht“.
+     */
+    private static void gewicht(ClientGameTestContext context, TestInput maus, int k) {
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        // Unter der Mitte, A links, B um 8 Blöcke nach rechts, beide 16 × 16.
+        int ax = mitte[0] - 20, bx = mitte[0] - 12, z = mitte[1] + 8;
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        try {
+            context.runOnClient(mc -> {
+                String dimension = mc.level.dimension().identifier().toString();
+                for (int x : new int[] {ax, bx}) {
+                    Wegpunkte.INSTANZ.setzeForm(dimension, List.of(new Wegpunkte.Ecke(x, z), new Wegpunkte.Ecke(x + 16, z),
+                            new Wegpunkte.Ecke(x + 16, z + 16), new Wegpunkte.Ecke(x, z + 16)));
+                }
+                Wegpunkte.INSTANZ.faerbe(Wegpunkte.INSTANZ.eigeneFormen().get(formen), 0xE03030);
+                Wegpunkte.INSTANZ.faerbe(Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1), 0x3050E0);
+            });
+            context.waitTicks(3);
+            // Auf der linken Kante von B, anderthalb Blöcke unter ihrer oberen Ecke: in A, über dem Feld, das am Griff von A öffnet.
+            double[] ort = context.computeOnClient(mc -> {
+                Wegpunkte.EigeneForm b = Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1);
+                Karte.EckeAn e0 = ((Karte) mc.gui.screen()).ecken().stream().filter(e -> e.form().equals(b) && e.index() == 0)
+                        .findFirst().orElseThrow();
+                return new double[] {e0.x(), e0.y() + 6};
+            });
+            frei(context, new double[][] {ort});
+            maus.setCursorPos(2 * k, 2 * k);
+            context.waitTicks(2);
+            BufferedImage vor = ImageIO.read(context.takeScreenshot(TestScreenshotOptions.of("gewicht-vorher").disableCounterPrefix()).toFile());
+            // Der blaueste Pixel um die Kante ist ihr Rand; danach derselbe Pixel.
+            int py = (int) Math.round(ort[1] * k), px = -1, besteBlau = Integer.MIN_VALUE;
+            for (int x = (int) Math.round(ort[0] * k) - 2 * k; x <= (int) Math.round(ort[0] * k) + 2 * k; x++) {
+                int c = vor.getRGB(x, py), blau = (c & 0xFF) - (c >> 16 & 0xFF);
+                if (blau > besteBlau) {
+                    besteBlau = blau;
+                    px = x;
+                }
+            }
+            int vorRot = vor.getRGB(px, py) >> 16 & 0xFF;
+
+            double[] g = griff(context, formen);
+            eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.farbe");
+            int[][] w = eingabeWidgets(context);
+            if (w[3] == null || w[3][4] != 1 || w[3][5] != Wegpunkte.MAX_GEWICHT || w[1] != null || w[2] != null) {
+                throw new AssertionError("„Farbe…“: Regler „Gewicht“ fehlt, ist grau oder nicht auf 0, " + Arrays.deepToString(w));
+            }
+            raste(context, maus, k, w[3], Wegpunkte.MAX_GEWICHT + 2, 2 * Wegpunkte.MAX_GEWICHT + 1);
+            Path datei = context.computeOnClient(mc -> Downloads.weltOrdner().resolve("wegpunkte.json"));
+            if (form(context, formen).gewicht() != 2 || Files.readString(datei, StandardCharsets.UTF_8).contains("\"gewicht\"")) {
+                throw new AssertionError("Vor Enter: " + form(context, formen));
+            }
+            maus.setCursorPos(2 * k, 2 * k);
+            context.waitTicks(2);
+            BufferedImage live = ImageIO.read(context.takeScreenshot(TestScreenshotOptions.of("gewicht-live").disableCounterPrefix()).toFile());
+            int liveRot = live.getRGB(px, py) >> 16 & 0xFF;
+            if (liveRot < vorRot + 30) {
+                throw new AssertionError("Die Fläche von A liegt nicht über dem Rand von B: Rot " + vorRot + " vorher, " + liveRot + " mit Gewicht 2");
+            }
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            if (form(context, formen).gewicht() != 2 || !Files.readString(datei, StandardCharsets.UTF_8).contains("\"gewicht\":2")) {
+                throw new AssertionError("Nach Enter: " + form(context, formen));
+            }
+
+            // Wieder geöffnet steht der Regler auf +2; −3 und Esc nimmt es zurück.
+            g = griff(context, formen);
+            eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.farbe");
+            w = eingabeWidgets(context);
+            if (w[3][5] != Wegpunkte.MAX_GEWICHT + 2) {
+                throw new AssertionError("Wieder geöffnet steht „Gewicht“ auf Raste " + w[3][5]);
+            }
+            raste(context, maus, k, w[3], Wegpunkte.MAX_GEWICHT - 3, 2 * Wegpunkte.MAX_GEWICHT + 1);
+            if (form(context, formen).gewicht() != -3) {
+                throw new AssertionError("Der Regler wirkt nicht gleich: " + form(context, formen));
+            }
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTicks(2);
+            if (form(context, formen).gewicht() != 2) {
+                throw new AssertionError("Esc nahm nicht zurück: " + form(context, formen));
+            }
+
+            // Bei GS 3 und 4 am unteren Rand: Feld und Regler ganz auf dem Schirm.
+            for (int gs : new int[] {3, 4}) {
+                context.getInput().resizeWindow(1280, 240 * gs);
+                context.runOnClient(mc -> {
+                    mc.options.guiScale().set(gs);
+                    mc.resizeGui();
+                });
+                context.waitTicks(3);
+                int nummer = context.computeOnClient(mc -> {
+                    int breite = mc.getWindow().getGuiScaledWidth(), hoehe = mc.getWindow().getGuiScaledHeight();
+                    int[] b = ((Karte) mc.gui.screen()).blockUnter(breite / 2 + 40, hoehe - 16);
+                    Wegpunkte.INSTANZ.setzeForm(mc.level.dimension().identifier().toString(), List.of(new Wegpunkte.Ecke(b[0] - 1, b[1] - 1),
+                            new Wegpunkte.Ecke(b[0] + 1, b[1] - 1), new Wegpunkte.Ecke(b[0] + 1, b[1] + 1), new Wegpunkte.Ecke(b[0] - 1, b[1] + 1)));
+                    return Wegpunkte.INSTANZ.eigeneFormen().size() - 1;
+                });
+                context.waitTicks(2);
+                double[] ge = griff(context, nummer);
+                eintrag(context, maus, gs, ge[0], ge[1], "heroicmap.karte.farbe");
+                int[] schirm = context.computeOnClient(mc -> new int[] {mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight(),
+                    mc.getWindow().getGuiScale()});
+                int[][] ws = eingabeWidgets(context);
+                for (int[] x : new int[][] {ws[0], ws[3]}) {
+                    if (schirm[2] != gs || x == null || x[0] < 0 || x[1] < 0 || x[0] + x[2] > schirm[0] || x[1] + x[3] > schirm[1]) {
+                        throw new AssertionError("GS " + schirm[2] + " statt " + gs + ", Schirm " + schirm[0] + " × " + schirm[1] + ": "
+                                + Arrays.deepToString(ws));
+                    }
+                }
+                maus.pressKey(InputConstants.KEY_ESCAPE);
+                context.waitTicks(2);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } finally {
+            context.getInput().resizeWindow(vorher[0], vorher[1]);
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(vorher[2]);
+                mc.resizeGui();
+                List<Wegpunkte.EigeneForm> alle = Wegpunkte.INSTANZ.eigeneFormen();
+                for (Wegpunkte.EigeneForm f : List.copyOf(alle.subList(Math.min(formen, alle.size()), alle.size()))) {
+                    Wegpunkte.INSTANZ.loesche(f);
+                }
+            });
+            context.waitTicks(3);
+        }
+    }
+
+    /** Eingabefeld, Regler „Schrift“, „Biegung“ und „Gewicht“ der offenen Karte: je {x, y, Breite, Höhe, an, Raste}, null ohne. */
+    private static int[][] eingabeWidgets(ClientGameTestContext context) {
+        return context.computeOnClient(mc -> {
+            AbstractWidget[] w = ((Karte) mc.gui.screen()).eingabeWidgets();
+            int[][] aus = new int[w.length][];
+            for (int i = 0; i < w.length; i++) {
+                if (w[i] != null) {
+                    aus[i] = new int[] {w[i].getX(), w[i].getY(), w[i].getWidth(), w[i].getHeight(), w[i].active ? 1 : 0,
+                        w[i] instanceof Karte.Raster r ? r.raste() : -1};
+                }
+            }
+            return aus;
+        });
+    }
+
+    /** Ein Klick von Hand auf die Raste {@code i} von {@code n} des Reglers {@code w}: wo der Regler den Wert i / (n − 1) hat. */
+    private static void raste(ClientGameTestContext context, TestInput maus, int k, int[] w, int i, int n) {
+        spielerKlick(context, maus, k, w[0] + 4 + i * (w[2] - 8) / (double) (n - 1), w[1] + 10);
+    }
+
+    private static Wegpunkte.EigeneForm form(ClientGameTestContext context, int nummer) {
+        return context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(nummer));
     }
 
     /** Liegt im Bildschirmfoto bei (x, y) in Einheiten des GUI die Farbe einer eigenen Linie, auf 12 je Kanal genau? */
@@ -1897,12 +3246,25 @@ public final class Bedienung implements FabricClientGameTest {
         warte250();
         maus.setCursorPos(ort[0] * k, ort[1] * k);
         context.waitTick();
-        maus.pressMouse(LINKS);
         if (doppelt) {
-            context.waitTick();
+            doppelklick(maus);
+        } else {
             maus.pressMouse(LINKS);
         }
         context.waitTicks(2);
+    }
+
+    /** Abstand der zwei Drücke eines Doppelklicks nach der Uhr: deutlich unter den 250 ms des Spiels. */
+    static final long DOPPELKLICK_MS = 50;
+
+    /**
+     * Ein Doppelklick an der Stelle der Maus: zwei Drücke {@link #DOPPELKLICK_MS} nach der Uhr auseinander, ohne Tick dazwischen;
+     * der Client steht, solange der Test schläft. Ein Tick dazwischen dauerte unter Last auch länger als 250 ms, dann war es keiner.
+     */
+    private static void doppelklick(TestInput maus) {
+        maus.pressMouse(LINKS);
+        schlafe(DOPPELKLICK_MS);
+        maus.pressMouse(LINKS);
     }
 
     /** Die Mitte des Knopfs mit dieser Aufschrift auf dem offenen Schirm, in Einheiten des GUI. */
@@ -2415,6 +3777,224 @@ public final class Bedienung implements FabricClientGameTest {
         context.waitFor(mc -> mc.level.dimension() == Level.OVERWORLD && Math.abs(mc.player.getY() - -60) < 0.01 && mc.player.onGround(), 600);
     }
 
+    /**
+     * „Im Browser öffnen“, siehe docs/vollbildkarte.md, „Im Browser öffnen“. Der Einzelspieler hat keinen Kanal zum Plugin; den
+     * setzt der Test, ebenso die Frage und das Öffnen, so geht kein Browser auf. Die Antworten des Plugins gibt er wie das Netz
+     * über {@code Downloads.empfange}. Geprüft: grau mit Grund bei altem Plugin und ohne Freigabe; mit Freigabe ein Klick von
+     * Hand, die Frage, der Link aus der eigenen Basis mit dem Token im Fragment; eine Absage wegen der Rate; und das Token steht
+     * nicht im Log.
+     */
+    private static void imBrowser(ClientGameTestContext context, TestInput maus, int k) {
+        String token = "eyJ2IjoyfQ.Gametest_Token-0123456789";
+        AtomicInteger fragen = new AtomicInteger();
+        AtomicReference<URI> geoeffnet = new AtomicReference<>();
+        var kanalVorher = Webkarte.kanal;
+        var fragenVorher = Webkarte.fragen;
+        var oeffnenVorher = Webkarte.oeffnen;
+        Webkarte.kanal = () -> true;
+        Webkarte.fragen = () -> {
+            fragen.incrementAndGet();
+            return true;
+        };
+        Webkarte.oeffnen = geoeffnet::set;
+        try {
+            context.runOnClient(mc -> {
+                Webkarte.INSTANZ.leeren();
+                Symbole.INSTANZ.basis(JsonParser.parseString("{\"url\":\"http://127.0.0.1:8082/welt/tiles\"}").getAsJsonObject(),
+                        InetAddress.getLoopbackAddress());
+                mc.gui.setScreen(new Karte(Satz.lies(Bilder.testsatz())));
+            });
+            context.waitTicks(3);
+            // Ohne Antwort auf show mit dem Feld web: ein altes Plugin, grau.
+            pruefeWeb(context, false, "heroicmap.web.alt");
+            context.runOnClient(mc -> Downloads.INSTANZ.empfange("{\"v\":1,\"typ\":\"show\",\"erlaubt\":true,\"web\":false}"));
+            context.waitTicks(2);
+            pruefeWeb(context, false, "heroicmap.web.nicht_frei");
+            context.runOnClient(mc -> Downloads.INSTANZ.empfange("{\"v\":1,\"typ\":\"show\",\"erlaubt\":true,\"web\":true}"));
+            context.waitTicks(2);
+            pruefeWeb(context, true, null);
+            // Ein Klick von Hand auf den Knopf: die Frage geht hinaus, der Knopf wartet auf die Antwort.
+            int[] knopf = context.computeOnClient(mc -> {
+                AbstractWidget w = ((Karte) mc.gui.screen()).webKnopf();
+                return new int[] {w.getX() + w.getWidth() / 2, w.getY() + w.getHeight() / 2};
+            });
+            spielerKlick(context, maus, k, knopf[0], knopf[1]);
+            if (fragen.get() != 1) {
+                throw new AssertionError("Im Browser öffnen: " + fragen.get() + " Fragen statt 1 nach dem Klick");
+            }
+            pruefeWeb(context, false, "heroicmap.web.laeuft");
+            context.runOnClient(mc -> Downloads.INSTANZ.empfange("{\"v\":1,\"typ\":\"web\",\"erlaubt\":true,\"token\":\"" + token + "\"}"));
+            for (int i = 0; geoeffnet.get() == null; i++) {
+                if (i == 100) {
+                    throw new AssertionError("Im Browser öffnen: nach der Antwort kein Link geöffnet");
+                }
+                context.waitTick();
+            }
+            String link = geoeffnet.get().toString();
+            if (!link.equals("http://127.0.0.1:8082/welt/#anmelden=" + token)) {
+                throw new AssertionError("Im Browser öffnen: Link " + link.replace(token, "<token>"));
+            }
+            pruefeWeb(context, true, null);
+            // Noch einmal, und der Server sagt: erst in 12 s. Das steht unten links.
+            spielerKlick(context, maus, k, knopf[0], knopf[1]);
+            context.runOnClient(mc -> Downloads.INSTANZ.empfange(
+                    "{\"v\":1,\"typ\":\"web\",\"erlaubt\":false,\"grund\":\"rate\",\"jetzt\":1760000000,\"wieder\":12}"));
+            context.waitTicks(2);
+            String hinweis = context.computeOnClient(mc -> {
+                Component h = ((Karte) mc.gui.screen()).hinweis();
+                return h == null ? "" : h.getString();
+            });
+            String erwartet = context.computeOnClient(mc -> Component.translatable("heroicmap.web.grund.rate", 12L).getString());
+            if (fragen.get() != 2 || !hinweis.equals(erwartet)) {
+                throw new AssertionError("Im Browser öffnen, Rate: " + fragen.get() + " Fragen, Hinweis „" + hinweis + "“ statt „" + erwartet + "“");
+            }
+            context.runOnClient(mc -> mc.gui.setScreen(null));
+            context.waitTicks(5);
+            // Das Token steht nirgends im Log.
+            Path log = net.fabricmc.loader.api.FabricLoader.getInstance().getGameDir().resolve("logs").resolve("latest.log");
+            if (Files.readString(log, StandardCharsets.UTF_8).contains(token)) {
+                throw new AssertionError("Im Browser öffnen: Das Token steht in latest.log");
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } finally {
+            Webkarte.kanal = kanalVorher;
+            Webkarte.fragen = fragenVorher;
+            Webkarte.oeffnen = oeffnenVorher;
+            context.runOnClient(mc -> Webkarte.INSTANZ.leeren());
+        }
+    }
+
+    /**
+     * Neue Version: Beim Start fragte der Gametest niemanden. Mit Schalter aus fragt der Mod nicht und zeigt nichts. Von Hand
+     * im Untermenü angeschaltet fragt er einmal einen Server auf loopback, mit Spielversion und User-Agent; ein zweites An im
+     * selben Start fragt nicht wieder. Dann steht oben links der Hinweis; ein Klick von Hand öffnet den Bestätigungsschirm mit
+     * der festen Adresse, Abbrechen führt zurück, kein Browser. Siehe docs/vollbildkarte.md, „Neue Version“.
+     */
+    private static void neueVersion(ClientGameTestContext context, TestInput maus, int k) {
+        List<String> anfragen = new CopyOnWriteArrayList<>();
+        HttpServer server;
+        try {
+            server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        server.createContext("/", t -> {
+            anfragen.add(t.getRequestURI().getRawQuery() + " " + t.getRequestHeaders().getFirst("User-Agent"));
+            byte[] koerper = "[{\"version_number\":\"100.0.0-rc.1\"},{\"version_number\":\"99.0.0\"}]".getBytes(StandardCharsets.UTF_8);
+            t.sendResponseHeaders(200, koerper.length);
+            try (OutputStream aus = t.getResponseBody()) {
+                aus.write(koerper);
+            }
+        });
+        server.start();
+        try {
+            String beimStart = context.computeOnClient(mc -> NeueVersion.basis + " " + NeueVersion.neu + " " + NeueVersion.gefragt.get());
+            if (!beimStart.equals("null null false")) {
+                throw new AssertionError("Neue Version beim Start der Gametests: " + beimStart);
+            }
+            context.runOnClient(mc -> {
+                NeueVersion.basis = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v2/project/heroic-map/version");
+                Minimap.INSTANZ.setzeNeueVersion(false);
+                NeueVersion.frage();
+                mc.gui.setScreen(new Karte(Satz.lies(Bilder.testsatz())));
+            });
+            context.waitTicks(20);
+            boolean knopf = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).neueVersionKnopf() != null);
+            if (!anfragen.isEmpty() || NeueVersion.gefragt.get() || knopf) {
+                throw new AssertionError("Neue Version mit Schalter aus: " + anfragen.size() + " Fragen, Knopf " + knopf);
+            }
+            // Von Hand an im Untermenü; dann aus und wieder an, das fragt nicht noch einmal.
+            context.runOnClient(mc -> mc.gui.setScreen(new Anzeige(null)));
+            context.waitTicks(2);
+            int[] schalter = context.computeOnClient(mc -> {
+                String name = Component.translatable("heroicmap.menue.neue_version").getString();
+                AbstractWidget w = mc.gui.screen().children().stream().filter(c -> c instanceof CycleButton<?> b
+                        && b.getMessage().getString().startsWith(name)).map(c -> (AbstractWidget) c).findFirst().orElseThrow();
+                return new int[] {w.getX() + w.getWidth() / 2, w.getY() + w.getHeight() / 2};
+            });
+            spielerKlick(context, maus, k, schalter[0], schalter[1]);
+            for (int i = 0; NeueVersion.neu == null; i++) {
+                if (i == 200) {
+                    throw new AssertionError("Neue Version: keine Antwort nach dem Anschalten, " + anfragen.size() + " Fragen");
+                }
+                context.waitTick();
+            }
+            spielerKlick(context, maus, k, schalter[0], schalter[1]);
+            spielerKlick(context, maus, k, schalter[0], schalter[1]);
+            context.waitTicks(20);
+            String erwartet = context.computeOnClient(mc -> NeueVersion.adresse(URI.create(""), SharedConstants.getCurrentVersion().name())
+                    .getRawQuery() + " " + NeueVersion.agent(NeueVersion.eigene()));
+            if (!anfragen.equals(List.of(erwartet)) || !"99.0.0".equals(NeueVersion.neu) || !Minimap.INSTANZ.neueVersion()) {
+                throw new AssertionError("Neue Version: Fragen " + anfragen + " statt [" + erwartet + "], neu " + NeueVersion.neu);
+            }
+            // Oben links der Hinweis; ein Klick von Hand öffnet den Bestätigungsschirm mit der festen Adresse.
+            context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(Bilder.testsatz()))));
+            context.waitTicks(3);
+            int[] hinweis = context.computeOnClient(mc -> {
+                AbstractWidget w = ((Karte) mc.gui.screen()).neueVersionKnopf();
+                if (w == null || w.getX() != 4 || w.getY() != 4
+                        || !w.getMessage().getString().equals(Component.translatable("heroicmap.karte.neue_version", "99.0.0").getString())) {
+                    throw new AssertionError("Neue Version: Hinweis " + (w == null ? "fehlt" : w.getMessage().getString() + " bei " + w.getX() + ", " + w.getY()));
+                }
+                return new int[] {w.getX() + w.getWidth() / 2, w.getY() + w.getHeight() / 2};
+            });
+            spielerKlick(context, maus, k, hinweis[0], hinweis[1]);
+            context.waitFor(mc -> mc.gui.screen() instanceof ConfirmLinkScreen, 100);
+            int[] abbrechen = context.computeOnClient(mc -> {
+                if (!(mc.gui.screen() instanceof ConfirmLinkScreen s) || !s.getNarrationMessage().getString().contains(NeueVersion.SEITE.toString())) {
+                    throw new AssertionError("Neue Version: nach dem Klick " + mc.gui.screen());
+                }
+                AbstractWidget w = s.children().stream().filter(c -> c instanceof AbstractWidget a
+                        && (a.getMessage().getString().equals(CommonComponents.GUI_CANCEL.getString())
+                        || a.getMessage().getString().equals(CommonComponents.GUI_NO.getString()))).map(c -> (AbstractWidget) c).findFirst().orElseThrow();
+                return new int[] {w.getX() + w.getWidth() / 2, w.getY() + w.getHeight() / 2};
+            });
+            spielerKlick(context, maus, k, abbrechen[0], abbrechen[1]);
+            context.waitFor(mc -> mc.gui.screen() instanceof Karte, 100);
+            // Mit Schalter aus kein Hinweis, auch wenn die Antwort da ist.
+            boolean zurueck = context.computeOnClient(mc -> mc.gui.screen() instanceof Karte);
+            context.runOnClient(mc -> {
+                Minimap.INSTANZ.setzeNeueVersion(false);
+                mc.gui.setScreen(new Karte(Satz.lies(Bilder.testsatz())));
+            });
+            context.waitTicks(3);
+            boolean ohne = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).neueVersionKnopf() == null);
+            if (!zurueck || !ohne || anfragen.size() != 1) {
+                throw new AssertionError("Neue Version: zurück auf der Karte " + zurueck + ", ohne Hinweis bei aus " + ohne + ", " + anfragen.size() + " Fragen");
+            }
+        } finally {
+            server.stop(0);
+            context.runOnClient(mc -> {
+                mc.gui.setScreen(null);
+                Minimap.INSTANZ.setzeNeueVersion(true);
+                NeueVersion.basis = null;
+                NeueVersion.neu = null;
+            });
+        }
+    }
+
+    /** Der Knopf „Im Browser öffnen“ geht oder ist aus mit dem Grund {@code schluessel}. */
+    private static void pruefeWeb(ClientGameTestContext context, boolean geht, String schluessel) {
+        // Den Knopf stellt erst der nächste Tick der Karte (Karte.webStand); darauf warten, höchstens 5 s, statt ihn sofort zu lesen.
+        String[] stand = null;
+        for (int i = 0; i <= 100; i++) {
+            if (i > 0) {
+                context.waitTick();
+            }
+            stand = context.computeOnClient(mc -> {
+                Karte karte = (Karte) mc.gui.screen();
+                Component aus = Webkarte.INSTANZ.aus(Symbole.INSTANZ.basis(), Util.getMillis());
+                return new String[] {String.valueOf(karte.webKnopf() != null && karte.webKnopf().active), aus == null ? "" : aus.getString(),
+                    schluessel == null ? "" : Component.translatable(schluessel).getString()};
+            });
+            if (Boolean.parseBoolean(stand[0]) == geht && stand[1].equals(stand[2])) {
+                return;
+            }
+        }
+        throw new AssertionError("Im Browser öffnen: an " + stand[0] + " statt " + geht + ", Grund „" + stand[1] + "“ statt „" + stand[2] + "“");
+    }
+
     /** Öffnet die Karte über (x, z), Rechtsklick in die Mitte, ein Klick auf „Hierher teleportieren“; sie schliesst sich. */
     private static void teleportiere(ClientGameTestContext context, TestInput maus, int k, Path baum, int x, int z) {
         context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
@@ -2506,12 +4086,14 @@ public final class Bedienung implements FabricClientGameTest {
             context.waitTicks(2);
             context.takeScreenshot(TestScreenshotOptions.of("anzeige-gs" + gs).disableCounterPrefix());
             String f = context.computeOnClient(mc -> {
-                for (String schluessel : gs == 3 ? new String[] {"heroicmap.menue.aufloesung", "heroicmap.menue.todespunkt"} : new String[0]) {
-                    String name = Component.translatable(schluessel).getString();
+                // Der Regler der Todespunkte mit seinem breitesten Text, „16“ (mod#151).
+                for (String schluessel : gs == 3 ? new String[] {"heroicmap.menue.aufloesung", "heroicmap.menue.todespunkte"} : new String[0]) {
+                    String name = Component.translatable(schluessel, "").getString();
                     AbstractWidget w = mc.gui.screen().children().stream().filter(c -> c instanceof AbstractWidget a
                             && a.getMessage().getString().startsWith(name)).map(c -> (AbstractWidget) c).findFirst().orElse(null);
-                    if (w == null || mc.font.width(w.getMessage()) > w.getWidth() - 8) {
-                        return name + (w == null ? " fehlt" : ": " + mc.font.width(w.getMessage()) + " breit, Knopf " + w.getWidth());
+                    int text = w == null ? 0 : Math.max(mc.font.width(w.getMessage()), mc.font.width(Component.translatable(schluessel, "16")));
+                    if (w == null || text > w.getWidth() - 8) {
+                        return name + (w == null ? " fehlt" : ": " + text + " breit, Knopf " + w.getWidth());
                     }
                 }
                 return null;

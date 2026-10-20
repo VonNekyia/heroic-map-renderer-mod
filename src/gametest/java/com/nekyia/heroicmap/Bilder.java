@@ -137,12 +137,115 @@ public final class Bilder implements FabricClientGameTest {
             fenster(context);
             vollbildkarte(context);
             formen(context, server);
+            namenImBogen(context);
             orte(context, server);
             strahl(context, server);
             schleier(context, server);
             selbst(context);
             tueren(context, server);
             pflanzen(context, server);
+            koordinatenAmRand(context, server);
+        }
+    }
+
+    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
+    private static final String[] ECKEN = {"oben links", "oben rechts", "unten links", "unten rechts"};
+
+    /**
+     * Die Koordinaten am Rand der Welt mit y, bei GUI-Massstab 1 bis 4, die Minimap klein und gross in jeder Ecke: Die Zeile
+     * liegt ganz auf dem Schirm (mod#157). Mit -Pbilder bei GS 4, halb so gross: die kleinste Minimap oben links und oben rechts
+     * als Streifen über die ganze Breite, koordinaten-rand.png, und die grösste oben links, koordinaten-gross.png.
+     * Siehe docs/minimap.md, „Koordinaten“.
+     */
+    private static void koordinatenAmRand(ClientGameTestContext context, TestServerContext server) {
+        Path sicherung = FabricLoader.getInstance().getGameDir().resolve("heroicmap-koordinaten-test.properties");
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.schreibe(sicherung);
+            Minimap.INSTANZ.setzeKoordinaten(Minimap.Koordinaten.XYZ);
+        });
+        server.runCommand("tp @a -29999000.5 -60 -29999000.5 0 90");
+        context.waitTicks(40);
+        context.getInput().resizeWindow(1280, 960);
+        List<String> fehler = new ArrayList<>();
+        BufferedImage[] ecken = new BufferedImage[2];
+        BufferedImage[] gross = new BufferedImage[1];
+        try {
+            for (int gs = 1; gs <= 4; gs++) {
+                int g = gs;
+                context.runOnClient(mc -> {
+                    mc.options.guiScale().set(g);
+                    mc.resizeGui();
+                });
+                context.waitTicks(2);
+                for (int seite : new int[] {Minimap.KLEINSTE, Minimap.GROESSTE}) {
+                    for (int ecke = 0; ecke < ECKEN.length; ecke++) {
+                        int e = ecke;
+                        context.runOnClient(mc -> {
+                            int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+                            Minimap.INSTANZ.stelle(e % 2 == 0 ? 0 : b, e < 2 ? 0 : h, seite, b, h);
+                        });
+                        context.waitTicks(2);
+                        String f = context.computeOnClient(mc -> {
+                            int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+                            int[] k = Minimap.INSTANZ.koordinatenKasten();
+                            Minimap.Rahmen r = Minimap.INSTANZ.zuletzt();
+                            String lage = "Schirm " + b + " × " + h + ", Minimap " + r.x() + ", " + r.y() + " Seite " + r.seite();
+                            if (k == null) {
+                                return "keine Zeile; " + lage;
+                            }
+                            LOGGER.info("Koordinaten GS {}, Seite {}, {}: x {} bis {}, y {} bis {}; {}", g, seite, ECKEN[e], k[0], k[0] + k[2], k[1], k[1] + k[3], lage);
+                            return k[0] >= 0 && k[1] >= 0 && k[0] + k[2] <= b && k[1] + k[3] <= h ? null
+                                    : "x " + k[0] + " bis " + (k[0] + k[2]) + ", y " + k[1] + " bis " + (k[1] + k[3]) + "; " + lage;
+                        });
+                        if (f != null) {
+                            fehler.add("GS " + g + ", Seite " + seite + ", " + ECKEN[e] + ": " + f);
+                        }
+                        if (g == 4 && (seite == Minimap.KLEINSTE ? e < 2 : e == 0)) {
+                            Path bild = context.takeScreenshot(TestScreenshotOptions.of("koordinaten-" + seite + "-" + e).disableCounterPrefix());
+                            try {
+                                BufferedImage ganz = ImageIO.read(bild.toFile());
+                                int w = ganz.getWidth() / 2, hh = ganz.getHeight() / 2;
+                                BufferedImage halb = new BufferedImage(w, hh, BufferedImage.TYPE_INT_RGB);
+                                halb.getGraphics().drawImage(ganz, 0, 0, w, hh, null);
+                                // Über die ganze Breite, so schneidet nur der Schirm die Zeile; 96 Einheiten hoch reicht unter die Zeile.
+                                if (seite == Minimap.KLEINSTE) {
+                                    ecken[e] = halb.getSubimage(0, 0, w, hh * 2 / 5);
+                                } else {
+                                    gross[0] = halb;
+                                }
+                            } catch (IOException ex) {
+                                throw new UncheckedIOException(ex);
+                            }
+                        }
+                    }
+                }
+            }
+            if (!AUSGABE.isEmpty()) {
+                BufferedImage alle = new BufferedImage(ecken[0].getWidth(), 2 * ecken[0].getHeight(), BufferedImage.TYPE_INT_RGB);
+                alle.getGraphics().drawImage(ecken[0], 0, 0, null);
+                alle.getGraphics().drawImage(ecken[1], 0, ecken[0].getHeight(), null);
+                ImageIO.write(alle, "png", Path.of(AUSGABE, "koordinaten-rand.png").toFile());
+                ImageIO.write(gross[0], "png", Path.of(AUSGABE, "koordinaten-gross.png").toFile());
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } finally {
+            context.getInput().resizeWindow(vorher[0], vorher[1]);
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(vorher[2]);
+                mc.resizeGui();
+                Minimap.INSTANZ.lies(sicherung);
+            });
+            server.runCommand("tp @a 0.5 -30 0.5 0 90");
+            try {
+                Files.deleteIfExists(sicherung);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        if (!fehler.isEmpty()) {
+            throw new AssertionError("Koordinaten nicht ganz auf dem Schirm, " + fehler.size() + " Fälle: " + String.join(" | ", fehler));
         }
     }
 
@@ -851,6 +954,49 @@ public final class Bilder implements FabricClientGameTest {
             Minimap.INSTANZ.setzeRund(false);
         });
         context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getYRot()) < 0.1f && Minimap.INSTANZ.fertig(), 1200);
+    }
+
+    /**
+     * Namen eigener Regionen im Bogen (mod#150): „Hafenstadt“ ½× und 60° nach oben, „Westmark“ ⅔× und 90° nach unten, angeheftet;
+     * die Minimap und die Vollbildkarte. Mit -Pbilder nebeneinander als namen-bogen.png. Siehe docs/wegpunkte.md, „Namen“.
+     */
+    private static void namenImBogen(ClientGameTestContext context) {
+        int vorher = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        context.runOnClient(mc -> {
+            Wegpunkte w = Wegpunkte.INSTANZ;
+            w.setzeForm(Ebenen.UEBERWELT, List.of(new Wegpunkte.Ecke(-34, -26), new Wegpunkte.Ecke(-10, -26), new Wegpunkte.Ecke(-10, -14),
+                    new Wegpunkte.Ecke(-34, -14)));
+            w.benenne(w.stil(w.eigeneFormen().getLast(), 0.5, 60, 0), "Hafenstadt");
+            w.setzeForm(Ebenen.UEBERWELT, List.of(new Wegpunkte.Ecke(6, 2), new Wegpunkte.Ecke(30, 2), new Wegpunkte.Ecke(30, 18),
+                    new Wegpunkte.Ecke(6, 18)));
+            w.benenne(w.stil(w.eigeneFormen().getLast(), 2.0 / 3, -90, 0), "Westmark");
+            w.umschalten(w.eigeneFormen().getLast());
+            Minimap.INSTANZ.setzeScale(4);
+            Minimap.INSTANZ.setzeZoom(2);
+        });
+        context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
+        context.waitTicks(2);
+        BufferedImage minimap = mitRand(context, context.takeScreenshot(TestScreenshotOptions.of("namen-bogen-minimap").disableCounterPrefix()));
+        Path baum = testsatz();
+        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
+        context.waitTicks(40);
+        Path karte = context.takeScreenshot(TestScreenshotOptions.of("namen-bogen-karte").disableCounterPrefix());
+        try {
+            if (!AUSGABE.isEmpty()) {
+                ImageIO.write(nebeneinander(0, minimap, ImageIO.read(karte.toFile())), "png", Path.of(AUSGABE, "namen-bogen.png").toFile());
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } finally {
+            context.runOnClient(mc -> {
+                mc.gui.setScreen(null);
+                List<Wegpunkte.EigeneForm> alle = Wegpunkte.INSTANZ.eigeneFormen();
+                for (Wegpunkte.EigeneForm f : List.copyOf(alle.subList(vorher, alle.size()))) {
+                    Wegpunkte.INSTANZ.loesche(f);
+                }
+                Minimap.INSTANZ.setzeZoom(2);
+            });
+        }
     }
 
     /** Die Minimap rund bei 4 px, dann das Menü über der Szene. Siehe docs/minimap.md, „Bedienung“. */
