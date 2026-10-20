@@ -163,6 +163,7 @@ public final class Bedienung implements FabricClientGameTest {
         formenZiehen(context, maus, k);
         schweben(context, maus, k);
         namen(context, maus, k);
+        schriftUndBiegung(context, maus, k);
         farbe(context, maus, k);
         hinweisWeg(context, maus, k);
         wegpunktBei(context, maus, k);
@@ -2680,6 +2681,163 @@ public final class Bedienung implements FabricClientGameTest {
                     .orElseThrow(() -> new AssertionError("Kein Griff von " + f + " auf dem Schirm"));
             return new double[] {g.x(), g.y()};
         });
+    }
+
+    /**
+     * Schrift und Biegung beim Namen (mod#150), mit Klicks von Hand. „Name…“ an einer Region: unter dem Feld die Regler
+     * „Schrift“ und „Biegung“, grau, solange es leer ist; ein Klick auf einen grauen Regler schliesst nichts. Getippt und beide
+     * Regler auf eine Raste geklickt: Die Form zeigt es gleich, in der Datei steht es erst nach Enter. Noch einmal geöffnet,
+     * die Biegung verstellt, Esc: wieder wie gespeichert. An einer Linie nur „Schrift“. Bei GS 3 und 4 am unteren Rand, rechts
+     * der Mitte, wo das Feld nach oben und bei GS 4 auch nach links rückt, liegen Feld und Regler ganz auf dem Schirm. In der Ecke
+     * selbst liegt „Optionen …“. Siehe docs/wegpunkte.md, „Namen“.
+     */
+    private static void schriftUndBiegung(ClientGameTestContext context, TestInput maus, int k) {
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        // Rechts oben neben der Region aus namen, und eine Linie darunter.
+        int bx = mitte[0] + 12, bz = mitte[1] - 24;
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        try {
+            context.runOnClient(mc -> {
+                String dimension = mc.level.dimension().identifier().toString();
+                Wegpunkte.INSTANZ.setzeForm(dimension, List.of(new Wegpunkte.Ecke(bx, bz), new Wegpunkte.Ecke(bx + 16, bz),
+                        new Wegpunkte.Ecke(bx + 16, bz + 16), new Wegpunkte.Ecke(bx, bz + 16)));
+                Wegpunkte.INSTANZ.setzeForm(dimension, List.of(new Wegpunkte.Ecke(bx, bz + 20), new Wegpunkte.Ecke(bx + 16, bz + 20)));
+            });
+            context.waitTicks(2);
+            double[] g = griff(context, formen);
+            eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.name");
+            int[][] w = eingabeWidgets(context);
+            if (w[1] == null || w[2] == null || w[1][4] != 0 || w[2][4] != 0) {
+                throw new AssertionError("„Name…“ an einer Region: Regler fehlen oder sind nicht grau, " + Arrays.deepToString(w));
+            }
+            spielerKlick(context, maus, k, w[2][0] + w[2][2] / 2.0, w[2][1] + 10);
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe()) == null) {
+                throw new AssertionError("Ein Klick auf den grauen Regler schloss das Feld");
+            }
+            maus.typeChars("Hof");
+            context.waitTicks(2);
+            w = eingabeWidgets(context);
+            if (w[1][4] != 1 || w[2][4] != 1) {
+                throw new AssertionError("Mit Namen sind die Regler nicht an: " + Arrays.deepToString(w));
+            }
+            // Schrift auf 2 (Raste 6 von 9), Biegung auf 90° nach oben (Raste 18 von 25).
+            raste(context, maus, k, w[1], 6, Wegpunkte.SCHRIFTEN.length);
+            raste(context, maus, k, w[2], 18, 25);
+            Path datei = context.computeOnClient(mc -> Downloads.weltOrdner().resolve("wegpunkte.json"));
+            Wegpunkte.EigeneForm live = form(context, formen);
+            String vorEnter = Files.readString(datei, StandardCharsets.UTF_8);
+            if (live.schrift() != 2 || live.biegung() != 90 || live.name() != null || vorEnter.contains("\"biegung\"")) {
+                throw new AssertionError("Vor Enter: " + live + ", in der Datei " + vorEnter.contains("\"biegung\""));
+            }
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            Wegpunkte.EigeneForm gespeichert = form(context, formen);
+            String nachEnter = Files.readString(datei, StandardCharsets.UTF_8);
+            if (!"Hof".equals(gespeichert.name()) || gespeichert.schrift() != 2 || gespeichert.biegung() != 90
+                    || !nachEnter.contains("\"schrift\":2.0") || !nachEnter.contains("\"biegung\":90")) {
+                throw new AssertionError("Nach Enter: " + gespeichert);
+            }
+            context.takeScreenshot(TestScreenshotOptions.of("namen-bogen").disableCounterPrefix());
+
+            // Noch einmal: die Regler stehen auf den gespeicherten Rasten; Biegung auf 90° nach unten, Esc nimmt es zurück.
+            g = griff(context, formen);
+            eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.name_aendern");
+            w = eingabeWidgets(context);
+            if (w[1][5] != 6 || w[2][5] != 18) {
+                throw new AssertionError("Wieder geöffnet stehen die Regler auf " + w[1][5] + " und " + w[2][5]);
+            }
+            raste(context, maus, k, w[2], 6, 25);
+            if (form(context, formen).biegung() != -90) {
+                throw new AssertionError("Die Biegung wirkt nicht gleich: " + form(context, formen));
+            }
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTicks(2);
+            if (!form(context, formen).equals(gespeichert) || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eingabe()) != null) {
+                throw new AssertionError("Esc nahm nicht zurück: " + form(context, formen));
+            }
+
+            // An der Linie nur „Schrift“.
+            double[] gl = griff(context, formen + 1);
+            eintrag(context, maus, k, gl[0], gl[1], "heroicmap.karte.name");
+            w = eingabeWidgets(context);
+            if (w[1] == null || w[2] != null) {
+                throw new AssertionError("An einer Linie: Schrift " + (w[1] != null) + ", Biegung " + (w[2] != null));
+            }
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTicks(2);
+
+            // Bei GS 3 und 4 eine kleine Region am unteren Rand: Feld und Regler ganz auf dem Schirm.
+            for (int gs : new int[] {3, 4}) {
+                context.getInput().resizeWindow(1280, 240 * gs);
+                context.runOnClient(mc -> {
+                    mc.options.guiScale().set(gs);
+                    mc.resizeGui();
+                });
+                context.waitTicks(3);
+                int nummer = context.computeOnClient(mc -> {
+                    int breite = mc.getWindow().getGuiScaledWidth(), hoehe = mc.getWindow().getGuiScaledHeight();
+                    int[] b = ((Karte) mc.gui.screen()).blockUnter(breite / 2 + 40, hoehe - 16);
+                    Wegpunkte.INSTANZ.setzeForm(mc.level.dimension().identifier().toString(), List.of(new Wegpunkte.Ecke(b[0] - 1, b[1] - 1),
+                            new Wegpunkte.Ecke(b[0] + 1, b[1] - 1), new Wegpunkte.Ecke(b[0] + 1, b[1] + 1), new Wegpunkte.Ecke(b[0] - 1, b[1] + 1)));
+                    return Wegpunkte.INSTANZ.eigeneFormen().size() - 1;
+                });
+                context.waitTicks(2);
+                double[] ge = griff(context, nummer);
+                eintrag(context, maus, gs, ge[0], ge[1], "heroicmap.karte.name");
+                int[] schirm = context.computeOnClient(mc -> new int[] {mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight(),
+                    mc.getWindow().getGuiScale()});
+                int[][] ws = eingabeWidgets(context);
+                for (int[] x : ws) {
+                    if (schirm[2] != gs || x == null || x[0] < 0 || x[1] < 0 || x[0] + x[2] > schirm[0] || x[1] + x[3] > schirm[1]) {
+                        throw new AssertionError("GS " + schirm[2] + " statt " + gs + ", Schirm " + schirm[0] + " × " + schirm[1] + ": "
+                                + Arrays.deepToString(ws));
+                    }
+                }
+                maus.pressKey(InputConstants.KEY_ESCAPE);
+                context.waitTicks(2);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } finally {
+            context.getInput().resizeWindow(vorher[0], vorher[1]);
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(vorher[2]);
+                mc.resizeGui();
+                List<Wegpunkte.EigeneForm> alle = Wegpunkte.INSTANZ.eigeneFormen();
+                for (Wegpunkte.EigeneForm f : List.copyOf(alle.subList(Math.min(formen, alle.size()), alle.size()))) {
+                    Wegpunkte.INSTANZ.loesche(f);
+                }
+            });
+            context.waitTicks(3);
+        }
+    }
+
+    /** Eingabefeld, Regler „Schrift“ und „Biegung“ der offenen Karte: je {x, y, Breite, Höhe, an, Raste}, null ohne. */
+    private static int[][] eingabeWidgets(ClientGameTestContext context) {
+        return context.computeOnClient(mc -> {
+            AbstractWidget[] w = ((Karte) mc.gui.screen()).eingabeWidgets();
+            int[][] aus = new int[w.length][];
+            for (int i = 0; i < w.length; i++) {
+                if (w[i] != null) {
+                    aus[i] = new int[] {w[i].getX(), w[i].getY(), w[i].getWidth(), w[i].getHeight(), w[i].active ? 1 : 0,
+                        w[i] instanceof Karte.Raster r ? r.raste() : -1};
+                }
+            }
+            return aus;
+        });
+    }
+
+    /** Ein Klick von Hand auf die Raste {@code i} von {@code n} des Reglers {@code w}: wo der Regler den Wert i / (n − 1) hat. */
+    private static void raste(ClientGameTestContext context, TestInput maus, int k, int[] w, int i, int n) {
+        spielerKlick(context, maus, k, w[0] + 4 + i * (w[2] - 8) / (double) (n - 1), w[1] + 10);
+    }
+
+    private static Wegpunkte.EigeneForm form(ClientGameTestContext context, int nummer) {
+        return context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(nummer));
     }
 
     /** Liegt im Bildschirmfoto bei (x, y) in Einheiten des GUI die Farbe einer eigenen Linie, auf 12 je Kanal genau? */

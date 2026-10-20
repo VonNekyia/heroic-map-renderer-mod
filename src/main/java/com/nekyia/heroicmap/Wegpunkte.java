@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 import com.mojang.logging.LogUtils;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -61,10 +62,18 @@ final class Wegpunkte {
      * als RGB, {@link #KEIN_HEX} ohne, dann gilt {@code farbe}; {@code ebene} die id ihrer eigenen Ebene. Siehe docs/wegpunkte.md,
      * „Eigene Formen“.
      */
-    record EigeneForm(String dimension, List<Ecke> ecken, int farbe, boolean angeheftet, String name, int hex, int ebene) {
+    record EigeneForm(String dimension, List<Ecke> ecken, int farbe, boolean angeheftet, String name, int hex, int ebene, double schrift,
+            int biegung) {
 
+        /** Eine Linie biegt ihren Namen nicht; er folgt ihr schon. Siehe docs/wegpunkte.md, „Namen“. */
         EigeneForm {
             ecken = List.copyOf(ecken);
+            biegung = ecken.size() >= 3 ? biegung : 0;
+        }
+
+        /** Mit Schrift 1 und ohne Biegung, wie vor mod#150. */
+        EigeneForm(String dimension, List<Ecke> ecken, int farbe, boolean angeheftet, String name, int hex, int ebene) {
+            this(dimension, ecken, farbe, angeheftet, name, hex, ebene, 1, 0);
         }
 
         /** Die Farbe der Form, deckend: die eigene, sonst die aus {@link #FARBEN}. Siehe docs/wegpunkte.md, „Farbe“. */
@@ -118,6 +127,10 @@ final class Wegpunkte {
      * Vorgabe vom Server; die Kontur in Einheiten des GUI wie beim Namen einer Nadel. Siehe docs/wegpunkte.md, „Namen“.
      */
     static final float NAME_KLEINSTE = 4, NAME_GROESSE = 16, NAME_KONTUR = 1.25f;
+    /** Die Rasten des Reglers „Schrift“: ein Faktor auf die Höhe des Namens, Vorgabe 1. Siehe docs/wegpunkte.md, „Namen“. */
+    static final double[] SCHRIFTEN = {0.25, 1.0 / 3, 0.5, 2.0 / 3, 1, 1.5, 2, 3, 4};
+    /** Die Biegung eines Namens in Grad, ±{@link #MAX_BIEGUNG} in Schritten zu {@link #BIEGUNG_SCHRITT}; + nach oben gewölbt. */
+    static final int MAX_BIEGUNG = 180, BIEGUNG_SCHRITT = 15;
     /** So viele Regionen und Kreise je Welt angeheftet, eigene und vom Server zusammen; darüber heftet der Mod keine an. */
     static final int MAX_ANGEHEFTET = 64;
     /** So viele Nadeln und Banner je Welt angeheftet, eine eigene Grenze; darüber heftet der Mod keine an. */
@@ -300,8 +313,13 @@ final class Wegpunkte {
                     // Ein Name, der kein Text ist, fehlt; die Form bleibt.
                     String name = o.has("name") && o.get("name").isJsonPrimitive() ? name(o.get("name").getAsString()) : null;
                     int hex = o.has("hex") && o.get("hex").isJsonPrimitive() ? hex(o.get("hex").getAsString()) : KEIN_HEX;
+                    // Schrift und Biegung ausserhalb der Grenzen oder ohne Zahl: die Vorgabe; die Form bleibt.
+                    double schrift = o.get("schrift") instanceof JsonPrimitive s && s.isNumber() && schriftGilt(s.getAsDouble())
+                            ? schrift(s.getAsDouble()) : 1;
+                    int biegung = o.get("biegung") instanceof JsonPrimitive b && b.isNumber() && Math.abs(b.getAsDouble()) <= MAX_BIEGUNG
+                            ? biegung(b.getAsDouble()) : 0;
                     eigene.add(new EigeneForm(dimension, gueltig, Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length),
-                            o.get("minimap").getAsBoolean() && angeheftet() < MAX_ANGEHEFTET, name, hex, ebeneAus(o)));
+                            o.get("minimap").getAsBoolean() && angeheftet() < MAX_ANGEHEFTET, name, hex, ebeneAus(o), schrift, biegung));
                 }
             } catch (RuntimeException kaputt) {
                 // Nur dieser Eintrag fällt weg.
@@ -412,6 +430,13 @@ final class Wegpunkte {
             }
             if (f.hex() != KEIN_HEX) {
                 o.addProperty("hex", hex(f.hex()));
+            }
+            // Nur ohne Vorgabe; so bleiben alte Dateien gleich, und ältere Versionen überlesen die Felder.
+            if (f.schrift() != 1) {
+                o.addProperty("schrift", f.schrift());
+            }
+            if (f.biegung() != 0) {
+                o.addProperty("biegung", f.biegung());
             }
             o.addProperty("ebene", f.ebene());
             zuege.add(o);
@@ -570,7 +595,7 @@ final class Wegpunkte {
             }
         }
         for (EbenenCode.Form f : inhalt.formen()) {
-            eigene.add(new EigeneForm(f.dimension(), f.ecken(), f.farbe(), false, f.name(), f.hex(), id));
+            eigene.add(new EigeneForm(f.dimension(), f.ecken(), f.farbe(), false, f.name(), f.hex(), id, f.schrift(), f.biegung()));
         }
         schreibe();
         return new Eingefuegt(id, n, inhalt.formen().size(), null);
@@ -630,7 +655,7 @@ final class Wegpunkte {
     }
 
     private static EigeneForm mitEbene(EigeneForm f, int ebene) {
-        return new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), f.hex(), ebene);
+        return new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), f.hex(), ebene, f.schrift(), f.biegung());
     }
 
     /** Der Wegpunkt auf dem Block (x, z) in {@code dimension}, sichtbar oder nicht, oder null. */
@@ -834,7 +859,8 @@ final class Wegpunkte {
         if (gueltig == null) {
             eigene.remove(i);
         } else {
-            eigene.set(i, new EigeneForm(f.dimension(), gueltig, f.farbe(), f.angeheftet(), f.name(), f.hex(), f.ebene()));
+            eigene.set(i, new EigeneForm(f.dimension(), gueltig, f.farbe(), f.angeheftet(), f.name(), f.hex(), f.ebene(), f.schrift(),
+                    f.biegung()));
         }
         schreibe();
         return true;
@@ -855,7 +881,8 @@ final class Wegpunkte {
         if (!f.angeheftet() && angeheftet() >= MAX_ANGEHEFTET) {
             return false;
         }
-        eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), !f.angeheftet(), f.name(), f.hex(), f.ebene()));
+        eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), !f.angeheftet(), f.name(), f.hex(), f.ebene(), f.schrift(),
+                f.biegung()));
         schreibe();
         return true;
     }
@@ -864,16 +891,54 @@ final class Wegpunkte {
     void benenne(EigeneForm f, String name) {
         int i = eigene.indexOf(f);
         if (i >= 0) {
-            eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), name(name), f.hex(), f.ebene()));
+            eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), name(name), f.hex(), f.ebene(), f.schrift(),
+                    f.biegung()));
             schreibe();
         }
+    }
+
+    /**
+     * Gibt der eigenen Form {@code f} Schrift und Biegung, nur im Speicher: Der Regler am Namensfeld zeigt sie gleich auf Karte
+     * und Minimap, gespeichert wird mit dem Namen ({@link #benenne}). Gibt die Form zurück, wie sie danach ist, ohne Fund
+     * {@code f}. Siehe docs/wegpunkte.md, „Namen“.
+     */
+    EigeneForm stil(EigeneForm f, double schrift, int biegung) {
+        int i = eigene.indexOf(f);
+        if (i < 0) {
+            return f;
+        }
+        EigeneForm neu = new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), f.hex(), f.ebene(), schrift, biegung);
+        eigene.set(i, neu);
+        stand++;
+        return neu;
+    }
+
+    /** Die Raste von {@link #SCHRIFTEN} nächst {@code f}. */
+    static double schrift(double f) {
+        double beste = SCHRIFTEN[0];
+        for (double s : SCHRIFTEN) {
+            if (Math.abs(s - f) < Math.abs(beste - f)) {
+                beste = s;
+            }
+        }
+        return beste;
+    }
+
+    /** Liegt {@code f} zwischen der kleinsten und der grössten Raste von {@link #SCHRIFTEN}? */
+    static boolean schriftGilt(double f) {
+        return f >= SCHRIFTEN[0] && f <= SCHRIFTEN[SCHRIFTEN.length - 1];
+    }
+
+    /** Die Biegung {@code g} in Grad auf dem nächsten Schritt von {@link #BIEGUNG_SCHRITT}. */
+    static int biegung(double g) {
+        return (int) Math.round(g / BIEGUNG_SCHRITT) * BIEGUNG_SCHRITT;
     }
 
     /** Gibt der eigenen Form {@code f} die Farbe {@code hex} als RGB; {@link #KEIN_HEX} nimmt sie weg. */
     void faerbe(EigeneForm f, int hex) {
         int i = eigene.indexOf(f);
         if (i >= 0) {
-            eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), hex, f.ebene()));
+            eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), hex, f.ebene(), f.schrift(), f.biegung()));
             schreibe();
         }
     }
@@ -1255,7 +1320,8 @@ final class Wegpunkte {
     /**
      * Der Name der Form durch die Punkte {@code p} als Kartenschrift in den Vorgaben vom Server, eine Schrifthöhe neben dem
      * Griff, so deckt der Griff keinen Buchstaben: unter einer Region waagrecht, an einer Linie entlang auf ihrer Nordseite,
-     * an einer Linie von Nord nach Süd auf ihrer Westseite. Null ohne Namen. Siehe docs/wegpunkte.md, „Namen“.
+     * an einer Linie von Nord nach Süd auf ihrer Westseite. Die Höhe mal dem Faktor {@code schrift} der Form, bei einer Region
+     * mit ihrer Biegung. Null ohne Namen. Siehe docs/wegpunkte.md, „Namen“.
      */
     static Ebenen.Schrift schrift(EigeneForm f, double[] p) {
         if (f.name() == null) {
@@ -1265,16 +1331,17 @@ final class Wegpunkte {
         float groesse;
         if (f.region()) {
             double[] b = box(p), g = griff(p, true);
-            groesse = groesse(Math.min(b[2] - b[0], b[3] - b[1]) / 2);
+            groesse = (float) (groesse(Math.min(b[2] - b[0], b[3] - b[1]) / 2) * f.schrift());
             pfad = new double[] {g[0], g[1] + groesse};
         } else {
             // Eine Linie hat genau zwei Ecken. Die Normale (dz, −dx) zeigt für dx > 0 nach Norden, für dx = 0 und dz < 0 nach Westen.
             double dx = p[2] - p[0], dz = p[3] - p[1], laenge = Math.hypot(dx, dz);
-            groesse = groesse(laenge / 4);
+            groesse = (float) (groesse(laenge / 4) * f.schrift());
             double s = (dx > 0 || dx == 0 && dz < 0 ? 1 : -1) * groesse / laenge;
             pfad = new double[] {p[0] + s * dz, p[1] - s * dx, p[2] + s * dz, p[3] - s * dx};
         }
-        return new Ebenen.Schrift(f.dimension(), f.name(), pfad, groesse, 0, Ebenen.SCHRIFTFARBE, Ebenen.KONTURFARBE, NAME_KONTUR, box(pfad));
+        return new Ebenen.Schrift(f.dimension(), f.name(), pfad, groesse, 0, Ebenen.SCHRIFTFARBE, Ebenen.KONTURFARBE, NAME_KONTUR, box(pfad),
+                Math.toRadians(f.biegung()));
     }
 
     /**
