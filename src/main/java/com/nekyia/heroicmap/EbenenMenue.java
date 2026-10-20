@@ -57,7 +57,9 @@ final class EbenenMenue extends Screen {
             zeilen.add(z -> eigene(e, x, z, breite));
         }
         zeilen.add(z -> neue(x, z, breite));
-        for (Ebenen.Eintrag e : Ebenen.INSTANZ.alle()) {
+        // In der Reihe des Spielers, wie auf der Vollbildkarte. Siehe docs/vollbildkarte.md, „Reihe der Ebenen“.
+        for (Ebenen.Eintrag e : Ebenenreihe.INSTANZ.vomServer(Ebenen.INSTANZ.alle(),
+                Wegpunkte.INSTANZ.ebenen().stream().map(Wegpunkte.EigeneEbene::id).toList())) {
             zeilen.add(z -> addRenderableWidget(CycleButton.onOffBuilder(Ebenen.INSTANZ.an(e))
                     .create(x, z, breite, 20, Component.literal(e.name(deutsch)), (b, an) -> Ebenen.INSTANZ.setze(e.id(), an))));
         }

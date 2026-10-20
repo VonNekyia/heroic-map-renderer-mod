@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.62
+
+- **Reorder the layers.** In the layer list of the full map, ▲ and ▼ move a layer up or down; the upper one is drawn on top, on the full map and the minimap. Your order is kept per server world; "Server order" puts it back. Until you reorder, nothing changes.
+
 ## 0.2.61
 
 - **Connect points.** Right-click a corner of your own line or region, or a waypoint, and choose "Connect": it snaps onto the nearest point within a short distance, and from then on they move together. Drag one, move it with "Set coordinates…" or move a shape by its handle, and the connected corners and waypoint follow; only the shared corner of another shape moves, the rest of that shape stays. "Disconnect" releases all points on that spot. Connected corners have a light centre. Shared layer codes don't carry connections.

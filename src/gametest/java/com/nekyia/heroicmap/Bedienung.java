@@ -178,6 +178,7 @@ public final class Bedienung implements FabricClientGameTest {
         ebenenTeilen(context, maus, k);
         knoepfe(context, maus, k);
         ebenen(context, maus, k);
+        reihe(context, maus, k);
         zumSpieler(context, maus, k);
         optionen(context, maus, k);
         verschieben(context, maus, k);
@@ -3121,6 +3122,108 @@ public final class Bedienung implements FabricClientGameTest {
             });
             context.waitTicks(3);
         }
+    }
+
+    /**
+     * Reihe der Ebenen je Spieler (renderer#317 Teil 4), mit Klicks von Hand. Eine eigene Ebene „Oben“ und eine vom Server
+     * „Reihe“, je mit einer Region auf derselben Stelle, die eigene blau, die vom Server rot. Ohne Umstellen liegt die eigene
+     * oben wie vorher, und „▲“ der obersten Zeile ist aus. „▼“ an „Oben“: Sie rückt unter „Reihe“, die Stelle wird im
+     * Bildschirmfoto röter, und die Reihe steht in ebenen-reihe.json. „Reihe des Servers“ stellt zurück und löscht die Datei.
+     * Siehe docs/vollbildkarte.md, „Reihe der Ebenen“.
+     */
+    private static void reihe(ClientGameTestContext context, TestInput maus, int k) {
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        // Links unter der Mitte, fern der Liste rechts und ihrer Überschriften.
+        int bx = mitte[0] - 30, bz = mitte[1] + 8;
+        int id = context.computeOnClient(mc -> {
+            int e = Wegpunkte.INSTANZ.neueEbene("Oben");
+            Wegpunkte.INSTANZ.setzeForm(mc.level.dimension().identifier().toString(), List.of(new Wegpunkte.Ecke(bx, bz),
+                    new Wegpunkte.Ecke(bx + 16, bz), new Wegpunkte.Ecke(bx + 16, bz + 16), new Wegpunkte.Ecke(bx, bz + 16)));
+            Wegpunkte.INSTANZ.ordne(Wegpunkte.INSTANZ.eigeneFormen().getLast(), e);
+            Wegpunkte.INSTANZ.faerbe(Wegpunkte.INSTANZ.eigeneFormen().getLast(), 0x3050E0);
+            Ebenen.INSTANZ.empfange(JsonParser.parseString("""
+                    {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:reihe","name":{"de":"Reihe","en":"Reihe"},"visible":true,
+                      "order":1,"version":"1"}]}""").getAsJsonObject());
+            Ebenen.INSTANZ.teil(Ebenen.Teil.lies("""
+                    {"v":1,"typ":"ebene","jetzt":1,"id":"test:reihe","version":"1","teil":1,"teile":1,"objects":[
+                      {"type":"region","fill":"#C04040C0","polygons":[{"outer":[[%d,%d],[%d,%d],[%d,%d],[%d,%d]]}]}]}"""
+                    .formatted(bx, bz, bx + 16, bz, bx + 16, bz + 16, bx, bz + 16)));
+            return e;
+        });
+        try {
+            context.waitTicks(3);
+            if (context.computeOnClient(mc -> ((Karte) mc.gui.screen()).eigenerSchalter("Oben")) == null) {
+                spielerKlick(context, maus, k, knopf(context, "heroicmap.karte.ebenen")[0], knopf(context, "heroicmap.karte.ebenen")[1]);
+            }
+            // Zwei Blöcke innen von der Ecke links oben der eigenen Region.
+            double[] ort = context.computeOnClient(mc -> {
+                Wegpunkte.EigeneForm f = Wegpunkte.INSTANZ.eigeneFormen().get(formen);
+                Karte.EckeAn e0 = ((Karte) mc.gui.screen()).ecken().stream().filter(e -> e.form().equals(f) && e.index() == 0)
+                        .findFirst().orElseThrow();
+                return new double[] {e0.x() + 8, e0.y() + 8};
+            });
+            frei(context, new double[][] {ort});
+            int vorher = rot(context, maus, k, ort, "reihe-vorher");
+            double[] runter = pfeil(context, "Oben", "▼");
+            double[] hochBase = pfeil(context, "Base", "▲");
+            if (hochBase[2] != 0 || context.computeOnClient(mc -> Ebenenreihe.INSTANZ.umgestellt())) {
+                throw new AssertionError("Ohne Umstellen: „▲“ der obersten Zeile an " + (hochBase[2] != 0) + ", umgestellt "
+                        + context.computeOnClient(mc -> Ebenenreihe.INSTANZ.umgestellt()));
+            }
+            spielerKlick(context, maus, k, runter[0], runter[1]);
+            Path datei = context.computeOnClient(mc -> Downloads.weltOrdner().resolve(Ebenenreihe.DATEI));
+            String json = Files.readString(datei, StandardCharsets.UTF_8);
+            int unten = rot(context, maus, k, ort, "reihe-umgestellt");
+            if (!context.computeOnClient(mc -> Ebenenreihe.INSTANZ.umgestellt())
+                    || json.indexOf("{\"server\":\"test:reihe\"}") > json.indexOf("{\"eigen\":" + id + "}") || unten < vorher + 15) {
+                throw new AssertionError("„▼“ an „Oben“: Rot " + vorher + " vorher, " + unten + " danach, Datei " + json);
+            }
+            double[] zurueck = knopf(context, "heroicmap.karte.reihe_server");
+            spielerKlick(context, maus, k, zurueck[0], zurueck[1]);
+            int wieder = rot(context, maus, k, ort, "reihe-zurueck");
+            if (context.computeOnClient(mc -> Ebenenreihe.INSTANZ.umgestellt()) || Files.exists(datei) || Math.abs(wieder - vorher) > 4) {
+                throw new AssertionError("„Reihe des Servers“: Rot " + wieder + " statt " + vorher + ", Datei da " + Files.exists(datei));
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } finally {
+            context.runOnClient(mc -> {
+                Ebenenreihe.INSTANZ.zuruecksetzen();
+                List<Wegpunkte.EigeneForm> alle = Wegpunkte.INSTANZ.eigeneFormen();
+                for (Wegpunkte.EigeneForm f : List.copyOf(alle.subList(Math.min(formen, alle.size()), alle.size()))) {
+                    Wegpunkte.INSTANZ.loesche(f);
+                }
+                Wegpunkte.INSTANZ.loescheEbene(id);
+                Ebenen.INSTANZ.leeren();
+            });
+            context.waitTicks(3);
+        }
+    }
+
+    /** Der Rotanteil im Bildschirmfoto bei {@code ort}, die Maus fern. */
+    private static int rot(ClientGameTestContext context, TestInput maus, int k, double[] ort, String name) throws IOException {
+        maus.setCursorPos(2 * k, 2 * k);
+        context.waitTicks(2);
+        BufferedImage bild = ImageIO.read(context.takeScreenshot(TestScreenshotOptions.of(name).disableCounterPrefix()).toFile());
+        return bild.getRGB((int) Math.round(ort[0] * k), (int) Math.round(ort[1] * k)) >> 16 & 0xFF;
+    }
+
+    /** „▲“ oder „▼“ in der Zeile der eigenen Ebene {@code name}: {x, y, an}. */
+    private static double[] pfeil(ClientGameTestContext context, String name, String pfeil) {
+        return context.computeOnClient(mc -> {
+            AbstractWidget zeile = ((Karte) mc.gui.screen()).eigenerSchalter(name);
+            if (zeile == null) {
+                throw new AssertionError("Keine Zeile „" + name + "“ in der Liste der Ebenen");
+            }
+            AbstractWidget w = mc.gui.screen().children().stream().filter(c -> c instanceof AbstractWidget a && a.getY() == zeile.getY()
+                    && a.getMessage().getString().equals(pfeil)).map(c -> (AbstractWidget) c).findFirst()
+                    .orElseThrow(() -> new AssertionError("Kein „" + pfeil + "“ in der Zeile „" + name + "“"));
+            return new double[] {w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0, w.active ? 1 : 0};
+        });
     }
 
     /** Eingabefeld, Regler „Schrift“, „Biegung“ und „Gewicht“ der offenen Karte: je {x, y, Breite, Höhe, an, Raste}, null ohne. */
