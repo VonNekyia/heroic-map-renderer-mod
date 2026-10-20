@@ -9,6 +9,10 @@ The release notes on GitHub and Modrinth come from here
 - **Alt connects while you drag.** Hold `Alt` (`⌥` on a Mac) while dragging a corner or waypoint: it snaps like with `Ctrl` and connects on release; both corners already show the light centre while you drag. If the target can't be connected, it only snaps and says why. `Ctrl` alone still only snaps, on a Mac too (`Ctrl`, not `⌘`).
 - A corner can now be connected even if an unrelated waypoint sits on the target's block.
 
+## 0.2.62
+
+- **Time of death.** On the full map, each death point shows when you died: the time for today, otherwise date and time. Death points from older versions have no time.
+
 ## 0.2.61
 
 - **Connect points.** Right-click a corner of your own line or region, or a waypoint, and choose "Connect": it snaps onto the nearest point within a short distance, and from then on they move together. Drag one, move it with "Set coordinates…" or move a shape by its handle, and the connected corners and waypoint follow; only the shared corner of another shape moves, the rest of that shape stays. "Disconnect" releases all points on that spot. Connected corners have a light centre. Shared layer codes don't carry connections.
