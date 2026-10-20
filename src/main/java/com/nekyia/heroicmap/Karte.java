@@ -167,6 +167,8 @@ final class Karte extends Screen {
     private EckeAn ueberEcke;
     /** Wohin, was an der Maus hängt, in diesem Frame einrastet, oder null. */
     private Rast rast;
+    /** Die Kreuzung, an der „Linie/Region von hier“ aus dem offenen Menü beginnt (K4). */
+    private int[] menueKante;
     /** Mit Alt beim Ziehen: das Glied an der Maus und das Ziel des Einrastens, wenn sie sich verbinden lassen; sonst null. */
     private Wegpunkte.Glied[] vorschau;
     /** Wohin die Bünde gerade ziehen, solange etwas an der Maus hängt, je Frame aus {@link #zuege}; sonst leer. */
@@ -578,7 +580,7 @@ final class Karte extends Screen {
         }
         // Mit Alt und einem Ziel, das sich verbinden lässt, tragen beide schon den hellen Kern (E2 von mod#169).
         Wegpunkte.Glied[] paar = rast != null && minecraft.hasAltDown() ? paar(rast) : null;
-        vorschau = paar != null && Wegpunkte.INSTANZ.kannVerbinden(paar[0], paar[1]) ? paar : null;
+        vorschau = paar != null && Wegpunkte.INSTANZ.warumNicht(paar[0], paar[1], welt(mausX, mausY)) == null ? paar : null;
         // Die gezogene Form und die, die ihr über einen Bund folgen, zeichnet die Karte selbst an der Maus; an ihrem alten Ort
         // fallen sie solange weg. Erst nach dem Einrasten, denn die Züge stehen dann auf dessen Ziel.
         zuege = zuege(mausX, mausY);
@@ -716,7 +718,9 @@ final class Karte extends Screen {
     /**
      * Mit gedrückter Strg oder Alt (mod#169), solange eine Ecke oder ein Wegpunkt an der Maus hängt: die nächste Ecke einer anderen eigenen Form oder,
      * für eine Ecke, der nächste Wegpunkt, höchstens {@link #EINRASTEN} von der Maus, nach den Lagen des letzten Frames; sonst null.
-     * Ein Wegpunkt rastet nur auf Ecken ein, denn zwei Wegpunkte liegen nie auf einem Block. Siehe docs/wegpunkte.md, „Einrasten“.
+     * Ein Wegpunkt rastet nur auf Ecken ein, denn zwei Wegpunkte liegen nie auf einem Block. Eine Ecke kommt auf die Kreuzung des
+     * Ziels, auf einem Wegpunkt auf die Ecke seines Blocks nächst der Maus; ein Wegpunkt auf den der vier Blöcke an der Kreuzung
+     * nächst der Maus (K2). Siehe docs/wegpunkte.md, „Einrasten“.
      */
     private Rast einrasten(double mx, double my) {
         if (haengt == null && eckeHaengt == null || !minecraft.hasControlDown() && !minecraft.hasAltDown()) {
@@ -724,6 +728,7 @@ final class Karte extends Screen {
         }
         Rast beste = null;
         double abstand = EINRASTEN;
+        double[] w = welt(mx, my);
         // Der eigene Bund zieht mit und steht an der Maus; auf ihn rastet nichts ein.
         int bund = haengt != null ? haengt.bund() : eckeHaengt.form().ecken().get(eckeHaengt.index()).bund();
         for (EckeAn e : ecken) {
@@ -731,7 +736,8 @@ final class Karte extends Screen {
             if ((eckeHaengt == null || e.form() != eckeHaengt.form()) && (bund == 0 || e.form().ecken().get(e.index()).bund() != bund)
                     && d <= abstand) {
                 Wegpunkte.Ecke c = e.form().ecken().get(e.index());
-                beste = new Rast(c.x(), c.z(), e, null);
+                int[] ort = haengt != null ? Wegpunkte.blockAnEcke(c.x(), c.z(), w[0], w[1]) : new int[] {c.x(), c.z()};
+                beste = new Rast(ort[0], ort[1], e, null);
                 abstand = d;
             }
         }
@@ -744,7 +750,8 @@ final class Karte extends Screen {
                 float[] s = schirm(m.punkt().x() + 0.5, m.punkt().z() + 0.5);
                 double d = Math.hypot(mx - s[0], my - s[1]);
                 if (d <= abstand) {
-                    beste = new Rast(m.punkt().x(), m.punkt().z(), null, m);
+                    int[] ort = Wegpunkte.eckeDesBlocks(m.punkt().x(), m.punkt().z(), w[0], w[1]);
+                    beste = new Rast(ort[0], ort[1], null, m);
                     abstand = d;
                 }
             }
@@ -760,9 +767,9 @@ final class Karte extends Screen {
     }
 
     /**
-     * Beim Loslassen mit Alt: Lässt sich, was an der Maus hängt, mit dem Ziel des Einrastens bei (x, y) verbinden, springt es samt
-     * Bund wie mit „Verbinden“ auf dessen Block. Sonst steht unten links, warum nicht, und der Rufer legt ab wie mit Strg. True,
-     * wenn verbunden. Siehe docs/wegpunkte.md, „Verbinden“.
+     * Beim Loslassen mit Alt: Lässt sich, was an der Maus hängt, mit dem Ziel des Einrastens bei (x, y) verbinden, zieht es samt
+     * Bund wie mit „Verbinden“ dorthin, wo es mit Strg einrastete, nach der Maus. Sonst steht unten links, warum nicht, und der
+     * Rufer legt ab wie mit Strg. True, wenn verbunden. Siehe docs/wegpunkte.md, „Verbinden“.
      */
     private boolean verbindeMitAlt(double x, double y) {
         Rast r = minecraft.hasAltDown() ? einrasten(x, y) : null;
@@ -770,18 +777,22 @@ final class Karte extends Screen {
             return false;
         }
         Wegpunkte.Glied[] p = paar(r);
-        String warum = Wegpunkte.INSTANZ.warumNicht(p[0], p[1]);
+        double[] nahe = welt(x, y);
+        String warum = Wegpunkte.INSTANZ.warumNicht(p[0], p[1], nahe);
         if (warum == null) {
-            return Wegpunkte.INSTANZ.verbinde(p[0], p[1]);
+            return Wegpunkte.INSTANZ.verbinde(p[0], p[1], nahe);
         }
         zeige(Component.translatable(warum));
         return false;
     }
 
-    /** Der Block, auf den beim Loslassen kommt, was an der Maus hängt: mit Strg oder Alt das Ziel des Einrastens, sonst der darunter. */
+    /**
+     * Wohin beim Loslassen kommt, was an der Maus hängt: mit Strg oder Alt das Ziel des Einrastens, sonst ein Wegpunkt auf den
+     * Block darunter, eine Ecke auf die nächste Kreuzung der Kanten.
+     */
     private int[] ablage(double x, double y) {
         Rast r = einrasten(x, y);
-        return r != null ? new int[] {r.x(), r.z()} : block(x, y);
+        return r != null ? new int[] {r.x(), r.z()} : haengt != null ? block(x, y) : kante(x, y);
     }
 
     /** Die eigene Form, die gerade an einer Ecke oder am Griff an der Maus hängt, oder null. */
@@ -805,23 +816,29 @@ final class Karte extends Screen {
     }
 
     /**
-     * Wohin die Bünde ziehen, was an der Maus hängt: Bund nach Ort der Welt in Blöcken, nicht gerundet. Der Wegpunkt oder die
-     * Ecke an der Maus nimmt ihren Bund mit, am Griff jede Ecke der Form ihren. Leer, wenn nichts Verbundenes hängt. Siehe
-     * docs/wegpunkte.md, „Verbinden“.
+     * Um welchen Weg die Bünde ziehen, was an der Maus hängt: Bund nach Weg in Blöcken, nicht gerundet. Der Wegpunkt oder die
+     * Ecke an der Maus nimmt ihren Bund mit, am Griff jede Ecke der Form ihren; alle Glieder um denselben Weg (K3). Leer, wenn
+     * nichts Verbundenes hängt. Siehe docs/wegpunkte.md, „Verbinden“.
      */
     private Map<Integer, double[]> zuege(double mausX, double mausY) {
-        int bund = haengt != null ? haengt.bund() : eckeHaengt != null ? eckeHaengt.form().ecken().get(eckeHaengt.index()).bund() : 0;
-        if (bund > 0) {
-            return Map.of(bund, rast != null ? new double[] {rast.x() + 0.5, rast.z() + 0.5} : welt(mausX, mausY));
+        double[] w = welt(mausX, mausY);
+        if (haengt != null && haengt.bund() > 0) {
+            double[] hin = rast != null ? new double[] {rast.x() + 0.5, rast.z() + 0.5} : w;
+            return Map.of(haengt.bund(), new double[] {hin[0] - haengt.x() - 0.5, hin[1] - haengt.z() - 0.5});
+        }
+        Wegpunkte.Ecke c = eckeHaengt != null ? eckeHaengt.form().ecken().get(eckeHaengt.index()) : null;
+        if (c != null && c.bund() > 0) {
+            double[] hin = rast != null ? new double[] {rast.x(), rast.z()} : w;
+            return Map.of(c.bund(), new double[] {hin[0] - c.x(), hin[1] - c.z()});
         }
         if (griffHaengt == null) {
             return Map.of();
         }
-        double[] w = welt(mausX, mausY), d = welt(druckX, druckY);
+        double[] d = welt(druckX, druckY);
         Map<Integer, double[]> aus = new HashMap<>();
-        for (Wegpunkte.Ecke c : griffHaengt.form().ecken()) {
-            if (c.bund() > 0) {
-                aus.put(c.bund(), new double[] {c.x() + 0.5 + w[0] - d[0], c.z() + 0.5 + w[1] - d[1]});
+        for (Wegpunkte.Ecke e : griffHaengt.form().ecken()) {
+            if (e.bund() > 0) {
+                aus.put(e.bund(), new double[] {w[0] - d[0], w[1] - d[1]});
             }
         }
         return aus;
@@ -829,20 +846,21 @@ final class Karte extends Screen {
 
     /**
      * Die Punkte (x, z) der eigenen Form, wie sie gerade steht: die Ecke an der Maus genau unter ihr, am Griff die ganze
-     * Form um den Weg der Maus seit dem Drücken, nicht auf ganze Blöcke gerundet; sonst die Mitten der Blöcke.
+     * Form um den Weg der Maus seit dem Drücken, nicht auf ganze Blöcke gerundet; sonst die Kreuzungen der Kanten.
      */
     private double[] punkte(Wegpunkte.EigeneForm f, double mausX, double mausY) {
-        double[] p = Wegpunkte.mitten(f);
-        // Verbundene Ecken stehen, wo ihr Bund gerade zieht.
-        for (int i = 0; i < f.ecken().size() && !zuege.isEmpty(); i++) {
+        double[] p = Wegpunkte.kanten(f);
+        // Verbundene Ecken ziehen um den Weg ihres Bunds; was selbst an der Maus hängt, steht schon dort.
+        boolean amGriff = griffHaengt != null && griffHaengt.form() == f;
+        for (int i = 0; i < f.ecken().size() && !zuege.isEmpty() && !amGriff; i++) {
             double[] z = zuege.get(f.ecken().get(i).bund());
-            if (z != null) {
-                p[2 * i] = z[0];
-                p[2 * i + 1] = z[1];
+            if (z != null && !(eckeHaengt != null && eckeHaengt.form() == f && eckeHaengt.index() == i)) {
+                p[2 * i] += z[0];
+                p[2 * i + 1] += z[1];
             }
         }
         if (eckeHaengt != null && eckeHaengt.form() == f) {
-            double[] w = rast != null ? new double[] {rast.x() + 0.5, rast.z() + 0.5} : welt(mausX, mausY);
+            double[] w = rast != null ? new double[] {rast.x(), rast.z()} : welt(mausX, mausY);
             p[2 * eckeHaengt.index()] = w[0];
             p[2 * eckeHaengt.index() + 1] = w[1];
         } else if (griffHaengt != null && griffHaengt.form() == f) {
@@ -853,6 +871,15 @@ final class Karte extends Screen {
             }
         }
         return p;
+    }
+
+    /**
+     * Die Kreuzung der Blockkanten nächst (x, y) des Schirms: dort liegt eine Ecke einer eigenen Form, (x, z) ist die Nordwestecke
+     * des Blocks (x, z). Siehe docs/wegpunkte.md, „Eigene Formen“.
+     */
+    private int[] kante(double x, double y) {
+        double[] w = welt(x, y);
+        return new int[] {(int) Math.round(w[0]), (int) Math.round(w[1])};
     }
 
     /** Der Ort der Welt unter (x, y) in Blöcken, nicht gerundet; {@link #block} rundet ihn ab. */
@@ -892,7 +919,7 @@ final class Karte extends Screen {
             if (p.dimension().equals(dimension) && !p.equals(haengt) && Wegpunkte.INSTANZ.sichtbar(p)) {
                 // Folgt er einem Bund, steht er, wo der gerade zieht.
                 double[] zug = p.bund() > 0 ? zuege.get(p.bund()) : null;
-                Marke m = zug != null ? marke(zug[0], zug[1], null, p) : marke(p.x() + 0.5, p.z() + 0.5, null, p);
+                Marke m = zug != null ? marke(p.x() + 0.5 + zug[0], p.z() + 0.5 + zug[1], null, p) : marke(p.x() + 0.5, p.z() + 0.5, null, p);
                 // Unter der Maus mit hellem Rand, auch angeheftet: Dann weicht der bunte Rand so lange.
                 boolean hell = ueberMarke != null && p.equals(ueberMarke.punkt());
                 Minimap.wegpunkt(g, m.x(), m.y(), Minimap.KOPF, p, hell ? HELL : p.angeheftet() ? bunt : 0);
@@ -1131,6 +1158,11 @@ final class Karte extends Screen {
         return block(x, y);
     }
 
+    /** Für den Gametest: die Kreuzung der Kanten nächst (x, y) in Einheiten des GUI. */
+    int[] kanteUnter(double x, double y) {
+        return kante(x, y);
+    }
+
     /** Für den Gametest: der Text im Eingabefeld, oder null, wenn es zu ist. */
     String eingabe() {
         return eingabe == null ? null : eingabe.getValue();
@@ -1225,9 +1257,9 @@ final class Karte extends Screen {
             // von dort zur Ecke danach, wo die nächste hinkommt.
             float[] maus = {mausX, mausY};
             for (int i = 0; i < zug.size(); i++) {
-                float[] a = schirm(zug.get(i).x() + 0.5, zug.get(i).z() + 0.5);
+                float[] a = schirm(zug.get(i).x(), zug.get(i).z());
                 if (i + 1 < zug.size() && i + 1 != zugStelle) {
-                    gepunktet(g, a, schirm(zug.get(i + 1).x() + 0.5, zug.get(i + 1).z() + 0.5));
+                    gepunktet(g, a, schirm(zug.get(i + 1).x(), zug.get(i + 1).z()));
                 }
                 if (i + 1 == zugStelle) {
                     gepunktet(g, a, maus);
@@ -1429,20 +1461,24 @@ final class Karte extends Screen {
         zug = null;
     }
 
-    /** Der Block für eine Ecke unter (x, y): der eines Wegpunkts dort, sonst der einer Ecke im Bau in Reichweite, sonst der darunter. */
+    /**
+     * Die Kreuzung für eine Ecke unter (x, y): auf einem Wegpunkt die Ecke seines Blocks nächst dem Klick, sonst eine Ecke im Bau
+     * in Reichweite, sonst die nächste Kreuzung der Kanten. Siehe docs/wegpunkte.md, „Eigene Formen“.
+     */
     private int[] eckBlock(double x, double y, Marke m) {
         if (m != null && m.punkt() != null) {
-            return new int[] {m.punkt().x(), m.punkt().z()};
+            double[] w = welt(x, y);
+            return Wegpunkte.eckeDesBlocks(m.punkt().x(), m.punkt().z(), w[0], w[1]);
         }
         if (zug != null) {
             for (Wegpunkte.Ecke e : zug) {
-                float[] s = schirm(e.x() + 0.5, e.z() + 0.5);
+                float[] s = schirm(e.x(), e.z());
                 if (Math.hypot(x - s[0], y - s[1]) <= ECKE_TREFFER) {
                     return new int[] {e.x(), e.z()};
                 }
             }
         }
-        return block(x, y);
+        return kante(x, y);
     }
 
     /** Die oberste eigene Form dieser Dimension unter (mx, my): in einer Region, oder höchstens 3 Einheiten neben einer Linie. */
@@ -2003,6 +2039,9 @@ final class Karte extends Screen {
      */
     private void menue(double x, double y, Wegpunkte.Punkt punkt, Wegpunkte.Region marke) {
         int[] z = punkt != null ? new int[] {punkt.x(), punkt.z()} : block(x, y);
+        // Wo „Linie/Region von hier“ beginnt: an der Kreuzung nächst dem Rechtsklick, am Wegpunkt an einer Ecke seines Blocks (K4).
+        double[] w = welt(x, y);
+        menueKante = punkt != null ? Wegpunkte.eckeDesBlocks(punkt.x(), punkt.z(), w[0], w[1]) : kante(x, y);
         String dimension = minecraft.level.dimension().identifier().toString();
         List<Eintrag> neu = new ArrayList<>();
         EckeAn ecke = punkt == null && marke == null ? eckeUnter(x, y) : null;
@@ -2308,7 +2347,8 @@ final class Karte extends Screen {
                 return false;
             })));
             verbinden(Wegpunkte.Glied.von(punkt), schirm(punkt.x() + 0.5, punkt.z() + 0.5), neu);
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_von_hier"), () -> beginne(punkt.x(), punkt.z())));
+            int[] k = menueKante;
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_von_hier"), () -> beginne(k[0], k[1])));
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.ebene"), () -> ebenenWahl(punkt.ebene(), id -> Wegpunkte.INSTANZ.ordne(punkt, id))));
         }
         neu.add(new Eintrag(Component.translatable(punkt.tod() ? "heroicmap.karte.tod_loeschen" : "heroicmap.karte.wegpunkt_loeschen"),
@@ -2425,7 +2465,8 @@ final class Karte extends Screen {
                     return true;
                 })));
         // Eine eigene Form beginnt hier. Siehe docs/wegpunkte.md, „Eigene Formen“.
-        neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_von_hier"), () -> beginne(z[0], z[1])));
+        int[] k = menueKante;
+        neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_von_hier"), () -> beginne(k[0], k[1])));
     }
 
     /**
