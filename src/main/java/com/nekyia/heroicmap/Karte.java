@@ -518,7 +518,8 @@ final class Karte extends Screen {
         long gesamt = f.gesamt, empfangen = Math.min(f.empfangen.get(), gesamt);
         double anteil = f.anteil(), tempo = f.tempo(Util.getMillis());
         g.fill(x, y, x + b, y + 38, 0xB0000000);
-        g.text(font, Component.translatable("heroicmap.download.laeuft"), x + 5, y + 5, TEXT);
+        g.text(font, Component.translatable(f.abgleich ? "heroicmap.download.abgleich_laeuft" : "heroicmap.download.laeuft"), x + 5, y + 5,
+                TEXT);
         Component prozent = Component.literal((int) (anteil * 100) + " %");
         g.text(font, prozent, x + b - 4 - font.width(prozent), y + 5, TEXT);
         // Wie der Ladebalken des Spiels: weisser Rand, weiss gefüllt.

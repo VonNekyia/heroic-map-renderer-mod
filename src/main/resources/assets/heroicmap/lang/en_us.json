@@ -39,6 +39,7 @@
   "heroicmap.download.grund.strom": "The map server's stream breaks a rule; details in the log.",
   "heroicmap.download.grund_status": "%s HTTP status %s.",
   "heroicmap.download.laeuft": "Downloading map",
+  "heroicmap.download.abgleich_laeuft": "Syncing map",
   "heroicmap.download.stand": "%s of %s",
   "heroicmap.download.tempo": "%s/s, %s left",
   "key.heroicmap.karte": "Full-screen map",

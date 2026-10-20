@@ -436,13 +436,16 @@ Reviewer in mod#155, Plan freigegeben am 19.10.; siehe
 
 ## Fortschritt
 
-Solange ein Strom läuft, siehe [Download](download.md), „Strom“, steht
-links neben „Karte laden …“ ein Kasten (`Karte.fortschritt`). So hat es der
-Reviewer nach einem Entwurf entschieden.
+Solange ein Strom oder ein Abgleich läuft, siehe [Download](download.md),
+„Strom“, steht links neben „Karte laden …“ ein Kasten (`Karte.fortschritt`).
+So hat es der Reviewer nach einem Entwurf entschieden; den Kasten beim
+Abgleich wünschte der User am 20.10., siehe [0027](entscheidungen/0027-abgleich-bis-zur-haelfte.md).
 
 - **Lage:** 200 × 38 Einheiten, oben bündig mit dem Knopf, 4 Einheiten
   links davon, dunkel durchscheinend.
-- **Zeile 1:** „Karte wird geladen“, rechts die Prozent, abgerundet.
+- **Zeile 1:** „Karte wird geladen“, beim Abgleich „Karte wird
+  abgeglichen“ (`Laden.Fortschritt.abgleich`), rechts die Prozent,
+  abgerundet.
 - **Balken:** wie der Ladebalken des Spiels, weisser Rand, weiss gefüllt.
 - **Zeile 2, grau:** links die Bytes, empfangen von gesamt in der Einheit
   des Gesamten, etwa „2.0 von 4.8 GB“; rechts Tempo und Restzeit, etwa
@@ -450,7 +453,9 @@ Reviewer nach einem Entwurf entschieden.
 - **Nur aus Bytes** (`Laden.Fortschritt`): Empfangen zählt jedes Byte des
   Körpers, gesamt ist `X-Heroic-Bytes`, ohne den Header die `bytes` der
   `freigabe`, höchstens die Grenze des Stroms. Über 100 % geht der Anteil
-  nicht. Dateien zählen nicht.
+  nicht. Dateien zählen nicht. Beim Abgleich ist gesamt die Summe der
+  Kacheln, die laut Manifest fehlen, höchstens die `bytes` der `freigabe`;
+  empfangen zählt jedes Byte einer geholten Kachel (`Laden.lade`).
 - **Tempo** über die letzten 5 s (`Laden.Fortschritt.FENSTER_MS`), die
   Restzeit ist der Rest durch das Tempo. Vor der ersten Sekunde und
   solange nichts kommt, steht „…“.

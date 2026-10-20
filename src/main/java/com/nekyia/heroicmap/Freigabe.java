@@ -142,12 +142,12 @@ record Freigabe(String baum, String art, int massstab, long bytes, URI url, Stri
         if (stand == null || stand.massstab != massstab) {
             return null;
         }
-        long grenze = abgleich() ? stand.bytes / 100 * 11 : stand.bytes + stand.bytes / 10;
+        long grenze = abgleich() ? stand.bytes / 100 * 55 : stand.bytes + stand.bytes / 10;
         return bytes <= grenze ? stand : null;
     }
 
     /**
-     * Still lädt nur ein Abgleich im gespeicherten Massstab mit höchstens 11 % des Satzes, oder ein
+     * Still lädt nur ein Abgleich im gespeicherten Massstab mit höchstens 55 % des Satzes, oder ein
      * voller Download mit höchstens 10 % mehr, als der Spieler bestätigt hat; beides nur mit
      * Zustimmung zum Host. Sonst fragt ein Dialog nach Host, Grösse und Massstab.
      */
@@ -160,8 +160,8 @@ record Freigabe(String baum, String art, int massstab, long bytes, URI url, Stri
 
     /**
      * Der Stand, an dem der Download Zeilen und Grösse misst. Passt keiner, hat der Spieler im
-     * Dialog {@code bytes} gesehen: Ein voller Download misst daran, ein Abgleich am Zehnfachen,
-     * denn sein Deckel ist 10 % des Satzes. Die Kacheln aus dem {@code angebot} gelten nur
+     * Dialog {@code bytes} gesehen: Ein voller Download misst daran, ein Abgleich am Doppelten,
+     * denn sein Deckel ist die Hälfte des Satzes. Die Kacheln aus dem {@code angebot} gelten nur
      * zusammen mit dieser Grösse, siehe {@link Laden.Auftrag#zeilen()}.
      */
     Stand mass(Stand gespeichert, Stand bestaetigt, long angebotKacheln) {
@@ -172,6 +172,6 @@ record Freigabe(String baum, String art, int massstab, long bytes, URI url, Stri
         if (abgleich() && gespeichert != null && gespeichert.massstab == massstab) {
             return gespeichert;
         }
-        return new Stand(massstab, abgleich() ? Math.min(bytes, Long.MAX_VALUE / 10) * 10 : bytes, angebotKacheln);
+        return new Stand(massstab, abgleich() ? Math.min(bytes, Long.MAX_VALUE / 2) * 2 : bytes, angebotKacheln);
     }
 }
