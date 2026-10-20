@@ -4,9 +4,13 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
-## 0.2.63
+## 0.2.64
 
 - **One map folder per server behind a proxy.** With the plugin from 0.14.0 on, the server names its map, and the mod keeps each server's map, waypoints and layers in its own folder, even when two servers share a world. A server that shows another server's map uses that server's folder. Existing folders move once on the first join.
+
+## 0.2.63
+
+- **Reorder the layers.** In the layer list of the full map, ▲ and ▼ move a layer up or down; the upper one is drawn on top, on the full map and the minimap. Your order is kept per server world; "Server order" puts it back. Until you reorder, nothing changes.
 
 ## 0.2.62
 

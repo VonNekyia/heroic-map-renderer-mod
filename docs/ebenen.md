@@ -727,7 +727,9 @@ Kanal stehen beim Plugin,
   Ebenen mit Schalter, „⧉“, „✎“ und „✕“ und darunter „Neue Ebene …“ und
   „Code einfügen“, siehe
   [Wegpunkte](wegpunkte.md), „Eigene Ebenen“; dann je Ebene vom Server ein
-  Schalter mit ihrem Namen in der Sprache des Spiels, die oberste zuerst.
+  Schalter mit ihrem Namen in der Sprache des Spiels, die oberste zuerst,
+  in der Reihe des Spielers, siehe [Vollbildkarte](vollbildkarte.md),
+  „Reihe der Ebenen“.
   Passen nicht alle auf den Schirm, blättern `<` und `>`. Ohne Ebenen vom
   Server steht unter „Fertig“ „Der Server schickt keine Ebenen.“
 - **Auf der Vollbildkarte** dieselbe Wahl in einer Liste unter dem Knopf

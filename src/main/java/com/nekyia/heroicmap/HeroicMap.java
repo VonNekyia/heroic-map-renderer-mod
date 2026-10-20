@@ -132,6 +132,7 @@ public final class HeroicMap implements ClientModInitializer {
             Tafeln.INSTANZ.leeren();
             Geheimbanner.INSTANZ.leeren();
             Wegpunkte.INSTANZ.leeren();
+            Ebenenreihe.INSTANZ.wechsel(null);
             Selbst.INSTANZ.leeren();
             Kartenlage.leeren();
         }));
@@ -236,5 +237,6 @@ public final class HeroicMap implements ClientModInitializer {
     static void weltOrdnerGewechselt() {
         Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());
         Ebenen.INSTANZ.wechsel(Downloads.weltOrdner());
+        Ebenenreihe.INSTANZ.wechsel(Downloads.weltOrdner());
     }
 }
