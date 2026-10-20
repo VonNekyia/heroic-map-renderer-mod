@@ -75,6 +75,7 @@
   "heroicmap.karte.biegung_unten": "Biegung: %s° nach unten",
   "heroicmap.karte.farbe": "Farbe…",
   "heroicmap.karte.farbe_hinweis": "Enter: Farbe als #RRGGBB speichern, leer: Farbe aus der Liste; Esc bricht ab",
+  "heroicmap.karte.gewicht": "Gewicht: %s",
   "heroicmap.karte.formen_voll": "Höchstens %s eigene Formen",
   "heroicmap.karte.form_weg": "Die Form gibt es so nicht mehr; die neuen Ecken sind nicht gespeichert",
   "heroicmap.karte.form_hinweis": "Linksklick: Eckpunkt hier oder auf einem Wegpunkt, auf den ersten: Region; Rechtsklick: fertig; Esc bricht ab",
