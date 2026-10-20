@@ -442,15 +442,23 @@ eines Proxys von einem des Netzes (`Laden.Fehler.status`).
     (`Downloads.karteAus`, `Kartenname.gueltig`); sonst übergeht der Mod
     das Feld mit einer Zeile im Log. Mit `karte-` davor ist kein Name ein
     Gerät von Windows.
-  - **Einmal je Sitzung** (`Kartenname`): Die erste gültige Karte nach
-    einem Login gilt; eine andere später erst nach dem nächsten Login. Nur
-    im Speicher.
-  - **Nach dem Betreten:** Die Antwort auf `show` kommt erst, wenn der
-    Spieler schon in der Welt ist. Dann entscheidet der Mod für jede Welt,
-    die er in der Sitzung betrat, ob die Karte dort gilt
+  - **Gedächtnis:** `heroicmap/karten.txt`, je Zeile die eingetippte
+    Adresse, klein wie in `namen.txt`, der Hash und die zuletzt gemeldete
+    Karte (`Kartenname.lies`, `Kartenname.merke`). Sie gilt gleich beim
+    Betreten, vor der Antwort auf `show`; so stimmt der Ordner ab der
+    zweiten Sitzung von Anfang an, auch für die eigene Karte und einen
+    Wegpunkt der ersten Sekunden.
+  - **Die erste Antwort der Sitzung** auf `show` gilt (`Kartenname`): mit
+    `karte` oder ohne. Weicht sie vom Gedächtnis ab, korrigiert sie es, auch
+    zu keiner Karte; spätere Antworten gelten erst nach dem nächsten Login.
+    Eine ungültige übergeht der Mod, ohne zu korrigieren. Antwortet der
+    Server gar nicht, etwa ohne Plugin, bleibt das Gedächtnis.
+  - **Wechsel:** Ändert die Antwort die Karte, entscheidet der Mod für jede
+    Welt, die er in der Sitzung betrat, ob sie dort gilt
     (`Downloads.karteGilt`), und liest neu: Minimap, eigene Karte,
-    Wegpunkte und Ebenen (`HeroicMap.weltOrdnerGewechselt`). Eine Welt,
-    die er später betritt, entscheidet beim Betreten, einmal je Sitzung.
+    Wegpunkte, Ebenen und ihre Reihe (`HeroicMap.weltOrdnerGewechselt`).
+    Eine Welt, die er später betritt, entscheidet beim Betreten, einmal je
+    Sitzung, und kommt ins Gedächtnis.
   - **Ob sie gilt:**
 
     | Ordner ohne Karte | Ordner mit Karte | Ergebnis |
@@ -461,9 +469,13 @@ eines Proxys von einem des Netzes (`Laden.Fehler.status`).
     | da | fehlt | Umzug wie beim Namen, siehe oben; scheitert er, gilt sie nicht |
 
     Gibt es den Ordner mit Karte schon, gilt er, anders als beim Namen:
-    Was der Mod vor der Antwort auf `show` schrieb, etwa die eigene Karte
-    der ersten Sekunden, liegt im Ordner ohne Karte und bliebe sonst jede
-    Sitzung der Grund, dort zu bleiben. Zusammengeführt wird nicht.
+    In der ersten Sitzung, ohne Gedächtnis, schreibt der Mod bis zur
+    Antwort auf `show` in den Ordner ohne Karte; der bliebe sonst der
+    Grund, dort zu bleiben. Zusammengeführt wird nicht.
+  - **Was bleibt:** In der ersten Sitzung, und wenn die Antwort das
+    Gedächtnis korrigiert, landen die ersten Sekunden noch im falschen
+    Ordner, etwa wenn zwei Server mit derselben Welt verschiedene Karten
+    haben und der Spieler zwischen ihnen wechselt.
   - **Zwei Server, ein alter Ordner:** Der zuerst betretene nimmt ihn mit,
     der andere beginnt leer. Ein laufender Download lädt weiter in seinen
     Ordner.

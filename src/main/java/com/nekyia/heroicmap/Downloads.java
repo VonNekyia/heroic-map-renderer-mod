@@ -153,27 +153,36 @@ final class Downloads {
     }
 
     /**
-     * {@code karte} an der Antwort auf show: Die erste gültige der Sitzung gilt für jede Welt, die der Spieler in ihr
-     * schon betrat, mit Umzug aus dem Ordner ohne sie ({@link #karteGilt}); dann lesen Minimap, eigene Karte, Wegpunkte
-     * und Ebenen neu. Ohne das Feld bleibt alles, wie es ist. Siehe docs/download.md, „Ablage“.
+     * {@code karte} an der Antwort auf show, oder keine: Die erste Antwort der Sitzung gilt und korrigiert die gemerkte,
+     * für jede Welt, die der Spieler schon betrat, mit Umzug aus dem Ordner ohne Karte ({@link #karteGilt}); dann lesen
+     * Minimap, eigene Karte, Wegpunkte und Ebenen neu. Gemerkt für den nächsten Login. Siehe docs/download.md, „Ablage“.
      */
     private void karte(JsonObject json) {
         ServerData server = server();
-        if (server == null || !json.has("karte")) {
+        if (server == null || KARTE.bestaetigt()) {
             return;
         }
         String karte = karteAus(json);
-        if (karte == null) {
+        if (json.has("karte") && karte == null) {
             LOGGER.warn("Heroic Map: Name der Karte ungültig, übergangen");
             return;
         }
-        if (KARTE.setze(karte, List.copyOf(nameGilt.keySet()),
-                seed -> karteGilt(wurzel(), Minimap.INSTANZ.ablage(), server.ip, name(seed), karte, seed, reihe::belegtUnter))) {
+        List<Long> betreten = List.copyOf(nameGilt.keySet());
+        boolean anders = KARTE.vomServer(karte, betreten, this::karteGilt);
+        Kartenname.merke(wurzel(), server.ip, betreten, karte);
+        if (anders) {
             Minimap.INSTANZ.leeren();
             Selbst.INSTANZ.leeren();
             HeroicMap.weltOrdnerGewechselt();
             baeume().forEach(b -> zieheUm(b.id()));
         }
+    }
+
+    /** {@link #karteGilt(Path, Ablage, String, String, String, long, Predicate)} für diesen Server. */
+    private boolean karteGilt(String karte, long seed) {
+        ServerData server = server();
+        return server != null
+                && karteGilt(wurzel(), Minimap.INSTANZ.ablage(), server.ip, name(seed), karte, seed, reihe::belegtUnter);
     }
 
     /** {@code karte} aus der Antwort auf show, wenn sie als Name einer Karte taugt; sonst null. */
@@ -650,9 +659,11 @@ final class Downloads {
             Path neu = wurzel().resolve(weltOrdner(Minimap.INSTANZ.ablage(), server.ip, servername, seed));
             nameGilt.put(seed, Servername.gilt(alt, neu, reihe.belegtUnter(alt.toString())));
         }
-        // Erst der Name, dann die Karte: Sie liegt im Ordner des Namens.
-        KARTE.betreten(seed, s -> karteGilt(wurzel(), Minimap.INSTANZ.ablage(), server.ip, name(s), KARTE.karte(), s,
-                reihe::belegtUnter));
+        // Erst der Name, dann die Karte: Sie liegt im Ordner des Namens. Ab der zweiten Sitzung gilt die gemerkte gleich.
+        KARTE.betreten(seed, Kartenname.lies(wurzel(), server.ip, seed), this::karteGilt);
+        if (KARTE.bestaetigt()) {
+            Kartenname.merke(wurzel(), server.ip, List.of(seed), KARTE.karte());
+        }
         welten().merke(Welten.server(server.ip), level.dimension().identifier().toString(), level.getBiomeManager().biomeZoomSeed);
         baeume().forEach(b -> zieheUm(b.id()));
         for (String baum : List.copyOf(wartend.keySet())) {

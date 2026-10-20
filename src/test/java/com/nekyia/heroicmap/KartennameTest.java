@@ -85,33 +85,86 @@ class KartennameTest {
         assertEquals("[2]", Files.readString(neu.resolve("wegpunkte.json")));
     }
 
+    private static final Kartenname.Gilt JA = (karte, s) -> true;
+    private static final Kartenname.Gilt NICHT_FRAGEN = (karte, s) -> {
+        throw new AssertionError("nichts neu zu entscheiden");
+    };
+
     @Test
     void jeSitzungUndJeHash() {
         var k = new Kartenname();
         var gefragt = new ArrayList<Long>();
-        assertNull(k.fuer(SEED), "vor der Antwort auf show");
-        assertFalse(k.setze("Main", List.of(SEED), s -> true), "ungültig");
-        assertTrue(k.setze("main", List.of(SEED), s -> gefragt.add(s)));
+        k.betreten(SEED, null, JA);
+        assertNull(k.fuer(SEED), "vor der Antwort auf show, ohne Gedächtnis");
+        assertTrue(k.vomServer("main", List.of(SEED), (karte, s) -> gefragt.add(s)));
         assertEquals(List.of(SEED), gefragt, "die schon betretene Welt");
         assertEquals("main", k.fuer(SEED));
-        assertFalse(k.setze("build", List.of(SEED), s -> true), "die erste der Sitzung gilt");
+        assertFalse(k.vomServer("build", List.of(SEED), JA), "die erste Antwort der Sitzung gilt");
         assertEquals("main", k.fuer(SEED));
 
         // Eine Welt, die erst später betreten wird, entscheidet beim Betreten, einmal.
-        k.betreten(ENDE, s -> true);
+        k.betreten(ENDE, null, JA);
         assertEquals("main", k.fuer(ENDE));
-        k.betreten(NETHER, s -> false);
+        k.betreten(NETHER, null, (karte, s) -> false);
         assertNull(k.fuer(NETHER), "dort läuft ein Download in den alten Ordner");
-        k.betreten(NETHER, s -> true);
+        k.betreten(NETHER, null, JA);
         assertNull(k.fuer(NETHER), "fest bis zur nächsten Sitzung");
 
         k.neueSitzung();
         assertNull(k.karte());
+        assertFalse(k.bestaetigt());
         assertNull(k.fuer(SEED), "ein neuer Login vergisst die Karte");
-        k.betreten(SEED, s -> true);
+        k.betreten(SEED, null, JA);
         assertNull(k.fuer(SEED), "ohne Karte nichts zu entscheiden");
-        assertTrue(k.setze("build", List.of(SEED), s -> true), "die nächste Sitzung darf eine andere haben");
+        assertTrue(k.vomServer("build", List.of(SEED), JA), "die nächste Sitzung darf eine andere haben");
         assertEquals("build", k.fuer(SEED));
+    }
+
+    @Test
+    void gemerkteKarteGiltGleichUndDerServerKorrigiert() {
+        var k = new Kartenname();
+        k.betreten(SEED, "main", JA);
+        assertEquals("main", k.fuer(SEED), "gleich beim Betreten, vor der Antwort auf show");
+        assertFalse(k.vomServer("main", List.of(SEED), NICHT_FRAGEN), "dieselbe: kein Wechsel");
+        assertTrue(k.bestaetigt());
+
+        k.neueSitzung();
+        k.betreten(SEED, "main", JA);
+        var gefragt = new ArrayList<String>();
+        assertTrue(k.vomServer("build", List.of(SEED), (karte, s) -> gefragt.add(karte)), "eine andere korrigiert");
+        assertEquals(List.of("build"), gefragt);
+        assertEquals("build", k.fuer(SEED));
+
+        k.neueSitzung();
+        k.betreten(SEED, "main", JA);
+        assertTrue(k.vomServer(null, List.of(SEED), NICHT_FRAGEN), "keine Karte korrigiert auch");
+        assertNull(k.fuer(SEED));
+        k.betreten(NETHER, "main", JA);
+        assertNull(k.fuer(NETHER), "nach der Antwort zählt das Gedächtnis nicht mehr");
+
+        k.neueSitzung();
+        k.betreten(SEED, "../main", JA);
+        assertNull(k.fuer(SEED), "ein ungültiger Eintrag gilt nicht");
+    }
+
+    @Test
+    void gedaechtnisJeAdresseUndHash(@TempDir Path wurzel) {
+        assertNull(Kartenname.lies(wurzel, "mc.example.com", SEED));
+        Kartenname.merke(wurzel, "Mc.Example.com", List.of(SEED, NETHER), "main");
+        assertEquals("main", Kartenname.lies(wurzel, "mc.example.com", SEED), "ohne Gross und Klein, wie beim Namen");
+        assertEquals("main", Kartenname.lies(wurzel, "mc.example.com", NETHER));
+        assertNull(Kartenname.lies(wurzel, "mc.example.com:25566", SEED), "je eingetippter Adresse");
+        assertNull(Kartenname.lies(wurzel, "mc.example.com", ENDE), "je Hash");
+
+        Kartenname.merke(wurzel, "andere.example", List.of(SEED), "build");
+        Kartenname.merke(wurzel, "mc.example.com", List.of(SEED), "build");
+        assertEquals("build", Kartenname.lies(wurzel, "mc.example.com", SEED), "die zuletzt gemeldete");
+        assertEquals("main", Kartenname.lies(wurzel, "mc.example.com", NETHER));
+
+        Kartenname.merke(wurzel, "mc.example.com", List.of(SEED, NETHER), null);
+        assertNull(Kartenname.lies(wurzel, "mc.example.com", SEED), "keine Karte nimmt sie heraus");
+        assertNull(Kartenname.lies(wurzel, "mc.example.com", NETHER));
+        assertEquals("build", Kartenname.lies(wurzel, "andere.example", SEED), "andere Adressen bleiben");
     }
 
     @Test
