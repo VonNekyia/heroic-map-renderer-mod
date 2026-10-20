@@ -99,9 +99,6 @@ final class Einstellungen extends Screen {
         breite = s[1];
         oben = Math.max(50, height / 2 - 48);
         int x = spalte, y = oben, halb = (breite - 4) / 2;
-        // Je zwei Knöpfe in einer Zeile; Vorlieben der Anzeige stehen im Untermenü.
-        addRenderableWidget(CycleButton.onOffBuilder(m.sichtbar())
-                .create(x, y, breite, 20, Component.translatable("heroicmap.menue.minimap"), (b, an) -> m.setzeSichtbar(an)));
         // Das L zuerst gezeichnet und zuletzt gefragt: Ist neben der Minimap zu wenig Platz, liegen die Knöpfe über ihm und
         // bekommen den Klick, wie vorher über der Minimap. Siehe docs/minimap.md, „Bedienung“.
         int[] z = zoomLage(m.rahmen(width, height), m.rand(), width);
@@ -112,6 +109,9 @@ final class Einstellungen extends Screen {
         form = addRenderableOnly(new Symbol(Symbol.FORM));
         raster = addRenderableOnly(new Symbol(Symbol.RASTER));
         lege();
+        // Je zwei Knöpfe in einer Zeile; Vorlieben der Anzeige stehen im Untermenü.
+        addRenderableWidget(CycleButton.onOffBuilder(m.sichtbar())
+                .create(x, y, breite, 20, Component.translatable("heroicmap.menue.minimap"), (b, an) -> m.setzeSichtbar(an)));
         // Gehen Mitspieler hier nicht, steht der Knopf rot und trägt den Grund als Tooltip.
         grund = Mitspieler.grund(Kanal.offen(), Mitspieler.INSTANZ.verweigert());
         CycleButton<Boolean> show = addRenderableWidget(CycleButton.booleanBuilder(rot(Component.translatable("heroicmap.menue.show.simplevoicechat")),
