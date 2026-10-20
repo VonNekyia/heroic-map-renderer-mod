@@ -50,9 +50,7 @@ final class Anzeige extends Screen {
                 .withValues(1, 2, 4, 8, 16)
                 .withTooltip(px -> Tooltip.create(Component.translatable("heroicmap.menue.aufloesung.beschreibung")))
                 .create(x, y + 24, halb, 20, Component.translatable("heroicmap.menue.aufloesung"), (b, px) -> m.setzeScale(px)));
-        addRenderableWidget(CycleButton.onOffBuilder(m.todespunkt())
-                .withTooltip(an -> Tooltip.create(Component.translatable("heroicmap.menue.todespunkt.beschreibung")))
-                .create(x + breite - halb, y + 24, halb, 20, Component.translatable("heroicmap.menue.todespunkt"), (b, an) -> m.setzeTodespunkt(an)));
+        addRenderableWidget(new TodRegler(x + breite - halb, y + 24, halb));
         addRenderableWidget(CycleButton.onOffBuilder(m.chunklinien())
                 .create(x, y + 48, halb, 20, Component.translatable("heroicmap.menue.chunklinien"), (b, an) -> m.setzeChunklinien(an)));
         addRenderableWidget(CycleButton.onOffBuilder(m.drehen())
@@ -106,6 +104,28 @@ final class Anzeige extends Screen {
         }
     }
 
+    /** Der Regler, wie viele Todespunkte der Mod behält: aus, 1 bis 16. Siehe docs/wegpunkte.md, „Todespunkt“. */
+    static final class TodRegler extends AbstractSliderButton {
+
+        TodRegler(int x, int y, int breite) {
+            super(x, y, breite, 20, Component.empty(), (double) Minimap.INSTANZ.todespunkte() / Minimap.MAX_TODESPUNKTE);
+            setTooltip(Tooltip.create(Component.translatable("heroicmap.menue.todespunkt.beschreibung")));
+            updateMessage();
+        }
+
+        @Override
+        protected void updateMessage() {
+            int n = Minimap.INSTANZ.todespunkte();
+            setMessage(Component.translatable("heroicmap.menue.todespunkte", n == 0 ? Component.translatable("options.off") : Component.literal(
+                    Integer.toString(n))));
+        }
+
+        @Override
+        protected void applyValue() {
+            Minimap.INSTANZ.setzeTodespunkte((int) Math.round(value * Minimap.MAX_TODESPUNKTE));
+        }
+    }
+
     /** Oben so weit, dass alles mittig steht, aber Platz für den Titel bleibt; bei 240 Einheiten Höhe reicht „Fertig“ bis 238. */
     private int oben() {
         return Math.max(30, height / 2 - 74);
@@ -138,6 +158,8 @@ final class Anzeige extends Screen {
     public void removed() {
         Minimap.INSTANZ.hervor(Minimap.KEIN_ZIEL);
         Minimap.INSTANZ.schreibe(HeroicMap.einstellungen());
+        // Erst hier, nicht beim Ziehen des Reglers: Von 8 auf 1 und zurück nimmt sonst sieben weg.
+        Wegpunkte.INSTANZ.kappeTode(Minimap.INSTANZ.todespunkte());
         // Eine andere Ablage heisst ein anderer Ordner der Welt, auch für Wegpunkte und Ebenen.
         Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());
         Ebenen.INSTANZ.wechsel(Downloads.weltOrdner());

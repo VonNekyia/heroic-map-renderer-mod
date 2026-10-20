@@ -45,7 +45,8 @@ final class Wegpunkte {
 
     /**
      * Ein Wegpunkt auf dem Block (x, z), mit einer festen {@code id}; {@code farbe} ist ein Index in {@link #FARBEN}. Mit
-     * {@code tod} der Todespunkt, höchstens einer, ohne eigene Farbe. Siehe docs/wegpunkte.md, „Todespunkt“.
+     * {@code tod} ein Todespunkt, ohne eigene Farbe; ihre Folge in der Liste ist die der Tode, der letzte der neueste. Siehe
+     * docs/wegpunkte.md, „Todespunkt“.
      */
     record Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet, boolean tod, int ebene) {
     }
@@ -224,17 +225,22 @@ final class Wegpunkte {
                 // Nur dieser Eintrag fällt weg.
             }
         }
-        // Der Todespunkt steht eigens, so zählt eine ältere Version ihn nicht zu den Wegpunkten. Eine id bekommt er unten.
-        if (json.has("tod") && json.get("tod").isJsonObject()) {
+        // Die Todespunkte stehen eigens, der älteste zuerst, so zählt eine ältere Version sie nicht zu den Wegpunkten. Ohne
+        // tode gilt das alte tod mit einem; eine id bekommen sie unten.
+        JsonArray tode = liste(json, "tode");
+        if (tode.isEmpty() && json.has("tod") && json.get("tod").isJsonObject()) {
+            tode.add(json.getAsJsonObject("tod"));
+        }
+        for (JsonElement e : tode) {
             try {
-                JsonObject o = json.getAsJsonObject("tod");
+                JsonObject o = e.getAsJsonObject();
                 Punkt p = new Punkt(0, o.get("dimension").getAsString(), o.get("x").getAsInt(), o.get("z").getAsInt(), 0,
                         o.get("minimap").getAsBoolean(), true, BASE);
                 if (finde(p.dimension(), p.x(), p.z()) < 0) {
                     punkte.add(p);
                 }
             } catch (RuntimeException kaputt) {
-                // Dann gibt es keinen.
+                // Nur dieser fällt weg.
             }
         }
         vergibIds();
@@ -330,7 +336,7 @@ final class Wegpunkte {
     }
 
     JsonObject json() {
-        JsonArray liste = new JsonArray();
+        JsonArray liste = new JsonArray(), tode = new JsonArray();
         JsonObject tod = null;
         for (Punkt p : punkte) {
             if (p.tod()) {
@@ -339,6 +345,7 @@ final class Wegpunkte {
                 tod.addProperty("x", p.x());
                 tod.addProperty("z", p.z());
                 tod.addProperty("minimap", p.angeheftet());
+                tode.add(tod);
                 continue;
             }
             JsonObject o = new JsonObject();
@@ -377,7 +384,9 @@ final class Wegpunkte {
         }
         json.add("ebenen", schichten);
         json.add("wegpunkte", liste);
+        // Dazu der neueste als tod, so behält eine ältere Version ihren einen.
         if (tod != null) {
+            json.add("tode", tode);
             json.add("tod", tod);
         }
         json.add("regionen", rechtecke);
@@ -630,28 +639,49 @@ final class Wegpunkte {
         return i < 0 ? null : punkte.get(i);
     }
 
-    /** Der Todespunkt, oder null. */
+    /** Die Todespunkte, der älteste zuerst. */
+    List<Punkt> tode() {
+        return punkte.stream().filter(Punkt::tod).toList();
+    }
+
+    /** Der neueste Todespunkt, oder null. */
     Punkt tod() {
-        for (Punkt p : punkte) {
-            if (p.tod()) {
-                return p;
-            }
-        }
-        return null;
+        List<Punkt> t = tode();
+        return t.isEmpty() ? null : t.getLast();
     }
 
     /**
-     * Setzt den Todespunkt auf den Block (x, z) in {@code dimension}, angeheftet; ein alter fällt weg. Liegt dort schon ein
-     * Wegpunkt, gibt es keinen, denn der Block ist schon markiert; dann false. Siehe docs/wegpunkte.md, „Todespunkt“.
+     * Setzt einen Todespunkt auf den Block (x, z) in {@code dimension}, angeheftet, als neuesten; der vorige neueste wird
+     * gelöst, so führt ein Strahl zum letzten Tod. Lag dort schon ein Todespunkt, fällt er weg. Liegt dort ein Wegpunkt, gibt
+     * es keinen, denn der Block ist schon markiert; dann false. Über {@code hoechstens} fallen die ältesten weg. Siehe
+     * docs/wegpunkte.md, „Todespunkt“.
      */
-    boolean setzeTod(String dimension, int x, int z) {
-        punkte.removeIf(Punkt::tod);
+    boolean setzeTod(String dimension, int x, int z, int hoechstens) {
+        punkte.removeIf(p -> p.tod() && p.dimension().equals(dimension) && p.x() == x && p.z() == z);
         boolean frei = finde(dimension, x, z) < 0;
         if (frei) {
+            Punkt voriger = tod();
+            if (voriger != null && voriger.angeheftet()) {
+                umschalten(voriger);
+            }
             punkte.add(new Punkt(naechsteId++, dimension, x, z, 0, true, true, BASE));
+            kappe(hoechstens);
         }
         schreibe();
         return frei;
+    }
+
+    /** Behält höchstens {@code hoechstens} Todespunkte, die neuesten; 0 nimmt alle weg. */
+    void kappeTode(int hoechstens) {
+        if (kappe(hoechstens)) {
+            schreibe();
+        }
+    }
+
+    private boolean kappe(int hoechstens) {
+        List<Punkt> weg = new ArrayList<>(tode());
+        weg = weg.subList(0, Math.max(0, weg.size() - Math.max(0, hoechstens)));
+        return punkte.removeAll(weg);
     }
 
     /** „Todespunkt gesetzt bei x z“ für den Chat; ein Klick darauf öffnet die Karte dort über {@code /hmap karte}. */
@@ -659,13 +689,6 @@ final class Wegpunkte {
         return Component.translatable("heroicmap.tod.gesetzt", x, z).withStyle(s -> s.withUnderlined(true)
                 .withClickEvent(new ClickEvent.RunCommand("/hmap karte " + x + " " + z))
                 .withHoverEvent(new HoverEvent.ShowText(Component.translatable("heroicmap.tod.klick"))));
-    }
-
-    /** Nimmt den Todespunkt weg, wenn es einen gibt. */
-    void loescheTod() {
-        if (punkte.removeIf(Punkt::tod)) {
-            schreibe();
-        }
     }
 
     /**

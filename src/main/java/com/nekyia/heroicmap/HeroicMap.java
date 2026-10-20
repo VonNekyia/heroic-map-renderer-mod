@@ -94,7 +94,7 @@ public final class HeroicMap implements ClientModInitializer {
             Selbst.INSTANZ.arbeite(client);
             // Beim Wechsel ins Sterben einmal der Todespunkt. Siehe docs/wegpunkte.md, „Todespunkt“.
             boolean tot = client.player != null && client.player.isDeadOrDying();
-            if (tot && !warTot && client.level != null && Minimap.INSTANZ.todespunkt()) {
+            if (tot && !warTot && client.level != null && Minimap.INSTANZ.todespunkte() > 0) {
                 gestorben(client);
             }
             warTot = tot;
@@ -177,7 +177,7 @@ public final class HeroicMap implements ClientModInitializer {
      */
     static void gestorben(Minecraft mc) {
         int x = mc.player.getBlockX(), z = mc.player.getBlockZ();
-        Wegpunkte.INSTANZ.setzeTod(mc.level.dimension().identifier().toString(), x, z);
+        Wegpunkte.INSTANZ.setzeTod(mc.level.dimension().identifier().toString(), x, z, Minimap.INSTANZ.todespunkte());
         mc.player.sendSystemMessage(Wegpunkte.todMeldung(x, z));
     }
 

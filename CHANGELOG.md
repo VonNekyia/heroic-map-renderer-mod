@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.58
+
+- **Several death points.** "Death points" under "Settings …" is now a slider: off, or keep 1 to 16. Each death adds one where you died; the oldest drop off. Lowering the slider removes the oldest when you close the menu, not while you drag. Only the newest is pinned, so the beam leads to your last death. Death points can't be dragged any more; delete them from the right-click menu or with `Delete`.
+
 ## 0.2.57
 
 - **New version hint.** When Modrinth has a newer Heroic Map for your game version, the full map shows it top left. A click opens the Modrinth page after the game's usual link prompt. Turn it off with "Report new version" under "Settings …"; then the mod doesn't ask Modrinth at all.

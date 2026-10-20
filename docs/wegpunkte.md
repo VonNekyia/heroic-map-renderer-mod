@@ -299,14 +299,22 @@ Reviewer freigegeben.
 - **Wann:** im Client-Tick, wenn `isDeadOrDying` von falsch auf wahr
   wechselt, einmal je Tod (`HeroicMap.gestorben`), auf dem Block des
   Spielers in seiner Dimension.
-- **Nur einer:** Ein neuer Tod verschiebt ihn (`Wegpunkte.setzeTod`). Liegt
-  auf dem Block schon ein Wegpunkt, gibt es keinen; der Block ist schon
-  markiert.
-- **Angeheftet** beim Setzen, so führen Minimap und Strahl zurück, siehe
-  „Strahl“. Sonst wie ein Wegpunkt: Doppelklick löst oder heftet an,
-  Halten verschiebt, ein Klick legt ihn in die Mitte, am Rand steht er wie
-  die anderen Marken. Ein Rechtsklick auf ihn bietet „Todespunkt löschen“
-  statt „Wegpunkt löschen“.
+- **Mehrere,** so viele, wie der Regler „Todespunkte“ sagt, 1 bis 16,
+  gewünscht vom User am 19.10. (mod#151). Jeder Tod setzt einen neuen
+  (`Wegpunkte.setzeTod`); sind es mehr, fallen die ältesten weg. Ihre
+  Folge ist die der Tode, der letzte der neueste; eine Zeit merkt sich der
+  Mod nicht, die Folge in der Liste reicht.
+- **Derselbe Block:** Stirbt der Spieler auf dem Block eines früheren
+  Todespunkts, wird der der neueste. Liegt auf dem Block ein Wegpunkt, gibt
+  es keinen; der Block ist schon markiert, und die übrigen bleiben.
+- **Angeheftet** wird der neue beim Setzen, und der vorige neueste wird
+  gelöst, auch wenn der Spieler ihn selbst angeheftet hatte; so führt ein
+  Strahl zum letzten Tod, siehe „Strahl“. So hat es der Reviewer
+  entschieden. Sonst wie ein Wegpunkt: Doppelklick löst oder heftet an, ein
+  Klick legt ihn in die Mitte, am Rand steht er wie die anderen Marken.
+- **Nicht verschiebbar,** so hat es der User entschieden: Gehalten hängt
+  ein Todespunkt nicht an der Maus, und „Koordinaten setzen…“ gibt es an
+  ihm nicht. Ein Rechtsklick bietet „Todespunkt löschen“, ebenso `Entf`.
 - **Gezeichnet** als dunkle Raute mit hellem ✕ (`Minimap.TOD`,
   `Minimap.TOD_KREUZ`), auf Vollbildkarte und Minimap; sein Strahl ist
   dunkel. Die Arme des ✕ sind 5 Sechzehntel der Marke lang und 0,75 dick;
@@ -320,12 +328,18 @@ Reviewer freigegeben.
   dort fängt Fabric die Befehle des Clients ab (per javap an 26.3 und am
   Fabric API). Die Karte öffnet sich in der jetzigen Dimension; wer in
   einer anderen gestorben ist, sieht den Todespunkt erst dort.
-- **Schalter** „Todespunkt“ im Untermenü „Einstellungen …“, neben
-  „Auflösung“, Vorgabe an (`Minimap.todespunkt`, gespeichert als
-  `todespunkt`). Aus setzt keinen, und ein vorhandener ist weg.
-- **Datei:** eigens als `tod`, nicht in der Liste `wegpunkte`, siehe
-  „Ablage“; so zählt ihn eine ältere Version nicht mit, sie überliest ihn.
-  Eine id bekommt er beim Lesen wie ein Wegpunkt ohne.
+- **Regler** „Todespunkte: aus, 1 … 16“ im Untermenü „Einstellungen …“,
+  neben „Auflösung“, Vorgabe 1 (`Anzeige.TodRegler`, `Minimap.todespunkte`,
+  gespeichert als `todespunkte`). Weniger nimmt die ältesten weg, aus alle,
+  aber erst beim Schliessen des Untermenüs (`Anzeige.removed`,
+  `Wegpunkte.kappeTode`): So löscht der Regler beim Ziehen keinen, von 8
+  auf 1 und zurück bleiben 8 (Review von #164). Aus setzt ein Tod keinen. Bis 0.2.57
+  war es ein Schalter `todespunkt`: aus wird 0, an oder ohne Eintrag 1.
+- **Datei:** eigens als Liste `tode`, der älteste zuerst, nicht in der
+  Liste `wegpunkte`, siehe „Ablage“. Dazu steht der neueste noch einmal als
+  `tod`; so behält eine ältere Version, die nur `tod` kennt, ihren einen.
+  Ohne `tode` liest der Mod `tod`, also eine alte Datei mit einem. Eine id
+  bekommt jeder beim Lesen wie ein Wegpunkt ohne.
 
 ## Menü je Objekt
 
@@ -792,7 +806,7 @@ Schleier am Rand, siehe „Schleier“.
   `ebenen` sind die eigenen Ebenen und `ebene` die eines Eintrags, auch bei
   Formen und alten Rechtecken, siehe „Eigene Ebenen“;
   `farbe` ist ein Index in `Wegpunkte.FARBEN`, `minimap` heisst angeheftet,
-  `tod` ist der Todespunkt, siehe „Todespunkt“, ohne `farbe` und `id`,
+  `tode` sind die Todespunkte und `tod` der neueste, siehe „Todespunkt“, ohne `farbe` und `id`,
   `eigene_formen` nennt ihre Dimension und die Blöcke ihrer Ecken in Reihenfolge,
   dazu `name`, wenn sie einen hat, siehe „Namen“, und `hex`, wenn sie eine
   eigene Farbe hat, siehe „Farbe“; eine ältere Version des Mods überliest
@@ -842,7 +856,10 @@ Schleier am Rand, siehe „Schleier“.
   ungültig, auch Ziffern anderer Schriften; Rand und Füllung; über die
   Datei, mit dem Index daneben; weggenommen; eine Farbe, die keine ist).
   Zum Schleier: `eigeneFormenFuerDenSchleierErkannt`. Zum Todespunkt:
-  `todespunktNurEinerAngeheftetUndEigensGespeichert` (nur einer, keine
+  `mehrereTodespunkte` (höchstens so viele, die ältesten fallen weg, nur der
+  neueste angeheftet, derselbe Block frischt auf, weniger einstellen, `tode`
+  und `tod` in der Datei, eine alte Datei mit `tod`),
+  `todespunktNurEinerAngeheftetUndEigensGespeichert` (mit einem: keine
   Farbe, eigens in der Datei, Lösen und Verschieben, nicht auf einem
   Wegpunkt, ein kaputter fehlt), `todMeldungOeffnetDieKarteDort`;
   `koordinatenEingetippt`. Zu eigenen Ebenen:
@@ -970,9 +987,14 @@ Schleier am Rand, siehe „Schleier“.
   `sendUnattendedCommand("hmap karte x z")`, der Weg des Klicks im Chat,
   die Karte mit ihm als Ziel; die Welt des Tests hat keinen geladenen Satz,
   also steht er mit dem Testsatz in der Mitte, mitten in ihm das helle ✕; sein
-  Menü hat genau „Hierher teleportieren“ und „Todespunkt löschen“, und
-  „Todespunkt löschen“ löscht ihn; mit dem Schalter aus setzt ein zweiter
-  Tod keinen. Eigene Ebenen (`eigeneEbenen`): Rechtsklick auf einen
+  Menü hat genau „Hierher teleportieren“ und „Todespunkt löschen“, gehalten
+  hängt er nicht an der Maus, und „Todespunkt löschen“ löscht ihn; mit zwei
+  behaltenen bleiben nach drei Toden die zwei neuesten, nur der neueste
+  angeheftet; aus setzt ein Tod keinen. Regler „Todespunkte“ (`todRegler`):
+  Klicks ans rechte Ende, ans linke und in die Mitte geben 16, aus und 8,
+  gespeichert beim Schliessen; mit acht Todespunkten nehmen diese Klicks und
+  ein Ziehen von 8 auf 1 und zurück keinen weg, nach `Esc` sind es acht; auf
+  2 gestellt, bleiben nach `Esc` die zwei neuesten. Eigene Ebenen (`eigeneEbenen`): Rechtsklick auf einen
   Wegpunkt, „Ebene …“ zeigt „• Base“ und „Neue Ebene …“; darüber „Farmen“
   angelegt, liegt er in ihr; ihr Knopf in der Liste der Karte schaltet sie
   aus, und der Wegpunkt fehlt auf der Karte, wieder an steht er da; im
