@@ -284,23 +284,63 @@ class FormenTest {
     @Test
     void schriftMittigAufDemPfad() {
         // Drei Zeichen zu 10, Lücke 2, auf einer Strecke von 0 bis 100: mittig ab 33, also Mitten bei 38, 50 und 62.
-        double[] l = Formen.anordnung(new double[] {0, 0, 100, 0}, new double[] {10, 10, 10}, 2);
+        double[] l = Formen.anordnung(new double[] {0, 0, 100, 0}, new double[] {10, 10, 10}, 2, 0);
         assertArrayEquals(new double[] {38, 0, 0, 50, 0, 0, 62, 0, 0}, l, 1e-9);
         // Nach links gezeichnet: umgekehrt, so steht die Schrift aufrecht, und dieselben Orte.
-        assertArrayEquals(l, Formen.anordnung(new double[] {100, 0, 0, 0}, new double[] {10, 10, 10}, 2), 1e-9);
+        assertArrayEquals(l, Formen.anordnung(new double[] {100, 0, 0, 0}, new double[] {10, 10, 10}, 2, 0), 1e-9);
         // Um eine Ecke: das zweite Zeichen auf der zweiten Strecke, im Winkel nach unten (y nach unten).
-        double[] ecke = Formen.anordnung(new double[] {0, 0, 10, 0, 10, 10}, new double[] {4, 4}, 0);
+        double[] ecke = Formen.anordnung(new double[] {0, 0, 10, 0, 10, 10}, new double[] {4, 4}, 0, 0);
         assertArrayEquals(new double[] {8, 0, 0, 10, 2, Math.PI / 2}, ecke, 1e-9);
     }
 
     @Test
     void schriftUeberDieEnden() {
         // Kürzer als der Text: Die Schrift läuft in Richtung des ersten und letzten Stücks weiter.
-        double[] l = Formen.anordnung(new double[] {0, 0, 10, 0}, new double[] {10, 10, 10}, 0);
+        double[] l = Formen.anordnung(new double[] {0, 0, 10, 0}, new double[] {10, 10, 10}, 0, 0);
         assertArrayEquals(new double[] {-5, 0, 0, 5, 0, 0, 15, 0, 0}, l, 1e-9);
         // Ein Punkt heisst waagrecht dort; doppelte Punkte zählen als einer.
-        double[] p = Formen.anordnung(new double[] {7, 3, 7, 3}, new double[] {4, 6}, 1);
+        double[] p = Formen.anordnung(new double[] {7, 3, 7, 3}, new double[] {4, 6}, 1, 0);
         assertArrayEquals(new double[] {3.5, 3, 0, 9.5, 3, 0}, p, 1e-9);
+    }
+
+    @Test
+    void schriftImBogen() {
+        // Drei Zeichen zu 10, Lücke 2, also 34 lang, auf einem Punkt; 90° nach oben (∩, mod#150): Radius 34 / (π / 2), die Mitte
+        // des Textes auf dem Punkt, die äusseren Zeichen 12 entlang des Bogens daneben, tiefer, im Winkel des Bogens.
+        double[] p = {7, 3}, b = {10, 10, 10};
+        double w = Math.PI / 2, r = 34 / w, phi = 12 / r;
+        double[] oben = Formen.anordnung(p, b, 2, w);
+        assertArrayEquals(new double[] {7 - r * Math.sin(phi), 3 + r - r * Math.cos(phi), -phi, 7, 3, 0,
+            7 + r * Math.sin(phi), 3 + r - r * Math.cos(phi), phi}, oben, 1e-9);
+        // Nach unten (∪): gespiegelt an der Waagrechten durch den Punkt, die Winkel umgekehrt.
+        double[] unten = Formen.anordnung(p, b, 2, -w);
+        for (int i = 0; i < 9; i += 3) {
+            assertEquals(oben[i], unten[i], 1e-9);
+            assertEquals(6 - oben[i + 1], unten[i + 1], 1e-9);
+            assertEquals(-oben[i + 2], unten[i + 2], 1e-9);
+        }
+        // Ohne Biegung wie bisher; auf einem Pfad aus mehreren Punkten zählt sie nicht, dort folgt die Schrift dem Pfad.
+        assertArrayEquals(new double[] {-5, 3, 0, 7, 3, 0, 19, 3, 0}, Formen.anordnung(p, b, 2, 0), 1e-9);
+        double[] strecke = {0, 0, 100, 0};
+        assertArrayEquals(Formen.anordnung(strecke, b, 2, 0), Formen.anordnung(strecke, b, 2, w), 0);
+    }
+
+    @Test
+    void bannerBogenWieVorher() {
+        // Der Bogen eines Bannernamens nach der gemeinsamen Hilfe: bytegleich mit der Rechnung vor mod#150.
+        double[] b = {7.5, 6, 9.25, 4.125};
+        for (double r : new double[] {20, 37.3, 400}) {
+            double[] alt = new double[3 * b.length];
+            double s = -Ebenen.laenge(b) / 2, mitte = Ebenen.BOGEN_TIEF - r;
+            for (int i = 0; i < b.length; i++) {
+                double phi = (s + b[i] / 2) / r;
+                alt[3 * i] = r * Math.sin(phi);
+                alt[3 * i + 1] = mitte + r * Math.cos(phi);
+                alt[3 * i + 2] = -phi;
+                s += b[i] + Ebenen.BOGEN_SPERRUNG;
+            }
+            assertArrayEquals(alt, Ebenen.bogen(b, r), 0);
+        }
     }
 
     @Test
@@ -317,7 +357,7 @@ class FormenTest {
 
     private static Ebenen.Schrift schrift(String text, float kontur) {
         return new Ebenen.Schrift(Ebenen.UEBERWELT, text, new double[] {0, 0, 100, 0}, 16, 0, 0xFF2B2B2B, 0xFFF2E8D0, kontur,
-                new double[] {0, 0, 100, 0});
+                new double[] {0, 0, 100, 0}, 0);
     }
 
     @Test
@@ -372,13 +412,13 @@ class FormenTest {
         float[] kasten = Drehung.rechteck(-1000, -1000, 1000, 1000);
         // Kontur mit Alpha 0: nur die zwei Füllungen, zwei Glyphen vom Budget.
         int[] rest = {Formen.MAX_ZEICHEN};
-        List<Formen.Glyphe> ohneKontur = Formen.glyphen(new Ebenen.Schrift(Ebenen.UEBERWELT, "AB", p, 16, 0, 0xFF2B2B2B, 0x00F2E8D0, 1, p),
+        List<Formen.Glyphe> ohneKontur = Formen.glyphen(new Ebenen.Schrift(Ebenen.UEBERWELT, "AB", p, 16, 0, 0xFF2B2B2B, 0x00F2E8D0, 1, p, 0),
                 p, new double[] {8, 8}, 16, 1, kasten, rest);
         assertEquals(2, ohneKontur.size());
         assertEquals(0xFF2B2B2B, ohneKontur.getFirst().farbe());
         assertEquals(Formen.MAX_ZEICHEN - 2, rest[0]);
         // Füllung mit Alpha 0: nur die 2 · 8 Kopien der Kontur.
-        List<Formen.Glyphe> ohneFuellung = Formen.glyphen(new Ebenen.Schrift(Ebenen.UEBERWELT, "AB", p, 16, 0, 0x002B2B2B, 0xFFF2E8D0, 1, p),
+        List<Formen.Glyphe> ohneFuellung = Formen.glyphen(new Ebenen.Schrift(Ebenen.UEBERWELT, "AB", p, 16, 0, 0x002B2B2B, 0xFFF2E8D0, 1, p, 0),
                 p, new double[] {8, 8}, 16, 1, kasten, rest);
         assertEquals(16, ohneFuellung.size());
         assertTrue(ohneFuellung.stream().allMatch(gl -> gl.farbe() == 0xFFF2E8D0));
@@ -404,9 +444,9 @@ class FormenTest {
         // Der Pfad liegt links neben der Welt, der lange Text reicht hinein; ein kurzer nicht.
         Formen.Ansicht a = ansicht(Minimap.abbild(1, 1, 0, 0, Drehung.Lage.von(0, 0, 0, 0, 0)));
         Ebenen.Schrift lang = new Ebenen.Schrift(Ebenen.UEBERWELT, "x".repeat(64), new double[] {-200, 30}, 16, 0, 0, 0, 0,
-                new double[] {-200, 30, -200, 30});
+                new double[] {-200, 30, -200, 30}, 0);
         Ebenen.Schrift kurz = new Ebenen.Schrift(Ebenen.UEBERWELT, "x", new double[] {-200, 30}, 16, 0, 0, 0, 0,
-                new double[] {-200, 30, -200, 30});
+                new double[] {-200, 30, -200, 30}, 0);
         assertTrue(Formen.sichtbar(a, lang));
         assertFalse(Formen.sichtbar(a, kurz));
     }
