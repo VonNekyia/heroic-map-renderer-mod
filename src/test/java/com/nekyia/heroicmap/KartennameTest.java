@@ -18,6 +18,7 @@ class KartennameTest {
 
     private static final long SEED = 0x0123456789abcdefL;
     private static final long NETHER = 0x1111111111111111L;
+    private static final long ENDE = 0x2222222222222222L;
 
     @Test
     void karteAusDerAntwort() {
@@ -97,6 +98,8 @@ class KartennameTest {
         assertEquals("main", k.fuer(SEED));
 
         // Eine Welt, die erst später betreten wird, entscheidet beim Betreten, einmal.
+        k.betreten(ENDE, s -> true);
+        assertEquals("main", k.fuer(ENDE));
         k.betreten(NETHER, s -> false);
         assertNull(k.fuer(NETHER), "dort läuft ein Download in den alten Ordner");
         k.betreten(NETHER, s -> true);
