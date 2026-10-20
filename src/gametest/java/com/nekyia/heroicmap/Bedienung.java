@@ -4176,6 +4176,9 @@ public final class Bedienung implements FabricClientGameTest {
         context.runOnClient(mc -> {
             Minimap.INSTANZ.schreibe(sicherung);
             Minimap.INSTANZ.setzeKoordinaten(Minimap.Koordinaten.XZ);
+            // Oben rechts, 128 Einheiten: Unter der Zeile der Koordinaten ist Platz für den Regler.
+            int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+            Minimap.INSTANZ.stelle(b, 0, Minimap.GROESSE, b, h);
             mc.gui.setScreen(new Einstellungen());
         });
         context.waitTicks(3);

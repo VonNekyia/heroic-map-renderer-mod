@@ -207,9 +207,9 @@ final class Einstellungen extends Screen {
         aufloesung.visible = m.sichtbar();
         aufloesung.folge(m.aufloesung());
         // Die Zeile der Koordinaten unter der Maus steht gelb, ab dem nächsten Frame, und nennt ihren Stil.
-        boolean zeile = m.sichtbar() && zug == Zug.KEINER && imKasten(m.koordinatenKasten(), mausX, mausY);
-        m.koordinatenHell(zeile);
-        if (zeile) {
+        boolean aufZeile = m.sichtbar() && zug == Zug.KEINER && imKasten(m.koordinatenKasten(), mausX, mausY);
+        m.koordinatenHell(aufZeile);
+        if (aufZeile) {
             g.setTooltipForNextFrame(Component.translatable("heroicmap.menue.koordinaten.klick", stil(m.koordinaten()), stil(naechste(m.koordinaten()))),
                     mausX, mausY);
         }
