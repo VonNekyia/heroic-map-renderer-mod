@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -186,5 +187,23 @@ class SchleierTest {
         assertEquals(Schleier.DECKUNG, Schleier.deckung(Schleier.HOEHE), 1e-6);
         assertEquals(Schleier.MAX_DECKUNG, Schleier.deckung(Schleier.MAX_HOEHE), 1e-6);
         assertEquals(0.7f, Schleier.deckung(10), 1e-6);
+    }
+
+    @Test
+    void geteilteKanteNurDerSchwereren() {
+        // Zwei eigene Stücke auf derselben Kante, gegenläufig; eines vom Server darauf; ein eigenes daneben (mod#163).
+        double[] p = {0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 5, 5, 6, 5};
+        boolean[] eigen = {true, true, false, true};
+        // Gewicht 2 schlägt 0: nur das leichtere eigene fällt weg, das vom Server und das daneben bleiben.
+        boolean[] weg = Schleier.geteilt(p, eigen, new int[] {0, 2, 0, 0}, 4);
+        assertTrue(weg[0]);
+        assertFalse(weg[1] || weg[2] || weg[3]);
+        // Gleiches Gewicht: beide bleiben, wie vor mod#163.
+        boolean[] gleich = Schleier.geteilt(p, eigen, new int[] {3, 3, 0, 3}, 4);
+        assertFalse(gleich[0] || gleich[1] || gleich[2] || gleich[3]);
+        // Auf ein Millionstel Block genau: ein Hauch daneben ist dasselbe Stück, ein Tausendstel nicht.
+        double[] fast = {0, 0, 1, 0, 1 + 1e-9, 0, 0, 0, 0, 0.001, 1, 0.001};
+        assertTrue(Schleier.geteilt(fast, new boolean[] {true, true, true}, new int[] {0, 1, 0}, 3)[0]);
+        assertFalse(Schleier.geteilt(fast, new boolean[] {true, true, true}, new int[] {0, 1, 0}, 3)[2]);
     }
 }

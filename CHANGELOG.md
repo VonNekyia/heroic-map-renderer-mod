@@ -4,9 +4,13 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
-## 0.2.60
+## 0.2.61
 
 - **Connect points.** Right-click a corner of your own line or region, or a waypoint, and choose "Connect": it snaps onto the nearest point within a short distance, and from then on they move together. Drag one, move it with "Set coordinates…" or move a shape by its handle, and the connected corners and waypoint follow; only the shared corner of another shape moves, the rest of that shape stays. "Disconnect" releases all points on that spot. Connected corners have a light centre. Shared layer codes don't carry connections.
+
+## 0.2.60
+
+- **Which shape lies on top.** Under "Color…" on a shape's handle sits a weight slider from −9 to +9. A heavier shape is drawn above lighter ones, fill, border and name, on the full map and the minimap; clicks hit the shape on top. Where two pinned regions share an edge, only the heavier one's veil shows.
 
 ## 0.2.59
 

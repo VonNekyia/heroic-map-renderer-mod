@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import net.minecraft.ChatFormatting;
@@ -112,7 +113,7 @@ final class Wegpunkte {
      * „Eigene Formen“.
      */
     record EigeneForm(String dimension, List<Ecke> ecken, int farbe, boolean angeheftet, String name, int hex, int ebene, double schrift,
-            int biegung) {
+            int biegung, int gewicht) {
 
         /** Eine Linie biegt ihren Namen nicht; er folgt ihr schon. Siehe docs/wegpunkte.md, „Namen“. */
         EigeneForm {
@@ -120,9 +121,15 @@ final class Wegpunkte {
             biegung = ecken.size() >= 3 ? biegung : 0;
         }
 
-        /** Mit Schrift 1 und ohne Biegung, wie vor mod#150. */
+        /** Mit Schrift 1, ohne Biegung und mit Gewicht 0, wie vor mod#150. */
         EigeneForm(String dimension, List<Ecke> ecken, int farbe, boolean angeheftet, String name, int hex, int ebene) {
-            this(dimension, ecken, farbe, angeheftet, name, hex, ebene, 1, 0);
+            this(dimension, ecken, farbe, angeheftet, name, hex, ebene, 1, 0, 0);
+        }
+
+        /** Mit Gewicht 0, wie vor mod#163. */
+        EigeneForm(String dimension, List<Ecke> ecken, int farbe, boolean angeheftet, String name, int hex, int ebene, double schrift,
+                int biegung) {
+            this(dimension, ecken, farbe, angeheftet, name, hex, ebene, schrift, biegung, 0);
         }
 
         /** Die Farbe der Form, deckend: die eigene, sonst die aus {@link #FARBEN}. Siehe docs/wegpunkte.md, „Farbe“. */
@@ -132,6 +139,11 @@ final class Wegpunkte {
 
         boolean region() {
             return ecken.size() >= 3;
+        }
+
+        /** Dieselbe Form mit anderen Ecken, alle übrigen Felder gleich; so trägt sich jedes neue Feld selbst mit (Review von #168). */
+        EigeneForm mitEcken(List<Ecke> ecken) {
+            return new EigeneForm(dimension, ecken, farbe, angeheftet, name, hex, ebene, schrift, biegung, gewicht);
         }
     }
 
@@ -180,6 +192,8 @@ final class Wegpunkte {
     static final double[] SCHRIFTEN = {0.25, 1.0 / 3, 0.5, 2.0 / 3, 1, 1.5, 2, 3, 4};
     /** Die Biegung eines Namens in Grad, ±{@link #MAX_BIEGUNG} in Schritten zu {@link #BIEGUNG_SCHRITT}; + nach oben gewölbt. */
     static final int MAX_BIEGUNG = 180, BIEGUNG_SCHRITT = 15;
+    /** Das Gewicht einer Form, ganzzahlig von −{@link #MAX_GEWICHT} bis {@link #MAX_GEWICHT}, Vorgabe 0; schwerer liegt oben. Siehe docs/wegpunkte.md, „Gewicht“. */
+    static final int MAX_GEWICHT = 9;
     /** So viele Regionen und Kreise je Welt angeheftet, eigene und vom Server zusammen; darüber heftet der Mod keine an. */
     static final int MAX_ANGEHEFTET = 64;
     /** So viele Nadeln und Banner je Welt angeheftet, eine eigene Grenze; darüber heftet der Mod keine an. */
@@ -213,6 +227,8 @@ final class Wegpunkte {
     /** Die eigene Form, die die Vollbildkarte gerade zieht, oder null; und die, für die zuletzt gebaut wurde. */
     private List<EigeneForm> gezogen = List.of(), gebautGezogen = List.of();
     private List<List<Ebenen.Form>> fuerKarte = List.of(), fuerMinimap = List.of();
+    /** Das Gewicht je eigener Form auf der Minimap, nach Identität; für den Schleier. */
+    private Map<Ebenen.Form, Integer> gewichte = new IdentityHashMap<>();
     private List<Ebenen.Ort> fuerNadeln = List.of();
     /** Dieselben Nadeln und Banner nach Identität, so prüft die Vollbildkarte je Nadel ohne Allokation. */
     private Set<Ebenen.Ort> angeheftetOrte = Set.of();
@@ -280,7 +296,7 @@ final class Wegpunkte {
                 int id = o.has("id") ? o.get("id").getAsInt() : 0;
                 Punkt p = new Punkt(id, o.get("dimension").getAsString(), o.get("x").getAsInt(), o.get("z").getAsInt(),
                         Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length), o.get("minimap").getAsBoolean(), false, ebeneAus(o),
-                        o.has("bund") ? Math.max(0, o.get("bund").getAsInt()) : 0);
+                        bund(o.get("bund")));
                 if (finde(p.dimension(), p.x(), p.z()) < 0) {
                     punkte.add(p);
                 }
@@ -349,7 +365,7 @@ final class Wegpunkte {
                     // Die dritte Zahl ist der Bund, nur an verbundenen Ecken; ältere Versionen lesen nur die ersten zwei.
                     for (JsonElement e : o.getAsJsonArray("ecken")) {
                         JsonArray xz = e.getAsJsonArray();
-                        ecken.add(new Ecke(xz.get(0).getAsInt(), xz.get(1).getAsInt(), xz.size() > 2 ? Math.max(0, xz.get(2).getAsInt()) : 0));
+                        ecken.add(new Ecke(xz.get(0).getAsInt(), xz.get(1).getAsInt(), xz.size() > 2 ? bund(xz.get(2)) : 0));
                     }
                 } else {
                     for (JsonElement id : o.getAsJsonArray("punkte")) {
@@ -370,8 +386,9 @@ final class Wegpunkte {
                             ? schrift(s.getAsDouble()) : 1;
                     int biegung = o.get("biegung") instanceof JsonPrimitive b && b.isNumber() && Math.abs(b.getAsDouble()) <= MAX_BIEGUNG
                             ? biegung(b.getAsDouble()) : 0;
+                    int gewicht = o.get("gewicht") instanceof JsonPrimitive g && g.isNumber() && gewichtGilt(g.getAsDouble()) ? g.getAsInt() : 0;
                     eigene.add(new EigeneForm(dimension, gueltig, Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length),
-                            o.get("minimap").getAsBoolean() && angeheftet() < MAX_ANGEHEFTET, name, hex, ebeneAus(o), schrift, biegung));
+                            o.get("minimap").getAsBoolean() && angeheftet() < MAX_ANGEHEFTET, name, hex, ebeneAus(o), schrift, biegung, gewicht));
                 }
             } catch (RuntimeException kaputt) {
                 // Nur dieser Eintrag fällt weg.
@@ -389,6 +406,18 @@ final class Wegpunkte {
             }
         }
         ordneBuende();
+    }
+
+    /**
+     * Der Bund aus der Datei: eine ganze Zahl über 0; was fehlt oder keine ist, heisst lose, und der Punkt bleibt (Review von
+     * #168). Siehe docs/wegpunkte.md, „Ablage“.
+     */
+    private static int bund(JsonElement e) {
+        if (!(e instanceof JsonPrimitive p) || !p.isNumber()) {
+            return 0;
+        }
+        double d = p.getAsDouble();
+        return d == Math.rint(d) && d > 0 && d <= Integer.MAX_VALUE ? (int) d : 0;
     }
 
     /** Die Ebene aus dem Feld {@code ebene} eines Eintrags, wenn es sie gibt; sonst Base. */
@@ -496,6 +525,9 @@ final class Wegpunkte {
             }
             if (f.biegung() != 0) {
                 o.addProperty("biegung", f.biegung());
+            }
+            if (f.gewicht() != 0) {
+                o.addProperty("gewicht", f.gewicht());
             }
             o.addProperty("ebene", f.ebene());
             zuege.add(o);
@@ -654,7 +686,7 @@ final class Wegpunkte {
             }
         }
         for (EbenenCode.Form f : inhalt.formen()) {
-            eigene.add(new EigeneForm(f.dimension(), f.ecken(), f.farbe(), false, f.name(), f.hex(), id, f.schrift(), f.biegung()));
+            eigene.add(new EigeneForm(f.dimension(), f.ecken(), f.farbe(), false, f.name(), f.hex(), id, f.schrift(), f.biegung(), f.gewicht()));
         }
         schreibe();
         return new Eingefuegt(id, n, inhalt.formen().size(), null);
@@ -714,7 +746,7 @@ final class Wegpunkte {
     }
 
     private static EigeneForm mitEbene(EigeneForm f, int ebene) {
-        return new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), f.hex(), ebene, f.schrift(), f.biegung());
+        return new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), f.hex(), ebene, f.schrift(), f.biegung(), f.gewicht());
     }
 
     /** Der Wegpunkt auf dem Block (x, z) in {@code dimension}, sichtbar oder nicht, oder null. */
@@ -922,7 +954,7 @@ final class Wegpunkte {
         if (gueltig == null) {
             eigene.remove(i);
         } else {
-            eigene.set(i, mitEcken(f, gueltig));
+            eigene.set(i, f.mitEcken(gueltig));
             for (Ecke c : gueltig) {
                 boolean blieb = f.ecken().stream().anyMatch(a -> a.bund() == c.bund() && a.x() == c.x() && a.z() == c.z());
                 if (c.bund() > 0 && !blieb && !zieheBund(c.bund(), f.dimension(), c.x(), c.z())) {
@@ -933,10 +965,6 @@ final class Wegpunkte {
         }
         schreibe();
         return true;
-    }
-
-    private static EigeneForm mitEcken(EigeneForm f, List<Ecke> ecken) {
-        return new EigeneForm(f.dimension(), ecken, f.farbe(), f.angeheftet(), f.name(), f.hex(), f.ebene(), f.schrift(), f.biegung());
     }
 
     /** Setzt Wegpunkte und eigene Formen auf einen früheren Stand, wenn eine Änderung mit Bünden nicht ganz ging. */
@@ -970,7 +998,7 @@ final class Wegpunkte {
                 if (neu == null) {
                     return false;
                 }
-                eigene.set(i, mitEcken(f, neu));
+                eigene.set(i, f.mitEcken(neu));
             }
         }
         return true;
@@ -1053,14 +1081,14 @@ final class Wegpunkte {
         if (alt > 0) {
             punkte.replaceAll(p -> p.bund() == alt ? mitBund(p, b) : p);
             eigene.replaceAll(f -> f.ecken().stream().noneMatch(c -> c.bund() == alt) ? f
-                    : mitEcken(f, f.ecken().stream().map(c -> c.bund() == alt ? new Ecke(c.x(), c.z(), b) : c).toList()));
+                    : f.mitEcken(f.ecken().stream().map(c -> c.bund() == alt ? new Ecke(c.x(), c.z(), b) : c).toList()));
         } else if (g.punkt() != null) {
             punkte.set(punkte.indexOf(g.punkt()), mitBund(g.punkt(), b));
         } else {
             List<Ecke> ecken = new ArrayList<>(g.form().ecken());
             Ecke c = ecken.get(g.index());
             ecken.set(g.index(), new Ecke(c.x(), c.z(), b));
-            eigene.set(eigene.indexOf(g.form()), mitEcken(g.form(), ecken));
+            eigene.set(eigene.indexOf(g.form()), g.form().mitEcken(ecken));
         }
     }
 
@@ -1083,7 +1111,7 @@ final class Wegpunkte {
         }
         punkte.replaceAll(p -> p.bund() == b ? mitBund(p, 0) : p);
         eigene.replaceAll(f -> f.ecken().stream().noneMatch(c -> c.bund() == b) ? f
-                : mitEcken(f, f.ecken().stream().map(c -> c.bund() == b ? new Ecke(c.x(), c.z()) : c).toList()));
+                : f.mitEcken(f.ecken().stream().map(c -> c.bund() == b ? new Ecke(c.x(), c.z()) : c).toList()));
         schreibe();
     }
 
@@ -1113,7 +1141,7 @@ final class Wegpunkte {
             return;
         }
         punkte.replaceAll(p -> p.bund() == 0 ? p : mitBund(p, neu.getOrDefault(List.of(p.bund(), p.dimension(), p.x(), p.z()), 0)));
-        eigene.replaceAll(f -> f.ecken().stream().allMatch(c -> c.bund() == 0) ? f : mitEcken(f, f.ecken().stream()
+        eigene.replaceAll(f -> f.ecken().stream().allMatch(c -> c.bund() == 0) ? f : f.mitEcken(f.ecken().stream()
                 .map(c -> c.bund() == 0 ? c : new Ecke(c.x(), c.z(), neu.getOrDefault(List.of(c.bund(), f.dimension(), c.x(), c.z()), 0)))
                 .toList()));
     }
@@ -1134,7 +1162,7 @@ final class Wegpunkte {
             return false;
         }
         eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), !f.angeheftet(), f.name(), f.hex(), f.ebene(), f.schrift(),
-                f.biegung()));
+                f.biegung(), f.gewicht()));
         schreibe();
         return true;
     }
@@ -1144,7 +1172,7 @@ final class Wegpunkte {
         int i = eigene.indexOf(f);
         if (i >= 0) {
             eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), name(name), f.hex(), f.ebene(), f.schrift(),
-                    f.biegung()));
+                    f.biegung(), f.gewicht()));
             schreibe();
         }
     }
@@ -1154,15 +1182,35 @@ final class Wegpunkte {
      * und Minimap, gespeichert wird mit dem Namen ({@link #benenne}). Gibt die Form zurück, wie sie danach ist, ohne Fund
      * {@code f}. Siehe docs/wegpunkte.md, „Namen“.
      */
-    EigeneForm stil(EigeneForm f, double schrift, int biegung) {
+    EigeneForm stil(EigeneForm f, double schrift, int biegung, int gewicht) {
         int i = eigene.indexOf(f);
         if (i < 0) {
             return f;
         }
-        EigeneForm neu = new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), f.hex(), f.ebene(), schrift, biegung);
+        EigeneForm neu = new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), f.hex(), f.ebene(), schrift, biegung,
+                gewicht);
         eigene.set(i, neu);
         stand++;
         return neu;
+    }
+
+    /** Ist {@code g} ein Gewicht: eine ganze Zahl von −{@link #MAX_GEWICHT} bis {@link #MAX_GEWICHT}? */
+    static boolean gewichtGilt(double g) {
+        return g == Math.rint(g) && Math.abs(g) <= MAX_GEWICHT;
+    }
+
+    /**
+     * Trifft der Griff oder die Ecke im Abstand {@code d} mit Gewicht {@code gewicht} eher als die beste bisher, im Abstand
+     * {@code abstand} mit {@code gewichtBeste}? Näher gewinnt; bei gleichem Abstand das schwerere, bei gleichem Gewicht die
+     * spätere, wie vor mod#163. Ohne beste ist {@code gewichtBeste} {@link Integer#MIN_VALUE}.
+     */
+    static boolean trifftEher(double d, int gewicht, double abstand, int gewichtBeste) {
+        return d < abstand || d == abstand && gewicht >= gewichtBeste;
+    }
+
+    /** Das Gewicht einer Form aus {@link #minimap}: das der eigenen Form, sonst 0. */
+    int gewicht(Ebenen.Form f) {
+        return gewichte.getOrDefault(f, 0);
     }
 
     /** Die Raste von {@link #SCHRIFTEN} nächst {@code f}. */
@@ -1190,7 +1238,7 @@ final class Wegpunkte {
     void faerbe(EigeneForm f, int hex) {
         int i = eigene.indexOf(f);
         if (i >= 0) {
-            eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), hex, f.ebene(), f.schrift(), f.biegung()));
+            eigene.set(i, new EigeneForm(f.dimension(), f.ecken(), f.farbe(), f.angeheftet(), f.name(), hex, f.ebene(), f.schrift(), f.biegung(), f.gewicht()));
             schreibe();
         }
     }
@@ -1537,8 +1585,12 @@ final class Wegpunkte {
         fuerNadeln = List.copyOf(orte);
         angeheftetOrte = Collections.newSetFromMap(new IdentityHashMap<>());
         angeheftetOrte.addAll(orte);
-        List<Ebenen.Form> aufKarte = new ArrayList<>(), aufMinimap = new ArrayList<>();
-        regionen.stream().filter(r -> r.angeheftet() && an(r.ebene())).map(Wegpunkte::flaeche).forEach(aufMinimap::add);
+        // Je Gewicht eine Liste, leicht zuerst: Formen zeichnet jede ganz, Fläche, Rand und Name, so liegt die schwerere mit allem
+        // oben. Alle 0 gibt die eine Liste wie vor mod#163. Siehe docs/wegpunkte.md, „Gewicht“.
+        TreeMap<Integer, List<Ebenen.Form>> aufKarteJe = new TreeMap<>(), aufMinimapJe = new TreeMap<>();
+        IdentityHashMap<Ebenen.Form, Integer> gewichtJe = new IdentityHashMap<>();
+        regionen.stream().filter(r -> r.angeheftet() && an(r.ebene())).map(Wegpunkte::flaeche)
+                .forEach(fl -> aufMinimapJe.computeIfAbsent(0, g -> new ArrayList<>()).add(fl));
         for (EigeneForm f : this.eigene) {
             if (!an(f.ebene())) {
                 continue;
@@ -1546,6 +1598,8 @@ final class Wegpunkte {
             double[] p = mitten(f);
             Ebenen.Form form = form(f, p);
             Ebenen.Schrift name = schrift(f, p);
+            List<Ebenen.Form> aufKarte = aufKarteJe.computeIfAbsent(f.gewicht(), g -> new ArrayList<>());
+            List<Ebenen.Form> aufMinimap = aufMinimapJe.computeIfAbsent(f.gewicht(), g -> new ArrayList<>());
             // Die Form, die gerade gezogen wird, zeichnet die Vollbildkarte selbst, wo sie an der Maus steht.
             if (!gezogen.contains(f)) {
                 aufKarte.add(f.angeheftet() ? breiter(form) : form);
@@ -1555,19 +1609,25 @@ final class Wegpunkte {
             }
             if (f.angeheftet()) {
                 aufMinimap.add(form);
+                gewichtJe.put(form, f.gewicht());
                 if (name != null) {
                     aufMinimap.add(name);
                 }
             }
         }
-        if (!aufKarte.isEmpty()) {
-            karte.add(List.copyOf(aufKarte));
-        }
-        if (!aufMinimap.isEmpty()) {
-            minimap.add(List.copyOf(aufMinimap));
-        }
         eigeneAufMinimap = Collections.newSetFromMap(new IdentityHashMap<>());
-        eigeneAufMinimap.addAll(aufMinimap);
+        for (List<Ebenen.Form> l : aufKarteJe.values()) {
+            if (!l.isEmpty()) {
+                karte.add(List.copyOf(l));
+            }
+        }
+        for (List<Ebenen.Form> l : aufMinimapJe.values()) {
+            if (!l.isEmpty()) {
+                minimap.add(List.copyOf(l));
+                eigeneAufMinimap.addAll(l);
+            }
+        }
+        gewichte = gewichtJe;
         fuerKarte = List.copyOf(karte);
         fuerMinimap = List.copyOf(minimap);
     }

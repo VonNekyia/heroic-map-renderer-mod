@@ -75,6 +75,7 @@
   "heroicmap.karte.biegung_unten": "Curve: %s° down",
   "heroicmap.karte.farbe": "Color…",
   "heroicmap.karte.farbe_hinweis": "Enter: save the color as #RRGGBB, empty for the list color; Esc cancels",
+  "heroicmap.karte.gewicht": "Weight: %s",
   "heroicmap.karte.formen_voll": "At most %s own shapes",
   "heroicmap.karte.form_weg": "This shape has changed or is gone; the new corners were not saved",
   "heroicmap.karte.form_hinweis": "Left-click: corner here or on a waypoint, on the first one: region; right-click: finish; Esc cancels",

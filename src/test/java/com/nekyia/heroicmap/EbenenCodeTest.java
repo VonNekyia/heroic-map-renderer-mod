@@ -51,8 +51,8 @@ class EbenenCodeTest {
         assertEquals(List.of(new EbenenCode.Ort(WELT, 12, -40, w.punkte().get(0).farbe()),
                 new EbenenCode.Ort("minecraft:the_nether", 3, 4, w.punkte().get(1).farbe())), g.inhalt().orte());
         // Mit eigener Farbe steht im Code nur „#RRGGBB“, kein Index; gelesen ist er 0.
-        assertEquals(List.of(new EbenenCode.Form(WELT, List.of(e(0, 0), e(10, 0), e(10, 10)), 0, 0x3A7FD5, "Hof", 1, 0),
-                new EbenenCode.Form(WELT, List.of(e(0, 20), e(10, 20)), w.eigeneFormen().get(1).farbe(), Wegpunkte.KEIN_HEX, null, 1, 0)),
+        assertEquals(List.of(new EbenenCode.Form(WELT, List.of(e(0, 0), e(10, 0), e(10, 10)), 0, 0x3A7FD5, "Hof", 1, 0, 0),
+                new EbenenCode.Form(WELT, List.of(e(0, 20), e(10, 20)), w.eigeneFormen().get(1).farbe(), Wegpunkte.KEIN_HEX, null, 1, 0, 0)),
                 g.inhalt().formen());
         // Eingefügt in eine andere Welt: eine neue Ebene, an, nichts angeheftet.
         Wegpunkte andere = new Wegpunkte();
@@ -120,7 +120,7 @@ class EbenenCodeTest {
             voll.setzeForm(WELT, List.of(e(i, 0), e(i, 5)));
         }
         EbenenCode.Inhalt eine = new EbenenCode.Inhalt("X", List.of(),
-                List.of(new EbenenCode.Form(WELT, List.of(e(0, 9), e(5, 9)), 0, Wegpunkte.KEIN_HEX, null, 1, 0)));
+                List.of(new EbenenCode.Form(WELT, List.of(e(0, 9), e(5, 9)), 0, Wegpunkte.KEIN_HEX, null, 1, 0, 0)));
         assertEquals("formen_voll", voll.fuegeEin(eine).fehler());
         assertEquals(1, voll.ebenen().size());
     }
@@ -132,15 +132,18 @@ class EbenenCodeTest {
         w.lies((Path) null);
         w.setzeForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10)));
         w.setzeForm(WELT, List.of(e(0, 20), e(10, 20)));
-        w.benenne(w.stil(w.eigeneFormen().get(0), 0.5, 120), "Hof");
+        w.benenne(w.stil(w.eigeneFormen().get(0), 0.5, 120, -4), "Hof");
         EbenenCode.Gelesen g = EbenenCode.lies(EbenenCode.schreibe(w, Wegpunkte.BASE));
         assertEquals(List.of(0.5, 1.0), g.inhalt().formen().stream().map(EbenenCode.Form::schrift).toList());
         assertEquals(List.of(120, 0), g.inhalt().formen().stream().map(EbenenCode.Form::biegung).toList());
+        // Das Gewicht ebenso (mod#163).
+        assertEquals(List.of(-4, 0), g.inhalt().formen().stream().map(EbenenCode.Form::gewicht).toList());
         Wegpunkte andere = new Wegpunkte();
         andere.lies((Path) null);
         assertNull(andere.fuegeEin(g.inhalt()).fehler());
         assertEquals(0.5, andere.eigeneFormen().get(0).schrift());
         assertEquals(120, andere.eigeneFormen().get(0).biegung());
+        assertEquals(-4, andere.eigeneFormen().get(0).gewicht());
         // Zwischenwerte auf die nächste Raste; falscher Typ oder ausserhalb der Grenzen macht den Code kaputt.
         String gut = "{\"v\":1,\"name\":\"N\",\"formen\":[{\"dimension\":\"minecraft:overworld\",\"ecken\":[[0,0],[5,0],[5,5]],"
                 + "\"farbe\":0,\"schrift\":0.3,\"biegung\":37}]}";
@@ -154,6 +157,9 @@ class EbenenCodeTest {
             {"\"biegung\":37", "\"biegung\":181"},
             {"\"biegung\":37", "\"biegung\":1.5"},
             {"\"biegung\":37", "\"biegung\":\"90\""},
+            {"\"biegung\":37", "\"biegung\":37,\"gewicht\":10"},
+            {"\"biegung\":37", "\"biegung\":37,\"gewicht\":1.5"},
+            {"\"biegung\":37", "\"biegung\":37,\"gewicht\":\"2\""},
         }) {
             assertEquals("kaputt", EbenenCode.lies(EbenenCode.packe(gut.replace(falsch[0], falsch[1]))).fehler(), falsch[1]);
         }
