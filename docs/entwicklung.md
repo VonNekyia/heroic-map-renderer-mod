@@ -157,10 +157,12 @@ gemeinsamen Sperre. Warum, steht in
   ```bash
   git push origin <branch>
   gh workflow run ci.yml --ref <branch>
-  gh run list --workflow ci.yml --branch <branch> --event workflow_dispatch --limit 1
   gh run watch <id> --exit-status
   ```
 
+  `gh workflow run` nennt die Adresse des Laufs, die Zahl am Ende ist
+  `<id>` (gh 2.101); sonst findet ihn
+  `gh run list --workflow ci.yml --branch <branch> --event workflow_dispatch --limit 1`.
   Der Branch muss `workflow_dispatch` in seiner eigenen `ci.yml` tragen,
   also einen Stand von `main` mit 0026. An einer offenen PR läuft die CI
   ohnehin bei jedem Push.
