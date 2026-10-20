@@ -4649,7 +4649,8 @@ public final class Bedienung implements FabricClientGameTest {
             mc.resizeGui();
             int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
             Minimap.INSTANZ.stelle(b, 0, Minimap.GROESSTE, b, h);
-            Minimap.INSTANZ.setzeZoom(2);
+            // Der Knauf ganz unten, fern der Knöpfe: Sonst träfe die Prüfung des Bilds seinen hellen Griff statt der Spur.
+            Minimap.INSTANZ.setzeZoom(Minimap.ZOOMS[0]);
             mc.gui.setScreen(new Einstellungen());
         });
         context.waitTicks(3);
@@ -4675,8 +4676,8 @@ public final class Bedienung implements FabricClientGameTest {
             spielerKlick(context, maus, 4, ort[0], ort[1]);
             boolean zu = context.computeOnClient(mc -> mc.gui.screen() == null);
             double zoom = context.computeOnClient(mc -> Minimap.INSTANZ.zoom());
-            if (!zu || zoom != 2) {
-                throw new AssertionError("Klick auf „Fertig“ über dem Regler „Zoom“: Menü zu " + zu + ", Zoom " + zoom + " statt 2");
+            if (!zu || zoom != Minimap.ZOOMS[0]) {
+                throw new AssertionError("Klick auf „Fertig“ über dem Regler „Zoom“: Menü zu " + zu + ", Zoom " + zoom + " statt " + Minimap.ZOOMS[0]);
             }
         } finally {
             context.getInput().resizeWindow(vorher[0], vorher[1]);
