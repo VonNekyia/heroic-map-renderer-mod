@@ -387,7 +387,7 @@ final class Downloads {
 
     /**
      * Lädt der Mod statt eines Abgleichs voll? Ja, wenn er im Ordner des Massstabs keinen Stand hat,
-     * etwa nach dem Löschen der Karte: Ein Abgleich brächte je Tag nur ein Zehntel. Dann fragt er wie
+     * etwa nach dem Löschen der Karte: Ein Abgleich brächte je Tag nur die Hälfte. Dann fragt er wie
      * vor dem ersten Download und schickt {@code anfrage voll} mit {@code neu: true}. Ebenso, solange
      * ein Strom nicht fertig ist; der volle Download setzt ihn fort. Siehe docs/download.md,
      * „Zustimmung und Grösse“.
@@ -506,7 +506,10 @@ final class Downloads {
                 fortschritt = null;
             }
             if (ergebnis == null) {
-                ergebnis = laden.lade(auftrag, ziel);
+                // Ein Abgleich zeigt den Kasten wie der Strom, der einzelne volle Download nicht. Siehe docs/vollbildkarte.md,
+                // „Fortschritt“.
+                fortschritt = f.abgleich() ? new Laden.Fortschritt(Laden.Fortschritt.UNBEKANNT, true) : null;
+                ergebnis = laden.lade(auftrag, ziel, fortschritt);
             }
             if (!ergebnis.gekappt()) {
                 Laden.behalteNur(ordner, f.massstab());

@@ -4,6 +4,11 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.67
+
+- **Syncs catch up more.** A sync may now load up to half of your map instead of a tenth, so after a longer break the map is up to date in one go. How much a sync brings is set by the server's plugin; with an older plugin it stays at a tenth. Without a saved map the mod still asks for a full download.
+- **Syncs show their progress.** While a sync runs, the full map shows the same box as the first download next to "Download map …": "Syncing map", how much of what the sync needs has arrived, speed and time left. Until the sync knows what it needs, the box shows "…"; if nothing is missing, there is no box.
+
 ## 0.2.66
 
 - **Your own map stays sharp when you zoom out.** Each coarser level of the self-drawn map now keeps one pixel of every 2 × 2, like the maps from the server, instead of averaging them; averaged, it got blurrier with every level. Maps drawn with earlier versions are rebuilt once in the background, while you play in that dimension.

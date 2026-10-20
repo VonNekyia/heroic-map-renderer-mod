@@ -101,12 +101,15 @@ class FreigabeTest {
 
     @Test
     void abgleichMisstAmGespeichertenStand() {
+        // Bis zur Hälfte des Satzes still, mit Spiel bis 55 %; ein altes Plugin mit 10 % ebenso.
+        assertEquals(Freigabe.Weg.STILL, freigabe("abgleich", 4, SATZ / 2).weg(GESPEICHERT, null, true));
+        assertEquals(Freigabe.Weg.STILL, freigabe("abgleich", 4, SATZ / 100 * 55).weg(GESPEICHERT, null, true));
         assertEquals(Freigabe.Weg.STILL, freigabe("abgleich", 4, SATZ / 10).weg(GESPEICHERT, null, true));
         assertEquals(Freigabe.Weg.HOST, freigabe("abgleich", 4, SATZ / 10).weg(GESPEICHERT, null, false));
-        // Ein anderer Massstab, keiner gespeichert, oder mehr als 11 % des gespeicherten Satzes: fragen.
+        // Ein anderer Massstab, keiner gespeichert, oder mehr als 55 % des gespeicherten Satzes: fragen.
         assertEquals(Freigabe.Weg.FRAGEN, freigabe("abgleich", 1, SATZ / 10).weg(GESPEICHERT, null, true));
         assertEquals(Freigabe.Weg.FRAGEN, freigabe("abgleich", 4, SATZ / 10).weg(null, null, true));
-        assertEquals(Freigabe.Weg.FRAGEN, freigabe("abgleich", 4, SATZ / 100 * 11 + 1).weg(GESPEICHERT, null, true));
+        assertEquals(Freigabe.Weg.FRAGEN, freigabe("abgleich", 4, SATZ / 100 * 55 + 1).weg(GESPEICHERT, null, true));
         // Ein Server, der im angebot 5e12 nennt, kommt an weg gar nicht heran; auch eine Bestätigung zählt beim Abgleich nicht.
         Freigabe gross = freigabe("abgleich", 4, 500_000_000_000L);
         assertEquals(Freigabe.Weg.FRAGEN, gross.weg(GESPEICHERT, new Freigabe.Stand(4, 5_000_000_000_000L, 1_000_000_000), true));
@@ -116,13 +119,13 @@ class FreigabeTest {
 
     @Test
     void abgleichOhneStandMisstAnDerGezeigtenGroesse() {
-        // Ohne gespeicherten Stand hat der Spieler im Dialog 1000 Byte gesehen; der Deckel eines Abgleichs ist 10 % des Satzes.
+        // Ohne gespeicherten Stand hat der Spieler im Dialog 1000 Byte gesehen; der Deckel eines Abgleichs ist die Hälfte des Satzes.
         Freigabe.Stand mass = freigabe("abgleich", 4, 1000).mass(null, null, 1_000_000_000);
-        assertEquals(new Freigabe.Stand(4, 10_000, 1_000_000_000), mass);
+        assertEquals(new Freigabe.Stand(4, 2000, 1_000_000_000), mass);
         // Die Kacheln aus dem angebot zählen nur bis zu einer Zeile je 4 KiB dieser Grösse.
         Laden.Auftrag a = new Laden.Auftrag(URI.create("http://k.example/b"), "t", "", 1000, 4, true, mass.bytes(),
                 mass.kacheln(), null);
-        assertEquals(11_000 / Laden.ZEILE_MIN + 16, a.zeilen());
+        assertEquals(2200 / Laden.ZEILE_MIN + 16, a.zeilen());
     }
 
     @Test

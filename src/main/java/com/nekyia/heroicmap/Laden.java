@@ -186,19 +186,38 @@ final class Laden {
     }
 
     /**
-     * Bytes empfangen und erwartet, für die Anzeige auf der Vollbildkarte. Der Download zählt,
-     * ein anderer Thread liest. Siehe docs/vollbildkarte.md, „Fortschritt“.
+     * Bytes empfangen und erwartet, für die Anzeige auf der Vollbildkarte, beim Strom und beim Abgleich.
+     * Der Download zählt, ein anderer Thread liest. Siehe docs/vollbildkarte.md, „Fortschritt“.
      */
     static final class Fortschritt {
         /** Über so viele ms mittelt das Tempo. */
         static final long FENSTER_MS = 5000;
+        /** Gesamt, solange es nicht feststeht: beim Abgleich, bis das Manifest verglichen ist. */
+        static final long UNBEKANNT = -1;
         final AtomicLong empfangen = new AtomicLong();
         volatile long gesamt;
+        /** Ein Abgleich statt eines Stroms; die Karte sagt es in Zeile 1. */
+        final boolean abgleich;
         /** Je Aufruf von {@link #tempo} die Zeit in ms und die Bytes bis dahin; nur der lesende Thread. */
         private final ArrayDeque<long[]> proben = new ArrayDeque<>();
 
         Fortschritt(long gesamt) {
+            this(gesamt, false);
+        }
+
+        Fortschritt(long gesamt, boolean abgleich) {
             this.gesamt = gesamt;
+            this.abgleich = abgleich;
+        }
+
+        /** Steht gesamt fest? Sonst zeigt die Karte „…“ statt Bytes und Prozent. */
+        boolean bekannt() {
+            return gesamt != UNBEKANNT;
+        }
+
+        /** Zeigt die Karte den Kasten? Nicht, wenn einem Abgleich nach dem Vergleich nichts fehlt. */
+        boolean zeigen() {
+            return gesamt != 0;
         }
 
         /** Der Anteil von 0 bis 1. */
@@ -251,6 +270,15 @@ final class Laden {
 
     /** Lädt den Satz nach {@code ziel}: {@code map.json}, {@code etags.txt} und {@code z/x/y.webp}. */
     Ergebnis lade(Auftrag a, Path ziel) throws Fehler, IOException, InterruptedException {
+        return lade(a, ziel, null);
+    }
+
+    /**
+     * Wie {@link #lade(Auftrag, Path)}; zählt dazu in {@code fortschritt}, wenn nicht null: gesamt sind, sobald das Manifest
+     * verglichen ist, die Bytes der Kacheln, die fehlen, höchstens {@link Auftrag#grenze()}; empfangen jedes Byte einer geholten
+     * Kachel.
+     */
+    Ergebnis lade(Auftrag a, Path ziel, Fortschritt fortschritt) throws Fehler, IOException, InterruptedException {
         Path zwischen = ziel.resolve(ZWISCHEN);
         // Was ein beendetes Spiel halb geschrieben hat.
         loesche(zwischen);
@@ -269,6 +297,9 @@ final class Laden {
             }
         }
         int gleich = soll.size() - fehlt.size();
+        if (fortschritt != null) {
+            fortschritt.gesamt = Math.min(a.grenze(), fehlt.stream().mapToLong(Eintrag::groesse).sum());
+        }
         long grenze = a.grenze();
         AtomicLong reserviert = new AtomicLong(), geladenBytes = new AtomicLong();
         AtomicInteger geladen = new AtomicInteger();
@@ -311,6 +342,9 @@ final class Laden {
                             ist.put(e.pfad(), etag);
                             geladen.incrementAndGet();
                             geladenBytes.addAndGet(bild.length);
+                            if (fortschritt != null) {
+                                fortschritt.empfangen.addAndGet(bild.length);
+                            }
                         }
                     } catch (Exception f) {
                         fehlt.clear();

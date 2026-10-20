@@ -146,7 +146,7 @@ Ohne Unterbefehl öffnet `/hmap` das Menü, siehe [Minimap](minimap.md), „Bedi
   | `freigabe` | Bedingung | Weg |
   |---|---|---|
   | `voll` | der Spieler bestätigte diesen Baum und Massstab vor der `anfrage`, `bytes` höchstens 10 % über der bestätigten Grösse | still |
-  | `abgleich` | im gespeicherten Massstab, `bytes` höchstens 11 % der gespeicherten Grösse des Satzes | still |
+  | `abgleich` | im gespeicherten Massstab, `bytes` höchstens 55 % der gespeicherten Grösse des Satzes, die Hälfte mit Spiel ([0027](entscheidungen/0027-abgleich-bis-zur-haelfte.md)) | still |
   | jede andere | | Dialog mit Spielserver, Host, Grösse und Massstab |
 
   Still heisst: nur mit Zustimmung zum Host; fehlt sie, fragt ein Dialog
@@ -155,8 +155,8 @@ Ohne Unterbefehl öffnet `/hmap` das Menü, siehe [Minimap](minimap.md), „Bedi
   Ein voller Download misst an dem, was der Spieler bestätigt hat, im
   Befehl oder im Dialog nach der `freigabe`. Beim Start legt der Mod Grösse
   und Kacheln dieses Satzes ab, siehe „Ablage“, und ein Abgleich misst
-  daran. Fehlt der Stand, misst ein Abgleich nach dem Dialog am Zehnfachen
-  der gezeigten `bytes`, denn sein Deckel ist 10 % des Satzes.
+  daran. Fehlt der Stand, misst ein Abgleich nach dem Dialog am Doppelten
+  der gezeigten `bytes`, denn sein Deckel ist die Hälfte des Satzes.
 - **Die Zustimmung** gilt je Paar aus Spielserver und Host, gespeichert in
   `heroicmap/zustimmung.txt` im Spielordner.
 - **Höchstens ein Dialog,** geplant oder offen. Eine `freigabe`, die einen
@@ -165,14 +165,17 @@ Ohne Unterbefehl öffnet `/hmap` das Menü, siehe [Minimap](minimap.md), „Bedi
   geht keine `anfrage` hinaus.
 - **Der tägliche Abgleich:** Das Plugin schickt ihn von sich aus als
   `freigabe` mit `art` `abgleich`; mit Zustimmung lädt der Mod ihn im
-  Hintergrund.
+  Hintergrund. Den Deckel setzt das Plugin, die Hälfte des Satzes; ein
+  älteres mit 10 % lädt mit diesem Mod weiter still. Auf der Vollbildkarte
+  zeigt der Abgleich den Kasten des Fortschritts, siehe
+  [Vollbildkarte](vollbildkarte.md), „Fortschritt“.
 - **Abgleich ohne Stand:** Hat der Mod im Ordner des Massstabs keinen
   Stand (`Laden.hatStand`), etwa nach dem Löschen der Karte oder in einem
   neuen Massstab, lädt er statt des Abgleichs voll
   (`Downloads.vollStattAbgleich`). Er fragt wie vor dem ersten Download
   und schickt dann `anfrage voll` mit `neu: true`. Sonst brächte der
-  Abgleich je Tag nur ein Zehntel der Karte, denn sein Deckel ist 10 %
-  des Satzes. Den Abgleich dieses Tages verbraucht das trotzdem. Ebenso,
+  Abgleich je Tag nur die Hälfte der Karte, denn sein Deckel ist die
+  Hälfte des Satzes. Den Abgleich dieses Tages verbraucht das trotzdem. Ebenso,
   solange ein Strom nicht fertig ist; dann geht die `anfrage` ohne `neu`,
   siehe „Strom“.
 - **Im Einzelspieler** gibt es keinen Server und keinen Download, aber einen

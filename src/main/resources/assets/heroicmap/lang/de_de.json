@@ -39,6 +39,7 @@
   "heroicmap.download.grund.strom": "Der Strom des Kartenservers verletzt eine Regel; Einzelheiten im Log.",
   "heroicmap.download.grund_status": "%s HTTP-Status %s.",
   "heroicmap.download.laeuft": "Karte wird geladen",
+  "heroicmap.download.abgleich_laeuft": "Karte wird abgeglichen",
   "heroicmap.download.stand": "%s von %s",
   "heroicmap.download.tempo": "%s/s, noch %s",
   "key.heroicmap.karte": "Vollbildkarte",

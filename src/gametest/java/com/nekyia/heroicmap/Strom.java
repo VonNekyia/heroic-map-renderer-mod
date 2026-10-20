@@ -20,10 +20,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 import java.util.zip.CRC32;
@@ -38,7 +40,8 @@ import net.minecraft.client.Minecraft;
 /**
  * Der erste Download als ein Strom gegen einen Server auf 127.0.0.1: Die Vollbildkarte ohne Satz zeigt
  * den Kasten des Fortschritts statt des Hinweises, ab der gröbsten Stufe die Karte; am Ende liegt der
- * Satz ganz da, bei 100 % der angekündigten Bytes. Gegenproben: Ein Name mit {@code ..} bricht ab,
+ * Satz ganz da, bei 100 % der angekündigten Bytes. Ein Abgleich danach zeigt denselben Kasten mit eigener
+ * Zeile 1; gesamt sind die Bytes der Kacheln, die laut Manifest fehlen. Gegenproben: Ein Name mit {@code ..} bricht ab,
  * ohne etwas ausserhalb abzulegen; ein Abbruch im Netz lässt keine halbe Kachel. Siehe docs/download.md, „Strom“.
  */
 public final class Strom implements FabricClientGameTest {
@@ -60,6 +63,15 @@ public final class Strom implements FabricClientGameTest {
         byte[] manifest = manifest(kacheln);
         byte[] ganz = strom(karte, manifest, kacheln);
         long bytes = kacheln.stream().mapToLong(k -> k.inhalt().length).sum();
+        // Für den Abgleich danach tauschen die zwei letzten Kacheln, die feinsten, ihren Inhalt und bekommen neue ETags.
+        int a = kacheln.size() - 1, b = kacheln.size() - 2;
+        List<Kachel> neu = new ArrayList<>(kacheln);
+        neu.set(a, new Kachel(kacheln.get(a).name(), kacheln.get(b).inhalt()));
+        neu.set(b, new Kachel(kacheln.get(b).name(), kacheln.get(a).inhalt()));
+        Set<String> geaendert = Set.of(kacheln.get(a).name(), kacheln.get(b).name());
+        long fehlen = kacheln.get(a).inhalt().length + kacheln.get(b).inhalt().length;
+        Abgleich abgleich = new Abgleich(manifest(neu, geaendert), neu, kacheln.get(b).name(), new CountDownLatch(1), new AtomicInteger(),
+                new CountDownLatch(1));
         // Der Server hält den Strom an, bis das Bild ohne Karte und das mit der gröbsten Stufe aufgenommen sind.
         CountDownLatch ohneKarte = new CountDownLatch(1), mitKarte = new CountDownLatch(1);
         HttpServer http;
@@ -75,7 +87,7 @@ public final class Strom implements FabricClientGameTest {
             return t;
         });
         http.setExecutor(threads);
-        http.createContext("/download/", t -> antworte(t, karte, manifest, kacheln, ganz.length, ohneKarte, mitKarte));
+        http.createContext("/download/", t -> antworte(t, karte, manifest, kacheln, ganz.length, ohneKarte, mitKarte, abgleich));
         http.start();
         String basis = "http://127.0.0.1:" + http.getAddress().getPort() + "/download/";
         Path welt = null;
@@ -124,6 +136,48 @@ public final class Strom implements FabricClientGameTest {
             Satz satz = Satz.lies(strom);
             if (Laden.imStrom(strom.resolve("4")) || satz == null || !satz.name().equals("Strom")) {
                 throw new AssertionError("Der Satz ist nicht fertig: Strom offen " + Laden.imStrom(strom.resolve("4")) + ", Satz " + satz);
+            }
+
+            // Ein Abgleich danach: derselbe Kasten, Zeile 1 anders als beim Strom, gesamt die zwei Kacheln, die fehlen. Der Server
+            // hält eine, bis das Bild steht. Siehe docs/vollbildkarte.md, „Fortschritt“.
+            starteAbgleich(context, basis, welt, abgleich.manifest(), bytes, kacheln.size());
+            warte(context, "der Kasten des Abgleichs", mc -> Downloads.INSTANZ.fortschritt() != null
+                    && Downloads.INSTANZ.fortschritt().abgleich && Downloads.INSTANZ.fortschritt().empfangen.get() > 0);
+            Laden.Fortschritt imAbgleich = context.computeOnClient(mc -> Downloads.INSTANZ.fortschritt());
+            context.waitTicks(2);
+            Path bildAbgleich = context.takeScreenshot(TestScreenshotOptions.of("abgleich").disableCounterPrefix());
+            pruefeKasten(context, bildAbgleich, "beim Abgleich");
+            if (zeileEins(context, bildAbgleich).equals(zeileEins(context, bild))) {
+                throw new AssertionError("Zeile 1 des Kastens beim Abgleich wie beim Strom");
+            }
+            abgleich.gesehen().countDown();
+            warte(context, "das Ende des Abgleichs", mc -> !Downloads.INSTANZ.belegt(strom));
+            if (imAbgleich.gesamt != fehlen || imAbgleich.empfangen.get() != fehlen) {
+                throw new AssertionError("Fortschritt des Abgleichs: " + imAbgleich.empfangen.get() + " von " + imAbgleich.gesamt
+                        + " Byte, erwartet " + fehlen);
+            }
+            for (Kachel k : neu) {
+                if (geaendert.contains(k.name()) && !Arrays.equals(Files.readAllBytes(strom.resolve("4").resolve(k.name())), k.inhalt())) {
+                    throw new AssertionError("Kachel nach dem Abgleich nicht neu: " + k.name());
+                }
+            }
+            // Ein zweiter Abgleich mit demselben Manifest: Bis es verglichen ist, steht im Kasten „…“ statt Bytes; danach fehlt
+            // nichts. Der Server hält dieses Manifest, bis das Bild steht.
+            starteAbgleich(context, basis, welt, abgleich.manifest(), bytes, kacheln.size());
+            warte(context, "der Kasten vor dem Vergleich", mc -> Downloads.INSTANZ.fortschritt() != null
+                    && Downloads.INSTANZ.fortschritt().abgleich && !Downloads.INSTANZ.fortschritt().bekannt());
+            Laden.Fortschritt vorher = context.computeOnClient(mc -> Downloads.INSTANZ.fortschritt());
+            context.waitTicks(2);
+            Path bildVorher = context.takeScreenshot(TestScreenshotOptions.of("abgleich-vorher").disableCounterPrefix());
+            pruefeKasten(context, bildVorher, "vor dem Vergleich");
+            int punkte = zeileZwei(context, bildVorher), mitBytes = zeileZwei(context, bildAbgleich);
+            if (punkte * 3 > mitBytes) {
+                throw new AssertionError("Zeile 2 vor dem Vergleich zeigt mehr als „…“: " + punkte + " Pixel, mit Bytes " + mitBytes);
+            }
+            abgleich.zweitesFrei().countDown();
+            warte(context, "das Ende des zweiten Abgleichs", mc -> !Downloads.INSTANZ.belegt(strom));
+            if (vorher.gesamt != 0 || vorher.empfangen.get() != 0 || vorher.zeigen()) {
+                throw new AssertionError("Zweiter Abgleich: " + vorher.empfangen.get() + " von " + vorher.gesamt + " Byte statt nichts");
             }
 
             // Gegenprobe: Ein Name mit .. bricht ab; ausserhalb liegt nichts, eine Karte entsteht nicht.
@@ -196,6 +250,41 @@ public final class Strom implements FabricClientGameTest {
         context.runOnClient(mc -> Downloads.INSTANZ.reiheEin(f, a, welt.resolve(baum), "Strom", DIMENSION));
     }
 
+    /** Ein Abgleich des Baums strom gegen das neue Manifest, mit dem Satz als Deckel. */
+    private static void starteAbgleich(ClientGameTestContext context, String basis, Path welt, byte[] manifest, long bytes, int zahl) {
+        URI url = URI.create(basis + "strom");
+        Freigabe f = new Freigabe("strom", "abgleich", 4, bytes, url, TOKEN, Laden.sha256(manifest));
+        Laden.Auftrag a = new Laden.Auftrag(url, TOKEN, Laden.sha256(manifest), bytes, 4, true, bytes, zahl, InetAddress.getLoopbackAddress());
+        context.runOnClient(mc -> Downloads.INSTANZ.reiheEin(f, a, welt.resolve("strom"), "Strom", DIMENSION));
+    }
+
+    /** Die grauen Pixel der Zeile 2 im Kasten, links, wo die Bytes stehen. */
+    private static int zeileZwei(ClientGameTestContext context, Path bild) throws IOException {
+        int[] f = context.computeOnClient(mc -> new int[] {mc.getWindow().getGuiScale(), mc.getWindow().getGuiScaledWidth()});
+        int gs = f[0], x = f[1] - 94 - 4 - 200, n = 0;
+        BufferedImage b = ImageIO.read(bild.toFile());
+        for (int y = (4 + 27) * gs; y < (4 + 36) * gs; y++) {
+            for (int px = (x + 5) * gs; px < (x + 80) * gs; px++) {
+                n += (b.getRGB(px, y) & 0xFFFFFF) == 0xC0C0C0 ? 1 : 0;
+            }
+        }
+        return n;
+    }
+
+    /** Die weissen Pixel der Zeile 1 im Kasten, links der Prozent, als Muster. */
+    private static String zeileEins(ClientGameTestContext context, Path bild) throws IOException {
+        int[] f = context.computeOnClient(mc -> new int[] {mc.getWindow().getGuiScale(), mc.getWindow().getGuiScaledWidth()});
+        int gs = f[0], x = f[1] - 94 - 4 - 200;
+        BufferedImage b = ImageIO.read(bild.toFile());
+        StringBuilder muster = new StringBuilder();
+        for (int y = (4 + 5) * gs; y < (4 + 14) * gs; y++) {
+            for (int px = (x + 5) * gs; px < (x + 140) * gs; px++) {
+                muster.append((b.getRGB(px, y) & 0xFFFFFF) == 0xFFFFFF ? '#' : '.');
+            }
+        }
+        return muster.toString();
+    }
+
     /** Wartet höchstens 60 s, bis {@code bis} gilt; sonst sagt der Fehler, worauf. */
     private static void warte(ClientGameTestContext context, String was, Predicate<Minecraft> bis) {
         for (int i = 0; i < 1200; i++) {
@@ -252,15 +341,30 @@ public final class Strom implements FabricClientGameTest {
         }
     }
 
-    /** Antwortet wie der Renderer auf {@code /download/<baum>.zip}; je Baum ein anderer Strom. */
+    /**
+     * Der Abgleich danach: das neue Manifest, die Kacheln danach, die Kachel, die der Server hält, bis {@code gesehen}; das zweite
+     * Mal hält er das Manifest selbst, bis {@code zweitesFrei}.
+     */
+    private record Abgleich(byte[] manifest, List<Kachel> kacheln, String haelt, CountDownLatch gesehen, AtomicInteger manifeste,
+            CountDownLatch zweitesFrei) {
+    }
+
+    /**
+     * Antwortet wie der Renderer auf {@code /download/<baum>.zip}, je Baum ein anderer Strom, und einzeln auf
+     * {@code /download/strom/<datei>} für den Abgleich.
+     */
     private static void antworte(HttpExchange t, byte[] karte, byte[] manifest, List<Kachel> kacheln, long gesamt,
-            CountDownLatch ohneKarte, CountDownLatch mitKarte) throws IOException {
+            CountDownLatch ohneKarte, CountDownLatch mitKarte, Abgleich abgleich) throws IOException {
         if (!("Bearer " + TOKEN).equals(t.getRequestHeaders().getFirst("Authorization"))) {
             t.sendResponseHeaders(401, -1);
             t.close();
             return;
         }
         String baum = t.getRequestURI().getPath().substring("/download/".length());
+        if (!baum.endsWith(".zip")) {
+            einzeln(t, baum.substring(baum.indexOf('/') + 1), karte, abgleich);
+            return;
+        }
         t.getResponseHeaders().add("X-Heroic-Bytes", String.valueOf(gesamt));
         t.sendResponseHeaders(200, 0);
         OutputStream aus = t.getResponseBody();
@@ -304,6 +408,32 @@ public final class Strom implements FabricClientGameTest {
         }
         eintrag(aus, "ende", new byte[0]);
         t.close();
+    }
+
+    /** Eine Datei für den Abgleich: map.json, das neue Manifest oder eine Kachel danach. */
+    private static void einzeln(HttpExchange t, String name, byte[] karte, Abgleich abgleich) throws IOException {
+        byte[] inhalt = switch (name) {
+            case "map.json" -> karte;
+            case "manifest" -> {
+                if (abgleich.manifeste().incrementAndGet() == 2) {
+                    warte(abgleich.zweitesFrei());
+                }
+                yield abgleich.manifest();
+            }
+            default -> abgleich.kacheln().stream().filter(k -> k.name().equals(name)).map(Kachel::inhalt).findFirst().orElse(null);
+        };
+        if (inhalt == null) {
+            t.sendResponseHeaders(404, -1);
+            t.close();
+            return;
+        }
+        if (name.equals(abgleich.haelt())) {
+            warte(abgleich.gesehen());
+        }
+        t.sendResponseHeaders(200, inhalt.length);
+        try (OutputStream aus = t.getResponseBody()) {
+            aus.write(inhalt);
+        }
     }
 
     private static void warte(CountDownLatch frei) {
@@ -355,10 +485,16 @@ public final class Strom implements FabricClientGameTest {
     }
 
     private static byte[] manifest(List<Kachel> kacheln) {
+        return manifest(kacheln, Set.of());
+    }
+
+    /** Das Manifest; die Kacheln in {@code neu} bekommen einen anderen ETag. */
+    private static byte[] manifest(List<Kachel> kacheln, Set<String> neu) {
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < kacheln.size(); i++) {
             Kachel k = kacheln.get(i);
-            text.append(k.name().replace(".webp", "")).append(' ').append(k.inhalt().length).append(" \"t").append(i).append("\"\n");
+            text.append(k.name().replace(".webp", "")).append(' ').append(k.inhalt().length).append(neu.contains(k.name()) ? " \"n" : " \"t")
+                    .append(i).append("\"\n");
         }
         ByteArrayOutputStream aus = new ByteArrayOutputStream();
         try (GZIPOutputStream gz = new GZIPOutputStream(aus)) {

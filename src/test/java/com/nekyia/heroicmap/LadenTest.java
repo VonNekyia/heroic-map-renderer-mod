@@ -277,6 +277,38 @@ class LadenTest {
     }
 
     @Test
+    void fortschrittEinesAbgleichs() throws Exception {
+        new Laden().lade(auftrag(4, summe()), ziel);
+        byte[] neu = "neu und laenger".getBytes(StandardCharsets.UTF_8), anders = "anders".getBytes(StandardCharsets.UTF_8);
+        setze("2/1/1", neu, "\"neu\"");
+        setze("1/0/0", anders, "\"anders\"");
+        manifest = baueManifest();
+        // Bis das Manifest verglichen ist, steht gesamt nicht fest; der Kasten zeigt dann „…“.
+        Laden.Fortschritt f = new Laden.Fortschritt(Laden.Fortschritt.UNBEKANNT, true);
+        assertFalse(f.bekannt());
+        assertTrue(f.zeigen());
+        assertEquals(0.0, f.anteil());
+        // Dann sind es die zwei Kacheln, die laut Manifest fehlen, nicht der Deckel; empfangen jedes ihrer Bytes.
+        new Laden().lade(auftrag(4, 1 << 20, true, InetAddress.getLoopbackAddress()), ziel, f);
+        assertTrue(f.bekannt());
+        assertEquals(neu.length + anders.length, f.gesamt);
+        assertEquals(neu.length + anders.length, f.empfangen.get());
+        assertEquals(1.0, f.anteil());
+        // Fehlt nach dem Vergleich nichts, zeigt die Karte keinen Kasten.
+        Laden.Fortschritt leer = new Laden.Fortschritt(Laden.Fortschritt.UNBEKANNT, true);
+        new Laden().lade(auftrag(4, 1 << 20, true, InetAddress.getLoopbackAddress()), ziel, leer);
+        assertEquals(0, leer.gesamt);
+        assertFalse(leer.zeigen());
+        // Fehlt mehr als der Deckel, ist gesamt der Deckel: eine Kachel von 15 Byte bei 10 Byte Deckel, die der Abgleich liegen lässt.
+        setze("1/0/0", "nochmals anders".getBytes(StandardCharsets.UTF_8), "\"anders2\"");
+        manifest = baueManifest();
+        Laden.Fortschritt gedeckelt = new Laden.Fortschritt(Laden.Fortschritt.UNBEKANNT, true);
+        assertTrue(new Laden().lade(auftrag(4, 10, true, InetAddress.getLoopbackAddress()), ziel, gedeckelt).gekappt());
+        assertEquals(10, gedeckelt.gesamt);
+        assertEquals(0, gedeckelt.empfangen.get());
+    }
+
+    @Test
     void nurBisZurStufeDesMassstabs() throws Exception {
         // maxZoom 2: 2 px reicht bis Stufe 1, 1 px bis Stufe 0.
         assertEquals(3, new Laden().lade(auftrag(2, summe()), ziel).geladen());
