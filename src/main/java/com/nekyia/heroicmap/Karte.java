@@ -1,6 +1,7 @@
 package com.nekyia.heroicmap;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -76,6 +77,8 @@ final class Karte extends Screen {
     private static final double ECKE_TREFFER = 3;
     /** So nah an der Maus, in Einheiten des GUI, rastet mit Strg eine gezogene Ecke oder ein gezogener Wegpunkt ein (Reviewer). */
     private static final double EINRASTEN = 8;
+    /** Die halbe Diagonale der Raute eines Wegpunkts, in Einheiten des GUI: Bis dorthin reicht sie unter ihre Mitte. */
+    private static final float TOD_FUSS = (float) (6 * Math.sqrt(2) * Minimap.KOPF / 16);
 
     private final Satz satz;
     private final Kacheln kacheln;
@@ -859,6 +862,9 @@ final class Karte extends Screen {
                 // Unter der Maus mit hellem Rand, auch angeheftet: Dann weicht der bunte Rand so lange.
                 boolean hell = ueberMarke != null && p.equals(ueberMarke.punkt());
                 Minimap.wegpunkt(g, m.x(), m.y(), Minimap.KOPF, p, hell ? HELL : p.angeheftet() ? bunt : 0);
+                if (p.tod() && p.zeit() > 0) {
+                    todZeit(g, m, p);
+                }
             }
         }
         // Mitspieler mit Namen. Siehe docs/minimap.md, „Mitspieler“.
@@ -1294,6 +1300,24 @@ final class Karte extends Screen {
             }
         }
         return beste;
+    }
+
+    /**
+     * Unter dem Todespunkt die Zeit des Todes im Stil der Namen von Nadeln, nur, wo er wirklich liegt, nicht am Rand: Dort
+     * zeigt die Marke nur die Richtung. Siehe docs/wegpunkte.md, „Todespunkt“.
+     */
+    private void todZeit(GuiGraphicsExtractor g, Marke m, Wegpunkte.Punkt p) {
+        float[] s = schirm(p.x() + 0.5, p.z() + 0.5);
+        if (Math.abs(s[0] - m.x()) > 1 || Math.abs(s[1] - m.y()) > 1) {
+            return;
+        }
+        String text = Wegpunkte.todZeit(p.zeit(), System.currentTimeMillis(), ZoneId.systemDefault(),
+                Component.translatable("heroicmap.karte.tod_zeit_heute").getString(), Component.translatable("heroicmap.karte.tod_zeit").getString());
+        g.pose().pushMatrix();
+        // Der Fuss ist die untere Spitze der Raute, halbe Diagonale TOD_FUSS unter der Mitte.
+        g.pose().translate(m.x(), m.y() + TOD_FUSS);
+        Ebenen.name(g, font, text);
+        g.pose().popMatrix();
     }
 
     /** Der Ort (x, z) der Welt auf dem Schirm, in Einheiten des GUI. */

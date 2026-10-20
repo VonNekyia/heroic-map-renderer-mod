@@ -4,9 +4,13 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
-## 0.2.62
+## 0.2.63
 
 - **Reorder the layers.** In the layer list of the full map, ▲ and ▼ move a layer up or down; the upper one is drawn on top, on the full map and the minimap. Your order is kept per server world; "Server order" puts it back. Until you reorder, nothing changes.
+
+## 0.2.62
+
+- **Time of death.** On the full map, each death point shows when you died: the time for today, otherwise date and time. Death points from older versions have no time.
 
 ## 0.2.61
 

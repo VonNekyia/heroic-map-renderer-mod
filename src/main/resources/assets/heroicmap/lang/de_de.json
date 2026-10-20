@@ -185,6 +185,8 @@
   "heroicmap.menue.schleier": "Schleier: %s Blöcke",
   "heroicmap.menue.schleier.beschreibung": "Wie hoch der Schleier am Rand deiner angehefteten Regionen steht; höher heisst auch deckender. Regionen vom Server bleiben bei 4 Blöcken.",
   "heroicmap.karte.tod_loeschen": "Todespunkt löschen",
+  "heroicmap.karte.tod_zeit_heute": "HH:mm",
+  "heroicmap.karte.tod_zeit": "dd.MM. HH:mm",
   "heroicmap.karte.wegpunkt_bei": "Wegpunkt bei …",
   "heroicmap.karte.koordinaten": "Koordinaten setzen…",
   "heroicmap.karte.verbinden": "Verbinden",
