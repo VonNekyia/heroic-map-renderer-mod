@@ -6,6 +6,8 @@ The release notes on GitHub and Modrinth come from here
 
 ## 0.2.66
 
+- **Your own map stays sharp when you zoom out.** Each coarser level of the self-drawn map now keeps one pixel of every 2 × 2, like the maps from the server, instead of averaging them; averaged, it got blurrier with every level. Maps drawn with earlier versions are rebuilt once in the background, while you play in that dimension.
+
 - **The minimap zooms out one step further,** to 0.5×: it shows four times the area, one pixel per block at GUI scale 2.
 - **Minimap zoom is a slider** in the menu, standing upright right next to the minimap, with one notch per step; up is closer, and the tooltip names the level. The mouse wheel over the minimap or the slider steps one notch. The zoom key still steps through all levels.
 - **The menu buttons move aside:** after you drag the minimap or resize it, the buttons go to the free side next to it.

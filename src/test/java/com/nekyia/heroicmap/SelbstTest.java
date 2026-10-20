@@ -53,7 +53,7 @@ class SelbstTest {
         schreibe(werk, true);
         int[] grob = lies(ordner.resolve("7/0/0.png"));
         for (int i = 0; i < 4; i++) {
-            int[] klein = Pyramide.halbiere(lies(ordner.resolve("8/" + (i & 1) + "/" + (i >> 1) + ".png")), 256);
+            int[] klein = Pyramide.halbiere(lies(ordner.resolve("8/" + (i & 1) + "/" + (i >> 1) + ".png")), 256, 1);
             int ox = (i & 1) * 128, oy = (i >> 1) * 128;
             for (int y = 0; y < 128; y++) {
                 assertArrayEquals(Arrays.copyOfRange(klein, y * 128, y * 128 + 128),
@@ -249,6 +249,99 @@ class SelbstTest {
         byte[] bytes = Files.readAllBytes(datei);
         assertThrows(IOException.class, () -> Kacheln.png(bytes, 256));
         assertEquals(512 * 512, Kacheln.png(bytes, 512).argb().length);
+    }
+
+    @Test
+    void alterSatzBautDieGroeberenNeu(@TempDir Path ordner) throws Exception {
+        alterSatz(ordner, 4, 4);
+        Kachelwerk werk = new Kachelwerk(ordner, 256, 64, 6, 8);
+        assertTrue(werk.neubauOffen(), "map.json ohne downscale: gemittelt");
+        List<Kachelwerk.Kachel> fertig = new ArrayList<>();
+        werk.baueNeu(16, fertig);
+        assertFalse(werk.neubauOffen());
+        assertEquals("{\"tileSize\":256,\"minZoom\":6,\"maxZoom\":8,\"scale\":4,\"downscale\":\"nearest\"}",
+                Files.readString(ordner.resolve("map.json")), "erst jetzt, die übrigen Felder bleiben");
+        assertTrue(fertig.containsAll(List.of(new Kachelwerk.Kachel(7, 1, 1), new Kachelwerk.Kachel(6, 0, 0))));
+        pruefePyramide(ordner, 2, 2);
+    }
+
+    @Test
+    void einAbgebrochenerNeubauBeginntVonVorn(@TempDir Path ordner) throws Exception {
+        alterSatz(ordner, 8, 4);
+        Kachelwerk erstes = new Kachelwerk(ordner, 256, 64, 6, 8);
+        erstes.baueNeu(16, new ArrayList<>());
+        assertTrue(erstes.neubauOffen(), "die Hälfte");
+        assertFalse(Files.readString(ordner.resolve("map.json")).contains("downscale"), "abgebrochen: noch kein downscale");
+        // Welt verlassen, Spiel zu: Ein neues Werk baut wieder alles, auch was schon neu ist.
+        Kachelwerk zweites = new Kachelwerk(ordner, 256, 64, 6, 8);
+        assertTrue(zweites.neubauOffen());
+        zweites.baueNeu(16, new ArrayList<>());
+        assertTrue(zweites.neubauOffen());
+        zweites.baueNeu(16, new ArrayList<>());
+        assertFalse(zweites.neubauOffen());
+        assertTrue(Files.readString(ordner.resolve("map.json")).contains("\"downscale\":\"nearest\""));
+        pruefePyramide(ordner, 4, 2);
+    }
+
+    @Test
+    void neueSaetzeBauenNichtNeu(@TempDir Path welt) throws Exception {
+        Path baum = Selbst.anlegen(welt, "minecraft:overworld", 4);
+        assertTrue(Files.readString(baum.resolve("4/map.json")).contains("\"downscale\":\"nearest\""));
+        assertFalse(new Kachelwerk(baum.resolve("4"), 256, 64, 0, 8).neubauOffen());
+        assertFalse(new Kachelwerk(welt.resolve("ohne-map-json"), 256, 64, 0, 8).neubauOffen(), "ohne map.json nichts");
+    }
+
+    /** Ein Satz von früher: {@code breite} × {@code hoehe} Kacheln der Stufe 8 mit Muster, gröbere Stufen gelb, map.json ohne downscale. */
+    private static void alterSatz(Path ordner, int breite, int hoehe) throws IOException {
+        for (int ty = 0; ty < hoehe; ty++) {
+            for (int tx = 0; tx < breite; tx++) {
+                int[] muster = new int[256 * 256];
+                for (int i = 0; i < muster.length; i++) {
+                    muster[i] = 0xFF000000 | ((i % 256) * 7 + (i / 256) * 13 + tx * 31 + ty * 57) & 0xFFFFFF;
+                }
+                schreibePng(ordner.resolve("8/" + tx + "/" + ty + ".png"), muster);
+            }
+        }
+        for (int z = 7; z >= 6; z--) {
+            int n = 8 - z;
+            for (int ty = 0; ty < (hoehe + (1 << n) - 1) >> n; ty++) {
+                for (int tx = 0; tx < (breite + (1 << n) - 1) >> n; tx++) {
+                    Path p = ordner.resolve(z + "/" + tx + "/" + ty + ".png");
+                    Files.createDirectories(p.getParent());
+                    Files.write(p, pngVoll(GELB));
+                }
+            }
+        }
+        Files.writeString(ordner.resolve("map.json"), "{\"tileSize\":256,\"minZoom\":6,\"maxZoom\":8,\"scale\":4}");
+    }
+
+    /** Jede Kachel der Stufen 7 und 6 ist ihre vier Kinder je 2 × 2 ein Pixel, in Tiefe 1 rechts unten, in Tiefe 2 links oben. */
+    private static void pruefePyramide(Path ordner, int breite7, int hoehe7) throws IOException {
+        for (int z = 7; z >= 6; z--) {
+            int b = z == 7 ? breite7 : (breite7 + 1) / 2, h = z == 7 ? hoehe7 : (hoehe7 + 1) / 2;
+            for (int ty = 0; ty < h; ty++) {
+                for (int tx = 0; tx < b; tx++) {
+                    int[] grob = lies(ordner.resolve(z + "/" + tx + "/" + ty + ".png"));
+                    for (int i = 0; i < 4; i++) {
+                        Path kind = ordner.resolve((z + 1) + "/" + (2 * tx + (i & 1)) + "/" + (2 * ty + (i >> 1)) + ".png");
+                        int[] klein = Files.exists(kind) ? Pyramide.halbiere(lies(kind), 256, 8 - z) : new int[128 * 128];
+                        int ox = (i & 1) * 128, oy = (i >> 1) * 128;
+                        for (int y = 0; y < 128; y++) {
+                            assertArrayEquals(Arrays.copyOfRange(klein, y * 128, y * 128 + 128),
+                                    Arrays.copyOfRange(grob, (oy + y) * 256 + ox, (oy + y) * 256 + ox + 128),
+                                    "Stufe " + z + ", Kachel " + tx + "/" + ty + ", Viertel " + i + ", Zeile " + y);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static void schreibePng(Path datei, int[] argb) throws IOException {
+        Files.createDirectories(datei.getParent());
+        BufferedImage bild = new BufferedImage(256, 256, BufferedImage.TYPE_INT_ARGB);
+        bild.setRGB(0, 0, 256, 256, argb, 0, 256);
+        ImageIO.write(bild, "png", datei.toFile());
     }
 
     private static void satzVomServer(Path baum, String dimension) throws IOException {

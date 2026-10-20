@@ -16,7 +16,8 @@
       "com.nekyia.heroicmap.Strom",
       "com.nekyia.heroicmap.Blockentities",
       "com.nekyia.heroicmap.Spieler",
-      "com.nekyia.heroicmap.Zoomstufen"
+      "com.nekyia.heroicmap.Zoomstufen",
+      "com.nekyia.heroicmap.SelbstZoom"
     ],
     "heroicmap": [
       "com.nekyia.heroicmap.ProbeEbene"
