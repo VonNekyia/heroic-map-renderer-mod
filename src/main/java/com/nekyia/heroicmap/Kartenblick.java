@@ -150,6 +150,18 @@ final class Kartenblick {
         return chunkAbstand(scale) >= Math.max(LINIEN_MIN, LINIEN_MIN_PIXEL / guiMassstab);
     }
 
+    /** Keine Chunklinie in Reichweite, siehe {@link #chunklinie}. */
+    static final int KEINE_LINIE = Integer.MIN_VALUE;
+
+    /**
+     * Die Chunklinie 16·c nächst {@code welt}, x oder z in Blöcken, wenn sie höchstens {@code reichweite} Blöcke weg liegt;
+     * sonst {@link #KEINE_LINIE}. Siehe docs/wegpunkte.md, „Einrasten“.
+     */
+    static int chunklinie(double welt, double reichweite) {
+        int linie = 16 * (int) Math.round(welt / 16);
+        return Math.abs(welt - linie) <= reichweite ? linie : KEINE_LINIE;
+    }
+
     /** Der erste Chunk, dessen Linie bei Schirm-x 0 oder rechts davon liegt. */
     int ersterChunkX(int scale, int breite) {
         return (int) Math.ceil(basisRasterX(0, breite) / (16.0 * scale));

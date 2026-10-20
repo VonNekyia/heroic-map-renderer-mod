@@ -424,6 +424,17 @@ des Spiels liegt auf keiner der beiden Alt-Tasten (per javap,
 - **Nah** heisst höchstens 8 Einheiten des GUI von der Maus, gemessen an
   den Lagen des letzten Frames; das nächste Ziel gewinnt. Entschieden vom
   Reviewer.
+- **Chunklinien,** gewünscht vom User am 20.10. (mod#170): Liegt kein Ziel
+  nah, rastet x auf eine senkrechte und z auf eine waagrechte Chunklinie,
+  die ebenso nah liegt, nahe einer Ecke des Chunks beide
+  (`Kartenblick.chunklinie`); die andere Achse liegt wie ohne `Strg`. Ein
+  Ziel in Reichweite gewinnt immer, auch vor einer näheren Linie. Eine Ecke
+  kommt genau auf die Grenze 16·c, ein Wegpunkt auf den Block an ihr auf der
+  Seite der Maus. Nur auf Linien, die die Karte zeichnet: der Schalter
+  „Chunklinien“ an und die Linien nicht zu dicht (`Karte.linienAn`, E4),
+  siehe [Minimap](minimap.md), „Chunklinien“. Beim Ziehen ist die Linie
+  weiss (`Karte.linien`). Mit `Alt` rastet der Punkt nur ein, ohne Hinweis:
+  Auf einer Linie gibt es nichts zu verbinden.
 - **Beim Ziehen** steht, was an der Maus hängt, schon genau auf dem Ziel,
   und das Ziel ist hell wie unter der Maus. Ohne `Strg` folgt es der Maus
   wie bisher.
@@ -1173,8 +1184,9 @@ Schleier am Rand, siehe „Schleier“.
 - `KartenblickTest`: `markenAufDemRasterDerKacheln`,
   `klickTrifftDenGezeichnetenBlock` (Lupe 1, 2, 4, grobe Stufe, links des
   Ursprungs, genau auf der Kante), `kachelnRasterUndKlickAufEinerKante`,
-  `nameBleibtAufDemSchirmUndNebenDenKnoepfen` und
-  `markeWeichtDenKnoepfenAus`.
+  `nameBleibtAufDemSchirmUndNebenDenKnoepfen`,
+  `markeWeichtDenKnoepfenAus` und `chunklinieNaechstDerMaus` (die Linie
+  16·c auf beiden Seiten und unter null, die Grenze der Reichweite).
 - Gametest `Bedienung` mit echten Eingaben: Rechtsklick und „Wegpunkt
   setzen“; die Karte ziehen, bis der Wegpunkt am rechten Rand steht; auf
   der Marke ziehen zieht nur die Karte; ein Klick legt sie in die Mitte;
@@ -1285,7 +1297,15 @@ Schleier am Rand, siehe „Schleier“.
   `Alt` legt sie auf deren Block und verbindet, beim Ziehen mit hellem Kern
   im Bild `alt-vorschau.png`; `Strg` und `Alt` zugleich verbinden; `Alt`
   neben einem Todespunkt rastet nur ein, mit dem Hinweis; ein Wegpunkt mit
-  `Alt` neben einer Ecke liegt auf ihr, beide verbunden. Rechtsklick im Bau (`rechtsklickImBau`): mit einer Ecke der Hinweis,
+  `Alt` neben einer Ecke liegt auf ihr, beide verbunden. Chunklinien
+  (`chunklinien`), mit echten Tasten: eine Ecke mit `Strg` 1¼ Blöcke neben
+  einer senkrechten Chunklinie liegt auf ihr, z wie ohne `Strg`, und die
+  Linie ist im Bild `chunklinie.png` beim Ziehen weiss, danach nicht; nahe
+  der Ecke des Chunks rasten x und z ein; die Ecke einer anderen Form
+  1½ Blöcke weg gewinnt vor der Linie einen halben Block weg; mit `Alt` nur
+  eingerastet, lose und ohne Hinweis; ein Wegpunkt links und rechts neben
+  der Linie auf dem Block an ihr auf seiner Seite; mit Chunklinien aus wie
+  ohne `Strg`. Rechtsklick im Bau (`rechtsklickImBau`): mit einer Ecke der Hinweis,
   kein Menü und keine Form; mit zweien auf einem Wegpunkt eine Linie; mit
   vier auf freier Karte eine Region mit allen vieren; am Griff einer Form im
   Bau mit einer Ecke ihr Menü mit „Form abbrechen“ und ohne „Form fertig“;
