@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
@@ -70,6 +71,8 @@ final class Formen {
      */
     static void neuGeladen() {
         generation++;
+        Minecraft mc = Minecraft.getInstance();
+        minecraftKappe = mc != null && mc.options != null && mc.options.forceUnicodeFont().get() ? UNICODE_KAPPE : MINECRAFT_KAPPE;
     }
 
     /** Was eine Ansicht zuletzt gezeichnet hat: Bleiben Ansicht und Formen gleich, hängt sie nur die fertigen Elemente wieder an. */
@@ -212,6 +215,21 @@ final class Formen {
     static final float KAPPE = 16f * 1384 / 2048;
     /** Die Grundlinie liegt 7 Einheiten unter dem y des Texts, wie bei jeder Schrift des Spiels (GlyphBitmap.getTop). */
     static final float GRUNDLINIE = 7;
+    /**
+     * Höhe der Grossbuchstaben der Minecraft-Schrift in ihren Einheiten: 7 in der Standardschrift; mit „Unicode-Schrift erzwingen“
+     * 5, denn das H der Unicode-Schrift ist 10 von 16 Pixeln hoch und ihre Glyphen stehen halb so gross (`getOversample` 2, per
+     * javap). Siehe docs/wegpunkte.md, „Namen“.
+     */
+    static final float MINECRAFT_KAPPE = 7, UNICODE_KAPPE = 5;
+    /** Die Höhe der Grossbuchstaben der Minecraft-Schrift jetzt, nach der Option des Spiels; gesetzt in {@link #neuGeladen}. */
+    static float minecraftKappe = MINECRAFT_KAPPE;
+    /** Die Minecraft-Schrift: ohne eigene Schrift, also die des Spiels, mit „Unicode-Schrift erzwingen“ die Unicode-Schrift. */
+    private static final Style MINECRAFT_STIL = Style.EMPTY;
+
+    /** Die Höhe der Grossbuchstaben der Schrift von {@code s} in ihren Einheiten: Kartenschrift oder Minecraft-Schrift (mod#171). */
+    static float schriftKappe(Ebenen.Schrift s) {
+        return s.minecraft() ? minecraftKappe : KAPPE;
+    }
     /** Unter so vielen Einheiten des GUI Höhe fehlt die Schrift, über so vielen bleibt sie so gross, wie im Format. */
     static final double KLEINSTE_SCHRIFT = 8, GROESSTE_SCHRIFT = 96;
     /** So viele Zeichen legt ein Neubau höchstens, die Kopien der Kontur mitgezählt; was darüber geht, fehlt. */
@@ -255,7 +273,7 @@ final class Formen {
      * nicht ganz, null und {@code rest} bleibt, so steht keine Kontur ohne ihre Zeichen.
      */
     static List<Glyphe> glyphen(Ebenen.Schrift s, double[] p, double[] breiten, double kappe, double einheit, float[] schnitt, int[] rest) {
-        double massstab = kappe / KAPPE;
+        double massstab = kappe / schriftKappe(s);
         double[] b = new double[breiten.length];
         for (int i = 0; i < b.length; i++) {
             b[i] = breiten[i] * massstab;
@@ -309,7 +327,7 @@ final class Formen {
             FormattedCharSequence[] zeichen = new FormattedCharSequence[codes.length];
             double[] breiten = new double[codes.length];
             for (int i = 0; i < codes.length; i++) {
-                Component c = Component.literal(Character.toString(codes[i])).withStyle(STIL);
+                Component c = Component.literal(Character.toString(codes[i])).withStyle(s.minecraft() ? MINECRAFT_STIL : STIL);
                 zeichen[i] = c.getVisualOrderText();
                 breiten[i] = font.getSplitter().stringWidth(c);
             }
@@ -321,7 +339,7 @@ final class Formen {
             for (Glyphe gl : glyphen) {
                 // Die Mitte des Zeichens auf dem Punkt, die Mitte der Grossbuchstaben auf der Linie.
                 Matrix3x2f pose = new Matrix3x2f(a.pose()).translate((float) gl.x(), (float) gl.y()).rotate((float) gl.winkel())
-                        .scale((float) gl.massstab()).translate((float) (gl.dx() - breiten[gl.zeichen()] / 2), (float) (gl.dy() + KAPPE / 2 - GRUNDLINIE));
+                        .scale((float) gl.massstab()).translate((float) (gl.dx() - breiten[gl.zeichen()] / 2), (float) (gl.dy() + schriftKappe(s) / 2 - GRUNDLINIE));
                 aus.add(new GuiTextRenderState(font, zeichen[gl.zeichen()], pose, 0, 0, gl.farbe(), 0, false, false, a.bounds()));
             }
         }

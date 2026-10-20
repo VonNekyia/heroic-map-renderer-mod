@@ -10,6 +10,7 @@ The release notes on GitHub and Modrinth come from here
 - **Minimap zoom is a slider** in the menu, standing upright right next to the minimap, with one notch per step; up is closer, and the tooltip names the level. The mouse wheel over the minimap or the slider steps one notch. The zoom key still steps through all levels.
 - **The menu buttons move aside:** after you drag the minimap or resize it, the buttons go to the free side next to it.
 - **Zoom the minimap much further out,** down to 1/32: the slider now has nine notches from 1/32× to 8×. From 1/4× on, the minimap shows the tiles of your map, like the full map: from a download it then looks like the web map, and nearby changes appear once the tiles have them. Without a map it shows just the loaded chunks in the middle.
+- **Minecraft font for names.** Under the size and curve sliders of a shape's name sits a "Font" button: Map or Minecraft. It shows right away on the full map and the minimap; Enter saves, Esc undoes. With "Force Unicode Font" the game draws its Unicode font; capital letters stay the same height in all fonts. Only your own shapes; names from the server stay in the map font.
 
 ## 0.2.65
 

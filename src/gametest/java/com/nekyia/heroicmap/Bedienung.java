@@ -169,6 +169,7 @@ public final class Bedienung implements FabricClientGameTest {
         schweben(context, maus, k);
         namen(context, maus, k);
         schriftUndBiegung(context, maus, k);
+        schriftart(context, maus, k);
         farbe(context, maus, k);
         gewicht(context, maus, k);
         hinweisWeg(context, maus, k);
@@ -3152,8 +3153,8 @@ public final class Bedienung implements FabricClientGameTest {
                 int[] schirm = context.computeOnClient(mc -> new int[] {mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight(),
                     mc.getWindow().getGuiScale()});
                 int[][] ws = eingabeWidgets(context);
-                // Feld, Schrift und Biegung; „Gewicht“ gehört zur Farbe.
-                for (int[] x : Arrays.copyOf(ws, 3)) {
+                // Feld, Schrift, Biegung und Schriftart (mod#171); „Gewicht“ gehört zur Farbe.
+                for (int[] x : new int[][] {ws[0], ws[1], ws[2], ws[4]}) {
                     if (schirm[2] != gs || x == null || x[0] < 0 || x[1] < 0 || x[0] + x[2] > schirm[0] || x[1] + x[3] > schirm[1]) {
                         throw new AssertionError("GS " + schirm[2] + " statt " + gs + ", Schirm " + schirm[0] + " × " + schirm[1] + ": "
                                 + Arrays.deepToString(ws));
@@ -3416,6 +3417,132 @@ public final class Bedienung implements FabricClientGameTest {
     }
 
     /** Eingabefeld, Regler „Schrift“, „Biegung“ und „Gewicht“ der offenen Karte: je {x, y, Breite, Höhe, an, Raste}, null ohne. */
+    /**
+     * Die Schriftart am Namen (mod#171), mit Klicks von Hand: Unter den Reglern steht der Knopf „Schriftart“, an, sobald ein Name
+     * im Feld steht. Ein Klick schaltet die Form gleich auf die Minecraft-Schrift; in der Datei steht sie erst nach Enter, und im
+     * Bild unter dem Griff ist der Name dann anders gezeichnet als in der Kartenschrift. Mit „Unicode-Schrift erzwingen“ stehen die
+     * Grossbuchstaben so hoch wie ohne (F1). Noch einmal geöffnet, zurückgeschaltet und Esc: wieder die Minecraft-Schrift. Siehe
+     * docs/wegpunkte.md, „Namen“.
+     */
+    private static void schriftart(ClientGameTestContext context, TestInput maus, int k) {
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        // Links oben; die Region ist 16 Blöcke breit, ihr Name also 8 Blöcke hoch, und er steht 8 Blöcke unter dem Griff.
+        int bx = mitte[0] - 40, bz = mitte[1] - 24;
+        try {
+            context.runOnClient(mc -> {
+                Wegpunkte w = Wegpunkte.INSTANZ;
+                w.setzeForm(mc.level.dimension().identifier().toString(), List.of(new Wegpunkte.Ecke(bx, bz), new Wegpunkte.Ecke(bx + 16, bz),
+                        new Wegpunkte.Ecke(bx + 16, bz + 16), new Wegpunkte.Ecke(bx, bz + 16)));
+                w.benenne(w.eigeneFormen().get(formen), "HOF");
+            });
+            context.waitTicks(2);
+            double[] g = griff(context, formen);
+            frei(context, new double[][] {g});
+            double[] ort = {g[0], g[1] + 8 * 4};
+            Path karte = context.takeScreenshot(TestScreenshotOptions.of("schriftart-karte").disableCounterPrefix());
+
+            eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.name_aendern");
+            int[][] w = eingabeWidgets(context);
+            if (w[4] == null || w[4][4] != 1) {
+                throw new AssertionError("Am Namensfeld fehlt der Knopf „Schriftart“ oder ist grau: " + Arrays.deepToString(w));
+            }
+            spielerKlick(context, maus, k, w[4][0] + w[4][2] / 2.0, w[4][1] + 10);
+            Path datei = context.computeOnClient(mc -> Downloads.weltOrdner().resolve("wegpunkte.json"));
+            if (!form(context, formen).minecraft() || Files.readString(datei, StandardCharsets.UTF_8).contains("\"schriftart\"")) {
+                throw new AssertionError("Nach dem Klick: Form " + form(context, formen) + ", in der Datei schon die Schriftart");
+            }
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            if (!form(context, formen).minecraft() || !Files.readString(datei, StandardCharsets.UTF_8).contains("\"schriftart\":\"minecraft\"")) {
+                throw new AssertionError("Nach Enter: Form " + form(context, formen) + ", Schriftart nicht in der Datei");
+            }
+            context.waitTicks(2);
+            Path minecraft = context.takeScreenshot(TestScreenshotOptions.of("schriftart-minecraft").disableCounterPrefix());
+            int anders = verschieden(karte, minecraft, k, ort, 40);
+            if (anders < 200 * k * k / 4) {
+                throw new AssertionError("Unter dem Griff kaum anders gezeichnet: " + anders + " Pixel");
+            }
+            // Mit „Unicode-Schrift erzwingen“ so hohe Grossbuchstaben wie ohne, auf eine Einheit genau.
+            context.runOnClient(mc -> mc.options.forceUnicodeFont().set(true));
+            context.waitTicks(20);
+            Path unicode = context.takeScreenshot(TestScreenshotOptions.of("schriftart-unicode").disableCounterPrefix());
+            context.runOnClient(mc -> mc.options.forceUnicodeFont().set(false));
+            context.waitTicks(20);
+            double ohne = hoeheDunkel(minecraft, k, ort, 40), mit = hoeheDunkel(unicode, k, ort, 40);
+            if (ohne < 20 || Math.abs(ohne - mit) > 1) {
+                throw new AssertionError("Grossbuchstaben ohne Unicode " + ohne + ", mit " + mit + " Einheiten hoch");
+            }
+
+            // Noch einmal: zurück auf die Karte geschaltet, Esc: wieder die Minecraft-Schrift.
+            eintrag(context, maus, k, g[0], g[1], "heroicmap.karte.name_aendern");
+            w = eingabeWidgets(context);
+            spielerKlick(context, maus, k, w[4][0] + w[4][2] / 2.0, w[4][1] + 10);
+            boolean zurueckGeschaltet = !form(context, formen).minecraft();
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTicks(2);
+            if (!zurueckGeschaltet || !form(context, formen).minecraft()) {
+                throw new AssertionError("Zurückgeschaltet " + zurueckGeschaltet + ", nach Esc " + form(context, formen));
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } finally {
+            context.runOnClient(mc -> {
+                mc.options.forceUnicodeFont().set(false);
+                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+            });
+            context.waitTicks(2);
+        }
+    }
+
+    /** Wie viele Pixel im Quadrat ±{@code r} Einheiten um (x, y) sich zwischen den Bildschirmfotos {@code a} und {@code b} unterscheiden. */
+    private static int verschieden(Path a, Path b, int k, double[] mitte, int r) {
+        try {
+            BufferedImage x = ImageIO.read(a.toFile()), y = ImageIO.read(b.toFile());
+            int n = 0;
+            for (int py = (int) ((mitte[1] - r) * k); py < (mitte[1] + r) * k; py++) {
+                for (int px = (int) ((mitte[0] - r) * k); px < (mitte[0] + r) * k; px++) {
+                    n += x.getRGB(px, py) != y.getRGB(px, py) ? 1 : 0;
+                }
+            }
+            return n;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * Wie hoch die dunkle Kartenschrift im Quadrat ±{@code r} Einheiten um (x, y) steht, in Einheiten des GUI: von der obersten bis
+     * zur untersten Zeile mit mindestens drei Pixeln in ihrer Farbe.
+     */
+    private static double hoeheDunkel(Path bild, int k, double[] mitte, int r) {
+        try {
+            BufferedImage b = ImageIO.read(bild.toFile());
+            int oben = -1, unten = -1;
+            for (int py = (int) ((mitte[1] - r) * k); py < (mitte[1] + r) * k; py++) {
+                int n = 0;
+                for (int px = (int) ((mitte[0] - r) * k); px < (mitte[0] + r) * k; px++) {
+                    int p = b.getRGB(px, py);
+                    boolean dunkel = true;
+                    for (int s = 0; s < 24; s += 8) {
+                        dunkel &= Math.abs((p >> s & 0xFF) - (Ebenen.SCHRIFTFARBE >> s & 0xFF)) <= 16;
+                    }
+                    n += dunkel ? 1 : 0;
+                }
+                if (n >= 3) {
+                    oben = oben < 0 ? py : oben;
+                    unten = py;
+                }
+            }
+            return oben < 0 ? 0 : (unten - oben + 1) / (double) k;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     private static int[][] eingabeWidgets(ClientGameTestContext context) {
         return context.computeOnClient(mc -> {
             AbstractWidget[] w = ((Karte) mc.gui.screen()).eingabeWidgets();

@@ -51,8 +51,8 @@ class EbenenCodeTest {
         assertEquals(List.of(new EbenenCode.Ort(WELT, 12, -40, w.punkte().get(0).farbe()),
                 new EbenenCode.Ort("minecraft:the_nether", 3, 4, w.punkte().get(1).farbe())), g.inhalt().orte());
         // Mit eigener Farbe steht im Code nur „#RRGGBB“, kein Index; gelesen ist er 0.
-        assertEquals(List.of(new EbenenCode.Form(WELT, List.of(e(0, 0), e(10, 0), e(10, 10)), 0, 0x3A7FD5, "Hof", 1, 0, 0),
-                new EbenenCode.Form(WELT, List.of(e(0, 20), e(10, 20)), w.eigeneFormen().get(1).farbe(), Wegpunkte.KEIN_HEX, null, 1, 0, 0)),
+        assertEquals(List.of(new EbenenCode.Form(WELT, List.of(e(0, 0), e(10, 0), e(10, 10)), 0, 0x3A7FD5, "Hof", 1, 0, 0, false),
+                new EbenenCode.Form(WELT, List.of(e(0, 20), e(10, 20)), w.eigeneFormen().get(1).farbe(), Wegpunkte.KEIN_HEX, null, 1, 0, 0, false)),
                 g.inhalt().formen());
         // Eingefügt in eine andere Welt: eine neue Ebene, an, nichts angeheftet.
         Wegpunkte andere = new Wegpunkte();
@@ -88,6 +88,31 @@ class EbenenCodeTest {
                 g.inhalt().formen().stream().map(EbenenCode.Form::ecken).toList());
     }
 
+    /**
+     * Die Schriftart im Code (mod#171): „minecraft“ nur, wenn gesetzt, und so zurück; ohne Feld und mit einer anderen Schriftart
+     * die Kartenschrift; was kein Text ist, ist kaputt. Siehe docs/wegpunkte.md, „Ebenen teilen“.
+     */
+    @Test
+    void schriftartImCode() {
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        w.setzeForm(WELT, List.of(e(0, 0), e(5, 5)));
+        w.setzeForm(WELT, List.of(e(9, 0), e(9, 5)));
+        w.benenne(w.schriftart(w.eigeneFormen().get(0), true), "Hof");
+        String code = EbenenCode.schreibe(w, Wegpunkte.BASE);
+        List<EbenenCode.Form> formen = EbenenCode.lies(code).inhalt().formen();
+        assertEquals(List.of(true, false), formen.stream().map(EbenenCode.Form::minecraft).toList());
+        String gut = "{\"v\":1,\"name\":\"N\",\"formen\":[{\"dimension\":\"a:b\",\"ecken\":[[0,0],[5,5]],\"farbe\":0";
+        assertFalse(EbenenCode.lies(EbenenCode.packe(gut + ",\"schriftart\":\"gotisch\"}]}")).inhalt().formen().getFirst().minecraft());
+        assertTrue(EbenenCode.lies(EbenenCode.packe(gut + ",\"schriftart\":\"minecraft\"}]}")).inhalt().formen().getFirst().minecraft());
+        assertEquals("kaputt", EbenenCode.lies(EbenenCode.packe(gut + ",\"schriftart\":7}]}")).fehler());
+        // Eingefügt trägt die Form die Schriftart.
+        Wegpunkte andere = new Wegpunkte();
+        andere.lies((Path) null);
+        andere.fuegeEin(EbenenCode.lies(code).inhalt());
+        assertTrue(andere.eigeneFormen().getFirst().minecraft());
+    }
+
     @Test
     void gleicherNameBekommtEineZahlUndBelegteBloeckeBleiben() {
         Wegpunkte w = new Wegpunkte();
@@ -120,7 +145,7 @@ class EbenenCodeTest {
             voll.setzeForm(WELT, List.of(e(i, 0), e(i, 5)));
         }
         EbenenCode.Inhalt eine = new EbenenCode.Inhalt("X", List.of(),
-                List.of(new EbenenCode.Form(WELT, List.of(e(0, 9), e(5, 9)), 0, Wegpunkte.KEIN_HEX, null, 1, 0, 0)));
+                List.of(new EbenenCode.Form(WELT, List.of(e(0, 9), e(5, 9)), 0, Wegpunkte.KEIN_HEX, null, 1, 0, 0, false)));
         assertEquals("formen_voll", voll.fuegeEin(eine).fehler());
         assertEquals(1, voll.ebenen().size());
     }
