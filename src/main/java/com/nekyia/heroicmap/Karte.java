@@ -4,7 +4,9 @@ import com.mojang.blaze3d.platform.InputConstants;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -157,6 +159,8 @@ final class Karte extends Screen {
     private EckeAn ueberEcke;
     /** Wohin, was an der Maus hängt, in diesem Frame einrastet, oder null. */
     private Rast rast;
+    /** Wohin die Bünde gerade ziehen, solange etwas an der Maus hängt, je Frame aus {@link #zuege}; sonst leer. */
+    private Map<Integer, double[]> zuege = Map.of();
     private GriffAn ueberGriff;
     /** Der helle Rand von dem, was unter der Maus liegt. */
     private static final int HELL = 0xFFFFFFFF;
@@ -526,8 +530,6 @@ final class Karte extends Screen {
                 && Util.getMillis() - gedruecktSeit >= HALTEN_MS) {
             griffHaengt = griffGedrueckt;
         }
-        // Die gezogene Form zeichnet die Karte selbst an der Maus; an ihrem alten Ort fällt sie solange weg.
-        Wegpunkte.INSTANZ.ziehe(gezogeneForm());
         schwebe(mausX, mausY);
         // Mit Strg steht das Ziel des Einrastens hell wie unter der Maus.
         rast = einrasten(mausX, mausY);
@@ -535,6 +537,10 @@ final class Karte extends Screen {
             ueberEcke = rast.ecke();
             ueberMarke = rast.marke();
         }
+        // Die gezogene Form und die, die ihr über einen Bund folgen, zeichnet die Karte selbst an der Maus; an ihrem alten Ort
+        // fallen sie solange weg. Erst nach dem Einrasten, denn die Züge stehen dann auf dessen Ziel.
+        zuege = zuege(mausX, mausY);
+        Wegpunkte.INSTANZ.ziehe(gezogeneFormen());
         // Ein Klick auf eine Marke zentriert erst, wenn kein zweiter folgt; so bewegt ein Doppelklick die Karte nicht.
         if (wartend != null && Util.getMillis() - wartendSeit >= MouseHandler.DOUBLE_CLICK_THRESHOLD_MS) {
             zentriere(wartend.weltX(), wartend.weltZ());
@@ -620,10 +626,12 @@ final class Karte extends Screen {
                         blick.basisRasterX(width, width) / scale, blick.basisRasterZ(height, height) / scale},
                 pose, new ScreenRectangle(0, 0, width, height).transformMaxBounds(pose), Double.POSITIVE_INFINITY);
         Formen.zeichne(g, a, dimension, Wegpunkte.INSTANZ.karte(Ebenen.INSTANZ), formenSpeicher, font, true);
-        // Die gezogene Form folgt der Maus in jedem Frame; sie ist eine, ihr Speicher gilt nur bis zur nächsten Bewegung.
-        Wegpunkte.EigeneForm f = gezogeneForm();
-        if (f != null && f.dimension().equals(dimension)) {
-            Formen.zeichne(g, a, dimension, List.of(Wegpunkte.INSTANZ.aufKarte(f, punkte(f, mausX, mausY))), gezogenSpeicher, font, true);
+        // Die gezogenen Formen folgen der Maus in jedem Frame; ihr Speicher gilt nur bis zur nächsten Bewegung.
+        List<List<Ebenen.Form>> gezogen = gezogeneFormen().stream()
+                .filter(f -> f.dimension().equals(dimension) && Wegpunkte.INSTANZ.an(f.ebene()))
+                .map(f -> Wegpunkte.INSTANZ.aufKarte(f, punkte(f, mausX, mausY))).toList();
+        if (!gezogen.isEmpty()) {
+            Formen.zeichne(g, a, dimension, gezogen, gezogenSpeicher, font, true);
         }
     }
 
@@ -674,9 +682,12 @@ final class Karte extends Screen {
         }
         Rast beste = null;
         double abstand = EINRASTEN;
+        // Der eigene Bund zieht mit und steht an der Maus; auf ihn rastet nichts ein.
+        int bund = haengt != null ? haengt.bund() : eckeHaengt.form().ecken().get(eckeHaengt.index()).bund();
         for (EckeAn e : ecken) {
             double d = Math.hypot(mx - e.x(), my - e.y());
-            if ((eckeHaengt == null || e.form() != eckeHaengt.form()) && d <= abstand) {
+            if ((eckeHaengt == null || e.form() != eckeHaengt.form()) && (bund == 0 || e.form().ecken().get(e.index()).bund() != bund)
+                    && d <= abstand) {
                 Wegpunkte.Ecke c = e.form().ecken().get(e.index());
                 beste = new Rast(c.x(), c.z(), e, null);
                 abstand = d;
@@ -684,7 +695,7 @@ final class Karte extends Screen {
         }
         if (eckeHaengt != null) {
             for (Marke m : marken) {
-                if (m.punkt() == null) {
+                if (m.punkt() == null || bund != 0 && m.punkt().bund() == bund) {
                     continue;
                 }
                 // An der Lage des Blocks, nicht an der Marke: Die eines fernen Wegpunkts steht am Rand (Review von #161).
@@ -710,12 +721,58 @@ final class Karte extends Screen {
         return eckeHaengt != null ? eckeHaengt.form() : griffHaengt != null ? griffHaengt.form() : null;
     }
 
+    /** Die gezogene Form und alle, deren Ecken über einen Bund mitziehen ({@link #zuege}). */
+    private List<Wegpunkte.EigeneForm> gezogeneFormen() {
+        Wegpunkte.EigeneForm f = gezogeneForm();
+        if (zuege.isEmpty()) {
+            return f == null ? List.of() : List.of(f);
+        }
+        List<Wegpunkte.EigeneForm> aus = new ArrayList<>();
+        for (Wegpunkte.EigeneForm e : Wegpunkte.INSTANZ.eigeneFormen()) {
+            if (e.equals(f) || e.ecken().stream().anyMatch(c -> zuege.containsKey(c.bund()))) {
+                aus.add(e);
+            }
+        }
+        return aus;
+    }
+
+    /**
+     * Wohin die Bünde ziehen, was an der Maus hängt: Bund nach Ort der Welt in Blöcken, nicht gerundet. Der Wegpunkt oder die
+     * Ecke an der Maus nimmt ihren Bund mit, am Griff jede Ecke der Form ihren. Leer, wenn nichts Verbundenes hängt. Siehe
+     * docs/wegpunkte.md, „Verbinden“.
+     */
+    private Map<Integer, double[]> zuege(double mausX, double mausY) {
+        int bund = haengt != null ? haengt.bund() : eckeHaengt != null ? eckeHaengt.form().ecken().get(eckeHaengt.index()).bund() : 0;
+        if (bund > 0) {
+            return Map.of(bund, rast != null ? new double[] {rast.x() + 0.5, rast.z() + 0.5} : welt(mausX, mausY));
+        }
+        if (griffHaengt == null) {
+            return Map.of();
+        }
+        double[] w = welt(mausX, mausY), d = welt(druckX, druckY);
+        Map<Integer, double[]> aus = new HashMap<>();
+        for (Wegpunkte.Ecke c : griffHaengt.form().ecken()) {
+            if (c.bund() > 0) {
+                aus.put(c.bund(), new double[] {c.x() + 0.5 + w[0] - d[0], c.z() + 0.5 + w[1] - d[1]});
+            }
+        }
+        return aus;
+    }
+
     /**
      * Die Punkte (x, z) der eigenen Form, wie sie gerade steht: die Ecke an der Maus genau unter ihr, am Griff die ganze
      * Form um den Weg der Maus seit dem Drücken, nicht auf ganze Blöcke gerundet; sonst die Mitten der Blöcke.
      */
     private double[] punkte(Wegpunkte.EigeneForm f, double mausX, double mausY) {
         double[] p = Wegpunkte.mitten(f);
+        // Verbundene Ecken stehen, wo ihr Bund gerade zieht.
+        for (int i = 0; i < f.ecken().size() && !zuege.isEmpty(); i++) {
+            double[] z = zuege.get(f.ecken().get(i).bund());
+            if (z != null) {
+                p[2 * i] = z[0];
+                p[2 * i + 1] = z[1];
+            }
+        }
         if (eckeHaengt != null && eckeHaengt.form() == f) {
             double[] w = rast != null ? new double[] {rast.x() + 0.5, rast.z() + 0.5} : welt(mausX, mausY);
             p[2 * eckeHaengt.index()] = w[0];
@@ -765,7 +822,9 @@ final class Karte extends Screen {
         }
         for (Wegpunkte.Punkt p : Wegpunkte.INSTANZ.punkte()) {
             if (p.dimension().equals(dimension) && !p.equals(haengt) && Wegpunkte.INSTANZ.sichtbar(p)) {
-                Marke m = marke(p.x() + 0.5, p.z() + 0.5, null, p);
+                // Folgt er einem Bund, steht er, wo der gerade zieht.
+                double[] zug = p.bund() > 0 ? zuege.get(p.bund()) : null;
+                Marke m = zug != null ? marke(zug[0], zug[1], null, p) : marke(p.x() + 0.5, p.z() + 0.5, null, p);
                 // Unter der Maus mit hellem Rand, auch angeheftet: Dann weicht der bunte Rand so lange.
                 boolean hell = ueberMarke != null && p.equals(ueberMarke.punkt());
                 Minimap.wegpunkt(g, m.x(), m.y(), Minimap.KOPF, p, hell ? HELL : p.angeheftet() ? bunt : 0);
@@ -1131,7 +1190,8 @@ final class Karte extends Screen {
             for (int i = 0; i < f.ecken().size(); i++) {
                 float[] s = schirm(p[2 * i], p[2 * i + 1]);
                 ecken.add(new EckeAn(f, i, s[0], s[1]));
-                raute(g, s[0], s[1], farbe, ueberEcke != null && ueberEcke.form() == f && ueberEcke.index() == i ? HELL : 0xFF000000);
+                raute(g, s[0], s[1], farbe, ueberEcke != null && ueberEcke.form() == f && ueberEcke.index() == i ? HELL : 0xFF000000,
+                        f.ecken().get(i).bund() > 0);
             }
             double[] m = Wegpunkte.griff(p, f.region());
             float[] s = schirm(m[0], m[1]);
@@ -1169,16 +1229,25 @@ final class Karte extends Screen {
 
     /** Eine kleine Raute bei (x, y) in {@code farbe}, mit dunklem Rand, der sie auf jeder Karte zeigt. */
     private static void raute(GuiGraphicsExtractor g, float x, float y, int farbe) {
-        raute(g, x, y, farbe, 0xFF000000);
+        raute(g, x, y, farbe, 0xFF000000, false);
     }
 
-    /** Wie {@link #raute(GuiGraphicsExtractor, float, float, int)}, mit dem Rand {@code rand}, unter der Maus hell. */
-    private static void raute(GuiGraphicsExtractor g, float x, float y, int farbe, int rand) {
+    /**
+     * Wie {@link #raute(GuiGraphicsExtractor, float, float, int)}, mit dem Rand {@code rand}, unter der Maus hell; {@code verbunden}
+     * eine Nummer grösser mit hellem Kern wie der Griff. Siehe docs/wegpunkte.md, „Verbinden“.
+     */
+    private static void raute(GuiGraphicsExtractor g, float x, float y, int farbe, int rand, boolean verbunden) {
         g.pose().pushMatrix();
         g.pose().translate(x, y);
         g.pose().rotate((float) (Math.PI / 4));
-        g.fill(-2, -2, 2, 2, rand);
-        g.fill(-1, -1, 1, 1, farbe | 0xFF000000);
+        if (verbunden) {
+            g.fill(-3, -3, 3, 3, rand);
+            g.fill(-2, -2, 2, 2, farbe | 0xFF000000);
+            g.fill(-1, -1, 1, 1, 0xFFFFFFFF);
+        } else {
+            g.fill(-2, -2, 2, 2, rand);
+            g.fill(-1, -1, 1, 1, farbe | 0xFF000000);
+        }
         g.pose().popMatrix();
     }
 
@@ -1488,7 +1557,10 @@ final class Karte extends Screen {
         // Der Wegpunkt an der Maus kommt auf den Block unter ihr, mit Strg auf den, wo er einrastet, mit Farbe und Anheften.
         if (haengt != null) {
             int[] b = ablage(e.x(), e.y());
-            Wegpunkte.INSTANZ.verschiebe(haengt, b[0], b[1]);
+            // Ein verbundener bleibt mit seinem Bund, wo er war, wenn er auf einen anderen Wegpunkt träfe (D7 von mod#162).
+            if (!Wegpunkte.INSTANZ.verschiebe(haengt, b[0], b[1]) && haengt.bund() > 0 && (b[0] != haengt.x() || b[1] != haengt.z())) {
+                zeige(Component.translatable("heroicmap.karte.koordinaten_belegt"));
+            }
             haengt = null;
             return true;
         }
@@ -1496,8 +1568,12 @@ final class Karte extends Screen {
         if (eckeHaengt != null) {
             int[] b = ablage(e.x(), e.y());
             List<Wegpunkte.Ecke> neu = new ArrayList<>(eckeHaengt.form().ecken());
-            neu.set(eckeHaengt.index(), new Wegpunkte.Ecke(b[0], b[1]));
-            Wegpunkte.INSTANZ.ersetze(eckeHaengt.form(), neu);
+            Wegpunkte.Ecke c = neu.get(eckeHaengt.index());
+            neu.set(eckeHaengt.index(), c.auf(b[0], b[1]));
+            // Ein Bund bleibt, wo er war, wenn sein Wegpunkt auf einen anderen träfe.
+            if (!Wegpunkte.INSTANZ.ersetze(eckeHaengt.form(), neu) && c.bund() > 0) {
+                zeige(Component.translatable("heroicmap.karte.koordinaten_belegt"));
+            }
             eckeHaengt = null;
             return true;
         }
@@ -1505,8 +1581,11 @@ final class Karte extends Screen {
         if (griffHaengt != null) {
             double[] w = welt(e.x(), e.y()), d = welt(druckX, druckY);
             int dx = (int) Math.round(w[0] - d[0]), dz = (int) Math.round(w[1] - d[1]);
-            Wegpunkte.INSTANZ.ersetze(griffHaengt.form(), griffHaengt.form().ecken().stream()
-                    .map(c -> new Wegpunkte.Ecke(c.x() + dx, c.z() + dz)).toList());
+            List<Wegpunkte.Ecke> alt = griffHaengt.form().ecken();
+            if (!Wegpunkte.INSTANZ.ersetze(griffHaengt.form(), alt.stream().map(c -> c.auf(c.x() + dx, c.z() + dz)).toList())
+                    && alt.stream().anyMatch(c -> c.bund() > 0)) {
+                zeige(Component.translatable("heroicmap.karte.koordinaten_belegt"));
+            }
             griffHaengt = null;
             return true;
         }
@@ -2116,6 +2195,7 @@ final class Karte extends Screen {
                 zeige(Component.translatable("heroicmap.karte.koordinaten_belegt"));
                 return false;
             })));
+            verbinden(Wegpunkte.Glied.von(punkt), schirm(punkt.x() + 0.5, punkt.z() + 0.5), neu);
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_von_hier"), () -> beginne(punkt.x(), punkt.z())));
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.ebene"), () -> ebenenWahl(punkt.ebene(), id -> Wegpunkte.INSTANZ.ordne(punkt, id))));
         }
@@ -2123,18 +2203,69 @@ final class Karte extends Screen {
                 () -> Wegpunkte.INSTANZ.loesche(punkt)));
     }
 
-    /** Das Menü einer Ecke: „Koordinaten setzen…“, „Eckpunkt hinzufügen“ und „Eckpunkt löschen“. */
+    /** Das Menü einer Ecke: „Koordinaten setzen…“, „Verbinden“ und „Lösen“, „Eckpunkt hinzufügen“ und „Eckpunkt löschen“. */
     private void eckMenue(EckeAn ecke, List<Eintrag> neu) {
         Wegpunkte.Ecke e = ecke.form().ecken().get(ecke.index());
         neu.add(new Eintrag(Component.translatable("heroicmap.karte.koordinaten"), () -> koordinaten(e.x(), e.z(), k -> {
-            // Wie beim Loslassen: Auf dem Block ihrer Nachbarin werden beide eine.
+            // Wie beim Loslassen: Auf dem Block ihrer Nachbarin werden beide eine, und ein Bund zieht mit.
             List<Wegpunkte.Ecke> neueEcken = new ArrayList<>(ecke.form().ecken());
-            neueEcken.set(ecke.index(), new Wegpunkte.Ecke(k[0], k[1]));
-            Wegpunkte.INSTANZ.ersetze(ecke.form(), neueEcken);
-            return true;
+            neueEcken.set(ecke.index(), e.auf(k[0], k[1]));
+            if (Wegpunkte.INSTANZ.ersetze(ecke.form(), neueEcken) || e.bund() == 0) {
+                return true;
+            }
+            zeige(Component.translatable("heroicmap.karte.koordinaten_belegt"));
+            return false;
         })));
+        verbinden(Wegpunkte.Glied.von(ecke.form(), ecke.index()), new float[] {ecke.x(), ecke.y()}, neu);
         neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_hinzu"), () -> bearbeite(ecke)));
         neu.add(new Eintrag(Component.translatable("heroicmap.karte.ecke_loeschen"), () -> loescheEcke(ecke)));
+    }
+
+    /**
+     * „Verbinden“, wenn ein Punkt nah genug ist ({@link #verbindeZiel}), und „Lösen“ an einem verbundenen; {@code s} ist die Lage
+     * von {@code ich} auf dem Schirm. Siehe docs/wegpunkte.md, „Verbinden“.
+     */
+    private void verbinden(Wegpunkte.Glied ich, float[] s, List<Eintrag> neu) {
+        Wegpunkte.Glied ziel = verbindeZiel(ich, s[0], s[1]);
+        if (ziel != null) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.verbinden"), () -> Wegpunkte.INSTANZ.verbinde(ich, ziel)));
+        }
+        if (ich.bund() > 0) {
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.loesen"), () -> Wegpunkte.INSTANZ.loese(ich.bund())));
+        }
+    }
+
+    /**
+     * Womit „Verbinden“ den Punkt {@code ich} bei (x, y) verbindet: die nächste Ecke einer eigenen Form oder, für eine Ecke, der
+     * nächste Wegpunkt, höchstens {@link #EINRASTEN} weg, an der Lage des Blocks nach dem letzten Frame, in Ebenen, die an sind,
+     * und nur, was sich verbinden lässt ({@link Wegpunkte#kannVerbinden}); sonst null. Siehe docs/wegpunkte.md, „Verbinden“.
+     */
+    private Wegpunkte.Glied verbindeZiel(Wegpunkte.Glied ich, double x, double y) {
+        Wegpunkte.Glied beste = null;
+        double abstand = EINRASTEN;
+        for (EckeAn e : ecken) {
+            Wegpunkte.Glied g = Wegpunkte.Glied.von(e.form(), e.index());
+            double d = Math.hypot(x - e.x(), y - e.y());
+            if (d <= abstand && Wegpunkte.INSTANZ.kannVerbinden(ich, g)) {
+                beste = g;
+                abstand = d;
+            }
+        }
+        if (ich.punkt() == null) {
+            for (Marke m : marken) {
+                if (m.punkt() == null) {
+                    continue;
+                }
+                float[] s = schirm(m.punkt().x() + 0.5, m.punkt().z() + 0.5);
+                double d = Math.hypot(x - s[0], y - s[1]);
+                Wegpunkte.Glied g = Wegpunkte.Glied.von(m.punkt());
+                if (d <= abstand && Wegpunkte.INSTANZ.kannVerbinden(ich, g)) {
+                    beste = g;
+                    abstand = d;
+                }
+            }
+        }
+        return beste;
     }
 
     /** Nimmt die Ecke aus ihrer Form: Aus einer Region mit drei Ecken wird eine Linie, eine Linie mit zwei fällt weg. */
@@ -2347,7 +2478,7 @@ final class Karte extends Screen {
     @Override
     public void removed() {
         // Was beim Schliessen noch an der Maus hing, steht wieder an seinem Ort.
-        Wegpunkte.INSTANZ.ziehe(null);
+        Wegpunkte.INSTANZ.ziehe(List.of());
         if (blick != null && gestellt) {
             Kartenlage.schreibe(Downloads.weltOrdner(), satz,
                     new Kartenlage.Lage(blick.mx / satz.scale(), blick.mz / satz.scale(), blick.zoom, blick.lupe));

@@ -15,6 +15,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -170,6 +171,7 @@ public final class Bedienung implements FabricClientGameTest {
         wegpunktBei(context, maus, k);
         menueJeObjekt(context, maus, k);
         einrasten(context, maus, k);
+        verbinden(context, maus, k);
         rechtsklickImBau(context, maus, k);
         entfernen(context, maus, k);
         eigeneEbenen(context, maus, k);
@@ -1900,6 +1902,174 @@ public final class Bedienung implements FabricClientGameTest {
             }
         } finally {
             maus.releaseControl();
+            context.runOnClient(mc -> {
+                List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+            });
+            context.waitTicks(2);
+        }
+    }
+
+    /**
+     * Verbinden und Lösen (mod#162) mit Klicks wie von Hand: Rechtsklick auf eine Ecke einen Block schräg neben der Ecke einer
+     * anderen Form bietet „Verbinden“; ein Klick legt sie auf deren Block, und im Bildschirmfoto hat die verbundene einen hellen
+     * Kern, eine lose nicht. Gehalten und gezogen folgt die andere schon beim Ziehen und danach, ihre übrigen Ecken bleiben.
+     * „Lösen“, dann folgt sie nicht mehr. „Verbinden“ am Wegpunkt legt ihn auf eine Ecke; den Wegpunkt gezogen, folgt sie. Am
+     * Griff folgt die verbundene Ecke der anderen Form. Auf einen anderen Wegpunkt gezogen, bleibt der ganze Bund mit dem
+     * Hinweis. Ohne Punkt in 8 Einheiten und mit nur einer Ecke der eigenen Form daneben fehlt „Verbinden“, an einer losen
+     * Ecke „Lösen“. Den Wegpunkt gelöscht, bleibt seine Ecke, lose und ohne Kern. Siehe docs/wegpunkte.md, „Verbinden“.
+     */
+    private static void verbinden(ClientGameTestContext context, TestInput maus, int k) {
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
+        int[] mitte = context.computeOnClient(mc -> {
+            double[] m = ((Karte) mc.gui.screen()).blickMitte();
+            return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
+        });
+        int bx = mitte[0] - 34, bz = mitte[1] + 6;
+        // A und B, zwei Linien, B0 einen Block schräg neben A1; C weit rechts, zwei Ecken einen Block auseinander; der Wegpunkt W
+        // einen Block schräg unter A0, X weiter unten. Ein Block sind 4 Einheiten, schräg also 5,7.
+        try {
+            context.runOnClient(mc -> {
+                String dimension = mc.level.dimension().identifier().toString();
+                Wegpunkte.INSTANZ.setzeForm(dimension, List.of(new Wegpunkte.Ecke(bx, bz), new Wegpunkte.Ecke(bx + 8, bz)));
+                Wegpunkte.INSTANZ.setzeForm(dimension, List.of(new Wegpunkte.Ecke(bx + 9, bz + 1), new Wegpunkte.Ecke(bx + 16, bz + 1)));
+                Wegpunkte.INSTANZ.setzeForm(dimension, List.of(new Wegpunkte.Ecke(bx + 30, bz + 10), new Wegpunkte.Ecke(bx + 31, bz + 10)));
+                Wegpunkte.INSTANZ.setze(dimension, bx - 1, bz + 1);
+                Wegpunkte.INSTANZ.setze(dimension, bx + 4, bz + 12);
+            });
+            context.waitTicks(2);
+            frei(context, new double[][] {ecke(context, formen, 1), ecke(context, formen + 1, 0), ecke(context, formen + 2, 0)});
+
+            // „Verbinden“ an A1: Sie liegt danach auf B0, beide im selben Bund.
+            double[] a1 = ecke(context, formen, 1);
+            eintrag(context, maus, k, a1[0], a1[1], "heroicmap.karte.verbinden");
+            List<Wegpunkte.Ecke> ab = context.computeOnClient(mc -> List.of(Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1),
+                    Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1).ecken().get(0)));
+            if (ab.get(0).x() != bx + 9 || ab.get(0).z() != bz + 1 || ab.get(0).bund() == 0 || ab.get(0).bund() != ab.get(1).bund()) {
+                throw new AssertionError("„Verbinden“ an A1: " + ab + " statt beide auf " + (bx + 9) + " " + (bz + 1) + " in einem Bund");
+            }
+            // Der helle Kern: an B0 ja, an A0 nicht. Die Maus steht weg, sonst wäre ein Rand hell.
+            double[] a0 = ecke(context, formen, 0);
+            maus.setCursorPos((a0[0] - 40) * k, a0[1] * k);
+            context.waitTicks(2);
+            Path bild = context.takeScreenshot(TestScreenshotOptions.of("verbunden").disableCounterPrefix());
+            double[] b0 = ecke(context, formen + 1, 0);
+            a0 = ecke(context, formen, 0);
+            int kern = weisse(bild, k, b0, 1), lose = weisse(bild, k, a0, 1);
+            if (kern < 2 * k * k || lose > 0) {
+                throw new AssertionError("Heller Kern: " + kern + " weisse Pixel an der verbundenen Ecke, " + lose + " an der losen");
+            }
+
+            // B0 gehalten und drei Blöcke nach unten gezogen: A1 folgt schon beim Ziehen und danach; A0 und B1 bleiben.
+            b0 = ecke(context, formen + 1, 0);
+            double[] nach = {b0[0], b0[1] + 12};
+            double[] live = halteUndZiehe(context, maus, k, b0, nach, false, formen, 1);
+            if (Math.abs(live[0] - nach[0]) > 1.5 || Math.abs(live[1] - nach[1]) > 1.5) {
+                throw new AssertionError("A1 beim Ziehen von B0 bei " + Arrays.toString(live) + " statt bei " + Arrays.toString(nach));
+            }
+            List<Wegpunkte.Ecke> alle = context.computeOnClient(mc -> {
+                List<Wegpunkte.Ecke> aus = new ArrayList<>(Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken());
+                aus.addAll(Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1).ecken());
+                return aus;
+            });
+            if (alle.get(1).x() != alle.get(2).x() || alle.get(1).z() != alle.get(2).z() || alle.get(2).z() == bz + 1
+                    || !alle.get(0).equals(new Wegpunkte.Ecke(bx, bz)) || alle.get(3).x() != bx + 16 || alle.get(3).z() != bz + 1) {
+                throw new AssertionError("Nach dem Ziehen von B0: A " + alle.subList(0, 2) + ", B " + alle.subList(2, 4));
+            }
+
+            // „Lösen“ am Bund, dann B0 wieder gezogen: A1 bleibt.
+            b0 = ecke(context, formen + 1, 0);
+            eintrag(context, maus, k, b0[0], b0[1], "heroicmap.karte.loesen");
+            Wegpunkte.Ecke a1Vorher = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
+            if (a1Vorher.bund() != 0) {
+                throw new AssertionError("„Lösen“ liess A1 im Bund: " + a1Vorher);
+            }
+            b0 = ecke(context, formen + 1, 0);
+            halteUndZiehe(context, maus, k, b0, new double[] {b0[0], b0[1] - 12}, false, -1, 0);
+            Wegpunkte.Ecke a1Nach = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
+            Wegpunkte.Ecke b0Nach = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1).ecken().get(0));
+            if (!a1Nach.equals(a1Vorher) || b0Nach.z() == a1Vorher.z()) {
+                throw new AssertionError("Nach „Lösen“ zog B0 A1 mit: A1 " + a1Nach + ", B0 " + b0Nach);
+            }
+
+            // „Verbinden“ am Wegpunkt W: Er liegt danach auf A0. W gezogen, folgt A0; A1 bleibt.
+            Wegpunkte.Punkt w = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
+            Karte.Marke wm = marke(context, w);
+            eintrag(context, maus, k, wm.x(), wm.y(), "heroicmap.karte.verbinden");
+            Wegpunkte.Punkt wAuf = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
+            if (wAuf.x() != bx || wAuf.z() != bz || wAuf.bund() == 0) {
+                throw new AssertionError("„Verbinden“ am Wegpunkt: " + wAuf + " statt auf " + bx + " " + bz + " in einem Bund");
+            }
+            wm = marke(context, wAuf);
+            double[] von = {wm.x(), wm.y()}, hin = {wm.x(), wm.y() + 12};
+            live = halteUndZiehe(context, maus, k, von, hin, false, formen, 0);
+            Wegpunkte.Punkt wNach = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
+            Wegpunkte.Ecke a0Nach = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(0));
+            Wegpunkte.Ecke a1Jetzt = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(1));
+            if (Math.abs(live[0] - hin[0]) > 1.5 || Math.abs(live[1] - hin[1]) > 1.5 || a0Nach.x() != wNach.x() || a0Nach.z() != wNach.z()
+                    || wNach.z() == bz || !a1Jetzt.equals(a1Nach)) {
+                throw new AssertionError("W gezogen: beim Ziehen A0 bei " + Arrays.toString(live) + " statt " + Arrays.toString(hin)
+                        + ", danach W " + wNach + ", A0 " + a0Nach + ", A1 " + a1Jetzt);
+            }
+
+            // Am Griff von B: A1, wieder mit B0 verbunden, folgt; A0 und W bleiben.
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.verbinde(Wegpunkte.Glied.von(Wegpunkte.INSTANZ.eigeneFormen().get(formen), 1),
+                    Wegpunkte.Glied.von(Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1), 0)));
+            context.waitTicks(2);
+            double[] gr = griff(context, formen + 1), b0Griff = ecke(context, formen + 1, 0);
+            live = halteUndZiehe(context, maus, k, gr, new double[] {gr[0], gr[1] - 12}, false, formen, 1);
+            if (Math.abs(live[0] - b0Griff[0]) > 1.5 || Math.abs(live[1] - (b0Griff[1] - 12)) > 1.5) {
+                throw new AssertionError("Am Griff beim Ziehen: A1 bei " + Arrays.toString(live) + " statt bei " + b0Griff[0] + ","
+                        + (b0Griff[1] - 12));
+            }
+            List<Wegpunkte.Ecke> nachGriff = context.computeOnClient(mc -> {
+                List<Wegpunkte.Ecke> aus = new ArrayList<>(Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken());
+                aus.addAll(Wegpunkte.INSTANZ.eigeneFormen().get(formen + 1).ecken());
+                return aus;
+            });
+            if (nachGriff.get(1).x() != nachGriff.get(2).x() || nachGriff.get(1).z() != nachGriff.get(2).z() || nachGriff.get(3).z() == bz + 1
+                    || !nachGriff.get(0).equals(a0Nach)) {
+                throw new AssertionError("Am Griff von B: A " + nachGriff.subList(0, 2) + ", B " + nachGriff.subList(2, 4) + ", A0 vorher " + a0Nach);
+            }
+
+            // Auf A0 liegt W, dessen Marke vorgeht; gezogen wird so W, mit A0. Auf die Mitte der Marke von X: W träfe auf X, also
+            // bleibt der ganze Bund, mit dem Hinweis. Ebenso wäre es mit A0 an der Maus.
+            Wegpunkte.Punkt x = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte + 1));
+            Karte.Marke xm = marke(context, x);
+            halteUndZiehe(context, maus, k, ecke(context, formen, 0), new double[] {xm.x(), xm.y()}, false, -1, 0);
+            Wegpunkte.Ecke a0Bleibt = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(0));
+            Wegpunkte.Punkt wBleibt = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().get(punkte));
+            String hinweis = context.computeOnClient(mc -> {
+                Component h = ((Karte) mc.gui.screen()).hinweis();
+                return h == null ? "" : h.getString();
+            });
+            String belegt = context.computeOnClient(mc -> Component.translatable("heroicmap.karte.koordinaten_belegt").getString());
+            if (!a0Bleibt.equals(a0Nach) || wBleibt.x() != wNach.x() || wBleibt.z() != wNach.z() || !hinweis.equals(belegt)) {
+                throw new AssertionError("A0 auf X: A0 " + a0Bleibt + " statt " + a0Nach + ", W " + wBleibt + ", Hinweis „" + hinweis + "“");
+            }
+
+            // Ohne Punkt in 8 Einheiten fehlt „Verbinden“ (B1), ebenso mit nur der eigenen Ecke daneben (C0); an losen fehlt „Lösen“.
+            List<String> nie = texte(context, "heroicmap.karte.verbinden", "heroicmap.karte.loesen");
+            for (double[] o : new double[][] {ecke(context, formen + 1, 1), ecke(context, formen + 2, 0)}) {
+                List<String> menue = eintraegeBei(context, maus, k, o[0], o[1]);
+                if (menue.stream().anyMatch(nie::contains)) {
+                    throw new AssertionError("Menü einer losen Ecke ohne Ziel bei " + Arrays.toString(o) + ": " + menue);
+                }
+            }
+
+            // W gelöscht: A0 bleibt, lose und ohne Kern.
+            wm = marke(context, wBleibt);
+            eintrag(context, maus, k, wm.x(), wm.y(), "heroicmap.karte.wegpunkt_loeschen");
+            Wegpunkte.Ecke a0Lose = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().get(formen).ecken().get(0));
+            a0 = ecke(context, formen, 0);
+            maus.setCursorPos((a0[0] - 40) * k, a0[1] * k);
+            context.waitTicks(2);
+            bild = context.takeScreenshot(TestScreenshotOptions.of("verbunden-geloescht").disableCounterPrefix());
+            if (!a0Lose.equals(new Wegpunkte.Ecke(a0Nach.x(), a0Nach.z())) || weisse(bild, k, ecke(context, formen, 0), 1) > 0) {
+                throw new AssertionError("Nach dem Löschen von W: A0 " + a0Lose + ", weisse Pixel " + weisse(bild, k, a0, 1));
+            }
+        } finally {
             context.runOnClient(mc -> {
                 List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
                 List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
