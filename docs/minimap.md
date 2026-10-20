@@ -936,14 +936,22 @@ runde Form am 09.10., seit dem Vieleck, siehe
 
 Der Flug geht dabei mit 20 Blöcken/s über geladenes Gelände.
 
-**Weit heraus,** geschätzt, nicht gemessen, siehe „Weit heraus“: je Frame ein
-Blit je sichtbarer Kachel, bei 128 Einheiten und GUI-Massstab 2 höchstens 9,
+**Weit heraus,** siehe „Weit heraus“, gemessen am 20.10. bei 1/32 gegen 2,
+siehe [Minimap, Zoom 1/32](messungen/2026-10-20-minimap-zoom-weit.md):
+
+- **Im Stand** gleich: mit Minimap im p50 0,309 statt 0,308 ms.
+- **Im Flug** 0,06 ms mehr im p50, 0,327 statt 0,269 ms, und 0,04 ms im
+  p95; das HUD-Element 0,014 statt 0,013 ms.
+- **Nach dem Wechsel** ganz gezeichnet nach 47 bis 48 ms, so schnell wie
+  bei 2.
+
+Geschätzt, nicht gemessen: je Frame ein Blit je sichtbarer Kachel, bei 128 Einheiten und GUI-Massstab 2 höchstens 9,
 so viele wie heute Regionen; im schlimmsten Fall, 256 Einheiten bei
 GUI-Massstab 4, bis 81. Dekodieren im Hintergrund, rund 2,8 ms je Kachel,
 beim Wechsel der Stufe typisch 25 ms verteilt; im Flug mit 20 Blöcken/s
 bei 1/32 alle rund 200 s eine neue Kachel. Speicher: typisch 9 Kacheln,
 rund 2,3 MiB auf der Grafikkarte und ebenso viel im RAM, höchstens 64. Auf
-der Platte nichts Neues. Die Messung 1/32 gegen 2 läuft nachts.
+der Platte nichts Neues.
 
 **Pflanzen von oben,** geschätzt, nicht gemessen: Je Spalte mit Pflanze
 kommt eine volle Fläche über das gemittelte Raster dazu, rund 0,5 bis 1 µs,
