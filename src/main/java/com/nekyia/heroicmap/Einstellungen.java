@@ -1,6 +1,7 @@
 package com.nekyia.heroicmap;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.blaze3d.platform.cursor.CursorTypes;
 import java.util.List;
 import java.util.Objects;
 import net.minecraft.ChatFormatting;
@@ -13,20 +14,24 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.ARGB;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import org.joml.Matrix3x2fStack;
 
 /**
- * Das Menü hinter {@code /hmap}: Minimap an oder aus, Zoom, Mitspieler, die Karten des Servers und die
+ * Das Menü hinter {@code /hmap}: Minimap an oder aus, Mitspieler, die Karten des Servers und die
  * auf der Platte, dazu das Untermenü „Einstellungen …“ für Vorlieben der Anzeige ({@link Anzeige}).
  * Die Minimap im HUD bleibt sichtbar; Ziehen verschiebt sie, der Griff an der Ecke zur Mitte des
- * Schirms zieht sie grösser oder kleiner, mit der linken wie der rechten Taste. Ein Klick auf den
- * Spieler oder eine Marke stellt ihr Aussehen ein ({@link MinimapKlick}). Die Knöpfe passen sich dem
- * Platz an. Gespeichert wird beim Schliessen.
+ * Schirms zieht sie grösser oder kleiner, mit der linken wie der rechten Taste. Neben ihr steht der
+ * Zoom als senkrechter Regler ({@link ZoomRegler}). Ein Klick auf den Spieler oder eine Marke stellt
+ * ihr Aussehen ein ({@link MinimapKlick}). Die Knöpfe passen sich dem Platz an und gehen nach dem
+ * Ziehen auf die freie Seite. Gespeichert wird beim Schliessen.
  * Siehe docs/minimap.md, „Bedienung“.
  */
 final class Einstellungen extends Screen {
@@ -36,6 +41,8 @@ final class Einstellungen extends Screen {
     private static final int GRIFF = 3;
     /** Breite der Knöpfe, höchstens; schmaler, wenn neben der Minimap weniger Platz ist. */
     private static final int BREITE = 200;
+    /** Breite des senkrechten Reglers „Zoom“, so breit wie ein Regler des Spiels hoch ist. */
+    static final int ZOOM_BREITE = 20;
 
     /** KLICK: gedrückt auf Spieler oder Marke; wandert die Maus weiter als {@link MinimapKlick#WEG}, wird daraus LAGE. */
     private enum Zug { KEINER, KLICK, LAGE, GROESSE }
@@ -52,6 +59,7 @@ final class Einstellungen extends Screen {
     private String grund;
     /** Linker Rand, Oberkante und Breite der Knöpfe. */
     private int spalte, oben, breite;
+    private ZoomRegler zoom;
 
     /** Wohin „Fertig“ und Escape führen: die Vollbildkarte, von der das Menü kam, oder null fürs Spiel. */
     private final Screen zurueck;
@@ -80,8 +88,10 @@ final class Einstellungen extends Screen {
         int x = spalte, y = oben, halb = (breite - 4) / 2;
         // Je zwei Knöpfe in einer Zeile; Vorlieben der Anzeige stehen im Untermenü.
         addRenderableWidget(CycleButton.onOffBuilder(m.sichtbar())
-                .create(x, y, halb, 20, Component.translatable("heroicmap.menue.minimap"), (b, an) -> m.setzeSichtbar(an)));
-        addRenderableWidget(new ZoomRegler(x + breite - halb, y, halb, m));
+                .create(x, y, breite, 20, Component.translatable("heroicmap.menue.minimap"), (b, an) -> m.setzeSichtbar(an)));
+        int[] z = zoomLage(m.rahmen(width, height), m.rand(), width);
+        zoom = addRenderableWidget(new ZoomRegler(z[0], z[1], z[2], m));
+        zoom.visible = m.sichtbar();
         // Gehen Mitspieler hier nicht, steht der Knopf rot und trägt den Grund als Tooltip.
         grund = Mitspieler.grund(Kanal.offen(), Mitspieler.INSTANZ.verweigert());
         CycleButton<Boolean> show = addRenderableWidget(CycleButton.booleanBuilder(rot(Component.translatable("heroicmap.menue.show.simplevoicechat")),
@@ -113,18 +123,32 @@ final class Einstellungen extends Screen {
     }
 
     /**
-     * Linker Rand und Breite der Knöpfe: mittig im grösseren freien Platz neben der Minimap, nicht
-     * auf ihr; bei grossem GUI-Massstab ist der Schirm schmal, dann werden die Knöpfe schmaler.
+     * Linker Rand und Breite der Knöpfe: mittig im grösseren freien Platz neben der Minimap und ihrem
+     * Regler „Zoom“, nicht auf ihnen; bei grossem GUI-Massstab ist der Schirm schmal, dann werden die
+     * Knöpfe schmaler.
      */
     static int[] spalte(int width, int height) {
         Minimap m = Minimap.INSTANZ;
         Minimap.Rahmen r = m.rahmen(width, height);
-        int links = r.x(), rechts = width - r.x() - r.seite();
+        int zx = zoomLage(r, m.rand(), width)[0];
+        int von = Math.min(r.x(), zx), bis = Math.max(r.x() + r.seite(), zx + ZOOM_BREITE);
+        int links = von, rechts = width - bis;
         int platz = !m.sichtbar() ? width : Math.max(links, rechts);
         int breite = Math.max(120, Math.min(BREITE, platz - 8));
         int spalte = !m.sichtbar() ? (width - breite) / 2
-                : links >= rechts ? (links - breite) / 2 : r.x() + r.seite() + (rechts - breite) / 2;
+                : links >= rechts ? (links - breite) / 2 : bis + (rechts - breite) / 2;
         return new int[] {Math.max(4, Math.min(spalte, width - breite - 4)), breite};
+    }
+
+    /**
+     * Wo der Regler „Zoom“ neben der Minimap {@code r} steht, {x, y, Höhe}: so hoch wie sie, links im Abstand {@code rand}
+     * wie ihre Koordinaten; passt er dort nicht auf den Schirm, ebenso rechts; passt er auf keiner Seite, innen an ihrem
+     * linken Rand. Siehe docs/minimap.md, „Bedienung“.
+     */
+    static int[] zoomLage(Minimap.Rahmen r, int rand, int width) {
+        int links = r.x() - rand - ZOOM_BREITE, rechts = r.x() + r.seite() + rand;
+        int x = links >= rand ? links : rechts + ZOOM_BREITE <= width - rand ? rechts : r.x();
+        return new int[] {x, r.y(), r.seite()};
     }
 
     /** Ohne Unschärfe und Abdunkeln, damit die Minimap im HUD zu sehen ist. */
@@ -134,6 +158,13 @@ final class Einstellungen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mausX, int mausY, float delta) {
+        // Der Regler folgt der Minimap schon beim Ziehen; die Knöpfe erst nach dem Loslassen.
+        Minimap m = Minimap.INSTANZ;
+        int[] z = zoomLage(m.rahmen(width, height), m.rand(), width);
+        zoom.setPosition(z[0], z[1]);
+        zoom.setHeight(z[2]);
+        zoom.visible = m.sichtbar();
+        zoom.folge(m.zoom());
         super.extractRenderState(g, mausX, mausY, delta);
         // Titel und Hinweis über den Knöpfen; unten läge der Chat darüber.
         int mitte = spalte + breite / 2;
@@ -175,8 +206,7 @@ final class Einstellungen extends Screen {
     /** Über der Minimap die Koordinaten des Blocks unter der Maus, fest unten links, genau wie gezeichnet: im Menü immer genordet. */
     private void koordinaten(GuiGraphicsExtractor g, Minimap.Rahmen r, int mausX, int mausY) {
         Minimap m = Minimap.INSTANZ;
-        double h = r.seite() / 2.0, dx = mausX - (r.x() + h), dz = mausY - (r.y() + h);
-        if (zug != Zug.KEINER || minecraft.player == null || (m.rund() ? dx * dx + dz * dz > h * h : !r.enthaelt(mausX, mausY))) {
+        if (zug != Zug.KEINER || minecraft.player == null || !auf(r, mausX, mausY)) {
             return;
         }
         // In Pixeln des Schirms wie Minimap.zeichne.
@@ -188,6 +218,23 @@ final class Einstellungen extends Screen {
         double ix = (mausX - r.x()) * k, iy = (mausY - r.y()) * k;
         int bx = Mth.floor((links + ix) / block), bz = Mth.floor((oben + iy) / block);
         g.text(font, Component.translatable("heroicmap.koordinaten", bx, bz), 4, height - 12, TEXT);
+    }
+
+    /** Liegt (x, y) auf der Minimap {@code r}, rund im Kreis? */
+    private static boolean auf(Minimap.Rahmen r, double x, double y) {
+        double h = r.seite() / 2.0, dx = x - (r.x() + h), dz = y - (r.y() + h);
+        return Minimap.INSTANZ.rund() ? dx * dx + dz * dz <= h * h : r.enthaelt(x, y);
+    }
+
+    /** Das Mausrad über der Minimap oder dem Regler „Zoom“: je Schritt eine Raste, nach vorn näher. */
+    @Override
+    public boolean mouseScrolled(double x, double y, double weitX, double weitY) {
+        if (weitY != 0 && zug == Zug.KEINER && Minimap.INSTANZ.sichtbar()
+                && (zoom.isMouseOver(x, y) || auf(Minimap.INSTANZ.rahmen(width, height), x, y))) {
+            zoom.schritt(weitY > 0 ? 1 : -1);
+            return true;
+        }
+        return super.mouseScrolled(x, y, weitX, weitY);
     }
 
     @Override
@@ -255,7 +302,13 @@ final class Einstellungen extends Screen {
     @Override
     public boolean mouseReleased(MouseButtonEvent e) {
         boolean geklickt = zug == Zug.KLICK && klick.lasse(e);
+        boolean gezogen = zug == Zug.LAGE || zug == Zug.GROESSE;
         zug = Zug.KEINER;
+        if (gezogen) {
+            // Die Knöpfe auf die freie Seite, neben Minimap und Regler.
+            rebuildWidgets();
+            return true;
+        }
         return geklickt || super.mouseReleased(e);
     }
 
@@ -340,16 +393,24 @@ final class Einstellungen extends Screen {
     }
 
     /**
-     * Der Zoom der Minimap als Schieberegler mit einer Raste je Stufe aus {@link Minimap#ZOOMS}, wie die Regler der
-     * Spieleinstellungen; die Pfeiltasten gehen je eine Raste. Siehe docs/minimap.md, „Bedienung“.
+     * Der Zoom der Minimap als senkrechter Schieberegler neben ihr, eine Raste je Stufe aus {@link Minimap#ZOOMS}, oben die
+     * nächste. Gezeichnet mit den Sprites der Regler des Spiels, quer; den Wert zeigt der Tooltip. Die Pfeiltasten und das
+     * Mausrad gehen je eine Raste, hoch, rechts und nach vorn näher. Siehe docs/minimap.md, „Bedienung“.
      */
     static final class ZoomRegler extends AbstractSliderButton {
 
         private static final int RASTEN = Minimap.ZOOMS.length - 1;
+        /** Höhe des Knaufs, wie im Spiel seine Breite. */
+        private static final int KNAUF = 8;
+        private static final Identifier SPUR = Identifier.withDefaultNamespace("widget/slider");
+        private static final Identifier SPUR_HELL = Identifier.withDefaultNamespace("widget/slider_highlighted");
+        private static final Identifier GRIFF = Identifier.withDefaultNamespace("widget/slider_handle");
+        private static final Identifier GRIFF_HELL = Identifier.withDefaultNamespace("widget/slider_handle_highlighted");
         private final Minimap minimap;
+        private boolean zieht;
 
-        ZoomRegler(int x, int y, int breite, Minimap minimap) {
-            super(x, y, breite, 20, Component.empty(), (double) Math.max(0, Minimap.stufe(minimap.zoom())) / RASTEN);
+        ZoomRegler(int x, int y, int hoehe, Minimap minimap) {
+            super(x, y, ZOOM_BREITE, hoehe, Component.empty(), (double) Math.max(0, Minimap.stufe(minimap.zoom())) / RASTEN);
             this.minimap = minimap;
             updateMessage();
         }
@@ -361,6 +422,7 @@ final class Einstellungen extends Screen {
         @Override
         protected void updateMessage() {
             setMessage(CommonComponents.optionNameValue(Component.translatable("heroicmap.menue.zoom"), Minimap.fach(Minimap.ZOOMS[raste()])));
+            setTooltip(Tooltip.create(getMessage()));
         }
 
         @Override
@@ -370,14 +432,66 @@ final class Einstellungen extends Screen {
             minimap.setzeZoom(Minimap.ZOOMS[raste()]);
         }
 
+        /** Wie der Regler des Spiels, nur quer: Spur und Knauf, ohne Text. */
+        @Override
+        public void extractWidgetRenderState(GuiGraphicsExtractor g, int mausX, int mausY, float delta) {
+            int farbe = ARGB.white(alpha);
+            g.blitSprite(RenderPipelines.GUI_TEXTURED, isActive() && isFocused() && !canChangeValue ? SPUR_HELL : SPUR,
+                    getX(), getY(), getWidth(), getHeight(), farbe);
+            int knauf = getY() + (int) Math.round((1 - value) * (getHeight() - KNAUF));
+            g.blitSprite(RenderPipelines.GUI_TEXTURED, isActive() && (isHovered || canChangeValue) ? GRIFF_HELL : GRIFF,
+                    getX(), knauf, getWidth(), KNAUF, farbe);
+            if (isHovered()) {
+                g.requestCursor(!isActive() ? CursorTypes.NOT_ALLOWED : zieht ? CursorTypes.RESIZE_NS : CursorTypes.POINTING_HAND);
+            }
+        }
+
+        @Override
+        public void onClick(MouseButtonEvent e, boolean doppelt) {
+            zieht = active;
+            vonMaus(e.y());
+        }
+
+        @Override
+        protected void onDrag(MouseButtonEvent e, double dx, double dy) {
+            vonMaus(e.y());
+        }
+
+        @Override
+        public void onRelease(MouseButtonEvent e) {
+            zieht = false;
+            super.onRelease(e);
+        }
+
+        /** Die Mitte des Knaufs liegt bei y + 4 + (1 − Wert) × (Höhe − 8), wie im Spiel quer. */
+        private void vonMaus(double y) {
+            setValue(1 - (y - getY() - KNAUF / 2.0) / (getHeight() - KNAUF));
+        }
+
         @Override
         public boolean keyPressed(KeyEvent ereignis) {
-            int schritt = ereignis.key() == InputConstants.KEY_LEFT ? -1 : ereignis.key() == InputConstants.KEY_RIGHT ? 1 : 0;
+            int taste = ereignis.key();
+            int schritt = taste == InputConstants.KEY_UP || taste == InputConstants.KEY_RIGHT ? 1
+                    : taste == InputConstants.KEY_DOWN || taste == InputConstants.KEY_LEFT ? -1 : 0;
             if (schritt != 0 && active) {
-                setValue((double) Math.clamp(raste() + schritt, 0, RASTEN) / RASTEN);
+                schritt(schritt);
                 return true;
             }
             return super.keyPressed(ereignis);
+        }
+
+        /** Stellt den Knauf auf {@code zoom}, ohne ihn anzuwenden: Der Zoom kann sich auch ohne den Regler ändern. */
+        void folge(double zoom) {
+            double v = (double) Math.max(0, Minimap.stufe(zoom)) / RASTEN;
+            if (v != value) {
+                value = v;
+                updateMessage();
+            }
+        }
+
+        /** Eine Raste näher (+1) oder weiter (−1), am Ende bleibt er stehen. */
+        void schritt(int schritt) {
+            setValue((double) Math.clamp(raste() + schritt, 0, RASTEN) / RASTEN);
         }
     }
 }
