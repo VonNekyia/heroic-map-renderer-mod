@@ -1070,28 +1070,39 @@ final class Wegpunkte {
         return true;
     }
 
-    /**
-     * Darf {@code von} mit {@code ziel} verbunden werden? Nicht zwei Wegpunkte und keine Todespunkte, nur in einer Dimension,
-     * nicht, was schon verbunden ist, keine Form zweimal im neuen Bund, und ein Wegpunkt darin nicht auf den Block eines
-     * anderen. Siehe docs/wegpunkte.md, „Verbinden“.
-     */
+    /** Darf {@code von} mit {@code ziel} verbunden werden? Wenn {@link #warumNicht} keinen Grund findet. */
     boolean kannVerbinden(Glied von, Glied ziel) {
-        if (von.punkt() != null && von.punkt().tod() || ziel.punkt() != null && ziel.punkt().tod() || !von.dimension().equals(ziel.dimension())
-                || von.bund() > 0 && von.bund() == ziel.bund()) {
-            return false;
+        return warumNicht(von, ziel) == null;
+    }
+
+    /**
+     * Warum sich {@code von} nicht mit {@code ziel} verbinden lässt, als Schlüssel der Meldung, oder null, wenn es geht: kein
+     * Todespunkt; nur in einer Dimension und nicht, was schon verbunden ist; keine Form zweimal im neuen Bund; höchstens ein
+     * Wegpunkt darin, und der nicht auf dem Block eines anderen. Siehe docs/wegpunkte.md, „Verbinden“.
+     */
+    String warumNicht(Glied von, Glied ziel) {
+        if (von.punkt() != null && von.punkt().tod() || ziel.punkt() != null && ziel.punkt().tod()) {
+            return "heroicmap.karte.verbinden_tod";
+        }
+        if (!von.dimension().equals(ziel.dimension()) || von.bund() > 0 && von.bund() == ziel.bund()) {
+            return "heroicmap.karte.verbinden_nicht";
         }
         List<Glied> a = glieder(von), b = glieder(ziel);
         Set<EigeneForm> formen = new HashSet<>();
         a.stream().filter(g -> g.form() != null).forEach(g -> formen.add(g.form()));
         if (b.stream().anyMatch(g -> g.form() != null && formen.contains(g.form()))) {
-            return false;
+            return "heroicmap.karte.verbinden_form";
         }
         List<Punkt> wegpunkte = new ArrayList<>();
         a.stream().filter(g -> g.punkt() != null).forEach(g -> wegpunkte.add(g.punkt()));
         b.stream().filter(g -> g.punkt() != null).forEach(g -> wegpunkte.add(g.punkt()));
         // Höchstens ein Wegpunkt je Bund, denn zwei liegen nie auf einem Block; das schliesst auch zwei Wegpunkte miteinander aus.
+        if (wegpunkte.size() > 1) {
+            return "heroicmap.karte.verbinden_wegpunkte";
+        }
+        // Nur ein Wegpunkt im Bund kann auf einen anderen treffen; eine Ecke darf auf dem Block eines fremden liegen.
         Punkt dort = punktAuf(ziel.dimension(), ziel.x(), ziel.z());
-        return wegpunkte.size() <= 1 && (dort == null || wegpunkte.contains(dort));
+        return wegpunkte.isEmpty() || dort == null || wegpunkte.contains(dort) ? null : "heroicmap.karte.koordinaten_belegt";
     }
 
     /** Das Glied und alle anderen seines Bunds; lose nur es selbst. */

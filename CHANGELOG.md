@@ -8,6 +8,11 @@ The release notes on GitHub and Modrinth come from here
 
 - **One map folder per server behind a proxy.** With the plugin from 0.14.0 on, the server names its map, and the mod keeps each server's map, waypoints and layers in its own folder, even when two servers share a world. A server that shows another server's map uses that server's folder. Existing folders move once on the first join. From the second join on, the mod remembers the map and uses the right folder right away.
 
+## 0.2.64
+
+- **Alt connects while you drag.** Hold `Alt` (`⌥` on a Mac) while dragging a corner or waypoint: it snaps like with `Ctrl` and connects on release; both corners already show the light centre while you drag. If the target can't be connected, it only snaps and says why. `Ctrl` alone still only snaps, on a Mac too (`Ctrl`, not `⌘`).
+- A corner can now be connected even if an unrelated waypoint sits on the target's block.
+
 ## 0.2.63
 
 - **Reorder the layers.** In the layer list of the full map, ▲ and ▼ move a layer up or down; the upper one is drawn on top, on the full map and the minimap. Your order is kept per server world; "Server order" puts it back. Until you reorder, nothing changes.

@@ -393,6 +393,38 @@ class WegpunkteTest {
         felder(vorher, w.eigeneFormen().get(0));
     }
 
+    /**
+     * Warum nicht verbinden (mod#169): je Grund der Schlüssel der Meldung, sonst null; kannVerbinden folgt ihm. Siehe
+     * docs/wegpunkte.md, „Verbinden“.
+     */
+    @Test
+    void warumNichtVerbinden() {
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        w.setzeForm(WELT, List.of(e(0, 0), e(10, 0)));
+        w.setzeForm(WELT, List.of(e(20, 0), e(30, 0)));
+        w.setzeForm("minecraft:the_nether", List.of(e(0, 0), e(5, 5)));
+        w.setzeForm(WELT, List.of(e(70, 70), e(80, 70)));
+        w.setzeForm(WELT, List.of(e(40, 40), e(45, 45)));
+        w.setze(WELT, 40, 40);
+        w.setze(WELT, 50, 50);
+        w.setzeTod(WELT, 60, 60, 1);
+        Wegpunkte.Glied p = Wegpunkte.Glied.von(w.punkte().get(0)), q = Wegpunkte.Glied.von(w.punkte().get(1));
+        assertNull(w.warumNicht(g(w, 0, 1), g(w, 1, 0)));
+        assertEquals("heroicmap.karte.verbinden_tod", w.warumNicht(g(w, 0, 0), Wegpunkte.Glied.von(w.tod())));
+        assertEquals("heroicmap.karte.verbinden_nicht", w.warumNicht(g(w, 0, 0), g(w, 2, 0)));
+        assertEquals("heroicmap.karte.verbinden_form", w.warumNicht(g(w, 0, 0), g(w, 0, 1)));
+        assertEquals("heroicmap.karte.verbinden_wegpunkte", w.warumNicht(p, q));
+        // Eine Ecke auf dem Block eines fremden Wegpunkts: Ohne Wegpunkt im Bund geht es.
+        assertNull(w.warumNicht(g(w, 0, 0), g(w, 4, 0)));
+        assertTrue(w.verbinde(g(w, 0, 1), g(w, 1, 0)));
+        assertEquals("heroicmap.karte.verbinden_nicht", w.warumNicht(g(w, 0, 1), g(w, 1, 0)));
+        // C0 im Bund mit q, dann auf Z0, auf dem p liegt: q träfe auf p, also „Dort liegt schon ein Wegpunkt“.
+        assertTrue(w.verbinde(g(w, 3, 0), Wegpunkte.Glied.von(w.punkte().get(1))));
+        assertEquals("heroicmap.karte.koordinaten_belegt", w.warumNicht(g(w, 3, 0), g(w, 4, 0)));
+        assertFalse(w.kannVerbinden(g(w, 0, 0), Wegpunkte.Glied.von(w.tod())));
+    }
+
     private static void felder(Wegpunkte.EigeneForm soll, Wegpunkte.EigeneForm ist) {
         assertEquals(List.of(soll.name(), soll.hex(), soll.schrift(), soll.biegung(), soll.gewicht(), soll.farbe(), soll.ebene()),
                 List.of(ist.name(), ist.hex(), ist.schrift(), ist.biegung(), ist.gewicht(), ist.farbe(), ist.ebene()));
