@@ -112,7 +112,7 @@ final class Servername {
     }
 
     /** Die Adresse, wie der Spieler sie eingetippt hat, ohne Gross und Klein und ohne Leerzeichen. */
-    private static String schluessel(String adresse) {
+    static String schluessel(String adresse) {
         return adresse.trim().toLowerCase(Locale.ROOT).replace(' ', '_');
     }
 
