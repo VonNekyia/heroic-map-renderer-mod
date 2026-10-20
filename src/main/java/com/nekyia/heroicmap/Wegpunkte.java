@@ -853,8 +853,7 @@ final class Wegpunkte {
      * (Review von #172).
      */
     private static DateTimeFormatter format(String muster, String fest) {
-        return FORMATE.computeIfAbsent(muster + "
-" + fest, k -> {
+        return FORMATE.computeIfAbsent(muster + "\n" + fest, k -> {
             try {
                 DateTimeFormatter f = DateTimeFormatter.ofPattern(muster);
                 f.format(ZonedDateTime.ofInstant(Instant.EPOCH, ZoneOffset.UTC));
