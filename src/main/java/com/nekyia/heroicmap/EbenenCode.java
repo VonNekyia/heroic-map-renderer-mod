@@ -34,8 +34,8 @@ final class EbenenCode {
     record Ort(String dimension, int x, int z, int farbe) {
     }
 
-    /** Eine Form im Code; {@code hex} wie bei {@link Wegpunkte.EigeneForm}, {@code name} null ohne. */
-    record Form(String dimension, List<Wegpunkte.Ecke> ecken, int farbe, int hex, String name) {
+    /** Eine Form im Code; {@code hex}, {@code schrift} und {@code biegung} wie bei {@link Wegpunkte.EigeneForm}, {@code name} null ohne. */
+    record Form(String dimension, List<Wegpunkte.Ecke> ecken, int farbe, int hex, String name, double schrift, int biegung, int gewicht) {
     }
 
     /** Was ein Code enthält. */
@@ -88,6 +88,16 @@ final class EbenenCode {
             }
             if (f.name() != null) {
                 q.addProperty("name", f.name());
+            }
+            // Nur ohne Vorgabe; ältere Versionen überlesen sie. Siehe docs/wegpunkte.md, „Ebenen teilen“.
+            if (f.schrift() != 1) {
+                q.addProperty("schrift", f.schrift());
+            }
+            if (f.biegung() != 0) {
+                q.addProperty("biegung", f.biegung());
+            }
+            if (f.gewicht() != 0) {
+                q.addProperty("gewicht", f.gewicht());
             }
             formen.add(q);
         }
@@ -220,7 +230,30 @@ final class EbenenCode {
             }
             name = Wegpunkte.name(q.get("name").getAsString());
         }
-        return new Form(dimension(q), gueltig, index, hex, name);
+        double schrift = 1;
+        if (q.has("schrift")) {
+            JsonElement s = q.get("schrift");
+            if (!s.isJsonPrimitive() || !s.getAsJsonPrimitive().isNumber() || !Wegpunkte.schriftGilt(s.getAsDouble())) {
+                throw new IllegalArgumentException("Schrift");
+            }
+            schrift = Wegpunkte.schrift(s.getAsDouble());
+        }
+        int biegung = 0;
+        if (q.has("biegung")) {
+            int b = ganz(q.get("biegung"));
+            if (Math.abs(b) > Wegpunkte.MAX_BIEGUNG) {
+                throw new IllegalArgumentException("Biegung " + b);
+            }
+            biegung = Wegpunkte.biegung(b);
+        }
+        int gewicht = 0;
+        if (q.has("gewicht")) {
+            gewicht = ganz(q.get("gewicht"));
+            if (!Wegpunkte.gewichtGilt(gewicht)) {
+                throw new IllegalArgumentException("Gewicht " + gewicht);
+            }
+        }
+        return new Form(dimension(q), gueltig, index, hex, name, schrift, biegung, gewicht);
     }
 
     private static Gelesen fehler(String schluessel) {

@@ -37,7 +37,9 @@ Formen“ (mod#79, mod#112).
 | Eingabe auf der Vollbildkarte | tut |
 |---|---|
 | Rechtsklick, „Wegpunkt setzen“ | der Eintrag unter „Hierher teleportieren“; setzt einen Wegpunkt auf den Block unter der Maus, in der ersten der 8 Farben (`Wegpunkte.FARBEN`), die in der Dimension noch frei ist, sind alle vergeben, reihum. Steht dort schon einer, bleibt es einer |
-| Rechtsklick auf einen Wegpunkt | das Menü für seinen Block: „Hierher teleportieren“ und „Wegpunkt löschen“, auf dem Todespunkt „Todespunkt löschen“ |
+| Rechtsklick auf einen Wegpunkt, eine Ecke oder die Raute eines alten Rechtecks | nur das Menü dieses Objekts, siehe „Menü je Objekt“ |
+| Rechtsklick, „Koordinaten setzen…“ | an einem Wegpunkt oder einer Ecke ein Feld mit ihrem `x z` wie bei „Wegpunkt bei …“; Enter legt sie dorthin und in die Mitte, siehe „Menü je Objekt“ |
+| `Entf` oder `⌫` | löscht, was unter der Maus hervorgehoben steht, wie „… löschen“ im Menü: einen Wegpunkt, auch den Todespunkt, eine Ecke, am Griff die ganze Form, die Raute eines alten Rechtecks. `⌫`, weil die Taste auf dem Mac so heisst (Reviewer). Nichts auf freier Karte, im offenen Feld (dort löscht sie Zeichen), bei offenem Menü, bei gedrückter Taste und solange eine Form im Bau ist. Nichts vom Server. Wie im Menü ohne Rückgängig (mod#149) |
 | Rechtsklick auf einen Wegpunkt, den Griff einer Form oder die Raute eines alten Rechtecks, „Ebene …“ | legt es in eine eigene Ebene, auch in eine neue, siehe „Eigene Ebenen“ |
 | Rechtsklick, „Wegpunkt bei …“ | öffnet an der Stelle des Menüs ein Eingabefeld mit `x z` des Blocks unter der Maus, wie bei „Name…“, siehe „Namen“. Enter nimmt `x z`, `x, z` oder `x y z`, ganze Zahlen aus Ziffern in ASCII, x und z höchstens 30 000 000 weit (`Wegpunkte.koordinaten`); y zählt nicht, ein Wegpunkt hat nur x und z, so sagt es auch der Hinweis unten links. Dann setzt es dort einen Wegpunkt in der jetzigen Dimension wie „Wegpunkt setzen“ und legt ihn in die Mitte. Was keine Koordinaten sind, nimmt Enter nicht; der Text wird rot. Gewünscht vom User am 18.10. (mod#129) |
 | Klick auf eine Marke | legt sie in die Mitte, sobald kein zweiter Klick mehr folgen kann, 250 ms nach dem Loslassen: einen Wegpunkt, einen Mitspieler oder den eigenen Spieler. So kommt man vom Wegpunkt zum eigenen Spieler zurück. Wer auf einer Marke zu ziehen beginnt und sich weiter als 3 Einheiten vom Druckpunkt entfernt (`Karte.ZUG`), zieht nur die Karte |
@@ -46,14 +48,14 @@ Formen“ (mod#79, mod#112).
 | Doppelklick in eine eigene Region, auf eine eigene Linie, auf die Raute eines alten Rechtecks, auf eine Fläche, einen Kreis, eine Nadel oder ein Banner vom Server | heftet sie an die Minimap oder löst sie wieder, siehe „Anheften“ |
 | Rechtsklick, „Linie/Region von hier“ | beginnt eine eigene Form mit einer Ecke auf dem Block unter der Maus, auf einem Wegpunkt auf dessen Block, siehe „Eigene Formen“ |
 | Linksklick auf die Karte, solange eine Form im Bau ist | setzt eine Ecke, auf einem Wegpunkt auf dessen Block, statt ihn in die Mitte zu legen, sonst auf den Block darunter; auf die erste Ecke schliesst er bei drei und mehr die Region. Ziehen verschiebt die Karte wie sonst |
-| Rechtsklick, „Eckpunkt hinzufügen“ | im Bau: eine Ecke hier, wie ein Linksklick; auf einer Ecke einer fertigen Form: neue Ecken zwischen ihr und der nächsten |
+| Rechtsklick auf eine Ecke, „Eckpunkt hinzufügen“ | neue Ecken zwischen ihr und der nächsten, siehe „Eigene Formen“ |
 | Rechtsklick auf eine Ecke, „Eckpunkt löschen“ | nimmt sie aus der Form; aus einer Region mit drei Ecken wird eine Linie, eine Linie mit zwei fällt weg |
+| Beim Ziehen einer Ecke oder eines Wegpunkts `Strg` halten | er rastet auf die nächste Ecke einer anderen Form oder, eine Ecke, auf den nächsten Wegpunkt ein, höchstens 8 Einheiten weg, siehe „Einrasten“ |
 | Linke Taste 0,5 s still auf einer Ecke halten | sie hängt an der Maus, die Form folgt ihr, und sie liegt beim Loslassen auf dem Block darunter; `Esc` bricht ab |
 | Linke Taste 0,5 s still auf dem Griff in der Mitte einer Form halten | die ganze Form hängt an der Maus; beim Loslassen liegt sie um ganze Blöcke verschoben; `Esc` bricht ab, siehe „Eigene Formen“ |
-| Rechtsklick, „Form fertig“ | speichert die Form im Bau, mit zwei Ecken eine Linie, mit mehr eine Region; den Eintrag gibt es ab zwei Ecken |
-| Rechtsklick, „Form abbrechen“, oder `Esc` | verwirft die Form im Bau; eine geänderte bleibt, wie sie war |
+| Rechtsklick, solange eine Form im Bau ist | schliesst sie ab: mit zwei Ecken eine Linie, mit mehr eine Region; mit einer nur ein Hinweis. Am Griff einer Form statt dessen ihr Menü mit „Form fertig“ ab zwei Ecken und „Form abbrechen“ |
+| `Esc`, oder am Griff „Form abbrechen“ | verwirft die Form im Bau; eine geänderte bleibt, wie sie war |
 | Rechtsklick auf den Griff einer eigenen Form | ihr Menü: „An die Minimap heften“ oder „Von der Minimap lösen“, „Name…“, „Farbe…“, „Eckpunkt hinzufügen“, „Form löschen“; siehe „Eigene Formen“, „Namen“ und „Farbe“ |
-| Rechtsklick auf die Raute eines alten Rechtecks | „Region löschen“ |
 
 - **Unter der Maus** steht hervorgehoben, was ein Klick dort träfe: ein
   Wegpunkt oder die Raute eines alten Rechtecks mit hellem statt bunten oder
@@ -181,6 +183,9 @@ nach oben immer durchsichtiger.
 
 ![Der Schleier einer angehefteten Region am Hang und der Strahl eines angehefteten Wegpunkts; Szene `schleier` des Gametests](bilder/schleier.png)
 
+- **Geteilte Kanten:** Teilen zwei angeheftete eigene Regionen ein Stück
+  ihrer Kante genau, steht dort nur der Schleier der schwereren, siehe
+  „Gewicht“.
 - **Welche:** dieselben Formen wie auf der Minimap, siehe „Anheften“:
   angeheftete Flächen und Kreise der sichtbaren Ebenen, angeheftete eigene
   Regionen aus Wegpunkten und alte Rechtecke, in der Dimension des Spielers
@@ -265,10 +270,12 @@ nach oben immer durchsichtiger.
   Kreis um den Spieler liegt, einen Block weiter als die Reichweite
   (`Schleier.imKreis`). Ein Stück mit der Mitte in der Reichweite liegt ganz
   darin, so fehlt keins; was ausserhalb liegt, entsteht gar nicht erst.
-- **Geschätzt, noch nicht gemessen:** Beides nimmt von den rund 2 ms für
-  Sammeln und Sortieren an der Spitze den grössten Teil; ein Bau mit
-  47 Regionen läge dann eher bei 3 als bei 4,5 ms. Die Messung folgt in
-  der nächsten Nacht.
+- **Gemessen am 19.10.,** siehe
+  [Schleier, Auswahl statt Sortieren](messungen/2026-10-19-schleier-auswahl.md):
+  Ein Bau mit 47 Regionen dauert im Median 3,44 statt 4,31 ms, rund 20 %
+  weniger. Das Sortieren sinkt von 1,34 auf 0,49 ms, das Sammeln steigt
+  von 0,57 auf 0,70 ms; die Höhen bleiben bei rund 2,6 ms und sind jetzt
+  drei Viertel des Baus. Je Frame ändert sich nichts.
 - **Schalter** „Effekte in der Welt“, siehe „Strahl“.
 
 ## Grösse
@@ -295,14 +302,22 @@ Reviewer freigegeben.
 - **Wann:** im Client-Tick, wenn `isDeadOrDying` von falsch auf wahr
   wechselt, einmal je Tod (`HeroicMap.gestorben`), auf dem Block des
   Spielers in seiner Dimension.
-- **Nur einer:** Ein neuer Tod verschiebt ihn (`Wegpunkte.setzeTod`). Liegt
-  auf dem Block schon ein Wegpunkt, gibt es keinen; der Block ist schon
-  markiert.
-- **Angeheftet** beim Setzen, so führen Minimap und Strahl zurück, siehe
-  „Strahl“. Sonst wie ein Wegpunkt: Doppelklick löst oder heftet an,
-  Halten verschiebt, ein Klick legt ihn in die Mitte, am Rand steht er wie
-  die anderen Marken. Ein Rechtsklick auf ihn bietet „Todespunkt löschen“
-  statt „Wegpunkt löschen“.
+- **Mehrere,** so viele, wie der Regler „Todespunkte“ sagt, 1 bis 16,
+  gewünscht vom User am 19.10. (mod#151). Jeder Tod setzt einen neuen
+  (`Wegpunkte.setzeTod`); sind es mehr, fallen die ältesten weg. Ihre
+  Folge ist die der Tode, der letzte der neueste; eine Zeit merkt sich der
+  Mod nicht, die Folge in der Liste reicht.
+- **Derselbe Block:** Stirbt der Spieler auf dem Block eines früheren
+  Todespunkts, wird der der neueste. Liegt auf dem Block ein Wegpunkt, gibt
+  es keinen; der Block ist schon markiert, und die übrigen bleiben.
+- **Angeheftet** wird der neue beim Setzen, und der vorige neueste wird
+  gelöst, auch wenn der Spieler ihn selbst angeheftet hatte; so führt ein
+  Strahl zum letzten Tod, siehe „Strahl“. So hat es der Reviewer
+  entschieden. Sonst wie ein Wegpunkt: Doppelklick löst oder heftet an, ein
+  Klick legt ihn in die Mitte, am Rand steht er wie die anderen Marken.
+- **Nicht verschiebbar,** so hat es der User entschieden: Gehalten hängt
+  ein Todespunkt nicht an der Maus, und „Koordinaten setzen…“ gibt es an
+  ihm nicht. Ein Rechtsklick bietet „Todespunkt löschen“, ebenso `Entf`.
 - **Gezeichnet** als dunkle Raute mit hellem ✕ (`Minimap.TOD`,
   `Minimap.TOD_KREUZ`), auf Vollbildkarte und Minimap; sein Strahl ist
   dunkel. Die Arme des ✕ sind 5 Sechzehntel der Marke lang und 0,75 dick;
@@ -316,12 +331,77 @@ Reviewer freigegeben.
   dort fängt Fabric die Befehle des Clients ab (per javap an 26.3 und am
   Fabric API). Die Karte öffnet sich in der jetzigen Dimension; wer in
   einer anderen gestorben ist, sieht den Todespunkt erst dort.
-- **Schalter** „Todespunkt“ im Untermenü „Einstellungen …“, neben
-  „Auflösung“, Vorgabe an (`Minimap.todespunkt`, gespeichert als
-  `todespunkt`). Aus setzt keinen, und ein vorhandener ist weg.
-- **Datei:** eigens als `tod`, nicht in der Liste `wegpunkte`, siehe
-  „Ablage“; so zählt ihn eine ältere Version nicht mit, sie überliest ihn.
-  Eine id bekommt er beim Lesen wie ein Wegpunkt ohne.
+- **Regler** „Todespunkte: aus, 1 … 16“ im Untermenü „Einstellungen …“,
+  neben „Auflösung“, Vorgabe 1 (`Anzeige.TodRegler`, `Minimap.todespunkte`,
+  gespeichert als `todespunkte`). Weniger nimmt die ältesten weg, aus alle,
+  aber erst beim Schliessen des Untermenüs (`Anzeige.removed`,
+  `Wegpunkte.kappeTode`): So löscht der Regler beim Ziehen keinen, von 8
+  auf 1 und zurück bleiben 8 (Review von #164). Aus setzt ein Tod keinen. Bis 0.2.57
+  war es ein Schalter `todespunkt`: aus wird 0, an oder ohne Eintrag 1.
+- **Datei:** eigens als Liste `tode`, der älteste zuerst, nicht in der
+  Liste `wegpunkte`, siehe „Ablage“. Dazu steht der neueste noch einmal als
+  `tod`; so behält eine ältere Version, die nur `tod` kennt, ihren einen.
+  Ohne `tode` liest der Mod `tod`, also eine alte Datei mit einem. Eine id
+  bekommt jeder beim Lesen wie ein Wegpunkt ohne.
+
+## Menü je Objekt
+
+Ein Rechtsklick zeigt nur, was das Objekt unter der Maus betrifft
+(`Karte.menue`), gewünscht vom User am 19.10. (mod#149). Was unter der
+Maus liegt, zählt wie beim Zeigen und beim Klick: ein Wegpunkt oder die
+Raute eines alten Rechtecks vor einer Ecke vor dem Griff einer Form.
+
+| Objekt | Einträge |
+|---|---|
+| Wegpunkt | „Hierher teleportieren“, „Koordinaten setzen…“, „Linie/Region von hier“ auf seinem Block, „Ebene …“, „Wegpunkt löschen“ |
+| Todespunkt | „Hierher teleportieren“, „Todespunkt löschen“; er bleibt, wo er ist, und in Base |
+| Ecke einer eigenen Form | „Koordinaten setzen…“, „Eckpunkt hinzufügen“, „Eckpunkt löschen“ |
+| Raute eines alten Rechtecks | „Ebene …“, „Region löschen“ |
+| Griff einer eigenen Form | ihr Menü, siehe „Eigene Formen“, „Menü am Griff“ |
+| freie Karte, auch in einer Fläche | „Hierher teleportieren“, „Wegpunkt setzen“, „Wegpunkt bei …“, „Linie/Region von hier“ |
+
+- **Teleport** bleibt am Wegpunkt und am Todespunkt, entschieden vom
+  Reviewer: Er betrifft den Ort, und nach einem Tod ist er der Weg zurück.
+- **Im Bau** gibt es kein Menü ausser am Griff; ein Rechtsklick schliesst
+  die Form ab, siehe „Eigene Formen“.
+- **„Koordinaten setzen…“** öffnet an der Stelle des Menüs ein Feld mit
+  `x z` des Objekts (`Karte.koordinaten`). Enter nimmt dieselben Formen
+  wie „Wegpunkt bei …“, `x z`, `x, z` oder `x y z` (`Wegpunkte.koordinaten`),
+  legt das Objekt dorthin und es in die Mitte. Was keine Koordinaten sind,
+  steht rot.
+  - Eine Ecke liegt danach auf diesem Block, wie nach dem Loslassen; auf
+    dem Block ihrer Nachbarin werden beide eine.
+  - Ein Wegpunkt auf einen Block, auf dem schon einer liegt: Enter nimmt
+    es nicht, der Text steht rot, und unten links steht „Dort liegt schon
+    ein Wegpunkt“.
+  - Den Todespunkt gibt es dort nicht; er lässt sich nicht verschieben,
+    so hat es der User entschieden (mod#151).
+
+## Einrasten
+
+Hält der Spieler beim Ziehen einer Ecke oder eines Wegpunkts `Strg`
+(auf dem Mac `⌘`, `Minecraft.hasControlDown`), rastet er auf ein nahes
+Ziel ein (`Karte.einrasten`), gewünscht vom User am 19.10. (mod#149): So
+schliessen Regionen sauber aneinander.
+
+- **Ziele:** die Ecken anderer eigener Formen und, für eine Ecke, die
+  Wegpunkte, alle in Ebenen, die an sind, und in dieser Dimension.
+  Gemessen wird an der Lage des Blocks, nicht an der Marke: Die Marke
+  eines fernen Wegpunkts steht am Rand, siehe „Am Rand“, und zählt nicht. Die
+  Ecken der eigenen Form zählen nicht; liegt eine Ecke beim Loslassen auf
+  dem Block ihrer Nachbarin, werden beide eine, wie ohne `Strg`. Ein
+  Wegpunkt rastet nur auf Ecken ein, denn zwei Wegpunkte liegen nie auf
+  einem Block.
+- **Nah** heisst höchstens 8 Einheiten des GUI von der Maus, gemessen an
+  den Lagen des letzten Frames; das nächste Ziel gewinnt. Entschieden vom
+  Reviewer.
+- **Beim Ziehen** steht, was an der Maus hängt, schon genau auf dem Ziel,
+  und das Ziel ist hell wie unter der Maus. Ohne `Strg` folgt es der Maus
+  wie bisher.
+- **Beim Loslassen** zählt, ob `Strg` dann gedrückt ist: mit dem Ziel auf
+  dessen Block (`Karte.ablage`), sonst auf dem Block unter der Maus.
+- **Nicht** am Griff, wo die ganze Form hängt, und nicht auf Objekte vom
+  Server.
 
 ## Eigene Formen
 
@@ -339,21 +419,23 @@ sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
   auf die Karte eine Ecke (`Karte.hinzu`): auf einem Wegpunkt auf dessen
   Block, statt ihn in die Mitte zu legen, sonst auf den Block darunter, und
   höchstens 3 Einheiten neben einer Ecke im Bau auf deren Block
-  (`Karte.eckBlock`). Ebenso Rechtsklick, „Eckpunkt hinzufügen“. Ziehen
-  über `Karte.ZUG` verschiebt die Karte wie sonst. Ein Wegpunkt entsteht
-  dabei nicht. Ein Linksklick auf die erste Ecke schliesst eine neue Form
-  ab drei Ecken zur Region; „Form fertig“ speichert sie, wie sie ist
-  (`Karte.fertig`, `Wegpunkte.setzeForm`).
+  (`Karte.eckBlock`). Ziehen über `Karte.ZUG` verschiebt die Karte wie
+  sonst. Ein Wegpunkt entsteht dabei nicht. Ein Linksklick auf die erste
+  Ecke schliesst eine neue Form ab drei Ecken zur Region.
+- **Abschliessen:** Ein Rechtsklick speichert die Form, wie sie ist, wie
+  „Form fertig“ (`Karte.fertig`, `Wegpunkte.setzeForm`): mit zwei Ecken eine
+  Linie, ab drei eine Region. Das gilt auch auf einem Wegpunkt, einer
+  Ecke oder der Raute eines alten Rechtecks. Mit einer Ecke sagt er unten
+  links „Mindestens zwei Eckpunkte; Esc bricht ab“ und tut sonst nichts.
+  Am Griff einer Form, wo nichts darüber liegt, kommt statt dessen ihr
+  Menü, siehe „Griff“. Gewünscht vom User am 19.10. (mod#149); bis dahin
+  öffnete der Rechtsklick ein Menü zum Bauen.
 - **Im Bau** verbindet eine gepunktete weisse Vorschau die Ecken, mit
   einer weissen Raute auf jeder, und die Stelle der nächsten Ecke mit der
   Maus. Unten links steht „Linksklick: Eckpunkt hier oder auf einem
-  Wegpunkt, auf den ersten: Region; Rechtsklick: Menü mit „Form fertig“;
-  Esc bricht ab“. Ein Rechtsklick schliesst nie sofort ab; das Menü hat
-  dann: „Hierher teleportieren“; „Wegpunkt setzen“, auf einem
-  Wegpunkt „Wegpunkt löschen“; „Eckpunkt hinzufügen“; „Form fertig“ ab zwei
-  Ecken; „Form abbrechen“; „Region löschen“ auf der Raute eines alten
-  Rechtecks. Auf dem Griff einer Form das Menü der Form, siehe „Griff“, mit
-  „Form fertig“ und „Form abbrechen“ für die Form im Bau.
+  Wegpunkt, auf den ersten: Region; Rechtsklick: fertig; Esc bricht ab“.
+  Ein Menü gibt es im Bau nur am Griff einer Form: ihr Menü, siehe
+  „Griff“, mit „Form fertig“ und „Form abbrechen“ für die Form im Bau.
 - **Keine Tafel,** solange die Form im Bau ist (`Karte.tafel`). Sonst ging
   die Tafel einer Region vom Server dort auf, wo das Menü war, lag über den
   Stellen, die der Spieler anklickt, und nahm deren Klick; so fügte ein
@@ -366,16 +448,16 @@ sollte dann ein Punkte sein genau wie eine Region mit Eckpunkten“.
   ihrer Form, mit dunklem Rand, immer, unter den Marken (`Karte.ecken`).
   Ein Klick trifft die Ecke, deren Mitte am nächsten liegt, höchstens 3
   Einheiten weg (`Karte.eckeUnter`); liegen zwei eng, die nähere, nicht die
-  zuletzt gezeichnete. Ein Wegpunkt auf derselben Stelle geht beim
-  Linksklick vor; der Rechtsklick dort zeigt die Einträge für beide.
+  zuletzt gezeichnete. Ein Wegpunkt auf derselben Stelle geht vor, beim
+  Linksklick wie beim Rechtsklick, siehe „Menü je Objekt“.
 - **Eckpunkt hinzufügen** auf einer Ecke einer fertigen Form: Die Form kommt
   in den Bau (`Karte.bearbeite`), neue Ecken kommen zwischen diese und die
   nächste, jede weitere hinter die vorige neue. Nach der letzten Ecke einer
   Region ist die erste die nächste; an der letzten einer Linie hängt sie
-  hinten an. „Form fertig“ speichert an derselben Stelle, mit Farbe und
+  hinten an. Abschliessen speichert an derselben Stelle, mit Farbe und
   Anheften (`Wegpunkte.ersetze`); „Form abbrechen“ oder `Esc` lässt die Form,
   wie sie war. Gibt es sie beim Speichern so nicht mehr, etwa weil sie im
-  Bau über „Form löschen“ ging, speichert „Form fertig“ nichts und sagt
+  Bau über „Form löschen“ ging, speichert das Abschliessen nichts und sagt
   unten links „Die Form gibt es so nicht mehr; die neuen Ecken sind nicht
   gespeichert“, statt sie still zu verwerfen (Review von #122).
 - **Eckpunkt löschen** auf einer Ecke nimmt sie heraus, die Form bleibt.
@@ -485,6 +567,52 @@ am 18.10. (mod#128); Plan, Farbe und Ort hat der Reviewer freigegeben.
   Kartenschrift höchstens ein Zehntel ihrer Seite hoch.
 - **Bleibt** beim Ziehen, wo er der Form an der Maus folgt, beim Ändern der
   Ecken und beim Anheften (`Wegpunkte.ersetze`, `Wegpunkte.umschalten`).
+- **Schrift und Biegung** unter dem Feld, zwei Regler, je so breit wie das
+  Feld. Gewünscht vom User am 19.10. (mod#150); Plan vom Reviewer
+  freigegeben am 20.10.
+  - **Schrift:** ein Faktor auf die Höhe nach der Form, Rasten ¼, ⅓, ½,
+    ⅔, 1, 1½, 2, 3 und 4, Vorgabe 1 (`Wegpunkte.SCHRIFTEN`). Die Höhe ist
+    also 1 bis 64 Blöcke. Die Grenzen auf dem Schirm bleiben: Unter 8
+    Einheiten fehlt der Name, über 96 bleibt er 96 hoch, auf der Minimap
+    höchstens ein Zehntel ihrer Seite. Ein Faktor statt einer festen
+    Höhe: So folgt der Name weiter der Form, wenn sie grösser wird.
+  - **Biegung,** nur bei Regionen: der Winkel, den der Name auf seinem
+    Bogen überspannt, −180° bis +180° in Schritten zu 15°, Vorgabe 0,
+    gerade (`Wegpunkte.MAX_BIEGUNG`, `Wegpunkte.BIEGUNG_SCHRITT`). + ist
+    nach oben gewölbt (∩), − nach unten (∪) wie der Name eines Banners.
+    Oben gilt zu den Buchstaben, auch auf der gedrehten Minimap. Über den
+    Winkel statt einen Radius, so biegt sich ein kurzer Name wie ein
+    langer.
+  - **An einer Linie** fehlt der Regler „Biegung“: Der Name folgt ihr
+    schon, und ein Bogen auf einem Pfad aus mehreren Stücken wäre nicht
+    klar bestimmt. So hat es der Reviewer entschieden.
+  - **Gezeichnet** in `Formen.anordnung`, die die Länge L des Textes
+    kennt: auf einem Bogen mit dem Radius L geteilt durch den Winkel, die
+    Mitte des Textes, wo der gerade Name stünde, jedes Zeichen aufrecht
+    zum Bogen. Die Rechnung je Zeichen teilt er mit dem Namen eines
+    Banners (`Ebenen.bogen`); dessen Bogen bleibt bytegleich. Nach unten
+    gewölbt umfasst der Name den Griff, statt ihn zu kreuzen.
+  - **Bedienung** (`Karte.benennen`): Die Regler sind grau, solange das
+    Feld leer ist; so lassen sich Schrift und Biegung schon beim ersten
+    Benennen stellen. Ein Regler wirkt gleich auf Karte und Minimap, nur
+    im Speicher (`Wegpunkte.stil`). Enter speichert Name, Schrift und
+    Biegung. `Esc`, ein Klick neben Feld und Regler und ein neuer Aufbau
+    des Schirms nehmen Schrift und Biegung zurück. Ein Klick auf einen
+    Regler, auch einen grauen, schliesst das Feld nicht; die Tasten
+    gehören weiter dem Feld.
+  - **Auf dem Schirm:** Das Feld öffnet an der Stelle des Menüs der Form,
+    und das rückt mit mindestens fünf Einträgen, 70 Einheiten hoch, so weit
+    nach oben, dass darunter Feld und Regler Platz haben: mit zwei Reglern
+    64 Einheiten, an einer Linie 42. Bei GUI-Massstab 3 und 4 prüft der
+    Gametest das am unteren Rand.
+  - **Gespeichert** in `wegpunkte.json` als `schrift` und `biegung` an der
+    Form, nur ohne Vorgabe; alte Dateien bleiben gleich. Gelesen auf die
+    nächste Raste; ausserhalb der Grenzen oder ohne Zahl gilt die
+    Vorgabe, die Form bleibt. Ältere Versionen lesen nur ihre Felder;
+    speichert eine ältere Version die Datei neu, fallen Schrift und
+    Biegung weg.
+
+  ![Links die Minimap mit „Westmark“, ⅔× und 90° nach unten, angeheftet; rechts die Vollbildkarte mit „Hafenstadt“, ½× und 60° nach oben, und „Westmark“](bilder/namen-bogen.png)
 
 ## Farbe
 
@@ -499,7 +627,8 @@ vom User am 18.10.; Plan vom Reviewer freigegeben.
   (`Wegpunkte.hex`); leer heisst zurück zur Farbe aus der Liste. Was keine
   Farbe ist, nimmt Enter nicht: Das Feld bleibt offen, der Text wird rot,
   bis der Spieler ihn ändert. `Esc` oder ein Klick daneben bricht ab, und
-  jede Taste gehört dem Feld, wie bei „Name…“, siehe „Namen“.
+  jede Taste gehört dem Feld, wie bei „Name…“, siehe „Namen“. Darunter
+  steht der Regler „Gewicht“, siehe „Gewicht“.
 - **Gilt überall,** wo die Form ihre Farbe zeigt (`EigeneForm.argb`):
   Fläche zu 25 % und Rand auf Vollbildkarte und Minimap, Ecken, Griff,
   Schleier. Ändern der Ecken, Verschieben, Anheften und Namen lassen sie.
@@ -508,6 +637,43 @@ vom User am 18.10.; Plan vom Reviewer freigegeben.
 - **Datei:** `hex` neben dem Index `farbe`, siehe „Ablage“; ohne eigene
   Farbe fehlt das Feld. Eine ältere Version nimmt die Farbe des Index.
 - **Wegpunkte** haben weiter nur die 8 Farben, siehe „Was fehlt“.
+
+## Gewicht
+
+Wo sich eigene Formen überdecken oder ihre Ränder aufeinanderliegen, etwa
+nach dem Einrasten, entscheidet ein Gewicht, welche oben liegt. Gewünscht
+vom User am 20.10. (mod#163); Plan vom Reviewer freigegeben.
+
+- **Wert:** ganzzahlig von −9 bis +9, Vorgabe 0 (`Wegpunkte.MAX_GEWICHT`).
+  Mit der Vorgabe in der Mitte lässt sich eine Form auch unter alle anderen
+  legen.
+- **Einstellen:** unter dem Feld „Farbe…“ am Griff der Regler „Gewicht“,
+  „Gewicht: +3“, immer an (`Karte.faerben`). Er wirkt gleich auf Karte und
+  Minimap, nur im Speicher; Enter speichert Farbe und Gewicht, `Esc` und
+  ein Klick daneben nehmen es zurück, wie bei Schrift und Biegung, siehe
+  „Namen“. Bei Linien und Regionen gleich.
+- **Gezeichnet:** je Gewicht eine eigene Liste, die leichteste zuerst
+  (`Wegpunkte.baue`). Jede Liste zeichnet die Karte ganz, Fläche, Rand und
+  Name; so liegt eine schwerere Form mit allem über einer leichteren.
+  Innerhalb eines Gewichts bleibt es wie vorher: erst alle Flächen, dann
+  alle Ränder, dann die Namen, in der Reihenfolge der Formen. Haben alle
+  Gewicht 0, ist es genau eine Liste wie vor dem Gewicht. Gilt auf
+  Vollbildkarte und Minimap; die Form, die gerade gezogen wird, liegt an
+  der Maus obenauf. Ebenen vom Server bleiben, wie sie sind.
+- **Treffer:** Man trifft, was oben liegt. Bei Griffen und Ecken gewinnt
+  die nächste, bei gleichem Abstand die schwerere, bei gleichem Gewicht
+  wie vorher die spätere (`Wegpunkte.trifftEher`). Ein Doppelklick in eine
+  Region prüft die schwereren zuerst (`Karte.eigeneUnter`).
+- **Schleier:** Auf einem Stück einer Kante, das zwei angeheftete eigene
+  Regionen genau teilen, auf ein Millionstel Block und gleich in welcher
+  Richtung, steht nur der Schleier der schwereren (`Schleier.geteilt`). Bei
+  gleichem Gewicht beide, wie vorher; dort mischen sich die Farben.
+  Gerechnet beim Neubau des Schleiers, nicht je Frame; haben alle dasselbe
+  Gewicht, rechnet der Mod nichts.
+- **Gespeichert** als `gewicht` an der Form in `wegpunkte.json` und im Code
+  zum Teilen, nur ohne Vorgabe. In der Datei gilt ausserhalb der Grenzen
+  oder ohne ganze Zahl 0; im Code ist es dann kaputt. Ältere Versionen
+  überlesen das Feld.
 
 ## Eigene Ebenen
 
@@ -585,12 +751,16 @@ bei einem anderen Spieler als neue Ebene an. Gewünscht vom User am 18.10.
   ```json
   {"v":1,"name":"Farmen",
    "wegpunkte":[{"dimension":"minecraft:overworld","x":12,"z":-40,"farbe":0}],
-   "formen":[{"dimension":"minecraft:overworld","ecken":[[12,-40],[30,-40],[30,-20]],"farbe":"#3A7FD5","name":"Hof"}]}
+   "formen":[{"dimension":"minecraft:overworld","ecken":[[12,-40],[30,-40],[30,-20]],"farbe":"#3A7FD5","name":"Hof",
+     "schrift":1.5,"biegung":-90}]}
   ```
 
   `farbe` ist bei einem Wegpunkt der Index in `Wegpunkte.FARBEN`, bei einer
   Form der Index oder ihre eigene Farbe als `#RRGGBB`, siehe „Farbe“; mit
-  eigener Farbe steht kein Index darin, eingefügt ist er 0.
+  eigener Farbe steht kein Index darin, eingefügt ist er 0. `schrift` und
+  `biegung` wie in der Datei, siehe „Namen“, ebenso `gewicht`, siehe
+  „Gewicht“, nur ohne Vorgabe; ältere Versionen überlesen sie, `v` bleibt
+  1.
 - **Nicht darin:** Angeheftetes, Mitspieler, Formen vom Server, der
   Todespunkt und alte Rechtecke. Ein altes Rechteck als Form durch die
   Mitten seiner Eckblöcke wäre einen halben Block kleiner als es selbst;
@@ -613,7 +783,10 @@ bei einem anderen Spieler als neue Ebene an. Gewünscht vom User am 18.10.
   und `"1"` nicht); eine Dimension, die nicht wie `ns:pfad` aus
   Kleinbuchstaben, Ziffern und `_.-/` aussieht oder länger als 64 Zeichen
   ist; eine Farbe ausser 0 bis 7 und `#RRGGBB`; weniger als 2 oder mehr als
-  64 Ecken. Die Grenze von 256 KiB entpackt fängt eine Bombe: wenig Text,
+  64 Ecken; eine `schrift`, die keine Zahl von 0,25 bis 4 ist; eine
+  `biegung`, die keine ganze Zahl von −180 bis 180 ist; ein `gewicht`, das
+  keine ganze Zahl von −9 bis 9 ist. Die Grenze von
+  256 KiB entpackt fängt eine Bombe: wenig Text,
   der entpackt riesig würde (`EbenenCode.MAX_ENTPACKT`). Tief
   verschachteltes JSON, etwa 100 000 öffnende Klammern, und eine Zahl mit
   200 000 Ziffern sind kaputt, ohne dass das Lesen einen Fehler wirft, der
@@ -727,7 +900,7 @@ Schleier am Rand, siehe „Schleier“.
   `ebenen` sind die eigenen Ebenen und `ebene` die eines Eintrags, auch bei
   Formen und alten Rechtecken, siehe „Eigene Ebenen“;
   `farbe` ist ein Index in `Wegpunkte.FARBEN`, `minimap` heisst angeheftet,
-  `tod` ist der Todespunkt, siehe „Todespunkt“, ohne `farbe` und `id`,
+  `tode` sind die Todespunkte und `tod` der neueste, siehe „Todespunkt“, ohne `farbe` und `id`,
   `eigene_formen` nennt ihre Dimension und die Blöcke ihrer Ecken in Reihenfolge,
   dazu `name`, wenn sie einen hat, siehe „Namen“, und `hex`, wenn sie eine
   eigene Farbe hat, siehe „Farbe“; eine ältere Version des Mods überliest
@@ -773,11 +946,18 @@ Schleier am Rand, siehe „Schleier“.
   `nameBereinigtUndGekappt`, `namenUeberstehenDenNeustartUndAenderungen`
   (auch ein Name, der kein Text ist), `namenEineSchrifthoeheNebenDemGriff`
   (Region, Linie in vier Richtungen, Höhe nach der Form und gekappt, ohne
-  Namen). Zur Farbe: `hexFarbeLesenSchreibenUndUeberall` (gültig und
+  Namen), `schriftUndBiegungJeForm` (Faktor und Bogenmass, eine Linie
+  biegt nicht, nur ohne Vorgabe gespeichert, Rasten und Vorgabe beim
+  Lesen), `gewichtLegtFormenUebereinander` (eine Liste je Gewicht,
+  aufsteigend, alle 0 wie vorher, Datei und Grenzen),
+  `trefferNachGewicht`. Zur Farbe: `hexFarbeLesenSchreibenUndUeberall` (gültig und
   ungültig, auch Ziffern anderer Schriften; Rand und Füllung; über die
   Datei, mit dem Index daneben; weggenommen; eine Farbe, die keine ist).
   Zum Schleier: `eigeneFormenFuerDenSchleierErkannt`. Zum Todespunkt:
-  `todespunktNurEinerAngeheftetUndEigensGespeichert` (nur einer, keine
+  `mehrereTodespunkte` (höchstens so viele, die ältesten fallen weg, nur der
+  neueste angeheftet, derselbe Block frischt auf, weniger einstellen, `tode`
+  und `tod` in der Datei, eine alte Datei mit `tod`),
+  `todespunktNurEinerAngeheftetUndEigensGespeichert` (mit einem: keine
   Farbe, eigens in der Datei, Lösen und Verschieben, nicht auf einem
   Wegpunkt, ein kaputter fehlt), `todMeldungOeffnetDieKarteDort`;
   `koordinatenEingetippt`. Zu eigenen Ebenen:
@@ -791,7 +971,9 @@ Schleier am Rand, siehe „Schleier“.
   bleibt (`gleicherNameBekommtEineZahlUndBelegteBloeckeBleiben`); die
   Grenzen der Welt beim Einfügen (`grenzenBeimEinfuegenInDieWelt`); beim
   Lesen jede Grenze, eine Bombe, ein halber Code, falsche Felder und
-  unbekannte, die es überliest (`lesenPrueftAllesOderNichts`); tief
+  unbekannte, die es überliest (`lesenPrueftAllesOderNichts`); Schrift und
+  Biegung hin und zurück, auf die Raste, falsche Werte kaputt
+  (`schriftUndBiegungImCode`), ebenso das Gewicht; tief
   verschachteltes JSON und eine Zahl mit 200 000 Ziffern
   (`boesartigeCodesSindKaputtOhneZuWerfen`).
 - `SchleierTest`: Teilen an jeder ganzen Zahl, auch rückwärts und durch
@@ -829,7 +1011,7 @@ Schleier am Rand, siehe „Schleier“.
   setzen“; auf dem ersten „Linie/Region von hier“, die Tafel der Region geht
   auf, wo das Menü war; Linksklicks auf den dritten, rechts unter dem
   Menü, den zweiten und den ersten schliessen eine Region; „Linie/Region
-  von hier“, ein Linksklick und „Form fertig“ geben eine Linie; ein
+  von hier“, ein Linksklick und ein Rechtsklick geben eine Linie; ein
   Doppelklick in die Region heftet sie an und nicht die Region vom Server;
   ein Doppelklick von Hand auf einen Wegpunkt in ihr heftet ihn an, und
   die Karte bleibt stehen; ein Rechtsklick in die Fläche bietet kein „Form
@@ -850,7 +1032,7 @@ Schleier am Rand, siehe „Schleier“.
   löscht die zweite; „Eckpunkt hinzufügen“ an der ersten setzt die neue an
   die zweite Stelle; 700 ms gehalten hängt eine Ecke an der Maus und liegt
   nach dem Loslassen 2 bis 3 Blöcke weiter; eine Linie mit zwei Ecken fällt
-  beim Löschen einer weg; im Bau gelöscht, speichert „Form fertig“ nichts
+  beim Löschen einer weg; im Bau gelöscht, speichert der Rechtsklick nichts
   und zeigt den Hinweis, nach 4 s noch und nach gut 5 s nicht mehr. Ein
   Hinweis geht beim nächsten Klick auf die Karte und bei der nächsten
   Taste weg (`hinweisWeg`). Formen ziehen (`formenZiehen`): eine gehaltene
@@ -869,7 +1051,18 @@ Schleier am Rand, siehe „Schleier“.
   Bildschirmfoto mindestens 100 Pixel mehr in der Farbe der Kartenschrift
   als vorher. Am Griff gezogen behält sie den Namen. „Name ändern…“ zeigt
   den Namen, ein Klick neben das Feld lässt ihn, leer gemacht und Enter
-  nimmt ihn weg. Danach steht unten links kein Hinweis. Farbe
+  nimmt ihn weg. Danach steht unten links kein Hinweis. Schrift und
+  Biegung (`schriftUndBiegung`): „Name…“ an einer Region zeigt beide
+  Regler, grau; ein Klick auf einen grauen schliesst nichts. Getippt und
+  beide auf eine Raste geklickt, wirkt es gleich, in der Datei steht es
+  erst nach Enter. Wieder geöffnet stehen sie auf den Rasten; die Biegung
+  verstellt und `Esc` nimmt sie zurück. An einer Linie nur „Schrift“. Bei
+  GUI-Massstab 3 und 4 liegen Feld und Regler am unteren Rand ganz auf
+  dem Schirm. Gewicht (`gewicht`): zwei überlappende Regionen, A rot, B
+  blau; „Farbe…“ an A, der Regler „Gewicht“ auf +2, und im Bildschirmfoto
+  wird der Rand von B in A röter, denn die Fläche von A liegt jetzt
+  darüber; in der Datei erst nach Enter; −3 und `Esc` nimmt zurück; bei
+  GUI-Massstab 3 und 4 ganz auf dem Schirm. Farbe
   (`farbe`): „Farbe…“ am Griff zeigt die Farbe der Region als `#RRGGBB`;
   „#3A7FDG“ nimmt Enter nicht, das Feld bleibt offen; „3a7fd5“ und Enter
   färben sie, und im Bildschirmfoto steht ihr Rand in `#3A7FD5`; leer und
@@ -880,13 +1073,39 @@ Schleier am Rand, siehe „Schleier“.
   hoch und unten zu 90 % deckend. Wegpunkt bei (`wegpunktBei`): „Wegpunkt
   bei …“ auf freier Karte zeigt `x z` des Blocks; „12“ nimmt Enter nicht;
   `x 64 z` 30 Blöcke weiter setzt dort einen Wegpunkt und legt ihn in die
-  Mitte. Todespunkt (`tod`): `kill @a`, danach steht auf dem Block des
+  Mitte. Einrasten (`einrasten`): eine Ecke 0,7 s gehalten und mit `Strg`
+  6 Einheiten neben die Ecke einer anderen Form gezogen liegt auf deren
+  Block und stand schon beim Ziehen dort; ohne `Strg` auf dem Block unter
+  der Maus; mit `Strg` neben einem Wegpunkt auf seinem Block; 12 Einheiten
+  weg und neben einer Ecke der eigenen Form rastet nichts ein; ein Wegpunkt
+  mit `Strg` neben einer Ecke liegt auf ihr, das Bild `einrasten.png` zeigt
+  ihn beim Ziehen dort; neben der Marke eines fernen Wegpunkts am Rand rastet
+  eine Ecke nicht ein. Rechtsklick im Bau (`rechtsklickImBau`): mit einer Ecke der Hinweis,
+  kein Menü und keine Form; mit zweien auf einem Wegpunkt eine Linie; mit
+  vier auf freier Karte eine Region mit allen vieren; am Griff einer Form im
+  Bau mit einer Ecke ihr Menü mit „Form abbrechen“ und ohne „Form fertig“;
+  „Form abbrechen“ verwirft den Bau.
+  Menü je Objekt (`menueJeObjekt`): die Einträge an einem Wegpunkt,
+  an einem Wegpunkt auf einer Ecke nur seine, an einer Ecke, an der Raute
+  eines alten Rechtecks und auf freier Karte in einer Region; „Koordinaten
+  setzen…“ an einer Ecke, „Burg“ nimmt Enter nicht, `x, z` legt sie dorthin;
+  am Wegpunkt auf einen belegten Block mit Hinweis nicht, auf einen freien
+  dort und in die Mitte. Entf und ⌫ (`entfernen`): auf freier Karte, bei
+  offenem Menü über einem Wegpunkt, im Bau und im offenen Feld nichts, dort löscht ⌫ ein Zeichen; dann ein Wegpunkt
+  mit Entf, eine Ecke mit ⌫, am Griff die Form, die Raute eines alten
+  Rechtecks. Todespunkt (`tod`): `kill @a`, danach steht auf dem Block des
   Spielers ein angehefteter Todespunkt; nach dem Respawn öffnet
   `sendUnattendedCommand("hmap karte x z")`, der Weg des Klicks im Chat,
   die Karte mit ihm als Ziel; die Welt des Tests hat keinen geladenen Satz,
-  also steht er mit dem Testsatz in der Mitte, mitten in ihm das helle ✕, und
-  „Todespunkt löschen“ löscht ihn; mit dem Schalter aus setzt ein zweiter
-  Tod keinen. Eigene Ebenen (`eigeneEbenen`): Rechtsklick auf einen
+  also steht er mit dem Testsatz in der Mitte, mitten in ihm das helle ✕; sein
+  Menü hat genau „Hierher teleportieren“ und „Todespunkt löschen“, gehalten
+  hängt er nicht an der Maus, und „Todespunkt löschen“ löscht ihn; mit zwei
+  behaltenen bleiben nach drei Toden die zwei neuesten, nur der neueste
+  angeheftet; aus setzt ein Tod keinen. Regler „Todespunkte“ (`todRegler`):
+  Klicks ans rechte Ende, ans linke und in die Mitte geben 16, aus und 8,
+  gespeichert beim Schliessen; mit acht Todespunkten nehmen diese Klicks und
+  ein Ziehen von 8 auf 1 und zurück keinen weg, nach `Esc` sind es acht; auf
+  2 gestellt, bleiben nach `Esc` die zwei neuesten. Eigene Ebenen (`eigeneEbenen`): Rechtsklick auf einen
   Wegpunkt, „Ebene …“ zeigt „• Base“ und „Neue Ebene …“; darüber „Farmen“
   angelegt, liegt er in ihr; ihr Knopf in der Liste der Karte schaltet sie
   aus, und der Wegpunkt fehlt auf der Karte, wieder an steht er da; im

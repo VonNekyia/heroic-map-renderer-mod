@@ -260,7 +260,7 @@ final class Formen {
         for (int i = 0; i < b.length; i++) {
             b[i] = breiten[i] * massstab;
         }
-        double[] lage = anordnung(p, b, s.sperrung() * kappe);
+        double[] lage = anordnung(p, b, s.sperrung() * kappe, s.biegung());
         boolean[] drin = new boolean[b.length];
         for (int i = 0; i < b.length; i++) {
             drin[i] = innen(schnitt, lage[3 * i], lage[3 * i + 1]);
@@ -351,9 +351,10 @@ final class Formen {
      * in Einheiten des Elements, mittig, mit {@code luecke} zwischen Zeichen der Breiten {@code breiten}.
      * Läuft der Pfad im Bild nach links, gilt er umgekehrt, so steht die Schrift nie auf dem Kopf. Ist er
      * kürzer als der Text, läuft die Schrift an den Enden in Richtung des ersten und letzten Stücks weiter;
-     * ein einzelner Punkt heisst waagrecht.
+     * ein einzelner Punkt heisst waagrecht. Ist {@code biegung} nicht 0, liegt der Text auf einem Punkt im Bogen über diesen
+     * Winkel, + nach oben gewölbt, seine Mitte auf dem Punkt; siehe docs/wegpunkte.md, „Namen“.
      */
-    static double[] anordnung(double[] p, double[] breiten, double luecke) {
+    static double[] anordnung(double[] p, double[] breiten, double luecke, double biegung) {
         // Doppelte Punkte fallen weg, sie hätten keine Richtung.
         double[] q = new double[p.length];
         int n = 0;
@@ -380,6 +381,15 @@ final class Formen {
         double text = luecke * (breiten.length - 1);
         for (double b : breiten) {
             text += b;
+        }
+        if (n == 1 && biegung != 0 && breiten.length > 0) {
+            double r = text / Math.abs(biegung);
+            double[] aus = Ebenen.bogen(breiten, luecke, r, biegung > 0 ? r : -r, biegung > 0);
+            for (int c = 0; c < breiten.length; c++) {
+                aus[3 * c] += q[0];
+                aus[3 * c + 1] += q[1];
+            }
+            return aus;
         }
         double d = (l[n - 1] - text) / 2;
         double[] aus = new double[3 * breiten.length];

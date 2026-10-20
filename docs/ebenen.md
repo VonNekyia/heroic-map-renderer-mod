@@ -1,6 +1,6 @@
 ---
 title: Ebenen
-description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Symbol und Namen und ihre Banner auf Minimap und Vollbildkarte zeichnet, in fester Grösse, Symbole und Bilder vom Server holt, Flächen, Kreise und Linien flach zeichnet, Kartenschrift entlang ihres Pfads, die Infotafel beim Zeigen auf der Vollbildkarte, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
+description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Symbol und Namen und ihre Banner auf Minimap und Vollbildkarte zeichnet, in fester Grösse, Symbole und Bilder vom Server holt, Flächen, Kreise und Linien flach zeichnet, Kartenschrift entlang ihres Pfads, die Infotafel beim Zeigen auf der Vollbildkarte mit den Knöpfen des Plugins, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Ebenen.java
   - src/main/java/com/nekyia/heroicmap/EbenenMenue.java
@@ -499,7 +499,9 @@ in der Schrift IM Fell English SC (`Formen.glyphen`, `Formen.texte`).
   liegt bei jeder Schrift des Spiels 7 Einheiten unter dem Anfang der
   Zeile (`GlyphBitmap.getTop`, per javap). Der Text steht mittig auf dem
   Pfad. Ist der Pfad kürzer, läuft die Schrift in Richtung des ersten und
-  letzten Stücks weiter; ein einzelner Punkt heisst waagrecht.
+  letzten Stücks weiter; ein einzelner Punkt heisst waagrecht. Den Namen
+  einer eigenen Region kann der Spieler dort im Bogen stellen, siehe
+  [Wegpunkte](wegpunkte.md), „Namen“; Schrift vom Server bleibt gerade.
 - **Nie auf dem Kopf:** Läuft der Pfad im Bild nach links, etwa auf der
   gedrehten Minimap, gilt er umgekehrt.
 - **Reihenfolge:** je Ebene nach `order` erst die Füllungen, dann Ränder
@@ -549,7 +551,8 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
     ohne `panel`, mit einem unlesbaren oder einem ohne gültige Bausteine
     merkt er sich als „keine Tafel“.
   - Eine neue `version` einer Ebene leert ihre Tafeln.
-  - Eine Antwort, um die er nicht bat, gilt nicht.
+  - Eine Antwort, um die er nicht bat, gilt nicht. Ein Klick auf einen
+    Knopf zählt als Frage, siehe „Knöpfe“.
   - Gelesen auf dem Thread des Netzes wie die Teile (`Tafeln.Antwort`).
 - **Ziel** (`Karte.tafelUnter`): oben liegen Nadeln und Banner, die
   spätere über der früheren, gemessen am Kasten von Bild und Name, wie
@@ -588,7 +591,8 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
   Höchstens 64 Bausteine, zwei Ebenen tief: `columns` und `section` nur
   oben. Titel und Labels höchstens 64 Zeichen, Zeilen 120, Bilder 512 × 512,
   Wertungen 20 Punkte; dazu eigene Grenzen, 64 Zeilen je Baustein und 20
-  Reihen je Wertung. Texte schlicht, Codes mit `§` gestrichen.
+  Reihen je Wertung. Texte schlicht, Codes mit `§` gestrichen. Dazu
+  Knöpfe, siehe „Knöpfe“.
 - **Massstab:** Die Tafel hat einen eigenen, ganzen Massstab g', Pixel je
   Einheit der Tafel (`Tafel.massstab`). Er ist der grösste bis zum
   GUI-Massstab, bei dem die breiteste Tafel, 200 Inhalt und 2 × 6 Rand, also
@@ -650,6 +654,72 @@ hat. Auf der Minimap gibt es keine Tafel, wie im Format.
 
 ![Die Tafel der Nadel „Nordhafen“ beim Zeigen; Szene `orte` des Gametests](bilder/tafel-zeigen.png)
 
+## Knöpfe
+
+Ein Plugin kann Knöpfe an ein Objekt hängen, etwa „Schiff“ an jede Stadt
+(heroic-map-renderer#294). Der Mod zeigt sie unter der Tafel des Objekts,
+mit dem Zustand dieses Spielers, und schickt einen Klick an das Plugin.
+Was der Knopf bewirkt, entscheidet das Plugin, dem er gehört. Format und
+Kanal stehen beim Plugin,
+[Ebenen](https://github.com/VonNekyia/heroic-map-renderer-plugin/blob/main/docs/ebenen.md),
+„Knöpfe“ und „Aktionsebenen im Mod“.
+
+- **Gelesen** (`Tafel.lies`) mit der Antwort auf `tafel`: Bausteine
+  `button` mit `id`, `label` und `on`.
+  - Nur oben in `blocks`; in `section` und `columns` übergeht der Mod sie.
+  - Höchstens 4. Sie zählen nicht zu den 64 Bausteinen, denn das Plugin
+    hängt sie auch hinter eine volle Tafel.
+  - `id` als `modname:name`, jeder Teil wie eine Kennung (`Symbole.teil`).
+  - `label` mit `de` oder `en`, je höchstens 32 Zeichen nach Codepoints,
+    wie das Plugin zählt; Codes mit `§` gestrichen.
+  - `on` als Wahrheitswert.
+  - Fehlt etwas davon, fällt der Knopf weg. Steht eine Kennung zweimal da,
+    gilt der erste.
+  - Ein Objekt nur mit Knöpfen hat eine Tafel nur mit ihnen.
+- **Gesetzt** (`Tafel.setze`) unter dem Inhalt, je Knopf eine Zeile über
+  die ganze Breite, 4 Abstand davor, so hoch wie eine Zeile und 2 Rand
+  oben und unten. Links ein Quadrat von 7, gefüllt, wenn der Knopf an ist;
+  dann das Label in der Sprache des Spiels, sonst in der anderen, gekürzt
+  auf den Platz. Die Tafel ist mindestens so breit wie ihr breitester
+  Knopf, höchstens 200.
+- **Aussehen,** so hat es der Reviewer entschieden:
+  - dunkel wie die Tafel, Grund `#2A2A33`, Rahmen `#3A3A44`;
+  - unter dem Zeiger heller, `#3C3C48` mit Rahmen `#5C5C6A`;
+  - gesperrt mit gedämpfter Schrift `#8A8A8A`;
+  - ohne Bild aus dem Skin.
+- **Klick** mit der linken Taste auf einen Knopf (`Tafeln.druecke`,
+  `Kanal.knopf`): Der Mod schickt
+  `{"v":1,"typ":"knopf","ebene","version","id","knopf"}`, mit Ebene,
+  `version` und `id` der offenen Tafel wie bei `tafel`. Das tut er nur,
+  wenn die Ebene noch in dieser `version` gezeichnet wird (`Tafeln.gilt`).
+  Ein Klick in die Tafel wirkt auch hier nie auf die Karte. Die Tastatur
+  bedient keine Knöpfe, so wie die Tafel im Mod kein Ziel für die Tastatur
+  ist.
+- **Gesperrt,** bis der neue Zustand da ist (`Tafeln.gesperrt`): Ein
+  zweiter Klick schickt nichts. So hat es der Reviewer entschieden.
+  - Der Klick zählt als Frage nach der Tafel, denn danach schickt das
+    Plugin sie neu.
+  - Hat die Antwort noch den alten Zustand, fragt der Mod die Tafel nach
+    0,3, 0,8, 1,5 und 3 s neu, wie die Webkarte, bis der Knopf umspringt
+    (`Tafeln.takt`). So springt er auch, wenn das Plugin den Zustand erst
+    später setzt. Das sind höchstens 4 Fragen mehr je Klick, weit unter
+    den 20 je Sekunde, die das Plugin annimmt.
+  - Nach 3,5 s, der letzten Frage und einer halben Sekunde für ihre
+    Antwort, ist er mit dem alten Zustand wieder frei. Unten links steht
+    dann „Noch keine Antwort vom Server“.
+  - Fehlt der Knopf in der Antwort, hat das Objekt keine Tafel mehr oder
+    kommt eine neue `version` der Ebene, wartet er nicht mehr.
+  - Ist die Ebene weg oder ausgeblendet, fällt er still weg, ohne
+    Nachfrage und ohne Hinweis, denn darauf antwortet das Plugin nicht
+    (Review von mod#147).
+- **Neu gefragt** wird eine gemerkte Tafel mit Knöpfen jedes Mal, wenn sie
+  aufgeht (`Tafeln.aufgegangen`), denn ihr Zustand ändert sich ohne neue
+  `version`, etwa nach einem Klick auf der Webkarte. Bis zur Antwort steht
+  die gemerkte. Tafeln ohne Knöpfe merkt er wie bisher.
+- **Aktionsebenen,** `"player": true` in der Liste, sind im Mod gewöhnliche
+  Ebenen: Das Plugin schickt jedem Spieler seine Fassung mit ihrer eigenen
+  `version`. Das Feld `player` liest der Mod nicht.
+
 ## Umschalten
 
 - **Untermenü „Ebenen …“** im Untermenü „Einstellungen …“, siehe
@@ -690,6 +760,8 @@ Grenzen des Mods. So kann ein Server den Speicher des Mods nicht füllen:
 | Bild einer Tafel | 512 × 512 Pixel, 256 KiB, 10 s | `alt` steht statt seiner |
 | Bilder der Tafeln | 16 MiB an Pixeln, 1024 Einträge | die am längsten nicht gezeigten gehen frei |
 | Bausteine einer Tafel | 64, wie im Format | die übrigen fehlen |
+| Knöpfe einer Tafel, zusätzlich zu den Bausteinen | 4, wie im Format | die übrigen fehlen |
+| Label eines Knopfs | 32 Zeichen nach Codepoints, wie im Format | das Label fehlt, ohne beide der Knopf |
 | Zeilen je Baustein, Reihen je Wertung | 64, 20 | die übrigen fehlen |
 | Bild eines Symbols | 256 KiB, 10 s | das Symbol fehlt |
 | Bild eines Banners | 32 × 64 Pixel, 256 KiB, 10 s | das Banner fehlt |

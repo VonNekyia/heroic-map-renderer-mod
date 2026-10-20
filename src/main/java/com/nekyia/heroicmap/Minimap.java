@@ -137,8 +137,12 @@ public final class Minimap {
     /** Effekte in der Welt, Vorgabe an: der Strahl über angehefteten Wegpunkten. Siehe docs/wegpunkte.md, „Strahl“. */
     /** Der Todespunkt: die Raute und ihr Strahl dunkel, das ✕ hell. Siehe docs/wegpunkte.md, „Todespunkt“. */
     static final int TOD = 0xFF3A3A3A, TOD_KREUZ = 0xFFE0E0E0;
-    /** Setzt der Mod beim Tod einen Todespunkt? */
-    private boolean todespunkt = true;
+    /** Wie viele Todespunkte der Mod behält, 0 für keinen. */
+    private int todespunkte = 1;
+    /** So viele Todespunkte höchstens; so stellt es der Regler ein. */
+    static final int MAX_TODESPUNKTE = 16;
+    /** Fragt der Mod beim Start Modrinth nach einer neuen Version? Siehe docs/vollbildkarte.md, „Neue Version“. */
+    private boolean neueVersion = true;
     private boolean effekte = true;
     /** Wie hoch der Schleier eigener Regionen steht, in Blöcken. Siehe docs/wegpunkte.md, „Schleier“. */
     private int schleier = Schleier.HOEHE;
@@ -153,6 +157,8 @@ public final class Minimap {
     private BeiF3 beiF3 = BeiF3.BLEIBT;
     /** Wo die Minimap im letzten Frame stand, oder null, wenn sie nicht zu sehen war; der Gametest fragt es ab. */
     private Rahmen zuletzt;
+    /** Wo die Zeile der Koordinaten im letzten Frame stand: x, y, Breite, Höhe; null ohne Zeile. Für die Gametests. */
+    private int[] koordinatenKasten;
     /** Wie der eigene Spieler aussieht, auf Minimap und Vollbildkarte. Siehe docs/minimap.md, „Spieler“. */
     enum Darstellung { KOPF, PFEIL, DURCHSICHTIG }
 
@@ -346,6 +352,14 @@ public final class Minimap {
         return chunklinien;
     }
 
+    boolean neueVersion() {
+        return neueVersion;
+    }
+
+    void setzeNeueVersion(boolean neueVersion) {
+        this.neueVersion = neueVersion;
+    }
+
     void setzeChunklinien(boolean chunklinien) {
         this.chunklinien = chunklinien;
     }
@@ -362,16 +376,16 @@ public final class Minimap {
         return schleier;
     }
 
-    boolean todespunkt() {
-        return todespunkt;
+    int todespunkte() {
+        return todespunkte;
     }
 
-    /** Schaltet den Todespunkt; aus nimmt auch einen vorhandenen weg. Siehe docs/wegpunkte.md, „Todespunkt“. */
-    void setzeTodespunkt(boolean an) {
-        todespunkt = an;
-        if (!an) {
-            Wegpunkte.INSTANZ.loescheTod();
-        }
+    /**
+     * Wie viele Todespunkte der Mod behält, 0 bis {@link #MAX_TODESPUNKTE}. Nur die Zahl: Die ältesten nimmt erst das Schliessen
+     * des Untermenüs weg ({@link Anzeige#removed}), so löscht der Regler beim Ziehen keinen. Siehe docs/wegpunkte.md, „Todespunkt“.
+     */
+    void setzeTodespunkte(int n) {
+        todespunkte = Math.clamp(n, 0, MAX_TODESPUNKTE);
     }
 
     /** Setzt die Höhe des Schleiers eigener Regionen, gekappt auf {@link Schleier#HOEHE} bis {@link Schleier#MAX_HOEHE}. */
@@ -385,6 +399,10 @@ public final class Minimap {
 
     BeiF3 beiF3() {
         return beiF3;
+    }
+
+    int[] koordinatenKasten() {
+        return koordinatenKasten;
     }
 
     Rahmen zuletzt() {
@@ -599,7 +617,9 @@ public final class Minimap {
         chunklinien = "true".equals(p.getProperty("chunklinien"));
         effekte = !"false".equals(p.getProperty("effekte"));
         setzeSchleier(zahl(p.getProperty("schleier"), Schleier.HOEHE));
-        todespunkt = !"false".equals(p.getProperty("todespunkt"));
+        // Bis 0.2.57 ein Schalter todespunkt: aus heisst keiner, an einer.
+        todespunkte = Math.clamp(zahl(p.getProperty("todespunkte"), "false".equals(p.getProperty("todespunkt")) ? 0 : 1), 0, MAX_TODESPUNKTE);
+        neueVersion = !"false".equals(p.getProperty("neue_version"));
         koordinaten = switch (String.valueOf(p.getProperty("koordinaten")).trim()) {
             case "aus" -> Koordinaten.AUS;
             case "xyz" -> Koordinaten.XYZ;
@@ -649,7 +669,8 @@ public final class Minimap {
         p.setProperty("chunklinien", Boolean.toString(chunklinien));
         p.setProperty("effekte", Boolean.toString(effekte));
         p.setProperty("schleier", Integer.toString(schleier));
-        p.setProperty("todespunkt", Boolean.toString(todespunkt));
+        p.setProperty("todespunkte", Integer.toString(todespunkte));
+        p.setProperty("neue_version", Boolean.toString(neueVersion));
         p.setProperty("koordinaten", koordinaten.name().toLowerCase(Locale.ROOT));
         p.setProperty("bei_f3", beiF3.name().toLowerCase(Locale.ROOT));
         p.setProperty("spieler", darstellung.name().toLowerCase(Locale.ROOT));
@@ -898,12 +919,20 @@ public final class Minimap {
             }
         }
         Object[] werte = werte(koordinaten, spieler.getX(), spieler.getY(), spieler.getZ());
+        koordinatenKasten = null;
         if (werte != null) {
             Component text = Component.translatable(werte.length == 3 ? "heroicmap.koordinaten_xyz" : "heroicmap.koordinaten", werte);
-            int breite = mc.font.width(text);
+            int abstand = rand();
+            float f = koordinatenMassstab(g.guiWidth(), abstand, mc.font.width(text));
+            int breite = Mth.ceil(mc.font.width(text) * f), zeile = Mth.ceil(mc.font.lineHeight * f);
             // Unter dem Ring oder den Ornamenten des Rahmens, die halb über die Ecken ragen.
-            int[] wo = koordinatenLage(r, rahmen == null ? 1 : rand(), g.guiHeight(), breite, mc.font.lineHeight);
-            g.text(mc.font, text, wo[0], wo[1], TEXT, true);
+            int[] wo = koordinatenLage(r, rahmen == null ? 1 : abstand, abstand, g.guiWidth(), g.guiHeight(), breite, zeile);
+            g.pose().pushMatrix();
+            g.pose().translate(wo[0], wo[1]);
+            g.pose().scale(f);
+            g.text(mc.font, text, 0, 0, TEXT, true);
+            g.pose().popMatrix();
+            koordinatenKasten = new int[] {wo[0], wo[1], breite, zeile};
         }
     }
 
@@ -929,12 +958,23 @@ public final class Minimap {
     }
 
     /**
-     * Wo der Text der Koordinaten links oben beginnt: mittig unter der Minimap, {@code ueberstand}
-     * Einheiten unter ihrem Rand und 2 Abstand; passt er dort nicht mehr auf den Schirm, ebenso darüber.
+     * Wo der Text der Koordinaten links oben beginnt: mittig unter der Minimap, {@code ueberstand} Einheiten unter ihrem
+     * Rand und 2 Abstand; passt er dort nicht auf den Schirm, ebenso darüber, sonst unten am Schirm auf der Minimap.
+     * Waagrecht zum Schirm hin verschoben, bis {@code abstand} vor seinen Rand; so endet er in einer Ecke bündig mit der
+     * Minimap. Siehe docs/minimap.md, „Koordinaten“.
      */
-    static int[] koordinatenLage(Rahmen r, int ueberstand, int schirmHoehe, int textBreite, int zeile) {
-        int x = r.x() + (r.seite() - textBreite) / 2, unter = r.y() + r.seite() + ueberstand + 2;
-        return new int[] {x, unter + zeile <= schirmHoehe ? unter : r.y() - ueberstand - 2 - zeile};
+    static int[] koordinatenLage(Rahmen r, int ueberstand, int abstand, int schirmBreite, int schirmHoehe, int textBreite, int zeile) {
+        int x = Math.clamp(r.x() + (r.seite() - textBreite) / 2, abstand, Math.max(abstand, schirmBreite - abstand - textBreite));
+        int unter = r.y() + r.seite() + ueberstand + 2, ueber = r.y() - ueberstand - 2 - zeile;
+        return new int[] {x, unter + zeile <= schirmHoehe ? unter : ueber >= 0 ? ueber : schirmHoehe - zeile};
+    }
+
+    /**
+     * Wie gross die Zeile der Koordinaten steht: 1, ausser sie passt nicht zwischen die Ränder; das geschieht nur mit einer
+     * breiten Schrift aus einem Pack, denn der Schirm ist mindestens 320 Einheiten breit. Siehe docs/minimap.md, „Koordinaten“.
+     */
+    static float koordinatenMassstab(int schirmBreite, int abstand, int textBreite) {
+        return Math.min(1, (schirmBreite - 2 * abstand) / (float) textBreite);
     }
 
     /** Die Seite eines Kopfes auf der Minimap: {@link #KOPF} bei 128 Einheiten, mit der Seite wachsend, mindestens 4. */

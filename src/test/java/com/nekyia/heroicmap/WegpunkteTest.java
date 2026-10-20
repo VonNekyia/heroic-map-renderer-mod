@@ -656,6 +656,108 @@ class WegpunkteTest {
         assertEquals(null, Wegpunkte.schrift(ohne, Wegpunkte.mitten(ohne)));
     }
 
+    @Test
+    void schriftUndBiegungJeForm() {
+        // Faktor und Biegung (mod#150): Eine Region 10 × 10 heisst 5 hoch, mal 2 also 10, eine Schrifthöhe unter dem Griff, die
+        // Biegung im Bogenmass. Eine Linie biegt nicht; der Faktor gilt auch dort.
+        Wegpunkte.EigeneForm region = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(10, 0), e(10, 10), e(0, 10)), 0, false, "Hof",
+                Wegpunkte.KEIN_HEX, Wegpunkte.BASE, 2, 90);
+        Ebenen.Schrift s = Wegpunkte.schrift(region, Wegpunkte.mitten(region));
+        assertEquals(10, s.groesse());
+        assertArrayEquals(new double[] {5.5, 5.5 + 10}, s.pfad(), 1e-9);
+        assertEquals(Math.PI / 2, s.biegung(), 1e-12);
+        Wegpunkte.EigeneForm linie = new Wegpunkte.EigeneForm(WELT, List.of(e(0, 0), e(40, 0)), 0, false, "Weg", Wegpunkte.KEIN_HEX,
+                Wegpunkte.BASE, 0.5, 90);
+        assertEquals(0, linie.biegung());
+        assertEquals(5, Wegpunkte.schrift(linie, Wegpunkte.mitten(linie)).groesse());
+        assertEquals(0, Wegpunkte.schrift(linie, Wegpunkte.mitten(linie)).biegung());
+        // Gespeichert nur ohne Vorgabe, und so gelesen; die Vorschau des Reglers allein speichert nicht.
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        w.setzeForm(WELT, region.ecken());
+        w.setzeForm(WELT, List.of(e(0, 20), e(10, 20), e(10, 30)));
+        w.benenne(w.stil(w.eigeneFormen().get(0), 2, -45, 0), "Hof");
+        String json = w.json().toString();
+        assertTrue(json.contains("\"schrift\":2.0") && json.contains("\"biegung\":-45"), json);
+        assertEquals(1, json.split("\"schrift\"", -1).length - 1, json);
+        assertEquals(1, json.split("\"biegung\"", -1).length - 1, json);
+        Wegpunkte zurueck = new Wegpunkte();
+        zurueck.lies(JsonParser.parseString(json).getAsJsonObject());
+        assertEquals(w.eigeneFormen(), zurueck.eigeneFormen());
+        // Ausserhalb der Grenzen oder ohne Zahl: die Vorgabe, die Form bleibt; Zwischenwerte auf die nächste Raste.
+        Wegpunkte kaputt = new Wegpunkte();
+        kaputt.lies(JsonParser.parseString("""
+                {"eigene_formen":[
+                  {"dimension":"minecraft:overworld","ecken":[[0,0],[9,0],[9,9]],"farbe":0,"minimap":false,"schrift":5,"biegung":200},
+                  {"dimension":"minecraft:overworld","ecken":[[0,20],[9,20],[9,29]],"farbe":0,"minimap":false,"schrift":"2","biegung":"90"},
+                  {"dimension":"minecraft:overworld","ecken":[[0,40],[9,40],[9,49]],"farbe":0,"minimap":false,"schrift":0.3,"biegung":37},
+                  {"dimension":"minecraft:overworld","ecken":[[0,60],[9,60]],"farbe":0,"minimap":false,"schrift":1.5,"biegung":90}]}
+                """).getAsJsonObject());
+        List<Wegpunkte.EigeneForm> k = kaputt.eigeneFormen();
+        assertEquals(List.of(1.0, 1.0, 1.0 / 3, 1.5), k.stream().map(Wegpunkte.EigeneForm::schrift).toList());
+        assertEquals(List.of(0, 0, 30, 0), k.stream().map(Wegpunkte.EigeneForm::biegung).toList());
+    }
+
+    @Test
+    void gewichtLegtFormenUebereinander() {
+        // Je Gewicht eine Liste, leicht zuerst, nach den Ebenen vom Server; in einer Liste die Reihenfolge wie bisher (mod#163).
+        Ebenen e = ebene("b:wald", "v1", FLAECHE);
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        for (int i = 0; i < 4; i++) {
+            w.setzeForm(WELT, List.of(e(10 * i, 0), e(10 * i + 5, 0), e(10 * i + 5, 5)));
+        }
+        // Alle 0: eine Liste wie vor mod#163, nach der Ebene vom Server.
+        assertEquals(2, w.karte(e).size());
+        assertEquals(4, w.karte(e).get(1).size());
+        List<Wegpunkte.EigeneForm> f = w.eigeneFormen();
+        w.stil(f.get(0), 1, 0, 2);
+        w.stil(f.get(2), 1, 0, -1);
+        List<List<Ebenen.Form>> karte = w.karte(e);
+        // Ebene vom Server, dann −1, 0 (zwei, in ihrer Reihenfolge), 2.
+        assertEquals(4, karte.size());
+        assertEquals(List.of(1, 2, 1), karte.subList(1, 4).stream().map(List::size).toList());
+        assertArrayEquals(((Ebenen.Flaeche) w.form(w.eigeneFormen().get(2))).box(), ((Ebenen.Flaeche) karte.get(1).getFirst()).box(), 1e-9);
+        assertArrayEquals(((Ebenen.Flaeche) w.form(w.eigeneFormen().get(1))).box(), ((Ebenen.Flaeche) karte.get(2).get(0)).box(), 1e-9);
+        assertArrayEquals(((Ebenen.Flaeche) w.form(w.eigeneFormen().get(3))).box(), ((Ebenen.Flaeche) karte.get(2).get(1)).box(), 1e-9);
+        assertArrayEquals(((Ebenen.Flaeche) w.form(w.eigeneFormen().get(0))).box(), ((Ebenen.Flaeche) karte.get(3).getFirst()).box(), 1e-9);
+        // Auf der Minimap ebenso, mit dem Gewicht je Form für den Schleier.
+        w.umschalten(w.eigeneFormen().get(0));
+        w.umschalten(w.eigeneFormen().get(2));
+        List<List<Ebenen.Form>> minimap = w.minimap(e);
+        assertEquals(2, minimap.size());
+        assertEquals(-1, w.gewicht(minimap.get(0).getFirst()));
+        assertEquals(2, w.gewicht(minimap.get(1).getFirst()));
+        // Gespeichert nur ohne Vorgabe; gelesen ganzzahlig bis ±9, sonst 0.
+        w.faerbe(w.eigeneFormen().get(0), Wegpunkte.KEIN_HEX);
+        String json = w.json().toString();
+        assertEquals(2, json.split("\"gewicht\"", -1).length - 1, json);
+        Wegpunkte zurueck = new Wegpunkte();
+        zurueck.lies(JsonParser.parseString(json).getAsJsonObject());
+        assertEquals(List.of(2, 0, -1, 0), zurueck.eigeneFormen().stream().map(Wegpunkte.EigeneForm::gewicht).toList());
+        Wegpunkte kaputt = new Wegpunkte();
+        kaputt.lies(JsonParser.parseString("""
+                {"eigene_formen":[
+                  {"dimension":"minecraft:overworld","ecken":[[0,0],[9,0],[9,9]],"farbe":0,"minimap":false,"gewicht":10},
+                  {"dimension":"minecraft:overworld","ecken":[[0,20],[9,20],[9,29]],"farbe":0,"minimap":false,"gewicht":1.5},
+                  {"dimension":"minecraft:overworld","ecken":[[0,40],[9,40],[9,49]],"farbe":0,"minimap":false,"gewicht":"3"},
+                  {"dimension":"minecraft:overworld","ecken":[[0,60],[9,60]],"farbe":0,"minimap":false,"gewicht":-9}]}
+                """).getAsJsonObject());
+        assertEquals(List.of(0, 0, 0, -9), kaputt.eigeneFormen().stream().map(Wegpunkte.EigeneForm::gewicht).toList());
+    }
+
+    @Test
+    void trefferNachGewicht() {
+        // Näher gewinnt; bei gleichem Abstand das schwerere, bei gleichem Gewicht die spätere wie bisher; ohne beste bis zur Grenze.
+        assertTrue(Wegpunkte.trifftEher(3, -9, 4, 9));
+        assertFalse(Wegpunkte.trifftEher(4, 9, 3, -9));
+        assertTrue(Wegpunkte.trifftEher(3, 2, 3, 1));
+        assertFalse(Wegpunkte.trifftEher(3, 1, 3, 2));
+        assertTrue(Wegpunkte.trifftEher(3, 0, 3, 0));
+        assertTrue(Wegpunkte.trifftEher(4, -9, 4, Integer.MIN_VALUE));
+        assertFalse(Wegpunkte.trifftEher(4.1, 9, 4, Integer.MIN_VALUE));
+    }
+
     private static float groesse(List<Wegpunkte.Ecke> ecken) {
         Wegpunkte.EigeneForm f = new Wegpunkte.EigeneForm(WELT, ecken, 0, false, "Weg", Wegpunkte.KEIN_HEX, Wegpunkte.BASE);
         return Wegpunkte.schrift(f, Wegpunkte.mitten(f)).groesse();
@@ -728,18 +830,64 @@ class WegpunkteTest {
         assertTrue(alle.stream().filter(w::eigen).allMatch(f -> f instanceof Ebenen.Flaeche fl && fl.id() == null));
     }
 
+    /**
+     * Mehrere Todespunkte (mod#151): höchstens so viele wie eingestellt, die ältesten fallen weg; nur der neueste ist angeheftet;
+     * derselbe Block frischt einen auf; weniger einstellen nimmt die ältesten weg. In der Datei als tode, der älteste zuerst, und
+     * der neueste als tod für ältere Versionen; eine alte Datei mit nur tod gibt einen. Siehe docs/wegpunkte.md, „Todespunkt“.
+     */
+    @Test
+    void mehrereTodespunkte(@TempDir Path ordner) {
+        Wegpunkte w = new Wegpunkte();
+        w.lies(ordner);
+        w.setzeTod(WELT, 1, 1, 3);
+        w.setzeTod(WELT, 2, 2, 3);
+        w.setzeTod(WELT, 3, 3, 3);
+        assertEquals(List.of(1, 2, 3), w.tode().stream().map(Wegpunkte.Punkt::x).toList());
+        assertEquals(List.of(false, false, true), w.tode().stream().map(Wegpunkte.Punkt::angeheftet).toList());
+        // Ein vierter: Der älteste fällt weg.
+        w.setzeTod(WELT, 4, 4, 3);
+        assertEquals(List.of(2, 3, 4), w.tode().stream().map(Wegpunkte.Punkt::x).toList());
+        // Wieder auf dem Block des ältesten: Er wird der neueste und angeheftet, der vorige neueste gelöst.
+        w.setzeTod(WELT, 2, 2, 3);
+        assertEquals(List.of(3, 4, 2), w.tode().stream().map(Wegpunkte.Punkt::x).toList());
+        assertEquals(List.of(false, false, true), w.tode().stream().map(Wegpunkte.Punkt::angeheftet).toList());
+        // In der Datei: tode in dieser Folge, tod der neueste; und so zurück.
+        String json = w.json().toString();
+        assertTrue(json.contains("\"tod\":{\"dimension\":\"" + WELT + "\",\"x\":2,\"z\":2,\"minimap\":true}"), json);
+        assertEquals(3, w.json().getAsJsonArray("tode").size());
+        Wegpunkte nachher = new Wegpunkte();
+        nachher.lies(ordner);
+        assertEquals(List.of(3, 4, 2), nachher.tode().stream().map(Wegpunkte.Punkt::x).toList());
+        assertEquals(List.of(false, false, true), nachher.tode().stream().map(Wegpunkte.Punkt::angeheftet).toList());
+        // Weniger einstellen nimmt die ältesten weg, 0 alle.
+        nachher.kappeTode(1);
+        assertEquals(List.of(2), nachher.tode().stream().map(Wegpunkte.Punkt::x).toList());
+        nachher.kappeTode(0);
+        assertEquals(List.of(), nachher.tode());
+        // Eine alte Datei hat nur tod: ein Todespunkt.
+        Wegpunkte alt = new Wegpunkte();
+        alt.lies(JsonParser.parseString("{\"tod\":{\"dimension\":\"" + WELT + "\",\"x\":9,\"z\":9,\"minimap\":true}}").getAsJsonObject());
+        assertEquals(List.of(9), alt.tode().stream().map(Wegpunkte.Punkt::x).toList());
+        // Stehen beide da, gilt tode; tod ist dort nur der neueste noch einmal.
+        Wegpunkte beide = new Wegpunkte();
+        beide.lies(JsonParser.parseString("{\"tode\":[{\"dimension\":\"" + WELT + "\",\"x\":5,\"z\":5,\"minimap\":false},"
+                + "{\"dimension\":\"" + WELT + "\",\"x\":6,\"z\":6,\"minimap\":true}],"
+                + "\"tod\":{\"dimension\":\"" + WELT + "\",\"x\":6,\"z\":6,\"minimap\":true}}").getAsJsonObject());
+        assertEquals(List.of(5, 6), beide.tode().stream().map(Wegpunkte.Punkt::x).toList());
+    }
+
     @Test
     void todespunktNurEinerAngeheftetUndEigensGespeichert(@TempDir Path ordner) {
         Wegpunkte w = new Wegpunkte();
         w.lies(ordner);
-        assertTrue(w.setzeTod(WELT, 10, -5));
+        assertTrue(w.setzeTod(WELT, 10, -5, 1));
         Wegpunkte.Punkt tod = w.tod();
         assertTrue(tod.tod() && tod.angeheftet() && tod.x() == 10 && tod.z() == -5 && tod.dimension().equals(WELT), tod.toString());
         // Er nimmt keine Farbe: Der erste Wegpunkt bekommt die erste.
         w.setze(WELT, 1, 1);
         assertEquals(0, w.punkte().getLast().farbe());
-        // Ein neuer Tod verschiebt ihn; es bleibt einer.
-        assertTrue(w.setzeTod("minecraft:the_nether", 3, 4));
+        // Mit höchstens einem verschiebt ein neuer Tod ihn; es bleibt einer.
+        assertTrue(w.setzeTod("minecraft:the_nether", 3, 4, 1));
         assertEquals(1, w.punkte().stream().filter(Wegpunkte.Punkt::tod).count());
         assertEquals("minecraft:the_nether", w.tod().dimension());
         // In der Datei eigens, nicht in der Liste der Wegpunkte, und so zurück.
@@ -756,10 +904,10 @@ class WegpunkteTest {
         assertTrue(nachher.verschiebe(nachher.tod(), 7, 7));
         assertTrue(nachher.tod().tod() && !nachher.tod().angeheftet() && nachher.tod().x() == 7);
         // Auf einem Wegpunkt gibt es keinen; der Block ist schon markiert.
-        assertFalse(nachher.setzeTod(WELT, 1, 1));
-        assertNull(nachher.tod());
-        nachher.setzeTod(WELT, 2, 2);
-        nachher.loescheTod();
+        assertFalse(nachher.setzeTod(WELT, 1, 1, 1));
+        assertEquals(7, nachher.tod().x());
+        nachher.setzeTod(WELT, 2, 2, 1);
+        nachher.kappeTode(0);
         assertNull(nachher.tod());
         // Eine Datei ohne Todespunkt oder mit einem kaputten liest der Mod ohne Fehler.
         Wegpunkte alt = new Wegpunkte();

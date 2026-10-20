@@ -9,14 +9,27 @@ import net.minecraft.ChatFormatting;
 
 /**
  * Die Infotafel eines Objekts: Bausteine statt HTML, gelesen auf dem Thread des Netzes, gesetzt in
- * Einheiten des GUI zu Stücken, die die Vollbildkarte zeichnet. Siehe docs/ebenen.md, „Infotafel“.
+ * Einheiten des GUI zu Stücken, die die Vollbildkarte zeichnet; darunter die Knöpfe, die das Plugin
+ * anhängt. Siehe docs/ebenen.md, „Infotafel“,
+ * für die Knöpfe docs/ebenen.md, „Knöpfe“.
  */
-record Tafel(List<Baustein> bausteine) {
+record Tafel(List<Baustein> bausteine, List<Knopf> knoepfe) {
+
+    Tafel(List<Baustein> bausteine) {
+        this(bausteine, List.of());
+    }
 
     /** Grenzen aus dem Format: Bausteine je Tafel, Zeichen eines Titels und einer Zeile, Seite eines Bilds, Punkte je Reihe. */
     static final int MAX_BAUSTEINE = 64, MAX_TITEL = 64, MAX_ZEILE = 120, MAX_BILD = 512, MAX_PUNKTE = 20;
     /** Eigene Grenzen: Zeilen je Baustein und Reihen je Wertung. */
     static final int MAX_ZEILEN = 64, MAX_REIHEN = 20;
+    /** Grenzen aus dem Format für Knöpfe: je Tafel, zusätzlich zu den Bausteinen, und Zeichen eines Labels. */
+    static final int MAX_KNOEPFE = 4, MAX_LABEL = 32;
+    /** Ein Knopf in Einheiten des GUI: Rand über und unter der Zeile, Rand links, Seite des Quadrats, Beginn des Labels. */
+    static final int KNOPF_RAND = 2, KNOPF_LINKS = 3, QUADRAT = 7, KNOPF_TEXT = 14;
+    /** Die Farben eines Knopfs, dunkel wie die Tafel; unter dem Zeiger heller, gesperrt die Schrift gedämpft. */
+    static final int KNOPF = 0xFF2A2A33, KNOPF_HELL = 0xFF3C3C48, KNOPF_RAHMEN = 0xFF3A3A44, KNOPF_RAHMEN_HELL = 0xFF5C5C6A,
+            GEDAEMPFT = 0xFF8A8A8A;
     /** Die Schrift der Tafel, hell auf allen Fassungen, denn die Fläche ist überall dunkel. */
     static final int SCHRIFT = 0xFFD9D9D9;
     /** Der Grund der Tafel, gegen den der Kontrast eines Titels zählt, wie in rahmen/ohne/tafel.png ohne Alpha. */
@@ -102,23 +115,44 @@ record Tafel(List<Baustein> bausteine) {
     record Spalten(List<Baustein> links, List<Baustein> rechts) implements Baustein {
     }
 
+    /** Ein Knopf des Plugins: seine Kennung, das Label je Sprache oder null, und sein Zustand für diesen Spieler. */
+    record Knopf(String id, String de, String en, boolean an) {
+
+        /** Das Label in der Sprache des Spiels, sonst in der anderen. */
+        String label(boolean deutsch) {
+            String erst = deutsch ? de : en;
+            return erst != null ? erst : deutsch ? en : de;
+        }
+    }
+
     /**
      * Liest {@code panel}: höchstens {@link #MAX_BAUSTEINE} Bausteine, zwei Ebenen tief; unbekannte und
-     * kaputte fallen weg, ebenso eine verschachtelte Spalte oder ein verschachtelter Abschnitt.
+     * kaputte fallen weg, ebenso eine verschachtelte Spalte oder ein verschachtelter Abschnitt. Knöpfe nur
+     * oben, höchstens {@link #MAX_KNOEPFE}, die nicht zu den Bausteinen zählen: Das Plugin hängt sie auch
+     * hinter eine volle Tafel.
      */
     static Tafel lies(JsonObject panel) {
         int[] zahl = {0};
-        return new Tafel(liste(panel.getAsJsonArray("blocks"), true, zahl));
+        List<Knopf> knoepfe = new ArrayList<>();
+        return new Tafel(liste(panel.getAsJsonArray("blocks"), true, zahl, knoepfe), List.copyOf(knoepfe));
     }
 
-    private static List<Baustein> liste(JsonArray bloecke, boolean oben, int[] zahl) {
+    private static List<Baustein> liste(JsonArray bloecke, boolean oben, int[] zahl, List<Knopf> knoepfe) {
         List<Baustein> aus = new ArrayList<>();
         for (JsonElement e : bloecke) {
-            if (zahl[0] >= MAX_BAUSTEINE) {
-                break;
-            }
             try {
-                Baustein b = baustein(e.getAsJsonObject(), oben, zahl);
+                JsonObject o = e.getAsJsonObject();
+                if (oben && o.has("type") && "button".equals(o.get("type").getAsString())) {
+                    Knopf k = knoepfe.size() < MAX_KNOEPFE ? knopf(o) : null;
+                    if (k != null && knoepfe.stream().noneMatch(x -> x.id().equals(k.id()))) {
+                        knoepfe.add(k);
+                    }
+                    continue;
+                }
+                if (zahl[0] >= MAX_BAUSTEINE) {
+                    continue;
+                }
+                Baustein b = baustein(o, oben, zahl, knoepfe);
                 if (b != null) {
                     aus.add(b);
                 }
@@ -129,7 +163,7 @@ record Tafel(List<Baustein> bausteine) {
         return List.copyOf(aus);
     }
 
-    private static Baustein baustein(JsonObject o, boolean oben, int[] zahl) {
+    private static Baustein baustein(JsonObject o, boolean oben, int[] zahl, List<Knopf> knoepfe) {
         String typ = o.has("type") ? o.get("type").getAsString() : "";
         Baustein b = switch (typ) {
             case "title" -> {
@@ -168,7 +202,7 @@ record Tafel(List<Baustein> bausteine) {
                 Bild bild = kopf.has("image") ? bild(kopf) : null;
                 String text = Ebenen.text(kopf, "text", MAX_TITEL);
                 zahl[0]++;
-                yield new Abschnitt(bild, bild == null ? text : null, liste(o.getAsJsonArray("blocks"), false, zahl));
+                yield new Abschnitt(bild, bild == null ? text : null, liste(o.getAsJsonArray("blocks"), false, zahl, knoepfe));
             }
             case "columns" -> {
                 if (!oben) {
@@ -176,7 +210,8 @@ record Tafel(List<Baustein> bausteine) {
                 }
                 JsonArray spalten = o.getAsJsonArray("columns");
                 zahl[0]++;
-                yield new Spalten(liste(spalten.get(0).getAsJsonArray(), false, zahl), liste(spalten.get(1).getAsJsonArray(), false, zahl));
+                yield new Spalten(liste(spalten.get(0).getAsJsonArray(), false, zahl, knoepfe),
+                        liste(spalten.get(1).getAsJsonArray(), false, zahl, knoepfe));
             }
             default -> null;
         };
@@ -185,6 +220,35 @@ record Tafel(List<Baustein> bausteine) {
             zahl[0]++;
         }
         return b;
+    }
+
+    /**
+     * Ein Knopf: {@code id} als {@code modname:name} nach der Regel einer Kennung, ein {@code label} mit {@code de} oder
+     * {@code en} und {@code on} als Wahrheitswert; sonst null.
+     */
+    private static Knopf knopf(JsonObject o) {
+        String id = o.get("id").getAsString();
+        int doppelpunkt = id.indexOf(':');
+        JsonObject label = o.getAsJsonObject("label");
+        String de = label(label, "de"), en = label(label, "en");
+        if (doppelpunkt < 0 || !Symbole.teil(id.substring(0, doppelpunkt)) || !Symbole.teil(id.substring(doppelpunkt + 1))
+                || de == null && en == null || !o.getAsJsonPrimitive("on").isBoolean()) {
+            return null;
+        }
+        return new Knopf(id, de, en, o.get("on").getAsBoolean());
+    }
+
+    /** Ein Label: höchstens {@link #MAX_LABEL} Zeichen, nach Codepoints wie das Plugin, Codes mit § gestrichen, nicht leer; sonst null. */
+    private static String label(JsonObject label, String sprache) {
+        if (!label.has(sprache)) {
+            return null;
+        }
+        String t = label.get(sprache).getAsString();
+        if (t.codePointCount(0, t.length()) > MAX_LABEL) {
+            return null;
+        }
+        t = ChatFormatting.stripFormatting(t);
+        return t.isBlank() ? null : t;
     }
 
     private static Bild bild(JsonObject o) {
@@ -222,7 +286,7 @@ record Tafel(List<Baustein> bausteine) {
     }
 
     /** Ein Stück der gesetzten Tafel, relativ zur linken oberen Ecke des Inhalts. */
-    sealed interface Stueck permits Text, Bildstueck, Punkt {
+    sealed interface Stueck permits Text, Bildstueck, Punkt, Knopfstueck {
     }
 
     record Text(int x, int y, String text, int farbe, boolean fett) implements Stueck {
@@ -234,19 +298,41 @@ record Tafel(List<Baustein> bausteine) {
     record Punkt(int x, int y, int seite, int farbe) implements Stueck {
     }
 
+    /** Ein Knopf über die ganze Breite, mit seinem Label in der Sprache des Spiels, gekürzt auf den Platz. */
+    record Knopfstueck(int x, int y, int breite, int hoehe, Knopf knopf, String label) implements Stueck {
+    }
+
     /** Die gesetzte Tafel: ihre Stücke und die Grösse des Inhalts. */
     record Satz(List<Stueck> stuecke, int breite, int hoehe) {
     }
 
-    /** Setzt die Tafel: so breit wie ihr breitester Baustein, höchstens {@link #BREITE}, so hoch wie ihr Inhalt. */
     static Satz setze(Tafel t, Masse m) {
+        return setze(t, m, true);
+    }
+
+    /**
+     * Setzt die Tafel: so breit wie ihr breitester Baustein oder Knopf, höchstens {@link #BREITE}, so hoch wie ihr Inhalt.
+     * Die Knöpfe stehen darunter, je einer in einer Zeile, mit dem Label in der Sprache des Spiels.
+     */
+    static Satz setze(Tafel t, Masse m, boolean deutsch) {
         int breite = 1;
         for (Baustein b : t.bausteine()) {
             breite = Math.max(breite, natuerlich(b, m));
         }
+        for (Knopf k : t.knoepfe()) {
+            breite = Math.max(breite, KNOPF_TEXT + m.breite(k.label(deutsch), false) + KNOPF_LINKS);
+        }
         breite = Math.min(breite, BREITE);
         List<Stueck> aus = new ArrayList<>();
         int y = setze(t.bausteine(), 0, 0, breite, m, aus);
+        for (Knopf k : t.knoepfe()) {
+            if (y > 0) {
+                y += ABSTAND;
+            }
+            int h = m.zeile() + 2 * KNOPF_RAND;
+            aus.add(new Knopfstueck(0, y, breite, h, k, m.kuerze(k.label(deutsch), breite - KNOPF_TEXT - KNOPF_LINKS, false)));
+            y += h;
+        }
         return new Satz(List.copyOf(aus), breite, y);
     }
 

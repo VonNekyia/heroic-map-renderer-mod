@@ -14,8 +14,8 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 
 - [Projektion](projektion.md): wo ein Block auf Minimap und Vollbildkarte liegt, genordet von oben wie `top-north`, geprüft an `projektion.json` des Renderers.
 - [Download](download.md): wie der Mod die Karte vom Plugin lädt, Kanal, Befehle, Zustimmung und Grösse, Sicherheit, Manifest, harte Grenzen, Ablage je Welt nach dem Hash des Seeds, Kartenliste mit Löschen, Fortsetzen und Abgleich.
-- [Vollbildkarte](vollbildkarte.md): Bedienung, welcher Satz, Stufen und Lupe, Kacheln lesen und behalten, Farbindex hinter der Palette, Spieler und Koordinaten, das Bild aus dem Gametest und was fehlt.
-- [Ebenen](ebenen.md): Ebenen vom Plugin empfangen, in Teilen je `version`, ihre Nadeln als Wappenschild mit Symbol und Namen, ihre Banner und ihre Flächen, Kreise, Linien und Kartenschrift auf Minimap und Vollbildkarte zeichnen, Grenzen und Kosten, und je Ebene im Menü umschalten.
+- [Vollbildkarte](vollbildkarte.md): Bedienung, der Hinweis auf eine neue Version, welcher Satz, Stufen und Lupe, Kacheln lesen und behalten, Farbindex hinter der Palette, Spieler und Koordinaten, das Bild aus dem Gametest und was fehlt.
+- [Ebenen](ebenen.md): Ebenen vom Plugin empfangen, in Teilen je `version`, ihre Nadeln als Wappenschild mit Symbol und Namen, ihre Banner und ihre Flächen, Kreise, Linien und Kartenschrift auf Minimap und Vollbildkarte zeichnen, Knöpfe des Plugins in der Tafel, Grenzen und Kosten, und je Ebene im Menü umschalten.
 - [API für Client-Mods](api.md): wie ein anderer Fabric-Mod eigene Ebenen anlegt, im Format der Ebenen vom Server, über den Entrypoint `heroicmap` und `HeroicMapClientApi`; Kennungen, Grenzen, Version, was v1 nicht kann.
 - [Wegpunkte](wegpunkte.md): Wegpunkte setzen und löschen, auch an eingetippten Koordinaten, der Todespunkt, eigene Linien und Regionen mit eigenen Ecken, Namen und Farben, eigene Ebenen und ihr Teilen als Code, Marken am Rand der Vollbildkarte, Klick zum Zentrieren, Doppelklick zum Anheften an die Minimap, auch für Regionen und Kreise vom Server, Grösse der Köpfe und Ablage in `wegpunkte.json`.
 - [Selbst gezeichnete Karte](selbst.md): die Wahl „Selbst“, wie der Mod die geladenen Chunks in eine eigene Karte zeichnet, auch im Einzelspieler, Wahl und Beenden, Massstab 1, 2 oder 4 px, wann gezeichnet wird, Kacheln als PNG und Pyramide.
@@ -50,6 +50,8 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [0014](entscheidungen/0014-eigene-karte-mit-massstab.md): Die eigene Karte mit 1, 2 oder 4 Pixeln je Block, fest bis zum Löschen, der Baum wie ein Download; löst 0004 im Massstab ab.
 - [0015](entscheidungen/0015-ordner-fuer-einzelspielerwelten.md): Ein Ordner der Welt auch im Einzelspieler, unter heroicmap/ nach Speicherordner und Hash, nicht im Speicherordner der Welt; löst 0004 im Einzelspieler ab.
 - [0022](entscheidungen/0022-marken-nach-aussen.md): Bei „kompass“ und „biom“ zeigt das Bild jeder Marke von der Mitte weg, genordet wie gedreht; die anderen Skins bleiben starr.
+- [0024](entscheidungen/0024-browser-ohne-bestaetigung.md): „Im Browser öffnen“ öffnet direkt nach dem Klick, ohne Bestätigungsschirm und nicht über Blaze3D.openUri, mit dem Link aus der eigenen Basis.
+- [0025](entscheidungen/0025-neue-version-von-modrinth.md): Einmal je Start Modrinth nach einer neueren Version fragen, Vorabversionen nach Semver statt nach dem Kanal, das Repo als Kontakt, Vorgabe an, der feste Link hinter dem Bestätigungsschirm.
 - [0023](entscheidungen/0023-teleport-mit-korrektur.md): „Hierher teleportieren“ immer im Menü; ohne Höhe zuerst der Server, nach 5 Ticks die Höhe des Spielers; danach einmal korrigieren, sobald der Chunk beim Client ist; löst 0019 in Punkt 3 ab.
 
 ## Messungen
@@ -60,8 +62,10 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [2026-10-09, Minimap, Drehen](messungen/2026-10-09-minimap-drehen.md): was die drehende Minimap je Frame kostet, eckig und rund, im Stand und im Flug; rund gedreht ist billiger als ungedreht.
 - [2026-10-09, Minimap, Vieleck auch ungedreht](messungen/2026-10-09-minimap-vieleck.md): was die Minimap je Frame kostet, seit sie auch ungedreht mit dem Vieleck zeichnet, gegen main; rund so billig wie eckig.
 - [2026-10-10, Minimap, Verzierungen drehen mit](messungen/2026-10-10-minimap-verzierungen.md): was die Minimap mit dem Rahmen „kompass“ je Frame kostet, seit die Verzierungen mitdrehen, gegen main im Wechsel A B A B unter Grundlast; unverändert.
+- [2026-10-20, Minimap, Zoom 0,5](messungen/2026-10-20-minimap-zoom-halb.md): was Zoom 0,5 gegen 2 je Frame kostet und bis die Minimap nach dem Wechsel ganz gezeichnet ist; je Frame gleich, ganz gezeichnet nach rund 1 s statt 50 ms.
 - [2026-10-11, Strahl über angehefteten Wegpunkten](messungen/2026-10-11-strahl.md): was 64 Strahlen je Frame kosten, mit und ohne „Effekte in der Welt“, drei Läufe im Wechsel mit dem Schleier.
 - [2026-10-11, Schleier am Rand angehefteter Regionen](messungen/2026-10-11-schleier.md): was der Schleier an der Grenze von 20 000 Vierecken mit 64 Strahlen je Frame kostet und wie lange ein Bau dauert.
+- [2026-10-19, Schleier, Auswahl statt Sortieren](messungen/2026-10-19-schleier-auswahl.md): Ein Bau mit 47 Regionen wird mit der Auswahl der 5 000 nächsten Stücke 20 % schneller, 3,44 statt 4,31 ms; je Frame unverändert.
 - [2026-10-09, Selbst gezeichnete Karte, Schreiben der Kacheln](messungen/2026-10-09-selbst-schreiben.md): was `Kachelwerk.schreibe` je Durchlauf kostet und wie viele PNG es je Stunde schreibt, für eine Farm und einen Flug.
 - [2026-10-10, Selbst gezeichnete Karte, Platz je Massstab](messungen/2026-10-10-selbst-platz-je-massstab.md): wie viele PNG die eigene Karte je Stunde schreibt und wie viel Platz sie braucht, bei 1, 2 und 4 px; Zeiten folgen.
 - [2026-10-11, Selbst gezeichnete Karte, Schreiben je Massstab](messungen/2026-10-11-selbst-schreiben-je-massstab.md): was `Kachelwerk.schreibe` je Durchlauf bei 1, 2 und 4 px kostet, Farm und Flug, drei Läufe in Ruhe.
