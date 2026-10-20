@@ -52,7 +52,7 @@ steht unter „Kosten“.
 | Einstellung | Vorgabe | tut |
 |---|---|---|
 | Minimap | an | blendet die Minimap aus und ein |
-| Zoom der Minimap | 2× | 0,5, 1, 2, 4 oder 8 Einheiten des GUI je Block: wie viel Gegend die Minimap zeigt; im Menü ein Schieberegler mit einer Raste je Stufe |
+| Zoom der Minimap | 2× | 0,5, 1, 2, 4 oder 8 Einheiten des GUI je Block: wie viel Gegend die Minimap zeigt; im Menü ein senkrechter Regler neben der Minimap mit einer Raste je Stufe, siehe unten |
 | Mitspieler | Simple Voice Chat | siehe „Mitspieler“ |
 | Knopf „Karte laden …“ | – | die Karten des Servers, wie in der [Vollbildkarte](vollbildkarte.md), „Bedienung“ |
 | Knopf „Kartenliste …“ | – | alle Karten auf der Platte mit Grösse und Summe in GB, mit Löschen, siehe [Download](download.md), „Kartenliste“ |
@@ -124,8 +124,12 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
 
 - **Knöpfe** stehen im grösseren freien Platz neben der Minimap, 200
   Einheiten breit oder schmaler, bis 120, wenn dort weniger Platz ist
-  (`Einstellungen.spalte`), im Untermenü ebenso. Im Hauptmenü teilen sich
-  je zwei eine Zeile: „Minimap“ und der Regler „Zoom der Minimap“, „Karte laden …“ und
+  (`Einstellungen.spalte`), im Untermenü ebenso. Der Regler „Zoom der
+  Minimap“ zählt dabei zur Minimap; die Knöpfe liegen nie auf ihm. Nach dem
+  Verschieben oder Ziehen am Griff gehen die Knöpfe auf die dann freie
+  Seite, so hat es der Reviewer am 20.10. freigegeben; vorher blieben sie
+  stehen. Im Hauptmenü steht „Minimap“ allein in der ersten Zeile, ganz
+  breit; dann teilen sich je zwei eine Zeile: „Karte laden …“ und
   „Kartenliste …“, „Einstellungen …“ und „Fertig“; im Untermenü
   „Chunklinien“ und „Drehen“, „Verzierungen“ und „Koordinaten“, „Effekte in
   der Welt“ und der Regler „Schleier“, „Auflösung“ und der Regler
@@ -163,11 +167,26 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
   Steuerung, Gruppe „Heroic Map“; was sie ändern, speichert der Mod gleich.
   Die Taste für den Zoom geht reihum 0,5 → 1 → 2 → 4 → 8 → 0,5
   (`Minimap.naechsterZoom`).
-- **Der Regler „Zoom der Minimap“** im Hauptmenü
-  (`Einstellungen.ZoomRegler`) ersetzt den Knopf, wie die Regler der
-  Spieleinstellungen, mit einer Raste je Stufe; dazwischen gibt es keinen
-  Zoom. Klick oder Ziehen stellt die nächste Raste, die Pfeiltasten gehen
-  je eine. Ein Mausrad am Zoom gibt es nicht; daran ändert sich nichts.
+- **Der Regler „Zoom der Minimap“** (`Einstellungen.ZoomRegler`) steht im
+  Hauptmenü senkrecht neben der Minimap, so hat es der User gewünscht
+  (mod#173, Plan vom Reviewer freigegeben am 20.10.):
+  - **Aussehen:** wie die Regler der Spieleinstellungen, mit ihren Sprites,
+    nur quer; 20 Einheiten breit, so hoch wie die Minimap. Eine Raste je
+    Stufe, oben die nächste; dazwischen gibt es keinen Zoom. Den Wert zeigt
+    der Tooltip beim Schweben und Ziehen, etwa „Zoom der Minimap: 0,5×“.
+  - **Bedienung:** Klick oder Ziehen stellt die nächste Raste, die
+    Pfeiltasten gehen je eine, hoch und rechts näher.
+  - **Mausrad:** Über der Minimap oder dem Regler geht es je Schritt eine
+    Raste, nach vorn näher; sonst tut es im Menü nichts. So hat es der User
+    am 20.10. gewünscht.
+  - **Lage** (`Einstellungen.zoomLage`): links neben der Minimap, im
+    Abstand `Minimap.rand` wie ihre Koordinaten; so bleiben Rahmen, Umriss
+    und Griff frei. Passt er links nicht auf den Schirm, steht er ebenso
+    rechts. Passt er auf keiner Seite, liegt er innen an ihrem linken Rand;
+    das geschieht nur bei einem fast quadratischen Schirm und der grössten
+    Seite.
+  - **Beim Ziehen** folgt er der Minimap in jedem Frame. Ist die Minimap
+    aus, fehlt er.
 - **Reichweite bei 0,5×:** Die Minimap zeigt 4× so viele Chunks wie bei
   1×, bei 128 Einheiten Seite ±8 Chunks, bei der grössten Seite ±16
   (`Minimap.reichweite`). Was jenseits der Sichtweite liegt, bleibt
