@@ -11,9 +11,11 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -31,15 +33,17 @@ import net.minecraft.resources.Identifier;
  */
 final class Kacheln implements AutoCloseable {
 
-    /** So viele Texturen bleiben; bei 256² Pixeln rund 48 MiB. */
-    private static final int MAX = 192;
+    /** So viele Texturen behält die Vollbildkarte; bei 256² Pixeln rund 48 MiB. */
+    static final int MAX = 192;
 
     /** Ein dekodiertes Bild, ARGB Zeile für Zeile. */
     record Bild(int breite, int hoehe, int[] argb) {
     }
 
-    /** Die offene Karte, der ein fertiger Download gemeldet wird; nur auf dem Render-Thread. */
-    private static Kacheln offen;
+    /** Die offenen Kacheln, Vollbildkarte und Minimap, denen ein fertiger Download gemeldet wird; nur auf dem Render-Thread. */
+    private static final List<Kacheln> OFFEN = new ArrayList<>();
+    /** Zählt die Texturen aller Kacheln; so tragen zwei offene nie denselben Namen. Nur auf dem Render-Thread. */
+    private static int naechste;
 
     private final Path ordner;
     private final int seite;
@@ -51,7 +55,7 @@ final class Kacheln implements AutoCloseable {
     private final Map<String, Identifier> texturen = new LinkedHashMap<>(16, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<String, Identifier> aeltester) {
-            if (size() > MAX) {
+            if (size() > max) {
                 Minecraft.getInstance().getTextureManager().release(aeltester.getValue());
                 return true;
             }
@@ -65,33 +69,34 @@ final class Kacheln implements AutoCloseable {
     private final Map<String, Integer> generation = new HashMap<>();
     /** Kacheln mit einer älteren Textur: Sie bleibt sichtbar, bis die neue da ist. */
     private final Set<String> veraltet = new HashSet<>();
+    private final int max;
     private boolean geschlossen;
-    private int naechste;
 
-    /** Die Kacheln des Satzes; jede muss genau {@code tileSize} gross sein. Auf dem Render-Thread. */
-    Kacheln(Satz satz) {
+    /** Die Kacheln des Satzes; jede muss genau {@code tileSize} gross sein. Höchstens {@code max} Texturen bleiben. Auf dem Render-Thread. */
+    Kacheln(Satz satz, int max) {
         this.ordner = satz.ordner();
         this.seite = satz.kachel();
-        offen = this;
+        this.max = max;
+        OFFEN.add(this);
     }
 
     /** Eine Kachel der selbst gezeichneten Karte in {@code ordner} ist neu geschrieben; ist sie offen, lädt die Kachel neu. */
     static void geaendert(Path ordner, int z, int x, int y) {
-        if (offen != null && offen.ordner.equals(ordner)) {
-            String pfad = z + "/" + x + "/" + y;
-            offen.leer.remove(pfad);
-            if (offen.texturen.containsKey(pfad) || offen.laeuft.contains(pfad)) {
-                offen.generation.merge(pfad, 1, Integer::sum);
-                offen.veraltet.add(pfad);
+        String pfad = z + "/" + x + "/" + y;
+        for (Kacheln offen : OFFEN) {
+            if (offen.ordner.equals(ordner)) {
+                offen.leer.remove(pfad);
+                if (offen.texturen.containsKey(pfad) || offen.laeuft.contains(pfad)) {
+                    offen.generation.merge(pfad, 1, Integer::sum);
+                    offen.veraltet.add(pfad);
+                }
             }
         }
     }
 
     /** Nach einem vollständigen Download: Alle Kacheln laden neu. Auf dem Render-Thread. */
     static void satzGeladen() {
-        if (offen != null) {
-            offen.allesNeu();
-        }
+        OFFEN.forEach(Kacheln::allesNeu);
     }
 
     private void allesNeu() {
@@ -305,9 +310,7 @@ final class Kacheln implements AutoCloseable {
     @Override
     public void close() {
         geschlossen = true;
-        if (offen == this) {
-            offen = null;
-        }
+        OFFEN.remove(this);
         dekoder.shutdownNow();
         texturen.values().forEach(Minecraft.getInstance().getTextureManager()::release);
         texturen.clear();

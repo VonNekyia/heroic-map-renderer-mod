@@ -24,6 +24,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.BiFunction;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -104,14 +105,30 @@ public final class Minimap {
     });
     /** Gehört dem Worker; nur er legt ihn an und ruft ihn. */
     private ChunkMaler maler;
+    /** Der Satz der Dimension und seine Kacheln im Kachelmodus, oder null; wann zuletzt gesucht. Nur auf dem Render-Thread. */
+    private Satz satz;
+    private Kacheln kacheln;
+    private long satzGesucht;
+    /** Im Kachelmodus: wie viele sichtbare Kacheln im letzten Frame noch luden; die es nicht gibt, zählen nicht. */
+    private int kachelnLaden;
+    /** Die Sichtweite des Clients in Chunks, je Frame neu; bis zum ersten Frame unbegrenzt. */
+    private int sichtweite = Integer.MAX_VALUE / 2;
 
     private boolean sichtbar = true;
     /** Auflösung, die der Spieler gewählt hat: höchstens so viele Pixel je Block, 1, 2, 4, 8 oder 16. */
     private int aufloesung = 2;
     /** Pixel je Block in den Texturen, wie gezeichnet: siehe {@link #effektiv}. */
     private int scale = 2;
-    /** Zoom: Einheiten des GUI je Block, 1, 2, 4 oder 8; wie viel Gegend die Minimap zeigt. */
-    private int zoom = 2;
+    /** Die Stufen des Zooms, Einheiten des GUI je Block, der Reihe nach. Siehe docs/minimap.md, „Bedienung“. */
+    static final double[] ZOOMS = {1.0 / 32, 1.0 / 16, 1.0 / 8, 1.0 / 4, 1.0 / 2, 1, 2, 4, 8};
+    /** Ab diesem Zoom und weiter heraus zeichnet die Minimap die Kacheln des Satzes, wenn es einen gibt. Siehe docs/minimap.md, „Weit heraus“. */
+    static final double KACHELN_AB = 1.0 / 4;
+    /** So viele Kacheln behält die Minimap; bei 256² Pixeln rund 16 MiB. */
+    static final int KACHELN_MAX = 64;
+    /** So oft, alle 2 s, sucht die Minimap im Kachelmodus den Satz der Dimension neu, etwa nach einem Download. */
+    private static final long SATZ_MS = 2000;
+    /** Zoom: Einheiten des GUI je Block, einer aus {@link #ZOOMS}; wie viel Gegend die Minimap zeigt. */
+    private double zoom = 2;
     private boolean rund;
     /** Die Wahl {@code show}: Mitspieler über Simple Voice Chat zeigen und gezeigt werden, oder versteckt. */
     private boolean show = true;
@@ -265,21 +282,31 @@ public final class Minimap {
         return sichtbar;
     }
 
-    /** Zoom 1, 2, 4 oder 8 Einheiten je Block, der Reihe nach. */
+    /** Die nächste Stufe aus {@link #ZOOMS}, nach der grössten wieder die kleinste. */
     void naechsterZoom() {
-        setzeZoom(zoom == 8 ? 1 : zoom * 2);
+        setzeZoom(ZOOMS[(stufe(zoom) + 1) % ZOOMS.length]);
     }
 
-    /** Ein anderer Zoom ändert nur den Bereich; die Texturen behalten ihre Auflösung. */
-    void setzeZoom(int zoom) {
-        if (zoom != this.zoom) {
+    /** Ein anderer Zoom ändert nur den Bereich; die Texturen behalten ihre Auflösung. Nur Stufen aus {@link #ZOOMS}. */
+    void setzeZoom(double zoom) {
+        if (zoom != this.zoom && stufe(zoom) >= 0) {
             this.zoom = zoom;
             mitte = null;
         }
     }
 
-    int zoom() {
+    double zoom() {
         return zoom;
+    }
+
+    /** Die Stelle von {@code zoom} in {@link #ZOOMS}, oder -1. */
+    static int stufe(double zoom) {
+        for (int i = 0; i < ZOOMS.length; i++) {
+            if (ZOOMS[i] == zoom) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /**
@@ -304,11 +331,11 @@ public final class Minimap {
     /**
      * Die Auflösung, mit der gezeichnet wird: die grösste Zweierpotenz von Pixeln je Block bis zur
      * gewählten, die in die Pixel eines Blocks auf dem Schirm, Zoom mal GUI-Massstab, ganz aufgeht.
-     * So wird nie verkleinert, also nie unscharf, und jeder Texel ist gleich gross.
-     * Siehe docs/minimap.md, „Bedienung“.
+     * So wird nie verkleinert, also nie unscharf, und jeder Texel ist gleich gross; nur bei Zoom 0,5 und
+     * ungeradem GUI-Massstab ist ein Block 1,5 oder 0,5 Pixel, dann 1 px je Block. Siehe docs/minimap.md, „Bedienung“.
      */
-    static int effektiv(int aufloesung, int zoom, int guiMassstab) {
-        int schirm = zoom * guiMassstab;
+    static int effektiv(int aufloesung, double zoom, int guiMassstab) {
+        double schirm = zoom * guiMassstab;
         for (int r = aufloesung; r > 1; r /= 2) {
             if (schirm % r == 0) {
                 return r;
@@ -583,8 +610,8 @@ public final class Minimap {
         int s = zahl(p.getProperty("massstab"), 2);
         aufloesung = s == 1 || s == 4 || s == 8 || s == 16 ? s : 2;
         // Vor dem Zoom galt der Massstab für beides; ohne zoom bleibt der Ausschnitt so.
-        int z = zahl(p.getProperty("zoom"), aufloesung);
-        zoom = z == 1 || z == 4 || z == 8 ? z : 2;
+        double z = dezimal(p.getProperty("zoom"), aufloesung);
+        zoom = stufe(z) >= 0 ? z : 2;
         rund = "rund".equals(p.getProperty("form"));
         show = !"hidden".equals(p.getProperty("show"));
         chunklinien = "true".equals(p.getProperty("chunklinien"));
@@ -635,7 +662,8 @@ public final class Minimap {
         Properties p = new Properties();
         p.setProperty("minimap", Boolean.toString(sichtbar));
         p.setProperty("massstab", Integer.toString(aufloesung));
-        p.setProperty("zoom", Integer.toString(zoom));
+        // Ganze Stufen wie bisher als ganze Zahl; eine ältere Version liest 0.5 nicht und nimmt 2.
+        p.setProperty("zoom", zoom == Math.rint(zoom) ? Integer.toString((int) zoom) : Double.toString(zoom));
         p.setProperty("form", rund ? "rund" : "eckig");
         p.setProperty("show", show ? "simplevoicechat" : "hidden");
         p.setProperty("chunklinien", Boolean.toString(chunklinien));
@@ -671,6 +699,14 @@ public final class Minimap {
         }
     }
 
+    private static double dezimal(String text, double vorgabe) {
+        try {
+            return text == null ? vorgabe : Double.parseDouble(text.trim());
+        } catch (NumberFormatException e) {
+            return vorgabe;
+        }
+    }
+
     private static int zahl(String text, int vorgabe) {
         try {
             return text == null ? vorgabe : Integer.parseInt(text.trim());
@@ -694,7 +730,7 @@ public final class Minimap {
 
     /** Ist nichts mehr nachzuzeichnen? */
     boolean fertig() {
-        return mitte != null && offen.isEmpty() && laufend.isEmpty();
+        return kacheln != null ? kachelnLaden == 0 : mitte != null && offen.isEmpty() && laufend.isEmpty();
     }
 
     /**
@@ -716,9 +752,14 @@ public final class Minimap {
         return texel;
     }
 
-    /** Chunks je Richtung um den Spieler, die die Minimap zeichnet: sichtbar plus Vorrat. */
+    /** Chunks je Richtung um den Spieler, die die Minimap zeichnet: sichtbar plus Vorrat, höchstens die Sichtweite plus Vorrat. */
     int reichweite() {
-        return reichweite(zoom, sicht(seite, drehen, rund));
+        return reichweite(zoom, sicht(seite, drehen, rund), sichtweite);
+    }
+
+    /** Wie {@link #reichweite(double, int)}, höchstens die Sichtweite plus Vorrat: Weiter hat der Client keine Chunks, bei 1/32 wären es sonst ±130. */
+    static int reichweite(double zoom, int groesse, int sichtweite) {
+        return Math.min(reichweite(zoom, groesse), sichtweite + VORRAT);
     }
 
     /** Wie viel Gegend die Minimap braucht, als Seite eines Quadrats: eckig und gedreht reicht sie in den Ecken √2 weiter. */
@@ -726,8 +767,8 @@ public final class Minimap {
         return drehen && !rund ? (int) Math.ceil(groesse * Math.sqrt(2)) : groesse;
     }
 
-    static int reichweite(int zoom, int groesse) {
-        return Mth.ceil(groesse / 2f / (16f * zoom)) + VORRAT;
+    static int reichweite(double zoom, int groesse) {
+        return Mth.ceil(groesse / 2.0 / (16.0 * zoom)) + VORRAT;
     }
 
     private boolean imBereich(int x, int z) {
@@ -740,6 +781,7 @@ public final class Minimap {
      * fallen weg; mit der nächsten Mitte wird der Bereich neu markiert.
      */
     void leeren() {
+        gibKachelnFrei();
         regionen.values().forEach(Region::schliessen);
         regionen.clear();
         offen.clear();
@@ -782,7 +824,14 @@ public final class Minimap {
             }
         }
         zuletzt = r;
-        arbeite(mc, level, spieler);
+        sichtweite = mc.options.getEffectiveRenderDistance();
+        String dimension = level.dimension().identifier().toString();
+        // Ab 1/4 die Kacheln des Satzes, wenn es einen gibt; dann ruhen die Chunks. Siehe docs/minimap.md, „Weit heraus“.
+        Satz kachelSatz = zoom <= KACHELN_AB ? satz(dimension) : null;
+        if (kachelSatz == null) {
+            gibKachelnFrei();
+            arbeite(mc, level, spieler);
+        }
 
         float a = anteil(level, spieler, zeit);
         int k = mc.getWindow().getGuiScale(), n = r.seite() * k;
@@ -806,11 +855,26 @@ public final class Minimap {
         double[] bereich = lage != null ? new double[] {lage.px() - weit, lage.py() - weit, lage.px() + weit, lage.py() + weit}
                 : new double[] {0, 0, n, n};
         float[] form = schnitt(r, k, rahmen);
-        male(g, r, links, oben, k, bild, bereich, form, rahmen == null);
-        if (chunklinien) {
+        if (kachelSatz != null) {
+            int z = kachelStufe(kachelSatz.scale(), kachelSatz.minZoom(), kachelSatz.maxZoom(), kachelSatz.stufe(), zoom, k);
+            kachelnLaden = 0;
+            male(g, r, links, oben, k, bild, bereich, form, rahmen == null, kachelSeite(kachelSatz, z, zoom, k), (tx, ty) -> {
+                Identifier id = kacheln.textur(z, tx, ty);
+                if (id == null && !kacheln.fehlt(z, tx, ty)) {
+                    kachelnLaden++;
+                }
+                return id;
+            });
+        } else {
+            male(g, r, links, oben, k, bild, bereich, form, rahmen == null, (int) (CHUNKS_JE_REGION * 16 * zoom * k), (rx, rz) -> {
+                Region region = regionen.get(ChunkPos.pack(rx, rz));
+                return region == null ? null : region.id;
+            });
+        }
+        // Unter 1/2 stünden die Linien dichter als ein Pixel. Siehe docs/minimap.md, „Chunklinien“.
+        if (chunklinien && zoom >= 0.5) {
             linien(g, r, links, oben, k, bild, bereich, form);
         }
-        String dimension = level.dimension().identifier().toString();
         formen(g, r, links, oben, k, bild, bereich, form, dimension);
         // Vor Ring und Rahmen: Was am Rand über sie ragt, decken sie.
         nadeln(g, mc.font, r, dimension, links, oben, k, lage, rahmen == null ? 0 : rahmen.baender(), spieler.getX(), spieler.getZ());
@@ -956,7 +1020,7 @@ public final class Minimap {
     }
 
     /** Wie die Formen einen Punkt der Welt in die Pixel der Minimap legen: wie die Karte, mit {@code lage} gedreht. */
-    static Formen.Abbild abbild(int zoom, int k, int links, int oben, Drehung.Lage lage) {
+    static Formen.Abbild abbild(double zoom, int k, int links, int oben, Drehung.Lage lage) {
         return (wx, wz, aus) -> {
             double bx = Projektion.zuPixel(wx, zoom) * k - links, by = Projektion.zuPixel(wz, zoom) * k - oben;
             aus[0] = lage.x(bx, by);
@@ -1014,7 +1078,7 @@ public final class Minimap {
      * {@code klemmen} am Rand der Form in seiner Richtung, sonst null. Mit {@code lage} gedreht um den
      * Spieler, dann ohne Raster. Siehe docs/wegpunkte.md, „Am Rand“.
      */
-    static float[] marke(Rahmen r, double x, double z, int links, int oben, int k, int zoom, boolean rund, double innen, boolean klemmen,
+    static float[] marke(Rahmen r, double x, double z, int links, int oben, int k, double zoom, boolean rund, double innen, boolean klemmen,
             Drehung.Lage lage) {
         double h = r.seite() / 2.0, mx, my;
         if (lage == null) {
@@ -1039,7 +1103,61 @@ public final class Minimap {
      * ist die Kante des Bildes aus {@link #ecke}. Mit derselben Kante wie die Karte wackelt eine
      * Marke beim Laufen nicht gegen sie.
      */
-    static int pixel(double welt, int zoom, int k, int links) {
+    /**
+     * Der Satz der Dimension für den Kachelmodus, die eigene Karte vor einem Download, wie die Vollbildkarte; alle
+     * {@link #SATZ_MS} neu gesucht. Ein anderer Satz bekommt neue Kacheln. Siehe docs/minimap.md, „Weit heraus“.
+     */
+    private Satz satz(String dimension) {
+        long jetzt = Util.getMillis();
+        if (kacheln == null || jetzt - satzGesucht >= SATZ_MS) {
+            satzGesucht = jetzt;
+            Satz neu = Satz.fuer(Downloads.weltOrdner(), dimension);
+            if (neu == null || satz == null || !neu.ordner().equals(satz.ordner())) {
+                gibKachelnFrei();
+                satz = neu;
+                kacheln = neu == null ? null : new Kacheln(neu, KACHELN_MAX);
+            }
+        }
+        return satz;
+    }
+
+    /** Für den Gametest: zeichnet die Minimap gerade die Kacheln eines Satzes? */
+    boolean kachelmodus() {
+        return kacheln != null;
+    }
+
+    /** Gibt die Kacheln des Kachelmodus frei, etwa wieder ab 1/2 oder in einer anderen Welt. */
+    private void gibKachelnFrei() {
+        if (kacheln != null) {
+            kacheln.close();
+            kacheln = null;
+        }
+        satz = null;
+    }
+
+    /**
+     * Die Stufe des Satzes für den Kachelmodus: die gröbste, deren Pixel auf dem Schirm noch höchstens einen Pixel decken,
+     * Zoom mal GUI-Massstab Pixel je Block; so verkleinert die Minimap höchstens 2× und vergrössert nie. Nie feiner als die
+     * feinste Stufe des Massstabs, nie gröber als {@code minZoom}. Siehe docs/minimap.md, „Weit heraus“.
+     */
+    static int kachelStufe(int scale, int minZoom, int maxZoom, int feinste, double zoom, int k) {
+        // Stufe z hat scale / 2^(maxZoom - z) Pixel je Block.
+        int groeber = (int) Math.floor(Math.log(scale / (zoom * k)) / Math.log(2) + 1e-9);
+        return Math.clamp(maxZoom - groeber, minZoom, feinste);
+    }
+
+    /** Die Seite einer Kachel der Stufe {@code z} auf dem Schirm, in Pixeln; ganz, denn Zoom und Stufen sind Zweierpotenzen. */
+    static int kachelSeite(Satz satz, int z, double zoom, int k) {
+        return (int) Math.round(Math.scalb((double) satz.kachel(), satz.maxZoom() - z) / satz.scale() * zoom * k);
+    }
+
+    /** Die Beschriftung einer Stufe: unter 1 als Bruch „1/32×“ bis „1/2×“, sonst „1×“ bis „8×“. */
+    static Component fach(double zoom) {
+        return zoom < 1 ? Component.translatable("heroicmap.menue.fach_bruch", (int) Math.round(1 / zoom))
+                : Component.translatable("heroicmap.menue.fach", (int) zoom);
+    }
+
+    static int pixel(double welt, double zoom, int k, int links) {
         return (int) Math.round(Projektion.zuPixel(welt, zoom) * k) - links;
     }
 
@@ -1058,7 +1176,7 @@ public final class Minimap {
      * {@code neu} beim Anteil {@code a} eines Ticks, auf ganze Pixel. {@code k} ist der GUI-Massstab,
      * {@code n} die Seite in Pixeln.
      */
-    static int ecke(double alt, double neu, float a, int zoom, int k, int n) {
+    static int ecke(double alt, double neu, float a, double zoom, int k, int n) {
         return Mth.floor(Projektion.zuPixel(Mth.lerp(a, alt, neu), zoom) * k) - n / 2;
     }
 
@@ -1087,7 +1205,7 @@ public final class Minimap {
      * genau zwischen zwei Ticks, auf der Mitte der Minimap, die Blickrichtung {@code gier} oben.
      * Siehe docs/minimap.md, „Drehen“.
      */
-    static Drehung.Lage lage(Rahmen r, double x, double z, float gier, int zoom, int k, int links, int oben) {
+    static Drehung.Lage lage(Rahmen r, double x, double z, float gier, double zoom, int k, int links, int oben) {
         // Die Mitte auf ganzen Pixeln, wie ungedreht der Kopf.
         int n = r.seite() * k;
         return Drehung.Lage.von(Drehung.winkel(gier), r.x() * k + n / 2, r.y() * k + n / 2,
@@ -1130,14 +1248,14 @@ public final class Minimap {
     }
 
     /**
-     * Die Regionen: je Region ihr Quadrat mit {@code lage} auf den Schirm, mit der Form geschnitten
-     * und als ein Element gezeichnet; {@code bereich} ist, was im Bild zu sehen sein kann. Ohne
-     * Rahmen eckig davor der Umriss; rund zeichnet ihn {@link #zeichne} danach als Ring. Siehe
+     * Die Regionen oder die Kacheln: je Quadrat von {@code s} Pixeln seine Textur aus {@code textur} mit {@code lage} auf den
+     * Schirm, mit der Form geschnitten und als ein Element gezeichnet; ohne Textur nichts. {@code bereich} ist, was im Bild zu
+     * sehen sein kann. Ohne Rahmen eckig davor der Umriss; rund zeichnet ihn {@link #zeichne} danach als Ring. Siehe
      * docs/minimap.md, „Form“.
      */
     private void male(GuiGraphicsExtractor g, Rahmen r, int links, int oben, int k, Drehung.Lage lage, double[] bereich, float[] form,
-            boolean umriss) {
-        int s = CHUNKS_JE_REGION * 16 * zoom * k, n = r.seite() * k, x0 = r.x() * k, y0 = r.y() * k;
+            boolean umriss, int s, BiFunction<Integer, Integer, Identifier> textur) {
+        int n = r.seite() * k, x0 = r.x() * k, y0 = r.y() * k;
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.scale(1f / k);
@@ -1149,8 +1267,8 @@ public final class Minimap {
         int[] regionen = Drehung.regionen(bereich, links, oben, s);
         for (int rz = regionen[2]; rz <= regionen[3]; rz++) {
             for (int rx = regionen[0]; rx <= regionen[1]; rx++) {
-                Region region = this.regionen.get(ChunkPos.pack(rx, rz));
-                if (region == null) {
+                Identifier id = textur.apply(rx, rz);
+                if (id == null) {
                     continue;
                 }
                 int anzahl = Drehung.region(lage, rx * s - links, rz * s - oben, s, form, puffer);
@@ -1159,8 +1277,8 @@ public final class Minimap {
                 }
                 // Das Element zeichnet später; Ecken und UV gehören ihm.
                 float[] ecken = Arrays.copyOf(puffer.ecken(), 2 * anzahl), uv = Arrays.copyOf(puffer.uv(), 2 * anzahl);
-                AbstractTexture textur = Minecraft.getInstance().getTextureManager().getTexture(region.id);
-                g.guiRenderState.addGuiElement(new Drehung.Bild(kopie, TextureSetup.singleTexture(textur.getTextureView(), textur.getSampler()),
+                AbstractTexture bild = Minecraft.getInstance().getTextureManager().getTexture(id);
+                g.guiRenderState.addGuiElement(new Drehung.Bild(kopie, TextureSetup.singleTexture(bild.getTextureView(), bild.getSampler()),
                         ecken, uv, anzahl, flaeche));
             }
         }
@@ -1228,7 +1346,7 @@ public final class Minimap {
         pose.pushMatrix();
         pose.scale(1f / k);
         Gitter.zeichne(g, bx, by, new ScreenRectangle(r.x() * k, r.y() * k, n, n), k, LINIE,
-                linien(seite, links + bx, oben + by, 16 * zoom * k, k), lage, form);
+                linien(seite, links + bx, oben + by, (int) (16 * zoom * k), k), lage, form);
         pose.popMatrix();
     }
 
