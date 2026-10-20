@@ -1095,6 +1095,10 @@ class WegpunkteTest {
         long spaet = ZonedDateTime.of(2026, 10, 19, 23, 59, 0, 0, zone).toInstant().toEpochMilli();
         long frueh = ZonedDateTime.of(2026, 10, 20, 0, 1, 0, 0, zone).toInstant().toEpochMilli();
         assertEquals("19.10. 23:59", Wegpunkte.todZeit(spaet, frueh, zone, "HH:mm", "dd.MM. HH:mm"));
+        // Ein Muster aus einem Ressourcenpaket, das nicht geht oder ein Feld nicht kennt, gibt das feste (Review von #172).
+        assertEquals("14:32", Wegpunkte.todZeit(heute, jetzt, zone, "HH:mm 'offen", "dd.MM. HH:mm"));
+        assertEquals("18.10. 14:32", Wegpunkte.todZeit(frueher, jetzt, zone, "HH:mm", "{dd}"));
+        assertEquals("18.10. 14:32", Wegpunkte.todZeit(frueher, jetzt, zone, "HH:mm", "dd.MM. bb"));
         // In der Datei: zeit im Eintrag von tode, tod wie bisher ohne.
         Wegpunkte w = new Wegpunkte();
         w.lies(ordner);

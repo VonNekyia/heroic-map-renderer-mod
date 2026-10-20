@@ -331,7 +331,10 @@ Reviewer freigegeben.
   Datum, etwa „18.10. 14:32“ (`Wegpunkte.todZeit`, `Karte.todZeit`). Die
   Muster kommen aus der Sprache des Spiels
   (`heroicmap.karte.tod_zeit_heute`, `heroicmap.karte.tod_zeit`), die Zeit
-  aus der Uhr und der Zeitzone des Rechners. Nicht am Rand, wo die Marke
+  aus der Uhr und der Zeitzone des Rechners. Ein Ressourcenpaket, auch vom
+  Server, kann die Muster überschreiben; eines, das nicht geht, gibt das
+  feste `HH:mm` bzw. `dd.MM. HH:mm`, gebaut einmal je Muster
+  (`Wegpunkte.format`, Review von #172). Nicht am Rand, wo die Marke
   nur die Richtung zeigt, und nicht auf der Minimap; dort wäre sie zu
   klein. Ein Todespunkt aus einer älteren Datei hat keine Zeit und also
   keine Schrift.
@@ -1048,7 +1051,7 @@ Schleier am Rand, siehe „Schleier“.
   nur die Uhrzeit, ein früherer Tag mit Datum, auch über Mitternacht;
   `zeit` in `tode`, nicht in `tod`; über den Neustart und das Anheften; die
   Folge aus der Liste; eine alte Datei ohne `zeit`; eine `zeit`, die keine
-  ganze Zahl über 0 ist),
+  ganze Zahl über 0 ist; ein Muster, das nicht geht, gibt das feste),
   `todespunktNurEinerAngeheftetUndEigensGespeichert` (mit einem: keine
   Farbe, eigens in der Datei, Lösen und Verschieben, nicht auf einem
   Wegpunkt, ein kaputter fehlt), `todMeldungOeffnetDieKarteDort`;

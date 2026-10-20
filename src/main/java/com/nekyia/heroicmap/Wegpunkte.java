@@ -12,8 +12,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.text.Normalizer;
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -30,6 +32,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.ClickEvent;
@@ -828,7 +831,11 @@ final class Wegpunkte {
         return punkte.removeAll(weg);
     }
 
-    /** „Todespunkt gesetzt bei x z“ für den Chat; ein Klick darauf öffnet die Karte dort über {@code /hmap karte}. */
+    /** Die festen Muster der Zeit unter dem Todespunkt, wenn das der Sprache nicht taugt. */
+    static final String TOD_ZEIT_HEUTE = "HH:mm", TOD_ZEIT = "dd.MM. HH:mm";
+    /** Die Formatierer je Muster aus der Sprache, einmal gebaut statt in jedem Frame. */
+    private static final Map<String, DateTimeFormatter> FORMATE = new ConcurrentHashMap<>();
+
     /**
      * Die Zeit des Todes {@code zeit} unter dem Todespunkt, in der Zeitzone {@code zone}: am Tag von {@code jetzt} nach dem Muster
      * {@code heute}, sonst nach {@code frueher}; die Muster kommen aus der Sprache des Spiels. Siehe docs/wegpunkte.md,
@@ -837,9 +844,28 @@ final class Wegpunkte {
     static String todZeit(long zeit, long jetzt, ZoneId zone, String heute, String frueher) {
         ZonedDateTime t = Instant.ofEpochMilli(zeit).atZone(zone);
         boolean amTag = t.toLocalDate().equals(Instant.ofEpochMilli(jetzt).atZone(zone).toLocalDate());
-        return DateTimeFormatter.ofPattern(amTag ? heute : frueher).format(t);
+        return format(amTag ? heute : frueher, amTag ? TOD_ZEIT_HEUTE : TOD_ZEIT).format(t);
     }
 
+    /**
+     * Der Formatierer für {@code muster}, einmal gebaut. Ein Ressourcenpaket, auch vom Server, kann die Sprache überschreiben; ein
+     * Muster, das nicht geht oder ein Feld der Zeit nicht kennt, gibt das feste {@code fest}, statt beim Zeichnen zu werfen
+     * (Review von #172).
+     */
+    private static DateTimeFormatter format(String muster, String fest) {
+        return FORMATE.computeIfAbsent(muster + "
+" + fest, k -> {
+            try {
+                DateTimeFormatter f = DateTimeFormatter.ofPattern(muster);
+                f.format(ZonedDateTime.ofInstant(Instant.EPOCH, ZoneOffset.UTC));
+                return f;
+            } catch (IllegalArgumentException | DateTimeException kaputt) {
+                return DateTimeFormatter.ofPattern(fest);
+            }
+        });
+    }
+
+    /** „Todespunkt gesetzt bei x z“ für den Chat; ein Klick darauf öffnet die Karte dort über {@code /hmap karte}. */
     static Component todMeldung(int x, int z) {
         return Component.translatable("heroicmap.tod.gesetzt", x, z).withStyle(s -> s.withUnderlined(true)
                 .withClickEvent(new ClickEvent.RunCommand("/hmap karte " + x + " " + z))
