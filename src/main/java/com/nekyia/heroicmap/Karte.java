@@ -159,6 +159,8 @@ final class Karte extends Screen {
     private EckeAn ueberEcke;
     /** Wohin, was an der Maus hängt, in diesem Frame einrastet, oder null. */
     private Rast rast;
+    /** Mit Alt beim Ziehen: das Glied an der Maus und das Ziel des Einrastens, wenn sie sich verbinden lassen; sonst null. */
+    private Wegpunkte.Glied[] vorschau;
     /** Wohin die Bünde gerade ziehen, solange etwas an der Maus hängt, je Frame aus {@link #zuege}; sonst leer. */
     private Map<Integer, double[]> zuege = Map.of();
     private GriffAn ueberGriff;
@@ -531,12 +533,15 @@ final class Karte extends Screen {
             griffHaengt = griffGedrueckt;
         }
         schwebe(mausX, mausY);
-        // Mit Strg steht das Ziel des Einrastens hell wie unter der Maus.
+        // Mit Strg oder Alt steht das Ziel des Einrastens hell wie unter der Maus.
         rast = einrasten(mausX, mausY);
         if (rast != null) {
             ueberEcke = rast.ecke();
             ueberMarke = rast.marke();
         }
+        // Mit Alt und einem Ziel, das sich verbinden lässt, tragen beide schon den hellen Kern (E2 von mod#169).
+        Wegpunkte.Glied[] paar = rast != null && minecraft.hasAltDown() ? paar(rast) : null;
+        vorschau = paar != null && Wegpunkte.INSTANZ.kannVerbinden(paar[0], paar[1]) ? paar : null;
         // Die gezogene Form und die, die ihr über einen Bund folgen, zeichnet die Karte selbst an der Maus; an ihrem alten Ort
         // fallen sie solange weg. Erst nach dem Einrasten, denn die Züge stehen dann auf dessen Ziel.
         zuege = zuege(mausX, mausY);
@@ -672,12 +677,12 @@ final class Karte extends Screen {
     }
 
     /**
-     * Mit gedrückter Strg, solange eine Ecke oder ein Wegpunkt an der Maus hängt: die nächste Ecke einer anderen eigenen Form oder,
+     * Mit gedrückter Strg oder Alt (mod#169), solange eine Ecke oder ein Wegpunkt an der Maus hängt: die nächste Ecke einer anderen eigenen Form oder,
      * für eine Ecke, der nächste Wegpunkt, höchstens {@link #EINRASTEN} von der Maus, nach den Lagen des letzten Frames; sonst null.
      * Ein Wegpunkt rastet nur auf Ecken ein, denn zwei Wegpunkte liegen nie auf einem Block. Siehe docs/wegpunkte.md, „Einrasten“.
      */
     private Rast einrasten(double mx, double my) {
-        if (haengt == null && eckeHaengt == null || !minecraft.hasControlDown()) {
+        if (haengt == null && eckeHaengt == null || !minecraft.hasControlDown() && !minecraft.hasAltDown()) {
             return null;
         }
         Rast beste = null;
@@ -710,7 +715,33 @@ final class Karte extends Screen {
         return beste;
     }
 
-    /** Der Block, auf den beim Loslassen kommt, was an der Maus hängt: mit Strg das Ziel des Einrastens, sonst der darunter. */
+    /** Das Glied an der Maus und das Ziel des Einrastens {@code r}. */
+    private Wegpunkte.Glied[] paar(Rast r) {
+        Wegpunkte.Glied von = haengt != null ? Wegpunkte.Glied.von(haengt) : Wegpunkte.Glied.von(eckeHaengt.form(), eckeHaengt.index());
+        Wegpunkte.Glied ziel = r.ecke() != null ? Wegpunkte.Glied.von(r.ecke().form(), r.ecke().index()) : Wegpunkte.Glied.von(r.marke().punkt());
+        return new Wegpunkte.Glied[] {von, ziel};
+    }
+
+    /**
+     * Beim Loslassen mit Alt: Lässt sich, was an der Maus hängt, mit dem Ziel des Einrastens bei (x, y) verbinden, springt es samt
+     * Bund wie mit „Verbinden“ auf dessen Block. Sonst steht unten links, warum nicht, und der Rufer legt ab wie mit Strg. True,
+     * wenn verbunden. Siehe docs/wegpunkte.md, „Verbinden“.
+     */
+    private boolean verbindeMitAlt(double x, double y) {
+        Rast r = minecraft.hasAltDown() ? einrasten(x, y) : null;
+        if (r == null) {
+            return false;
+        }
+        Wegpunkte.Glied[] p = paar(r);
+        String warum = Wegpunkte.INSTANZ.warumNicht(p[0], p[1]);
+        if (warum == null) {
+            return Wegpunkte.INSTANZ.verbinde(p[0], p[1]);
+        }
+        zeige(Component.translatable(warum));
+        return false;
+    }
+
+    /** Der Block, auf den beim Loslassen kommt, was an der Maus hängt: mit Strg oder Alt das Ziel des Einrastens, sonst der darunter. */
     private int[] ablage(double x, double y) {
         Rast r = einrasten(x, y);
         return r != null ? new int[] {r.x(), r.z()} : block(x, y);
@@ -1191,13 +1222,18 @@ final class Karte extends Screen {
                 float[] s = schirm(p[2 * i], p[2 * i + 1]);
                 ecken.add(new EckeAn(f, i, s[0], s[1]));
                 raute(g, s[0], s[1], farbe, ueberEcke != null && ueberEcke.form() == f && ueberEcke.index() == i ? HELL : 0xFF000000,
-                        f.ecken().get(i).bund() > 0);
+                        f.ecken().get(i).bund() > 0 || vorschau != null && (ist(vorschau[0], f, i) || ist(vorschau[1], f, i)));
             }
             double[] m = Wegpunkte.griff(p, f.region());
             float[] s = schirm(m[0], m[1]);
             griffe.add(new GriffAn(f, s[0], s[1]));
             griff(g, s[0], s[1], farbe, ueberGriff != null && ueberGriff.form() == f ? HELL : 0xFF000000);
         }
+    }
+
+    /** Ist das Glied {@code g} die Ecke {@code i} der Form {@code f}? */
+    private static boolean ist(Wegpunkte.Glied g, Wegpunkte.EigeneForm f, int i) {
+        return g.punkt() == null && g.index() == i && g.form().equals(f);
     }
 
     /**
@@ -1555,6 +1591,10 @@ final class Karte extends Screen {
         eckeGedrueckt = null;
         griffGedrueckt = null;
         // Der Wegpunkt an der Maus kommt auf den Block unter ihr, mit Strg auf den, wo er einrastet, mit Farbe und Anheften.
+        if (haengt != null && verbindeMitAlt(e.x(), e.y())) {
+            haengt = null;
+            return true;
+        }
         if (haengt != null) {
             int[] b = ablage(e.x(), e.y());
             // Ein verbundener bleibt mit seinem Bund, wo er war, wenn er auf einen anderen Wegpunkt träfe (D7 von mod#162).
@@ -1565,6 +1605,10 @@ final class Karte extends Screen {
             return true;
         }
         // Ebenso die Ecke an der Maus; liegt sie dann auf dem Block ihrer Nachbarin, werden beide eine.
+        if (eckeHaengt != null && verbindeMitAlt(e.x(), e.y())) {
+            eckeHaengt = null;
+            return true;
+        }
         if (eckeHaengt != null) {
             int[] b = ablage(e.x(), e.y());
             List<Wegpunkte.Ecke> neu = new ArrayList<>(eckeHaengt.form().ecken());
