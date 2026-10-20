@@ -185,6 +185,8 @@
   "heroicmap.karte.tod_loeschen": "Delete death point",
   "heroicmap.karte.wegpunkt_bei": "Waypoint at …",
   "heroicmap.karte.koordinaten": "Set coordinates…",
+  "heroicmap.karte.verbinden": "Connect",
+  "heroicmap.karte.loesen": "Disconnect",
   "heroicmap.karte.form_zwei": "At least two corners; Esc cancels",
   "heroicmap.karte.koordinaten_hinweis": "Enter: move here, x z, y does not count; Esc cancels",
   "heroicmap.karte.koordinaten_belegt": "There is already a waypoint there",
