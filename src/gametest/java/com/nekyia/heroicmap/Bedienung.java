@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiPredicate;
 import java.util.function.IntPredicate;
 import java.util.zip.Deflater;
 import javax.imageio.ImageIO;
@@ -217,6 +216,7 @@ public final class Bedienung implements FabricClientGameTest {
      * Siehe docs/wegpunkte.md.
      */
     private static void wegpunkt(ClientGameTestContext context, TestInput maus, int k, double x, double y) {
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
         maus.setCursorPos(x * k, y * k);
         context.waitTick();
         maus.pressMouse(RECHTS);
@@ -370,6 +370,9 @@ public final class Bedienung implements FabricClientGameTest {
         context.waitTick();
         maus.pressMouse(LINKS);
         context.waitTicks(2);
+        context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size())
+                .forEach(Wegpunkte.INSTANZ::loesche));
+        context.waitTicks(2);
     }
 
     /**
@@ -378,6 +381,7 @@ public final class Bedienung implements FabricClientGameTest {
      * des Rechtecks heftet sie an. Siehe docs/wegpunkte.md, „Anheften“.
      */
     private static void anheften(ClientGameTestContext context, TestInput maus, int k) {
+        int rechtecke = context.computeOnClient(mc -> Wegpunkte.INSTANZ.regionen().size());
         int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
         int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
         double[] mitte = mitte(context);
@@ -449,7 +453,10 @@ public final class Bedienung implements FabricClientGameTest {
         if (!context.computeOnClient(mc -> Wegpunkte.INSTANZ.regionen().getFirst().angeheftet())) {
             throw new AssertionError("Doppelklick auf die Raute heftet die Region nicht an");
         }
-        context.runOnClient(mc -> Ebenen.INSTANZ.leeren());
+        context.runOnClient(mc -> {
+            Ebenen.INSTANZ.leeren();
+            List.copyOf(Wegpunkte.INSTANZ.regionen()).subList(rechtecke, Wegpunkte.INSTANZ.regionen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+        });
         warte250();
     }
 
@@ -841,12 +848,19 @@ public final class Bedienung implements FabricClientGameTest {
      * Tafel der Region auf, wo das Menü war. Siehe docs/wegpunkte.md, „Eigene Formen“.
      */
     private static void form(ClientGameTestContext context, TestInput maus, int k) {
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
+        int formen = context.computeOnClient(mc -> Wegpunkte.INSTANZ.eigeneFormen().size());
         Tafeln.fragen = z -> true;
         try {
             formSchritte(context, maus, k);
         } finally {
             Tafeln.fragen = Kanal::frageTafel;
-            context.runOnClient(mc -> Ebenen.INSTANZ.leeren());
+            context.runOnClient(mc -> {
+                Ebenen.INSTANZ.leeren();
+                List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                bisFormen(formen);
+            });
+            context.waitTicks(2);
         }
     }
 
@@ -1067,8 +1081,7 @@ public final class Bedienung implements FabricClientGameTest {
                 maus.pressKey(InputConstants.KEY_ESCAPE);
                 context.waitTick();
             }
-            context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size())
-                    .forEach(Wegpunkte.INSTANZ::loesche));
+            context.runOnClient(mc -> bisFormen(formen));
             context.waitTicks(2);
         }
     }
@@ -1187,8 +1200,7 @@ public final class Bedienung implements FabricClientGameTest {
             }
         } finally {
             warte250();
-            context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size())
-                    .forEach(Wegpunkte.INSTANZ::loesche));
+            context.runOnClient(mc -> bisFormen(formen));
             context.waitTicks(2);
         }
     }
@@ -1318,8 +1330,7 @@ public final class Bedienung implements FabricClientGameTest {
             }
         } finally {
             warte250();
-            context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size())
-                    .forEach(Wegpunkte.INSTANZ::loesche));
+            context.runOnClient(mc -> bisFormen(formen));
             context.waitTicks(2);
         }
     }
@@ -1373,8 +1384,7 @@ public final class Bedienung implements FabricClientGameTest {
         } finally {
             context.runOnClient(mc -> {
                 List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
-                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size())
-                        .forEach(Wegpunkte.INSTANZ::loesche);
+                bisFormen(formen);
             });
             context.waitTicks(2);
         }
@@ -1511,8 +1521,7 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Nach Umbenennen und Ziehen steht unten links „" + hinweis(context) + "“");
             }
         } finally {
-            context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size())
-                    .forEach(Wegpunkte.INSTANZ::loesche));
+            context.runOnClient(mc -> bisFormen(formen));
             context.waitTicks(2);
         }
     }
@@ -1583,8 +1592,7 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Leer und Enter liess die eigene Farbe: " + hex(context, formen));
             }
         } finally {
-            context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size())
-                    .forEach(Wegpunkte.INSTANZ::loesche));
+            context.runOnClient(mc -> bisFormen(formen));
             context.waitTicks(2);
         }
     }
@@ -1746,7 +1754,7 @@ public final class Bedienung implements FabricClientGameTest {
             }
             context.runOnClient(mc -> {
                 List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
-                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                bisFormen(formen);
             });
             context.waitTicks(2);
         }
@@ -1904,7 +1912,7 @@ public final class Bedienung implements FabricClientGameTest {
             maus.releaseControl();
             context.runOnClient(mc -> {
                 List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
-                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                bisFormen(formen);
                 Wegpunkte.INSTANZ.kappeTode(0);
             });
             context.waitTicks(2);
@@ -1926,21 +1934,8 @@ public final class Bedienung implements FabricClientGameTest {
             double[] m = ((Karte) mc.gui.screen()).blickMitte();
             return new int[] {(int) Math.floor(m[0] / 4), (int) Math.floor(m[1] / 4)};
         });
-        // Eine senkrechte Chunklinie bei lx nahe der Mitte, eine waagrechte bei lz unter ihr. Frühere Tests lassen Formen liegen;
-        // so gilt die erste Ecke des Chunks, an deren Aufbau keine Ecke und kein Wegpunkt in Reichweite der Ziele liegt.
-        int[] stelle = context.computeOnClient(mc -> {
-            int lz0 = 16 * Math.floorDiv(mitte[1], 16) + 16;
-            for (int dx : new int[] {0, 16, -16}) {
-                int lx0 = 16 * Math.floorDiv(mitte[0], 16) + dx;
-                BiPredicate<Integer, Integer> imAufbau = (x, z) -> x >= lx0 - 12 && x <= lx0 + 4 && z >= lz0 - 20 && z <= lz0 + 4;
-                if (Wegpunkte.INSTANZ.eigeneFormen().stream().flatMap(f -> f.ecken().stream()).noneMatch(c -> imAufbau.test(c.x(), c.z()))
-                        && Wegpunkte.INSTANZ.punkte().stream().noneMatch(q -> imAufbau.test(q.x(), q.z()))) {
-                    return new int[] {lx0, lz0};
-                }
-            }
-            throw new AssertionError("Keine freie Ecke eines Chunks nahe der Mitte für den Test");
-        });
-        int lx = stelle[0], lz = stelle[1];
+        // Eine senkrechte Chunklinie bei lx, links der Mitte oder auf ihr; eine waagrechte bei lz, unter der Mitte.
+        int lx = 16 * Math.floorDiv(mitte[0], 16), lz = 16 * Math.floorDiv(mitte[1], 16) + 16;
         List<Wegpunkte.Ecke> a = List.of(new Wegpunkte.Ecke(lx - 6, lz - 6), new Wegpunkte.Ecke(lx - 10, lz - 6));
         Wegpunkte.Ecke b0 = new Wegpunkte.Ecke(lx - 2, lz - 14);
         try {
@@ -2055,7 +2050,7 @@ public final class Bedienung implements FabricClientGameTest {
             context.runOnClient(mc -> {
                 Minimap.INSTANZ.setzeChunklinien(linienVorher);
                 List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
-                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                bisFormen(formen);
             });
             context.waitTicks(2);
         }
@@ -2209,7 +2204,7 @@ public final class Bedienung implements FabricClientGameTest {
             maus.releaseControl();
             context.runOnClient(mc -> {
                 List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
-                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                bisFormen(formen);
             });
             context.waitTicks(2);
         }
@@ -2380,7 +2375,7 @@ public final class Bedienung implements FabricClientGameTest {
         } finally {
             context.runOnClient(mc -> {
                 List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
-                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                bisFormen(formen);
             });
             context.waitTicks(2);
         }
@@ -2517,7 +2512,7 @@ public final class Bedienung implements FabricClientGameTest {
         } finally {
             context.runOnClient(mc -> {
                 List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size()).forEach(Wegpunkte.INSTANZ::loesche);
-                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                bisFormen(formen);
                 List.copyOf(Wegpunkte.INSTANZ.regionen()).subList(rechtecke, Wegpunkte.INSTANZ.regionen().size()).forEach(Wegpunkte.INSTANZ::loesche);
             });
             context.waitTicks(2);
@@ -2641,8 +2636,7 @@ public final class Bedienung implements FabricClientGameTest {
             context.runOnClient(mc -> {
                 List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(Math.min(punkte, Wegpunkte.INSTANZ.punkte().size()), Wegpunkte.INSTANZ.punkte().size())
                         .forEach(Wegpunkte.INSTANZ::loesche);
-                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(Math.min(formen, Wegpunkte.INSTANZ.eigeneFormen().size()),
-                        Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                bisFormen(formen);
                 List.copyOf(Wegpunkte.INSTANZ.regionen()).subList(Math.min(rechtecke, Wegpunkte.INSTANZ.regionen().size()),
                         Wegpunkte.INSTANZ.regionen().size()).forEach(Wegpunkte.INSTANZ::loesche);
             });
@@ -3343,10 +3337,7 @@ public final class Bedienung implements FabricClientGameTest {
             context.runOnClient(mc -> {
                 mc.options.guiScale().set(vorher[2]);
                 mc.resizeGui();
-                List<Wegpunkte.EigeneForm> alle = Wegpunkte.INSTANZ.eigeneFormen();
-                for (Wegpunkte.EigeneForm f : List.copyOf(alle.subList(Math.min(formen, alle.size()), alle.size()))) {
-                    Wegpunkte.INSTANZ.loesche(f);
-                }
+                bisFormen(formen);
             });
             context.waitTicks(3);
         }
@@ -3478,10 +3469,7 @@ public final class Bedienung implements FabricClientGameTest {
             context.runOnClient(mc -> {
                 mc.options.guiScale().set(vorher[2]);
                 mc.resizeGui();
-                List<Wegpunkte.EigeneForm> alle = Wegpunkte.INSTANZ.eigeneFormen();
-                for (Wegpunkte.EigeneForm f : List.copyOf(alle.subList(Math.min(formen, alle.size()), alle.size()))) {
-                    Wegpunkte.INSTANZ.loesche(f);
-                }
+                bisFormen(formen);
             });
             context.waitTicks(3);
         }
@@ -3556,10 +3544,7 @@ public final class Bedienung implements FabricClientGameTest {
         } finally {
             context.runOnClient(mc -> {
                 Ebenenreihe.INSTANZ.zuruecksetzen();
-                List<Wegpunkte.EigeneForm> alle = Wegpunkte.INSTANZ.eigeneFormen();
-                for (Wegpunkte.EigeneForm f : List.copyOf(alle.subList(Math.min(formen, alle.size()), alle.size()))) {
-                    Wegpunkte.INSTANZ.loesche(f);
-                }
+                bisFormen(formen);
                 Wegpunkte.INSTANZ.loescheEbene(id);
                 Ebenen.INSTANZ.leeren();
             });
@@ -3665,7 +3650,7 @@ public final class Bedienung implements FabricClientGameTest {
         } finally {
             context.runOnClient(mc -> {
                 mc.options.forceUnicodeFont().set(false);
-                List.copyOf(Wegpunkte.INSTANZ.eigeneFormen()).subList(formen, Wegpunkte.INSTANZ.eigeneFormen().size()).forEach(Wegpunkte.INSTANZ::loesche);
+                bisFormen(formen);
             });
             context.waitTicks(2);
         }
@@ -3762,6 +3747,17 @@ public final class Bedienung implements FabricClientGameTest {
                     .orElseThrow(() -> new AssertionError("Keine Ecke " + index + " von " + f + " auf dem Schirm"));
             return new double[] {e.x(), e.y()};
         });
+    }
+
+    /**
+     * Löscht eigene Formen vom Ende her, bis wieder {@code formen} da sind; auf dem Thread des Clients. Am lebenden Stand, nicht
+     * an einer Kopie: Das Löschen ordnet die Bünde neu und ersetzt dabei eine Form, deren Bund zerfällt, die eine Kopie dann nicht
+     * mehr findet. Siehe docs/wegpunkte.md, „Verbinden“.
+     */
+    private static void bisFormen(int formen) {
+        while (Wegpunkte.INSTANZ.eigeneFormen().size() > formen) {
+            Wegpunkte.INSTANZ.loesche(Wegpunkte.INSTANZ.eigeneFormen().getLast());
+        }
     }
 
     /** Wirft, wenn bei einem der Orte eine Marke liegt; der Test braucht dort freie Karte. */
@@ -4108,6 +4104,7 @@ public final class Bedienung implements FabricClientGameTest {
      * Escape bleibt er, wo er war. Siehe docs/wegpunkte.md, „Bedienung“.
      */
     private static void verschieben(ClientGameTestContext context, TestInput maus, int k) {
+        int punkte = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punkte().size());
         // Ein Wegpunkt links über der Mitte, wo nichts anderes liegt: 40 und 32 Einheiten, bei scale 4 also 10 und 8 Blöcke.
         Wegpunkte.Punkt punkt = context.computeOnClient(mc -> {
             double[] m = ((Karte) mc.gui.screen()).blickMitte();
@@ -4169,6 +4166,8 @@ public final class Bedienung implements FabricClientGameTest {
                 || !context.computeOnClient(mc -> mc.gui.screen() instanceof Karte)) {
             throw new AssertionError("Escape beim Verschieben liess den Wegpunkt nicht, wo er war, oder schloss die Karte");
         }
+        context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size())
+                .forEach(Wegpunkte.INSTANZ::loesche));
         warte250();
     }
 

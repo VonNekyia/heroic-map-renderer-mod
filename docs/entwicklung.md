@@ -117,6 +117,14 @@ der Test kopiert sie nur unverändert in den Arbeitsordner, den Loom vor
 jedem Lauf leert, und schreibt nie selbst eine. Ohne `-Peula` überspringt
 er den Server-Fall mit einer Zeile im Log, so auch in der CI.
 
+**Aufräumen:** Jeder Gametest in `Bedienung` löscht am Ende, was er angelegt
+hat: Wegpunkte, eigene Formen und alte Rechtecke. So hängt kein Test von der
+Reihenfolge ab, und jeder findet die Karte, wie er sie erwartet. Eigene
+Formen löscht `Bedienung.bisFormen` vom Ende der lebenden Liste her, nicht
+aus einer Kopie: Das Löschen ordnet die Bünde neu (`Wegpunkte.ordneBuende`)
+und ersetzt dabei die Form, deren Bund zerfällt; eine Kopie fände sie nicht
+mehr, und sie bliebe liegen.
+
 **Frist:** Im Gametest tickt der Client nur im Takt mit dem Thread des
 Tests und dem Server (`ThreadingImpl.PHASER` der Fabric API, per javap in
 `fabric-client-gametest-api-v1` 6.0.7). Hängt einer der drei, steht alles,
