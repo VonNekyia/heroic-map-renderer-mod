@@ -194,6 +194,7 @@ public final class Bedienung implements FabricClientGameTest {
         zumSpieler(context, maus, k);
         optionen(context, maus, k);
         verschieben(context, maus, k);
+        zoomZurMaus(context, maus, k);
         lageGemerkt(context, maus, k);
         // Jeder Test räumt weg, was er anlegte; so hängt keiner von der Reihenfolge ab. Siehe docs/entwicklung.md, „Gametests“.
         String ende = stand(context);
@@ -4272,6 +4273,58 @@ public final class Bedienung implements FabricClientGameTest {
         context.runOnClient(mc -> List.copyOf(Wegpunkte.INSTANZ.punkte()).subList(punkte, Wegpunkte.INSTANZ.punkte().size())
                 .forEach(Wegpunkte.INSTANZ::loesche));
         warte250();
+    }
+
+    /**
+     * Das Mausrad zoomt zur Maus: Links oben und rechts unten der Mitte bleibt bei jeder Raste der Block unter der Maus, auf
+     * den Stufen und in der Lupe, bis auf eine Einheit des GUI. Eine Raste über `minZoom` oder die grösste Lupe hinaus lässt
+     * die Mitte. Danach wieder Stufe und Lupe von vorher. Siehe docs/vollbildkarte.md, „Stufen und Lupe“.
+     */
+    private static void zoomZurMaus(ClientGameTestContext context, TestInput maus, int k) {
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+        Satz satz = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).satz());
+        int[] anfang = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).stufe());
+        for (double[] ort : new double[][] {{breite * 0.35, hoehe * 0.4}, {breite * 0.65, hoehe * 0.6}}) {
+            maus.setCursorPos(ort[0] * k, ort[1] * k);
+            context.waitTick();
+            // Zurück bis eine Raste über minZoom hinaus, dann vor bis eine über die grösste Lupe hinaus.
+            for (int raste : new int[] {-1, 1}) {
+                for (int i = 0; ; i++) {
+                    int[] vorher = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).stufe());
+                    double[] mitte = mitte(context);
+                    int[] block = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blockUnter(ort[0], ort[1]));
+                    maus.scroll(raste);
+                    context.waitTick();
+                    int[] nachher = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).stufe());
+                    String wo = "Mausrad " + (raste > 0 ? "vor" : "zurück") + " an " + Arrays.toString(ort) + ", Stufe und Lupe "
+                            + Arrays.toString(vorher) + " → " + Arrays.toString(nachher);
+                    if (Arrays.equals(nachher, vorher)) {
+                        if (!Arrays.equals(mitte(context), mitte)) {
+                            throw new AssertionError(wo + ": an der Grenze bewegte sich die Mitte " + Arrays.toString(mitte) + " → "
+                                    + Arrays.toString(mitte(context)));
+                        }
+                        break;
+                    }
+                    if (i > 8) {
+                        throw new AssertionError(wo + ": keine Grenze nach " + i + " Rasten");
+                    }
+                    int[] jetzt = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blockUnter(ort[0], ort[1]));
+                    // Eine Einheit des GUI in Blöcken auf der gröberen der beiden Stufen, dazu einer fürs Abrunden.
+                    double weit = Math.scalb(1.0, satz.maxZoom() - Math.min(vorher[0], nachher[0])) / Math.min(vorher[1], nachher[1])
+                            / satz.scale() + 1;
+                    if (Math.abs(jetzt[0] - block[0]) > weit || Math.abs(jetzt[1] - block[1]) > weit) {
+                        throw new AssertionError(wo + ": Block unter der Maus " + Arrays.toString(block) + " → " + Arrays.toString(jetzt));
+                    }
+                }
+            }
+        }
+        maus.setCursorPos(breite / 2.0 * k, hoehe / 2.0 * k);
+        context.waitTick();
+        for (int i = 0; i < 8 && !Arrays.equals(context.computeOnClient(mc -> ((Karte) mc.gui.screen()).stufe()), anfang); i++) {
+            maus.scroll(-1);
+            context.waitTick();
+        }
     }
 
     /** Eine Stufe gröber, schliessen und wieder öffnen: Mitte, Stufe und Lupe wie vorher. Siehe docs/vollbildkarte.md, „Lage merken“. */

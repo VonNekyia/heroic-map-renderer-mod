@@ -2607,10 +2607,8 @@ final class Karte extends Screen {
         if (blick == null) {
             return false;
         }
-        if (weitY > 0) {
-            blick.naeher();
-        } else if (weitY < 0) {
-            blick.ferner();
+        if (weitY != 0) {
+            blick.zoome(weitY > 0, x, y, width, height);
         }
         return true;
     }

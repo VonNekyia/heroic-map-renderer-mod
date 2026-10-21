@@ -201,6 +201,43 @@ class KartenblickTest {
     }
 
     @Test
+    void mausradZoomtZurMaus() {
+        // Schirm 427 × 240; die Maus links oben, rechts unten und in der Mitte, eine Mitte nah und eine fern vom Ursprung.
+        int breite = 427, hoehe = 240;
+        double[][] orte = {{50.5, 30.25}, {400, 200}, {breite / 2.0, hoehe / 2.0}};
+        for (double[] ort : orte) {
+            for (double fern : new double[] {1234.5, 4_000_000.25}) {
+                Kartenblick blick = new Kartenblick(256, 2, 6, 4);
+                blick.stelle(fern, -fern, 2, 1);
+                // Von minZoom vor bis zur grössten Lupe, dann zurück: je 4 Rasten, die fünfte an der Grenze.
+                for (boolean naeher : new boolean[] {true, false}) {
+                    for (int i = 0; i < 5; i++) {
+                        String wo = (naeher ? "vor" : "zurück") + " an " + ort[0] + "," + ort[1] + " Mitte " + fern + " Raste " + i;
+                        double bx = blick.basisX(ort[0], breite), bz = blick.basisZ(ort[1], hoehe), mx = blick.mx, mz = blick.mz;
+                        int zoom = blick.zoom, lupe = blick.lupe;
+                        blick.zoome(naeher, ort[0], ort[1], breite, hoehe);
+                        if (i == 4) {
+                            assertEquals(zoom, blick.zoom, wo);
+                            assertEquals(lupe, blick.lupe, wo);
+                            assertEquals(mx, blick.mx, wo);
+                            assertEquals(mz, blick.mz, wo);
+                            continue;
+                        }
+                        assertTrue(blick.zoom != zoom || blick.lupe != lupe, wo);
+                        assertEquals(bx, blick.basisX(ort[0], breite), 1e-6, wo);
+                        assertEquals(bz, blick.basisZ(ort[1], hoehe), 1e-6, wo);
+                        // Gezeichnet auf dem Raster der Kacheln wandert der Punkt um weniger als eine Einheit des GUI.
+                        double einheit = blick.teiler() / blick.lupe;
+                        assertTrue(Math.abs(blick.basisRasterX(ort[0], breite) - bx) < einheit, wo);
+                        assertTrue(Math.abs(blick.basisRasterZ(ort[1], hoehe) - bz) < einheit, wo);
+                    }
+                }
+                assertEquals(2, blick.zoom);
+            }
+        }
+    }
+
+    @Test
     void sichtbareKacheln() {
         Kartenblick blick = new Kartenblick(256, 0, 6, 6);
         assertArrayEquals(new int[] {-1, 1, -1, 0}, blick.kacheln(512, 480));
