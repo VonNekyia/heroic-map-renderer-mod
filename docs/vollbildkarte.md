@@ -41,7 +41,7 @@ sagt sie das und zeigt nichts.
 |---|---|
 | Taste `.` | öffnet die Karte, schliesst sie wieder; frei belegbar unter „Heroic Map“, die einzige vorbelegte Taste des Mods |
 | Ziehen mit links | verschiebt die Karte, der Inhalt folgt der Maus |
-| Mausrad | zoomt, siehe „Stufen und Lupe“; über einer Tafel, die höher ist als ihr Platz, scrollt es sie |
+| Mausrad | zoomt zur Maus, siehe „Stufen und Lupe“; über einer Tafel, die höher ist als ihr Platz, scrollt es sie |
 | Zeigen auf eine Nadel, ein Banner, eine Fläche oder einen Kreis | öffnet nach 50 ms dessen Tafel, siehe [Ebenen](ebenen.md), „Infotafel“ |
 | Doppelklick auf eine Nadel, ein Banner, eine Fläche oder einen Kreis | heftet es an die Minimap oder löst es, siehe [Wegpunkte](wegpunkte.md), „Anheften“; ein Klick hält keine Tafel, sie kommt nur beim Zeigen |
 | Rechtsklick | öffnet ein kleines Menü für den Block unter der Maus, wie die Anzeige unten links: „Hierher teleportieren (x, z)“, siehe unten, darunter „Wegpunkt setzen“, auf einem Wegpunkt „Wegpunkt löschen“, dazu „Linie/Region von hier“ und auf Ecken eigener Formen „Eckpunkt hinzufügen“ und „Eckpunkt löschen“, siehe [Wegpunkte](wegpunkte.md); erst ein Klick auf einen Eintrag tut etwas, mit der linken oder rechten Taste, jeder Klick daneben schliesst es, ein Rechtsklick öffnet es dort neu |
@@ -480,9 +480,16 @@ Abgleich wünschte der User am 20.10., siehe [0027](entscheidungen/0027-abgleich
 - **Mausrad zurück** geht eine Stufe gröber, bis `minZoom`.
 - **Mausrad vor** geht eine Stufe feiner, auf der feinsten vergrössert die
   Lupe auf 2 und 4 Einheiten je Pixel.
+- **Zur Maus:** Das Mausrad zoomt um den Punkt unter der Maus, wie die
+  Webkarte. Er bleibt bei jeder Raste unter ihr, in beide Richtungen und
+  in der Lupe (`Kartenblick.zoome`). Gezeichnet auf dem Raster der
+  Kacheln wandert er um weniger als eine Einheit des GUI.
+- **An den Grenzen,** `minZoom` und Lupe 4, ändert eine Raste nichts,
+  auch die Mitte bleibt.
 - **Die Mitte** rechnet `Kartenblick` in Pixeln der Basis, der Stufe
-  `maxZoom`; so bleibt sie beim Zoomen stehen. Die Kacheln einer Stufe
-  liegen auf ganzen Einheiten nebeneinander, ohne Naht.
+  `maxZoom`; die neue merkt sich `Kartenlage` wie jede, siehe „Lage
+  merken“. Die Kacheln einer Stufe liegen auf ganzen Einheiten
+  nebeneinander, ohne Naht.
 
 ## Kacheln
 

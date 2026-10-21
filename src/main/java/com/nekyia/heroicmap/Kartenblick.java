@@ -215,6 +215,23 @@ final class Kartenblick {
     }
 
     /**
+     * Eine Raste des Mausrads an (x, y) des Schirms: näher oder ferner, und der Pixel der Basis unter (x, y) bleibt dort.
+     * An den Grenzen bleibt die Mitte genau. Siehe docs/vollbildkarte.md, „Stufen und Lupe“.
+     */
+    void zoome(boolean naeher, double x, double y, int breite, int hoehe) {
+        double vorher = teiler() / lupe;
+        if (naeher) {
+            naeher();
+        } else {
+            ferner();
+        }
+        // Pixel der Basis je Einheit vorher weniger nachher; an den Grenzen 0.
+        double d = vorher - teiler() / lupe;
+        mx += (x - breite / 2.0) * d;
+        mz += (y - hoehe / 2.0) * d;
+    }
+
+    /**
      * Stellt Mitte, Stufe und Lupe, etwa wie die Karte zuletzt stand: die Stufe zwischen der gröbsten
      * und {@code stufe}, die Lupe 1, 2 oder 4 und nur auf der feinsten Stufe. Siehe docs/vollbildkarte.md, „Lage merken“.
      */

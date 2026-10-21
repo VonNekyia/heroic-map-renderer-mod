@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.68
+
+- **The full map zooms toward the mouse.** The spot under the mouse pointer stays under it while you zoom with the mouse wheel, in and out, like on the web map. At the closest and farthest zoom the map doesn't move.
+
 ## 0.2.67
 
 - **Syncs catch up more.** A sync may now load up to half of your map instead of a tenth, so after a longer break the map is up to date in one go. How much a sync brings is set by the server's plugin; with an older plugin it stays at a tenth. Without a saved map the mod still asks for a full download.
