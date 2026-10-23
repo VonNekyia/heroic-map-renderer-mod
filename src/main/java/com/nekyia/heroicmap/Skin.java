@@ -65,7 +65,7 @@ final class Skin {
     /** Die längere Seite der grössten Marke, in Pixeln. */
     final int groesste;
     /**
-     * Je Richtung N, O, S, W: mit {@code lage=innen} Breite und Höhe ihres Bilds und der Versatz des Schattens, dann liegt die
+     * Je Richtung N, O, S, W: mit {@code lage=kante} Breite und Höhe ihres Bilds und der Versatz des Schattens, dann liegt die
      * Marke samt Schatten innen an der äusseren Kante ({@link #anliegend}); null auf der Mitte der Bänder. Für N gilt
      * {@code lage_norden}, ohne die Zeile wie {@code lage}. Ganz null, wenn alle auf der Mitte liegen. Siehe docs/rahmen.md,
      * „Nach aussen“.
@@ -149,9 +149,10 @@ final class Skin {
     /**
      * Liest {@code palette.txt}: eine Zeile je Band von aussen nach innen, eine Farbe oder zwei,
      * Licht und Schatten; {@code //} beginnt einen Kommentar. Aus {@code info.txt} {@code schatten=ja}, {@code aussen=ja},
-     * {@code lage} und {@code lage_norden}, je {@code mitte} oder {@code innen}; {@code innen} nur mit {@code aussen=ja}, denn
-     * nur dann zeigt jedes Bild von der Mitte weg. {@code groesste} ist die längere Seite der grössten Marke in Pixeln,
-     * {@code norden} und {@code marke} Breite und Höhe dieser Bilder, nur für {@code innen} nötig. Mindestens zwei Bänder,
+     * {@code lage} und {@code lage_norden}, je {@code mitte} oder {@code kante}; {@code kante} nur mit {@code aussen=ja}, denn
+     * nur dann zeigt jedes Bild von der Mitte weg. {@code innen} und {@code aussen} kommen mit dem Skin der Buchstaben.
+     * {@code groesste} ist die längere Seite der grössten Marke in Pixeln, {@code norden} und {@code marke} Breite und Höhe
+     * dieser Bilder, nur für {@code kante} nötig. Mindestens zwei Bänder,
      * siehe docs/minimap.md, „Form“.
      */
     static Skin lies(String name, String palette, String info, int groesste) {
@@ -178,30 +179,30 @@ final class Skin {
         int[] licht = baender.stream().mapToInt(b -> b[0]).toArray(), schatten = baender.stream().mapToInt(b -> b[1]).toArray();
         List<String> schalter = info.lines().map(String::trim).toList();
         boolean mitSchatten = schalter.contains("schatten=ja"), aussen = schalter.contains("aussen=ja");
-        boolean innen = innen(schalter, "lage", false), innenNorden = innen(schalter, "lage_norden", innen);
+        boolean kante = kante(schalter, "lage", false), kanteNorden = kante(schalter, "lage_norden", kante);
         int[][] auflage = null;
-        if (innen || innenNorden) {
+        if (kante || kanteNorden) {
             if (!aussen) {
-                throw new IllegalArgumentException("info.txt: lage=innen nur mit aussen=ja");
+                throw new IllegalArgumentException("info.txt: lage=kante nur mit aussen=ja");
             }
             int s = mitSchatten ? 1 : 0;
-            int[] m = innen ? new int[] {marke[0], marke[1], s} : null;
-            auflage = new int[][] {innenNorden ? new int[] {norden[0], norden[1], s} : null, m, m, m};
+            int[] m = kante ? new int[] {marke[0], marke[1], s} : null;
+            auflage = new int[][] {kanteNorden ? new int[] {norden[0], norden[1], s} : null, m, m, m};
         }
         return new Skin(name, licht, schatten, mitSchatten, aussen, groesste, auflage);
     }
 
-    /** Steht {@code schluessel=innen} in info.txt? {@code mitte} heisst nein, ohne die Zeile gilt {@code vorgabe}; anderes geht nicht. */
-    private static boolean innen(List<String> schalter, String schluessel, boolean vorgabe) {
+    /** Steht {@code schluessel=kante} in info.txt? {@code mitte} heisst nein, ohne die Zeile gilt {@code vorgabe}; anderes geht nicht. */
+    private static boolean kante(List<String> schalter, String schluessel, boolean vorgabe) {
         String wert = schalter.stream().filter(z -> z.startsWith(schluessel + "=")).map(z -> z.substring(schluessel.length() + 1))
                 .findFirst().orElse(null);
         if (wert == null) {
             return vorgabe;
         }
-        if (!wert.equals("innen") && !wert.equals("mitte")) {
+        if (!wert.equals("kante") && !wert.equals("mitte")) {
             throw new IllegalArgumentException("info.txt: " + schluessel + "=" + wert);
         }
-        return wert.equals("innen");
+        return wert.equals("kante");
     }
 
     private static int farbe(String text) {

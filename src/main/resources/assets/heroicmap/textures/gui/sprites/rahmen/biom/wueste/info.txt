@@ -1,4 +1,4 @@
 schatten=ja
 aussen=ja
-lage=innen
+lage=kante
 lage_norden=mitte

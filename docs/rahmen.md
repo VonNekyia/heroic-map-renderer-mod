@@ -144,8 +144,8 @@ im Atlas des GUI; F3+T und Ressourcenpakete laden ihn neu:
   Mindestens zwei Bänder, siehe [Minimap](minimap.md), „Form“.
 - **`info.txt`:** `schatten=ja` oder `schatten=nein`; dazu `aussen=ja`,
   wenn jedes Bild von der Mitte weg zeigen soll; `lage=mitte` oder
-  `lage=innen` für die Lage der Marken, `lage_norden` ebenso für N, ohne
-  die Zeile wie `lage`; `innen` nur mit `aussen=ja`, siehe „Nach aussen“
+  `lage=kante` für die Lage der Marken, `lage_norden` ebenso für N, ohne
+  die Zeile wie `lage`; `kante` nur mit `aussen=ja`, siehe „Nach aussen“
   (`Skin.lies`). Vorgabe ist `mitte`, ein anderer Wert lässt den Skin
   nicht laden.
 - **Namen und Beschreibungen** stehen in `de_de.json` und `en_us.json`
@@ -257,11 +257,13 @@ der User am 15.10. gewünscht, siehe
   nicht darüber, auch ihr Schatten nicht. So hat es der User am 23.10.
   gewählt, aus zwei Entwürfen: aussen bündig statt kleiner im Band, denn
   ganz im Band von 2 Einheiten wäre eine Marke ein Punkt.
-  - **Schalter:** `lage=innen` und `lage_norden=mitte` in `info.txt`
+  - **Schalter:** `lage=kante` und `lage_norden=mitte` in `info.txt`
     jeder Kategorie (`Skin.auflage`: je Richtung Breite und Höhe ihres
     Bilds und der Schatten, null auf der Mitte). Das Format hat der
-    Reviewer mit dem Designer für die Varianten der Rahmen festgelegt;
-    `lage=aussen` kommt mit dem Skin der Buchstaben.
+    Reviewer mit dem Designer für die Varianten der Rahmen festgelegt.
+    `kante` heisst auf dem Band, aussen bündig; `innen`, ganz in der Karte
+    mit einer Einheit Abstand zum Band, und `aussen`, ganz ausserhalb,
+    kommen mit dem Skin der Buchstaben und laden bis dahin nicht.
   - **Lage:** Bild und Schatten um (+1, +1) liegen innen an der äusseren
     Kante (`Skin.anliegend`). Ungedreht schliessen O und S mit ihrem
     Schatten an der Kante ab, eine Einheit weiter innen als das Bild

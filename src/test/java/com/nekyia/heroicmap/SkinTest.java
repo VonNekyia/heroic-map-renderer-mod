@@ -247,16 +247,18 @@ class SkinTest {
 
     @Test
     void lageInInfoTxt() {
-        // lage_norden gilt wie lage, wenn die Zeile fehlt; innen nur mit aussen=ja; sonst nur mitte oder innen.
+        // lage_norden gilt wie lage, wenn die Zeile fehlt; kante nur mit aussen=ja; sonst nur mitte oder kante, innen und aussen
+        // kommen mit dem Skin der Buchstaben.
         int[] n = {15, 15}, m = {5, 9};
         assertNull(Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage=mitte", 15, n, m).auflage);
         assertArrayEquals(new int[][] {{15, 15, 1}, {5, 9, 1}, {5, 9, 1}, {5, 9, 1}},
-                Skin.lies("t", "#000000\n#111111", "schatten=ja\naussen=ja\nlage=innen", 15, n, m).auflage);
+                Skin.lies("t", "#000000\n#111111", "schatten=ja\naussen=ja\nlage=kante", 15, n, m).auflage);
         assertArrayEquals(new int[][] {null, {5, 9, 0}, {5, 9, 0}, {5, 9, 0}},
-                Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage=innen\nlage_norden=mitte", 15, n, m).auflage);
+                Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage=kante\nlage_norden=mitte", 15, n, m).auflage);
         assertArrayEquals(new int[][] {{15, 15, 0}, null, null, null},
-                Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage_norden=innen", 15, n, m).auflage);
-        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000\n#111111", "lage=innen", 15, n, m));
+                Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage_norden=kante", 15, n, m).auflage);
+        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000\n#111111", "lage=kante", 15, n, m));
+        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage=innen", 15, n, m));
         assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage=aussen", 15, n, m));
     }
 
