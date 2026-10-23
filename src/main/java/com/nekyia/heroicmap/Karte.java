@@ -1590,9 +1590,8 @@ final class Karte extends Screen {
     /**
      * Linksklick auf eine Marke, beim Loslassen ohne Zug, legt sie in die Mitte, sobald kein zweiter
      * Klick mehr folgen kann; ein Doppelklick heftet sie an die Minimap oder löst sie, ohne die Karte zu bewegen, ebenso auf eine Nadel, ein Banner, eine Fläche oder einen Kreis vom Server.
-     * Rechtsklick öffnet das Menü: „Hierher teleportieren“,
-     * nur mit execute und tp im Befehlsbaum und nicht unter einer Decke, sonst landete man auf dem
-     * Dach; darunter „Wegpunkt setzen“, auf einem Wegpunkt „Wegpunkt löschen“. Erst ein Klick auf
+     * Rechtsklick öffnet das Menü: „Hierher teleportieren“, sobald es eine Verbindung gibt;
+     * darunter „Wegpunkt setzen“, auf einem Wegpunkt „Wegpunkt löschen“. Erst ein Klick auf
      * einen Eintrag tut etwas. Solange eine Form im Bau ist, fügt ein Linksklick ohne Zug auf einen Wegpunkt ihn an. Siehe docs/vollbildkarte.md, „Bedienung“;
      * Marken: siehe docs/wegpunkte.md, „Bedienung“.
      */

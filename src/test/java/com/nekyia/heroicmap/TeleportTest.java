@@ -30,9 +30,10 @@ class TeleportTest {
 
     @Test
     void befehlAufDieMitteDesBlocks() {
-        assertEquals("execute in minecraft:overworld positioned 12.5 0 -40.5 positioned over motion_blocking_no_leaves run tp @s ~ ~ ~",
-                Teleport.befehl("minecraft:overworld", 12, -41));
-        assertEquals("execute in minecraft:overworld run tp @s 12.5 70 -40.5", Teleport.befehl("minecraft:overworld", 12, 70, -41));
+        assertEquals("tp 12.5 70 -40.5", Teleport.befehl(12, 70, -41));
+        assertEquals("tp -0.5 -60 0.5", Teleport.befehl(-1, -60, 0));
+        // Zurück an den Start: genau, auch auf einer Stufe.
+        assertEquals("tp 12.347 64.500 -40.001", Teleport.befehl(12.3467, 64.5, -40.0009));
     }
 
     /** Eine Säule ab y = 0 aus Zeichen: # fest, . Luft, ~ Flüssigkeit, unten zuerst. */
@@ -76,31 +77,77 @@ class TeleportTest {
     }
 
     @Test
-    void festeHoeheMindestensMeeresspiegelInDerWelt() {
-        assertEquals(80, Teleport.hoehe(80, 63, -64, 318));
-        assertEquals(63, Teleport.hoehe(20, 63, -64, 318));
-        assertEquals(318, Teleport.hoehe(400, 63, -64, 318));
-        assertEquals(-60, Teleport.hoehe(-70, -80, -60, 318));
+    void sichereHoeheInDerLuftUnterDerDeckeDieDesSpielers() {
+        // Ohne Decke zwei unter dem obersten Block, egal wo der Spieler steht.
+        assertEquals(317, Teleport.sicher(false, 80, 63, -64, 319));
+        assertEquals(317, Teleport.sicher(false, -63, 63, -64, 319));
+        assertEquals(253, Teleport.sicher(false, 70, 0, 0, 255));
+        // Mit Decke die Höhe des Spielers, mindestens der Meeresspiegel, in der Welt.
+        assertEquals(80, Teleport.sicher(true, 80, 32, 0, 255));
+        assertEquals(32, Teleport.sicher(true, 20, 32, 0, 255));
+        assertEquals(254, Teleport.sicher(true, 400, 32, 0, 255));
+        assertEquals(10, Teleport.sicher(true, 5, -80, 10, 255));
     }
 
     @Test
     void grenzenDesOffenenTeleports() {
-        // Unterwegs wartet er; sucht der Server, nach 5 Ticks die feste Höhe.
-        assertEquals(Teleport.Schritt.WARTEN, Teleport.schritt(1, true, false, 500));
-        assertEquals(Teleport.Schritt.WARTEN, Teleport.schritt(4, true, false, 500));
-        assertEquals(Teleport.Schritt.FEST, Teleport.schritt(5, true, false, 500));
-        assertEquals(Teleport.Schritt.WARTEN, Teleport.schritt(5, false, false, 500));
-        // Am Ziel prüfen, auch nach der festen Höhe.
-        assertEquals(Teleport.Schritt.PRUEFEN, Teleport.schritt(2, true, false, 0.4));
-        assertEquals(Teleport.Schritt.PRUEFEN, Teleport.schritt(30, false, true, 1.5));
-        // Nach der Ankunft bis 4 Blöcke weg warten, weiter weg aufgeben; vor der Ankunft zählt der Weg nicht.
-        assertEquals(Teleport.Schritt.WARTEN, Teleport.schritt(30, false, true, 4));
-        assertEquals(Teleport.Schritt.ENDE, Teleport.schritt(30, false, true, 4.1));
-        assertEquals(Teleport.Schritt.WARTEN, Teleport.schritt(30, false, false, 4.1));
-        // Nach 10 s gibt er auf, auch am Ziel.
-        assertEquals(Teleport.Schritt.PRUEFEN, Teleport.schritt(200, false, true, 0));
-        assertEquals(Teleport.Schritt.ENDE, Teleport.schritt(201, false, true, 0));
-        assertEquals(Teleport.Schritt.ENDE, Teleport.schritt(201, true, false, 500));
+        // Mit Höhe: unterwegs warten, auch ohne Chunk.
+        assertEquals(Teleport.Schritt.WARTEN, Teleport.schritt(1, false, false, 500, false));
+        assertEquals(Teleport.Schritt.WARTEN, Teleport.schritt(30, false, true, 0.4, false));
+        // Am Ziel mit dem Chunk beim Client prüfen.
+        assertEquals(Teleport.Schritt.PRUEFEN, Teleport.schritt(2, false, false, 0.4, true));
+        assertEquals(Teleport.Schritt.PRUEFEN, Teleport.schritt(30, false, true, 1.5, true));
+        assertEquals(Teleport.Schritt.WARTEN, Teleport.schritt(30, false, false, 1.6, true));
+        // Nach der Ankunft bis 4 Blöcke weg warten, weiter weg aufhören; vor der Ankunft zählt der Weg nicht.
+        assertEquals(Teleport.Schritt.WARTEN, Teleport.schritt(30, false, true, 4, false));
+        assertEquals(Teleport.Schritt.ENDE, Teleport.schritt(30, false, true, 4.1, true));
+        assertEquals(Teleport.Schritt.WARTEN, Teleport.schritt(30, false, false, 4.1, true));
+        // Nach 10 s hört er auf, auch am Ziel.
+        assertEquals(Teleport.Schritt.PRUEFEN, Teleport.schritt(200, false, true, 0, true));
+        assertEquals(Teleport.Schritt.ENDE, Teleport.schritt(201, false, true, 0, true));
+        assertEquals(Teleport.Schritt.ENDE, Teleport.schritt(201, false, false, 500, false));
+    }
+
+    @Test
+    void ohneHoeheNachObenBisZumChunkDannZurueck() {
+        // Bis der Chunk da ist, alle 10 Ticks zurück auf die sichere Höhe, auch vor der Ankunft.
+        assertEquals(Teleport.Schritt.WARTEN, Teleport.schritt(1, true, false, 500, false));
+        assertEquals(Teleport.Schritt.WARTEN, Teleport.schritt(9, true, true, 0, false));
+        assertEquals(Teleport.Schritt.NACH_OBEN, Teleport.schritt(10, true, true, 0, false));
+        assertEquals(Teleport.Schritt.NACH_OBEN, Teleport.schritt(20, true, false, 500, false));
+        assertEquals(Teleport.Schritt.WARTEN, Teleport.schritt(21, true, true, 0, false));
+        // Mit dem Chunk am Ziel landen, auch genau an der Frist.
+        assertEquals(Teleport.Schritt.PRUEFEN, Teleport.schritt(3, true, true, 0, true));
+        assertEquals(Teleport.Schritt.PRUEFEN, Teleport.schritt(100, true, true, 0, true));
+        // Nach 5 s ohne Chunk zurück an den Start.
+        assertEquals(Teleport.Schritt.NACH_OBEN, Teleport.schritt(90, true, true, 0, false));
+        assertEquals(Teleport.Schritt.AUFGEBEN, Teleport.schritt(100, true, true, 0, false));
+        // Fliegt der Spieler nach der Ankunft weg, hört er auf, ohne ihn zurückzuholen.
+        assertEquals(Teleport.Schritt.ENDE, Teleport.schritt(50, true, true, 4.1, false));
+        assertEquals(Teleport.Schritt.ENDE, Teleport.schritt(100, true, true, 4.1, false));
+    }
+
+    /**
+     * Der Server zählt je Befehl 20 und je Tick 1 ab und wirft bei 200 hinaus, ausser Ops
+     * ({@code ServerGamePacketListenerImpl.detectCommandRateSpam}, per javap in 26.3, Standard
+     * {@code command-spam-threshold-seconds=10}). Ein schwebender Teleport bis zur Frist bleibt mit drei eigenen Befehlen
+     * des Spielers davor darunter. Siehe docs/vollbildkarte.md, „Teleportieren“.
+     */
+    @Test
+    void ohneHoeheUnterDerGrenzeFuerBefehle() {
+        int zaehler = 3 * 20 + 20, hoechstens = zaehler;
+        for (int t = 1; ; t++) {
+            zaehler = Math.max(0, zaehler - 1);
+            Teleport.Schritt s = Teleport.schritt(t, true, true, 0, false);
+            if (s == Teleport.Schritt.NACH_OBEN || s == Teleport.Schritt.AUFGEBEN) {
+                zaehler += 20;
+                hoechstens = Math.max(hoechstens, zaehler);
+            }
+            if (s == Teleport.Schritt.AUFGEBEN) {
+                break;
+            }
+        }
+        assertTrue(hoechstens < 200, "Zähler " + hoechstens);
     }
 
     private static JsonObject karte(String felder) {

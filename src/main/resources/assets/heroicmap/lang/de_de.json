@@ -59,6 +59,8 @@
   "heroicmap.karte.zum_spieler": "Zum Spieler",
   "heroicmap.karte.optionen": "Optionen …",
   "heroicmap.karte.teleport": "Hierher teleportieren (%s, %s)",
+  "heroicmap.teleport.frist": "Teleport abgebrochen: Der Server hat das Ziel nicht in 5 Sekunden geschickt. Du bist zurück, wo du warst.",
+  "heroicmap.teleport.kein_platz": "Teleport abgebrochen: Am Ziel ist kein Platz zum Stehen. Du bist zurück, wo du warst.",
   "heroicmap.karte.wegpunkt": "Wegpunkt setzen",
   "heroicmap.karte.wegpunkt_loeschen": "Wegpunkt löschen",
   "heroicmap.karte.region_loeschen": "Region löschen",
