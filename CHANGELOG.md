@@ -9,6 +9,11 @@ The release notes on GitHub and Modrinth come from here
 - **Thin chunk lines on the block edges.** Chunk lines now sit exactly on the border between two chunks, where `Ctrl` snaps, instead of on the first block of a chunk, and they are one screen pixel thin at every GUI scale, on the minimap and the full map. The line that lights up while you snap is just as thin.
 - **The marks of the biome frame sit on the frame.** The east, south and west marks of the "biome" frame no longer stick out past its narrow band: they rest on it, flush with the outer edge, shadow included, square and round, upright and rotating. North and the other frames stay as they were.
 
+- **Choose your frame from a preview.** Click a mark N, E, S or W on the minimap in the menu to open the frame chooser: a small minimap for each frame, with a colour swatch per variant below it. Click a swatch to recolour the preview, click the preview to use it; Esc or a click beside it keeps your frame. Clicking a mark no longer steps to the next frame.
+- **Frames come in families with colours.** "Shield" (grey, gold, paper) and "Rose" (silver, gold, parchment) replace grey, wood, paper, compass, clock and cartographer; your choice moves over by itself. Every biome of the "biome" frame has its own colours too, and you can set each one in the chooser.
+- **New frame "Letters"** with upright letters N, E, S, W, inside or outside the minimap, in four colours.
+- **Make a mark see-through with the middle mouse button.** The right click now opens the frame chooser.
+
 ## 0.2.68
 
 - **The full map zooms toward the mouse.** The spot under the mouse pointer stays under it while you zoom with the mouse wheel, in and out, like on the web map. At the closest and farthest zoom the map doesn't move.

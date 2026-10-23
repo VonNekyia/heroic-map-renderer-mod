@@ -1,6 +1,6 @@
 ---
 title: Rahmen
-description: Die Rahmen der Minimap als umschaltbare Skins - Wahl per Klick auf eine Marke im Menü, die Vorgabe „biom“ nach dem Biom unter dem Spieler, die sechs festen Skins, ihre Dateien und Quellen, Bänder eckig und rund, die Marken N, O, S, W, genordet fest und gedreht mitdrehend, ihr Schalter, der Griff im Menü, Abstand zum Rand, Kosten und Bilder.
+description: Die Rahmen der Minimap als Familien mit Varianten - der Wähler per Klick auf eine Marke im Menü, die Vorgabe „biom“ nach dem Biom unter dem Spieler, schild, rose und lettern, Dateien, varianten.txt und Quellen, Bänder eckig und rund, die Marken N, O, S, W mit Stellung und Lage, genordet fest und gedreht mitdrehend, durchsichtig per mittlerer Taste, der Griff im Menü, Abstand zum Rand, Kosten und Bilder.
 code:
   - src/main/java/com/nekyia/heroicmap/Skin.java
   - src/main/java/com/nekyia/heroicmap/Biom.java
@@ -9,6 +9,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/Einstellungen.java
   - src/main/java/com/nekyia/heroicmap/Anzeige.java
   - src/main/java/com/nekyia/heroicmap/MinimapKlick.java
+  - src/main/java/com/nekyia/heroicmap/Waehler.java
   - src/main/java/com/nekyia/heroicmap/Drehung.java
   - src/test/java/com/nekyia/heroicmap/DrehungTest.java
   - src/main/resources/heroicmap.accesswidener
@@ -18,25 +19,45 @@ code:
 
 # Rahmen
 
-Um die Minimap kann ein Rahmen liegen, ein Skin aus dem Paket des
-Designers: Bänder in festen Farben und Marken für N, O, S und W. Gewählt
-wird mit einem Klick auf eine Marke der Minimap im Menü; die Vorgabe ist „biom“, ein Rahmen,
-der mit dem Biom unter dem Spieler wechselt. „Ohne“ ist der dünne Umriss
-wie bisher. Die Vollbildkarte bekommt keinen Rahmen. Warum so:
-[0005](entscheidungen/0005-rahmen-als-skins.md) und
-[0008](entscheidungen/0008-biom-rahmen-als-vorgabe.md).
+Um die Minimap kann ein Rahmen liegen, aus dem Satz des Designers: Bänder
+in festen Farben und Marken für N, O, S und W. Rahmen gibt es in Familien
+mit Varianten, meist andere Farben desselben Rahmens. Gewählt wird im
+Wähler, den ein Klick auf eine Marke der Minimap im Menü öffnet; die
+Vorgabe ist „biom“, ein Rahmen, der mit dem Biom unter dem Spieler
+wechselt. „Ohne“ ist der dünne Umriss wie bisher. Die Vollbildkarte
+bekommt keinen Rahmen. Warum so:
+[0005](entscheidungen/0005-rahmen-als-skins.md),
+[0008](entscheidungen/0008-biom-rahmen-als-vorgabe.md) und
+[0028](entscheidungen/0028-rahmen-familien-und-waehler.md).
 
 ## Wahl
 
-- **Wo:** ein Klick auf eine Marke N, O, S, W der Minimap im Menü von
-  `/hmap` oder im Untermenü „Einstellungen …“ schaltet zum nächsten Skin,
-  siehe [Minimap](minimap.md), „Aussehen an der Minimap“. Der Tooltip
-  nennt und beschreibt den Skin. Bis 0.2.27 war es der Knopf „Rahmen“ im
+- **Wo:** ein Klick mit der linken oder rechten Taste auf eine Marke N, O,
+  S, W der Minimap im Menü von `/hmap` oder im Untermenü „Einstellungen …“
+  öffnet den Wähler, siehe „Wähler“ und [Minimap](minimap.md), „Aussehen an
+  der Minimap“. Der Tooltip nennt Familie und Variante. Bis 0.2.68 schaltete
+  ein Linksklick zum nächsten Skin, bis 0.2.27 war es der Knopf „Rahmen“ im
   Untermenü.
 - **Vorgabe `biom`.** Gespeichert als `rahmen_wahl` in
   `heroicmap.properties`, nur wenn der Spieler den Rahmen selbst gewählt
   hat, auch „ohne“; sonst gilt die Vorgabe, auch wenn sie sich wieder
   ändert. Ein unbekannter Name gilt als nicht gewählt.
+- **Die Variante** je Familie als `rahmen_variante.<familie>`, bei „biom“
+  je Kategorie `rahmen_variante.biom/<kategorie>`; ohne Eintrag gilt die
+  erste aus `varianten.txt` (`Minimap.variante`).
+- **Umzug aus 0.2.68 und älter** (`Skin.ALT`): `rahmen_wahl` oder ein
+  altes `rahmen` mit einem Skin von vorher wird Familie und Variante:
+
+  | vorher | Familie | Variante |
+  |---|---|---|
+  | `grau` | `schild` | `grau` |
+  | `holz` | `schild` | `gold` |
+  | `papier` | `schild` | `papier` |
+  | `kompass` | `rose` | `silber` |
+  | `uhr` | `rose` | `gold` |
+  | `kartograph` | `rose` | `pergament` |
+
+  Beim nächsten Speichern steht es neu in der Datei.
 - **Aus einer älteren Version** stand `rahmen` immer in der Datei. Ein
   Rahmen ausser `ohne` gilt als gewählt, denn die Vorgabe war `ohne`. Ein
   `rahmen=ohne` lässt sich nicht von der alten Vorgabe unterscheiden; dort
@@ -45,30 +66,46 @@ wie bisher. Die Vollbildkarte bekommt keinen Rahmen. Warum so:
 - **Die Gametests** `Bilder` und `Messung` stellen „ohne“ ein, denn ihre
   Bilder und Messreihen zeigen die Minimap ohne Rahmen.
 
-## Skins
+## Familien
 
-| Skin | Bänder | Schatten | `norden` | Abstand zum Rand |
-|---|---|---|---|---|
-| `biom` | 2 | ja | 15 × 15 | 11 |
-| `grau` | 3 | nein | 6 × 7 | 5 |
-| `holz` | 4 | nein | 6 × 7 | 5 |
-| `papier` | 5 | nein | 6 × 7 | 5 |
-| `kompass` | 2 | ja | 17 × 17 | 13 |
-| `uhr` | 2 | ja | 17 × 17 | 13 |
-| `kartograph` | 2 | ja | 17 × 17 | 13 |
+Je Familie die Varianten aus `varianten.txt`, die erste ist die Vorgabe
+(`Skin.FAMILIEN`, `Skin.MIT_VARIANTEN`, `Skin.varianten`).
 
-![Der Rahmen „uhr“ eckig und rund](bilder/rahmen-uhr.png)
+| Familie | Varianten | Bänder | Schatten | Stellung, Lage | `norden` | Abstand zum Rand |
+|---|---|---|---|---|---|---|
+| `biom` | je Kategorie `standard` und 1–2 Recolors, siehe „Biom“ | 2 | ja | aussen, O/S/W `kante`, N `mitte` | 15 × 15 | 11 |
+| `schild` | `grau`, `gold`, `papier` | 3, 4, 5 | nein | karte, `mitte` | 6 × 7 | 5 |
+| `rose` | `silber`, `gold`, `pergament` | 2 | ja | `silber` aussen, sonst karte; `mitte` | 17 × 17 | 13 |
+| `lettern` | `tinte`, `nacht`, `gold`, `rubrik`, je `_innen` und `_aussen` | 2 | ja | aufrecht, `innen` oder `aussen` | 7 × 9 | 11 |
+
+Die Pixelbilder von `schild`, `rose` und `biom/<kategorie>/standard` sind
+die der alten Skins, unverändert; die Recolors und `lettern` sind neu.
+
+![Die Familie „rose“ in der ersten Variante „silber“ eckig und rund](bilder/rahmen-rose.png)
 
 ## Biom
 
-Der Rahmen `biom` zeigt einen von acht Skins, je nach dem Biom unter dem
-Spieler (`Biom`, `Minimap.skinJetzt`). So hat es der User gewünscht, als
-Vorgabe.
+Der Rahmen `biom` zeigt eine von acht Familien, je nach dem Biom unter dem
+Spieler (`Biom`, `Minimap.skinJetzt`), in der Variante, die für diese
+Kategorie gewählt ist. So hat es der User gewünscht, als Vorgabe.
 
 - **Kategorien:** `waelder`, `grasland`, `gebirge`, `schnee`, `wueste`,
-  `tropen`, `feuchtgebiete`, `gewaesser`; je ein Ordner
-  `rahmen/biom/<kategorie>/` wie ein fester Skin, aufgebaut wie `kompass`,
-  `uhr` und `kartograph`.
+  `tropen`, `feuchtgebiete`, `gewaesser`; je eine Familie
+  `rahmen/biom/<kategorie>/` mit `varianten.txt`:
+
+  | Kategorie | Varianten |
+  |---|---|
+  | `feuchtgebiete` | `standard`, `mangrove` |
+  | `gebirge` | `standard`, `sandstein` |
+  | `gewaesser` | `standard`, `lagune` |
+  | `grasland` | `standard`, `trocken` |
+  | `schnee` | `standard`, `polarnacht` |
+  | `tropen` | `standard`, `regenwald` |
+  | `waelder` | `standard`, `herbst`, `kirschhain` |
+  | `wueste` | `standard`, `rotfels` |
+- **Je Kategorie gewählt:** Im Wähler stellt „&lt; Kategorie &gt;“ unter der
+  Vorschau ein, welche Kategorie die Farbfelder meinen; so lässt sich jede
+  einstellen, ohne hinzulaufen. Er öffnet mit der, die gerade gezeigt ist.
 - **Zuordnung** in fester Rangfolge, die erste passende Zeile gewinnt
   (`Biom.kategorie`). Je Zeile Tags der Biome und Biome des Spiels mit
   Namen:
@@ -120,8 +157,9 @@ Vorgabe.
   in allen acht gleich gebaut, darum liegen die alten zu 1 und die neuen zu
   t darüber; nur die alten Marken blenden zu 1 − t aus. So sinkt die
   Deckung der Bänder nie.
-- **Abstand zum Rand:** der grösste aller acht, 11 Einheiten, denn `norden`
-  ist in allen 15 × 15 Pixel gross (`Minimap.rand`). So springt die Minimap beim
+- **Abstand zum Rand:** der grösste aller Kategorien und ihrer Varianten,
+  11 Einheiten, denn `norden` ist in allen 15 × 15 Pixel gross
+  (`Minimap.rand`). So springt die Minimap beim
   Wechsel nicht; ebenso die Koordinaten darunter.
 - **Kosten:** Das Biom unter dem Spieler liest die Minimap je Frame; die
   Kategorie rechnet sie nur neu, wenn sich das Biom ändert. Während der
@@ -131,33 +169,55 @@ Vorgabe.
 
 ## Dateien
 
-Je Skin ein Ordner `assets/heroicmap/textures/gui/sprites/rahmen/<skin>/`,
-im Atlas des GUI; F3+T und Ressourcenpakete laden ihn neu:
+Je Familie ein Ordner `assets/heroicmap/textures/gui/sprites/rahmen/<familie>/`
+mit `varianten.txt` und je Variante einem Unterordner, im Atlas des GUI;
+F3+T und Ressourcenpakete laden ihn neu. Bei „biom“ je Kategorie
+`rahmen/biom/<kategorie>/`.
 
+- **`varianten.txt`:** eine Variante je Zeile, die erste die Vorgabe, `//`
+  beginnt einen Kommentar: `<name> [ordner=<unterordner>] [schalter=wert …]`.
+  Ohne `ordner` heisst der Unterordner wie die Variante; die Schalter
+  überschreiben `info.txt` des Ordners, so teilen sich `tinte_innen` und
+  `tinte_aussen` einen Ordner. Namen nur aus a–z, 0–9 und _, sonst lädt die
+  Familie nicht (`Skin.liesVarianten`).
 - **`griff.png`, `griff_aktiv.png`:** der Griff, 7 × 7, gezeichnet für
   unten rechts.
 - **`norden.png`, `marke.png`, `marke_quer.png`,** je mit `_aktiv`: die
-  Marken, siehe „Marken“.
+  Marken, siehe „Marken“. **`osten.png`, `sueden.png`, `westen.png`,** je
+  mit `_aktiv`: eigene Bilder je Richtung, etwa die Buchstaben von
+  „lettern“; gibt es sie, nimmt der Mod sie bei `drehung=aufrecht` statt
+  `marke` und `marke_quer`.
+- **`tafel.png`** bei `schild` und `rose`: der Grund der Infotafel auf der
+  Vollbildkarte in dieser Variante (`Karte.tafelSkin`), sonst der von
+  `rahmen/ohne/`.
 - **`palette.txt`:** eine Zeile je Band, von aussen nach innen, eine Farbe
   `#RRGGBB` oder zwei, Licht und Schatten; `//` beginnt einen Kommentar
   (`Skin.lies`). Der Atlas nimmt nur PNG, die Textdatei liegt daneben.
   Mindestens zwei Bänder, siehe [Minimap](minimap.md), „Form“.
-- **`info.txt`:** `schatten=ja` oder `schatten=nein`; dazu `aussen=ja`,
-  wenn jedes Bild von der Mitte weg zeigen soll; `lage=mitte` oder
-  `lage=kante` für die Lage der Marken, `lage_norden` ebenso für N, ohne
-  die Zeile wie `lage`; `kante` nur mit `aussen=ja`, siehe „Nach aussen“
-  (`Skin.lies`). Vorgabe ist `mitte`, ein anderer Wert lässt den Skin
-  nicht laden.
+- **`info.txt`:** je Zeile ein Schlüssel; die letzte Zeile je Schlüssel
+  gilt, so überschreibt eine Zeile aus `varianten.txt` (`Skin.lies`):
+
+  | Schlüssel | Werte | Vorgabe |
+  |---|---|---|
+  | `schatten` | `ja`, `nein`: Marken und Griff mit Schatten | `nein` |
+  | `drehung` | `karte`, `aussen`, `aufrecht`, siehe „Drehen“ und „Nach aussen“; ein altes `aussen=ja` heisst `aussen` | `karte` |
+  | `lage` | `mitte`, `kante`, `innen`, `aussen`, siehe „Lage“ | `mitte` |
+  | `lage_norden` | wie `lage`, nur für N | wie `lage` |
+
+  `kante` nur mit `drehung=aussen`, `innen` und `aussen` nur mit
+  `drehung=aufrecht`; ein anderer Wert lässt die Variante nicht laden.
 - **Namen und Beschreibungen** stehen in `de_de.json` und `en_us.json`
-  unter `heroicmap.rahmen.<skin>` und `heroicmap.rahmen.<skin>.beschreibung`.
-- **Ein neuer Skin** ist ein Ordner, ein Eintrag in `Skin.NAMEN` und zwei
-  Schlüssel je Sprache. `Skin.ORDNER` sind die Ordner, die der Mod lädt:
-  die festen Skins und je Kategorie von `biom` einer.
-- **Geladen** einmal je Skin, auch ein Fehlschlag bleibt gemerkt, bis der
-  Atlas neu lädt (`Skin.von`); sonst stünde je Frame eine Warnung im Log.
-- **Quellen** unter `docs/bilder/quellen/rahmen/`: je Skin die Datei von
-  Aseprite, eine Ebene je Bild; für `biom` je Kategorie eine unter
-  `biom/`.
+  unter `heroicmap.rahmen.<familie>` und `.beschreibung`, je Variante
+  `heroicmap.rahmen.<familie>.<variante>`, bei „biom“
+  `heroicmap.rahmen.biom.<kategorie>` und `.<variante>`.
+- **Ein neuer Rahmen** ist ein Ordner mit `varianten.txt`, ein Eintrag in
+  `Skin.FAMILIEN` und `Skin.MIT_VARIANTEN` und die Namen je Sprache; eine
+  neue Variante nur ein Unterordner, eine Zeile und ihr Name.
+- **Geladen** einmal je Variante, auch ein Fehlschlag bleibt gemerkt, bis
+  der Atlas neu lädt (`Skin.von`); sonst stünde je Frame eine Warnung im
+  Log. Ebenso `varianten.txt` je Familie.
+- **Quellen** unter `docs/bilder/quellen/rahmen/<familie>/<variante>.aseprite`,
+  eine Ebene je Bild, vom Designer; dazu `tafel.aseprite`.
 
 ## Bänder
 
@@ -168,7 +228,8 @@ im Atlas des GUI; F3+T und Ressourcenpakete laden ihn neu:
 - **Rund** liegt ein Pixel in Band `⌊R − d⌋`, d der Abstand von der Mitte
   des Pixels zur Mitte, R die halbe Seite; in Licht, wenn
   `dx + dy < 0`. Gezeichnet als ein Ring, eine Textur mit einem Texel je
-  Einheit des GUI (`Skin.ring`).
+  Einheit des GUI (`Skin.ring`); je Variante höchstens zwei Seiten zugleich,
+  die der Minimap und die der Vorschau im Wähler.
 - **Die Karte rund** reicht als Vieleck unter den Ring, siehe
   [Minimap](minimap.md), „Form“. Sichtbar endet sie so genau am Ring, auch
   die Chunklinien.
@@ -197,41 +258,47 @@ im Atlas des GUI; F3+T und Ressourcenpakete laden ihn neu:
   Schwarz zu 50 % um (+1, +1) versetzt, dann das Bild. Die PNG haben nur
   Alpha 0 oder 255.
 
-![Das Menü mit dem Rahmen „uhr“, unten links der Griff](bilder/rahmen-menue.png)
+![Das Menü mit dem Rahmen „rose“ in „gold“, unten links der Griff](bilder/rahmen-menue.png)
 
 ## Marken
 
 Der Rahmen zeigt die Himmelsrichtungen als Marken, genordet wie gedreht;
 Ornamente in den Ecken gibt es nicht. So hat es der User am 10.10.
 entschieden, siehe [0012](entscheidungen/0012-marken-statt-verzierungen.md).
-Ohne Rahmen gibt es keine, die Bilder gehören zum Skin; nur im Menü stehen
-dann die von „grau“, siehe „Im Menü“.
+Ohne Rahmen gibt es keine, die Bilder gehören zur Variante; nur im Menü
+stehen dann die von `schild/grau`, siehe „Im Menü“.
 
-- **Wo:** von der Mitte der Minimap in die Himmelsrichtung, auf der Mitte
-  der Bänder, rund auf dem Kreis, eckig auf dem Quadrat (`Skin.marke`,
-  `Minimap.ornamente`). Bei „biom“ liegen O, S und W an der äusseren
-  Kante, siehe „Nach aussen“. Genordet stehen sie fest oben, rechts, unten und
+- **Wo:** von der Mitte der Minimap in die Himmelsrichtung, nach ihrer Lage,
+  siehe „Lage“: auf der Mitte der Bänder, an ihrer Kante, in der Karte oder
+  ausserhalb; rund am Kreis, eckig am Quadrat (`Skin.marke`,
+  `Minimap.ornamente`). Genordet stehen sie fest oben, rechts, unten und
   links, die linke obere Ecke bei `⌊p − w / 2 + 0,5⌋` (`Skin.lage`);
   gedreht wandern sie am Rahmen entlang, siehe „Drehen“.
 - **Bild:** fest je Richtung, N `norden`, S `marke`, O und W `marke_quer`
-  (`Skin.MARKE_JE_RICHTUNG`); im Menü unter der Maus `_aktiv`. Es dreht mit, siehe
-  „Drehen“. Bei „kompass“ und „biom“ zeigt es von der Mitte weg, siehe
-  „Nach aussen“.
+  (`Skin.MARKE_JE_RICHTUNG`); mit `drehung=aussen` O, S und W `marke`, siehe
+  „Nach aussen“; mit `drehung=aufrecht` und eigenen Bildern `osten`,
+  `sueden`, `westen` (`Skin.EIGENE_JE_RICHTUNG`). Im Menü unter der Maus
+  `_aktiv`.
 - **Reihenfolge:** Bänder, die Marken, `norden` zuletzt, im Menü darüber
   der Griff.
 
 ## Drehen
 
-Dreht die Minimap, siehe [Minimap](minimap.md), „Drehen“, drehen die
-Marken starr mit der Karte, Lage und Bild; nichts steht fest ausser dem
-Griff im Menü. So hat es der User gewünscht, siehe
-[0012](entscheidungen/0012-marken-statt-verzierungen.md).
+Dreht die Minimap, siehe [Minimap](minimap.md), „Drehen“, wandern die
+Marken mit der Karte; nichts steht fest ausser dem Griff im Menü. So hat es
+der User gewünscht, siehe
+[0012](entscheidungen/0012-marken-statt-verzierungen.md). Wie ihr Bild
+steht, sagt `drehung` (`Skin.Stellung`): `karte` starr mit der Karte,
+`aussen` von der Mitte weg, siehe „Nach aussen“, `aufrecht` immer
+aufrecht, nur der Platz wandert, so bleiben die Buchstaben von „lettern“
+lesbar.
 
 - **Lage:** in ihrer Himmelsrichtung im Kartenbild, gedreht wie die Karte,
-  auf der Mitte der Bänder; rund auf dem Kreis, eckig auf dem Quadrat, das
-  selbst achsparallel bleibt (`Minimap.verzierung`, `Skin.marke`).
+  nach ihrer Lage; rund am Kreis, eckig am Quadrat, das selbst achsparallel
+  bleibt (`Minimap.verzierung`, `Skin.marke`).
 - **Bild:** um seine Mitte um denselben Winkel gedreht, über die Pose
-  (`Skin.ornament`). Der Schatten bleibt auf dem Schirm um (+1, +1).
+  (`Skin.ornament`), bei `aufrecht` nicht. Der Schatten bleibt auf dem
+  Schirm um (+1, +1).
 - **Pixel:** Die Mitte liegt auf ganzen Pixeln des Schirms, sonst zitterte
   sie beim Laufen. Gedreht ist die Pixelkunst nicht pixelgenau: Das Spiel
   rastert sie mit Nearest, die Kanten werden treppig, und beim Drehen
@@ -240,47 +307,56 @@ Griff im Menü. So hat es der User gewünscht, siehe
 
 ## Nach aussen
 
-Bei „kompass“ und allen Kategorien von „biom“ zeigt das Bild jeder Marke
-von der Mitte der Minimap weg, genordet wie gedreht; sonst zeigten alle
-gleich nach Norden, mit Blick nach Süden etwa alle nach unten. So hat es
-der User am 15.10. gewünscht, siehe
+Bei `drehung=aussen`, „rose“ in „silber“ und allen Kategorien von „biom“,
+zeigt das Bild jeder Marke von der Mitte der Minimap weg, genordet wie
+gedreht; sonst zeigten alle gleich nach Norden, mit Blick nach Süden etwa
+alle nach unten. So hat es der User am 15.10. gewünscht, siehe
 [0022](entscheidungen/0022-marken-nach-aussen.md).
 
-- **Schalter:** `aussen=ja` in `info.txt` des Skins (`Skin.nachAussen`);
-  bei „biom“ in jeder Kategorie.
 - **Bild:** N `norden` wie bisher; O, S und W nehmen `marke`, gezeichnet
   für oben, und drehen es um 90°, 180° und 270° weiter
-  (`Minimap.ornamente`). `marke_quer` bleibt bei diesen Skins ungenutzt.
-- **Lage** wie bei den anderen Skins, siehe „Marken“ und „Drehen“; bei
-  „biom“ liegen O, S und W an der Kante, siehe unten.
-- **An der Kante bei „biom“:** O, S und W sitzen auf dem Rahmen und ragen
-  nicht darüber, auch ihr Schatten nicht. So hat es der User am 23.10.
-  gewählt, aus zwei Entwürfen: aussen bündig statt kleiner im Band, denn
-  ganz im Band von 2 Einheiten wäre eine Marke ein Punkt.
-  - **Schalter:** `lage=kante` und `lage_norden=mitte` in `info.txt`
-    jeder Kategorie (`Skin.auflage`: je Richtung Breite und Höhe ihres
-    Bilds und der Schatten, null auf der Mitte). Das Format hat der
-    Reviewer mit dem Designer für die Varianten der Rahmen festgelegt.
-    `kante` heisst auf dem Band, aussen bündig; `innen`, ganz in der Karte
-    mit einer Einheit Abstand zum Band, und `aussen`, ganz ausserhalb,
-    kommen mit dem Skin der Buchstaben und laden bis dahin nicht.
-  - **Lage:** Bild und Schatten um (+1, +1) liegen innen an der äusseren
-    Kante (`Skin.anliegend`). Ungedreht schliessen O und S mit ihrem
-    Schatten an der Kante ab, eine Einheit weiter innen als das Bild
-    allein, W mit dem Bild; rund berühren die äussersten Ecken den Kreis.
-    Gedreht zählt der Kasten des gedrehten Bilds: eckig an beiden Seiten,
-    die es erreichen kann, rund jede Ecke. Die Mitte auf ganzen Pixeln
-    kann es dann um einen halben Pixel verschieben.
-  - **Nach innen** reicht die Marke über die Bänder in die Karte.
-  - `norden` bleibt auf der Mitte der Bänder, ebenso die Marken der
-    anderen Skins. Der Klick im Menü trifft die Marke dort, wo sie liegt,
-    siehe „Im Menü“.
+  (`Minimap.ornamente`). `marke_quer` bleibt bei diesen Varianten
+  ungenutzt.
 - **Pixel:** Um ganze Vierteldrehungen gedreht liegt der Kasten des Bildes
   mit vertauschten Seiten auf ganzen Einheiten wie ungedreht
   (`Skin.blit`); genordet bleibt die Pixelkunst so scharf.
-- **Die anderen Skins** behalten ihre Marken starr mit der Karte: ihr
-  `norden` ist ein Buchstabe, `marke` und `marke_quer` sind Balken für
-  ihre Seite.
+- **Starr** mit der Karte bleiben `schild` und „rose“ in „gold“ und
+  „pergament“: ihr `norden` ist ein Buchstabe oder Stern für oben, `marke`
+  und `marke_quer` sind für ihre Seite gezeichnet.
+
+## Lage
+
+Wo eine Marke liegt, sagt `lage`, für N `lage_norden` (`Skin.Lage`,
+`Skin.Platz`); die Rechnung ist `Skin.marke`.
+
+| Lage | wo | bei |
+|---|---|---|
+| `mitte` | die Mitte des Bilds auf der Mitte der Bänder | `schild`, `rose`, N von `biom` |
+| `kante` | auf den Bändern, Bild und Schatten innen an der äusseren Kante | O, S, W von `biom` |
+| `innen` | ganz in der Karte, eine Einheit innerhalb der Bänder | `lettern` `_innen` |
+| `aussen` | ganz ausserhalb, eine Einheit ausserhalb der Minimap | `lettern` `_aussen` |
+
+- **`kante`** (`Skin.anliegend`), so hat es der User am 23.10. für „biom“
+  gewählt, aus zwei Entwürfen: aussen bündig statt kleiner im Band, denn
+  ganz im Band von 2 Einheiten wäre eine Marke ein Punkt (mod#189).
+  Ungedreht schliessen O und S mit ihrem Schatten an der Kante ab, eine
+  Einheit weiter innen als das Bild allein, W mit dem Bild; rund berühren
+  die äussersten Ecken den Kreis. Gedreht zählt der Kasten des gedrehten
+  Bilds: eckig an beiden Seiten, die es erreichen kann, rund jede Ecke. Nach
+  innen reicht die Marke über die Bänder in die Karte. Die Lage hiess beim
+  Designer zuerst `innen`; so hat es der Reviewer am 24.10. getrennt, siehe
+  [0028](entscheidungen/0028-rahmen-familien-und-waehler.md).
+- **`innen`** (`Skin.innen`): Das aufrechte Bild berührt von innen die Linie
+  eine Einheit innerhalb der Bänder, eckig das Quadrat, rund mit seiner
+  weitesten Ecke den Kreis; genordet die Formel des Designers, Mitte bei
+  K/2 − n − 1 − a/2.
+- **`aussen`** (`Skin.aussen`): Das aufrechte Bild berührt von aussen die
+  Linie eine Einheit ausserhalb der Minimap, eckig mit einer Seite, rund mit
+  seinem nächsten Punkt; genordet die Mitte bei K/2 + 1 + a/2.
+- **Pixel:** Gedreht liegt die Mitte auf ganzen Pixeln des Schirms; das
+  kann sie um einen halben Pixel verschieben.
+- **Der Klick im Menü** trifft die Marke dort, wo sie liegt, siehe „Im
+  Menü“.
 
 ## Verzierungen
 
@@ -288,13 +364,15 @@ Jede Marke N, O, S, W steht für sich an oder durchsichtig, so hat es der
 User am 20.10. gewählt (mod#175). Einen Schalter im Untermenü gibt es dafür
 nicht mehr.
 
-- **Rechtsklick** im Menü auf eine Marke, ohne zu ziehen, macht nur sie
-  durchsichtig; ein zweiter holt sie zurück (`Minimap.schalteVerzierung`).
-  Ziehen heisst wie beim Linksklick: Die Maus wandert mehr als 3 Einheiten
-  (`MinimapKlick.WEG`); dann verschiebt sie die Minimap wie bisher.
-- **Linksklick** auf eine Marke wechselt weiter den Rahmen, siehe „Im
-  Menü“. Beide Tasten treffen dasselbe Ziel und tun anderes; der Tooltip
-  nennt beides.
+- **Die mittlere Maustaste** im Menü auf eine Marke, ohne zu ziehen, macht
+  nur sie durchsichtig; ein zweites Mal holt sie zurück
+  (`Minimap.schalteVerzierung`). Bis 0.2.68 war es der Rechtsklick; den
+  braucht jetzt der Wähler, siehe
+  [0028](entscheidungen/0028-rahmen-familien-und-waehler.md). Ziehen heisst
+  wie beim Linksklick: Die Maus wandert mehr als 3 Einheiten
+  (`MinimapKlick.WEG`).
+- **Links- und Rechtsklick** auf eine Marke öffnen den Wähler, siehe
+  „Wähler“. Der Tooltip nennt beides.
 - **Durchsichtig** heisst: im Spiel nicht gezeichnet, im Menü halb, siehe
   „Im Menü“. Der Rahmen zeigt dort nur seine Bänder oder den Ring, gedreht
   wie ungedreht. Griff und Abstand zum Rand bleiben.
@@ -307,15 +385,15 @@ nicht mehr.
 
 ## Im Menü
 
-Ein Klick auf eine Marke wechselt den Rahmen, siehe [Minimap](minimap.md),
-„Aussehen an der Minimap“. Damit es immer eine gibt:
+Ein Klick auf eine Marke öffnet den Wähler, siehe „Wähler“ und
+[Minimap](minimap.md), „Aussehen an der Minimap“. Damit es immer eine gibt:
 
 - **Halbe Marken:** Durchsichtige Marken, siehe „Verzierungen“, und bei
   „ohne“ alle vier zeichnet das Menü zu 50 % deckend, nur dort, nicht im
-  HUD sonst (`Minimap.geister`). So trifft ein Rechtsklick sie zum
-  Zurückholen. Mit Rahmen
-  dessen Marken an ihrem Ort, bei „ohne“ die von „grau“ auf der Mitte des
-  Umrisses, 1,5 Einheiten ausserhalb der Karte.
+  HUD sonst (`Minimap.geister`). So trifft die mittlere Taste sie zum
+  Zurückholen. Mit Rahmen dessen Marken an ihrem Ort, bei „ohne“ die von
+  `schild/grau` auf der Mitte des Umrisses, 1,5 Einheiten ausserhalb der
+  Karte.
 - **Genordet:** Im Menü dreht die Minimap nicht, auch mit Drehen an, siehe
   [Minimap](minimap.md), „Drehen“; sonst wanderten die Marken über den
   Griff.
@@ -327,16 +405,51 @@ Ein Klick auf eine Marke wechselt den Rahmen, siehe [Minimap](minimap.md),
   Einheit angeschnitten sein: Der Abstand zum Rand ist dort 4 Einheiten,
   siehe „Abstand zum Rand“, und gilt nur für das HUD.
 
-![Das Menü mit „uhr“ und allen Marken durchsichtig: die Marken halb, N unter der Maus hell, der Tooltip zum Rahmen](bilder/rahmen-menue-halb.png)
+![Das Menü mit „rose“ in „gold“ und allen Marken durchsichtig: die Marken halb, N unter der Maus hell, der Tooltip zum Rahmen](bilder/rahmen-menue-halb.png)
+
+## Wähler
+
+Ein Klick mit der linken oder rechten Taste auf eine Marke öffnet über dem
+Menü oder Untermenü eine Tafel mit einer Vorschau je Familie (`Waehler`).
+So hat es der User am 23.10. gewünscht, statt durch die Rahmen zu
+schalten, siehe [0028](entscheidungen/0028-rahmen-familien-und-waehler.md).
+
+- **Vorschau:** je Familie eine Minimap von 56 Einheiten mit ihrem Rahmen,
+  gezeichnet mit denselben Routinen wie die Minimap, Bänder oder Ring und
+  die Marken genordet, eckig oder rund wie die Minimap; auf einer festen
+  Beispielkarte aus der Testwelt (`waehler_karte.png`, rund
+  `waehler_karte_rund.png`, je 56 × 56). „Ohne“ zeigt nur die Karte.
+- **Farbfelder** unter dem Namen, eines je Ordner der Varianten, in der
+  Farbe des innersten Bands; das der Vorschau weiss umrandet, der Tooltip
+  nennt die Variante. Ein Klick färbt nur die Vorschau um.
+- **`lettern`** dazu „innen | aussen“: wählt in derselben Farbe die
+  Variante mit dieser Lage.
+- **`biom`** dazu „&lt; Kategorie &gt;“: wechselt die Kategorie, deren Rahmen
+  die Vorschau zeigt und deren Variante die Felder stellen.
+- **Übernehmen:** Ein Klick auf eine Vorschau setzt Familie und Variante
+  und schliesst; gespeichert wird beim Schliessen des Menüs wie sonst.
+- **Schliessen ohne Änderung:** Esc oder ein Klick neben die Tafel. Esc
+  schliesst nur den Wähler, nicht das Menü.
+- **Offen** nimmt er alle Klicks, Tasten und das Mausrad; das Menü darunter
+  zeigt dann keinen Hover und keinen Tooltip. Die gewählte Familie ist gelb
+  umrandet.
+- **Grösse:** 5 Karten zu 76 Einheiten, die Tafel rund 408 × 140; sie passt
+  bei GUI-Massstab 4 auf 427 × 240.
+
+![Das Menü mit dem offenen Wähler: je Familie eine Vorschau, darunter die Farbfelder](bilder/rahmen-waehler.png)
 
 ## Abstand zum Rand
 
 Die Minimap hält 4 Einheiten Abstand zum Rand des Schirms, mit Rahmen
 mindestens die halbe Diagonale der grössten Marke, aufgerundet
-(`Minimap.rand`, `Skin.einrueckung`), siehe die Tabelle unter „Skins“: bei
-`uhr` 13, bei `biom` 11. So bleibt jede Marke in jeder Drehung ganz auf
-dem Schirm, auch ihr Schatten, denn ihre Mitte liegt auf
-der Mitte der Bänder oder, bei „biom“, weiter innen. Das gilt immer, auch ungedreht und mit dem Schalter
+(`Minimap.rand`, `Skin.einrueckung`), siehe die Tabelle unter „Familien“:
+bei `rose` 13, bei `biom` 11. So bleibt jede Marke in jeder Drehung ganz
+auf dem Schirm, auch ihr Schatten, denn ihre Mitte liegt auf der Mitte der
+Bänder oder weiter innen. Liegen Marken aussen, wie bei `lettern`, so weit,
+wie sie samt Schatten in irgendeiner Drehung über die Minimap reichen,
+eckig wie rund: bei `lettern` 11, wie beim Designer. Je Familie gilt der
+grösste über alle Varianten, bei `biom` über alle Kategorien. Das gilt
+immer, auch ungedreht und mit dem Schalter
 „Verzierungen“ aus; so springt die Minimap beim Umschalten nicht, siehe
 [0012](entscheidungen/0012-marken-statt-verzierungen.md). Vorher war es die
 halbe zier, bei `uhr` 8, bei `biom` 6.
@@ -347,7 +460,7 @@ Der schwarze Umriss entfällt mit Rahmen.
 
 ## Kosten
 
-Gemessen am 10.10. mit „kompass“, 4 px und Zoom 4, siehe
+Gemessen am 10.10. mit „kompass“, heute `rose` in `silber`, 4 px und Zoom 4, siehe
 [Minimap, Verzierungen drehen mit](messungen/2026-10-10-minimap-verzierungen.md):
 das HUD-Element im Median eckig 0,016 bis 0,021 ms, rund 0,025 bis
 0,033 ms, gedreht wie ungedreht. Gemessen ist das noch mit zier, je Frame
@@ -362,31 +475,35 @@ Geschätzt, nicht gemessen:
   gedrehten Pose; die Minimap rechnet ihre 4 Punkte je Frame
   (`Minimap.ornamente`), im Menü dazu den Griff.
 - **Rund** je Frame ein Bild für den Ring. Den Ring rechnet der Mod nur,
-  wenn sich die Seite ändert, und behält je Skin nur den letzten
-  (`Skin.ring`); bei 256 Einheiten sind das 256 × 256 Texel, 256 KiB, und
-  eine Wurzel je Texel einmal. Mit `biom` hat jede Kategorie, die schon
-  gezeigt wurde, ihren Ring, höchstens 8, also bis 2 MiB.
+  wenn sich die Seite ändert, und behält je Variante höchstens zwei
+  Seiten, die der Minimap und die der Vorschau im Wähler (`Skin.ring`); bei
+  256 Einheiten sind das 256 × 256 Texel, 256 KiB, und eine Wurzel je Texel
+  einmal, für die Vorschau 56 × 56 Texel. Mit `biom` hat jede Kategorie,
+  die schon gezeigt wurde, ihren Ring, höchstens 8, also bis 2 MiB; nach
+  dem Wähler je Familie dazu die kleinen Ringe der Vorschauen.
 - **Überblendung:** 0,3 s lang zwei Rahmen je Frame.
-- **Abstand zum Rand bei `biom`:** je Frame das Grösste über die acht
-  Kategorien; ihre Namen stehen fest (`Biom.ORDNER`).
+- **Abstand zum Rand:** je Frame das Grösste über die Varianten der
+  Familie, bei `biom` über alle Kategorien und ihre Varianten, rund 20
+  Nachschlagen in Tabellen; den Abstand je Variante rechnet der Mod einmal
+  beim Laden, bei `lage=aussen` über 360 Drehungen eckig und rund.
+- **Wähler:** offen je Frame 4 Vorschauen mit Bändern oder Ring und je 4
+  Marken, dazu die Farbfelder; geschlossen nichts.
 
 ## Bilder
 
-Der Gametest `Bilder` nimmt jeden Rahmen eckig und rund bei 4 px auf,
-`rahmen-<skin>.png`, und das Menü mit `uhr`, dazu mit Verzierungen aus
-und der Maus auf N (`rahmen-menue-halb.png`), siehe [Minimap](minimap.md),
-„Bilder“. `rahmen-biom.png` stammt aus einem Lauf dieses Gametests in
-der CI mit `-Pbilder`, zu mod#189.
-`rahmen-abstand.png` setzt die Bildschirmfotos `rahmen-biom-0` und
-`rahmen-uhr-0` dieses Gametests zusammen, aus einem Lauf auf main `49e4f3c` und
-einem mit 0012, je die rechte obere Ecke.
+Der Gametest `Bilder` nimmt jede Familie in ihrer ersten Variante eckig und
+rund bei 4 px auf, `rahmen-<familie>.png`, dazu `lettern` aussen
+(`rahmen-lettern-aussen.png`), das Menü mit `rose` in `gold`, mit
+Verzierungen aus und der Maus auf N (`rahmen-menue-halb.png`) und mit dem
+offenen Wähler (`rahmen-waehler.png`), siehe [Minimap](minimap.md),
+„Bilder“. Diese Bilder stammen aus einem Lauf des Gametests in der CI mit
+`-Pbilder`. `rahmen-abstand.png` setzt die Bildschirmfotos `rahmen-biom-0`
+und `rahmen-uhr-0` dieses Gametests zusammen, aus einem Lauf auf main
+`49e4f3c` und einem mit 0012, je die rechte obere Ecke; es zeigt noch die
+alten Namen.
 
-![Der Rahmen „grau“](bilder/rahmen-grau.png)
+![Der Rahmen „schild“ in „grau“](bilder/rahmen-schild.png)
 
-![Der Rahmen „holz“](bilder/rahmen-holz.png)
+![Der Rahmen „lettern“ in „tinte“, innen](bilder/rahmen-lettern.png)
 
-![Der Rahmen „papier“](bilder/rahmen-papier.png)
-
-![Der Rahmen „kompass“](bilder/rahmen-kompass.png)
-
-![Der Rahmen „kartograph“](bilder/rahmen-kartograph.png)
+![Der Rahmen „lettern“ in „tinte“, aussen](bilder/rahmen-lettern-aussen.png)
