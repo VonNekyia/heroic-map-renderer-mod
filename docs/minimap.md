@@ -73,15 +73,40 @@ die Gruppe auf- und zuklappt; Vorgabe zu, gemerkt als `technik=auf` oder
 selbst angeht, stellt das Hauptmenü an ihr ein; eine Gruppe „Minimap“
 bliebe leer und fällt weg, so hat es der Reviewer entschieden. „Ebenen …“
 und „Fertig“ stehen unten ohne Überschrift. „Fertig“ führt zurück ins
-Menü:
+Menü.
 
-![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien und den Koordinaten darunter; unter „Wegpunkte“ der Regler „Todespunkte“, unter „In der Welt“ „Effekte in der Welt“ neben dem Regler „Schleier“, darunter der zugeklappte Knopf „Technik“, unten „Ebenen …“ neben „Fertig“](bilder/anzeige.png)
+Unter „Wegpunkte“ steht ein Todespunkt als Bild, unter „In der Welt“ eine
+Region mit Schleier, je mit ihrem Regler daneben; die eigenen Zeilen der
+Regler fallen weg. So hat es der User am 23.10. gewählt, aus einem
+Entwurf mit Bildern, das Untermenü statt des Hauptmenüs, denn dort passte
+es bei GUI-Massstab 4 nicht.
+
+- **Todespunkt** (`Anzeige.TodBild`): dasselbe Bild wie auf der Karte, 14
+  Einheiten gross, darunter die Zeit von jetzt im gewählten Stil, wie sie
+  unter einem Todespunkt auf der Vollbildkarte steht. Ein Klick auf Punkt
+  oder Zeit wechselt reihum „Datum und Uhrzeit“, „Datum“, „Uhrzeit“,
+  „keine“; bei keiner steht grau „Zeit aus“. Der Tooltip nennt den Stil
+  und den nächsten. Rechts daneben der Regler „Todespunkte“.
+- **Region** (`Anzeige.schleierBild`): ein Stück Boden schräg von oben in
+  der Farbe einer eigenen Region, an seinen Kanten der Schleier, so hoch,
+  wie der Regler sagt, unten so deckend wie in der Welt, nach oben
+  durchsichtig. Der Schleier steht nur in der Welt; im Menü ist es eine
+  Zeichnung. Daneben das Symbol „Effekte in der Welt“, hell an, dunkel aus
+  (`Einstellungen.Symbol.EFFEKTE`, Bild `menue/effekte.png`, ein Strahl
+  über einer Raute), dann der Regler „Schleier“.
+- **Grund:** Beide Bilder stehen auf einem dunklen, halb durchsichtigen
+  Grund, so heben sie sich von jeder Welt dahinter ab.
+- **Zeilen** 30 Einheiten hoch, das Bild 56 breit, die Regler 20 hoch in
+  der Mitte der Zeile.
+
+![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien und den Koordinaten darunter; unter „Wegpunkte“ der Todespunkt mit seiner Zeit und dem Regler „Todespunkte“, unter „In der Welt“ die Region mit Schleier, das Symbol „Effekte in der Welt“ und der Regler „Schleier“, darunter der zugeklappte Knopf „Technik“, unten „Ebenen …“ neben „Fertig“](bilder/anzeige.png)
 
 | Einstellung | Vorgabe | tut |
 |---|---|---|
-| Todespunkte, Gruppe „Wegpunkte“ | 1 | Regler aus, 1 bis 16, ganz breit: so viele Wegpunkte, wo der Spieler gestorben ist, der neueste angeheftet, siehe [Wegpunkte](wegpunkte.md), „Todespunkt“ |
-| Effekte in der Welt, Gruppe „In der Welt“ | an | der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen, siehe [Wegpunkte](wegpunkte.md), „Strahl“ und „Schleier“ |
-| Schleier | 4 Blöcke | Regler neben „Effekte in der Welt“: wie hoch und deckend der Schleier eigener Regionen steht, 4 bis 16 Blöcke, siehe [Wegpunkte](wegpunkte.md), „Schleier“ |
+| Zeit am Todespunkt, Gruppe „Wegpunkte“ | Datum und Uhrzeit | Klick auf das Bild des Todespunkts: die Zeit unter jedem Todespunkt auf der Vollbildkarte, Datum und Uhrzeit, Datum, Uhrzeit oder keine, gespeichert als `tod_zeit`, siehe [Wegpunkte](wegpunkte.md), „Todespunkt“ |
+| Todespunkte | 1 | Regler am Bild des Todespunkts, aus, 1 bis 16: so viele Wegpunkte, wo der Spieler gestorben ist, der neueste angeheftet, siehe [Wegpunkte](wegpunkte.md), „Todespunkt“ |
+| Effekte in der Welt, Gruppe „In der Welt“ | an | Symbol am Bild der Region: der Strahl über angehefteten Wegpunkten und der Schleier am Rand angehefteter Regionen, siehe [Wegpunkte](wegpunkte.md), „Strahl“ und „Schleier“ |
+| Schleier | 4 Blöcke | Regler am Bild der Region, neben dem Symbol: wie hoch und deckend der Schleier eigener Regionen steht, 4 bis 16 Blöcke, die Region im Bild folgt ihm, siehe [Wegpunkte](wegpunkte.md), „Schleier“ |
 | Bei F3, Gruppe „Technik“ | bleibt | was die Minimap tut, solange der Debug-Bildschirm offen ist: bleibt, weg oder waagrecht in die Mitte, siehe „Bei F3“ |
 | Ablage der Karten, Gruppe „Technik“ | IP + Hash | wie die Ordner der Welten heissen, siehe [Download](download.md), „Ablage“ |
 | Neue Version melden, Gruppe „Technik“ | an | fragt beim Start Modrinth nach einer neueren Version des Mods; der Tooltip sagt, dass Modrinth dabei die IP sieht; siehe [Vollbildkarte](vollbildkarte.md), „Neue Version“ |
@@ -144,8 +169,8 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
   stehen. Im Hauptmenü steht „Minimap“ allein in der ersten Zeile, ganz
   breit; dann teilen sich je zwei eine Zeile: „Karte laden …“ und
   „Kartenliste …“, „Einstellungen …“ und „Fertig“; im Untermenü
-  „Effekte in der Welt“ und der Regler „Schleier“, „Ebenen …“ und „Fertig“.
-  Ganz breit stehen dort der Regler „Todespunkte“, der Knopf „Technik“ und
+  „Ebenen …“ und „Fertig“. Dort stehen Todespunkt und Region je mit ihrem
+  Regler in einer Zeile, siehe oben. Ganz breit stehen der Knopf „Technik“ und
   in ihr „Bei F3“, „Ablage der Karten“ und „Neue Version melden“; „Ablage“
   passte halb in keiner Sprache. „Auflösung“ und „Koordinaten“ (mod#173),
   „Form“, „Drehen“, „Chunklinien“ und „Verzierungen“ (mod#175) stehen nicht
@@ -154,9 +179,10 @@ nicht ein Knopf, siehe „Aussehen an der Minimap“.
   dort laufen, auch bei den übrigen halben Knöpfen. So passen Menü und
   Untermenü auch bei grossem GUI-Massstab auf den Schirm, bis 240
   Einheiten Höhe, etwa 1280 × 720 bei GUI-Massstab 3. Das Untermenü
-  beginnt dafür höchstens 74 Einheiten über der Mitte und mindestens 30
-  unter dem oberen Rand; bei 240 Einheiten endet „Fertig“ bei 166, mit
-  aufgeklappter „Technik“ bei 238 (`Anzeige.oben`).
+  beginnt dafür höchstens 74 Einheiten über der Mitte, mindestens 30 unter
+  dem oberen Rand und so hoch, dass es auch mit aufgeklappter „Technik“
+  passt; die Technik verschiebt es nicht. Bei 240 Einheiten endet „Fertig“
+  bei 162, mit aufgeklappter „Technik“ bei 234 (`Anzeige.oben`).
 - **Koordinaten:** Im Menü stehen über der Minimap `x` und `z` des Blocks
   unter der Maus fest unten links, wie auf der Karte im Browser, genau wie
   gezeichnet; nicht beim Ziehen. Zum Umschauen dient die
