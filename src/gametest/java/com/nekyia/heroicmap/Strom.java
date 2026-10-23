@@ -188,9 +188,10 @@ public final class Strom implements FabricClientGameTest {
             context.runOnClient(mc -> mc.gui.setScreen(null));
             context.waitTicks(5);
             int[] danach = context.computeOnClient(mc -> Minimap.INSTANZ.koordinatenKasten().clone());
-            if (context.computeOnClient(mc -> Minimap.INSTANZ.balkenKasten() != null) || danach[1] != ohne[1]) {
-                throw new AssertionError("Nach dem Abgleich ohne Fehlendes: Balken " + Arrays.toString(context.computeOnClient(
-                        mc -> Minimap.INSTANZ.balkenKasten())) + ", Koordinaten bei " + danach[1] + " statt " + ohne[1]);
+            int[] balkenDanach = context.computeOnClient(mc -> Minimap.INSTANZ.balkenKasten());
+            if (balkenDanach != null || danach[1] != ohne[1]) {
+                throw new AssertionError("Nach dem Abgleich ohne Fehlendes: Balken " + Arrays.toString(balkenDanach) + ", Koordinaten bei "
+                        + danach[1] + " statt " + ohne[1]);
             }
             context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(Downloads.weltOrdner(), DIMENSION))));
             context.waitTicks(2);
