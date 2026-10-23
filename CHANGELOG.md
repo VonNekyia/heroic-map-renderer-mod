@@ -7,6 +7,7 @@ The release notes on GitHub and Modrinth come from here
 ## 0.2.69
 
 - **Thin chunk lines on the block edges.** Chunk lines now sit exactly on the border between two chunks, where `Ctrl` snaps, instead of on the first block of a chunk, and they are one screen pixel thin at every GUI scale, on the minimap and the full map. The line that lights up while you snap is just as thin.
+- **The marks of the biome frame sit on the frame.** The east, south and west marks of the "biome" frame no longer stick out past its narrow band: they rest on it, flush with the outer edge, shadow included, square and round, upright and rotating. North and the other frames stay as they were.
 - **Death points and the veil, right in the settings.** The settings submenu now shows a death point with its time and a pinned region with its veil, each with its slider next to it; the veil in the picture grows with its slider. The world effects switch is a symbol next to the region. The separate slider rows are gone.
 - **Choose the time under death points.** Click the death point in the settings to switch between date and time, date, time or none. Date and time now always shows both, also on the day you died.
 

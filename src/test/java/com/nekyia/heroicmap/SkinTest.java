@@ -1,5 +1,6 @@
 package com.nekyia.heroicmap;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -57,8 +58,17 @@ class SkinTest {
                 BufferedImage b = bild(name, teil);
                 groesste = Math.max(groesste, Math.max(b.getWidth(), b.getHeight()));
             }
-            Skin s = Skin.lies(name, text(name, "palette.txt"), text(name, "info.txt"), groesste);
+            BufferedImage norden = bild(name, "norden"), marke = bild(name, "marke");
+            Skin s = Skin.lies(name, text(name, "palette.txt"), text(name, "info.txt"), groesste, new int[] {norden.getWidth(), norden.getHeight()},
+                    new int[] {marke.getWidth(), marke.getHeight()});
             assertEquals(baender.get(name), s.baender(), name);
+            // Nur „biom“ legt O, S und W an die äussere Kante, N bleibt auf der Mitte; siehe biomMarkenLiegenAmRahmen.
+            if (name.startsWith(Skin.BIOM + "/")) {
+                int[] m = {marke.getWidth(), marke.getHeight(), 1};
+                assertArrayEquals(new int[][] {null, m, m, m}, s.auflage, name);
+            } else {
+                assertNull(s.auflage, name);
+            }
             for (String teil : List.of("griff", "griff_aktiv", "norden", "norden_aktiv", "marke", "marke_aktiv", "marke_quer",
                     "marke_quer_aktiv")) {
                 assertNotNull(bild(name, teil), name + "/" + teil);
@@ -173,6 +183,83 @@ class SkinTest {
                 assertTrue(halb <= Skin.einrueckung(w), w + " bei " + grad + "°");
             }
         }
+    }
+
+    @Test
+    void biomMarkenLiegenAmRahmen() throws IOException {
+        // Bei „biom“ liegen O, S und W samt Schatten um (+1, +1) innen an der äusseren Kante und ragen nicht darüber, eckig und
+        // rund, genordet und gedreht, bei GS 1 bis 4; N bleibt auf der Mitte der Bänder. Wunsch des Users vom 23.10.
+        // Siehe docs/rahmen.md, „Nach aussen“.
+        for (String kategorie : Biom.KATEGORIEN) {
+            String name = Skin.BIOM + "/" + kategorie;
+            BufferedImage bild = bild(name, "marke");
+            int w = bild.getWidth(), h = bild.getHeight();
+            Skin skin = Skin.lies(name, text(name, "palette.txt"), text(name, "info.txt"), 15, new int[] {15, 15}, new int[] {w, h});
+            for (int seite : new int[] {64, 101, 128, 256}) {
+                Minimap.Rahmen r = new Minimap.Rahmen(10, 21, seite);
+                double cx = r.x() + seite / 2.0, cy = r.y() + seite / 2.0, halb = seite / 2.0;
+                for (boolean rund : new boolean[] {false, true}) {
+                    for (int k = 1; k <= 4; k++) {
+                        for (int grad = -1; grad < 360; grad += 3) {
+                            Drehung.Lage lage = grad < 0 ? null : Drehung.Lage.von(Math.toRadians(grad), 0, 0, 0, 0);
+                            List<Minimap.Ornament> marken = Minimap.ornamente(r, 2, rund, true, skin.auflage, lage, k, 0, -1, false, -1);
+                            String wo = name + ", Seite " + seite + (rund ? " rund" : " eckig") + ", GS " + k + ", " + (grad < 0 ? "genordet" : grad + "°");
+                            assertEquals(Minimap.ornamente(r, 2, rund, true, null, lage, k, 0, -1, false, -1).get(3), marken.get(3), "N bleibt, " + wo);
+                            for (int i = 0; i < 3; i++) {
+                                Minimap.Ornament o = marken.get(i);
+                                String m = "NOSW".charAt(i + 1) + ", " + wo;
+                                if (lage == null) {
+                                    // Ungedreht ganze Einheiten wie in Skin.blit: O und W quer. Das Bild und sein Schatten, ohne die zwei
+                                    // Ecken des Kastens, die keins von beiden deckt.
+                                    boolean quer = i != 1;
+                                    int bw = quer ? h : w, bh = quer ? w : h, x0 = Skin.lage(o.x(), bw), y0 = Skin.lage(o.y(), bh);
+                                    for (int y = y0; y <= y0 + bh; y++) {
+                                        for (int x = x0; x <= x0 + bw; x++) {
+                                            if (x == x0 + bw && y == y0 || x == x0 && y == y0 + bh) {
+                                                continue;
+                                            }
+                                            double mx = x + 0.5 - cx, my = y + 0.5 - cy;
+                                            assertTrue(rund ? Math.hypot(mx, my) <= halb : Math.max(Math.abs(mx), Math.abs(my)) <= halb,
+                                                    m + ": Pixel " + x + ", " + y + " ausserhalb");
+                                        }
+                                    }
+                                    // Anliegend: eckig genau an der Kante, rund höchstens eine Einheit davor.
+                                    int luecke = i == 0 ? r.x() + seite - (x0 + bw + 1) : i == 1 ? r.y() + seite - (y0 + bh + 1) : x0 - r.x();
+                                    assertTrue(rund ? luecke >= 0 && luecke <= 1 : luecke == 0, m + ": " + luecke + " Einheiten vor der Kante");
+                                } else {
+                                    // Gedreht die Ecken des gedrehten Bilds und seines Schattens; die Mitte liegt auf ganzen Pixeln.
+                                    double nx = Math.sin(o.winkel()), ny = -Math.cos(o.winkel()), weit = 0, spiel = 0.5 / k * Math.sqrt(2) + 1e-9;
+                                    for (int j = 0; j < 8; j++) {
+                                        double a = (j & 1) == 0 ? h / 2.0 : -h / 2.0, b = (j & 2) == 0 ? w / 2.0 : -w / 2.0, sch = j < 4 ? 0 : 1;
+                                        double x = o.x() + a * nx - b * ny + sch - cx, y = o.y() + a * ny + b * nx + sch - cy;
+                                        weit = Math.max(weit, rund ? Math.hypot(x, y) : Math.max(Math.abs(x), Math.abs(y)));
+                                    }
+                                    assertTrue(weit <= halb + spiel, m + ": ragt " + (weit - halb) + " über die Kante");
+                                    assertTrue(weit >= halb - spiel, m + ": liegt " + (halb - weit) + " vor der Kante");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    void lageInInfoTxt() {
+        // lage_norden gilt wie lage, wenn die Zeile fehlt; kante nur mit aussen=ja; sonst nur mitte oder kante, innen und aussen
+        // kommen mit dem Skin der Buchstaben.
+        int[] n = {15, 15}, m = {5, 9};
+        assertNull(Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage=mitte", 15, n, m).auflage);
+        assertArrayEquals(new int[][] {{15, 15, 1}, {5, 9, 1}, {5, 9, 1}, {5, 9, 1}},
+                Skin.lies("t", "#000000\n#111111", "schatten=ja\naussen=ja\nlage=kante", 15, n, m).auflage);
+        assertArrayEquals(new int[][] {null, {5, 9, 0}, {5, 9, 0}, {5, 9, 0}},
+                Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage=kante\nlage_norden=mitte", 15, n, m).auflage);
+        assertArrayEquals(new int[][] {{15, 15, 0}, null, null, null},
+                Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage_norden=kante", 15, n, m).auflage);
+        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000\n#111111", "lage=kante", 15, n, m));
+        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage=innen", 15, n, m));
+        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage=aussen", 15, n, m));
     }
 
     @Test

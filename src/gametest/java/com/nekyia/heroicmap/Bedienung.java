@@ -96,6 +96,7 @@ public final class Bedienung implements FabricClientGameTest {
             zoomNebenMinimap(context, maus, k);
             aufloesungUndKoordinaten(context, maus, k);
             symbole(context, maus, k);
+            biomMarken(context, maus, k);
             knoepfeUeberDemL(context, maus);
             context.runOnClient(mc -> mc.gui.setScreen(null));
             beiF3(context, maus);
@@ -4915,6 +4916,89 @@ public final class Bedienung implements FabricClientGameTest {
                 Minimap.INSTANZ.lies(sicherung);
             });
             context.waitTicks(2);
+            try {
+                Files.deleteIfExists(sicherung);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+    }
+
+    /**
+     * Die Marken O, S und W von „biom“ sitzen samt Schatten auf dem Rahmen und ragen nicht darüber, eckig und rund (Wunsch
+     * des Users vom 23.10.): Im Spiel ändert eine durchsichtige Marke im Bildschirmfoto Pixel innerhalb der Minimap, ausserhalb
+     * neben ihr keins. Ein Rechtsklick von Hand auf eine Stelle, die nur die neue Lage von S trifft, nicht die alte auf der
+     * Mitte der Bänder, macht im Menü nur S durchsichtig. Siehe docs/rahmen.md, „Nach aussen“.
+     */
+    private static void biomMarken(ClientGameTestContext context, TestInput maus, int k) {
+        Path sicherung = FabricLoader.getInstance().getGameDir().resolve("heroicmap-biom-marken-test.properties");
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.schreibe(sicherung);
+            int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+            Minimap.INSTANZ.stelle(b, 0, Minimap.GROESSE, b, h);
+            Minimap.INSTANZ.setzeDrehen(false);
+            Minimap.INSTANZ.setzeVerzierungen(true);
+            Minimap.INSTANZ.setzeSkin(Skin.BIOM);
+            mc.gui.setScreen(new Einstellungen());
+        });
+        context.waitTicks(3);
+        try {
+            for (boolean rund : new boolean[] {false, true}) {
+                context.runOnClient(mc -> Minimap.INSTANZ.setzeRund(rund));
+                context.waitTicks(2);
+                Minimap.Rahmen r = rahmen(context);
+                double cx = r.x() + r.seite() / 2.0, cy = r.y() + r.seite() / 2.0, halb = r.seite() / 2.0;
+                BufferedImage alle = imSpiel(context, "biom-marken-" + rund);
+                // O, S und W: je ein Kasten um die Marke, 10 Einheiten zu beiden Seiten, von 14 innen bis 6 aussen.
+                for (int i = 1; i <= 3; i++) {
+                    int marke = i;
+                    context.runOnClient(mc -> Minimap.INSTANZ.schalteVerzierung(marke));
+                    BufferedImage ohne = imSpiel(context, "biom-marken-" + rund + "-" + i);
+                    context.runOnClient(mc -> Minimap.INSTANZ.schalteVerzierung(marke));
+                    double ux = i == 1 ? 1 : i == 3 ? -1 : 0, uy = i == 2 ? 1 : 0;
+                    int innen = 0, aussen = 0;
+                    for (double quer = -10; quer <= 10; quer += 1.0 / k) {
+                        for (double tief = -14; tief <= 6; tief += 1.0 / k) {
+                            // Die Mitte eines Pixels des Schirms in Einheiten des GUI.
+                            double x = cx + ux * (halb + tief) - uy * quer, y = cy + uy * (halb + tief) + ux * quer;
+                            int px = (int) Math.floor(x * k), py = (int) Math.floor(y * k);
+                            if (px < 0 || py < 0 || px >= alle.getWidth() || py >= alle.getHeight() || alle.getRGB(px, py) == ohne.getRGB(px, py)) {
+                                continue;
+                            }
+                            double mx = (px + 0.5) / k - cx, my = (py + 0.5) / k - cy;
+                            boolean drin = rund ? Math.hypot(mx, my) <= halb : Math.max(Math.abs(mx), Math.abs(my)) <= halb;
+                            if (drin) {
+                                innen++;
+                            } else {
+                                aussen++;
+                            }
+                        }
+                    }
+                    if (innen < 10 || aussen > 0) {
+                        throw new AssertionError("Marke " + "NOSW".charAt(i) + (rund ? " rund" : " eckig") + " bei „biom“: " + innen
+                                + " Pixel anders in der Minimap, " + aussen + " ausserhalb, ragt über den Rahmen");
+                    }
+                }
+                // Der Klick trifft S dort, wo es liegt: 6 Einheiten innen von seiner Mitte, ausserhalb der Mitte der Bänder ±8,5.
+                double[] s = context.computeOnClient(mc -> {
+                    Skin skin = Minimap.INSTANZ.skinJetzt();
+                    Minimap.Ornament o = Minimap.ornamente(r, skin.baender(), rund, skin.nachAussen, skin.auflage, null, k, 0, -1, false, -1).get(1);
+                    return new double[] {o.x(), o.y() - 6};
+                });
+                rechtsZitternd(context, maus, k, s[0], s[1]);
+                boolean[] aus = context.computeOnClient(mc -> new boolean[] {Minimap.INSTANZ.verzierungAus(0), Minimap.INSTANZ.verzierungAus(1),
+                        Minimap.INSTANZ.verzierungAus(2), Minimap.INSTANZ.verzierungAus(3)});
+                if (aus[0] || aus[1] || !aus[2] || aus[3]) {
+                    throw new AssertionError("Rechtsklick auf S" + (rund ? " rund" : " eckig") + " bei „biom“, 6 Einheiten innen von seiner Mitte: "
+                            + "durchsichtig " + Arrays.toString(aus) + " statt nur S");
+                }
+                rechtsZitternd(context, maus, k, s[0], s[1]);
+            }
+        } finally {
+            context.runOnClient(mc -> {
+                mc.gui.setScreen(null);
+                Minimap.INSTANZ.lies(sicherung);
+            });
             try {
                 Files.deleteIfExists(sicherung);
             } catch (IOException e) {
