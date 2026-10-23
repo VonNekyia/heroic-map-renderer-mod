@@ -955,7 +955,7 @@ public final class Minimap {
             menueSkin = rahmen != null ? rahmen : Skin.von("grau");
             if (menueSkin != null) {
                 menueMarken = ornamente(rahmen != null ? r : new Rahmen(r.x() - 2, r.y() - 2, r.seite() + 4),
-                        rahmen != null ? rahmen.baender() : 1, rund, menueSkin.nachAussen, lage, k, 0, -1, false, KEIN_ZIEL);
+                        rahmen != null ? rahmen.baender() : 1, rund, menueSkin.nachAussen, menueSkin.auflage, lage, k, 0, -1, false, KEIN_ZIEL);
             }
         }
         Object[] werte = werte(koordinaten, spieler.getX(), spieler.getY(), spieler.getZ());
@@ -1447,7 +1447,8 @@ public final class Minimap {
         } else {
             skin.baender(g, r.x(), r.y(), r.seite(), r.seite(), baender);
         }
-        for (Ornament o : ornamente(r, skin.baender(), rund, skin.nachAussen, lage, k, verzierungenAus, griffEcke, griffAktiv, hervor)) {
+        for (Ornament o : ornamente(r, skin.baender(), rund, skin.nachAussen, skin.auflage, lage, k, verzierungenAus, griffEcke, griffAktiv,
+                hervor)) {
             skin.ornament(g, o.teil(), o.ecke(), o.x(), o.y(), deckung, o.winkel());
         }
     }
@@ -1461,16 +1462,18 @@ public final class Minimap {
      * {@code ohne} (Bit i für Richtung i) auf der Mitte der Bänder, ungedreht fest rechts, unten, links und oben, gedreht starr
      * mit der Karte, die Marke {@code hervor} (0 bis 3, N, O, S, W) aktiv; im Menü zuletzt der Griff an seiner
      * Ecke, nie gedreht. In den Ecken sonst nichts. Mit {@code aussen} zeigt jedes Bild von der Mitte weg:
-     * O, S und W nehmen {@code marke}, um eine, zwei und drei Vierteldrehungen weiter. Siehe docs/rahmen.md, „Marken“.
+     * O, S und W nehmen {@code marke}, um eine, zwei und drei Vierteldrehungen weiter; mit {@code auflage} ({@link Skin#auflage})
+     * liegt eine Marke samt Schatten innen an der äusseren Kante, ohne auf der Mitte. Siehe docs/rahmen.md, „Marken“.
      */
-    static List<Ornament> ornamente(Rahmen r, int baender, boolean rund, boolean aussen, Drehung.Lage lage, int k, int ohne,
-            int griffEcke, boolean griffAktiv, int hervor) {
+    static List<Ornament> ornamente(Rahmen r, int baender, boolean rund, boolean aussen, int[][] auflage, Drehung.Lage lage, int k,
+            int ohne, int griffEcke, boolean griffAktiv, int hervor) {
         List<Ornament> aus = new ArrayList<>(5);
         double winkel = lage == null ? 0 : lage.winkel();
         for (int i : MARKEN) {
             if ((ohne & 1 << i) == 0) {
-                double[] p = lage == null ? Skin.marke(r.x(), r.y(), r.seite(), baender, rund, RICHTUNGEN[i][0], RICHTUNGEN[i][1])
-                        : verzierung(r, baender, rund, lage, RICHTUNGEN[i], k);
+                int[] auf = auflage == null ? null : auflage[i];
+                double[] p = lage == null ? Skin.marke(r.x(), r.y(), r.seite(), baender, rund, RICHTUNGEN[i][0], RICHTUNGEN[i][1], auf)
+                        : verzierung(r, baender, rund, lage, RICHTUNGEN[i], k, auf);
                 int teil = aussen && i != 0 ? Skin.MARKE : Skin.MARKE_JE_RICHTUNG[i];
                 aus.add(new Ornament(teil + (i == hervor ? 1 : 0), 0, p[0], p[1], aussen ? winkel + i * Math.PI / 2 : winkel));
             }
@@ -1487,9 +1490,9 @@ public final class Minimap {
      * ({@link Skin#marke}), die Mitte auf ganzen Pixeln des Schirms, sonst zitterte sie beim Laufen.
      * Siehe docs/rahmen.md, „Drehen“.
      */
-    static double[] verzierung(Rahmen r, int baender, boolean rund, Drehung.Lage lage, double[] richtung, int k) {
+    static double[] verzierung(Rahmen r, int baender, boolean rund, Drehung.Lage lage, double[] richtung, int k, int[] auflage) {
         double[] p = Skin.marke(r.x(), r.y(), r.seite(), baender, rund,
-                lage.richtungX(richtung[0], richtung[1]), lage.richtungY(richtung[0], richtung[1]));
+                lage.richtungX(richtung[0], richtung[1]), lage.richtungY(richtung[0], richtung[1]), auflage);
         return new double[] {Math.round(p[0] * k) / (double) k, Math.round(p[1] * k) / (double) k};
     }
 
