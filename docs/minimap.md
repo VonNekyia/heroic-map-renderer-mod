@@ -512,7 +512,8 @@ im Debug-Bildschirm des Spiels (`Mth.floor`). So hat es der User gewünscht.
   Schatten. 2 Einheiten Abstand unter dem Ring, mit Rahmen unter den
   Ornamenten, die halb über die Ecken ragen, so weit wie der Abstand zum
   Rand (`Minimap.rand`). Sie folgt Grösse und Lage der Minimap
-  (`Minimap.koordinatenLage`).
+  (`Minimap.koordinatenLage`). Läuft ein Download, steht zwischen Minimap
+  und Zeile der Balken, siehe „Fortschritt“.
 - **Immer ganz auf dem Schirm** (mod#157, Plan vom Reviewer freigegeben am
   19.10.):
   - **Waagrecht** rückt die Zeile zum Schirm hin, bis zum selben Abstand vom
@@ -533,6 +534,31 @@ im Debug-Bildschirm des Spiels (`Mth.floor`). So hat es der User gewünscht.
 ![Die Koordinaten am Rand der Welt bei GUI-Massstab 4, links vorher, rechts nachher; oben die kleinste Minimap oben links und oben rechts, je über die ganze Breite des Schirms, unten die grösste oben links](bilder/koordinaten-vergleich.png)
 - **Nicht gedreht:** Die Zeile bleibt waagrecht, auch wenn die Minimap
   dreht.
+
+## Fortschritt
+
+Solange ein Download oder ein Abgleich läuft, steht unter der Minimap ein
+dünner Balken mit den Prozent, auch ohne offene Vollbildkarte
+(`Minimap.balken`). Gewünscht vom User am 24.10.: Beim Abgleich nach dem
+Beitritt stand bis dahin nur eine Zeile im Chat; den Kasten gab es nur auf
+der Vollbildkarte.
+
+- **Lage:** die erste Zeile unter der Minimap, so breit wie sie, wo sonst
+  die Koordinaten beginnen. Die Koordinaten rücken so lange um eine Zeile
+  und 2 Einheiten weiter. Ist unter der Minimap kein Platz, steht beides
+  darüber, der Balken näher an der Minimap (`Minimap.koordinatenLage`).
+- **Balken:** 2 Einheiten hoch, mitten in der Zeile, auf dunklem Grund,
+  weiss gefüllt nach dem Anteil; rechts daneben die Prozent, abgerundet
+  (`Laden.Fortschritt.prozent`). Nur die Zahl, kein Wort davor; so
+  entschieden vom Reviewer am 24.10.
+- **Was er zeigt:** dasselbe wie der Kasten der Vollbildkarte, siehe
+  [Vollbildkarte](vollbildkarte.md), „Fortschritt“: den vollen Download
+  als Strom und jeden Abgleich. Bis gesamt feststeht, steht „…“ und der
+  Balken ist leer. Fehlt einem Abgleich nach dem Vergleich nichts, steht
+  keiner. Der einzelne volle Download ohne Strom zeigt keinen.
+- **Sichtbar** wie die Minimap: auch im Menü an der Minimap, bei F3 nach
+  „Bei F3“, und nicht, wenn die Minimap aus ist.
+- **Kosten:** je Frame ein Lesen des Fortschritts und ein Text.
 
 ## Bei F3
 
