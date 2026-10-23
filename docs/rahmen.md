@@ -127,7 +127,7 @@ Vorgabe.
   Kategorie rechnet sie nur neu, wenn sich das Biom ändert. Während der
   Überblendung zeichnet sie zwei Rahmen, siehe „Kosten“.
 
-![Der Rahmen „biom“ eckig und rund in der Szene des Gametests, einer Ebene, also Grasland; die Blumen O, S und W zeigen nach aussen](bilder/rahmen-biom.png)
+![Der Rahmen „biom“ eckig und rund in der Szene des Gametests, einer Ebene, also Grasland; die Blumen O, S und W zeigen nach aussen und sitzen innen an der Kante](bilder/rahmen-biom.png)
 
 ## Dateien
 
@@ -373,7 +373,8 @@ Geschätzt, nicht gemessen:
 Der Gametest `Bilder` nimmt jeden Rahmen eckig und rund bei 4 px auf,
 `rahmen-<skin>.png`, und das Menü mit `uhr`, dazu mit Verzierungen aus
 und der Maus auf N (`rahmen-menue-halb.png`), siehe [Minimap](minimap.md),
-„Bilder“.
+„Bilder“. `rahmen-biom.png` stammt aus einem Lauf dieses Gametests in
+der CI mit `-Pbilder`, zu mod#189.
 `rahmen-abstand.png` setzt die Bildschirmfotos `rahmen-biom-0` und
 `rahmen-uhr-0` dieses Gametests zusammen, aus einem Lauf auf main `49e4f3c` und
 einem mit 0012, je die rechte obere Ecke.
