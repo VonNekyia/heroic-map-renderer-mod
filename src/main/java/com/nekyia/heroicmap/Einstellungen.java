@@ -62,6 +62,11 @@ final class Einstellungen extends Screen {
     /** Der Wähler der Rahmen über dem Menü; offen nimmt er alle Klicks und Esc. Siehe docs/rahmen.md, „Wähler“. */
     private final Waehler waehler = new Waehler();
     private final MinimapKlick klick = new MinimapKlick(waehler);
+
+    /** Für die Gametests. */
+    Waehler waehler() {
+        return waehler;
+    }
     /** Beim Verschieben: wo die Maus die Minimap gegriffen hat. Beim Ziehen: die feste Ecke. */
     private int festX, festY;
     /** Beim Ziehen: liegt der Griff links oder oben? */

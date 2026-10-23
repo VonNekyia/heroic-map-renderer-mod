@@ -32,6 +32,11 @@ final class Anzeige extends Screen {
     /** Der Wähler der Rahmen über dem Untermenü, wie im Menü. Siehe docs/rahmen.md, „Wähler“. */
     private final Waehler waehler = new Waehler();
     private final MinimapKlick klick = new MinimapKlick(waehler);
+
+    /** Für die Gametests. */
+    Waehler waehler() {
+        return waehler;
+    }
     /** Höhe einer Überschrift über ihrer Gruppe. */
     private static final int GRUPPE = 12;
     /** Eine Überschrift und wo sie steht. */

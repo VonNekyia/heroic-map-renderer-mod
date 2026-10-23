@@ -95,6 +95,18 @@ final class Waehler {
         return y0 + KOPF;
     }
 
+    /** Für die Gametests: die Mitte der Vorschau der Familie j, in Einheiten des GUI. */
+    double[] vorschauMitte(int j, int breite, int hoehe) {
+        lege(breite, hoehe);
+        return new double[] {karteX(j) + KARTE / 2.0, karteY() + KARTE / 2.0};
+    }
+
+    /** Für die Gametests: die Mitte des Farbfelds i unter der Vorschau der Familie j. */
+    double[] feldMitte(int j, int i, int breite, int hoehe) {
+        lege(breite, hoehe);
+        return new double[] {karteX(j) + 4 + i * (FELD + 2) + FELD / 2.0, karteY() + KARTE + 12 + FELD / 2.0};
+    }
+
     /** Ein Klick, solange der Wähler offen ist; er nimmt jeden. */
     void klick(double mx, double my, int breite, int hoehe) {
         lege(breite, hoehe);

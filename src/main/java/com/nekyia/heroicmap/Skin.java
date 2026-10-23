@@ -358,7 +358,8 @@ final class Skin {
                 }
             }
         }
-        return Math.max(einrueckung(groesste), (int) Math.ceil(weit - 1e-9));
+        // Ein Tausendstel weniger: Die Halbierung in aussen liegt um so viel darüber.
+        return Math.max(einrueckung(groesste), (int) Math.ceil(weit - 1e-3));
     }
 
     /**

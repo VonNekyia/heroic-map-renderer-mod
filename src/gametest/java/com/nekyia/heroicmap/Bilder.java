@@ -907,7 +907,8 @@ public final class Bilder implements FabricClientGameTest {
             server.runCommand("tp @a 0.5 -30 0.5 " + (gedreht ? 30 : 0) + " 90");
             context.runOnClient(mc -> {
                 Minimap.INSTANZ.setzeDrehen(gedreht);
-                Minimap.INSTANZ.setzeSkin(gedreht ? "uhr" : Skin.OHNE);
+                Minimap.INSTANZ.setzeSkin(gedreht ? "rose" : Skin.OHNE);
+                Minimap.INSTANZ.setzeVariante("rose", "gold");
                 Minimap.INSTANZ.setzeRund(gedreht);
             });
             context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getYRot() - (gedreht ? 30 : 0)) < 0.1f && Minimap.INSTANZ.fertig(), 1200);
@@ -1042,14 +1043,20 @@ public final class Bilder implements FabricClientGameTest {
         }
     }
 
-    /** Jeder Rahmen eckig und rund nebeneinander, bei 4 px und Zoom 4. Siehe docs/rahmen.md. */
+    /**
+     * Jede Familie in ihrer ersten Variante eckig und rund nebeneinander, „lettern“ auch aussen, bei 4 px und Zoom 4; dazu das
+     * Menü mit dem offenen Wähler. Siehe docs/rahmen.md.
+     */
     private static void rahmen(ClientGameTestContext context) {
-        for (String skin : Skin.NAMEN.subList(1, Skin.NAMEN.size())) {
+        String[][] bilder = {{"biom", null}, {"schild", null}, {"rose", null}, {"lettern", null}, {"lettern", "tinte_aussen"}};
+        for (String[] wahl : bilder) {
+            String skin = wahl[0] + (wahl[1] == null ? "" : "-aussen");
             BufferedImage[] teile = new BufferedImage[2];
             for (int i = 0; i < teile.length; i++) {
                 boolean rund = i == 1;
                 context.runOnClient(mc -> {
-                    Minimap.INSTANZ.setzeSkin(skin);
+                    Minimap.INSTANZ.setzeSkin(wahl[0]);
+                    Minimap.INSTANZ.setzeVariante(wahl[0], wahl[1] != null ? wahl[1] : Skin.varianten(wahl[0]).getFirst().name());
                     Minimap.INSTANZ.setzeRund(rund);
                 });
                 context.waitTicks(2);
@@ -1067,14 +1074,21 @@ public final class Bilder implements FabricClientGameTest {
                 }
             }
         }
-        // Das Menü mit „uhr“: an der Ecke zur Mitte der Griff, ohne den weissen Umriss.
+        // Das Menü mit rose/gold: an der Ecke zur Mitte der Griff, ohne den weissen Umriss.
         context.runOnClient(mc -> {
-            Minimap.INSTANZ.setzeSkin("uhr");
+            Minimap.INSTANZ.setzeSkin("rose");
+            Minimap.INSTANZ.setzeVariante("rose", "gold");
             Minimap.INSTANZ.setzeRund(false);
             mc.gui.setScreen(new Einstellungen());
         });
         context.waitTicks(5);
         Path menue = context.takeScreenshot(TestScreenshotOptions.of("rahmen-menue").disableCounterPrefix());
+        // Der Wähler über dem Menü, wie nach einem Klick auf eine Marke.
+        context.runOnClient(mc -> ((Einstellungen) mc.gui.screen()).waehler().oeffne());
+        context.waitTicks(3);
+        Path waehler = context.takeScreenshot(TestScreenshotOptions.of("rahmen-waehler").disableCounterPrefix());
+        context.runOnClient(mc -> ((Einstellungen) mc.gui.screen()).waehler().schliesse());
+        context.waitTicks(2);
         // Mit Verzierungen aus stehen die Marken im Menü halb; die Maus auf N macht sie hell und zeigt den Tooltip.
         int gs = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
         Minimap.Rahmen r = context.computeOnClient(mc -> Minimap.INSTANZ.rahmen(mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight()));
@@ -1094,6 +1108,7 @@ public final class Bilder implements FabricClientGameTest {
             Files.deleteIfExists(HeroicMap.einstellungen());
             if (!AUSGABE.isEmpty()) {
                 Files.copy(menue, Path.of(AUSGABE, "rahmen-menue.png"), StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(waehler, Path.of(AUSGABE, "rahmen-waehler.png"), StandardCopyOption.REPLACE_EXISTING);
                 Files.copy(halb, Path.of(AUSGABE, "rahmen-menue-halb.png"), StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (IOException e) {
@@ -1139,15 +1154,18 @@ public final class Bilder implements FabricClientGameTest {
      */
     private static void drehen(ClientGameTestContext context, TestServerContext server) {
         server.runCommand("tp @a 0.5 -30 0.5 30 90");
-        String[][] arten = {{Skin.OHNE, "eckig", "an"}, {"uhr", "rund", "an"}, {"kompass", "eckig", "an"}, {"kompass", "eckig", "aus"}};
+        String[][] arten = {{Skin.OHNE, "eckig", "an"}, {"rose/gold", "rund", "an"}, {"rose/silber", "eckig", "an"}, {"rose/silber", "eckig", "aus"}};
         BufferedImage[] teile = new BufferedImage[arten.length];
         for (int i = 0; i < arten.length; i++) {
-            String skin = arten[i][0];
+            String[] skin = arten[i][0].split("/");
             boolean rund = arten[i][1].equals("rund"), verzierungen = arten[i][2].equals("an");
             context.runOnClient(mc -> {
                 Minimap.INSTANZ.setzeDrehen(true);
                 Minimap.INSTANZ.setzeChunklinien(true);
-                Minimap.INSTANZ.setzeSkin(skin);
+                Minimap.INSTANZ.setzeSkin(skin[0]);
+                if (skin.length > 1) {
+                    Minimap.INSTANZ.setzeVariante(skin[0], skin[1]);
+                }
                 Minimap.INSTANZ.setzeRund(rund);
                 Minimap.INSTANZ.setzeVerzierungen(verzierungen);
             });

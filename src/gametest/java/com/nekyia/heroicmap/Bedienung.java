@@ -58,7 +58,8 @@ import net.minecraft.util.Mth;
 public final class Bedienung implements FabricClientGameTest {
 
     /** Die Tasten, wie das Spiel sie zählt; TestInput reicht die Zahl unverändert durch. Siehe docs/entwicklung.md, „Maustasten“. */
-    private static final int LINKS = InputConstants.MOUSE_BUTTON_LEFT, RECHTS = InputConstants.MOUSE_BUTTON_RIGHT;
+    private static final int LINKS = InputConstants.MOUSE_BUTTON_LEFT, RECHTS = InputConstants.MOUSE_BUTTON_RIGHT,
+            MITTE = InputConstants.MOUSE_BUTTON_MIDDLE;
     /** Das Zittern einer Hand, die die Taste hält: Versatz vom Druckpunkt in Pixeln des Fensters, je 1 bis 2. */
     private static final int[][] ZITTERN = {{1, 0}, {2, 1}, {1, 2}, {0, 1}, {1, 1}, {2, 0}};
 
@@ -4368,32 +4369,39 @@ public final class Bedienung implements FabricClientGameTest {
     }
 
     /**
-     * Das Aussehen an der Minimap im Menü, mit Handklicks: Ein Klick auf den Spieler schaltet die Darstellung, einer auf
-     * eine Marke den Rahmen, auch mit Drehen an, wo das Menü genordet bleibt, mit Verzierungen aus und ohne Rahmen; ein Klick daneben nichts. Ziehen von
-     * einer Marke verschiebt nur, der Griff ändert nur die Grösse, der Zoom nur den Zoom. Im Untermenü dasselbe.
-     * Siehe docs/minimap.md, „Aussehen an der Minimap“.
+     * Das Aussehen an der Minimap im Menü, mit Handklicks: Ein Klick auf den Spieler schaltet die Darstellung, einer auf eine
+     * Marke öffnet den Wähler der Rahmen, auch mit Drehen an, wo das Menü genordet bleibt, mit Verzierungen aus und ohne Rahmen;
+     * ein Klick daneben nichts. Im Wähler übernimmt ein Klick auf eine Vorschau, ein Farbfeld färbt nur die Vorschau, Esc und ein
+     * Klick daneben schliessen ihn ohne Änderung und lassen das Menü offen. Ziehen von einer Marke verschiebt nur, der Griff
+     * ändert nur die Grösse, der Zoom nur den Zoom. Im Untermenü dasselbe, dort mit der mittleren Taste eine Marke durchsichtig.
+     * Siehe docs/minimap.md, „Aussehen an der Minimap“, und docs/rahmen.md, „Wähler“.
      */
     private static void aussehen(ClientGameTestContext context, TestInput maus, int k) {
         context.runOnClient(mc -> {
             Minimap.INSTANZ.setzeDrehen(false);
             Minimap.INSTANZ.setzeVerzierungen(true);
-            Minimap.INSTANZ.setzeSkin("holz");
+            Minimap.INSTANZ.setzeSkin("schild");
+            Minimap.INSTANZ.setzeVariante("schild", "gold");
             Minimap.INSTANZ.setzeDarstellung(Minimap.Darstellung.KOPF);
         });
         context.waitTicks(2);
         Minimap.Rahmen r = rahmen(context);
         double cx = r.x() + r.seite() / 2.0, cy = r.y() + r.seite() / 2.0;
         spielerKlick(context, maus, k, cx, cy);
-        aussehenIst(context, Minimap.Darstellung.PFEIL, "holz", "Klick auf den Spieler");
+        aussehenIst(context, Minimap.Darstellung.PFEIL, "schild", "Klick auf den Spieler");
         if (!rahmen(context).equals(r)) {
             throw new AssertionError("Der Klick auf den Spieler verschob die Minimap: " + r + " → " + rahmen(context));
         }
         // Zwischen Spieler und Marke liegt nur die Karte.
         spielerKlick(context, maus, k, cx, r.y() + r.seite() / 4.0);
-        aussehenIst(context, Minimap.Darstellung.PFEIL, "holz", "Klick auf die Karte daneben");
-        // N oben auf der Mitte der Bänder.
+        aussehenIst(context, Minimap.Darstellung.PFEIL, "schild", "Klick auf die Karte daneben");
+        // N oben auf der Mitte der Bänder öffnet den Wähler; ein Klick auf die Vorschau „rose“ übernimmt sie und schliesst.
         spielerKlick(context, maus, k, cx, r.y() + baender(context) / 2.0);
-        aussehenIst(context, Minimap.Darstellung.PFEIL, "papier", "Klick auf N");
+        waehlerOffen(context, true, "Klick auf N");
+        aussehenIst(context, Minimap.Darstellung.PFEIL, "schild", "Klick auf N, Wähler offen");
+        klickImWaehler(context, maus, k, "vorschau", Skin.FAMILIEN.indexOf("rose"), 0);
+        waehlerOffen(context, false, "Klick auf die Vorschau „rose“");
+        aussehenIst(context, Minimap.Darstellung.PFEIL, "rose", "Klick auf die Vorschau „rose“");
 
         // Drehen an, mit Blick nach Süden: Im Menü steht die Minimap genordet still, oben bleibt N. Gedreht wanderten die Marken über den Griff.
         context.runOnClient(mc -> {
@@ -4409,7 +4417,15 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("Im Menü dreht die Minimap: Mit Blick nach Süden ist oben nicht N, sondern " + ziel);
         }
         spielerKlick(context, maus, k, oben[0], oben[1]);
-        aussehenIst(context, Minimap.Darstellung.PFEIL, "kompass", "Klick auf N, Drehen an, im Menü genordet");
+        waehlerOffen(context, true, "Klick auf N, Drehen an, im Menü genordet");
+        // Esc schliesst nur den Wähler, das Menü bleibt offen, der Rahmen bleibt.
+        maus.pressKey(InputConstants.KEY_ESCAPE);
+        context.waitTicks(2);
+        waehlerOffen(context, false, "Esc im Wähler");
+        if (!context.computeOnClient(mc -> mc.gui.screen() instanceof Einstellungen)) {
+            throw new AssertionError("Esc im Wähler schloss das Menü");
+        }
+        aussehenIst(context, Minimap.Darstellung.PFEIL, "rose", "Esc im Wähler");
 
         // Verzierungen aus: Das Menü zeigt die Marken halb, W links.
         context.runOnClient(mc -> {
@@ -4419,14 +4435,33 @@ public final class Bedienung implements FabricClientGameTest {
         context.waitTicks(2);
         Minimap.Rahmen v = rahmen(context);
         spielerKlick(context, maus, k, v.x() + baender(context) / 2.0, v.y() + v.seite() / 2.0);
-        aussehenIst(context, Minimap.Darstellung.PFEIL, "uhr", "Klick auf die halbe Marke W, Verzierungen aus");
+        waehlerOffen(context, true, "Klick auf die halbe Marke W, Verzierungen aus");
+        // Ein Klick daneben schliesst ihn ohne Änderung.
+        spielerKlick(context, maus, k, 2, 2);
+        waehlerOffen(context, false, "Klick neben den Wähler");
+        aussehenIst(context, Minimap.Darstellung.PFEIL, "rose", "Klick neben den Wähler");
 
         // Ohne Rahmen: die Marken von „grau“ halb auf dem Umriss, 1,5 Einheiten ausserhalb; O rechts.
         context.runOnClient(mc -> Minimap.INSTANZ.setzeSkin(Skin.OHNE));
         context.waitTicks(2);
         Minimap.Rahmen o = rahmen(context);
         spielerKlick(context, maus, k, o.x() + o.seite() + 1.5, o.y() + o.seite() / 2.0);
-        aussehenIst(context, Minimap.Darstellung.PFEIL, Skin.BIOM, "Klick auf die halbe Marke O, ohne Rahmen");
+        waehlerOffen(context, true, "Klick auf die halbe Marke O, ohne Rahmen");
+        // Das zweite Farbfeld unter „schild“ färbt nur die Vorschau; erst die Vorschau übernimmt Familie und Farbe.
+        klickImWaehler(context, maus, k, "feld", Skin.FAMILIEN.indexOf("schild"), 1);
+        waehlerOffen(context, true, "Klick auf ein Farbfeld unter „schild“");
+        aussehenIst(context, Minimap.Darstellung.PFEIL, Skin.OHNE, "Klick auf ein Farbfeld unter „schild“");
+        klickImWaehler(context, maus, k, "vorschau", Skin.FAMILIEN.indexOf("schild"), 0);
+        aussehenIst(context, Minimap.Darstellung.PFEIL, "schild", "Klick auf die Vorschau „schild“ nach dem Farbfeld");
+        String farbe = context.computeOnClient(mc -> Minimap.INSTANZ.variante("schild"));
+        if (!farbe.equals(Skin.varianten("schild").get(1).name())) {
+            throw new AssertionError("Nach dem zweiten Farbfeld und der Vorschau „schild“: Variante " + farbe);
+        }
+        // Zurück zu „biom“ über den Wähler, für die Schritte danach.
+        Minimap.Rahmen s = rahmen(context);
+        spielerKlick(context, maus, k, s.x() + s.seite() / 2.0, s.y() + baender(context) / 2.0);
+        klickImWaehler(context, maus, k, "vorschau", Skin.FAMILIEN.indexOf(Skin.BIOM), 0);
+        aussehenIst(context, Minimap.Darstellung.PFEIL, Skin.BIOM, "Klick auf die Vorschau „biom“");
 
         // Von N aus gezogen: Die Minimap folgt um 20 Einheiten, der Rahmen bleibt.
         context.runOnClient(mc -> Minimap.INSTANZ.setzeVerzierungen(true));
@@ -4473,8 +4508,22 @@ public final class Bedienung implements FabricClientGameTest {
         Minimap.Rahmen u = rahmen(context);
         spielerKlick(context, maus, k, u.x() + u.seite() / 2.0, u.y() + u.seite() / 2.0);
         aussehenIst(context, Minimap.Darstellung.DURCHSICHTIG, Skin.BIOM, "Untermenü, Klick auf den Spieler");
-        spielerKlick(context, maus, k, u.x() + u.seite() / 2.0, u.y() + u.seite() - baender(context) / 2.0);
-        aussehenIst(context, Minimap.Darstellung.DURCHSICHTIG, "grau", "Untermenü, Klick auf S");
+        double sx = u.x() + u.seite() / 2.0, sy = u.y() + u.seite() - baender(context) / 2.0;
+        spielerKlick(context, maus, k, sx, sy);
+        waehlerOffen(context, true, "Untermenü, Klick auf S");
+        maus.pressKey(InputConstants.KEY_ESCAPE);
+        context.waitTicks(2);
+        waehlerOffen(context, false, "Untermenü, Esc im Wähler");
+        // Die mittlere Taste auf S: nur S durchsichtig, ein zweites Mal zurück.
+        mitteZitternd(context, maus, k, sx, sy);
+        if (!context.computeOnClient(mc -> Minimap.INSTANZ.verzierungAus(2) && !Minimap.INSTANZ.verzierungAus(0))) {
+            throw new AssertionError("Untermenü, mittlere Taste auf S: S nicht allein durchsichtig");
+        }
+        mitteZitternd(context, maus, k, sx, sy);
+        if (!context.computeOnClient(mc -> Minimap.INSTANZ.verzierungen())) {
+            throw new AssertionError("Untermenü, zweite mittlere Taste auf S holte sie nicht zurück");
+        }
+        aussehenIst(context, Minimap.Darstellung.DURCHSICHTIG, Skin.BIOM, "Untermenü, nach S");
         warte250();
     }
 
@@ -4780,8 +4829,8 @@ public final class Bedienung implements FabricClientGameTest {
     /**
      * Die Marken O, S und W von „biom“ sitzen samt Schatten auf dem Rahmen und ragen nicht darüber, eckig und rund (Wunsch
      * des Users vom 23.10.): Im Spiel ändert eine durchsichtige Marke im Bildschirmfoto Pixel innerhalb der Minimap, ausserhalb
-     * neben ihr keins. Ein Rechtsklick von Hand auf eine Stelle, die nur die neue Lage von S trifft, nicht die alte auf der
-     * Mitte der Bänder, macht im Menü nur S durchsichtig. Siehe docs/rahmen.md, „Nach aussen“.
+     * neben ihr keins. Die mittlere Taste von Hand auf einer Stelle, die nur die neue Lage von S trifft, nicht die alte auf der
+     * Mitte der Bänder, macht im Menü nur S durchsichtig. Siehe docs/rahmen.md, „Lage“.
      */
     private static void biomMarken(ClientGameTestContext context, TestInput maus, int k) {
         Path sicherung = FabricLoader.getInstance().getGameDir().resolve("heroicmap-biom-marken-test.properties");
@@ -4835,17 +4884,17 @@ public final class Bedienung implements FabricClientGameTest {
                 // Der Klick trifft S dort, wo es liegt: 6 Einheiten innen von seiner Mitte, ausserhalb der Mitte der Bänder ±8,5.
                 double[] s = context.computeOnClient(mc -> {
                     Skin skin = Minimap.INSTANZ.skinJetzt();
-                    Minimap.Ornament o = Minimap.ornamente(r, skin.baender(), rund, skin.nachAussen, skin.auflage, null, k, 0, -1, false, -1).get(1);
+                    Minimap.Ornament o = Minimap.ornamente(r, skin.baender(), rund, skin.marken, null, k, 0, -1, false, -1).get(1);
                     return new double[] {o.x(), o.y() - 6};
                 });
-                rechtsZitternd(context, maus, k, s[0], s[1]);
+                mitteZitternd(context, maus, k, s[0], s[1]);
                 boolean[] aus = context.computeOnClient(mc -> new boolean[] {Minimap.INSTANZ.verzierungAus(0), Minimap.INSTANZ.verzierungAus(1),
                         Minimap.INSTANZ.verzierungAus(2), Minimap.INSTANZ.verzierungAus(3)});
                 if (aus[0] || aus[1] || !aus[2] || aus[3]) {
-                    throw new AssertionError("Rechtsklick auf S" + (rund ? " rund" : " eckig") + " bei „biom“, 6 Einheiten innen von seiner Mitte: "
+                    throw new AssertionError("Mittlere Taste auf S" + (rund ? " rund" : " eckig") + " bei „biom“, 6 Einheiten innen von seiner Mitte: "
                             + "durchsichtig " + Arrays.toString(aus) + " statt nur S");
                 }
-                rechtsZitternd(context, maus, k, s[0], s[1]);
+                mitteZitternd(context, maus, k, s[0], s[1]);
             }
         } finally {
             context.runOnClient(mc -> {
@@ -4861,10 +4910,10 @@ public final class Bedienung implements FabricClientGameTest {
     }
 
     /**
-     * Die Symbole im L um die Minimap und die Marken per Rechtsklick (mod#175), mit Klicks wie von Hand. Die Form sitzt in der
-     * Ecke zwischen Zoom und Auflösung; je ein Klick auf Form, Nordpfeil und Raster schaltet rund, drehen und Chunklinien und
-     * wieder zurück. Ein Rechtsklick auf N macht nur N durchsichtig, im Spiel fehlt sie im Bildschirmfoto; ein zweiter holt
-     * sie zurück. Rechts von N gezogen verschiebt nur, ein Linksklick wechselt weiter den Rahmen. Im Untermenü klappt
+     * Die Symbole im L um die Minimap und die Marken per mittlerer Taste (mod#175), mit Klicks wie von Hand. Die Form sitzt in
+     * der Ecke zwischen Zoom und Auflösung; je ein Klick auf Form, Nordpfeil und Raster schaltet rund, drehen und Chunklinien und
+     * wieder zurück. Die mittlere Taste auf N macht nur N durchsichtig, im Spiel fehlt sie im Bildschirmfoto; ein zweites Mal
+     * holt sie zurück. Rechts von N gezogen verschiebt nur, ein Rechtsklick öffnet den Wähler. Im Untermenü klappt
      * „Technik“ auf und zu und bleibt so nach dem Schliessen. Bei GS 3 und 4 in jeder Ecke, klein und gross, steht das L
      * ganz auf dem Schirm, nichts übereinander. Siehe docs/minimap.md, „Symbole an der Minimap“, und docs/rahmen.md,
      * „Verzierungen“.
@@ -4880,7 +4929,8 @@ public final class Bedienung implements FabricClientGameTest {
             Minimap.INSTANZ.setzeDrehen(false);
             Minimap.INSTANZ.setzeChunklinien(false);
             Minimap.INSTANZ.setzeVerzierungen(true);
-            Minimap.INSTANZ.setzeSkin("holz");
+            Minimap.INSTANZ.setzeSkin("schild");
+            Minimap.INSTANZ.setzeVariante("schild", "gold");
             Minimap.INSTANZ.setzeTechnikOffen(false);
             mc.gui.setScreen(new Einstellungen());
         });
@@ -4906,15 +4956,15 @@ public final class Bedienung implements FabricClientGameTest {
                 }
             }
 
-            // Rechtsklick auf N: nur N durchsichtig; im Spiel fehlt sie.
+            // Die mittlere Taste auf N: nur N durchsichtig; im Spiel fehlt sie.
             Minimap.Rahmen r = rahmen(context);
             double nx = r.x() + r.seite() / 2.0, ny = r.y() + baender(context) / 2.0;
             BufferedImage da = imSpiel(context, "symbole-n-da");
-            rechtsZitternd(context, maus, k, nx, ny);
+            mitteZitternd(context, maus, k, nx, ny);
             boolean[] aus = context.computeOnClient(mc -> new boolean[] {Minimap.INSTANZ.verzierungAus(0), Minimap.INSTANZ.verzierungAus(1),
                     Minimap.INSTANZ.verzierungAus(2), Minimap.INSTANZ.verzierungAus(3)});
             if (!aus[0] || aus[1] || aus[2] || aus[3]) {
-                throw new AssertionError("Rechtsklick auf N: durchsichtig " + Arrays.toString(aus) + " statt nur N");
+                throw new AssertionError("Mittlere Taste auf N: durchsichtig " + Arrays.toString(aus) + " statt nur N");
             }
             BufferedImage weg = imSpiel(context, "symbole-n-weg");
             int anders = 0;
@@ -4925,11 +4975,11 @@ public final class Bedienung implements FabricClientGameTest {
                 }
             }
             if (anders < 20) {
-                throw new AssertionError("Rechtsklick auf N: im Spiel nur " + anders + " Pixel bei N anders");
+                throw new AssertionError("Mittlere Taste auf N: im Spiel nur " + anders + " Pixel bei N anders");
             }
-            rechtsZitternd(context, maus, k, nx, ny);
+            mitteZitternd(context, maus, k, nx, ny);
             if (!context.computeOnClient(mc -> Minimap.INSTANZ.verzierungen())) {
-                throw new AssertionError("Zweiter Rechtsklick auf N holte sie nicht zurück");
+                throw new AssertionError("Zweite mittlere Taste auf N holte sie nicht zurück");
             }
             // Rechts von N gezogen: verschiebt nur.
             ziehe(context, maus, RECHTS, nx, ny, -2 * k, 0);
@@ -4938,12 +4988,16 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Rechts von N gezogen: " + r + " → " + gezogen + ", Marken alle da "
                         + context.computeOnClient(mc -> Minimap.INSTANZ.verzierungen()));
             }
-            // Ein Linksklick auf N wechselt weiter den Rahmen.
+            // Ein Rechtsklick auf N öffnet den Wähler, der Rahmen bleibt; Esc schliesst ihn.
             String skin = context.computeOnClient(mc -> Minimap.INSTANZ.skin());
             Minimap.Rahmen g = rahmen(context);
-            spielerKlick(context, maus, k, g.x() + g.seite() / 2.0, g.y() + baender(context) / 2.0);
-            if (context.computeOnClient(mc -> Minimap.INSTANZ.skin()).equals(skin)) {
-                throw new AssertionError("Linksklick auf N wechselte den Rahmen nicht: " + skin);
+            rechtsZitternd(context, maus, k, g.x() + g.seite() / 2.0, g.y() + baender(context) / 2.0);
+            waehlerOffen(context, true, "Rechtsklick auf N");
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTicks(2);
+            waehlerOffen(context, false, "Esc im Wähler");
+            if (!context.computeOnClient(mc -> Minimap.INSTANZ.skin()).equals(skin)) {
+                throw new AssertionError("Rechtsklick auf N und Esc wechselten den Rahmen: " + skin);
             }
 
             // Technik im Untermenü: auf, nach dem Schliessen weiter auf, wieder zu.
@@ -5146,6 +5200,36 @@ public final class Bedienung implements FabricClientGameTest {
         zittere(context, maus, x * k, y * k, 2);
         maus.releaseMouse(RECHTS);
         context.waitTicks(2);
+    }
+
+    /** Die mittlere Taste wie von Hand: drücken, ein wenig zittern, loslassen. */
+    private static void mitteZitternd(ClientGameTestContext context, TestInput maus, int k, double x, double y) {
+        warte250();
+        fahre(context, maus, k, x, y);
+        maus.holdMouse(MITTE);
+        zittere(context, maus, x * k, y * k, 2);
+        maus.releaseMouse(MITTE);
+        context.waitTicks(2);
+    }
+
+    /** Der Wähler der Rahmen im offenen Menü oder Untermenü. */
+    private static Waehler waehler(Minecraft mc) {
+        return mc.gui.screen() instanceof Einstellungen e ? e.waehler() : ((Anzeige) mc.gui.screen()).waehler();
+    }
+
+    private static void waehlerOffen(ClientGameTestContext context, boolean soll, String was) {
+        if (context.computeOnClient(mc -> waehler(mc).offen()) != soll) {
+            throw new AssertionError(was + ": Wähler " + (soll ? "nicht offen" : "noch offen"));
+        }
+    }
+
+    /** Ein Klick von Hand im Wähler: auf die Vorschau der Familie j oder auf ihr Farbfeld i. */
+    private static void klickImWaehler(ClientGameTestContext context, TestInput maus, int k, String was, int j, int i) {
+        double[] p = context.computeOnClient(mc -> {
+            int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+            return "feld".equals(was) ? waehler(mc).feldMitte(j, i, b, h) : waehler(mc).vorschauMitte(j, b, h);
+        });
+        spielerKlick(context, maus, k, p[0], p[1]);
     }
 
     /** Ein Bildschirmfoto im Spiel ohne Menü, danach wieder das Menü. */
