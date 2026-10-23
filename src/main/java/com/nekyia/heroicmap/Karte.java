@@ -927,15 +927,29 @@ final class Karte extends Screen {
      * „Chunklinien“, und docs/wegpunkte.md, „Einrasten“.
      */
     private void linien(GuiGraphicsExtractor g) {
-        Gitter.zeichne(g, 0, 0, 1, Minimap.LINIE, blick.linien(satz.scale(), width, height));
+        // In Pixeln des Geräts: jede Linie eines breit, auf dem ersten östlich und südlich der Kante, die helle ebenso.
+        int gs = minecraft.getWindow().getGuiScale();
+        g.pose().pushMatrix();
+        g.pose().scale(1f / gs);
+        Gitter.zeichne(g, 0, 0, 1, Minimap.LINIE, blick.linien(satz.scale(), width, height, gs));
         if (rast != null && rast.linieX() != Kartenblick.KEINE_LINIE) {
-            int x = (int) Math.floor(blick.rasterX(Projektion.zuPixel(rast.linieX(), satz.scale()), width));
-            g.fill(x, 0, x + 1, height, HELL);
+            int x = (int) Math.floor(blick.rasterX(Projektion.zuPixel(rast.linieX(), satz.scale()), width) * gs);
+            g.fill(x, 0, x + 1, height * gs, HELL);
         }
         if (rast != null && rast.linieZ() != Kartenblick.KEINE_LINIE) {
-            int y = (int) Math.floor(blick.rasterY(Projektion.zuPixel(rast.linieZ(), satz.scale()), height));
-            g.fill(0, y, width, y + 1, HELL);
+            int y = (int) Math.floor(blick.rasterY(Projektion.zuPixel(rast.linieZ(), satz.scale()), height) * gs);
+            g.fill(0, y, width * gs, y + 1, HELL);
         }
+        g.pose().popMatrix();
+    }
+
+    /** Für den Gametest: die Spalten der senkrechten Chunklinien in Pixeln des Geräts, oder leer, wenn die Karte keine zeichnet. */
+    int[] chunklinienSpalten() {
+        if (satz == null || !linienAn()) {
+            return new int[0];
+        }
+        Gitter.Linien l = blick.linien(satz.scale(), width, height, minecraft.getWindow().getGuiScale());
+        return Arrays.copyOf(l.xs(), l.nx());
     }
 
     /**

@@ -71,7 +71,7 @@ public final class Minimap {
     /** Ziele im Menü ({@link #ziel}): 0 bis 3 die Marken N, O, S, W, dazu der Spieler; oder keins. */
     static final int SPIELER = 4, KEIN_ZIEL = -1;
     /** Farbe der Chunklinien: Schwarz, zu 30 % deckend, so bleibt die Karte darunter lesbar. */
-    static final int LINIE = 0x4D000000;
+    static final int LINIE = 0x73000000;
     private static final int TEXT = 0xFFFFFFFF;
     /** Die Zeile der Koordinaten im Menü: gelb unter der Maus wie ein Verweis im Chat, grau bei „aus“. */
     private static final int KOORDINATEN_HELL = 0xFFFFFF55, KOORDINATEN_AUS = 0xFFA0A0A0;
@@ -1447,9 +1447,30 @@ public final class Minimap {
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.scale(1f / k);
-        Gitter.zeichne(g, bx, by, new ScreenRectangle(r.x() * k, r.y() * k, n, n), k, LINIE,
-                linien(seite, links + bx, oben + by, (int) (16 * zoom * k), k), lage, form);
+        Gitter.Linien l = linien(seite, links + bx, oben + by, (int) (16 * zoom * k), 1);
+        // Ein Pixel des Geräts breit, bei jedem GUI-Massstab. Siehe docs/minimap.md, „Chunklinien“.
+        Gitter.zeichne(g, bx, by, new ScreenRectangle(r.x() * k, r.y() * k, n, n), 1, LINIE, l, lage, form);
         pose.popMatrix();
+        // Ungedreht liegt Spalte x des Bilds auf Pixel cx + x des Schirms.
+        zuletztLinien = lage.sin() == 0 && lage.cos() == 1 ? l : null;
+        zuletztX = (int) lage.cx() + bx;
+    }
+
+    /** Die zuletzt ungedreht gezeichneten Chunklinien und wo Spalte 0 auf dem Schirm lag, für den Gametest. */
+    private Gitter.Linien zuletztLinien;
+    private int zuletztX;
+
+    /** Für den Gametest: die Spalten der senkrechten Chunklinien in Pixeln des Schirms, zuletzt ungedreht gezeichnet; sonst leer. */
+    int[] chunklinienSpalten() {
+        Gitter.Linien l = zuletztLinien;
+        if (l == null) {
+            return new int[0];
+        }
+        int[] spalten = new int[l.nx()];
+        for (int i = 0; i < spalten.length; i++) {
+            spalten[i] = zuletztX + l.xs()[i];
+        }
+        return spalten;
     }
 
     /**
@@ -1534,17 +1555,17 @@ public final class Minimap {
 
     /**
      * Die Chunklinien im Quadrat mit der Seite n, auf dem Raster der Karte: Die Linie von Chunk c
-     * beginnt auf dem Pixel, auf dem die Karte Block 16·c zeichnet ({@link #pixel}), alle
-     * {@code schritt} Pixel, und ist k breit; nur Linien ganz im Quadrat, über seine ganze Seite.
+     * beginnt auf dem Pixel, auf dem die Karte Block 16·c zeichnet ({@link #pixel}), dem ersten östlich und südlich der
+     * Kante, alle {@code schritt} Pixel, und ist {@code dicke} breit; nur Linien ganz im Quadrat, über seine ganze Seite.
      * Die Form schneidet danach {@link Gitter}.
      */
-    static Gitter.Linien linien(int n, int links, int oben, int schritt, int k) {
+    static Gitter.Linien linien(int n, int links, int oben, int schritt, int dicke) {
         int m = n / schritt + 1, nx = 0, ny = 0;
         int[] xs = new int[m], ys = new int[m];
-        for (int px = Math.ceilDiv(links, schritt) * schritt - links; px + k <= n; px += schritt) {
+        for (int px = Math.ceilDiv(links, schritt) * schritt - links; px + dicke <= n; px += schritt) {
             xs[nx++] = px;
         }
-        for (int pz = Math.ceilDiv(oben, schritt) * schritt - oben; pz + k <= n; pz += schritt) {
+        for (int pz = Math.ceilDiv(oben, schritt) * schritt - oben; pz + dicke <= n; pz += schritt) {
             ys[ny++] = pz;
         }
         return new Gitter.Linien(xs, nx, ys, ny, n, n);

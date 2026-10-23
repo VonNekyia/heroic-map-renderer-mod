@@ -444,7 +444,8 @@ des Spiels liegt auf keiner der beiden Alt-Tasten (per javap,
   Seite der Maus. Nur auf Linien, die die Karte zeichnet: der Schalter
   „Chunklinien“ an und die Linien nicht zu dicht (`Karte.linienAn`, E4),
   siehe [Minimap](minimap.md), „Chunklinien“. Beim Ziehen ist die Linie
-  weiss (`Karte.linien`). Mit `Alt` rastet der Punkt nur ein, ohne Hinweis:
+  weiss (`Karte.linien`), ein Pixel des Geräts breit auf derselben Kante.
+  Mit `Alt` rastet der Punkt nur ein, ohne Hinweis:
   Auf einer Linie gibt es nichts zu verbinden.
 - **Beim Ziehen** steht, was an der Maus hängt, schon genau auf dem Ziel,
   und das Ziel ist hell wie unter der Maus. Ohne `Strg` folgt es der Maus

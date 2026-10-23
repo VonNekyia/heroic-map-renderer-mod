@@ -1672,6 +1672,9 @@ public final class Bilder implements FabricClientGameTest {
         context.runOnClient(mc -> Minimap.INSTANZ.setzeChunklinien(true));
         context.waitTicks(2);
         Path linien = context.takeScreenshot(TestScreenshotOptions.of("chunklinien").disableCounterPrefix());
+        // Dünn auf der Kante, bei 1920 × 1080 mit GUI-Massstab 2 und 4; geprüft erst, wenn alle Bilder da sind.
+        int[][] spalten = new int[2][], bereiche = new int[2][];
+        Path[] karteGs = beiGs24(context, "chunklinien", spalten, bereiche, false);
         context.runOnClient(mc -> {
             mc.gui.screen().onClose();
             Minimap.INSTANZ.setzeZoom(2);
@@ -1679,11 +1682,18 @@ public final class Bilder implements FabricClientGameTest {
         context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
         context.waitTicks(2);
         Path minimapLinien = context.takeScreenshot(TestScreenshotOptions.of("minimap-chunklinien").disableCounterPrefix());
+        schneide(context, minimapLinien, minimapLinien.resolveSibling("minimap-chunklinien-ausschnitt.png"));
+        int[][] spaltenMinimap = new int[2][], bereicheMinimap = new int[2][];
+        Path[] minimapGs = beiGs24(context, "minimap-chunklinien", spaltenMinimap, bereicheMinimap, true);
         try {
             if (!AUSGABE.isEmpty()) {
                 Files.copy(bild, Path.of(AUSGABE, "selbst.png"), StandardCopyOption.REPLACE_EXISTING);
                 Files.copy(linien, Path.of(AUSGABE, "chunklinien.png"), StandardCopyOption.REPLACE_EXISTING);
                 schneide(context, minimapLinien, Path.of(AUSGABE, "minimap-chunklinien.png"));
+            }
+            for (int i = 0; i < 2; i++) {
+                pruefeDuenn(karteGs[i], spalten[i], bereiche[i], "der Karte bei GUI-Massstab " + (2 + 2 * i));
+                pruefeDuenn(minimapGs[i], spaltenMinimap[i], bereicheMinimap[i], "der Minimap bei GUI-Massstab " + (2 + 2 * i));
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -1737,6 +1747,87 @@ public final class Bilder implements FabricClientGameTest {
     }
 
     /** Der Ausschnitt der Minimap samt Rand, in Pixeln des Fensters. */
+    /**
+     * Bei 1920 × 1080 mit GUI-Massstab 2 und 4 je ein Bild {@code name}-gs2 und -gs4, die Minimap auch als Ausschnitt; dazu die
+     * Spalten der senkrechten Chunklinien in {@code spalten} und in {@code bereiche} die Fläche, auf der sie geprüft werden, in
+     * Pixeln: die Mitte der Vollbildkarte links der Knöpfe oder das Innere der Minimap. Danach das Fenster wie vorher. Siehe
+     * docs/minimap.md, „Chunklinien“.
+     */
+    private static Path[] beiGs24(ClientGameTestContext context, String name, int[][] spalten, int[][] bereiche, boolean minimap) {
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        Path[] bilder = new Path[2];
+        try {
+            context.getInput().resizeWindow(1920, 1080);
+            for (int i = 0; i < 2; i++) {
+                int gs = 2 + 2 * i;
+                context.runOnClient(mc -> {
+                    mc.options.guiScale().set(gs);
+                    mc.resizeGui();
+                });
+                context.waitTicks(10);
+                if (minimap) {
+                    context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
+                    context.waitTicks(2);
+                }
+                int echt = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+                if (echt != gs) {
+                    throw new AssertionError("GUI-Massstab " + echt + " statt " + gs);
+                }
+                bilder[i] = context.takeScreenshot(TestScreenshotOptions.of(name + "-gs" + gs).disableCounterPrefix());
+                if (minimap) {
+                    schneide(context, bilder[i], bilder[i].resolveSibling(name + "-gs" + gs + "-ausschnitt.png"));
+                    spalten[i] = context.computeOnClient(mc -> Minimap.INSTANZ.chunklinienSpalten());
+                    bereiche[i] = context.computeOnClient(mc -> {
+                        Minimap.Rahmen r = Minimap.INSTANZ.rahmen(mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+                        int n = r.seite() * gs;
+                        return new int[] {r.x() * gs + n / 10, r.y() * gs + n / 10, r.x() * gs + n * 9 / 10, r.y() * gs + n * 9 / 10};
+                    });
+                } else {
+                    spalten[i] = context.computeOnClient(mc -> mc.gui.screen() instanceof Karte k ? k.chunklinienSpalten() : new int[0]);
+                    bereiche[i] = new int[] {1920 / 20, 1080 / 4, 1920 * 13 / 20, 1080 * 3 / 4};
+                }
+            }
+        } finally {
+            context.getInput().resizeWindow(vorher[0], vorher[1]);
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(vorher[2]);
+                mc.resizeGui();
+            });
+            context.waitTicks(5);
+        }
+        return bilder;
+    }
+
+    /**
+     * Jede senkrechte Chunklinie ist ein Pixel des Geräts breit, auf der Spalte aus {@code spalten}: Über die Zeilen von
+     * {@code bereich} (x0, y0, x1, y1) ist sie dunkler als die Spalte rechts daneben, die denselben Block zeigt. Eine Linie von einer
+     * Einheit des GUI dunkelte beide gleich, eine links der Kante keine. Nur Linien in {@code bereich}.
+     */
+    private static void pruefeDuenn(Path bild, int[] spalten, int[] bereich, String wo) throws IOException {
+        BufferedImage b = ImageIO.read(bild.toFile());
+        double linie = 0, daneben = 0;
+        int n = 0;
+        for (int x : spalten) {
+            if (x < bereich[0] || x + 1 >= bereich[2]) {
+                continue;
+            }
+            for (int y = bereich[1]; y < bereich[3]; y++) {
+                linie += hell(b.getRGB(x, y));
+                daneben += hell(b.getRGB(x + 1, y));
+            }
+            n++;
+        }
+        if (n == 0 || linie > 0.9 * daneben) {
+            throw new AssertionError("Chunklinien " + wo + " nicht ein Pixel breit auf der Kante: " + n + " Linien, Helligkeit "
+                    + Math.round(linie) + " gegen " + Math.round(daneben) + " daneben");
+        }
+    }
+
+    /** Die Helligkeit eines Pixels, 0 bis 255. */
+    private static double hell(int p) {
+        return (p >> 16 & 0xFF) * 0.299 + (p >> 8 & 0xFF) * 0.587 + (p & 0xFF) * 0.114;
+    }
+
     private static void schneide(ClientGameTestContext context, Path bild, Path ziel) {
         int[] fenster = context.computeOnClient(mc -> new int[] {
             mc.getWindow().getGuiScale(), mc.getWindow().getGuiScaledWidth()});
