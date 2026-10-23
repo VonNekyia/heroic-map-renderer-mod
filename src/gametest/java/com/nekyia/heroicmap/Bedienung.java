@@ -2077,8 +2077,9 @@ public final class Bedienung implements FabricClientGameTest {
             if (ist.x() != lx || ist.z() != lz - 5) {
                 throw new AssertionError("Ecke mit Strg neben der Chunklinie x = " + lx + ": " + ist + " statt " + lx + " " + (lz - 5));
             }
-            if (an < aus + 2 * k * k) {
-                throw new AssertionError("Chunklinie beim Einrasten nicht hell: " + an + " weisse Pixel, danach " + aus);
+            // Ein Pixel des Geräts breit über die 4 Einheiten Höhe des Quadrats: 4·k weisse Pixel mehr; eine Einheit breit wären es 4·k².
+            if (an - aus < 2 * k || an - aus > 5 * k) {
+                throw new AssertionError("Chunklinie beim Einrasten nicht hell oder nicht ein Pixel breit: " + an + " weisse Pixel, danach " + aus);
             }
 
             // Nahe der Ecke des Chunks: x und z.
