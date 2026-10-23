@@ -320,8 +320,8 @@ vom Reviewer freigegeben. Das Gewicht vom Server ist `order`, siehe
       Korrektur.
     - **Im Gametest `Bedienung`,** in der flachen Welt, landet der
       Spieler ohne Daten ohne Schaden auf dem Boden: in einem Chunk, den
-      der Server hat, nach LADEN Ticks, in einem, den er erst erzeugt, nach
-      ERZEUGEN Ticks, gezählt ab dem Schliessen der Karte (Stand 24.10.).
+      der Server hat, nach 5 Ticks, in einem, den er erst erzeugt, nach
+      10 bis 14 Ticks, gezählt ab dem Klick (Stand 24.10.).
 - **Das Menü** bleibt ganz auf dem Schirm, auch bei grossem GUI-Massstab.
 - **Nach dem Klick** schliesst sich die Karte. Holt der Mod die Höhe, geht
   der Befehl ab, sobald sie da ist, höchstens 10 s später.
