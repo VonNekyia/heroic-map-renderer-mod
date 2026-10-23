@@ -3275,8 +3275,7 @@ public final class Bedienung implements FabricClientGameTest {
             context.waitTicks(2);
             String datei = Files.readString(HeroicMap.einstellungen());
             // Nach den vier Klicks und einem fünften steht Datum.
-            if (!datei.contains("tod_zeit=datum
-") && !datei.contains("tod_zeit=datum") || !datei.contains("effekte=true")) {
+            if (datei.lines().noneMatch("tod_zeit=datum"::equals) || !datei.contains("effekte=true")) {
                 throw new AssertionError("Beim Schliessen nicht gespeichert: " + datei.lines().filter(z -> z.startsWith("tod_zeit=")
                         || z.startsWith("effekte=")).toList());
             }
