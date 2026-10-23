@@ -99,7 +99,7 @@ es bei GUI-Massstab 4 nicht.
 - **Zeilen** 30 Einheiten hoch, das Bild 56 breit, die Regler 20 hoch in
   der Mitte der Zeile.
 
-![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien und den Koordinaten darunter; unter „Wegpunkte“ der Todespunkt mit seiner Zeit und dem Regler „Todespunkte“, unter „In der Welt“ die Region mit Schleier, das Symbol „Effekte in der Welt“ und der Regler „Schleier“, darunter der zugeklappte Knopf „Technik“, unten „Ebenen …“ neben „Fertig“](bilder/anzeige.png)
+![Das Untermenü über der Szene des Gametests, die Minimap rund mit Chunklinien und den Koordinaten darunter; unter „Wegpunkte“ der Todespunkt mit seiner Zeit und dem Regler „Todespunkte“, unter „In der Welt“ die Region mit Schleier, das Symbol „Effekte in der Welt“ und der Regler „Schleier“, darunter der zugeklappte Knopf „Technik“, unten „Ebenen …“ neben „Fertig“; aufgenommen in der CI mit `-Pbilder`, Sprache Englisch](bilder/anzeige.png)
 
 | Einstellung | Vorgabe | tut |
 |---|---|---|
