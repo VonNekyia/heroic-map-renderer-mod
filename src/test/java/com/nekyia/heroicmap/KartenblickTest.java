@@ -108,8 +108,8 @@ class KartenblickTest {
         assertTrue(blick.rasterX(c * 64.0, 854) >= 0 && blick.rasterX((c - 1) * 64.0, 854) < 0, "Chunk " + c);
         int z = blick.ersterChunkZ(4, 480);
         assertTrue(blick.rasterY(z * 64.0, 480) >= 0 && blick.rasterY((z - 1) * 64.0, 480) < 0, "Chunk " + z);
-        // Die Linien: ab dem ersten Chunk jede auf dem Raster, bis zum Rand, über Breite und Höhe.
-        Gitter.Linien l = blick.linien(4, 854, 480);
+        // Die Linien bei GUI-Massstab 1: ab dem ersten Chunk jede auf dem Raster, bis zum Rand, über Breite und Höhe.
+        Gitter.Linien l = blick.linien(4, 854, 480, 1);
         assertEquals(854, l.breite());
         assertEquals(480, l.hoehe());
         for (int i = 0; i < l.nx(); i++) {
@@ -133,6 +133,41 @@ class KartenblickTest {
     }
 
     @Test
+    void chunklinienAufDerKanteEinPixelBreit() {
+        // In Pixeln des Geräts liegt jede Linie auf dem ersten Pixel östlich und südlich der Kante 16·c: Ihr Pixel zeigt Block 16·c,
+        // das davor Block 16·c − 1. Bei Lupe 1, 2 und 4, GUI-Massstab 1 bis 4 und einer Mitte zwischen den Pixeln der Basis.
+        for (int lupe : new int[] {1, 2, 4}) {
+            for (int gs = 1; gs <= 4; gs++) {
+                for (double frac : new double[] {0, 0.25, 0.5, 0.75}) {
+                    Kartenblick blick = new Kartenblick(256, 0, 6, 6);
+                    blick.lupe = lupe;
+                    blick.mx = 1000 + frac;
+                    blick.mz = -300 - frac;
+                    Gitter.Linien l = blick.linien(4, 854, 480, gs);
+                    String wo = "Lupe " + lupe + ", GS " + gs + ", frac " + frac;
+                    assertEquals(854 * gs, l.breite(), wo);
+                    assertEquals(480 * gs, l.hoehe(), wo);
+                    assertTrue(l.nx() > 0 && l.ny() > 0, wo);
+                    for (int i = 0; i < l.nx(); i++) {
+                        int x = l.xs()[i], block = (int) Math.floor(blick.basisRasterX((x + 0.5) / gs, 854) / 4);
+                        assertEquals(0, Math.floorMod(block, 16), wo + ", Spalte " + x);
+                        if (x > 0) {
+                            assertEquals(block - 1, (int) Math.floor(blick.basisRasterX((x - 0.5) / gs, 854) / 4), wo + ", Spalte " + x);
+                        }
+                    }
+                    for (int j = 0; j < l.ny(); j++) {
+                        int y = l.ys()[j], block = (int) Math.floor(blick.basisRasterZ((y + 0.5) / gs, 480) / 4);
+                        assertEquals(0, Math.floorMod(block, 16), wo + ", Zeile " + y);
+                        if (y > 0) {
+                            assertEquals(block - 1, (int) Math.floor(blick.basisRasterZ((y - 0.5) / gs, 480) / 4), wo + ", Zeile " + y);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     void chunklinienBeiGuiMassstab1Auf4k() {
         // 3840 × 2160 Einheiten. Bei GUI-Massstab 1 sind 8 Pixel des Schirms 8 Einheiten: 4 Einheiten reichen nicht mehr.
         Kartenblick blick = new Kartenblick(256, 0, 6, 6);
@@ -144,7 +179,7 @@ class KartenblickTest {
         assertEquals(8, blick.chunkAbstand(4), 1e-9);
         assertTrue(blick.chunklinien(4, 1));
         // Der schlechteste Fall danach: rund 130 000 Rechtecke. Siehe docs/minimap.md, „Chunklinien“.
-        Gitter.Linien l = blick.linien(4, 3840, 2160);
+        Gitter.Linien l = blick.linien(4, 3840, 2160, 1);
         int[] rechtecke = {0};
         Gitter.rechtecke(1, l, (xa, ya, xb, yb) -> rechtecke[0]++);
         assertTrue(rechtecke[0] <= l.nx() + l.ny() * (l.nx() + 1));

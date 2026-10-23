@@ -325,20 +325,32 @@ weiter heraus stünden die Linien dichter als ein Pixel.
 
 ![Die selbst gezeichnete Karte der Szene mit Chunklinien](bilder/chunklinien.png)
 
-- **Aussehen:** eine Einheit des GUI breit, Schwarz zu 30 % deckend
-  (`Minimap.LINIE`), damit die Karte lesbar bleibt. Die Linie eines
-  Chunks liegt auf seinem ersten Block, westlich und nördlich.
+- **Aussehen:** ein Pixel des Geräts breit, bei jedem GUI-Massstab,
+  Schwarz zu 45 % deckend (`Minimap.LINIE`), damit sie auch bei
+  GUI-Massstab 4 sichtbar bleibt und die Karte lesbar. So hat es der User
+  am 23.10. gewünscht; bis 0.2.68 war sie eine Einheit des GUI breit, zu
+  30 % deckend, und lag auf dem ersten Block des Chunks. Mit einem Pixel
+  verschwanden 30 % bei GUI-Massstab 4 fast; 45 % und 60 % blieben lesbar,
+  45 % deckt die Karte weniger zu (Vergleich in der PR).
+- **Auf der Kante:** Die Linie eines Chunks liegt auf der Grenze zwischen
+  Block 16·c − 1 und 16·c, bei x wie bei z, dort, wo `Strg` einrastet,
+  siehe [Wegpunkte](wegpunkte.md), „Einrasten“. Weil ein Pixel keine Mitte
+  auf einer Kante hat, ist es immer das erste östlich und südlich davon,
+  das erste Pixel, auf dem die Karte Block 16·c zeichnet.
 - **Auf dem Raster der Karte,** sonst wackelten die Linien beim Ziehen und
   Laufen: auf der Minimap von der Kante des Bildes aus `Minimap.ecke`, wie
   die Regionen (`Minimap.linien`, gleich `Minimap.pixel` für Block 16·c);
   auf der Vollbildkarte von der ganzzahligen Kante aus `Kartenblick`, wie
-  Kacheln und Marken (`Kartenblick.linien`, `Kartenblick.rasterX`).
+  Kacheln und Marken (`Kartenblick.linien`, `Kartenblick.rasterX`), mal
+  dem GUI-Massstab in Pixeln des Geräts. Beide zeichnen mit einer Pose
+  von 1 / GUI-Massstab (`Karte.linien`, `Minimap.linien`).
 - **Einrasten:** Auf der Vollbildkarte rastet eine gezogene Ecke oder ein
   Wegpunkt mit `Strg` auf die Linien ein, siehe
   [Wegpunkte](wegpunkte.md), „Einrasten“.
 - **Kreuzungen:** Die waagrechten Linien sparen die Spalten der
-  senkrechten aus (`Gitter.rechtecke`). So ist eine Kreuzung so dunkel wie
-  die Linie, nicht 51 % statt 30 %; so ist es im Review entschieden.
+  senkrechten aus (`Gitter.rechtecke`), ein Pixel breit wie die Linien. So
+  ist eine Kreuzung so dunkel wie die Linie, nicht 70 % statt 45 %; so ist
+  es im Review entschieden.
 - **Ein Element je Frame:** Alle Linien einer Karte sind ein Element des
   GUI (`Gitter`); die Rechtecke entstehen erst beim Zeichnen. Dafür öffnet
   der Access Widener `GuiGraphicsExtractor.guiRenderState`.
