@@ -5175,7 +5175,7 @@ public final class Bedienung implements FabricClientGameTest {
      * hat, auf die Oberfläche, nicht auf den Grund; in einen Chunk, den weder Client noch Server geladen haben, mit dem
      * Boden der Karte, den der Mod genau einmal per HTTP holt, auf den Boden der flachen Welt. Dazu die Korrektur mit
      * veralteten Höhen; ohne Daten über die sichere Höhe in einen Chunk, den der Server hat, und einen, den er nicht hat;
-     * und im Nether.
+     * im Nether; und zurück an den Start, wo im End kein Platz zum Stehen ist.
      */
     private static void teleport(ClientGameTestContext context, TestServerContext server, TestInput maus, int k) {
         // Ein Becken aus Glas, das Wasser darin 6 hoch: der Grund bei y = -61, die Oberfläche im Block -55.
@@ -5260,6 +5260,7 @@ public final class Bedienung implements FabricClientGameTest {
             }
             korrektur(context, server, maus, k, baum);
             nether(context, server, maus, k, baum);
+            ende(context, server, maus, k, baum);
         } finally {
             http.stop(0);
             context.runOnClient(mc -> mc.gui.setScreen(null));
@@ -5368,6 +5369,51 @@ public final class Bedienung implements FabricClientGameTest {
         }
         server.runCommand("execute in minecraft:the_nether run forceload remove all");
         // Zurück in die Oberwelt, auf das Gras; die Schritte danach rechnen dort.
+        server.runCommand("execute in minecraft:overworld run tp @p 0.5 -60 0.5");
+        context.waitFor(mc -> mc.level.dimension() == Level.OVERWORLD && Math.abs(mc.player.getY() - -60) < 0.01 && mc.player.onGround(), 600);
+    }
+
+    /**
+     * Im End über der Leere: Ohne Daten geht der Spieler auf die sichere Höhe, y = 253; am Ziel ist kein Platz zum Stehen,
+     * und er geht zurück an den Start, mit einer Zeile im Chat. Start ist ein Podest aus Obsidian, die Füsse bei y = 64;
+     * beide liegen weit weg vom Drachen in der Mitte.
+     */
+    private static void ende(ClientGameTestContext context, TestServerContext server, TestInput maus, int k, Path baum) {
+        int start = -600, ziel = 600;
+        for (int a : new int[] {start, ziel}) {
+            server.runCommand("execute in minecraft:the_end run forceload add " + a + " " + a);
+        }
+        server.waitFor(s -> s.getLevel(Level.END).isLoaded(new BlockPos(start, 64, start)) && s.getLevel(Level.END).isLoaded(new BlockPos(ziel, 64, ziel)), 1200);
+        server.runCommand("execute in minecraft:the_end run fill " + (start - 1) + " 63 " + (start - 1) + " " + (start + 1) + " 63 " + (start + 1) + " obsidian");
+        server.runCommand("execute in minecraft:the_end run fill " + (start - 1) + " 64 " + (start - 1) + " " + (start + 1) + " 66 " + (start + 1) + " air");
+        server.runCommand("execute in minecraft:the_end run fill " + ziel + " 0 " + ziel + " " + ziel + " 255 " + ziel + " air");
+        server.runCommand("execute in minecraft:the_end run tp @p " + (start + 0.5) + " 64 " + (start + 0.5));
+        context.waitFor(mc -> mc.level.dimension() == Level.END && Math.abs(mc.player.getY() - 64) < 0.01 && mc.player.onGround(), 600);
+        if (context.computeOnClient(mc -> mc.level.getChunkSource().getChunk(ziel >> 4, ziel >> 4, ChunkStatus.FULL, false) != null)) {
+            throw new AssertionError("End: Der Chunk des Ziels ist schon beim Client");
+        }
+        teleportiere(context, maus, k, baum, ziel, ziel);
+        double hoechstes = -Double.MAX_VALUE;
+        for (int i = 0, ruhig = 0; ruhig < 20; i++) {
+            hoechstes = Math.max(hoechstes, context.computeOnClient(mc -> mc.player.getY()));
+            boolean daheim = context.computeOnClient(mc -> Math.abs(mc.player.getX() - (start + 0.5)) < 0.01 && Math.abs(mc.player.getZ() - (start + 0.5)) < 0.01
+                    && Math.abs(mc.player.getY() - 64) < 0.01 && mc.player.onGround());
+            ruhig = daheim && hoechstes > 250 ? ruhig + 1 : 0;
+            if (i == 600) {
+                throw new AssertionError("End: nicht über die sichere Höhe zurück am Start, höchstes y " + hoechstes + ", der Spieler steht bei "
+                        + context.computeOnClient(mc -> mc.player.position()));
+            }
+            context.waitTick();
+        }
+        Path log = net.fabricmc.loader.api.FabricLoader.getInstance().getGameDir().resolve("logs").resolve("latest.log");
+        try {
+            if (!Files.readString(log, StandardCharsets.UTF_8).contains("[CHAT] Teleport cancelled: there is no place to stand")) {
+                throw new AssertionError("End: keine Zeile „no place to stand“ im Chat");
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        server.runCommand("execute in minecraft:the_end run forceload remove all");
         server.runCommand("execute in minecraft:overworld run tp @p 0.5 -60 0.5");
         context.waitFor(mc -> mc.level.dimension() == Level.OVERWORLD && Math.abs(mc.player.getY() - -60) < 0.01 && mc.player.onGround(), 600);
     }
