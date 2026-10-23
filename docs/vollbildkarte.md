@@ -199,9 +199,16 @@ vom Reviewer freigegeben. Das Gewicht vom Server ist `order`, siehe
 ### Teleportieren
 
 - **Der Eintrag** „Hierher teleportieren“ steht in jedem Menü der Karte,
-  sobald es eine Verbindung gibt, in jeder Dimension. Fehlt dem Spieler
-  das Recht für `tp`, lehnt der Server ab und sagt es im Chat; der Mod
-  umgeht nichts. So hat es der User gewünscht (mod#131),
+  sobald es eine Verbindung gibt, in jeder Dimension. Der Mod umgeht
+  nichts.
+  - **Ohne Recht auf `tp`** schickt der Mod nichts. Unten links steht
+    „Teleport: Der Server erlaubt dir /tp nicht.“, die Karte bleibt offen
+    (`Karte.teleportiere`). Ob er darf, liest er aus dem Befehlsbaum, den
+    der Server dem Client schickt: Darin steht nur, was der Spieler darf
+    (`Commands.fillUsableCommands`, per javap in 26.3; `Teleport.erlaubt`).
+    Sonst kämen ohne Höhe bis zu 12 Absagen in den Chat und danach eine
+    falsche Zeile. Gefunden vom Reviewer in mod#192. Bis 0.2.68 lehnte der
+    Server ab und sagte es im Chat. So hat es der User gewünscht (mod#131),
   siehe [0023](entscheidungen/0023-teleport-mit-korrektur.md). Bis 0.2.48
   fehlte der Eintrag ohne beide Befehle im Befehlsbaum und unter einer
   Decke.

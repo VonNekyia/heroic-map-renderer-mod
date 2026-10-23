@@ -15,6 +15,7 @@ import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
+import com.mojang.brigadier.tree.RootCommandNode;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
@@ -100,6 +101,14 @@ final class Teleport {
      */
     static String befehl(int x, int y, int z) {
         return String.format(Locale.ROOT, "tp %.1f %d %.1f", x + 0.5, y, z + 0.5);
+    }
+
+    /**
+     * Ob der Server dem Spieler {@code tp} erlaubt: Er schickt im Befehlsbaum nur, was der Spieler darf
+     * ({@code Commands.fillUsableCommands}, per javap in 26.3).
+     */
+    static boolean erlaubt(RootCommandNode<?> wurzel) {
+        return wurzel.getChild("tp") != null;
     }
 
     /** Zurück auf (x, y, z), genau dorthin, wo der Spieler beim Klick stand. */

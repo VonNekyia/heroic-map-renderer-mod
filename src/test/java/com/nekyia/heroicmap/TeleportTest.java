@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonObject;
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.google.gson.JsonParser;
 import com.sun.net.httpserver.HttpServer;
 import java.io.ByteArrayOutputStream;
@@ -34,6 +36,20 @@ class TeleportTest {
         assertEquals("tp -0.5 -60 0.5", Teleport.befehl(-1, -60, 0));
         // Zurück an den Start: genau, auch auf einer Stufe.
         assertEquals("tp 12.347 64.500 -40.001", Teleport.befehl(12.3467, 64.5, -40.0009));
+    }
+
+    @Test
+    void nurMitTpImBefehlsbaum() {
+        // Der Server schickt nur Befehle, die der Spieler darf; ohne tp schickt der Mod nichts.
+        CommandDispatcher<Object> mit = new CommandDispatcher<>();
+        mit.register(LiteralArgumentBuilder.literal("tp"));
+        mit.register(LiteralArgumentBuilder.literal("teleport"));
+        assertTrue(Teleport.erlaubt(mit.getRoot()));
+        CommandDispatcher<Object> ohne = new CommandDispatcher<>();
+        ohne.register(LiteralArgumentBuilder.literal("teleport"));
+        ohne.register(LiteralArgumentBuilder.literal("execute"));
+        assertFalse(Teleport.erlaubt(ohne.getRoot()));
+        assertFalse(Teleport.erlaubt(new CommandDispatcher<>().getRoot()));
     }
 
     /** Eine Säule ab y = 0 aus Zeichen: # fest, . Luft, ~ Flüssigkeit, unten zuerst. */

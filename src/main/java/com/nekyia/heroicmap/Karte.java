@@ -2391,10 +2391,8 @@ final class Karte extends Screen {
      */
     private void punktMenue(Wegpunkte.Punkt punkt, String dimension, List<Eintrag> neu) {
         if (minecraft.getConnection() != null) {
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.teleport", punkt.x(), punkt.z()), () -> {
-                Teleport.los(minecraft, satz, dimension, punkt.x(), punkt.z());
-                onClose();
-            }));
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.teleport", punkt.x(), punkt.z()),
+                    () -> teleportiere(dimension, punkt.x(), punkt.z())));
         }
         if (!punkt.tod()) {
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.koordinaten"), () -> koordinaten(punkt.x(), punkt.z(), k -> {
@@ -2502,13 +2500,23 @@ final class Karte extends Screen {
         });
     }
 
+    /**
+     * „Hierher teleportieren“ nach (x, z): Erlaubt der Server {@code tp} nicht, schickt der Mod nichts, ein Hinweis sagt es, und
+     * die Karte bleibt offen. Siehe docs/vollbildkarte.md, „Teleportieren“.
+     */
+    private void teleportiere(String dimension, int x, int z) {
+        if (!Teleport.erlaubt(minecraft.getConnection().getCommands().getRoot())) {
+            zeige(Component.translatable("heroicmap.teleport.kein_recht"));
+            return;
+        }
+        Teleport.los(minecraft, satz, dimension, x, z);
+        onClose();
+    }
+
     /** Das allgemeine Menü auf freier Karte am Block {@code z}: Teleport, „Wegpunkt setzen“, „Wegpunkt bei …“, eine Form beginnen. */
     private void allgemein(int[] z, String dimension, List<Eintrag> neu) {
         if (minecraft.getConnection() != null) {
-            neu.add(new Eintrag(Component.translatable("heroicmap.karte.teleport", z[0], z[1]), () -> {
-                Teleport.los(minecraft, satz, dimension, z[0], z[1]);
-                onClose();
-            }));
+            neu.add(new Eintrag(Component.translatable("heroicmap.karte.teleport", z[0], z[1]), () -> teleportiere(dimension, z[0], z[1])));
         }
         neu.add(new Eintrag(Component.translatable("heroicmap.karte.wegpunkt"), () -> setzeWegpunkt(dimension, z[0], z[1])));
         // Ein Wegpunkt an eingetippten Koordinaten, dann in der Mitte. Siehe docs/wegpunkte.md, „Bedienung“.

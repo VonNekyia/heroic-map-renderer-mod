@@ -49,6 +49,12 @@ Entschieden vom Reviewer, 24.10.:
   dann höchstens eine Korrektur.
 - **Eigenbewegung:** Geht der Spieler nach der Ankunft mehr als 4 Blöcke
   weg, etwa fliegend, hört der Mod auf, ohne ihn zurückzuholen.
+- **Ohne Recht auf `tp`** schickt der Mod nichts und sagt es unten links
+  auf der Karte. Ob er darf, steht im Befehlsbaum des Clients: Der Server
+  schickt nur Befehle, die der Spieler darf (`Commands.fillUsableCommands`
+  mit `canUse`, per javap). Sonst kämen ohne Höhe bis zu 12 Absagen und
+  danach die falsche Zeile, das Ziel sei nicht gekommen. Befund des
+  Reviewers in mod#192.
 
 ## Belege
 

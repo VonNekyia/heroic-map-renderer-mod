@@ -14,6 +14,7 @@
       "com.nekyia.heroicmap.Server",
       "com.nekyia.heroicmap.Bedienung",
       "com.nekyia.heroicmap.Strom",
+      "com.nekyia.heroicmap.OhneTp",
       "com.nekyia.heroicmap.Blockentities",
       "com.nekyia.heroicmap.Spieler",
       "com.nekyia.heroicmap.Zoomstufen",
