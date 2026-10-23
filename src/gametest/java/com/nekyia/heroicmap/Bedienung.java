@@ -4454,7 +4454,7 @@ public final class Bedienung implements FabricClientGameTest {
         klickImWaehler(context, maus, k, "vorschau", Skin.FAMILIEN.indexOf("schild"), 0);
         aussehenIst(context, Minimap.Darstellung.PFEIL, "schild", "Klick auf die Vorschau „schild“ nach dem Farbfeld");
         String farbe = context.computeOnClient(mc -> Minimap.INSTANZ.variante("schild"));
-        if (!farbe.equals(Skin.varianten("schild").get(1).name())) {
+        if (!farbe.equals(context.computeOnClient(mc -> Skin.varianten("schild").get(1).name()))) {
             throw new AssertionError("Nach dem zweiten Farbfeld und der Vorschau „schild“: Variante " + farbe);
         }
         // Zurück zu „biom“ über den Wähler, für die Schritte danach.
