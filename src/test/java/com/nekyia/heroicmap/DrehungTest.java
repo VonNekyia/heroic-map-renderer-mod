@@ -261,9 +261,9 @@ class DrehungTest {
     void markenAufDerMitteDerBaender() {
         // Rund auf dem Kreis durch die Mitte der Bänder, eckig auf dem Quadrat; 30° gedreht.
         double ux = Math.sin(Math.toRadians(30)), uy = -Math.cos(Math.toRadians(30));
-        double[] rund = Skin.marke(10, 20, 128, 2, true, ux, uy);
+        double[] rund = Skin.marke(10, 20, 128, 2, true, ux, uy, null);
         assertEquals(63, Math.hypot(rund[0] - 74, rund[1] - 84), 1e-9);
-        double[] eckig = Skin.marke(10, 20, 128, 2, false, ux, uy);
+        double[] eckig = Skin.marke(10, 20, 128, 2, false, ux, uy, null);
         assertEquals(63, Math.max(Math.abs(eckig[0] - 74), Math.abs(eckig[1] - 84)), 1e-9);
         // Das Bild je Richtung steht fest und dreht mit: N norden, S marke, O und W marke_quer.
         assertArrayEquals(new int[] {Skin.NORDEN, Skin.MARKE_QUER, Skin.MARKE, Skin.MARKE_QUER}, Skin.MARKE_JE_RICHTUNG);
@@ -276,12 +276,12 @@ class DrehungTest {
         for (boolean rund : new boolean[] {false, true}) {
             assertEquals(List.of(new Minimap.Ornament(Skin.MARKE_QUER, 0, 137, 84, 0), new Minimap.Ornament(Skin.MARKE, 0, 74, 147, 0),
                     new Minimap.Ornament(Skin.MARKE_QUER, 0, 11, 84, 0), new Minimap.Ornament(Skin.NORDEN, 0, 74, 21, 0)),
-                    Minimap.ornamente(r, 2, rund, false, null, 2, 0, -1, false, -1), "rund " + rund);
+                    Minimap.ornamente(r, 2, rund, false, null, null, 2, 0, -1, false, -1), "rund " + rund);
         }
         // Um 30° gedreht: dieselben vier, starr mit der Karte, das Bild um denselben Winkel, die Mitte auf ganzen Pixeln.
         Drehung.Lage lage = Drehung.Lage.von(Math.toRadians(30), 0, 0, 0, 0);
         assertEquals(Math.toRadians(30), lage.winkel(), 1e-12);
-        List<Minimap.Ornament> rund = Minimap.ornamente(r, 2, true, false, lage, 3, 0, -1, false, -1);
+        List<Minimap.Ornament> rund = Minimap.ornamente(r, 2, true, false, null, lage, 3, 0, -1, false, -1);
         assertEquals(4, rund.size());
         Minimap.Ornament n = rund.get(3);
         assertEquals(Skin.NORDEN, n.teil());
@@ -291,14 +291,14 @@ class DrehungTest {
         assertEquals(Math.round(n.x() * 3), n.x() * 3, 1e-9);
         assertEquals(Math.round(n.y() * 3), n.y() * 3, 1e-9);
         // Eckig auf dem Quadrat durch die Mitte der Bänder.
-        for (Minimap.Ornament o : Minimap.ornamente(r, 2, false, false, lage, 1, 0, -1, false, -1)) {
+        for (Minimap.Ornament o : Minimap.ornamente(r, 2, false, false, null, lage, 1, 0, -1, false, -1)) {
             assertEquals(63, Math.max(Math.abs(o.x() - 74), Math.abs(o.y() - 84)), 0.5);
         }
         // Aus: nichts. Im Menü steht der Griff zuletzt an seiner Ecke, aktiv, nie gedreht; nur die Marke unter der Maus als _aktiv, hier N.
-        assertEquals(List.of(), Minimap.ornamente(r, 2, false, false, null, 2, Minimap.ALLE_MARKEN, -1, false, -1));
+        assertEquals(List.of(), Minimap.ornamente(r, 2, false, false, null, null, 2, Minimap.ALLE_MARKEN, -1, false, -1));
         double[] ecke = Skin.ecken(10, 20, 128, 128, 2, false)[3];
-        assertEquals(List.of(new Minimap.Ornament(Skin.GRIFF + 1, 3, ecke[0], ecke[1], 0)), Minimap.ornamente(r, 2, false, false, lage, 2, Minimap.ALLE_MARKEN, 3, true, -1));
-        List<Minimap.Ornament> menue = Minimap.ornamente(r, 2, false, false, null, 2, 0, 3, false, 0);
+        assertEquals(List.of(new Minimap.Ornament(Skin.GRIFF + 1, 3, ecke[0], ecke[1], 0)), Minimap.ornamente(r, 2, false, false, null, lage, 2, Minimap.ALLE_MARKEN, 3, true, -1));
+        List<Minimap.Ornament> menue = Minimap.ornamente(r, 2, false, false, null, null, 2, 0, 3, false, 0);
         assertEquals(5, menue.size());
         assertEquals(List.of(Skin.MARKE_QUER, Skin.MARKE, Skin.MARKE_QUER, Skin.NORDEN + 1), menue.subList(0, 4).stream().map(Minimap.Ornament::teil).toList());
         assertEquals(new Minimap.Ornament(Skin.GRIFF, 3, ecke[0], ecke[1], 0), menue.get(4));
@@ -313,8 +313,8 @@ class DrehungTest {
         for (boolean rund : new boolean[] {false, true}) {
             for (Drehung.Lage lage : new Drehung.Lage[] {null, Drehung.Lage.von(Math.toRadians(30), 0, 0, 0, 0)}) {
                 double grund = lage == null ? 0 : Math.toRadians(30);
-                List<Minimap.Ornament> starr = Minimap.ornamente(r, 2, rund, false, lage, 2, 0, -1, false, -1);
-                List<Minimap.Ornament> aussen = Minimap.ornamente(r, 2, rund, true, lage, 2, 0, -1, false, -1);
+                List<Minimap.Ornament> starr = Minimap.ornamente(r, 2, rund, false, null, lage, 2, 0, -1, false, -1);
+                List<Minimap.Ornament> aussen = Minimap.ornamente(r, 2, rund, true, null, lage, 2, 0, -1, false, -1);
                 assertEquals(List.of(Skin.MARKE, Skin.MARKE, Skin.MARKE, Skin.NORDEN), aussen.stream().map(Minimap.Ornament::teil).toList());
                 for (int i = 0; i < 4; i++) {
                     assertEquals(starr.get(i).x(), aussen.get(i).x());
@@ -328,7 +328,7 @@ class DrehungTest {
             }
         }
         // Die Marke unter der Maus nimmt auch nach aussen ihr Bild _aktiv, hier S.
-        assertEquals(Skin.MARKE + 1, Minimap.ornamente(r, 2, false, true, null, 2, 0, -1, false, 2).get(1).teil());
+        assertEquals(Skin.MARKE + 1, Minimap.ornamente(r, 2, false, true, null, null, 2, 0, -1, false, 2).get(1).teil());
     }
 
     @Test

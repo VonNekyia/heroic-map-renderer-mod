@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.69
+
+- **The marks of the biome frame sit on the frame.** The east, south and west marks of the "biome" frame no longer stick out past its narrow band: they rest on it, flush with the outer edge, shadow included, square and round, upright and rotating. North and the other frames stay as they were.
+
 ## 0.2.68
 
 - **The full map zooms toward the mouse.** The spot under the mouse pointer stays under it while you zoom with the mouse wheel, in and out, like on the web map. At the closest and farthest zoom the map doesn't move.

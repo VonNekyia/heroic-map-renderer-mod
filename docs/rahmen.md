@@ -143,7 +143,8 @@ im Atlas des GUI; F3+T und Ressourcenpakete laden ihn neu:
   (`Skin.lies`). Der Atlas nimmt nur PNG, die Textdatei liegt daneben.
   Mindestens zwei Bänder, siehe [Minimap](minimap.md), „Form“.
 - **`info.txt`:** `schatten=ja` oder `schatten=nein`; dazu `aussen=ja`,
-  wenn jedes Bild von der Mitte weg zeigen soll, siehe „Nach aussen“
+  wenn jedes Bild von der Mitte weg zeigen soll, und `buendig=ja`, wenn
+  O, S und W an der äusseren Kante liegen sollen, siehe „Nach aussen“
   (`Skin.lies`).
 - **Namen und Beschreibungen** stehen in `de_de.json` und `en_us.json`
   unter `heroicmap.rahmen.<skin>` und `heroicmap.rahmen.<skin>.beschreibung`.
@@ -206,7 +207,8 @@ dann die von „grau“, siehe „Im Menü“.
 
 - **Wo:** von der Mitte der Minimap in die Himmelsrichtung, auf der Mitte
   der Bänder, rund auf dem Kreis, eckig auf dem Quadrat (`Skin.marke`,
-  `Minimap.ornamente`). Genordet stehen sie fest oben, rechts, unten und
+  `Minimap.ornamente`). Bei „biom“ liegen O, S und W an der äusseren
+  Kante, siehe „Nach aussen“. Genordet stehen sie fest oben, rechts, unten und
   links, die linke obere Ecke bei `⌊p − w / 2 + 0,5⌋` (`Skin.lage`);
   gedreht wandern sie am Rahmen entlang, siehe „Drehen“.
 - **Bild:** fest je Richtung, N `norden`, S `marke`, O und W `marke_quer`
@@ -247,7 +249,25 @@ der User am 15.10. gewünscht, siehe
 - **Bild:** N `norden` wie bisher; O, S und W nehmen `marke`, gezeichnet
   für oben, und drehen es um 90°, 180° und 270° weiter
   (`Minimap.ornamente`). `marke_quer` bleibt bei diesen Skins ungenutzt.
-- **Lage** wie bei den anderen Skins, siehe „Marken“ und „Drehen“.
+- **Lage** wie bei den anderen Skins, siehe „Marken“ und „Drehen“; bei
+  „biom“ liegen O, S und W an der Kante, siehe unten.
+- **An der Kante bei „biom“:** O, S und W sitzen auf dem Rahmen und ragen
+  nicht darüber, auch ihr Schatten nicht. So hat es der User am 23.10.
+  gewählt, aus zwei Entwürfen: aussen bündig statt kleiner im Band, denn
+  ganz im Band von 2 Einheiten wäre eine Marke ein Punkt.
+  - **Schalter:** `buendig=ja` in `info.txt` jeder Kategorie
+    (`Skin.auflage`: Breite und Höhe von `marke`, der Schatten).
+  - **Lage:** Bild und Schatten um (+1, +1) liegen innen an der äusseren
+    Kante (`Skin.anliegend`). Ungedreht schliessen O und S mit ihrem
+    Schatten an der Kante ab, eine Einheit weiter innen als das Bild
+    allein, W mit dem Bild; rund berühren die äussersten Ecken den Kreis.
+    Gedreht zählt der Kasten des gedrehten Bilds: eckig an beiden Seiten,
+    die es erreichen kann, rund jede Ecke. Die Mitte auf ganzen Pixeln
+    kann es dann um einen halben Pixel verschieben.
+  - **Nach innen** reicht die Marke über die Bänder in die Karte.
+  - `norden` bleibt auf der Mitte der Bänder, ebenso die Marken der
+    anderen Skins. Der Klick im Menü trifft die Marke dort, wo sie liegt,
+    siehe „Im Menü“.
 - **Pixel:** Um ganze Vierteldrehungen gedreht liegt der Kasten des Bildes
   mit vertauschten Seiten auf ganzen Einheiten wie ungedreht
   (`Skin.blit`); genordet bleibt die Pixelkunst so scharf.
@@ -309,7 +329,7 @@ mindestens die halbe Diagonale der grössten Marke, aufgerundet
 (`Minimap.rand`, `Skin.einrueckung`), siehe die Tabelle unter „Skins“: bei
 `uhr` 13, bei `biom` 11. So bleibt jede Marke in jeder Drehung ganz auf
 dem Schirm, auch ihr Schatten, denn ihre Mitte liegt auf
-der Mitte der Bänder. Das gilt immer, auch ungedreht und mit dem Schalter
+der Mitte der Bänder oder, bei „biom“, weiter innen. Das gilt immer, auch ungedreht und mit dem Schalter
 „Verzierungen“ aus; so springt die Minimap beim Umschalten nicht, siehe
 [0012](entscheidungen/0012-marken-statt-verzierungen.md). Vorher war es die
 halbe zier, bei `uhr` 8, bei `biom` 6.

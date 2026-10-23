@@ -64,17 +64,23 @@ final class Skin {
     final boolean nachAussen;
     /** Die längere Seite der grössten Marke, in Pixeln. */
     final int groesste;
+    /**
+     * Mit {@code buendig=ja}: Breite und Höhe von {@code marke} und der Versatz des Schattens; O, S und W liegen dann samt Schatten
+     * innen an der äusseren Kante ({@link #anliegend}). Sonst null. Siehe docs/rahmen.md, „Nach aussen“.
+     */
+    final int[] auflage;
     private final Identifier[] sprites = new Identifier[TEILE.length];
     private Identifier ring;
     private int ringSeite;
 
-    private Skin(String name, int[] licht, int[] schatten, boolean mitSchatten, boolean nachAussen, int groesste) {
+    private Skin(String name, int[] licht, int[] schatten, boolean mitSchatten, boolean nachAussen, int groesste, int[] auflage) {
         this.name = name;
         this.licht = licht;
         this.schatten = schatten;
         this.mitSchatten = mitSchatten;
         this.nachAussen = nachAussen;
         this.groesste = groesste;
+        this.auflage = auflage;
         for (int i = 0; i < TEILE.length; i++) {
             sprites[i] = sprite(name, TEILE[i]);
         }
@@ -114,7 +120,9 @@ final class Skin {
                 TextureAtlasSprite s = gui().getSprite(sprite(name, teil));
                 groesste = Math.max(groesste, Math.max(s.contents().width(), s.contents().height()));
             }
-            return lies(name, text(name, "palette.txt"), text(name, "info.txt"), groesste);
+            TextureAtlasSprite marke = gui().getSprite(sprite(name, "marke"));
+            return lies(name, text(name, "palette.txt"), text(name, "info.txt"), groesste,
+                    new int[] {marke.contents().width(), marke.contents().height()});
         } catch (IOException | RuntimeException e) {
             LOGGER.warn("Heroic Map: Rahmen {} unlesbar", name, e);
             return null;
@@ -138,11 +146,15 @@ final class Skin {
 
     /**
      * Liest {@code palette.txt}: eine Zeile je Band von aussen nach innen, eine Farbe oder zwei,
-     * Licht und Schatten; {@code //} beginnt einen Kommentar. Aus {@code info.txt} {@code schatten=ja} und {@code aussen=ja}.
-     * {@code groesste} ist die längere Seite der grössten Marke in Pixeln. Mindestens zwei Bänder, siehe
-     * docs/minimap.md, „Form“.
+     * Licht und Schatten; {@code //} beginnt einen Kommentar. Aus {@code info.txt} {@code schatten=ja}, {@code aussen=ja} und
+     * {@code buendig=ja}. {@code groesste} ist die längere Seite der grössten Marke in Pixeln, {@code marke} Breite und Höhe
+     * von {@code marke}, nur für {@code buendig=ja} nötig. Mindestens zwei Bänder, siehe docs/minimap.md, „Form“.
      */
     static Skin lies(String name, String palette, String info, int groesste) {
+        return lies(name, palette, info, groesste, null);
+    }
+
+    static Skin lies(String name, String palette, String info, int groesste, int[] marke) {
         List<int[]> baender = new ArrayList<>();
         for (String zeile : palette.lines().toList()) {
             int kommentar = zeile.indexOf("//");
@@ -161,7 +173,9 @@ final class Skin {
         }
         int[] licht = baender.stream().mapToInt(b -> b[0]).toArray(), schatten = baender.stream().mapToInt(b -> b[1]).toArray();
         List<String> schalter = info.lines().map(String::trim).toList();
-        return new Skin(name, licht, schatten, schalter.contains("schatten=ja"), schalter.contains("aussen=ja"), groesste);
+        boolean mitSchatten = schalter.contains("schatten=ja");
+        int[] auflage = schalter.contains("buendig=ja") ? new int[] {marke[0], marke[1], mitSchatten ? 1 : 0} : null;
+        return new Skin(name, licht, schatten, mitSchatten, schalter.contains("aussen=ja"), groesste, auflage);
     }
 
     private static int farbe(String text) {
@@ -274,12 +288,49 @@ final class Skin {
 
     /**
      * Wo eine Marke sitzt, in Einheiten des GUI: von der Mitte der Minimap (x, y, Seite s) in
-     * Richtung (ux, uy), auf der Mitte der Bänder; rund auf dem Kreis, eckig auf dem Quadrat.
+     * Richtung (ux, uy), auf der Mitte der Bänder; rund auf dem Kreis, eckig auf dem Quadrat. Mit
+     * {@code auflage} ({@link #auflage}) liegt sie samt Schatten innen an der äusseren Kante ({@link #anliegend}).
      */
-    static double[] marke(double x, double y, double s, int baender, boolean rund, double ux, double uy) {
-        double h = s / 2 - baender / 2.0, laenge = Math.hypot(ux, uy);
-        double t = rund ? h / laenge : h / Math.max(Math.abs(ux), Math.abs(uy));
+    static double[] marke(double x, double y, double s, int baender, boolean rund, double ux, double uy, int[] auflage) {
+        double laenge = Math.hypot(ux, uy), t;
+        if (auflage == null) {
+            double h = s / 2 - baender / 2.0;
+            t = rund ? h / laenge : h / Math.max(Math.abs(ux), Math.abs(uy));
+        } else {
+            t = anliegend(s, rund, ux / laenge, uy / laenge, auflage) / laenge;
+        }
         return new double[] {x + s / 2 + ux * t, y + s / 2 + uy * t};
+    }
+
+    /**
+     * Wie weit von der Mitte der Minimap (Seite s) die Mitte eines Bilds {Breite, Höhe, Schatten} liegt, das von ihr weg in
+     * Richtung (nx, ny) der Länge 1 zeigt, damit es samt Schatten um (+Schatten, +Schatten) gerade innen an der äusseren Kante
+     * anliegt: rund am Kreis, eckig an beiden Seiten, die es erreichen kann; gedreht mit dem Kasten des gedrehten Bilds.
+     * Siehe docs/rahmen.md, „Nach aussen“.
+     */
+    static double anliegend(double s, boolean rund, double nx, double ny, int[] auflage) {
+        double r = s / 2, w = auflage[0] / 2.0, h = auflage[1] / 2.0, schatten = auflage[2];
+        if (rund) {
+            // Jede Ecke a des Bilds und seines Schattens im Kreis: |d · n + a| ≤ r.
+            double d = Double.MAX_VALUE;
+            for (int j = 0; j < 8; j++) {
+                double eh = (j & 1) == 0 ? h : -h, ew = (j & 2) == 0 ? w : -w, s0 = j < 4 ? 0 : schatten;
+                double ax = eh * nx - ew * ny + s0, ay = eh * ny + ew * nx + s0, p = ax * nx + ay * ny;
+                d = Math.min(d, Math.sqrt(p * p - (ax * ax + ay * ay) + r * r) - p);
+            }
+            return d;
+        }
+        double[] n = {nx, ny};
+        double d = Double.MAX_VALUE;
+        for (int a = 0; a < 2; a++) {
+            double u = Math.abs(n[a]);
+            if (u > 1e-12) {
+                // Die halbe Ausdehnung des gedrehten Bilds auf dieser Achse; der Schatten liegt rechts und unten.
+                double weit = h * u + w * Math.abs(n[1 - a]) + (n[a] > 0 ? schatten : 0);
+                d = Math.min(d, (r - weit) / u);
+            }
+        }
+        return d;
     }
 
     /** Die linke obere Ecke eines Bilds der Breite w, dessen Mitte auf p liegen soll. */
