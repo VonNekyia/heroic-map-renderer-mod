@@ -1232,6 +1232,7 @@ class WegpunkteTest {
     void todesZeit(@TempDir Path ordner) throws Exception {
         ZoneId zone = ZoneId.of("Europe/Berlin");
         long heute = ZonedDateTime.of(2026, 10, 20, 14, 32, 0, 0, zone).toInstant().toEpochMilli();
+        long frueher = ZonedDateTime.of(2026, 10, 18, 14, 32, 0, 0, zone).toInstant().toEpochMilli();
         Minimap.TodZeit[] stile = {Minimap.TodZeit.DATUM_UHRZEIT, Minimap.TodZeit.DATUM, Minimap.TodZeit.UHRZEIT};
         String[] erwartet = {"20.10. 14:32", "20.10.", "14:32"};
         for (int i = 0; i < stile.length; i++) {
