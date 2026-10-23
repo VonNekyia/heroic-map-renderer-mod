@@ -1,3 +1,4 @@
 schatten=ja
 aussen=ja
-buendig=ja
+lage=innen
+lage_norden=mitte

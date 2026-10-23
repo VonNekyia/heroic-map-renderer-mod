@@ -58,12 +58,14 @@ class SkinTest {
                 BufferedImage b = bild(name, teil);
                 groesste = Math.max(groesste, Math.max(b.getWidth(), b.getHeight()));
             }
-            BufferedImage marke = bild(name, "marke");
-            Skin s = Skin.lies(name, text(name, "palette.txt"), text(name, "info.txt"), groesste, new int[] {marke.getWidth(), marke.getHeight()});
+            BufferedImage norden = bild(name, "norden"), marke = bild(name, "marke");
+            Skin s = Skin.lies(name, text(name, "palette.txt"), text(name, "info.txt"), groesste, new int[] {norden.getWidth(), norden.getHeight()},
+                    new int[] {marke.getWidth(), marke.getHeight()});
             assertEquals(baender.get(name), s.baender(), name);
-            // Nur „biom“ legt die Marken an die äussere Kante, siehe biomMarkenLiegenAmRahmen.
+            // Nur „biom“ legt O, S und W an die äussere Kante, N bleibt auf der Mitte; siehe biomMarkenLiegenAmRahmen.
             if (name.startsWith(Skin.BIOM + "/")) {
-                assertArrayEquals(new int[] {marke.getWidth(), marke.getHeight(), 1}, s.auflage, name);
+                int[] m = {marke.getWidth(), marke.getHeight(), 1};
+                assertArrayEquals(new int[][] {null, m, m, m}, s.auflage, name);
             } else {
                 assertNull(s.auflage, name);
             }
@@ -192,7 +194,7 @@ class SkinTest {
             String name = Skin.BIOM + "/" + kategorie;
             BufferedImage bild = bild(name, "marke");
             int w = bild.getWidth(), h = bild.getHeight();
-            Skin skin = Skin.lies(name, text(name, "palette.txt"), text(name, "info.txt"), 15, new int[] {w, h});
+            Skin skin = Skin.lies(name, text(name, "palette.txt"), text(name, "info.txt"), 15, new int[] {15, 15}, new int[] {w, h});
             for (int seite : new int[] {64, 101, 128, 256}) {
                 Minimap.Rahmen r = new Minimap.Rahmen(10, 21, seite);
                 double cx = r.x() + seite / 2.0, cy = r.y() + seite / 2.0, halb = seite / 2.0;
@@ -241,6 +243,21 @@ class SkinTest {
                 }
             }
         }
+    }
+
+    @Test
+    void lageInInfoTxt() {
+        // lage_norden gilt wie lage, wenn die Zeile fehlt; innen nur mit aussen=ja; sonst nur mitte oder innen.
+        int[] n = {15, 15}, m = {5, 9};
+        assertNull(Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage=mitte", 15, n, m).auflage);
+        assertArrayEquals(new int[][] {{15, 15, 1}, {5, 9, 1}, {5, 9, 1}, {5, 9, 1}},
+                Skin.lies("t", "#000000\n#111111", "schatten=ja\naussen=ja\nlage=innen", 15, n, m).auflage);
+        assertArrayEquals(new int[][] {null, {5, 9, 0}, {5, 9, 0}, {5, 9, 0}},
+                Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage=innen\nlage_norden=mitte", 15, n, m).auflage);
+        assertArrayEquals(new int[][] {{15, 15, 0}, null, null, null},
+                Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage_norden=innen", 15, n, m).auflage);
+        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000\n#111111", "lage=innen", 15, n, m));
+        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage=aussen", 15, n, m));
     }
 
     @Test

@@ -1442,15 +1442,15 @@ public final class Minimap {
      * mit der Karte, die Marke {@code hervor} (0 bis 3, N, O, S, W) aktiv; im Menü zuletzt der Griff an seiner
      * Ecke, nie gedreht. In den Ecken sonst nichts. Mit {@code aussen} zeigt jedes Bild von der Mitte weg:
      * O, S und W nehmen {@code marke}, um eine, zwei und drei Vierteldrehungen weiter; mit {@code auflage} ({@link Skin#auflage})
-     * liegen sie samt Schatten innen an der äusseren Kante, N bleibt auf der Mitte. Siehe docs/rahmen.md, „Marken“.
+     * liegt eine Marke samt Schatten innen an der äusseren Kante, ohne auf der Mitte. Siehe docs/rahmen.md, „Marken“.
      */
-    static List<Ornament> ornamente(Rahmen r, int baender, boolean rund, boolean aussen, int[] auflage, Drehung.Lage lage, int k,
+    static List<Ornament> ornamente(Rahmen r, int baender, boolean rund, boolean aussen, int[][] auflage, Drehung.Lage lage, int k,
             int ohne, int griffEcke, boolean griffAktiv, int hervor) {
         List<Ornament> aus = new ArrayList<>(5);
         double winkel = lage == null ? 0 : lage.winkel();
         for (int i : MARKEN) {
             if ((ohne & 1 << i) == 0) {
-                int[] auf = i == 0 ? null : auflage;
+                int[] auf = auflage == null ? null : auflage[i];
                 double[] p = lage == null ? Skin.marke(r.x(), r.y(), r.seite(), baender, rund, RICHTUNGEN[i][0], RICHTUNGEN[i][1], auf)
                         : verzierung(r, baender, rund, lage, RICHTUNGEN[i], k, auf);
                 int teil = aussen && i != 0 ? Skin.MARKE : Skin.MARKE_JE_RICHTUNG[i];
