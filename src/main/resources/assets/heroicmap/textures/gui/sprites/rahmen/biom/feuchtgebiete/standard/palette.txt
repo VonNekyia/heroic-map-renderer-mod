@@ -1,0 +1,4 @@
+// heroicmap Rahmen 'biom/feuchtgebiete', Variante 'standard': Linie aussen -> innen, eine Zeile je Band.
+// Zwei Werte = Licht (oben/links) Schatten (unten/rechts).
+#1E1B18
+#B5C97A

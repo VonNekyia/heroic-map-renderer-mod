@@ -1,0 +1,4 @@
+schatten=ja
+drehung=aussen
+lage=kante
+lage_norden=mitte
