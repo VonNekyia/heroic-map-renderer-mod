@@ -1345,7 +1345,8 @@ Schleier am Rand, siehe „Schleier“.
   angeheftet; aus setzt ein Tod keinen. Zeit des Todes (`todZeit`): nach
   `kill @a` steht sie auf der Vollbildkarte unter dem Todespunkt, im Bild
   `tod-zeit.png` deutlich mehr dunkle Schrift als derselbe Todespunkt ohne
-  Zeit; auf der Minimap ändert sie nichts. Regler „Todespunkte“ (`todRegler`):
+  Zeit, mit dem Stil „keine“ so wenig wie ohne Zeit; auf der Minimap ändert
+  sie nichts. Regler „Todespunkte“ (`todRegler`):
   Klicks ans rechte Ende, ans linke und in die Mitte geben 16, aus und 8,
   gespeichert beim Schliessen; mit acht Todespunkten nehmen diese Klicks und
   ein Ziehen von 8 auf 1 und zurück keinen weg, nach `Esc` sind es acht; auf

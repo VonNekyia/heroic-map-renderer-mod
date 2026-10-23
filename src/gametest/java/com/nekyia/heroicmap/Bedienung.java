@@ -2852,8 +2852,9 @@ public final class Bedienung implements FabricClientGameTest {
 
     /**
      * Die Zeit des Todes (mod#166): Nach `kill @a` steht sie auf der Vollbildkarte unter dem Todespunkt, als dunkle Schrift im
-     * Bildschirmfoto; derselbe Todespunkt ohne Zeit hat dort deutlich weniger dunkle Pixel. Auf der Minimap ändert die Zeit
-     * nichts: dort mit und ohne Zeit gleich viele. Siehe docs/wegpunkte.md, „Todespunkt“.
+     * Bildschirmfoto; derselbe Todespunkt ohne Zeit hat dort deutlich weniger dunkle Pixel, ebenso mit dem Stil „keine“
+     * (`tod_zeit=aus`) wie ohne Zeit. Auf der Minimap ändert die Zeit nichts: dort mit und ohne Zeit gleich viele. Siehe
+     * docs/wegpunkte.md, „Todespunkt“.
      */
     private static void todZeit(ClientGameTestContext context, TestServerContext server, int k) {
         server.runCommand("tp @a 40.5 -60 -30.5");
@@ -2878,6 +2879,11 @@ public final class Bedienung implements FabricClientGameTest {
             Karte.Marke m = marke(context, tod);
             double[] unter = {m.x(), m.y() + 9};
             int mit = dunkle(context.takeScreenshot(TestScreenshotOptions.of("tod-zeit").disableCounterPrefix()), k, unter, 6);
+            // Mit dem Stil „keine“ steht keine Zeit, obwohl der Todespunkt eine hat.
+            context.runOnClient(mc -> Minimap.INSTANZ.setzeTodZeit(Minimap.TodZeit.AUS));
+            context.waitTicks(2);
+            int keine = dunkle(context.takeScreenshot(TestScreenshotOptions.of("tod-zeit-keine").disableCounterPrefix()), k, unter, 6);
+            context.runOnClient(mc -> Minimap.INSTANZ.setzeTodZeit(Minimap.TodZeit.DATUM_UHRZEIT));
             // Derselbe Block ohne Zeit: so stand ein Todespunkt aus einer älteren Datei.
             context.runOnClient(mc -> {
                 mc.gui.setScreen(null);
@@ -2892,12 +2898,16 @@ public final class Bedienung implements FabricClientGameTest {
             if (mit < ohne + 4 * k * k) {
                 throw new AssertionError("Unter dem Todespunkt fehlt die Zeit: " + mit + " dunkle Pixel mit, " + ohne + " ohne");
             }
+            if (Math.abs(keine - ohne) > k * k) {
+                throw new AssertionError("Mit dem Stil „keine“ steht doch eine Zeit: " + keine + " dunkle Pixel, " + ohne + " ohne Zeit");
+            }
             if (minimapMit != minimapOhne) {
                 throw new AssertionError("Auf der Minimap ändert die Zeit etwas: " + minimapMit + " dunkle Pixel mit, " + minimapOhne + " ohne");
             }
         } finally {
             context.runOnClient(mc -> {
                 Minimap.INSTANZ.setzeTodespunkte(1);
+                Minimap.INSTANZ.setzeTodZeit(Minimap.TodZeit.DATUM_UHRZEIT);
                 Wegpunkte.INSTANZ.kappeTode(0);
                 mc.gui.setScreen(null);
             });
