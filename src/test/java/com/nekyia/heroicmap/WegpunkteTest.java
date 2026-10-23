@@ -6,7 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.ZoneId;
@@ -1220,26 +1223,36 @@ class WegpunkteTest {
     }
 
     /**
-     * Die Zeit unter dem Todespunkt (mod#166): am selben Tag nur die Uhrzeit, an einem früheren mit Datum, nach den Mustern der
-     * Sprache, auch über Mitternacht. In der Datei je Eintrag von tode als zeit, tod bleibt ohne; über den Neustart und das
+     * Die Zeit unter dem Todespunkt (mod#166): streng je Stil Datum und Uhrzeit, Datum oder Uhrzeit, auch am Tag selbst (Wunsch
+     * des Users vom 24.10.), nach den Mustern der Sprache; die Muster beider Sprachen gehen. In der Datei je Eintrag von tode als zeit, tod bleibt ohne; über den Neustart und das
      * Anheften bleibt sie; die Folge kommt aus der Liste, nicht aus der Zeit; eine alte Datei ohne zeit gibt 0. Siehe
      * docs/wegpunkte.md, „Todespunkt“.
      */
     @Test
     void todesZeit(@TempDir Path ordner) throws Exception {
         ZoneId zone = ZoneId.of("Europe/Berlin");
-        long jetzt = ZonedDateTime.of(2026, 10, 20, 14, 40, 0, 0, zone).toInstant().toEpochMilli();
         long heute = ZonedDateTime.of(2026, 10, 20, 14, 32, 0, 0, zone).toInstant().toEpochMilli();
         long frueher = ZonedDateTime.of(2026, 10, 18, 14, 32, 0, 0, zone).toInstant().toEpochMilli();
-        assertEquals("14:32", Wegpunkte.todZeit(heute, jetzt, zone, "HH:mm", "dd.MM. HH:mm"));
-        assertEquals("18.10. 14:32", Wegpunkte.todZeit(frueher, jetzt, zone, "HH:mm", "dd.MM. HH:mm"));
-        long spaet = ZonedDateTime.of(2026, 10, 19, 23, 59, 0, 0, zone).toInstant().toEpochMilli();
-        long frueh = ZonedDateTime.of(2026, 10, 20, 0, 1, 0, 0, zone).toInstant().toEpochMilli();
-        assertEquals("19.10. 23:59", Wegpunkte.todZeit(spaet, frueh, zone, "HH:mm", "dd.MM. HH:mm"));
+        Minimap.TodZeit[] stile = {Minimap.TodZeit.DATUM_UHRZEIT, Minimap.TodZeit.DATUM, Minimap.TodZeit.UHRZEIT};
+        String[] erwartet = {"20.10. 14:32", "20.10.", "14:32"};
+        for (int i = 0; i < stile.length; i++) {
+            assertEquals(erwartet[i], Wegpunkte.todZeit(heute, zone, stile[i].fest, stile[i].fest));
+        }
+        // Die Muster aus beiden Sprachen gehen und geben je Stil, was er sagt.
+        String[][] sprachen = {{"de_de", "20.10. 14:32", "20.10.", "14:32"}, {"en_us", "10/20 14:32", "10/20", "14:32"}};
+        for (String[] s : sprachen) {
+            JsonObject lang;
+            try (InputStream rein = WegpunkteTest.class.getResourceAsStream("/assets/heroicmap/lang/" + s[0] + ".json")) {
+                lang = JsonParser.parseString(new String(rein.readAllBytes(), StandardCharsets.UTF_8)).getAsJsonObject();
+            }
+            for (int i = 0; i < stile.length; i++) {
+                assertEquals(s[i + 1], Wegpunkte.todZeit(heute, zone, lang.get(stile[i].schluessel).getAsString(), "'kaputt'"), s[0] + " " + stile[i]);
+            }
+        }
         // Ein Muster aus einem Ressourcenpaket, das nicht geht oder ein Feld nicht kennt, gibt das feste (Review von #172).
-        assertEquals("14:32", Wegpunkte.todZeit(heute, jetzt, zone, "HH:mm 'offen", "dd.MM. HH:mm"));
-        assertEquals("18.10. 14:32", Wegpunkte.todZeit(frueher, jetzt, zone, "HH:mm", "{dd}"));
-        assertEquals("18.10. 14:32", Wegpunkte.todZeit(frueher, jetzt, zone, "HH:mm", "dd.MM. bb"));
+        assertEquals("14:32", Wegpunkte.todZeit(heute, zone, "HH:mm 'offen", "HH:mm"));
+        assertEquals("20.10. 14:32", Wegpunkte.todZeit(heute, zone, "{dd}", "dd.MM. HH:mm"));
+        assertEquals("20.10. 14:32", Wegpunkte.todZeit(heute, zone, "dd.MM. bb", "dd.MM. HH:mm"));
         // In der Datei: zeit im Eintrag von tode, tod wie bisher ohne.
         Wegpunkte w = new Wegpunkte();
         w.lies(ordner);

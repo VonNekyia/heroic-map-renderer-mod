@@ -1442,8 +1442,11 @@ final class Karte extends Screen {
         if (Math.abs(s[0] - m.x()) > 1 || Math.abs(s[1] - m.y()) > 1) {
             return;
         }
-        String text = Wegpunkte.todZeit(p.zeit(), System.currentTimeMillis(), ZoneId.systemDefault(),
-                Component.translatable("heroicmap.karte.tod_zeit_heute").getString(), Component.translatable("heroicmap.karte.tod_zeit").getString());
+        Minimap.TodZeit stil = Minimap.INSTANZ.todZeit();
+        if (stil == Minimap.TodZeit.AUS) {
+            return;
+        }
+        String text = Wegpunkte.todZeit(p.zeit(), ZoneId.systemDefault(), Component.translatable(stil.schluessel).getString(), stil.fest);
         g.pose().pushMatrix();
         // Der Fuss ist die untere Spitze der Raute, halbe Diagonale TOD_FUSS unter der Mitte.
         g.pose().translate(m.x(), m.y() + TOD_FUSS);
