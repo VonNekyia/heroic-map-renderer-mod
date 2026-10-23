@@ -1409,10 +1409,30 @@ public final class Minimap {
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.scale(1f / k);
+        Gitter.Linien l = linien(seite, links + bx, oben + by, (int) (16 * zoom * k), 1);
         // Ein Pixel des Geräts breit, bei jedem GUI-Massstab. Siehe docs/minimap.md, „Chunklinien“.
-        Gitter.zeichne(g, bx, by, new ScreenRectangle(r.x() * k, r.y() * k, n, n), 1, LINIE,
-                linien(seite, links + bx, oben + by, (int) (16 * zoom * k), 1), lage, form);
+        Gitter.zeichne(g, bx, by, new ScreenRectangle(r.x() * k, r.y() * k, n, n), 1, LINIE, l, lage, form);
         pose.popMatrix();
+        // Ungedreht liegt Spalte x des Bilds auf Pixel cx + x des Schirms.
+        zuletztLinien = lage.sin() == 0 && lage.cos() == 1 ? l : null;
+        zuletztX = (int) lage.cx() + bx;
+    }
+
+    /** Die zuletzt ungedreht gezeichneten Chunklinien und wo Spalte 0 auf dem Schirm lag, für den Gametest. */
+    private Gitter.Linien zuletztLinien;
+    private int zuletztX;
+
+    /** Für den Gametest: die Spalten der senkrechten Chunklinien in Pixeln des Schirms, zuletzt ungedreht gezeichnet; sonst leer. */
+    int[] chunklinienSpalten() {
+        Gitter.Linien l = zuletztLinien;
+        if (l == null) {
+            return new int[0];
+        }
+        int[] spalten = new int[l.nx()];
+        for (int i = 0; i < spalten.length; i++) {
+            spalten[i] = zuletztX + l.xs()[i];
+        }
+        return spalten;
     }
 
     /**
