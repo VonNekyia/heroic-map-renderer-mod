@@ -1409,8 +1409,9 @@ public final class Minimap {
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.scale(1f / k);
-        Gitter.zeichne(g, bx, by, new ScreenRectangle(r.x() * k, r.y() * k, n, n), k, LINIE,
-                linien(seite, links + bx, oben + by, (int) (16 * zoom * k), k), lage, form);
+        // Ein Pixel des Geräts breit, bei jedem GUI-Massstab. Siehe docs/minimap.md, „Chunklinien“.
+        Gitter.zeichne(g, bx, by, new ScreenRectangle(r.x() * k, r.y() * k, n, n), 1, LINIE,
+                linien(seite, links + bx, oben + by, (int) (16 * zoom * k), 1), lage, form);
         pose.popMatrix();
     }
 
@@ -1496,17 +1497,17 @@ public final class Minimap {
 
     /**
      * Die Chunklinien im Quadrat mit der Seite n, auf dem Raster der Karte: Die Linie von Chunk c
-     * beginnt auf dem Pixel, auf dem die Karte Block 16·c zeichnet ({@link #pixel}), alle
-     * {@code schritt} Pixel, und ist k breit; nur Linien ganz im Quadrat, über seine ganze Seite.
+     * beginnt auf dem Pixel, auf dem die Karte Block 16·c zeichnet ({@link #pixel}), dem ersten östlich und südlich der
+     * Kante, alle {@code schritt} Pixel, und ist {@code dicke} breit; nur Linien ganz im Quadrat, über seine ganze Seite.
      * Die Form schneidet danach {@link Gitter}.
      */
-    static Gitter.Linien linien(int n, int links, int oben, int schritt, int k) {
+    static Gitter.Linien linien(int n, int links, int oben, int schritt, int dicke) {
         int m = n / schritt + 1, nx = 0, ny = 0;
         int[] xs = new int[m], ys = new int[m];
-        for (int px = Math.ceilDiv(links, schritt) * schritt - links; px + k <= n; px += schritt) {
+        for (int px = Math.ceilDiv(links, schritt) * schritt - links; px + dicke <= n; px += schritt) {
             xs[nx++] = px;
         }
-        for (int pz = Math.ceilDiv(oben, schritt) * schritt - oben; pz + k <= n; pz += schritt) {
+        for (int pz = Math.ceilDiv(oben, schritt) * schritt - oben; pz + dicke <= n; pz += schritt) {
             ys[ny++] = pz;
         }
         return new Gitter.Linien(xs, nx, ys, ny, n, n);

@@ -529,19 +529,21 @@ class MinimapTest {
 
     @Test
     void chunklinienAufDemRasterDerKarte() {
-        // Zoom 2, GUI-Massstab 3: ein Chunk sind 96 Pixel des Bildes, eine Linie 3 breit.
+        // Zoom 2, GUI-Massstab 3: ein Chunk sind 96 Pixel des Bildes, eine Linie ein Pixel breit.
         int zoom = 2, k = 3, n = 128 * k, schritt = 16 * zoom * k;
         for (int links : new int[] {-1000, -50, -1, 0, 1, 3, 50, 94, 95, 96, 1000}) {
-            Gitter.Linien l = Minimap.linien(n, links, links, schritt, k);
+            Gitter.Linien l = Minimap.linien(n, links, links, schritt, 1);
             assertEquals(n, l.breite());
             assertEquals(n, l.hoehe());
-            // Die erste ganz im Bild, die davor nicht; die letzte ganz im Bild, die danach nicht. Bei links 3 endet die letzte genau am Rand.
+            // Die erste ganz im Bild, die davor nicht; die letzte ganz im Bild, die danach nicht. Bei links 1 liegt die letzte auf dem
+            // letzten Pixel.
             assertTrue(l.xs()[0] >= 0 && l.xs()[0] - schritt < 0, "links " + links);
-            assertTrue(l.xs()[l.nx() - 1] + k <= n && l.xs()[l.nx() - 1] + schritt + k > n, "links " + links);
+            assertTrue(l.xs()[l.nx() - 1] + 1 <= n && l.xs()[l.nx() - 1] + schritt + 1 > n, "links " + links);
             for (int i = 0; i < l.nx(); i++) {
-                // Jede Linie, wo die Karte den ersten Block ihres Chunks zeichnet.
+                // Jede Linie auf dem ersten Pixel, auf dem die Karte Block 16·c zeichnet; das davor zeigt noch Block 16·c − 1.
                 int chunk = Math.floorDiv(l.xs()[i] + links, schritt);
                 assertEquals(Minimap.pixel(16.0 * chunk, zoom, k, links), l.xs()[i], "links " + links + ", Chunk " + chunk);
+                assertEquals(Minimap.pixel(16.0 * chunk - 1, zoom, k, links) + zoom * k, l.xs()[i], "links " + links + ", Chunk " + chunk);
             }
             assertArrayEquals(l.xs(), l.ys());
             assertEquals(l.nx(), l.ny());

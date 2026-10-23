@@ -172,28 +172,29 @@ final class Kartenblick {
     }
 
     /**
-     * Die sichtbaren Chunklinien auf dem Raster der Kacheln, eine Einheit breit: senkrechte über die
-     * ganze Höhe, waagrechte über die ganze Breite. Siehe docs/minimap.md, „Chunklinien“.
+     * Die sichtbaren Chunklinien auf dem Raster der Kacheln, in Pixeln des Geräts bei GUI-Massstab {@code gs} über
+     * {@code breite} × {@code hoehe} Einheiten: je eine Linie auf dem ersten Pixel östlich und südlich der Kante 16·c,
+     * senkrechte über die ganze Höhe, waagrechte über die ganze Breite. Siehe docs/minimap.md, „Chunklinien“.
      */
-    Gitter.Linien linien(int scale, int breite, int hoehe) {
+    Gitter.Linien linien(int scale, int breite, int hoehe, int gs) {
         double chunk = 16.0 * scale, abstand = chunkAbstand(scale);
         int mx = (int) (breite / abstand) + 2, mz = (int) (hoehe / abstand) + 2, nx = 0, ny = 0;
         int[] xs = new int[mx], ys = new int[mz];
         for (int c = ersterChunkX(scale, breite); nx < mx; c++) {
-            int x = (int) Math.floor(rasterX(c * chunk, breite));
-            if (x >= breite) {
+            int x = (int) Math.floor(rasterX(c * chunk, breite) * gs);
+            if (x >= breite * gs) {
                 break;
             }
             xs[nx++] = x;
         }
         for (int c = ersterChunkZ(scale, hoehe); ny < mz; c++) {
-            int y = (int) Math.floor(rasterY(c * chunk, hoehe));
-            if (y >= hoehe) {
+            int y = (int) Math.floor(rasterY(c * chunk, hoehe) * gs);
+            if (y >= hoehe * gs) {
                 break;
             }
             ys[ny++] = y;
         }
-        return new Gitter.Linien(xs, nx, ys, ny, breite, hoehe);
+        return new Gitter.Linien(xs, nx, ys, ny, breite * gs, hoehe * gs);
     }
 
     /** Eine Stufe feiner, auf der feinsten die Lupe grösser. */
