@@ -59,7 +59,9 @@ final class Einstellungen extends Screen {
     private enum Zug { KEINER, KLICK, LAGE, GROESSE }
 
     private Zug zug = Zug.KEINER;
-    private final MinimapKlick klick = new MinimapKlick();
+    /** Der Wähler der Rahmen über dem Menü; offen nimmt er alle Klicks und Esc. Siehe docs/rahmen.md, „Wähler“. */
+    private final Waehler waehler = new Waehler();
+    private final MinimapKlick klick = new MinimapKlick(waehler);
     /** Beim Verschieben: wo die Maus die Minimap gegriffen hat. Beim Ziehen: die feste Ecke. */
     private int festX, festY;
     /** Beim Ziehen: liegt der Griff links oder oben? */
@@ -253,6 +255,12 @@ final class Einstellungen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mausX, int mausY, float delta) {
+        // Ist der Wähler offen, gilt die Maus nur ihm: das Menü darunter ohne Hover und Tooltip.
+        int echtX = mausX, echtY = mausY;
+        if (waehler.offen()) {
+            mausX = -1;
+            mausY = -1;
+        }
         // Das L folgt der Minimap schon beim Ziehen; die Knöpfe erst nach dem Loslassen.
         Minimap m = Minimap.INSTANZ;
         lege();
@@ -301,6 +309,21 @@ final class Einstellungen extends Screen {
         boolean frei = (zug == Zug.KEINER || zug == Zug.KLICK)
                 && !(Minimap.INSTANZ.sichtbar() && imGriff(mausX, mausY, Minimap.INSTANZ.rahmen(width, height)));
         klick.zeichne(g, font, mausX, mausY, frei);
+        if (waehler.offen()) {
+            waehler.zeichne(g, font, echtX, echtY, width, height);
+        }
+    }
+
+    @Override
+    public boolean keyPressed(KeyEvent ereignis) {
+        // Offen nimmt der Wähler jede Taste; Esc schliesst nur ihn, nicht das Menü.
+        if (waehler.offen()) {
+            if (ereignis.key() == InputConstants.KEY_ESCAPE) {
+                waehler.schliesse();
+            }
+            return true;
+        }
+        return super.keyPressed(ereignis);
     }
 
     /** Über der Minimap die Koordinaten des Blocks unter der Maus, fest unten links, genau wie gezeichnet: im Menü immer genordet. */
@@ -333,6 +356,9 @@ final class Einstellungen extends Screen {
     /** Das Mausrad über der Minimap oder dem Regler „Zoom“: je Schritt eine Raste, nach vorn näher; über „Auflösung“ ebenso. */
     @Override
     public boolean mouseScrolled(double x, double y, double weitX, double weitY) {
+        if (waehler.offen()) {
+            return true;
+        }
         if (weitY != 0 && zug == Zug.KEINER && aufloesung.isMouseOver(x, y)) {
             aufloesung.schritt(weitY > 0 ? 1 : -1);
             return true;
@@ -347,10 +373,22 @@ final class Einstellungen extends Screen {
 
     @Override
     public boolean mouseClicked(MouseButtonEvent e, boolean doppelt) {
+        if (waehler.offen()) {
+            waehler.klick(e.x(), e.y(), width, height);
+            return true;
+        }
         if (super.mouseClicked(e, doppelt)) {
             return true;
         }
         if (!Minimap.INSTANZ.sichtbar()) {
+            return false;
+        }
+        // Die mittlere Taste nur auf eine Marke: durchsichtig oder zurück, beim Loslassen.
+        if (e.button() == InputConstants.MOUSE_BUTTON_MIDDLE) {
+            if (klick.druecke(e)) {
+                zug = Zug.KLICK;
+                return true;
+            }
             return false;
         }
         // Ein Linksklick auf die Zeile der Koordinaten wechselt ihren Stil, auch von „aus“ zurück.
@@ -387,6 +425,9 @@ final class Einstellungen extends Screen {
 
     @Override
     public boolean mouseDragged(MouseButtonEvent e, double dx, double dy) {
+        if (waehler.offen()) {
+            return true;
+        }
         Minimap m = Minimap.INSTANZ;
         int mx = Mth.floor(e.x()), my = Mth.floor(e.y());
         switch (zug) {
@@ -414,6 +455,9 @@ final class Einstellungen extends Screen {
 
     @Override
     public boolean mouseReleased(MouseButtonEvent e) {
+        if (waehler.offen() && zug == Zug.KEINER) {
+            return true;
+        }
         boolean geklickt = zug == Zug.KLICK && klick.lasse(e);
         boolean gezogen = zug == Zug.LAGE || zug == Zug.GROESSE;
         zug = Zug.KEINER;
