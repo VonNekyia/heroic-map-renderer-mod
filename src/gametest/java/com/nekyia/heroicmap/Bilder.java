@@ -1056,7 +1056,8 @@ public final class Bilder implements FabricClientGameTest {
                 boolean rund = i == 1;
                 context.runOnClient(mc -> {
                     Minimap.INSTANZ.setzeSkin(wahl[0]);
-                    Minimap.INSTANZ.setzeVariante(wahl[0], wahl[1] != null ? wahl[1] : Skin.varianten(wahl[0]).getFirst().name());
+                    // Ohne Angabe die erste Variante; „biom“ hat sie je Kategorie.
+                    Minimap.INSTANZ.setzeVariante(wahl[0], wahl[1]);
                     Minimap.INSTANZ.setzeRund(rund);
                 });
                 context.waitTicks(2);

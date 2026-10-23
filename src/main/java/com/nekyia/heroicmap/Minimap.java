@@ -455,8 +455,13 @@ public final class Minimap {
         return varianten.get(familie);
     }
 
+    /** Setzt die Variante der Familie; null nimmt die Wahl zurück, dann gilt die erste. */
     void setzeVariante(String familie, String variante) {
-        varianten.put(familie, variante);
+        if (variante == null) {
+            varianten.remove(familie);
+        } else {
+            varianten.put(familie, variante);
+        }
     }
 
     /** Die Kategorie, deren Rahmen „biom“ gerade zeigt. */
