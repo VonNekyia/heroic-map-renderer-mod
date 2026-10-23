@@ -326,9 +326,12 @@ weiter heraus stünden die Linien dichter als ein Pixel.
 ![Die selbst gezeichnete Karte der Szene mit Chunklinien](bilder/chunklinien.png)
 
 - **Aussehen:** ein Pixel des Geräts breit, bei jedem GUI-Massstab,
-  Schwarz zu 30 % deckend (`Minimap.LINIE`), damit die Karte lesbar
-  bleibt. So hat es der User am 23.10. gewünscht; bis 0.2.68 war sie eine
-  Einheit des GUI breit und lag auf dem ersten Block des Chunks.
+  Schwarz zu 45 % deckend (`Minimap.LINIE`), damit sie auch bei
+  GUI-Massstab 4 sichtbar bleibt und die Karte lesbar. So hat es der User
+  am 23.10. gewünscht; bis 0.2.68 war sie eine Einheit des GUI breit, zu
+  30 % deckend, und lag auf dem ersten Block des Chunks. Mit einem Pixel
+  verschwanden 30 % bei GUI-Massstab 4 fast; 45 % und 60 % blieben lesbar,
+  45 % deckt die Karte weniger zu (Vergleich in der PR).
 - **Auf der Kante:** Die Linie eines Chunks liegt auf der Grenze zwischen
   Block 16·c − 1 und 16·c, bei x wie bei z, dort, wo `Strg` einrastet,
   siehe [Wegpunkte](wegpunkte.md), „Einrasten“. Weil ein Pixel keine Mitte
@@ -346,7 +349,7 @@ weiter heraus stünden die Linien dichter als ein Pixel.
   [Wegpunkte](wegpunkte.md), „Einrasten“.
 - **Kreuzungen:** Die waagrechten Linien sparen die Spalten der
   senkrechten aus (`Gitter.rechtecke`), ein Pixel breit wie die Linien. So
-  ist eine Kreuzung so dunkel wie die Linie, nicht 51 % statt 30 %; so ist
+  ist eine Kreuzung so dunkel wie die Linie, nicht 70 % statt 45 %; so ist
   es im Review entschieden.
 - **Ein Element je Frame:** Alle Linien einer Karte sind ein Element des
   GUI (`Gitter`); die Rechtecke entstehen erst beim Zeichnen. Dafür öffnet

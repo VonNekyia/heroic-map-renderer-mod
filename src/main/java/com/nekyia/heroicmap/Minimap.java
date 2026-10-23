@@ -71,7 +71,7 @@ public final class Minimap {
     /** Ziele im Menü ({@link #ziel}): 0 bis 3 die Marken N, O, S, W, dazu der Spieler; oder keins. */
     static final int SPIELER = 4, KEIN_ZIEL = -1;
     /** Farbe der Chunklinien: Schwarz, zu 30 % deckend, so bleibt die Karte darunter lesbar. */
-    static final int LINIE = 0x4D000000;
+    static final int LINIE = 0x73000000;
     private static final int TEXT = 0xFFFFFFFF;
     /** Die Zeile der Koordinaten im Menü: gelb unter der Maus wie ein Verweis im Chat, grau bei „aus“. */
     private static final int KOORDINATEN_HELL = 0xFFFFFF55, KOORDINATEN_AUS = 0xFFA0A0A0;
