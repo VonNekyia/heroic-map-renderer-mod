@@ -7,6 +7,7 @@ The release notes on GitHub and Modrinth come from here
 ## 0.2.69
 
 - **Thin chunk lines on the block edges.** Chunk lines now sit exactly on the border between two chunks, where `Ctrl` snaps, instead of on the first block of a chunk, and they are one screen pixel thin at every GUI scale, on the minimap and the full map. The line that lights up while you snap is just as thin.
+- **The marks of the biome frame sit on the frame.** The east, south and west marks of the "biome" frame no longer stick out past its narrow band: they rest on it, flush with the outer edge, shadow included, square and round, upright and rotating. North and the other frames stay as they were.
 
 ## 0.2.68
 

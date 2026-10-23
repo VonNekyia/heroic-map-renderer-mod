@@ -44,7 +44,7 @@ class MinimapTest {
         assertTrue(m.verzierungen());
         // Ohne N zeichnet der Rahmen drei Marken, nicht oben.
         Minimap.Rahmen r = new Minimap.Rahmen(0, 0, 128);
-        List<Minimap.Ornament> drei = Minimap.ornamente(r, 2, false, false, null, 2, 1, -1, false, -1);
+        List<Minimap.Ornament> drei = Minimap.ornamente(r, 2, false, false, null, null, 2, 1, -1, false, -1);
         assertEquals(3, drei.size());
         for (Minimap.Ornament o : drei) {
             assertTrue(o.y() > 2, "Marke oben trotz N durchsichtig: " + o);
