@@ -103,6 +103,7 @@ public final class Bedienung implements FabricClientGameTest {
             beiF3(context, maus);
             schleierRegler(context, maus, k);
             todRegler(context, maus, k);
+            todUndRegion(context, maus, k);
 
             karte(context, maus, k);
             // Vor tod: Der lässt den Spieler am Ende fallen, und ein toter Spieler hat statt der Karte den Todesschirm.
@@ -2853,8 +2854,9 @@ public final class Bedienung implements FabricClientGameTest {
 
     /**
      * Die Zeit des Todes (mod#166): Nach `kill @a` steht sie auf der Vollbildkarte unter dem Todespunkt, als dunkle Schrift im
-     * Bildschirmfoto; derselbe Todespunkt ohne Zeit hat dort deutlich weniger dunkle Pixel. Auf der Minimap ändert die Zeit
-     * nichts: dort mit und ohne Zeit gleich viele. Siehe docs/wegpunkte.md, „Todespunkt“.
+     * Bildschirmfoto; derselbe Todespunkt ohne Zeit hat dort deutlich weniger dunkle Pixel, ebenso mit dem Stil „keine“
+     * (`tod_zeit=aus`) wie ohne Zeit. Auf der Minimap ändert die Zeit nichts: dort mit und ohne Zeit gleich viele. Siehe
+     * docs/wegpunkte.md, „Todespunkt“.
      */
     private static void todZeit(ClientGameTestContext context, TestServerContext server, int k) {
         server.runCommand("tp @a 40.5 -60 -30.5");
@@ -2879,6 +2881,11 @@ public final class Bedienung implements FabricClientGameTest {
             Karte.Marke m = marke(context, tod);
             double[] unter = {m.x(), m.y() + 9};
             int mit = dunkle(context.takeScreenshot(TestScreenshotOptions.of("tod-zeit").disableCounterPrefix()), k, unter, 6);
+            // Mit dem Stil „keine“ steht keine Zeit, obwohl der Todespunkt eine hat.
+            context.runOnClient(mc -> Minimap.INSTANZ.setzeTodZeit(Minimap.TodZeit.AUS));
+            context.waitTicks(2);
+            int keine = dunkle(context.takeScreenshot(TestScreenshotOptions.of("tod-zeit-keine").disableCounterPrefix()), k, unter, 6);
+            context.runOnClient(mc -> Minimap.INSTANZ.setzeTodZeit(Minimap.TodZeit.DATUM_UHRZEIT));
             // Derselbe Block ohne Zeit: so stand ein Todespunkt aus einer älteren Datei.
             context.runOnClient(mc -> {
                 mc.gui.setScreen(null);
@@ -2893,12 +2900,16 @@ public final class Bedienung implements FabricClientGameTest {
             if (mit < ohne + 4 * k * k) {
                 throw new AssertionError("Unter dem Todespunkt fehlt die Zeit: " + mit + " dunkle Pixel mit, " + ohne + " ohne");
             }
+            if (Math.abs(keine - ohne) > k * k) {
+                throw new AssertionError("Mit dem Stil „keine“ steht doch eine Zeit: " + keine + " dunkle Pixel, " + ohne + " ohne Zeit");
+            }
             if (minimapMit != minimapOhne) {
                 throw new AssertionError("Auf der Minimap ändert die Zeit etwas: " + minimapMit + " dunkle Pixel mit, " + minimapOhne + " ohne");
             }
         } finally {
             context.runOnClient(mc -> {
                 Minimap.INSTANZ.setzeTodespunkte(1);
+                Minimap.INSTANZ.setzeTodZeit(Minimap.TodZeit.DATUM_UHRZEIT);
                 Wegpunkte.INSTANZ.kappeTode(0);
                 mc.gui.setScreen(null);
             });
@@ -3196,6 +3207,142 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Beim Schliessen nicht gespeichert: " + neu.schleier());
             }
             Minimap.INSTANZ.setzeSchleier(Schleier.HOEHE);
+        });
+    }
+
+    /**
+     * Todespunkt und Region im Untermenü (Wunsch des Users vom 23.10.), mit Klicks wie von Hand: Ein Klick auf den Todespunkt
+     * geht reihum Datum, Uhrzeit, keine, Datum und Uhrzeit, gespeichert beim Schliessen; bei keiner steht im Bildschirmfoto grau
+     * „Zeit aus“ statt der Schrift der Karte. Das Symbol an der Region schaltet „Effekte in der Welt“. Bei GS 3 und 4 mit offener
+     * Technik steht alles auf dem Schirm, nichts übereinander. Siehe docs/minimap.md, „Bedienung“.
+     */
+    private static void todUndRegion(ClientGameTestContext context, TestInput maus, int k) {
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeTodZeit(Minimap.TodZeit.DATUM_UHRZEIT);
+            Minimap.INSTANZ.setzeEffekte(true);
+            mc.gui.setScreen(new Anzeige(null));
+        });
+        context.waitTicks(2);
+        try {
+            int[] bild = widget(context, Anzeige.TodBild.class);
+            Minimap.TodZeit[] reihe = {Minimap.TodZeit.DATUM, Minimap.TodZeit.UHRZEIT, Minimap.TodZeit.AUS, Minimap.TodZeit.DATUM_UHRZEIT};
+            for (Minimap.TodZeit soll : reihe) {
+                spielerKlick(context, maus, k, bild[0] + bild[2] / 2.0, bild[1] + bild[3] - 4);
+                Minimap.TodZeit ist = context.computeOnClient(mc -> Minimap.INSTANZ.todZeit());
+                if (ist != soll) {
+                    throw new AssertionError("Klick auf den Todespunkt im Untermenü: " + ist + " statt " + soll);
+                }
+                if (soll == Minimap.TodZeit.AUS || soll == Minimap.TodZeit.DATUM_UHRZEIT) {
+                    // Unter der Raute: grau „Zeit aus“ oder die Schrift der Karte mit ihrer hellen Kontur.
+                    maus.setCursorPos(0, 0);
+                    context.waitTicks(2);
+                    int grau = 0, kontur = 0;
+                    try {
+                        BufferedImage foto = ImageIO.read(context.takeScreenshot(TestScreenshotOptions.of("tod-zeit-" + soll.name().toLowerCase())
+                                .disableCounterPrefix()).toFile());
+                        for (int y = (bild[1] + 15) * k; y < (bild[1] + bild[3]) * k; y++) {
+                            for (int x = bild[0] * k; x < (bild[0] + bild[2]) * k; x++) {
+                                int f = foto.getRGB(x, y) & 0xFFFFFF;
+                                grau += f == 0x8A8A8A ? 1 : 0;
+                                kontur += f == (Ebenen.KONTURFARBE & 0xFFFFFF) ? 1 : 0;
+                            }
+                        }
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                    boolean richtig = soll == Minimap.TodZeit.AUS ? grau >= 10 && kontur == 0 : kontur >= 10 && grau == 0;
+                    if (!richtig) {
+                        throw new AssertionError("Unter dem Todespunkt bei " + soll + ": " + grau + " Pixel grau, " + kontur + " Pixel Kontur");
+                    }
+                }
+            }
+            spielerKlick(context, maus, k, bild[0] + bild[2] / 2.0, bild[1] + bild[3] - 4);
+            // Das Symbol an der Region: aus und wieder an.
+            int[] effekte = context.computeOnClient(mc -> {
+                for (Object kind : mc.gui.screen().children()) {
+                    if (kind instanceof Einstellungen.Symbol s && s.art() == Einstellungen.Symbol.EFFEKTE) {
+                        return new int[] {s.getX(), s.getY(), s.getWidth(), s.getHeight()};
+                    }
+                }
+                throw new AssertionError("Kein Symbol „Effekte in der Welt“ im Untermenü");
+            });
+            for (boolean soll : new boolean[] {false, true}) {
+                spielerKlick(context, maus, k, effekte[0] + effekte[2] / 2.0, effekte[1] + effekte[3] / 2.0);
+                if (context.computeOnClient(mc -> Minimap.INSTANZ.effekte()) != soll) {
+                    throw new AssertionError("Klick auf das Symbol an der Region: Effekte " + !soll + " statt " + soll);
+                }
+            }
+            context.runOnClient(mc -> mc.gui.setScreen(null));
+            context.waitTicks(2);
+            String datei = Files.readString(HeroicMap.einstellungen());
+            // Nach den vier Klicks und einem fünften steht Datum.
+            if (datei.lines().noneMatch("tod_zeit=datum"::equals) || !datei.contains("effekte=true")) {
+                throw new AssertionError("Beim Schliessen nicht gespeichert: " + datei.lines().filter(z -> z.startsWith("tod_zeit=")
+                        || z.startsWith("effekte=")).toList());
+            }
+
+            // Bei GS 3 und 4, 240 Einheiten hoch, mit offener Technik: alles auf dem Schirm, nichts übereinander.
+            List<String> fehler = new ArrayList<>();
+            context.runOnClient(mc -> Minimap.INSTANZ.setzeTechnikOffen(true));
+            for (int gs = 3; gs <= 4; gs++) {
+                int gg = gs;
+                context.getInput().resizeWindow(1280, 240 * gs);
+                context.runOnClient(mc -> {
+                    mc.options.guiScale().set(gg);
+                    mc.resizeGui();
+                    mc.gui.setScreen(new Anzeige(null));
+                });
+                context.waitTicks(2);
+                fehler.addAll(context.computeOnClient(mc -> {
+                    int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+                    List<AbstractWidget> l = mc.gui.screen().children().stream().filter(c -> c instanceof AbstractWidget)
+                            .map(c -> (AbstractWidget) c).toList();
+                    List<String> f = new ArrayList<>();
+                    for (int i = 0; i < l.size(); i++) {
+                        AbstractWidget w = l.get(i);
+                        if (w.getX() < 0 || w.getY() < 0 || w.getX() + w.getWidth() > b || w.getY() + w.getHeight() > h) {
+                            f.add("GS " + gg + ": " + w.getMessage().getString() + " nicht ganz auf dem Schirm, bis " + (w.getY() + w.getHeight()));
+                        }
+                        for (int j = i + 1; j < l.size(); j++) {
+                            AbstractWidget v = l.get(j);
+                            if (w.getX() < v.getX() + v.getWidth() && v.getX() < w.getX() + w.getWidth() && w.getY() < v.getY() + v.getHeight()
+                                    && v.getY() < w.getY() + w.getHeight()) {
+                                f.add("GS " + gg + ": " + w.getMessage().getString() + " über " + v.getMessage().getString());
+                            }
+                        }
+                    }
+                    return f;
+                }));
+            }
+            if (!fehler.isEmpty()) {
+                throw new AssertionError(String.join("; ", fehler));
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } finally {
+            context.getInput().resizeWindow(vorher[0], vorher[1]);
+            context.runOnClient(mc -> {
+                mc.gui.setScreen(null);
+                mc.options.guiScale().set(vorher[2]);
+                mc.resizeGui();
+                Minimap.INSTANZ.setzeTechnikOffen(false);
+                Minimap.INSTANZ.setzeTodZeit(Minimap.TodZeit.DATUM_UHRZEIT);
+                Minimap.INSTANZ.setzeEffekte(true);
+            });
+            context.waitTicks(2);
+        }
+    }
+
+    /** {x, y, Breite, Höhe} des ersten Widgets der Klasse {@code art} im offenen Schirm. */
+    private static int[] widget(ClientGameTestContext context, Class<?> art) {
+        return context.computeOnClient(mc -> {
+            for (Object kind : mc.gui.screen().children()) {
+                if (art.isInstance(kind) && kind instanceof AbstractWidget w) {
+                    return new int[] {w.getX(), w.getY(), w.getWidth(), w.getHeight()};
+                }
+            }
+            throw new AssertionError("Kein " + art.getSimpleName() + " im offenen Schirm");
         });
     }
 
