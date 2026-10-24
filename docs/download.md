@@ -432,6 +432,11 @@ eines Proxys von einem des Netzes (`Laden.Fehler.status`).
     nicht, solange ein Download in den alten Ordner läuft. Liegt die Welt
     schon an beiden Orten, bleibt alles, und die Kartenliste zeigt
     „doppelt“.
+  - **Ablage Hash vorher:** `heroicmap/welt-<hash>` hat keine Adresse.
+    Ihn holt der erste Server mit diesem Seed, den der Spieler betritt, in
+    seinen Ordner. Teilen sich zwei Server einen Seed, etwa eine Kopie oder
+    ein Spiegel, gehört die Karte danach dem zuerst besuchten; wer Hash
+    gewählt hatte, wollte eine Karte je Welt. Mit „Ort …“ zieht sie um.
   - **Im Menü:** Schliesst das Untermenü mit einer anderen Ablage, zieht
     die Welt, in der der Spieler ist, gleich um, im Worker von „Selbst
     zeichnen“ nach allem, was er noch schreibt (`Downloads.ablageGewechselt`).

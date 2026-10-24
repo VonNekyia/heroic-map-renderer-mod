@@ -70,3 +70,8 @@ Besuch seinen Ordner.
   nichts um; die Kartenliste zeigt dann „doppelt“.
 - Ein Ordner `<host>_25565` von vor dieser Regel zieht beim nächsten
   Betreten nach `<host>`, wenn es dort die Welt noch nicht gibt.
+- `heroicmap/welt-<hash>` aus der Ablage Hash hat keine Adresse; ihn holt
+  der erste Server mit diesem Seed, den der Spieler betritt. Teilen sich
+  zwei Server einen Seed, etwa eine Kopie oder ein Spiegel, gehört die
+  Karte danach dem zuerst besuchten. Das ist vertretbar, denn wer Hash
+  gewählt hatte, wollte eine Karte je Welt; „Ort …“ zieht sie um.
