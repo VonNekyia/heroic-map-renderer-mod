@@ -1742,9 +1742,10 @@ public final class Minimap {
      * Was der Rahmen über den Bändern zeichnet, in dieser Reihenfolge: die Marken O, S, W, N ausser denen in
      * {@code ohne} (Bit i für Richtung i) auf der Mitte der Bänder, ungedreht fest rechts, unten, links und oben, gedreht starr
      * mit der Karte, die Marke {@code hervor} (0 bis 3, N, O, S, W) aktiv; im Menü zuletzt der Griff an seiner
-     * Ecke, nie gedreht. In den Ecken sonst nichts. Das Bild steht nach {@link Skin.Marken#stellung}: starr mit der Karte, von
-     * der Mitte weg (O, S und W nehmen {@code marke}, um eine, zwei und drei Vierteldrehungen weiter) oder aufrecht, mit eigenen
-     * Bildern je Richtung, wenn es sie gibt. Jede Marke liegt nach ihrem {@link Skin.Platz}, ohne auf der Mitte der Bänder.
+     * Ecke, nie gedreht. In den Ecken sonst nichts. Das Bild steht nach {@link Skin.Marken#stellung} ({@link Skin#winkel}):
+     * starr mit der Karte, von der Mitte weg oder zu ihr hin (O, S und W um eine, zwei und drei Vierteldrehungen weiter) oder
+     * aufrecht; mit eigenen Bildern je Richtung, wenn es sie gibt, sonst O, S und W von der Mitte weg und zu ihr hin
+     * {@code marke}. Jede Marke liegt nach ihrem {@link Skin.Platz}, ohne auf der Mitte der Bänder.
      * Siehe docs/rahmen.md, „Marken“.
      */
     static List<Ornament> ornamente(Rahmen r, int baender, boolean rund, Skin.Marken marken, Drehung.Lage lage, int k,
@@ -1754,15 +1755,11 @@ public final class Minimap {
         for (int i : MARKEN) {
             if ((ohne & 1 << i) == 0) {
                 Skin.Platz platz = marken.platz(i);
-                double[] p = lage == null ? Skin.marke(r.x(), r.y(), r.seite(), baender, rund, RICHTUNGEN[i][0], RICHTUNGEN[i][1], platz)
-                        : verzierung(r, baender, rund, lage, RICHTUNGEN[i], k, platz);
+                double w = Skin.winkel(marken.stellung(), i, winkel);
+                double[] p = lage == null ? Skin.marke(r.x(), r.y(), r.seite(), baender, rund, RICHTUNGEN[i][0], RICHTUNGEN[i][1], platz, w)
+                        : verzierung(r, baender, rund, lage, RICHTUNGEN[i], k, platz, w);
                 int teil = marken.eigene() ? Skin.EIGENE_JE_RICHTUNG[i]
-                        : marken.stellung() == Skin.Stellung.AUSSEN && i != 0 ? Skin.MARKE : Skin.MARKE_JE_RICHTUNG[i];
-                double w = switch (marken.stellung()) {
-                    case KARTE -> winkel;
-                    case AUSSEN -> winkel + i * Math.PI / 2;
-                    case AUFRECHT -> 0;
-                };
+                        : marken.stellung().nachDerMitte() && i != 0 ? Skin.MARKE : Skin.MARKE_JE_RICHTUNG[i];
                 aus.add(new Ornament(teil + (i == hervor ? 1 : 0), 0, p[0], p[1], w, i));
             }
         }
@@ -1778,9 +1775,10 @@ public final class Minimap {
      * ({@link Skin#marke}), die Mitte auf ganzen Pixeln des Schirms, sonst zitterte sie beim Laufen.
      * Siehe docs/rahmen.md, „Drehen“.
      */
-    static double[] verzierung(Rahmen r, int baender, boolean rund, Drehung.Lage lage, double[] richtung, int k, Skin.Platz platz) {
+    static double[] verzierung(Rahmen r, int baender, boolean rund, Drehung.Lage lage, double[] richtung, int k, Skin.Platz platz,
+            double winkel) {
         double[] p = Skin.marke(r.x(), r.y(), r.seite(), baender, rund,
-                lage.richtungX(richtung[0], richtung[1]), lage.richtungY(richtung[0], richtung[1]), platz);
+                lage.richtungX(richtung[0], richtung[1]), lage.richtungY(richtung[0], richtung[1]), platz, winkel);
         return new double[] {Math.round(p[0] * k) / (double) k, Math.round(p[1] * k) / (double) k};
     }
 

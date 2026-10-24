@@ -1,4 +1,4 @@
 schatten=ja
 drehung=aussen
-lage=kante
+lage=aussen
 lage_norden=mitte

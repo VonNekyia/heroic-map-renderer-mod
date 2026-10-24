@@ -34,7 +34,7 @@ record Satz(Path ordner, String name, String dimension, int massstab, int kachel
         if (welt == null || !Files.isDirectory(welt)) {
             return null;
         }
-        Path ziel = Zeiger.ziel(welt);
+        Path ziel = Zeiger.ziel(welt, dimension);
         String gewaehlt = Zeigt.baum(welt, server, dimension);
         if (gewaehlt != null) {
             boolean dort = gewaehlt.startsWith(Zeiger.DORT);

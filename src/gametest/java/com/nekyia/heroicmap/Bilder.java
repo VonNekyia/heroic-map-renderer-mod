@@ -137,6 +137,7 @@ public final class Bilder implements FabricClientGameTest {
             rahmen(context);
             umriss(context);
             drehen(context, server);
+            ausrichtung(context, server);
             fenster(context);
             vollbildkarte(context);
             formen(context, server);
@@ -1374,6 +1375,61 @@ public final class Bilder implements FabricClientGameTest {
                 throw new UncheckedIOException(e);
             }
         }
+    }
+
+    /**
+     * Nur mit -Pbilder: „biom“ und „lettern“ innen und aussen bei GUI-Massstab 2 und 4, je eckig und rund, genordet und bei
+     * Gier 30 gedreht, nebeneinander als {@code ausrichtung-<skin>-gs<k>.png}. Bilder für den User, nicht für die Doku. Siehe
+     * docs/entscheidungen/0041-ausrichtung-der-marken.md.
+     */
+    private static void ausrichtung(ClientGameTestContext context, TestServerContext server) {
+        if (AUSGABE.isEmpty()) {
+            return;
+        }
+        server.runCommand("tp @a 0.5 -30 0.5 30 90");
+        context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getYRot() - 30) < 0.1f, 200);
+        int vorher = context.computeOnClient(mc -> mc.options.guiScale().get());
+        String[][] skins = {{"biom", null}, {"lettern", "tinte_innen"}, {"lettern", "tinte_aussen"}};
+        for (int gs : new int[] {2, 4}) {
+            for (String[] skin : skins) {
+                String name = "ausrichtung-" + skin[0] + (skin[1] == null ? "" : "-" + skin[1]) + "-gs" + gs;
+                BufferedImage[] teile = new BufferedImage[4];
+                for (int i = 0; i < teile.length; i++) {
+                    boolean rund = i >= 2, drehen = (i & 1) != 0;
+                    context.runOnClient(mc -> {
+                        mc.options.guiScale().set(gs);
+                        mc.resizeGui();
+                        Minimap.INSTANZ.setzeSkin(skin[0]);
+                        Minimap.INSTANZ.setzeVariante(skin[0], skin[1]);
+                        Minimap.INSTANZ.setzeRund(rund);
+                        Minimap.INSTANZ.setzeDrehen(drehen);
+                        Minimap.INSTANZ.setzeChunklinien(false);
+                    });
+                    context.waitFor(mc -> Minimap.INSTANZ.fertig(), 1200);
+                    context.waitTicks(2);
+                    teile[i] = mitRand(context, context.takeScreenshot(TestScreenshotOptions.of(name + "-" + i).disableCounterPrefix()));
+                }
+                BufferedImage alle = new BufferedImage(4 * teile[0].getWidth(), teile[0].getHeight(), BufferedImage.TYPE_INT_RGB);
+                for (int i = 0; i < teile.length; i++) {
+                    alle.getGraphics().drawImage(teile[i], i * teile[0].getWidth(), 0, null);
+                }
+                try {
+                    ImageIO.write(alle, "png", Path.of(AUSGABE, name + ".png").toFile());
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+        }
+        // Zurück wie nach drehen: Gier 0, ohne Rahmen, genordet, eckig.
+        server.runCommand("tp @a 0.5 -30 0.5 0 90");
+        context.runOnClient(mc -> {
+            mc.options.guiScale().set(vorher);
+            mc.resizeGui();
+            Minimap.INSTANZ.setzeDrehen(false);
+            Minimap.INSTANZ.setzeSkin(Skin.OHNE);
+            Minimap.INSTANZ.setzeRund(false);
+        });
+        context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getYRot()) < 0.1f && Minimap.INSTANZ.fertig(), 1200);
     }
 
     /** Die Minimap samt Ornamenten: ihr Rahmen und so viel darum, wie sie Abstand zum Rand hält. */

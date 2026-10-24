@@ -168,6 +168,7 @@
   "heroicmap.liste.dieser": "Dieser Server",
   "heroicmap.liste.zeiger": "%s zeigt auf: %s",
   "heroicmap.liste.zeiger_fehlt": "%s zeigt auf: %s (fehlt)",
+  "heroicmap.liste.zeiger_andere": "%s zeigt auf: %s (andere Welt)",
   "heroicmap.liste.zeiger_loesen": "lösen",
   "heroicmap.liste.gleiche_welt": "Gleiche Welt auf %s",
   "heroicmap.liste.zeiger_setzen": "Karte von %s nutzen",

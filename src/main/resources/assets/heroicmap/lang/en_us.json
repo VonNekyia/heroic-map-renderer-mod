@@ -168,6 +168,7 @@
   "heroicmap.liste.dieser": "This server",
   "heroicmap.liste.zeiger": "%s points to: %s",
   "heroicmap.liste.zeiger_fehlt": "%s points to: %s (missing)",
+  "heroicmap.liste.zeiger_andere": "%s points to: %s (other world)",
   "heroicmap.liste.zeiger_loesen": "unlink",
   "heroicmap.liste.gleiche_welt": "Same world on %s",
   "heroicmap.liste.zeiger_setzen": "Use the map of %s",
