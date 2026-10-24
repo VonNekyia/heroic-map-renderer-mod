@@ -28,7 +28,8 @@ final class Ort {
 
     /** Der Hash einer Welt, wie der Mod ihn schreibt: genau 16 Stellen hex, klein. */
     static final Pattern HASH = Pattern.compile("[0-9a-f]{16}");
-    private static final String WELT = "welt-", KARTE = "karte-", EINZELSPIELER = "einzelspieler_";
+    private static final String WELT = "welt-";
+    static final String KARTE = "karte-", EINZELSPIELER = "einzelspieler_";
 
     /**
      * Wo eine Welt liegt: die Adresse, leer bei der Ablage Hash, {@code einzelspieler_<speicherstand>} im Einzelspieler; der

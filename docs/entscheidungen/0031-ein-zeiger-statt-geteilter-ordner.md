@@ -14,7 +14,9 @@ code:
 
 # 0031: Ein Zeiger statt geteilter Ordner
 
-Ergänzt [0029](0029-was-ein-server-zeigt-gilt-je-server.md).
+Ergänzt [0029](0029-was-ein-server-zeigt-gilt-je-server.md). Teilweise
+abgelöst durch [0047](0047-zeiger-ueber-adressen.md): im Satz, dass im
+Zeiger nie ein Pfad oder eine Adresse steht.
 
 ## Anlass
 
