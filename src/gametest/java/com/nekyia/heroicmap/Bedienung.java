@@ -5069,9 +5069,10 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("„Koordinaten“ knapp unter der Minimap: " + w);
             }
 
-            // Esc schliesst nur die Liste, ohne etwas hinzuzufügen.
+            // Esc schliesst nur die Liste, ohne etwas hinzuzufügen; 30 Einheiten über dem Biom, das jetzt unten links liegt.
+            double ex = fx, ey = fy - 30;
             warte250();
-            fahre(context, maus, k, fx, fy);
+            fahre(context, maus, k, ex, ey);
             maus.pressMouse(RECHTS);
             context.waitTicks(2);
             offeneListe(context);
@@ -5094,7 +5095,7 @@ public final class Bedienung implements FabricClientGameTest {
             context.waitTicks(2);
             boolean plusAn = context.computeOnClient(mc -> plusWidget(mc).active);
             warte250();
-            fahre(context, maus, k, fx, fy);
+            fahre(context, maus, k, ex, ey);
             maus.pressMouse(RECHTS);
             context.waitTicks(2);
             if (plusAn || listeOffen(context)) {
