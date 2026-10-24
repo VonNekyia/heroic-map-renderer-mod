@@ -25,12 +25,13 @@ siehe [0033](entscheidungen/0033-widgets-an-der-minimap.md).
 | Biom | `name`, `punkt` | der Name des Bioms unter dem Spieler, „Plains“, mit `punkt` davor ein farbiger Punkt „■ Plains“ |
 
 - **Die Uhr des Spiels** ist die der Oberwelt,
-  `Level.getOverworldClockTime`, auch in Nether und End, wo die Uhr des
-  Spiels selbst wirbelt; so entschieden in
-  [0033](entscheidungen/0033-widgets-an-der-minimap.md). Der Server schickt
-  dem Client alle Uhren, nicht nur die der Dimension
-  (`ServerClockManager.createFullSyncPacket`, im Jar von 26.3 per `javap`
-  belegt am 24.10.). Tick 0 ist 6:00, 1000 Ticks sind eine Stunde, der Tag
+  `Level.getOverworldClockTime`, auch in Nether und End; so entschieden in
+  [0033](entscheidungen/0033-widgets-an-der-minimap.md). Der Nether hat
+  keine eigene Uhr, dort wirbelt die Uhr des Spiels; das End hat eine
+  eigene (`default_clock` in `dimension_type`). Der Server schickt dem
+  Client alle Uhren, nicht nur die der Dimension
+  (`ServerClockManager.createFullSyncPacket`). Beides im Jar von 26.3
+  belegt am 24.10. Tick 0 ist 6:00, 1000 Ticks sind eine Stunde, der Tag
   zählt ab 1 (`Widgets.uhr`, `Widgets.tag`).
 - **Der Name des Bioms** kommt aus dem Sprachpaket des Spiels,
   `biome.<namespace>.<pfad>`; fehlt der Schlüssel, etwa bei einem Biom aus
