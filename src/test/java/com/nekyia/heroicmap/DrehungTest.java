@@ -13,25 +13,23 @@ class DrehungTest {
 
     @Test
     void mitRahmenDecktDerRingDenRand() {
-        // Der Ring ist in Einheiten gestuft: Jede Pixelmitte einer Einheit innerhalb der Bänder liegt im Vieleck,
-        // auch nahe den Diagonalen; keine einer Einheit ausserhalb des Rings. Beides mit EINRASTEN Abstand zum Rand.
+        // Wo der Ring einen Pixel des Schirms nicht ganz deckt, liegt dessen Mitte innen im Vieleck, aussen nicht, auch nahe den
+        // Diagonalen. Beides mit EINRASTEN Abstand zum Rand.
         for (int k : new int[] {1, 2, 3, 4}) {
+            double p = (double) Skin.D / k;
             for (int seite : new int[] {Minimap.KLEINSTE, Minimap.GROESSE, 200, Minimap.GROESSTE}) {
                 for (int baender : new int[] {2, 3, 5}) {
                     float[] form = Minimap.schnitt(0, 0, seite, k, true, baender);
-                    for (int y = -2; y < seite + 2; y++) {
-                        for (int x = -2; x < seite + 2; x++) {
-                            int band = Skin.bandRund(x, y, seite);
-                            if (band < -2 || band > baender + 1 || band >= 0 && band < baender) {
+                    double r = seite * Skin.D / 2.0, b = baender * Skin.D;
+                    for (int y = -2 * k; y < (seite + 2) * k; y++) {
+                        for (int x = -2 * k; x < (seite + 2) * k; x++) {
+                            double dx = (x + 0.5) * p - r, dy = (y + 0.5) * p - r, v = r - Math.sqrt(dx * dx + dy * dy);
+                            if (v < -2 * p || v > b + 2 * p || Skin.deckung(v, b, p) == 1) {
                                 continue;
                             }
-                            for (int py = 0; py < k; py++) {
-                                for (int px = 0; px < k; px++) {
-                                    double a = abstand(form, x * k + px + 0.5, y * k + py + 0.5);
-                                    assertTrue(band >= baender ? a >= EINRASTEN : a <= -EINRASTEN,
-                                            "k " + k + ", Seite " + seite + ", Bänder " + baender + ", Einheit " + x + ", " + y);
-                                }
-                            }
+                            double a = abstand(form, x + 0.5, y + 0.5);
+                            assertTrue(v > b / 2 ? a >= EINRASTEN : a <= -EINRASTEN,
+                                    "k " + k + ", Seite " + seite + ", Bänder " + baender + ", Pixel " + x + ", " + y);
                         }
                     }
                 }

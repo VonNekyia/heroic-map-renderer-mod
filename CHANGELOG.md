@@ -15,11 +15,11 @@ The release notes on GitHub and Modrinth come from here
 - **Heads on map pins.** If a server's layer gives a pin a head, for example an NPC, the map shows that face instead of the pin, with the name below, on the full map and pinned on the minimap. Until the head has loaded, you see the pin.
 - **The coordinates are the first minimap widget.** Your choice of coordinates carries over and is now saved as `widgets`.
 - **Edit widgets in the minimap menu.** Drag a widget to snap it below or above the minimap, or leave it anywhere on the screen. The mouse wheel makes it bigger or smaller, a click or right-click switches its version, and Del or the × that appears when you hover removes it.
-
 - **Choose your frame from a preview.** Click a mark N, E, S or W on the minimap in the menu to open the frame chooser: a small minimap for each frame, with a colour swatch per variant below it. Click a swatch to recolour the preview, click the preview to use it; Esc or a click beside it keeps your frame. Clicking a mark no longer steps to the next frame.
 - **Frames come in families with colours.** "Shield" (grey, gold, paper) and "Rose" (silver, gold, parchment) replace grey, wood, paper, compass, clock and cartographer; your choice moves over by itself. Every biome of the "biome" frame has its own colours too, and you can set each one in the chooser.
 - **New frame "Letters"** with upright letters N, E, S, W, inside or outside the minimap, in four colours.
 - **Make a mark see-through with the middle mouse button.** The right click now opens the frame chooser.
+- **Softer frames.** The bands of every frame blend softly into each other, have a fine bevel and cast a light shadow onto the map; round frames get smooth edges. They're drawn in screen pixels, so they look even at every GUI scale.
 
 ## 0.2.68
 
