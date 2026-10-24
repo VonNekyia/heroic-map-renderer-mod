@@ -6061,10 +6061,10 @@ public final class Bedienung implements FabricClientGameTest {
     }
 
     /**
-     * Die Marken O, S und W von „biom“ sitzen samt Schatten auf dem Rahmen und ragen nicht darüber, eckig und rund (Wunsch
-     * des Users vom 23.10.): Im Spiel ändert eine durchsichtige Marke im Bildschirmfoto Pixel innerhalb der Minimap, ausserhalb
-     * neben ihr keins. Die mittlere Taste von Hand auf einer Stelle, die nur die neue Lage von S trifft, nicht die alte auf der
-     * Mitte der Bänder, macht im Menü nur S durchsichtig. Siehe docs/rahmen.md, „Lage“.
+     * Die Marken O, S und W von „biom“ stehen aussen auf dem Rand, eckig und rund (Wunsch des Users, 0041): Im Spiel ändert
+     * eine durchsichtige Marke im Bildschirmfoto Pixel ausserhalb der Minimap, innerhalb keins. Die mittlere Taste von Hand
+     * auf einer Stelle, die nur die neue Lage von S trifft, nicht die alte auf der Mitte der Bänder, macht im Menü nur S
+     * durchsichtig. Siehe docs/rahmen.md, „Lage“.
      */
     private static void biomMarken(ClientGameTestContext context, TestInput maus, int k) {
         Path sicherung = FabricLoader.getInstance().getGameDir().resolve("heroicmap-biom-marken-test.properties");
@@ -6085,7 +6085,7 @@ public final class Bedienung implements FabricClientGameTest {
                 Minimap.Rahmen r = rahmen(context);
                 double cx = r.x() + r.seite() / 2.0, cy = r.y() + r.seite() / 2.0, halb = r.seite() / 2.0;
                 BufferedImage alle = imSpiel(context, "biom-marken-" + rund);
-                // O, S und W: je ein Kasten um die Marke, 10 Einheiten zu beiden Seiten, von 14 innen bis 6 aussen.
+                // O, S und W: je ein Kasten um die Marke, 10 Einheiten zu beiden Seiten, von 6 innen bis 14 aussen.
                 for (int i = 1; i <= 3; i++) {
                     int marke = i;
                     // Zweimal: über HD nach durchsichtig; ein drittes Mal zurück zu Pixel.
@@ -6098,7 +6098,7 @@ public final class Bedienung implements FabricClientGameTest {
                     double ux = i == 1 ? 1 : i == 3 ? -1 : 0, uy = i == 2 ? 1 : 0;
                     int innen = 0, aussen = 0;
                     for (double quer = -10; quer <= 10; quer += 1.0 / k) {
-                        for (double tief = -14; tief <= 6; tief += 1.0 / k) {
+                        for (double tief = -6; tief <= 14; tief += 1.0 / k) {
                             // Die Mitte eines Pixels des Schirms in Einheiten des GUI.
                             double x = cx + ux * (halb + tief) - uy * quer, y = cy + uy * (halb + tief) + ux * quer;
                             int px = (int) Math.floor(x * k), py = (int) Math.floor(y * k);
@@ -6114,18 +6114,18 @@ public final class Bedienung implements FabricClientGameTest {
                             }
                         }
                     }
-                    if (innen < 10 || aussen > 0) {
-                        throw new AssertionError("Marke " + "NOSW".charAt(i) + (rund ? " rund" : " eckig") + " bei „biom“: " + innen
-                                + " Pixel anders in der Minimap, " + aussen + " ausserhalb, ragt über den Rahmen");
+                    if (aussen < 10 || innen > 0) {
+                        throw new AssertionError("Marke " + "NOSW".charAt(i) + (rund ? " rund" : " eckig") + " bei „biom“: " + aussen
+                                + " Pixel anders ausserhalb der Minimap, " + innen + " in ihr, steht nicht aussen auf dem Rand");
                     }
                 }
-                // Der Klick trifft S dort, wo es liegt: 6 Einheiten innen von seiner Mitte, ausserhalb der Mitte der Bänder ±8,5.
+                // Der Klick trifft S dort, wo es liegt: 4 Einheiten aussen von seiner Mitte, ausserhalb der Mitte der Bänder ±8,5.
                 double[] s = context.computeOnClient(mc -> {
                     Skin skin = Minimap.INSTANZ.skinJetzt();
                     Minimap.Ornament o = Minimap.ornamente(r, skin.baender(), rund, skin.marken, null, k, 0, -1, false, -1).get(1);
-                    return new double[] {o.x(), o.y() - 6};
+                    return new double[] {o.x(), o.y() + 4};
                 });
-                String wo = "Mittlere Taste auf S" + (rund ? " rund" : " eckig") + " bei „biom“, 6 Einheiten innen von seiner Mitte";
+                String wo = "Mittlere Taste auf S" + (rund ? " rund" : " eckig") + " bei „biom“, 4 Einheiten aussen von seiner Mitte";
                 mitteZitternd(context, maus, k, s[0], s[1]);
                 zierIst(context, 0b0100, 0, wo);
                 mitteZitternd(context, maus, k, s[0], s[1]);

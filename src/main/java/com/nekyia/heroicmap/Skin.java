@@ -85,12 +85,23 @@ final class Skin {
         int an(int x, int y);
     }
 
-    /** Wie das Bild einer Marke steht: starr mit der Karte, von der Mitte weg oder immer aufrecht. Siehe docs/rahmen.md, „Drehen“. */
-    enum Stellung { KARTE, AUSSEN, AUFRECHT }
+    /**
+     * Wie das Bild einer Marke steht: starr mit der Karte, mit dem Kopf von der Mitte weg, mit dem Kopf zur Mitte oder immer
+     * aufrecht. Siehe docs/rahmen.md, „Drehen“.
+     */
+    enum Stellung {
+        KARTE, AUSSEN, INNEN, AUFRECHT;
+
+        /** Dreht das Bild nach der Mitte, O, S und W also {@code marke} um Vierteldrehungen weiter? */
+        boolean nachDerMitte() {
+            return this == AUSSEN || this == INNEN;
+        }
+    }
 
     /**
      * Wo eine Marke liegt: auf der Mitte der Bänder, auf ihnen aussen bündig samt Schatten, ganz in der Karte mit einer Einheit
-     * Abstand zu den Bändern, oder ganz ausserhalb mit einer Einheit Abstand. Siehe docs/rahmen.md, „Lage“.
+     * Abstand zu den Bändern, oder ganz ausserhalb mit einer Einheit Abstand; in jeder {@link Stellung}. Siehe docs/rahmen.md,
+     * „Lage“.
      */
     enum Lage { MITTE, KANTE, INNEN, AUSSEN }
 
@@ -269,9 +280,8 @@ final class Skin {
      * Liest {@code palette.txt}: eine Zeile je Band von aussen nach innen, eine Farbe oder zwei, Licht und Schatten; {@code //}
      * beginnt einen Kommentar. Aus {@code info.txt}, die letzte Zeile je Schlüssel gilt, so überschreibt eine Variante:
      * {@code schatten=ja}, {@code drehung} ({@link Stellung}, ein altes {@code aussen=ja} heisst {@code aussen}), {@code lage} und
-     * {@code lage_norden} ({@link Lage}). {@code kante} nur mit {@code drehung=aussen}, {@code innen} und {@code aussen} nur mit
-     * {@code drehung=aufrecht}. {@code bilder} sind Breite und Höhe der Marken, die es gibt, je Teil wie {@code norden} oder
-     * {@code osten}. Mindestens zwei Bänder, siehe docs/minimap.md, „Form“.
+     * {@code lage_norden} ({@link Lage}), jede Lage mit jeder Drehung. {@code bilder} sind Breite und Höhe der Marken, die es
+     * gibt, je Teil wie {@code norden} oder {@code osten}. Mindestens zwei Bänder, siehe docs/minimap.md, „Form“.
      */
     static Skin lies(String name, String ordner, String palette, String info, Map<String, int[]> bilder) {
         List<int[]> baender = new ArrayList<>();
@@ -302,16 +312,11 @@ final class Skin {
         Stellung stellung = wert(Stellung.class, "drehung", s.getOrDefault("drehung", "ja".equals(s.get("aussen")) ? "aussen" : "karte"));
         Lage lage = wert(Lage.class, "lage", s.getOrDefault("lage", "mitte"));
         Lage lageNorden = wert(Lage.class, "lage_norden", s.getOrDefault("lage_norden", lage.name().toLowerCase(Locale.ROOT)));
-        for (Lage l : List.of(lage, lageNorden)) {
-            if (l == Lage.KANTE && stellung != Stellung.AUSSEN || (l == Lage.INNEN || l == Lage.AUSSEN) && stellung != Stellung.AUFRECHT) {
-                throw new IllegalArgumentException("info.txt: lage=" + l.name().toLowerCase(Locale.ROOT) + " nicht mit drehung="
-                        + stellung.name().toLowerCase(Locale.ROOT));
-            }
-        }
-        boolean eigene = stellung == Stellung.AUFRECHT && bilder.containsKey("osten") && bilder.containsKey("sueden") && bilder.containsKey("westen");
-        // Je Richtung das Bild, wie es gezeichnet wird: aussen dreht marke mit, aufrecht nimmt das eigene, starr marke und marke_quer.
+        boolean eigene = bilder.containsKey("osten") && bilder.containsKey("sueden") && bilder.containsKey("westen");
+        // Je Richtung das Bild, wie es gezeichnet wird: das eigene, wenn es eines gibt; sonst drehen aussen und innen marke mit,
+        // starr und aufrecht nehmen marke und marke_quer.
         String[] teil = eigene ? new String[] {"norden", "osten", "sueden", "westen"}
-                : stellung == Stellung.AUSSEN ? new String[] {"norden", "marke", "marke", "marke"} : new String[] {"norden", "marke_quer", "marke", "marke_quer"};
+                : stellung.nachDerMitte() ? new String[] {"norden", "marke", "marke", "marke"} : new String[] {"norden", "marke_quer", "marke", "marke_quer"};
         Platz[] plaetze = null;
         if (lage != Lage.MITTE || lageNorden != Lage.MITTE) {
             plaetze = new Platz[4];
@@ -367,9 +372,11 @@ final class Skin {
             }
             for (boolean rund : new boolean[] {false, true}) {
                 for (int grad = 0; grad < 360; grad++) {
-                    double a = Math.toRadians(grad);
-                    double[] m = marke(-s / 2, -s / 2, s, baender, rund, Math.sin(a), -Math.cos(a), p);
-                    weit = Math.max(weit, Math.max(Math.abs(m[0]) + p.w() / 2.0, Math.abs(m[1]) + p.h() / 2.0) + p.schatten() - s / 2);
+                    double karte = Math.toRadians(grad), a = karte + i * Math.PI / 2, bild = winkel(marken.stellung(), i, karte);
+                    double[] m = marke(-s / 2, -s / 2, s, baender, rund, Math.sin(a), -Math.cos(a), p, bild);
+                    for (double[] e : kasten(p, bild, p.schatten())) {
+                        weit = Math.max(weit, Math.max(Math.abs(m[0] + e[0]), Math.abs(m[1] + e[1])) - s / 2);
+                    }
                 }
             }
         }
@@ -625,97 +632,107 @@ final class Skin {
     }
 
     /**
-     * Wo eine Marke sitzt, in Einheiten des GUI: von der Mitte der Minimap (x, y, Seite s) in Richtung (ux, uy), nach ihrem
-     * {@code platz}: ohne auf der Mitte der Bänder, rund auf dem Kreis, eckig auf dem Quadrat; sonst nach {@link Lage}. Siehe
-     * docs/rahmen.md, „Lage“.
+     * Wie das Bild der Marke in Richtung i (0 N bis 3 W) auf dem Schirm gedreht ist, bei der Drehung {@code karte} der Karte:
+     * starr mit ihr, mit dem Kopf von der Mitte weg, mit dem Kopf zur Mitte oder aufrecht. Siehe docs/rahmen.md, „Drehen“.
      */
-    static double[] marke(double x, double y, double s, int baender, boolean rund, double ux, double uy, Platz platz) {
+    static double winkel(Stellung stellung, int i, double karte) {
+        return switch (stellung) {
+            case KARTE -> karte;
+            case AUSSEN -> karte + i * Math.PI / 2;
+            case INNEN -> karte + i * Math.PI / 2 + Math.PI;
+            case AUFRECHT -> 0;
+        };
+    }
+
+    /**
+     * Wo eine Marke sitzt, in Einheiten des GUI: von der Mitte der Minimap (x, y, Seite s) in Richtung (ux, uy), nach ihrem
+     * {@code platz}: ohne auf der Mitte der Bänder, rund auf dem Kreis, eckig auf dem Quadrat; sonst nach {@link Lage}, mit
+     * dem Kasten des Bilds, wie es um {@code winkel} gedreht auf dem Schirm steht. Siehe docs/rahmen.md, „Lage“.
+     */
+    static double[] marke(double x, double y, double s, int baender, boolean rund, double ux, double uy, Platz platz, double winkel) {
         double laenge = Math.hypot(ux, uy), nx = ux / laenge, ny = uy / laenge;
         double d = switch (platz == null ? Lage.MITTE : platz.lage()) {
             case MITTE -> {
                 double h = s / 2 - baender / 2.0;
                 yield rund ? h : h / Math.max(Math.abs(nx), Math.abs(ny));
             }
-            case KANTE -> anliegend(s, rund, nx, ny, platz);
-            case INNEN -> innen(s / 2 - baender - 1, rund, nx, ny, platz.w() / 2.0, platz.h() / 2.0);
-            case AUSSEN -> aussen(s / 2 + 1, rund, nx, ny, platz.w() / 2.0, platz.h() / 2.0);
+            case KANTE -> innen(s / 2, rund, nx, ny, kasten(platz, winkel, platz.schatten()));
+            case INNEN -> innen(s / 2 - baender - 1, rund, nx, ny, kasten(platz, winkel, 0));
+            case AUSSEN -> aussen(s / 2 + 1, rund, nx, ny, platz, winkel);
         };
         return new double[] {x + s / 2 + nx * d, y + s / 2 + ny * d};
     }
 
     /**
-     * Wie weit von der Mitte der Minimap (Seite s) die Mitte eines Bilds liegt, das von ihr weg in Richtung (nx, ny) der Länge 1
-     * zeigt, damit es samt Schatten um (+Schatten, +Schatten) gerade innen an der äusseren Kante anliegt: rund am Kreis, eckig
-     * an beiden Seiten, die es erreichen kann; gedreht mit dem Kasten des gedrehten Bilds. Siehe docs/rahmen.md, „Lage“.
+     * Die Ecken des Bilds von {@code platz}, um {@code winkel} gedreht, als Versatz zu seiner Mitte auf dem Schirm; mit
+     * {@code schatten} dazu die Ecken des Schattens, der auf dem Schirm um (+schatten, +schatten) liegt.
      */
-    static double anliegend(double s, boolean rund, double nx, double ny, Platz platz) {
-        double r = s / 2, w = platz.w() / 2.0, h = platz.h() / 2.0, schatten = platz.schatten();
+    static double[][] kasten(Platz platz, double winkel, int schatten) {
+        double w = platz.w() / 2.0, h = platz.h() / 2.0, c = Math.cos(winkel), s = Math.sin(winkel);
+        double[][] ecken = new double[schatten > 0 ? 8 : 4][];
+        for (int j = 0; j < ecken.length; j++) {
+            double ex = (j & 1) == 0 ? w : -w, ey = (j & 2) == 0 ? h : -h, s0 = j < 4 ? 0 : schatten;
+            ecken[j] = new double[] {ex * c - ey * s + s0, ex * s + ey * c + s0};
+        }
+        return ecken;
+    }
+
+    /**
+     * Wie weit in Richtung (nx, ny) der Länge 1 die Mitte eines Bilds mit den {@code ecken} ({@link #kasten}) liegt, das ganz
+     * innerhalb von {@code r} um die Mitte bleibt und es berührt: rund mit jeder Ecke im Kreis, eckig im Quadrat mit der halben
+     * Seite r an beiden Seiten, die es erreichen kann. Mit dem Schatten in den Ecken ist das {@link Lage#KANTE}.
+     */
+    static double innen(double r, boolean rund, double nx, double ny, double[][] ecken) {
+        double d = Double.MAX_VALUE;
         if (rund) {
-            // Jede Ecke a des Bilds und seines Schattens im Kreis: |d · n + a| ≤ r.
-            double d = Double.MAX_VALUE;
-            for (int j = 0; j < 8; j++) {
-                double eh = (j & 1) == 0 ? h : -h, ew = (j & 2) == 0 ? w : -w, s0 = j < 4 ? 0 : schatten;
-                double ax = eh * nx - ew * ny + s0, ay = eh * ny + ew * nx + s0, p = ax * nx + ay * ny;
-                d = Math.min(d, Math.sqrt(p * p - (ax * ax + ay * ay) + r * r) - p);
+            // Jede Ecke a im Kreis: |d · n + a| ≤ r.
+            for (double[] a : ecken) {
+                double p = a[0] * nx + a[1] * ny;
+                d = Math.min(d, Math.sqrt(p * p - (a[0] * a[0] + a[1] * a[1]) + r * r) - p);
             }
             return d;
         }
         double[] n = {nx, ny};
-        double d = Double.MAX_VALUE;
-        for (int a = 0; a < 2; a++) {
-            double u = Math.abs(n[a]);
-            if (u > 1e-12) {
-                // Die halbe Ausdehnung des gedrehten Bilds auf dieser Achse; der Schatten liegt rechts und unten.
-                double weit = h * u + w * Math.abs(n[1 - a]) + (n[a] > 0 ? schatten : 0);
-                d = Math.min(d, (r - weit) / u);
+        for (int i = 0; i < 2; i++) {
+            if (Math.abs(n[i]) > 1e-12) {
+                // Wie weit das Bild auf dieser Achse über seine Mitte hinaus nach aussen reicht.
+                double weit = -Double.MAX_VALUE;
+                for (double[] a : ecken) {
+                    weit = Math.max(weit, a[i] * Math.signum(n[i]));
+                }
+                d = Math.min(d, (r - weit) / Math.abs(n[i]));
             }
         }
         return d;
     }
 
     /**
-     * Wie weit in Richtung (nx, ny) die Mitte eines aufrechten Bilds mit den halben Seiten (w, h) liegt, das ganz innerhalb von
-     * {@code r} um die Mitte bleibt und es berührt: eckig im Quadrat mit der halben Seite r, rund mit jeder Ecke im Kreis.
+     * Wie weit in Richtung (nx, ny) der Länge 1 die Mitte des Bilds von {@code platz}, um {@code winkel} gedreht, liegt, das ganz
+     * ausserhalb von {@code r} um die Mitte liegt und es berührt: eckig ausserhalb des Quadrats mit der halben Seite r, an der
+     * Seite, die es zuerst ganz verlässt; rund mit seinem nächsten Punkt auf dem Kreis.
      */
-    static double innen(double r, boolean rund, double nx, double ny, double w, double h) {
-        double d = Double.MAX_VALUE;
-        if (rund) {
-            for (int j = 0; j < 4; j++) {
-                double ax = (j & 1) == 0 ? w : -w, ay = (j & 2) == 0 ? h : -h, p = ax * nx + ay * ny;
-                d = Math.min(d, Math.sqrt(p * p - (ax * ax + ay * ay) + r * r) - p);
-            }
-            return d;
-        }
-        if (Math.abs(nx) > 1e-12) {
-            d = Math.min(d, (r - w) / Math.abs(nx));
-        }
-        if (Math.abs(ny) > 1e-12) {
-            d = Math.min(d, (r - h) / Math.abs(ny));
-        }
-        return d;
-    }
-
-    /**
-     * Wie weit in Richtung (nx, ny) die Mitte eines aufrechten Bilds mit den halben Seiten (w, h) liegt, das ganz ausserhalb von
-     * {@code r} um die Mitte liegt und es berührt: eckig ausserhalb des Quadrats mit der halben Seite r, rund mit seinem
-     * nächsten Punkt auf dem Kreis.
-     */
-    static double aussen(double r, boolean rund, double nx, double ny, double w, double h) {
+    static double aussen(double r, boolean rund, double nx, double ny, Platz platz, double winkel) {
         if (!rund) {
+            double[] n = {nx, ny};
             double d = Double.MAX_VALUE;
-            if (Math.abs(nx) > 1e-12) {
-                d = Math.min(d, (r + w) / Math.abs(nx));
-            }
-            if (Math.abs(ny) > 1e-12) {
-                d = Math.min(d, (r + h) / Math.abs(ny));
+            for (int i = 0; i < 2; i++) {
+                if (Math.abs(n[i]) > 1e-12) {
+                    // Wie weit das Bild auf dieser Achse von seiner Mitte zur Mitte der Minimap hin reicht.
+                    double nah = Double.MAX_VALUE;
+                    for (double[] a : kasten(platz, winkel, 0)) {
+                        nah = Math.min(nah, a[i] * Math.signum(n[i]));
+                    }
+                    d = Math.min(d, (r - nah) / Math.abs(n[i]));
+                }
             }
             return d;
         }
-        // Der Abstand des nächsten Punkts wächst mit d; halbiert, bis er auf ein Millionstel stimmt.
-        double unten = 0, oben = r + w + h;
+        // Der Abstand des nächsten Punkts wächst mit d; halbiert, bis er auf ein Millionstel stimmt. Gerechnet im Bild: die
+        // Mitte der Minimap von der des Bilds aus, um winkel zurückgedreht.
+        double w = platz.w() / 2.0, h = platz.h() / 2.0, c = Math.cos(winkel), s = Math.sin(winkel), unten = 0, oben = r + w + h;
         while (oben - unten > 1e-6) {
-            double d = (unten + oben) / 2, dx = Math.max(0, Math.abs(d * nx) - w), dy = Math.max(0, Math.abs(d * ny) - h);
-            if (Math.hypot(dx, dy) < r) {
+            double d = (unten + oben) / 2, qx = -d * (nx * c + ny * s), qy = -d * (ny * c - nx * s);
+            if (Math.hypot(Math.max(0, Math.abs(qx) - w), Math.max(0, Math.abs(qy) - h)) < r) {
                 unten = d;
             } else {
                 oben = d;

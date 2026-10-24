@@ -6,6 +6,7 @@ The release notes on GitHub and Modrinth come from here
 
 ## 0.2.71
 
+- **The flower stands on the frame.** With the "biome" frame, the marks east, south and west now stand outside on the edge of the minimap, foot on the frame and bloom pointing out; the letters of "lettern" turn their head outward too. The minimap keeps a little more distance to the screen edge for that.
 - **Copy another server's map and draw over it.** In the map list, next to "Use the map of …", "Copy" makes the other server's map of the same world your own map on this server, and "Draw it yourself" then draws what changes here. The copy costs hardly any space: until a tile is drawn anew, both maps share its file.
 
 ## 0.2.70
