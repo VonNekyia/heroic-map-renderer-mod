@@ -67,7 +67,8 @@ record Satz(Path ordner, String name, String dimension, int massstab, int kachel
         try (Stream<Path> baeume = Files.list(welt)) {
             for (Path baum : baeume.sorted(Comparator.comparing((Path p) -> p.getFileName().toString())).toList()) {
                 Satz satz = lies(baum);
-                if (satz == null || !dimension.equals(satz.dimension())) {
+                // Ein ruhender Baum nach einem Reset zeigt nie. Siehe docs/download.md, „Reset“.
+                if (satz == null || !dimension.equals(satz.dimension()) || Files.exists(baum.resolve(Reset.RUHT))) {
                     continue;
                 }
                 if (!Selbst.selbst(baum)) {

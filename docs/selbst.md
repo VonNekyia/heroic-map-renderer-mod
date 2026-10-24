@@ -85,7 +85,8 @@ Server, [0029](entscheidungen/0029-was-ein-server-zeigt-gilt-je-server.md).
      Download, dann der im Ziel.
 
   Die eigene Karte eines anderen Servers zeigt er nie, auch nicht mit einer
-  Wahl. Gezeichnet wird nur in die eigene Karte dieses Servers, und nur,
+  Wahl. Einen ruhenden Baum nach einem Reset zeigt er nie, siehe
+  [Download](download.md), „Reset“. Gezeichnet wird nur in die eigene Karte dieses Servers, und nur,
   solange er sie zeigt. Downloads vom Server gehen weiter in ihre eigenen
   Bäume; einer kann auf main an sein und auf build ruhen.
 - **Die Frage** (`AlteKarte`): Zeigt dieser Server für die Dimension einen
