@@ -147,6 +147,7 @@ public final class Bilder implements FabricClientGameTest {
             selbst(context);
             tueren(context, server);
             pflanzen(context, server);
+            pflanzenAusPaketen(context, server);
             weitHeraus(context, server);
             koordinatenAmRand(context, server);
         }
@@ -1656,6 +1657,158 @@ public final class Bilder implements FabricClientGameTest {
         "setblock -34 -60 20 pink_petals[facing=north,flower_amount=1]",
         "setblock -32 -60 21 stone", "setblock -32 -60 20 ladder[facing=north]",
     };
+
+    /**
+     * Das Testpaket unter /pakete/pflanzen, eigene Modelle nach dem Muster mancher Pakete: eine ersetzte Vorlage
+     * {@code block/crop} mit gekippten Flächen, reifer Weizen als zwei Blöcke hohes Modell ohne {@code parent}, die Datei
+     * {@code potatoes_stage3} des Spiels mit diesem Modell als {@code parent}, und Gras, das neben dem Modell des Spiels ein
+     * schräges Kreuz ohne {@code parent} wählt. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
+     */
+    private static final String[] PAKET_PFLANZEN = {
+        "pack.mcmeta",
+        "assets/minecraft/blockstates/short_grass.json",
+        "assets/minecraft/blockstates/wheat.json",
+        "assets/minecraft/models/block/crop.json",
+        "assets/minecraft/models/block/heroicmap_test_gras.json",
+        "assets/minecraft/models/block/heroicmap_test_hohes_getreide.json",
+        "assets/minecraft/models/block/heroicmap_test_schraeges_kreuz.json",
+        "assets/minecraft/models/block/heroicmap_test_weizen_reif.json",
+        "assets/minecraft/models/block/potatoes_stage3.json",
+    };
+
+    /**
+     * Ein Feld: Weizen jung bis reif, Karotten, Kartoffeln, Gras und Farn, um (-56, 43). Wasser an beiden Enden hält das ganze
+     * Ackerland feucht; ein Zufallstick liesse es sonst trocknen, und trockenes sieht anders aus.
+     */
+    private static final String[] FELD = {
+        "fill -62 -61 38 -48 -61 48 grass_block", "fill -62 -60 38 -48 -50 48 air",
+        "fill -60 -61 40 -53 -61 42 farmland[moisture=7]", "setblock -52 -61 41 water", "setblock -61 -61 41 water",
+        "setblock -60 -60 40 wheat[age=0]", "setblock -59 -60 40 wheat[age=2]", "setblock -58 -60 40 wheat[age=4]",
+        "setblock -57 -60 40 wheat[age=6]", "fill -56 -60 40 -53 -60 40 wheat[age=7]",
+        "fill -60 -60 42 -57 -60 42 carrots[age=7]", "fill -56 -60 42 -53 -60 42 potatoes[age=7]",
+        "fill -60 -60 44 -53 -60 44 short_grass", "fill -60 -60 46 -57 -60 46 fern",
+    };
+
+    /**
+     * Pflanzen aus Paketen: das Feld bei 4 px und 1 px, Zoom 4, ohne und mit dem Testpaket. Mit dem Paket liegen Karotten und
+     * Gras bei 4 px wie ohne, denn ihre erste Fläche ist dieselbe, und reifer Weizen und Kartoffeln decken das Ackerland,
+     * statt wegzufallen; verglichen mit einem Bild derselben Stelle ohne sie, denn Ackerland in verschiedenen Reihen ist
+     * verschieden hell. Die Kartoffeln tragen im Testpaket die Textur des reifen Weizens, denn die linke Hälfte ihrer eigenen
+     * deckt nur ein Drittel des Blocks. Erst alle Bilder, dann die Prüfung. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
+     */
+    private static void pflanzenAusPaketen(ClientGameTestContext context, TestServerContext server) {
+        for (String befehl : FELD) {
+            server.runCommand(befehl);
+        }
+        Path ordner = FabricLoader.getInstance().getGameDir().resolve("resourcepacks").resolve("heroicmap-pflanzen-test");
+        try {
+            for (String datei : PAKET_PFLANZEN) {
+                Path ziel = ordner.resolve(datei);
+                Files.createDirectories(ziel.getParent());
+                try (InputStream rein = Bilder.class.getResourceAsStream("/pakete/pflanzen/" + datei)) {
+                    Files.copy(rein, ziel, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        // Zuerst das Ackerland ohne reifen Weizen und Kartoffeln, an derselben Stelle: Damit vergleicht die Prüfung, ob sie decken.
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeScale(4);
+            Minimap.INSTANZ.setzeZoom(4);
+        });
+        server.runCommand("fill -56 -60 40 -53 -60 40 air");
+        server.runCommand("fill -56 -60 42 -53 -60 42 air");
+        context.waitTicks(10);
+        BufferedImage boden = minimapBei(context, server, -56.5, 43.5, "pakete-4px-boden");
+        server.runCommand("fill -56 -60 40 -53 -60 40 wheat[age=7]");
+        server.runCommand("fill -56 -60 42 -53 -60 42 potatoes[age=7]");
+        context.waitTicks(10);
+        List<BufferedImage> bilder = new ArrayList<>();
+        try {
+            for (boolean mitPaket : new boolean[] {false, true}) {
+                paket(context, "file/heroicmap-pflanzen-test", mitPaket);
+                for (int scale : new int[] {4, 1}) {
+                    context.runOnClient(mc -> {
+                        Minimap.INSTANZ.setzeScale(scale);
+                        Minimap.INSTANZ.setzeZoom(4);
+                    });
+                    context.waitTicks(10);
+                    bilder.add(minimapBei(context, server, -56.5, 43.5, "pakete-" + scale + "px-" + (mitPaket ? "mit" : "ohne")));
+                }
+            }
+        } finally {
+            paket(context, "file/heroicmap-pflanzen-test", false);
+        }
+        if (!AUSGABE.isEmpty()) {
+            try {
+                ImageIO.write(nebeneinander(0, bilder.toArray(BufferedImage[]::new)), "png", Path.of(AUSGABE, "pflanzen-pakete.png").toFile());
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        server.runCommand("tp @a 0.5 -30 0.5 0 90");
+        BufferedImage ohne = bilder.get(0), mit = bilder.get(2);
+        int block = 4 * context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+        List<String> fehler = new ArrayList<>();
+        // Wie ohne Paket: Karotten (z 42) und Gras (z 44).
+        for (int[] b : new int[][] {{-60, 42}, {-59, 42}, {-58, 42}, {-57, 42}, {-60, 44}, {-58, 44}, {-56, 44}, {-54, 44}}) {
+            double anders = anteilAnders(mit, b[0], b[1], ohne, b[0], b[1], block);
+            if (anders > 0.15) {
+                fehler.add("(" + b[0] + ", " + b[1] + ") zu " + Math.round(100 * anders) + " % anders als ohne Paket");
+            }
+        }
+        // Deckt das Ackerland: reifer Weizen (z 40) und Kartoffeln (z 42), verglichen mit derselben Stelle ohne sie.
+        for (int[] b : new int[][] {{-56, 40}, {-55, 40}, {-54, 40}, {-53, 40}, {-56, 42}, {-55, 42}, {-54, 42}, {-53, 42}}) {
+            double wieBoden = 1 - anteilAnders(mit, b[0], b[1], boden, b[0], b[1], block);
+            if (wieBoden > 0.5) {
+                fehler.add("(" + b[0] + ", " + b[1] + ") zu " + Math.round(100 * wieBoden) + " % wie das Ackerland ohne Pflanze");
+            }
+        }
+        if (!fehler.isEmpty()) {
+            throw new AssertionError("Pflanzen aus Paketen bei 4 px: " + String.join("; ", fehler));
+        }
+    }
+
+    /**
+     * Welcher Anteil der Pixel im Inneren des Blocks (x, z) in {@code a} mehr als 4 in einem Kanal von denen des Blocks (x2, z2)
+     * in {@code b} abweicht; die Minimap steht mit dem Spieler bei (-56,5, 43,5) in der Mitte, {@code block} Pixel je Block.
+     */
+    private static double anteilAnders(BufferedImage a, int x, int z, BufferedImage b, int x2, int z2, int block) {
+        int ax = a.getWidth() / 2 + Math.round((x + 56.5f) * block), az = a.getHeight() / 2 + Math.round((z - 43.5f) * block);
+        int bx = b.getWidth() / 2 + Math.round((x2 + 56.5f) * block), bz = b.getHeight() / 2 + Math.round((z2 - 43.5f) * block);
+        int anders = 0, alle = 0;
+        for (int dy = 1; dy < block - 1; dy++) {
+            for (int dx = 1; dx < block - 1; dx++) {
+                int p = a.getRGB(ax + dx, az + dy), q = b.getRGB(bx + dx, bz + dy);
+                boolean gleich = true;
+                for (int s = 0; s <= 16; s += 8) {
+                    gleich &= Math.abs((p >> s & 0xFF) - (q >> s & 0xFF)) <= 4;
+                }
+                anders += gleich ? 0 : 1;
+                alle++;
+            }
+        }
+        return anders / (double) alle;
+    }
+
+    /** Schaltet das Paket {@code id} an oder aus und lädt die Ressourcen neu, wie das Menü der Pakete. */
+    private static void paket(ClientGameTestContext context, String id, boolean an) {
+        java.util.concurrent.CompletableFuture<Void> fertig = context.computeOnClient(mc -> {
+            net.minecraft.server.packs.repository.PackRepository r = mc.getResourcePackRepository();
+            r.reload();
+            List<String> gewaehlt = new ArrayList<>(r.getSelectedIds());
+            gewaehlt.remove(id);
+            if (an) {
+                gewaehlt.add(id);
+            }
+            r.setSelected(gewaehlt);
+            return mc.reloadResourcePacks();
+        });
+        // Fertig erst, wenn auch das Bild des Ladens ausgeblendet ist.
+        context.waitFor(mc -> fertig.isDone() && mc.gui.overlay() == null, 1200);
+        context.waitTicks(5);
+    }
 
     /** Was an ihrer Stelle steht, wenn die Pflanzen weg sind. */
     private static final String[] OHNE_PFLANZEN = {

@@ -1,0 +1,4 @@
+{
+  "parent": "minecraft:block/heroicmap_test_hohes_getreide",
+  "textures": {"crop": "minecraft:block/wheat_stage7"}
+}

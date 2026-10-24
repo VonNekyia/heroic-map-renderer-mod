@@ -77,12 +77,15 @@ final class Pflanzen {
         }
     }
 
-    /** Je Zustand des Blocks die Modelle, die das Spiel für ihn lädt, aus allen Packs, das oberste zuletzt; leer bei jedem Fehler. */
+    /**
+     * Je Zustand des Blocks die Modelle aus der untersten Quelle, dem Spiel oder dem Mod, der den Block bringt; ein
+     * Ressourcenpaket darüber zählt nicht. Leer bei jedem Fehler. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
+     */
     private static Map<BlockState, Set<Identifier>> lies(ResourceManager packs, Block block) {
         Identifier id = BuiltInRegistries.BLOCK.getKey(block);
         Map<BlockState, Set<Identifier>> aus = new HashMap<>();
         try {
-            for (Resource r : packs.getResourceStack(id.withPath(p -> "blockstates/" + p + ".json"))) {
+            for (Resource r : packs.getResourceStack(id.withPath(p -> "blockstates/" + p + ".json")).stream().limit(1).toList()) {
                 JsonElement json;
                 try (Reader rein = r.openAsReader()) {
                     json = JsonParser.parseReader(rein);
@@ -103,9 +106,9 @@ final class Pflanzen {
         return aus;
     }
 
-    /** Der {@code parent} der Modelldatei im obersten Pack, oder null. */
+    /** Der {@code parent} der Modelldatei aus der untersten Quelle, wie bei {@link #lies}, oder null. */
     private static Identifier eltern(ResourceManager packs, Identifier modell) {
-        Optional<Resource> r = packs.getResource(modell.withPath(p -> "models/" + p + ".json"));
+        Optional<Resource> r = packs.getResourceStack(modell.withPath(p -> "models/" + p + ".json")).stream().findFirst();
         if (r.isEmpty()) {
             return null;
         }

@@ -1,0 +1,4 @@
+{
+  "parent": "minecraft:block/heroicmap_test_schraeges_kreuz",
+  "textures": {"cross": "minecraft:block/short_grass"}
+}
