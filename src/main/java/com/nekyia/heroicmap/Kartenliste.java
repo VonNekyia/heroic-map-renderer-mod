@@ -8,6 +8,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -238,8 +239,8 @@ final class Kartenliste extends Screen {
 
     /**
      * Unten, unauffällig: mit Zeiger sein Ziel, „(fehlt)“, wenn es nicht daliegt, und „lösen“; ohne Zeiger je anderem
-     * Ordner derselben Welt unter derselben Adresse „Karte von … nutzen“. Ohne solche Ordner nichts. Kein Dialog. Siehe
-     * docs/download.md, „Kartenliste“.
+     * Ordner derselben Welt „Karte von … nutzen“, erst unter derselben Adresse, dann unter anderen, so viele, wie in die
+     * Zeile passen. Ohne solche Ordner nichts. Kein Dialog. Siehe docs/download.md, „Kartenliste“.
      */
     private void zeiger(Path welt, String wer) {
         String server = Zeigt.OHNE.equals(wer) ? Component.translatable("heroicmap.liste.dieser").getString() : wer;
@@ -263,7 +264,8 @@ final class Kartenliste extends Screen {
             zeigerZeile = true;
             return;
         }
-        List<String> andere = Zeiger.kandidaten(welt);
+        List<String> andere = new ArrayList<>(Zeiger.kandidaten(welt));
+        andere.addAll(Zeiger.fremde(welt, minecraft.level.dimension().identifier().toString()));
         if (andere.isEmpty()) {
             return;
         }
@@ -272,6 +274,9 @@ final class Kartenliste extends Screen {
         for (String k : andere) {
             Component text = Component.translatable("heroicmap.liste.zeiger_setzen", anzeige(k));
             int breite = Math.min(160, font.width(text) + 16);
+            if (x + breite + KOPIE > width - 8) {
+                break;
+            }
             addRenderableWidget(Button.builder(text, b -> {
                 try {
                     Zeiger.setze(welt, k);
@@ -290,12 +295,12 @@ final class Kartenliste extends Screen {
 
     /**
      * Neben „Karte von … nutzen“ und „lösen“: „Kopie“ macht die Karte von {@code k} für die Dimension des Spielers zur eigenen
-     * Karte dieses Servers, über die „Selbst“ zeichnet. Kein Knopf, wenn es dort keine gibt oder „Selbst“ hier nicht geht;
-     * grau mit Grund, wenn dieser Server schon eine eigene hat oder ein Download in die Quelle läuft. Gibt die belegte Breite
-     * zurück. Siehe docs/selbst.md, „Kopie“.
+     * Karte dieses Servers, über die „Selbst“ zeichnet. Kein Knopf, wenn es dort keine gibt, „Selbst“ hier nicht geht oder
+     * {@code k} unter einer anderen Adresse liegt; grau mit Grund, wenn dieser Server schon eine eigene hat oder ein Download
+     * in die Quelle läuft. Gibt die belegte Breite zurück. Siehe docs/selbst.md, „Kopie“.
      */
     private int kopieKnopf(Path welt, String wer, String k, int x, int y) {
-        if (!Selbst.INSTANZ.moeglich(minecraft)) {
+        if (!Selbst.INSTANZ.moeglich(minecraft) || k.startsWith(Zeiger.FREMD)) {
             return 0;
         }
         String dimension = minecraft.level.dimension().identifier().toString();
@@ -371,6 +376,11 @@ final class Kartenliste extends Screen {
 
     /** Der Name einer anderen Karte für die Zeile des Zeigers; ohne Namen ein Wort. */
     private static String anzeige(String karte) {
+        if (karte.startsWith(Zeiger.FREMD)) {
+            // @<adresse> oder @<adresse>/karte-<name>: „<adresse>“ oder „<name> (<adresse>)“.
+            String[] teile = karte.substring(Zeiger.FREMD.length()).split("/");
+            return teile.length == 1 ? teile[0] : teile[1].substring("karte-".length()) + " (" + teile[0] + ")";
+        }
         return Zeigt.OHNE.equals(karte) ? Component.translatable("heroicmap.liste.ohne_namen").getString() : karte;
     }
 
