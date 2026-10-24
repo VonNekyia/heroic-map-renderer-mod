@@ -1,0 +1,3 @@
+schatten=nein
+drehung=karte
+lage=mitte

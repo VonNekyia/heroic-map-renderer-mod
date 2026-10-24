@@ -1,4 +1,0 @@
-schatten=ja
-aussen=ja
-lage=kante
-lage_norden=mitte

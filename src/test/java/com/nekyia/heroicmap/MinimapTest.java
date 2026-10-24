@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.Test;
@@ -47,7 +48,7 @@ class MinimapTest {
         assertTrue(m.verzierungen());
         // Ohne N zeichnet der Rahmen drei Marken, nicht oben.
         Minimap.Rahmen r = new Minimap.Rahmen(0, 0, 128);
-        List<Minimap.Ornament> drei = Minimap.ornamente(r, 2, false, false, null, null, 2, 1, -1, false, -1);
+        List<Minimap.Ornament> drei = Minimap.ornamente(r, 2, false, Skin.Marken.STARR, null, 2, 1, -1, false, -1);
         assertEquals(3, drei.size());
         for (Minimap.Ornament o : drei) {
             assertTrue(o.y() > 2, "Marke oben trotz N durchsichtig: " + o);
@@ -456,11 +457,16 @@ class MinimapTest {
         // Ohne Lage und Grösse: Die rechnen mit dem Abstand des Skins, und den kennt erst das Spiel.
         Path datei = ordner.resolve("heroicmap.properties");
         Minimap vorher = new Minimap();
-        vorher.setzeSkin("uhr");
+        vorher.setzeSkin("rose");
+        vorher.setzeVariante("rose", "gold");
+        vorher.setzeVariante("biom/grasland", "trocken");
         vorher.schreibe(datei);
         Minimap nachher = new Minimap();
         nachher.lies(datei);
-        assertEquals("uhr", nachher.skin());
+        assertEquals("rose", nachher.skin());
+        assertEquals("gold", nachher.variante("rose"));
+        assertEquals("trocken", nachher.variante("biom/grasland"));
+        assertNull(nachher.variante("schild"));
         // Ein unbekannter Rahmen ist die Vorgabe.
         nachher.setzeSkin("quatsch");
         assertEquals(Skin.BIOM, nachher.skin());
@@ -473,9 +479,11 @@ class MinimapTest {
         // Aus einer älteren Version: ein Rahmen ausser „ohne“ war gewählt; rahmen=ohne ist von der alten Vorgabe nicht zu unterscheiden.
         Files.writeString(datei, "rahmen=uhr\n");
         m.lies(datei);
-        assertEquals("uhr", m.skin());
+        assertEquals("rose", m.skin());
+        assertEquals("gold", m.variante("rose"));
         m.schreibe(datei);
-        assertTrue(Files.readString(datei).contains("rahmen_wahl=uhr"));
+        assertTrue(Files.readString(datei).contains("rahmen_wahl=rose"));
+        assertTrue(Files.readString(datei).contains("rahmen_variante.rose=gold"));
         Files.writeString(datei, "rahmen=ohne\n");
         m.lies(datei);
         assertEquals(Skin.BIOM, m.skin());
@@ -491,6 +499,30 @@ class MinimapTest {
         assertEquals(Skin.BIOM, m.skin());
         m.schreibe(datei);
         assertFalse(Files.readString(datei).contains("rahmen"));
+    }
+
+    @Test
+    void alteRahmenZiehenInIhreFamilie(@TempDir Path ordner) throws Exception {
+        // Bis 0.2.68 hiessen die Rahmen grau, holz, papier, kompass, uhr und kartograph; jeder zieht in Familie und Variante um,
+        // aus rahmen_wahl wie aus dem alten rahmen. Siehe docs/rahmen.md, „Wahl“.
+        Path datei = ordner.resolve("heroicmap.properties");
+        Map<String, List<String>> erwartet = Map.of("grau", List.of("schild", "grau"), "holz", List.of("schild", "gold"),
+                "papier", List.of("schild", "papier"), "kompass", List.of("rose", "silber"), "uhr", List.of("rose", "gold"),
+                "kartograph", List.of("rose", "pergament"));
+        assertEquals(erwartet, Skin.ALT);
+        for (var e : erwartet.entrySet()) {
+            for (String zeile : List.of("rahmen_wahl=", "rahmen=")) {
+                Files.writeString(datei, zeile + e.getKey() + "\n");
+                Minimap m = new Minimap();
+                m.lies(datei);
+                assertEquals(e.getValue().getFirst(), m.skin(), zeile + e.getKey());
+                assertEquals(e.getValue().getLast(), m.variante(m.skin()), zeile + e.getKey());
+                m.schreibe(datei);
+                String text = Files.readString(datei);
+                assertTrue(text.contains("rahmen_wahl=" + e.getValue().getFirst()) && text.contains("rahmen_variante." + e.getValue().getFirst() + "="
+                        + e.getValue().getLast()), zeile + e.getKey() + ": " + text);
+            }
+        }
     }
 
     @Test
