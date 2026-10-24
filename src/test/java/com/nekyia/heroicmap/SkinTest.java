@@ -162,53 +162,68 @@ class SkinTest {
     }
 
     @Test
-    void baenderEckigNachDerRegel() {
-        // Jedes Pixel der Bänder genau einmal, im richtigen Band, oben und links Licht nach der Regel des Pakets.
-        int w = 20, h = 14, anzahl = 4;
-        int[][] band = new int[h][w], licht = new int[h][w], decke = new int[h][w];
-        Skin.baender(0, 0, w, h, anzahl, (xa, ya, xb, yb, i, l) -> {
-            for (int y = ya; y < yb; y++) {
-                for (int x = xa; x < xb; x++) {
-                    decke[y][x]++;
-                    band[y][x] = i;
-                    licht[y][x] = l ? 1 : 0;
-                }
-            }
-        });
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                int soll = Skin.bandEckig(x, y, w, h);
-                assertEquals(soll < anzahl ? 1 : 0, decke[y][x], x + ", " + y);
-                if (soll < anzahl) {
-                    assertEquals(soll, band[y][x], x + ", " + y);
-                    assertEquals(Skin.lichtEckig(x, y, w, h) ? 1 : 0, licht[y][x], x + ", " + y);
-                }
-            }
-        }
+    void bandNachDerFormel() {
+        // Das Beispiel grasland, zwei Bänder, B = 8 Texel, ein Texel je Pixel; die Werte von Hand gerechnet.
+        Skin gras = Skin.lies("t", "#1E1B18\n#C8E86A", "", 7);
+        // Mitte eines Bands: ohne Fase und Übergang die Farbe der Palette.
+        assertEquals(0xFF1E1B18, gras.bandFarbe(2, 1, 1));
+        assertEquals(0xFFC8E86A, gras.bandFarbe(6, 0.5, 1));
+        // Fase: aussen 7,5 % heller, innen 7,5 % dunkler.
+        assertEquals(0xFF2F2C29, gras.bandFarbe(0.5, 1, 1));
+        assertEquals(0xFFB9D762, gras.bandFarbe(7.5, 1, 1));
+        // Auf der Grenze zweier Bänder je zur Hälfte, jedes mit seiner Fase.
+        assertEquals(0xFF748147, gras.bandFarbe(4, 1, 1));
+        // Schatten auf die Karte: 38 % am inneren Rand, nach 3 Texeln nichts; aussen nichts.
+        assertEquals(0x51000000, gras.bandFarbe(8.5, 1, 1));
+        assertEquals(0, gras.bandFarbe(11.5, 1, 1));
+        assertEquals(0, gras.bandFarbe(-0.5, 1, 1));
+        // Ein Band mit Licht und Schatten.
+        Skin drei = Skin.lies("t", "#111111\n#222222 #333333\n#444444", "", 7);
+        assertEquals(0xFF222222, drei.bandFarbe(6, 1, 1));
+        assertEquals(0xFF333333, drei.bandFarbe(6, 0, 1));
+        // Der Ring bei Seite 128 und GUI-Skala 4: oben Licht, unten Schatten, je mit 2,5 % Fase; Mitte und Ecke leer.
+        // Wie weit die Karte unter den Ring reicht, prüft DrehungTest.mitRahmenDecktDerRingDenRand.
+        assertEquals(0xFF282828, drei.ringFarbe(256, 5, 128, 4));
+        assertEquals(0xFF383838, drei.ringFarbe(256, 506, 128, 4));
+        assertEquals(0, drei.ringFarbe(256, 256, 128, 4));
+        assertEquals(0, drei.ringFarbe(0, 0, 128, 4));
     }
 
     @Test
-    void ringLiegtInDenBaendern() {
-        // Seite 128, drei Bänder, von Hand gerechnet: In der mittleren Zeile liegen die Pixel 0 bis 2 im Ring, ab 3 die
-        // Karte. Auf der Diagonale (10, 10) ausserhalb, (19, 19) im zweiten Band, (20, 20) im dritten, (21, 21) die Karte.
-        // Wie weit die Karte unter den Ring reicht, prüft DrehungTest.mitRahmenDecktDerRingDenRand.
-        int s = 128;
-        Skin skin = Skin.lies("t", "#111111\n#222222 #333333\n#444444", "", 7);
-        assertEquals(0xFF111111, skin.ringFarbe(0, 64, s));
-        assertEquals(0xFF222222, skin.ringFarbe(1, 64, s));
-        assertEquals(0xFF444444, skin.ringFarbe(2, 64, s));
-        assertEquals(0, skin.ringFarbe(3, 64, s));
-        assertEquals(0xFF333333, skin.ringFarbe(126, 64, s));
-        assertEquals(0xFF111111, skin.ringFarbe(127, 64, s));
-        assertEquals(0, skin.ringFarbe(10, 10, s));
-        assertEquals(0xFF222222, skin.ringFarbe(19, 19, s));
-        assertEquals(0xFF444444, skin.ringFarbe(20, 20, s));
-        assertEquals(0, skin.ringFarbe(21, 21, s));
-        // Oben in der Mitte das äussere Band; im zweiten Band oben links Licht, unten rechts Schatten.
-        assertEquals(0xFF111111, skin.ringFarbe(s / 2, 0, s));
-        assertEquals(0xFF222222, skin.ringFarbe(s / 2, 1, s));
-        assertEquals(0xFF333333, skin.ringFarbe(s / 2, s - 2, s));
-        assertEquals(0, skin.ringFarbe(s / 2, s / 2, s));
+    void eckigAusStueckenGenau() {
+        // Die Stücke aus der Textur der Ecken geben jeden Pixel so, wie ihn die Formel für die ganze Seite rechnet: abgetastet
+        // wie mit Nearest an der Mitte des Pixels. Jeder Pixel nahe dem Rand liegt in genau einem Stück, die Mitte in keinem.
+        for (String palette : new String[] {"#1E1B18\n#C8E86A", "#111111\n#222222 #333333\n#444444",
+                "#101010\n#202020\n#303030 #404040\n#505050\n#606060"}) {
+            Skin skin = Skin.lies("t", palette, "", 7);
+            int c = skin.baender() + 2, m = 2 * c + 1;
+            for (int k = 1; k <= 4; k++) {
+                for (int s : new int[] {56, Minimap.GROESSE, Minimap.GROESSTE}) {
+                    List<Skin.Stueck> stuecke = Skin.stuecke(0, 0, s, c);
+                    for (int py = 0; py < s * k; py++) {
+                        for (int px = 0; px < s * k; px++) {
+                            boolean rand = Math.min(Math.min(px, py), Math.min(s * k - 1 - px, s * k - 1 - py)) < c * k;
+                            if (!rand && (px % 7 != 0 || py % 7 != 0)) {
+                                continue;
+                            }
+                            double ux = (px + 0.5) / k, uy = (py + 0.5) / k;
+                            int treffer = 0, farbe = 0;
+                            for (Skin.Stueck t : stuecke) {
+                                if (ux >= t.x1() && ux < t.x2() && uy >= t.y1() && uy < t.y2()) {
+                                    treffer++;
+                                    double u = t.u1() + (ux - t.x1()) / (t.x2() - t.x1()) * (t.u2() - t.u1());
+                                    double v = t.v1() + (uy - t.y1()) / (t.y2() - t.y1()) * (t.v2() - t.v1());
+                                    farbe = skin.eckigFarbe((int) Math.floor(u * m * k), (int) Math.floor(v * m * k), m, k);
+                                }
+                            }
+                            String wo = "Bänder " + skin.baender() + ", k " + k + ", Seite " + s + ", Pixel " + px + ", " + py;
+                            assertEquals(rand ? 1 : 0, treffer, wo);
+                            assertEquals(skin.eckigFarbe(px, py, s, k), farbe, wo);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @Test

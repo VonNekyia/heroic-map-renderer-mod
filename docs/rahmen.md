@@ -221,19 +221,58 @@ F3+T und Ressourcenpakete laden ihn neu. Bei „biom“ je Kategorie
 
 ## Bänder
 
-- **Eckig** liegt ein Pixel in Band `min(x, y, w − 1 − x, h − 1 − y)`, in
-  Licht, wenn `min(x, y) < min(w − 1 − x, h − 1 − y)`, also oben und
-  links. Gezeichnet als vier Rechtecke je Band (`Skin.baender`), über der
-  Karte; die Bänder decken sie.
-- **Rund** liegt ein Pixel in Band `⌊R − d⌋`, d der Abstand von der Mitte
-  des Pixels zur Mitte, R die halbe Seite; in Licht, wenn
-  `dx + dy < 0`. Gezeichnet als ein Ring, eine Textur mit einem Texel je
-  Einheit des GUI (`Skin.ring`); je Variante höchstens zwei Seiten zugleich,
-  die der Minimap und die der Vorschau im Wähler.
+Die Bänder rechnet der Mod aus `palette.txt` nach der Formel des
+Designers, mit weichem Übergang, Fase und Schatten; Bilder gibt es dafür
+nicht. Warum so:
+[0033](entscheidungen/0033-band-nach-der-formel.md).
+
+- **Masse:** Die Formel rechnet in Texeln, 4 je Einheit des GUI
+  (`Skin.D`). Ein Band ist 4 Texel breit, n Bänder sind B = 4n. Gezeichnet
+  wird in Pixeln des Schirms, k je Einheit, k der GUI-Massstab: Ein Pixel
+  ist p = 4/k Texel, es zählt seine Mitte. So bleibt das Band auch bei
+  GUI-Massstab 3 gleichmässig.
+- **Abstand v** der Pixelmitte vom Aussenrand, S die Seite in Texeln:
+  eckig `min(x, y, S − x, S − y)`, rund `S/2 − √(dx² + dy²)` mit dx, dy ab
+  der Mitte.
+- **Licht L** von 0 (Schatten) bis 1, mit `glatt(t) = t² · (3 − 2t)` und t
+  auf [0, 1] begrenzt:
+  - eckig `glatt(0,5 + (min(S − x, S − y) − min(x, y)) / 3)`: oben und
+    links Licht, die Grenze auf der Diagonale der Ecke, weich über etwa 3
+    Texel;
+  - rund `glatt(0,5 − (dx + dy) / 12)`: oben links Licht, die Grenze bei
+    45°, weich über etwa 12 Texel.
+- **Farbe** (`Skin.bandFarbe`), je Band i mit `lo = 4i` und
+  `hi = 4(i + 1)`; das äusserste hat kein lo, das innerste kein hi:
+  - Gewicht `glatt((v − lo) / 1,6 + 0,5) · glatt((hi − v) / 1,6 + 0,5)`,
+    der Übergang zwischen zwei Bändern über 1,6 Texel;
+  - Grundfarbe `Schatten + (Licht − Schatten) · L`, bei einer Farbe je
+    Zeile dieselbe;
+  - Fase `f = 0,10 · (1 − 2t)` mit `t = (v − lo) / 4` auf [0, 1]: aussen
+    bis 10 % heller, `c + (255 − c) · f`, innen bis 10 % dunkler,
+    `c · (1 + f)`;
+  - gemischt nach den Gewichten.
+- **Deckung** `clamp(v/p + 0,5) · clamp((B − v)/p + 0,5)`
+  (`Skin.deckung`): Die Aussenkante ist über einen Pixel weich, rund also
+  geglättet; eckig liegt sie auf ganzen Pixeln.
+- **Schatten auf die Karte:** Schwarz zu `0,38 · clamp(1 − (v − B) / 3)`
+  für v > B − p/2: 38 % am inneren Rand, nach 3 Texeln, einer
+  Dreiviertel-Einheit, nichts. Die Bänder liegen darüber.
+- **Gezeichnet** nach Karte und Linien (`Skin.baender`):
+  - rund als Ring, eine Textur mit (s · k)² Pixeln für die Seite s
+    (`Skin.ringFarbe`);
+  - eckig aus der Textur der Ecken, einem Quadrat der Seite 2c + 1
+    Einheiten mit c = n + 2: die vier Ecken c × c, dazwischen die
+    mittlere Einheit gestreckt (`Skin.stuecke`, `Skin.eckigFarbe`). Bis c
+    Einheiten vom Rand hängt die Farbe nur vom Abstand zur nächsten Kante
+    ab; darum ist das genau so, wie die Formel für die ganze Seite rechnet
+    (`SkinTest.eckigAusStueckenGenau`).
 - **Die Karte rund** reicht als Vieleck unter den Ring, siehe
   [Minimap](minimap.md), „Form“. Sichtbar endet sie so genau am Ring, auch
   die Chunklinien.
-- **Breite** in Einheiten des GUI, sie wächst mit dem GUI-Massstab.
+- **Breite** n Einheiten, sie wächst mit dem GUI-Massstab; dazu der
+  Schatten eine Dreiviertel-Einheit auf der Karte.
+- **Bis 0.2.68** war jedes Band eine Einheit in einer Farbe, eckig vier
+  Rechtecke je Band, rund ein Ring mit einem Texel je Einheit.
 
 ## Griff
 
@@ -466,21 +505,27 @@ das HUD-Element im Median eckig 0,016 bis 0,021 ms, rund 0,025 bis
 0,033 ms, gedreht wie ungedreht. Gemessen ist das noch mit zier, je Frame
 8 Bilder gedreht und 4 ungedreht; ohne zier sind es 4 und 4, die Zahlen
 sind also eine obere Schranke. Ohne Rahmen sind es eckig 0,002 bis 0,003 ms, siehe
-[Minimap](minimap.md), „Kosten“.
+[Minimap](minimap.md), „Kosten“. Gemessen ist das mit den Bändern bis 0.2.68, eckig als Rechtecke.
 
 Geschätzt, nicht gemessen:
 
-- **Eckig** je Frame höchstens 20 Rechtecke für 5 Bänder.
+- **Eckig** je Frame 8 Stücke aus einer Textur. Die Textur der Ecken
+  rechnet der Mod einmal je GUI-Massstab: bei 5 Bändern und GUI-Massstab
+  4 sind es 60 × 60 Pixel, 14 KiB.
 - **Marken** je Frame 4 Bilder, mit Schatten 8, gedreht je eines mit einer
   gedrehten Pose; die Minimap rechnet ihre 4 Punkte je Frame
   (`Minimap.ornamente`), im Menü dazu den Griff.
-- **Rund** je Frame ein Bild für den Ring. Den Ring rechnet der Mod nur,
-  wenn sich die Seite ändert, und behält je Variante höchstens zwei
-  Seiten, die der Minimap und die der Vorschau im Wähler (`Skin.ring`); bei
-  256 Einheiten sind das 256 × 256 Texel, 256 KiB, und eine Wurzel je Texel
-  einmal, für die Vorschau 56 × 56 Texel. Mit `biom` hat jede Kategorie,
-  die schon gezeigt wurde, ihren Ring, höchstens 8, also bis 2 MiB; nach
-  dem Wähler je Familie dazu die kleinen Ringe der Vorschauen.
+- **Rund** je Frame ein Bild für den Ring. Den Ring rechnet der Mod
+  einmal je Seite und GUI-Massstab, eine Wurzel und die Formel je Pixel:
+  bei 256 Einheiten und GUI-Massstab 4 sind es 1024 × 1024 Pixel, 4 MiB im
+  Arbeitsspeicher und so viel auf der Grafikkarte, bis 0.2.68 waren es
+  256 KiB. Für die Vorschau im Wähler 56 Einheiten, bei GUI-Massstab 4
+  196 KiB.
+- **Im Speicher** bleibt nur, was zu sehen ist: Alle Texturen der Bänder
+  liegen in einer Liste, und eine neue gibt alle frei, die 2 s nicht
+  gezeichnet wurden (`Skin.textur`). Im Spiel ist es meist ein Ring, beim
+  Überblenden zwei, mit dem Wähler dazu die Vorschauen. Bis 0.2.68 behielt
+  jede Variante zwei Ringe, mit `biom` bis 8 Kategorien.
 - **Überblendung:** 0,3 s lang zwei Rahmen je Frame.
 - **Abstand zum Rand:** je Frame das Grösste über die Varianten der
   Familie, bei `biom` über alle Kategorien und ihre Varianten, rund 20
