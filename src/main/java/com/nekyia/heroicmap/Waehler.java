@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -222,11 +223,7 @@ final class Waehler {
             }
             return;
         }
-        if (rund) {
-            g.innerBlit(RenderPipelines.GUI_TEXTURED, skin.ring(SEITE), x, x + SEITE, y, y + SEITE, 0, 1, 0, 1, 0xFFFFFFFF);
-        } else {
-            skin.baender(g, x, y, SEITE, SEITE, 1);
-        }
+        skin.baender(g, x, y, SEITE, Minecraft.getInstance().getWindow().getGuiScale(), rund, 1);
         for (Minimap.Ornament o : Minimap.ornamente(new Minimap.Rahmen(x, y, SEITE), skin.baender(), rund, skin.marken, null, 1, 0, -1,
                 false, Minimap.KEIN_ZIEL)) {
             skin.ornament(g, o.teil(), o.ecke(), o.x(), o.y(), 1, o.winkel());

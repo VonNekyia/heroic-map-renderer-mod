@@ -769,15 +769,17 @@ Der Mod zeichnet die Minimap in Pixeln des Schirms, nicht des GUI
   am knappsten, mit 0,78 Pixeln bis zum Rand des Umrisses. Bei 256
   Einheiten und GUI-Massstab 4 ragen die Ecken 0,7 Pixel über n/2, unter
   einen Ring von 4 Pixeln.
-- **Rand mit Rahmen:** Der Ring ist in Einheiten gestuft und dort
-  durchsichtig, wo die Mitte der Einheit innen liegt. Das Vieleck reicht
-  darum √2/2 Einheiten über die Bänder hinaus, bis in die Ecke jeder
-  solchen Einheit, und bleibt unter dem deckenden Ring, mit demselben
-  Abstand von 1/16 Pixel wie ohne Rahmen
-  (`DrehungTest.mitRahmenDecktDerRingDenRand`). Bei einem Band ragte es
-  über den Ring; darum verlangt `Skin.lies` mindestens zwei.
-- **Kanten:** Der Kreis ist gestuft, ohne Glättung: ohne Rahmen auf ganze
-  Pixel des Schirms, mit Rahmen auf Einheiten des GUI.
+- **Rand mit Rahmen:** Der Ring deckt einen Pixel nicht ganz, wenn
+  seine Mitte weniger als einen halben Pixel vom inneren oder äusseren
+  Rand der Bänder liegt, siehe [Rahmen](rahmen.md), „Bänder“. Das Vieleck
+  reicht √2/2 Einheiten über die Bänder hinaus, also über jeden solchen
+  Pixel am inneren Rand, und bleibt unter dem deckenden Ring, mit
+  demselben Abstand von 1/16 Pixel wie ohne Rahmen
+  (`DrehungTest.mitRahmenDecktDerRingDenRand`). Am knappsten ist es bei
+  GUI-Massstab 1, mit 0,2 Pixeln. Bei einem Band ragte es über den Ring;
+  darum verlangt `Skin.lies` mindestens zwei.
+- **Kanten:** ohne Rahmen gestuft auf ganze Pixel des Schirms, ohne
+  Glättung; mit Rahmen über einen Pixel des Schirms geglättet.
 - **Kosten:** siehe „Kosten“.
 
 ![Der Rand der runden Minimap ohne Rahmen bei GUI-Massstab 1](bilder/rund-gs1.png)
