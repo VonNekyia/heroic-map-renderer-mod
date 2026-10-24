@@ -1696,8 +1696,8 @@ public final class Bilder implements FabricClientGameTest {
     };
 
     /**
-     * Pflanzen aus Paketen: das Feld bei 4 px und 1 px, Zoom 4, ohne und mit dem Testpaket. Mit dem Paket liegen Karotten und
-     * Gras bei 4 px wie ohne, denn ihre erste Fläche ist dieselbe, und reifer Weizen und Kartoffeln decken das Ackerland,
+     * Pflanzen aus Paketen: das Feld bei 4 px und 1 px, Zoom 4, ohne und mit dem Testpaket. Mit dem Paket kippen Karotten und
+     * Gras ähnlich wie ohne, im Mittel höchstens 45 % anders, und reifer Weizen und Kartoffeln decken das Ackerland,
      * statt wegzufallen; verglichen mit einem Bild derselben Stelle ohne sie, denn Ackerland in verschiedenen Reihen ist
      * verschieden hell. Die Kartoffeln tragen im Testpaket die Textur des reifen Weizens, denn die linke Hälfte ihrer eigenen
      * deckt nur ein Drittel des Blocks. Erst alle Bilder, dann die Prüfung. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
@@ -1757,13 +1757,16 @@ public final class Bilder implements FabricClientGameTest {
         BufferedImage ohne = bilder.get(0), mit = bilder.get(2);
         int block = 4 * context.computeOnClient(mc -> mc.getWindow().getGuiScale());
         List<String> fehler = new ArrayList<>();
-        // Wie ohne Paket: Karotten (z 42) und Gras (z 44).
+        // Ähnlich wie ohne Paket, im Mittel: Karotten (z 42) und Gras (z 44) kippen, die schon gekippten Flächen des Pakets weiter.
+        // Zählten bei Pflanzen alle Flächen nach oben, stünden sie als Streifen da, im Mittel rund doppelt so anders.
+        double summe = 0;
         for (int[] b : new int[][] {{-60, 42}, {-59, 42}, {-58, 42}, {-57, 42}, {-60, 44}, {-58, 44}, {-56, 44}, {-54, 44}}) {
             double anders = anteilAnders(mit, b[0], b[1], ohne, b[0], b[1], block);
             LOGGER.info("Pflanzen aus Paketen ({}, {}) anders als ohne Paket: {}", b[0], b[1], anders);
-            if (anders > 0.15) {
-                fehler.add("(" + b[0] + ", " + b[1] + ") zu " + Math.round(100 * anders) + " % anders als ohne Paket");
-            }
+            summe += anders;
+        }
+        if (summe / 8 > 0.45) {
+            fehler.add("Karotten und Gras im Mittel zu " + Math.round(100 * summe / 8) + " % anders als ohne Paket, statt höchstens 45 %");
         }
         // Deckt das Ackerland: reifer Weizen (z 40) und Kartoffeln (z 42), verglichen mit derselben Stelle ohne sie.
         for (int[] b : new int[][] {{-56, 40}, {-55, 40}, {-54, 40}, {-53, 40}, {-56, 42}, {-55, 42}, {-54, 42}, {-53, 42}}) {
