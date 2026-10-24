@@ -1759,6 +1759,7 @@ public final class Bilder implements FabricClientGameTest {
         // Wie ohne Paket: Karotten (z 42) und Gras (z 44).
         for (int[] b : new int[][] {{-60, 42}, {-59, 42}, {-58, 42}, {-57, 42}, {-60, 44}, {-58, 44}, {-56, 44}, {-54, 44}}) {
             double anders = anteilAnders(mit, b[0], b[1], ohne, b[0], b[1], block);
+            LOGGER.info("Pflanzen aus Paketen ({}, {}) anders als ohne Paket: {}", b[0], b[1], anders);
             if (anders > 0.15) {
                 fehler.add("(" + b[0] + ", " + b[1] + ") zu " + Math.round(100 * anders) + " % anders als ohne Paket");
             }
@@ -1836,11 +1837,43 @@ public final class Bilder implements FabricClientGameTest {
         });
         context.waitTicks(10);
         BufferedImage mit = minimapBei(context, server, -35.5, 26.5, "pflanzen-mit");
+        // Dazu nah, 16 px je Block bei Zoom 8, mit und ohne: der Rand des reifen Weizens im Norden.
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeScale(16);
+            Minimap.INSTANZ.setzeZoom(8);
+        });
+        context.waitTicks(10);
+        BufferedImage mit16 = minimapBei(context, server, -35.5, 26.5, "pflanzen-16px");
         for (String befehl : OHNE_PFLANZEN) {
             server.runCommand(befehl);
         }
         context.waitTicks(10);
+        BufferedImage ohne16 = minimapBei(context, server, -35.5, 26.5, "pflanzen-16px-ohne");
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeScale(4);
+            Minimap.INSTANZ.setzeZoom(4);
+        });
+        context.waitTicks(10);
         BufferedImage ohne = minimapBei(context, server, -35.5, 26.5, "pflanzen-ohne");
+        int gs16 = context.computeOnClient(mc -> mc.getWindow().getGuiScale()), block16 = 8 * gs16;
+        int wx = mit16.getWidth() / 2 + Math.round((-38 + 35.5f) * block16), wz = mit16.getHeight() / 2 - Math.round(6.5f * block16);
+        double[] reihen = new double[16];
+        for (int r = 0; r < 16; r++) {
+            int anders16 = 0, alle16 = 0;
+            for (int y = wz + r * block16 / 16; y < wz + (r + 1) * block16 / 16; y++) {
+                for (int x = wx; x < wx + block16; x++) {
+                    int a = mit16.getRGB(x, y), b = ohne16.getRGB(x, y);
+                    boolean gleich = true;
+                    for (int sh = 0; sh <= 16; sh += 8) {
+                        gleich &= Math.abs((a >> sh & 0xFF) - (b >> sh & 0xFF)) <= 4;
+                    }
+                    anders16 += gleich ? 0 : 1;
+                    alle16++;
+                }
+            }
+            reihen[r] = Math.round(100.0 * anders16 / alle16) / 100.0;
+        }
+        LOGGER.info("Pflanzen 16 px, reifer Weizen je Texelreihe von Norden, Anteil anders: {}", Arrays.toString(reihen));
         int gs = context.computeOnClient(mc -> mc.getWindow().getGuiScale()), block = 4 * gs;
         // Die Ecke des Blocks (x, 20) im Bild; der Spieler steht bei (-35,5, 26,5) in der Mitte, seine Marke deckt die Reihe nicht.
         java.util.function.IntUnaryOperator links = x -> mit.getWidth() / 2 + Math.round((x + 35.5f) * block);
