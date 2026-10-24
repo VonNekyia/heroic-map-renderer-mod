@@ -19,7 +19,7 @@ class SatzTest {
             Files.createDirectories(welt.resolve(baum).resolve("4"));
             Files.writeString(welt.resolve(baum).resolve("4/map.json"), "{\"tileSize\":256,\"minZoom\":0,\"maxZoom\":5,\"scale\":4}");
         }
-        assertEquals("welt_alt", Satz.fuer(welt, "minecraft:overworld").name());
+        assertEquals("welt_alt", Satz.fuer(welt, "minecraft:overworld", Zeigt.OHNE).name());
     }
 
     @TempDir
@@ -30,7 +30,7 @@ class SatzTest {
         legeAn("oberwelt", "Die Welt", "minecraft:overworld", 2);
         legeAn("nether", "Der Nether", "minecraft:the_nether", 4);
 
-        Satz satz = Satz.fuer(server, "minecraft:overworld");
+        Satz satz = Satz.fuer(server, "minecraft:overworld", Zeigt.OHNE);
         assertEquals("Die Welt", satz.name());
         assertEquals(2, satz.massstab());
         assertEquals(server.resolve("oberwelt").resolve("2"), satz.ordner());
@@ -38,9 +38,9 @@ class SatzTest {
         // maxZoom 9 bei 2 px: die feinste Stufe ist 8.
         assertEquals(8, satz.stufe());
         assertEquals(4, satz.scale());
-        assertEquals("Der Nether", Satz.fuer(server, "minecraft:the_nether").name());
-        assertNull(Satz.fuer(server, "minecraft:the_end"));
-        assertNull(Satz.fuer(server.resolve("gibt-es-nicht"), "minecraft:overworld"));
+        assertEquals("Der Nether", Satz.fuer(server, "minecraft:the_nether", Zeigt.OHNE).name());
+        assertNull(Satz.fuer(server, "minecraft:the_end", Zeigt.OHNE));
+        assertNull(Satz.fuer(server.resolve("gibt-es-nicht"), "minecraft:overworld", Zeigt.OHNE));
     }
 
     @Test
@@ -55,7 +55,7 @@ class SatzTest {
         Files.writeString(server.resolve("kaputt").resolve("satz.json"), "{\"name\":\"ohne Dimension\",\"massstab\":4}");
         legeAn("oberwelt", "Die Welt", "minecraft:overworld", 4);
         assertNull(Satz.lies(server.resolve("kaputt")));
-        assertEquals("Die Welt", Satz.fuer(server, "minecraft:overworld").name());
+        assertEquals("Die Welt", Satz.fuer(server, "minecraft:overworld", Zeigt.OHNE).name());
     }
 
     @Test

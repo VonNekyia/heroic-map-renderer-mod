@@ -1,0 +1,134 @@
+package com.nekyia.heroicmap;
+
+import com.mojang.blaze3d.platform.InputConstants;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicBoolean;
+import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
+import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.network.chat.contents.TranslatableContents;
+
+/**
+ * „Selbst“ über einem Download, wie ein Spieler: die Frage nach der alten Karte mit „Behalten, ruht“, Esc und
+ * „Löschen“, dann „ruht“ in der Kartenliste und „Selbst · ruht“ im Fenster der Karten. Im Einzelspieler, also für
+ * einen Server ohne Namen; die Regeln je Server prüft KarteJeServerTest. Siehe docs/selbst.md, „Wahl“.
+ */
+public final class KarteJeServer implements FabricClientGameTest {
+
+    private static final String OBEN = "minecraft:overworld", DOWNLOAD = "probe-download";
+
+    @Override
+    public void runTest(ClientGameTestContext context) {
+        try (TestSingleplayerContext spiel = context.worldBuilder().create(); var _ = Abschluss.langsamerTakt(context, spiel)) {
+            spiel.getConnection().waitForChunksRender();
+            // Reste früherer Läufe in diesem Ordner weg, dann ein Download der Oberwelt wie vom Server.
+            Bilder.leereWelt(context);
+            Path welt = context.computeOnClient(mc -> Downloads.weltOrdner());
+            download(welt);
+
+            // Behalten: Die eigene Karte ist an, der Download ruht und bleibt auf der Platte.
+            selbst(context);
+            context.waitFor(mc -> mc.gui.screen() instanceof AlteKarte, 100);
+            context.clickScreenButton("heroicmap.alte.behalten_ohne");
+            context.waitTicks(2);
+            String eigene = Selbst.baum(OBEN);
+            pruefe(welt, eigene, "nach „Behalten, ruht“");
+            if (!Files.isDirectory(welt.resolve(DOWNLOAD)) || !Downloads.ruht(welt.resolve(DOWNLOAD), Zeigt.OHNE)) {
+                throw new AssertionError("Der Download ruht nicht oder ist weg");
+            }
+
+            // In der Kartenliste den Download wieder an: Dann ruht die eigene Karte.
+            context.runOnClient(mc -> mc.gui.setScreen(new Kartenliste(null)));
+            context.waitFor(mc -> knopf(mc, "heroicmap.liste.ruht") != null, 600);
+            context.clickScreenButton("heroicmap.liste.ruht");
+            context.waitTicks(2);
+            pruefe(welt, DOWNLOAD, "nach „ruht“ in der Kartenliste");
+
+            // Im Fenster der Karten heisst der Knopf jetzt „Selbst · ruht“; ein Klick zeigt die eigene wieder.
+            context.runOnClient(mc -> mc.gui.setScreen(new Auswahl(null)));
+            context.waitTicks(2);
+            klicke(context, "heroicmap.selbst.ruht");
+            context.waitTicks(2);
+            pruefe(welt, eigene, "nach „Selbst · ruht“");
+
+            // Esc: Nichts ändert sich, keine Datei. Die eigene Karte löscht der Worker, nach dem, was er noch in sie
+            // zeichnet; von hier aus gelöscht, legte er sie wieder an.
+            AtomicBoolean weg = new AtomicBoolean();
+            context.runOnClient(mc -> Selbst.INSTANZ.loesche(welt.resolve(eigene), weg::set));
+            context.waitFor(mc -> weg.get(), 600);
+            Files.deleteIfExists(welt.resolve(Zeigt.DATEI));
+            selbst(context);
+            context.waitFor(mc -> mc.gui.screen() instanceof AlteKarte, 100);
+            context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTicks(2);
+            if (Files.exists(welt.resolve(eigene))) {
+                throw new AssertionError("Esc legte eine eigene Karte an");
+            }
+            if (Files.exists(welt.resolve(Zeigt.DATEI))) {
+                throw new AssertionError("Esc schrieb zeigt.txt");
+            }
+            pruefe(welt, DOWNLOAD, "nach Esc");
+
+            // Löschen: Der Download geht von der Platte, dann ist die eigene Karte an.
+            context.clickScreenButton("heroicmap.selbst.knopf");
+            context.waitFor(mc -> mc.gui.screen() instanceof AlteKarte, 100);
+            context.clickScreenButton("heroicmap.alte.loeschen");
+            context.waitFor(mc -> !Files.exists(welt.resolve(DOWNLOAD)) && Files.exists(welt.resolve(eigene)), 600);
+            pruefe(welt, eigene, "nach „Löschen“");
+            context.runOnClient(mc -> mc.gui.setScreen(null));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** Der Knopf mit diesem Schlüssel auf dem Schirm, sonst null. */
+    private static Button knopf(Minecraft mc, String schluessel) {
+        return mc.gui.screen() == null ? null : mc.gui.screen().children().stream()
+                .filter(w -> w instanceof Button b && b.getMessage().getContents() instanceof TranslatableContents t && t.getKey().equals(schluessel))
+                .map(w -> (Button) w).findFirst().orElse(null);
+    }
+
+    /**
+     * Klickt mit der Maus auf den Knopf mit diesem Schlüssel. clickScreenButton vergleicht den Text ohne Argumente und
+     * findet einen Knopf wie „Selbst · ruht · 4 px“ nicht.
+     */
+    private static void klicke(ClientGameTestContext context, String schluessel) {
+        double[] mitte = context.computeOnClient(mc -> {
+            Button b = knopf(mc, schluessel);
+            if (b == null) {
+                throw new AssertionError("Kein Knopf " + schluessel);
+            }
+            return new double[] {b.getX() + b.getWidth() / 2.0, b.getY() + b.getHeight() / 2.0};
+        });
+        int k = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+        context.getInput().setCursorPos(mitte[0] * k, mitte[1] * k);
+        context.waitTick();
+        context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+    }
+
+    /** Das Fenster der Karten und darin „Selbst“, mit dem Massstab der Vorgabe. */
+    private static void selbst(ClientGameTestContext context) {
+        context.runOnClient(mc -> mc.gui.setScreen(new Auswahl(null)));
+        context.waitTicks(2);
+        context.clickScreenButton("heroicmap.selbst.knopf");
+    }
+
+    private static void download(Path welt) throws IOException {
+        Satz.schreibe(welt.resolve(DOWNLOAD), "Probe", OBEN, 4);
+        Path ordner = Files.createDirectories(welt.resolve(DOWNLOAD).resolve("4"));
+        Files.writeString(ordner.resolve("map.json"), "{\"tileSize\":256,\"scale\":4,\"minZoom\":0,\"maxZoom\":8}");
+    }
+
+    private static void pruefe(Path welt, String baum, String wann) {
+        Satz s = Satz.fuer(welt, OBEN, Zeigt.OHNE);
+        String gezeigt = s == null ? null : s.ordner().getParent().getFileName().toString();
+        if (!baum.equals(gezeigt)) {
+            throw new AssertionError("Gezeigt " + wann + ": " + gezeigt + " statt " + baum);
+        }
+    }
+}

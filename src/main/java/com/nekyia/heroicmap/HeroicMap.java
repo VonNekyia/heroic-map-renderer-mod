@@ -101,7 +101,7 @@ public final class HeroicMap implements ClientModInitializer {
             while (karte.consumeClick()) {
                 if (client.gui.screen() == null && client.level != null) {
                     String dimension = client.level.dimension().identifier().toString();
-                    client.gui.setScreen(new Karte(Satz.fuer(Downloads.weltOrdner(), dimension)));
+                    client.gui.setScreen(new Karte(Satz.fuer(Downloads.weltOrdner(), dimension, Downloads.INSTANZ.wer())));
                 }
             }
         });
@@ -188,7 +188,7 @@ public final class HeroicMap implements ClientModInitializer {
         mc.schedule(() -> {
             if (mc.level != null) {
                 String dimension = mc.level.dimension().identifier().toString();
-                mc.gui.setScreen(new Karte(Satz.fuer(Downloads.weltOrdner(), dimension)).bei(x + 0.5, z + 0.5));
+                mc.gui.setScreen(new Karte(Satz.fuer(Downloads.weltOrdner(), dimension, Downloads.INSTANZ.wer())).bei(x + 0.5, z + 0.5));
             }
         });
         return 1;

@@ -88,6 +88,6 @@ public final class Server implements FabricClientGameTest {
 
     /** Der vollständig geladene Satz des Baums, oder null, solange der Download läuft. */
     private static Satz satz(Downloads.Baum baum) {
-        return Satz.fuer(Downloads.weltOrdner(), baum.dimension());
+        return Satz.fuer(Downloads.weltOrdner(), baum.dimension(), Downloads.INSTANZ.wer());
     }
 }
