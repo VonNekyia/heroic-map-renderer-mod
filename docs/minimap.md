@@ -271,6 +271,8 @@ User am 20.10. gewählt (mod#175, Plan mit Bildern vom Reviewer freigegeben):
 - **Ecke** zwischen Spalte und Reihe: das Symbol der Form.
 - **Reihe:** der Regler „Auflösung“ hinter der Zeile der Koordinaten, an
   seinem Ende fern der Spalte das Raster.
+- **Hinter der Form,** fern der Spalte: das „+“ für ein neues Widget, siehe
+  [Widgets](widgets.md), „Hinzufügen“.
 
 Jedes Symbol ist ein Knopf des Spiels, 20 × 20 Einheiten
 (`Einstellungen.Symbol`), darin ein Sprite von 16 × 16 aus
@@ -293,7 +295,9 @@ nichts übereinander und nicht auf der Zeile der Koordinaten; das prüfen
 `EinstellungenTest.lUmDieMinimapBeiJedemMassstab` und der Gametest
 `Bedienung.symbole`. Zoom und Auflösung werden dafür um ein Symbol samt 2
 Einheiten Abstand kürzer; bei der kleinsten Minimap bleiben 42 Einheiten
-für die 9 Rasten des Zooms.
+für die 9 Rasten des Zooms. Das „+“ nimmt dem Zoom nur dann Platz, wenn es
+weder hinter noch neben der Form auf den Schirm passt; in den Fenstern des
+Tests kommt das nicht vor.
 
 **Der Nordpfeil sitzt in der Spalte, nicht über der Mitte der Minimap.**
 Das weicht vom Wortlaut des Wunsches ab, „oben an der Minimap“; der
@@ -529,15 +533,11 @@ im Debug-Bildschirm des Spiels (`Mth.floor`). So hat es der User gewünscht.
   Die Zeile ist ein Widget: Im Menü lässt sie sich ziehen, skalieren und
   löschen, gespeichert wird sie als Widget, siehe [Widgets](widgets.md); bis
   0.2.68 hiess die Einstellung `koordinaten`.
-- **Im Menü per Klick** (mod#173, so hat es der User gewünscht): Ein
-  Linksklick auf die Zeile wechselt den Stil reihum, aus → `xz` → `xyz` →
-  aus (`Einstellungen.naechste`). Einen Knopf im Untermenü gibt es dafür
-  nicht mehr.
-  - **Bei „aus“** steht die Zeile im Menü grau als „Koordinaten aus“, an
-    derselben Stelle; so lässt sich der Stil zurückholen. Im Spiel fehlt
-    sie wie bisher. So hat es der Reviewer am 20.10. entschieden.
-  - **Unter der Maus** steht die Zeile gelb, und ein Tooltip nennt den
-    Stil und den nächsten: „Koordinaten: xz – Klick: xyz“.
+- **Im Menü per Klick** (mod#173, so hat es der User gewünscht): Ein Klick
+  auf die Zeile wechselt den Stil reihum, `xz` → `xyz` → `xz`; das × nimmt
+  sie weg, das „+“ im L holt sie zurück. Unter der Maus steht sie gelb, und
+  ein Tooltip nennt den Stil und den nächsten: „Koordinaten: xz – Klick:
+  xyz“. Siehe [Widgets](widgets.md), „Hinzufügen“.
 - **Lage:** mittig unter der Minimap, in der Schrift des Spiels, weiss mit
   Schatten. 2 Einheiten Abstand unter dem Ring, mit Rahmen unter den
   Ornamenten, die halb über die Ecken ragen, so weit wie der Abstand zum

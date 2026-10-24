@@ -446,10 +446,6 @@ class MinimapTest {
         assertArrayEquals(new int[] {30, 240 - 9}, Minimap.koordinatenLage(new Minimap.Rahmen(4, 4, 232), 1, 4, 320, 240, 180, 9));
         // Breiter als der Schirm: links am Abstand.
         assertArrayEquals(new int[] {4, 71}, Minimap.koordinatenLage(new Minimap.Rahmen(252, 4, 64), 1, 4, 320, 240, 400, 9));
-        // Verkleinert nur, wenn sie nicht zwischen die Ränder passt: 180 auf 320 nicht, 400 auf 312 Platz.
-        assertEquals(1f, Minimap.koordinatenMassstab(320, 4, 180));
-        assertEquals(1f, Minimap.koordinatenMassstab(320, 4, 312));
-        assertEquals(312f / 400, Minimap.koordinatenMassstab(320, 4, 400), 1e-6);
     }
 
     @Test

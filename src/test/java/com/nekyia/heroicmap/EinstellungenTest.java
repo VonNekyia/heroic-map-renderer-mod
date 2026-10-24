@@ -54,7 +54,7 @@ class EinstellungenTest {
     @Test
     void lUmDieMinimapBeiJedemMassstab() {
         // Wie ganzAufDemSchirmBeiJedemMassstab, dazu die Zeile der Koordinaten, 60 breit, wie sie die Minimap legt.
-        String[] namen = {"Nordpfeil", "Zoom", "Form", "Auflösung", "Raster"};
+        String[] namen = {"Nordpfeil", "Zoom", "Form", "Auflösung", "Raster", "Plus"};
         int s = Einstellungen.SYMBOL;
         for (int[] fenster : new int[][] {{854, 480}, {1280, 720}, {1920, 1080}}) {
             for (int gs = 1; gs <= 4; gs++) {
@@ -114,6 +114,24 @@ class EinstellungenTest {
         assertArrayEquals(new int[] {zx, u.y(), B, 128 - s}, m[1]);
         assertArrayEquals(new int[] {RAND, oben[1] - 2 - 20, 20, 20}, m[4]);
         assertArrayEquals(new int[] {RAND + s, oben[1] - 2 - 20, 128 - s, 20}, m[3]);
+        // Das „+“ hinter der Form, fern der Spalte: oben rechts darunter, unten links darüber.
+        assertArrayEquals(new int[] {300 - RAND - B, kasten[1] + 9 + 2 + s, 20, 20}, l[5]);
+        assertArrayEquals(new int[] {zx, oben[1] - 2 - 20 - s, 20, 20}, m[5]);
+    }
+
+    @Test
+    void plusNebenOderVorDerForm() {
+        // Die Minimap fast so hoch wie der Schirm, die Reihe innen an ihrem unteren Rand: Darunter ist kein Platz, also neben
+        // der Form, fern der Minimap.
+        int[] kasten = {198, 261, 60, 9};
+        int[][] l = Einstellungen.lLage(new Minimap.Rahmen(100, RAND, 256), kasten, RAND, 480, 270);
+        assertArrayEquals(new int[] {76, 240, 20, 20}, l[2]);
+        assertArrayEquals(new int[] {54, 240, 20, 20}, l[5]);
+        // Ebenso, aber auch daneben kein Platz, weil die Spalte innen liegt: vor der Form, die Spalte um es kürzer.
+        int[][] m = Einstellungen.lLage(new Minimap.Rahmen(10, RAND, 256), new int[] {108, 261, 60, 9}, RAND, 290, 270);
+        assertArrayEquals(new int[] {10, 240, 20, 20}, m[2]);
+        assertArrayEquals(new int[] {10, 218, 20, 20}, m[5]);
+        assertArrayEquals(new int[] {10, 26, 20, 190}, m[1]);
     }
 
     private static boolean schneidet(int[] a, int[] b) {
