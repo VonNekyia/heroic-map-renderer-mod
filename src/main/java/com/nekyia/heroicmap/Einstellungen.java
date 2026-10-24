@@ -54,6 +54,8 @@ final class Einstellungen extends Screen {
     static final int REGLER_HOEHE = 20;
     /** Seite eines Symbols an der Minimap, so breit wie der Regler „Zoom“. */
     static final int SYMBOL = 20;
+    /** Die Höhe einer Zeile in der Liste „Widget hinzufügen“. */
+    static final int LISTE_ZEILE = 12;
 
     /**
      * KLICK: gedrückt auf Spieler oder Marke; wandert die Maus weiter als {@link MinimapKlick#WEG}, wird daraus LAGE. WIDGET:
@@ -69,6 +71,11 @@ final class Einstellungen extends Screen {
     /** Für die Gametests. */
     Waehler waehler() {
         return waehler;
+    }
+
+    /** Für die Gametests: die offene Liste „Widget hinzufügen“, {x, y, Breite, Höhe}, oder null. */
+    int[] liste() {
+        return liste == null ? null : liste.clone();
     }
     /** Beim Verschieben: wo die Maus die Minimap gegriffen hat. Beim Ziehen: die feste Ecke. */
     private int festX, festY;
@@ -90,6 +97,14 @@ final class Einstellungen extends Screen {
     private ZoomRegler zoom;
     private AufloesungRegler aufloesung;
     private Symbol nord, form, raster;
+    /** Das „+“ im L unter der Form: öffnet die Liste der Arten; die neue kommt unten in den Stapel. */
+    private Button plus;
+    /**
+     * Die Liste „Widget hinzufügen“, offen {x, y, Breite, Höhe}, sonst null; offen nimmt sie alle Klicks und Esc. Dazu, wo der
+     * Rechtsklick sie öffnete, denn die neue fällt dorthin; null vom „+“. Siehe docs/widgets.md, „Hinzufügen“.
+     */
+    private int[] liste;
+    private int[] listeMaus;
 
     /** Wohin „Fertig“ und Escape führen: die Vollbildkarte, von der das Menü kam, oder null fürs Spiel. */
     private final Screen zurueck;
@@ -125,6 +140,8 @@ final class Einstellungen extends Screen {
         nord = addRenderableOnly(new Symbol(Symbol.NORD));
         form = addRenderableOnly(new Symbol(Symbol.FORM));
         raster = addRenderableOnly(new Symbol(Symbol.RASTER));
+        plus = addRenderableOnly(Button.builder(Component.literal("+"), b -> oeffneListe(b.getX(), b.getY() + SYMBOL + 2, b.getY() - 2, null))
+                .size(SYMBOL, SYMBOL).tooltip(Tooltip.create(Component.translatable("heroicmap.menue.widget.neu"))).build());
         lege();
         // Je zwei Knöpfe in einer Zeile; Vorlieben der Anzeige stehen im Untermenü.
         addRenderableWidget(CycleButton.onOffBuilder(m.sichtbar())
@@ -145,7 +162,7 @@ final class Einstellungen extends Screen {
         addRenderableWidget(Button.builder(Component.translatable("heroicmap.menue.einstellungen"),
                 b -> minecraft.gui.setScreen(new Anzeige(this))).bounds(x, y + 76, halb, 20).build());
         addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x + breite - halb, y + 76, halb, 20).build());
-        for (AbstractWidget w : List.<AbstractWidget>of(zoom, aufloesung, nord, form, raster)) {
+        for (AbstractWidget w : List.<AbstractWidget>of(zoom, aufloesung, nord, form, raster, plus)) {
             addWidget(w);
         }
     }
@@ -202,19 +219,21 @@ final class Einstellungen extends Screen {
     private void lege() {
         Minimap m = Minimap.INSTANZ;
         int[][] l = lLage(m.rahmen(width, height), m.stapelKasten(), m.rand(), width, height);
-        AbstractWidget[] w = {nord, zoom, form, aufloesung, raster};
+        AbstractWidget[] w = {nord, zoom, form, aufloesung, raster, plus};
         for (int i = 0; i < w.length; i++) {
             w[i].setRectangle(l[i][2], l[i][3], l[i][0], l[i][1]);
             w[i].visible = m.sichtbar();
         }
+        plus.active = m.widgets().size() < Widgets.MAX;
     }
 
     /**
-     * Das L um die Minimap {@code r} im Menü, je {x, y, Breite, Höhe}: Nordpfeil, Zoom, Form, Auflösung, Raster. Die
+     * Das L um die Minimap {@code r} im Menü, je {x, y, Breite, Höhe}: Nordpfeil, Zoom, Form, Auflösung, Raster, „+“. Die
      * Spalte des Zooms ({@link #zoomLage}) trägt an ihrem Ende fern der Reihe den Nordpfeil, die Reihe der Auflösung
      * ({@link #aufloesungLage}) an ihrem Ende fern der Spalte das Raster; in der Ecke zwischen beiden die Form. Liegt die
-     * Spalte innen in der Reihe oder die Reihe innen in der Spalte, rückt die andere um die Ecke weiter. Siehe
-     * docs/minimap.md, „Symbole an der Minimap“.
+     * Spalte innen in der Reihe oder die Reihe innen in der Spalte, rückt die andere um die Ecke weiter. Das „+“ steht hinter
+     * der Form, fern der Spalte; passt es dort nicht auf den Schirm, neben ihr, fern der Minimap, sonst davor, und die Spalte
+     * wird um es kürzer. Siehe docs/minimap.md, „Symbole an der Minimap“.
      */
     static int[][] lLage(Minimap.Rahmen r, int[] kasten, int rand, int width, int height) {
         int[] z = zoomLage(r, rand, width), a = aufloesungLage(r, kasten, rand, height);
@@ -233,12 +252,25 @@ final class Einstellungen extends Screen {
                 oben = a[1] + REGLER_HOEHE + 2;
             }
         }
+        // Das „+“ hinter der Form, fern der Spalte; sonst neben ihr, fern der Minimap; sonst davor, und die Spalte wird kürzer.
+        int plusX = z[0], plusY = nordOben ? a[1] + s : a[1] - s;
+        if (plusY < 0 || plusY + SYMBOL > height) {
+            plusX = z[0] > r.x() ? z[0] + s : z[0] - s;
+            plusY = a[1];
+            if (plusX < 0 || plusX + SYMBOL > width) {
+                plusX = z[0];
+                plusY = nordOben ? a[1] - s : a[1] + s;
+                unten = nordOben ? Math.min(unten, plusY - 2) : unten;
+                oben = nordOben ? oben : Math.max(oben, plusY + SYMBOL + 2);
+            }
+        }
         return new int[][] {
             {z[0], nordOben ? oben : unten - SYMBOL, SYMBOL, SYMBOL},
             {z[0], nordOben ? oben + s : oben, ZOOM_BREITE, unten - oben - s},
             {z[0], a[1], SYMBOL, SYMBOL},
             {rasterRechts ? von : von + s, a[1], bis - von - s, REGLER_HOEHE},
             {rasterRechts ? bis - SYMBOL : von, a[1], SYMBOL, SYMBOL},
+            {plusX, plusY, SYMBOL, SYMBOL},
         };
     }
 
@@ -282,24 +314,78 @@ final class Einstellungen extends Screen {
     private void ziehe(int mx, int my) {
         Minimap m = Minimap.INSTANZ;
         int[][] k = m.widgetKaesten();
-        List<Widgets.Widget> jetzt = m.widgets();
         if (widgetZug < 0 || widgetZug >= k.length || k[widgetZug] == null) {
             return;
         }
+        Widgets.Ziel ziel = zielBei(mx - widgetGriffX, my - widgetGriffY, k[widgetZug][2], k[widgetZug][3], widgetZug);
+        Widgets.Gesetzt neu = Widgets.setze(vorZug, vorStelle, ziel);
+        m.widgets(neu.liste());
+        widgetZug = neu.stelle();
+    }
+
+    /** Wohin ein Widget mit der linken oberen Ecke bei (x, y) fällt ({@link Widgets#ziel}), die Stapel ohne das Widget {@code ohne}. */
+    private Widgets.Ziel zielBei(int x, int y, int breite, int hoehe, int ohne) {
+        Minimap m = Minimap.INSTANZ;
+        int[][] k = m.widgetKaesten();
+        List<Widgets.Widget> jetzt = m.widgets();
         List<int[]> unten = new ArrayList<>(), oben = new ArrayList<>();
         for (int i = 0; i < jetzt.size() && i < k.length; i++) {
-            if (i != widgetZug && k[i] != null && jetzt.get(i).anker() == Widgets.Anker.UNTEN) {
+            if (i != ohne && k[i] != null && jetzt.get(i).anker() == Widgets.Anker.UNTEN) {
                 unten.add(k[i]);
-            } else if (i != widgetZug && k[i] != null && jetzt.get(i).anker() == Widgets.Anker.OBEN) {
+            } else if (i != ohne && k[i] != null && jetzt.get(i).anker() == Widgets.Anker.OBEN) {
                 oben.add(k[i]);
             }
         }
         Minimap.Rahmen r = m.rahmen(width, height);
-        Widgets.Ziel ziel = Widgets.ziel(mx - widgetGriffX, my - widgetGriffY, k[widgetZug][2], k[widgetZug][3],
-                new int[] {r.x(), r.y(), r.seite()}, unten, oben, width, height, m.rand());
-        Widgets.Gesetzt neu = Widgets.setze(vorZug, vorStelle, ziel);
-        m.widgets(neu.liste());
-        widgetZug = neu.stelle();
+        return Widgets.ziel(x, y, breite, hoehe, new int[] {r.x(), r.y(), r.seite()}, unten, oben, width, height, m.rand());
+    }
+
+    /**
+     * Öffnet die Liste der Arten bei {@code x}, unter {@code unten} oder, passt sie dort nicht auf den Schirm, über {@code oben};
+     * {@code maus}: wo die neue hin soll, null unten in den Stapel.
+     */
+    private void oeffneListe(int x, int unten, int oben, int[] maus) {
+        int b = 0, h = Widgets.Art.values().length * LISTE_ZEILE + 4;
+        for (Widgets.Art a : Widgets.Art.values()) {
+            b = Math.max(b, font.width(artName(a)) + 8);
+        }
+        liste = new int[] {Math.clamp(x, 0, Math.max(0, width - b)), unten + h <= height ? unten : Math.max(0, oben - h), b, h};
+        listeMaus = maus;
+    }
+
+    /** Die Zeile der offenen Liste bei (x, y), also die Stelle der Art in {@link Widgets.Art}, oder -1. */
+    private int listeZeile(double x, double y) {
+        if (liste == null || x < liste[0] || x >= liste[0] + liste[2] || y < liste[1] + 2) {
+            return -1;
+        }
+        int i = Mth.floor((y - liste[1] - 2) / LISTE_ZEILE);
+        return i < Widgets.Art.values().length ? i : -1;
+    }
+
+    /**
+     * Ein Klick bei offener Liste schliesst sie; auf einer Art kommt ein Widget dieser Art in der ersten Version dazu: vom „+“
+     * unten hinter den Stapel, vom Rechtsklick mit der Mitte dort, wo die Maus war, nahe der Minimap eingerastet wie beim Ziehen.
+     */
+    private void klickListe(double x, double y) {
+        int i = listeZeile(x, y);
+        int[] maus = listeMaus;
+        liste = null;
+        Minimap m = Minimap.INSTANZ;
+        if (i < 0 || m.widgets().size() >= Widgets.MAX) {
+            return;
+        }
+        Widgets.Widget w = new Widgets.Widget(Widgets.Art.values()[i], 0, Widgets.Anker.UNTEN);
+        List<Widgets.Widget> neu = new ArrayList<>(m.widgets());
+        neu.add(w);
+        if (maus != null && minecraft.level != null && minecraft.player != null) {
+            int breite = font.width(m.text(w, minecraft.level, minecraft.player)), hoehe = font.lineHeight;
+            neu = Widgets.setze(neu, neu.size() - 1, zielBei(maus[0] - breite / 2, maus[1] - hoehe / 2, breite, hoehe, -1)).liste();
+        }
+        m.widgets(neu);
+    }
+
+    private static Component artName(Widgets.Art a) {
+        return Component.translatable("heroicmap.menue." + a.name);
     }
 
     private static boolean imKasten(int[] kasten, double x, double y) {
@@ -326,7 +412,7 @@ final class Einstellungen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor g, int mausX, int mausY, float delta) {
         // Ist der Wähler offen, gilt die Maus nur ihm: das Menü darunter ohne Hover und Tooltip.
         int echtX = mausX, echtY = mausY;
-        if (waehler.offen()) {
+        if (waehler.offen() || liste != null) {
             mausX = -1;
             mausY = -1;
         }
@@ -335,20 +421,14 @@ final class Einstellungen extends Screen {
         lege();
         zoom.folge(m.zoom());
         aufloesung.folge(m.aufloesung());
-        // Das Widget unter der Maus steht gelb, ab dem nächsten Frame, mit seinem ×; die Koordinaten nennen ihre nächste Version.
-        // Ohne Koordinaten gilt das für die graue Zeile.
+        // Das Widget unter der Maus steht gelb, ab dem nächsten Frame, mit seinem ×; ein Tooltip nennt die nächste Version.
         ueberWidget = m.sichtbar() && zug == Zug.KEINER ? widgetUnter(mausX, mausY) : zug == Zug.WIDGET ? widgetZug : -1;
         List<Widgets.Widget> widgets = m.widgets();
-        boolean aufAus = ueberWidget < 0 && m.sichtbar() && zug == Zug.KEINER && m.koordinaten() == Minimap.Koordinaten.AUS
-                && imKasten(m.koordinatenKasten(), mausX, mausY);
-        m.hell(aufAus ? widgets.size() : ueberWidget);
-        if (zug == Zug.KEINER && ueberWidget >= 0 && ueberWidget < widgets.size() && widgets.get(ueberWidget).art() == Widgets.Art.KOORDINATEN
-                && !aufKreuz(mausX, mausY)) {
+        m.hell(ueberWidget);
+        if (zug == Zug.KEINER && ueberWidget >= 0 && ueberWidget < widgets.size() && !aufKreuz(mausX, mausY)) {
             Widgets.Widget w = widgets.get(ueberWidget);
-            g.setTooltipForNextFrame(Component.translatable("heroicmap.menue.koordinaten.klick", stil(w), stil(w.naechsteVersion())), mausX, mausY);
-        } else if (aufAus) {
-            g.setTooltipForNextFrame(Component.translatable("heroicmap.menue.koordinaten.klick",
-                    Component.translatable("heroicmap.menue.koordinaten.aus"), Component.translatable("heroicmap.menue.koordinaten.xz")), mausX, mausY);
+            g.setTooltipForNextFrame(Component.translatable("heroicmap.menue.symbol.klick", artName(w.art()), stil(w), stil(w.naechsteVersion())),
+                    mausX, mausY);
         }
         super.extractRenderState(g, mausX, mausY, delta);
         // Titel und Hinweis über den Knöpfen; unten läge der Chat darüber.
@@ -391,6 +471,14 @@ final class Einstellungen extends Screen {
         if (zug == Zug.KEINER && ueberWidget >= 0 && ueberWidget < kaesten.length && kaesten[ueberWidget] != null) {
             kreuz(g, Widgets.kreuz(kaesten[ueberWidget]));
         }
+        if (liste != null) {
+            g.fill(liste[0], liste[1], liste[0] + liste[2], liste[1] + liste[3], 0xF0181818);
+            g.outline(liste[0], liste[1], liste[2], liste[3], 0xFF5A5A5A);
+            int hell = listeZeile(echtX, echtY);
+            for (int i = 0; i < Widgets.Art.values().length; i++) {
+                g.text(font, artName(Widgets.Art.values()[i]), liste[0] + 4, liste[1] + 4 + i * LISTE_ZEILE, i == hell ? 0xFFFFFF55 : TEXT, true);
+            }
+        }
         if (waehler.offen()) {
             waehler.zeichne(g, font, echtX, echtY, width, height);
         }
@@ -402,6 +490,13 @@ final class Einstellungen extends Screen {
         if (waehler.offen()) {
             if (ereignis.key() == InputConstants.KEY_ESCAPE) {
                 waehler.schliesse();
+            }
+            return true;
+        }
+        // Ebenso die Liste „Widget hinzufügen“.
+        if (liste != null) {
+            if (ereignis.key() == InputConstants.KEY_ESCAPE) {
+                liste = null;
             }
             return true;
         }
@@ -439,7 +534,7 @@ final class Einstellungen extends Screen {
     }
 
     private static Component stil(Widgets.Widget w) {
-        return Component.translatable("heroicmap.menue.koordinaten." + w.versionName());
+        return Component.translatable("heroicmap.menue." + w.art().name + "." + w.versionName());
     }
 
     /** Liegt (x, y) auf der Minimap {@code r}, rund im Kreis? */
@@ -451,7 +546,7 @@ final class Einstellungen extends Screen {
     /** Das Mausrad über der Minimap oder dem Regler „Zoom“: je Schritt eine Raste, nach vorn näher; über „Auflösung“ ebenso. */
     @Override
     public boolean mouseScrolled(double x, double y, double weitX, double weitY) {
-        if (waehler.offen()) {
+        if (waehler.offen() || liste != null) {
             return true;
         }
         // Über einem Widget eine Stufe grösser oder kleiner, in ganzen Pixeln des Geräts je Pixel der Schrift.
@@ -476,6 +571,10 @@ final class Einstellungen extends Screen {
     public boolean mouseClicked(MouseButtonEvent e, boolean doppelt) {
         if (waehler.offen()) {
             waehler.klick(e.x(), e.y(), width, height);
+            return true;
+        }
+        if (liste != null) {
+            klickListe(e.x(), e.y());
             return true;
         }
         // Vor den Knöpfen: das × des Widgets unter der Maus, dann das Widget, rechts die nächste Version, links greifen.
@@ -520,12 +619,6 @@ final class Einstellungen extends Screen {
             }
             return false;
         }
-        // Ohne Koordinaten holt ein Linksklick auf die graue Zeile sie unten zurück.
-        if (e.button() == InputConstants.MOUSE_BUTTON_LEFT && Minimap.INSTANZ.koordinaten() == Minimap.Koordinaten.AUS
-                && imKasten(Minimap.INSTANZ.koordinatenKasten(), e.x(), e.y())) {
-            Minimap.INSTANZ.setzeKoordinaten(Minimap.Koordinaten.XZ);
-            return true;
-        }
         Minimap.Rahmen r = Minimap.INSTANZ.rahmen(width, height);
         // Links wie rechts: Ziehen greift die ganze Minimap, am Griff ihre Grösse.
         if (e.button() != InputConstants.MOUSE_BUTTON_LEFT && e.button() != InputConstants.MOUSE_BUTTON_RIGHT) {
@@ -548,6 +641,12 @@ final class Einstellungen extends Screen {
             zug = ziel ? Zug.KLICK : Zug.LAGE;
             festX = Mth.floor(e.x()) - r.x();
             festY = Mth.floor(e.y()) - r.y();
+            return true;
+        }
+        // Rechts auf freie Fläche: die Liste der Arten an der Maus; die neue fällt dorthin.
+        if (e.button() == InputConstants.MOUSE_BUTTON_RIGHT && Minimap.INSTANZ.widgets().size() < Widgets.MAX) {
+            int mx = Mth.floor(e.x()), my = Mth.floor(e.y());
+            oeffneListe(mx, my, my, new int[] {mx, my});
             return true;
         }
         return false;

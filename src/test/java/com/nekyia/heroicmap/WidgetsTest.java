@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/** Lesen, Schreiben und Übernahme der Widgets, wohin ein gezogenes fällt, Grösse und ×. Siehe docs/widgets.md. */
+/** Lesen, Schreiben und Übernahme der Widgets, wohin ein gezogenes fällt, Grösse und ×, Uhr und Tag. Siehe docs/widgets.md. */
 class WidgetsTest {
 
     private static final Widgets.Widget XZ = new Widgets.Widget(Widgets.Art.KOORDINATEN, 0, Widgets.Anker.UNTEN);
@@ -25,6 +25,12 @@ class WidgetsTest {
         assertEquals("", Widgets.schreibe(List.of()));
         // Aus 0.2.69 ohne Grösse.
         assertEquals(List.of(XZ, XYZ), Widgets.lies("koordinaten:xz:unten;koordinaten:xyz:unten"));
+        // Zeit und Biom mit jeder Version.
+        String alle = "zeit:24h:0:unten;zeit:12h:0:unten;zeit:tag:0:oben;zeit:echt:2:frei:0.5:0.5;biom:name:0:unten;biom:punkt:0:oben";
+        List<Widgets.Widget> w2 = Widgets.lies(alle);
+        assertEquals(6, w2.size());
+        assertEquals(alle, Widgets.schreibe(w2));
+        assertEquals(List.of("24h", "12h", "tag", "echt", "name", "punkt"), w2.stream().map(Widgets.Widget::versionName).toList());
     }
 
     @Test
@@ -51,6 +57,10 @@ class WidgetsTest {
     void versionReihumGroesseInStufen() {
         assertEquals(XYZ, XZ.naechsteVersion());
         assertEquals(XZ, XYZ.naechsteVersion());
+        // Die Zeit reihum über vier Versionen, das Biom über zwei.
+        Widgets.Widget zeit = new Widgets.Widget(Widgets.Art.ZEIT, 3, Widgets.Anker.OBEN);
+        assertEquals(new Widgets.Widget(Widgets.Art.ZEIT, 0, Widgets.Anker.OBEN), zeit.naechsteVersion());
+        assertEquals(0, new Widgets.Widget(Widgets.Art.BIOM, 1, Widgets.Anker.UNTEN).naechsteVersion().version());
         // Grösse 0 heisst wie der GUI-Massstab; eine Raste gibt dann eine Zahl, von 1 bis 8.
         assertEquals(3, XZ.pixel(3));
         assertEquals(4, XZ.stufe(3, 1).groesse());
@@ -60,6 +70,28 @@ class WidgetsTest {
         // Im Stapel gilt keine Lage, frei schon.
         assertEquals(new Widgets.Widget(Widgets.Art.KOORDINATEN, 1, 5, Widgets.Anker.UNTEN, 0, 0), FREI.nach(Widgets.Anker.UNTEN, 0.5f, 0.5f));
         assertEquals(new Widgets.Widget(Widgets.Art.KOORDINATEN, 0, 0, Widgets.Anker.FREI, 0.5f, 0.1f), XZ.nach(Widgets.Anker.FREI, 0.5f, 0.1f));
+    }
+
+    @Test
+    void uhrUndTag() {
+        // Tick 0 ist 6:00, 1000 Ticks eine Stunde, 1000 / 60 Ticks eine Minute.
+        assertEquals("6:00", Widgets.uhr(0, false));
+        assertEquals("12:00", Widgets.uhr(6000, false));
+        assertEquals("0:00", Widgets.uhr(18000, false));
+        assertEquals("19:30", Widgets.uhr(13500, false));
+        assertEquals("5:59", Widgets.uhr(23999, false));
+        assertEquals("6:00", Widgets.uhr(24000 * 5, false));
+        assertEquals("6:00 AM", Widgets.uhr(0, true));
+        assertEquals("12:00 PM", Widgets.uhr(6000, true));
+        assertEquals("7:30 PM", Widgets.uhr(13500, true));
+        assertEquals("12:00 AM", Widgets.uhr(18000, true));
+        assertEquals("12:59 AM", Widgets.uhr(18999, true));
+        assertEquals("11:00 AM", Widgets.uhr(5000, true));
+        // Der Tag ab 1.
+        assertEquals(1, Widgets.tag(0));
+        assertEquals(1, Widgets.tag(23999));
+        assertEquals(2, Widgets.tag(24000));
+        assertEquals(12, Widgets.tag(24000 * 11 + 6000));
     }
 
     @Test

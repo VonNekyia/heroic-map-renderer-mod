@@ -13,6 +13,7 @@ import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalTime;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,12 +41,14 @@ import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.core.Holder;
 import net.minecraft.data.AtlasIds;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.util.Util;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.joml.Matrix3x2f;
@@ -72,8 +75,8 @@ public final class Minimap {
     /** Farbe der Chunklinien: Schwarz, zu 30 % deckend, so bleibt die Karte darunter lesbar. */
     static final int LINIE = 0x73000000;
     private static final int TEXT = 0xFFFFFFFF;
-    /** Die Zeile der Koordinaten im Menü: gelb unter der Maus wie ein Verweis im Chat, grau bei „aus“. */
-    private static final int KOORDINATEN_HELL = 0xFFFFFF55, KOORDINATEN_AUS = 0xFFA0A0A0;
+    /** Ein Widget im Menü gelb unter der Maus wie ein Verweis im Chat; der Punkt des Bioms in einer Höhle grau. */
+    private static final int WIDGET_HELL = 0xFFFFFF55, GRAU = 0xFFA0A0A0;
     /** Chunks je Seite einer Region, einer Textur. */
     static final int CHUNKS_JE_REGION = 8;
     /** Zeit je Frame auf dem Render-Thread für Abzüge und fertige Bilder. */
@@ -188,8 +191,7 @@ public final class Minimap {
     private int[] balkenKasten;
     /** Der Kasten um den ganzen Stapel unter der Minimap, Balken und Widgets, {x, y, Breite, Höhe}; null ohne. Daran hängt das L. */
     private int[] stapelKasten;
-    /** Im Menü liegt die Maus auf der Zeile der Koordinaten; dann steht sie gelb. */
-    /** Das Widget unter der Maus im Menü, gelb; die Zahl der Widgets für die graue Zeile ohne Koordinaten, -1 für keins. */
+    /** Das Widget unter der Maus im Menü, gelb; -1 für keins. */
     private int hell = -1;
     /** Wo jedes Widget zuletzt stand, {x, y, Breite, Höhe}, in der Reihe der Liste; null, solange nicht gezeichnet. */
     private int[][] widgetKaesten = new int[0][];
@@ -267,6 +269,10 @@ public final class Minimap {
     ChunkPos mitte;
     private Licht licht;
     private int decke = Integer.MAX_VALUE;
+    /** Das Biom unter dem Spieler, wie das Widget es zuletzt las, sein Name und seine Kategorie, null in einer Höhle. */
+    private Holder<Biome> widgetBiom;
+    private Component biomName = Component.literal("–");
+    private String biomKategorie;
     /** Der Biomübergang, mit dem gezeichnet ist; -1, solange keiner. */
     private int mischung = -1;
     /** Die Texel des Block-Atlas und die Liste der Sprites, aus der sie stammen. */
@@ -1139,8 +1145,7 @@ public final class Minimap {
         int obenHoehe = 0;
         for (int i = 0; i < anzahl; i++) {
             Widgets.Widget w = widgets.get(i);
-            Object[] werte = werte(w.version() == 0 ? Koordinaten.XZ : Koordinaten.XYZ, spieler.getX(), spieler.getY(), spieler.getZ());
-            texte[i] = Component.translatable(werte.length == 3 ? "heroicmap.koordinaten_xyz" : "heroicmap.koordinaten", werte);
+            texte[i] = text(w, level, spieler);
             // In ganzen Pixeln des Geräts je Pixel der Schrift; kleiner nur, wenn es nicht zwischen die Ränder passt.
             massstab[i] = Math.min(w.pixel(k) / (float) k, (sw - 2f * abstand) / Math.max(1, mc.font.width(texte[i])));
             obenHoehe += w.anker() == Widgets.Anker.OBEN ? Mth.ceil(mc.font.lineHeight * massstab[i]) + 2 : 0;
@@ -1169,23 +1174,50 @@ public final class Minimap {
                 case FREI -> new int[] {abstand + Math.round(w.x() * Math.max(0, sw - breite - 2 * abstand)),
                         abstand + Math.round(w.y() * Math.max(0, sh - zeile - 2 * abstand))};
             };
-            int[] kasten = zeile(g, mc.font, wo, texte[i], massstab[i], breite, zeile, klickbar && hell == i ? KOORDINATEN_HELL : TEXT);
+            int[] kasten = zeile(g, mc.font, wo, texte[i], massstab[i], breite, zeile, klickbar && hell == i ? WIDGET_HELL : TEXT);
             widgetKaesten[i] = kasten;
             if (w.anker() == Widgets.Anker.UNTEN) {
                 stapelKasten = vereint(stapelKasten, kasten);
             }
             koordinatenKasten = koordinatenKasten == null && w.art() == Widgets.Art.KOORDINATEN ? kasten : koordinatenKasten;
         }
-        // Ohne Koordinaten steht im Menü hinter dem Stapel grau „Koordinaten aus“; ein Klick darauf holt sie zurück. Siehe
-        // docs/widgets.md, „Bedienung“.
-        if (klickbar && koordinatenKasten == null) {
-            Component aus = Component.translatable("heroicmap.koordinaten_aus");
-            float f = koordinatenMassstab(sw, abstand, mc.font.width(aus));
-            int breite = Mth.ceil(mc.font.width(aus) * f), zeile = Mth.ceil(mc.font.lineHeight * f);
-            koordinatenKasten = zeile(g, mc.font, koordinatenLage(r, ueberstand, abstand, sw, sh, breite, zeile), aus, f, breite, zeile,
-                    hell == anzahl ? KOORDINATEN_HELL : KOORDINATEN_AUS);
-            stapelKasten = vereint(stapelKasten, koordinatenKasten);
-        }
+    }
+
+    /** Der Text eines Widgets. Siehe docs/widgets.md, „Arten“. */
+    Component text(Widgets.Widget w, ClientLevel level, LocalPlayer spieler) {
+        return switch (w.art()) {
+            case KOORDINATEN -> {
+                Object[] werte = werte(w.version() == 0 ? Koordinaten.XZ : Koordinaten.XYZ, spieler.getX(), spieler.getY(), spieler.getZ());
+                yield Component.translatable(werte.length == 3 ? "heroicmap.koordinaten_xyz" : "heroicmap.koordinaten", werte);
+            }
+            // Die Uhr der Oberwelt, auch in Nether und End.
+            case ZEIT -> switch (w.versionName()) {
+                case "tag" -> Component.translatable("heroicmap.widget.tag", Widgets.tag(level.getOverworldClockTime()));
+                case "echt" -> {
+                    LocalTime t = LocalTime.now();
+                    yield Component.literal(String.format(Locale.ROOT, "%d:%02d", t.getHour(), t.getMinute()));
+                }
+                default -> Component.literal(Widgets.uhr(level.getOverworldClockTime(), w.versionName().equals("12h")));
+            };
+            case BIOM -> {
+                // Wie beim Rahmen „biom“: Ein Chunk, den der Client noch nicht hat, läse sich als Ebene; dann bleibt das letzte.
+                if (level.hasChunkAt(spieler.blockPosition())) {
+                    Holder<Biome> jetzt = level.getBiome(spieler.blockPosition());
+                    if (jetzt != widgetBiom) {
+                        widgetBiom = jetzt;
+                        Identifier id = jetzt.unwrapKey().map(k -> k.identifier()).orElse(Identifier.withDefaultNamespace("plains"));
+                        biomName = Component.translatableWithFallback("biome." + id.getNamespace() + "." + id.getPath(), id.getPath());
+                        biomKategorie = biom.kategorie(jetzt);
+                    }
+                }
+                if (w.versionName().equals("name")) {
+                    yield biomName;
+                }
+                // Der Punkt in der Farbe des Rahmens „biom“ dieser Kategorie, wie im Wähler; in Höhlen grau.
+                Skin s = biomKategorie == null ? null : skin(Biom.ORDNER.get(biomKategorie));
+                yield Component.empty().append(Component.literal("■ ").withColor(s == null ? GRAU : s.licht[s.licht.length - 1])).append(biomName);
+            }
+        };
     }
 
     /** Links bei {@code x}, ganz auf dem Schirm im Abstand {@code abstand} vom Rand. */
@@ -1277,14 +1309,6 @@ public final class Minimap {
         int x = Math.clamp(r.x() + (r.seite() - textBreite) / 2, abstand, Math.max(abstand, schirmBreite - abstand - textBreite));
         int unter = r.y() + r.seite() + ueberstand + 2, ueber = r.y() - ueberstand - 2 - zeile;
         return new int[] {x, unter + zeile <= schirmHoehe ? unter : ueber >= 0 ? ueber : schirmHoehe - zeile};
-    }
-
-    /**
-     * Wie gross die Zeile der Koordinaten steht: 1, ausser sie passt nicht zwischen die Ränder; das geschieht nur mit einer
-     * breiten Schrift aus einem Pack, denn der Schirm ist mindestens 320 Einheiten breit. Siehe docs/minimap.md, „Koordinaten“.
-     */
-    static float koordinatenMassstab(int schirmBreite, int abstand, int textBreite) {
-        return Math.min(1, (schirmBreite - 2 * abstand) / (float) textBreite);
     }
 
     /** Die Seite eines Kopfes auf der Minimap: {@link #KOPF} bei 128 Einheiten, mit der Seite wachsend, mindestens 4. */

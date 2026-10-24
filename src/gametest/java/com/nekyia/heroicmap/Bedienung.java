@@ -97,6 +97,7 @@ public final class Bedienung implements FabricClientGameTest {
             zoomNebenMinimap(context, maus, k);
             aufloesungUndKoordinaten(context, maus, k);
             widgetsZiehen(context, maus, k);
+            widgetsHinzufuegen(context, maus, k);
             symbole(context, maus, k);
             biomMarken(context, maus, k);
             knoepfeUeberDemL(context, maus);
@@ -4971,6 +4972,202 @@ public final class Bedienung implements FabricClientGameTest {
         }
     }
 
+    /**
+     * Widgets hinzufügen: das „+“ im L unter der Form und der Rechtsklick auf freie Fläche öffnen die Liste der Arten; vom „+“
+     * kommt die neue unten hinter den Stapel, vom Rechtsklick dorthin, wo die Maus war. Zeit und Biom zeigen ihren Text, ein
+     * Rechtsklick schaltet reihum. Esc schliesst nur die Liste; bei 16 Widgets öffnet nichts sie. Siehe docs/widgets.md,
+     * „Hinzufügen“ und „Arten“.
+     */
+    private static void widgetsHinzufuegen(ClientGameTestContext context, TestInput maus, int k) {
+        Path sicherung = FabricLoader.getInstance().getGameDir().resolve("heroicmap-widgets-neu-test.properties");
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.schreibe(sicherung);
+            // Die Koordinaten mit y: So unterscheiden sie sich von denen, die später dazukommen.
+            Minimap.INSTANZ.widgets(List.of(new Widgets.Widget(Widgets.Art.KOORDINATEN, 1, Widgets.Anker.UNTEN)));
+            int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+            Minimap.INSTANZ.stelle(b, 0, Minimap.GROESSE, b, h);
+            mc.gui.setScreen(new Einstellungen());
+        });
+        context.waitTicks(3);
+        try {
+            Minimap.Rahmen r = rahmen(context);
+            int[] schirm = context.computeOnClient(mc -> new int[] {mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight()});
+            // Das „+“ steht im L unter der Form.
+            int[] plus = plusKnopf(context);
+            int[][] l = context.computeOnClient(mc -> Einstellungen.lLage(Minimap.INSTANZ.rahmen(schirm[0], schirm[1]), Minimap.INSTANZ.stapelKasten(),
+                    Minimap.INSTANZ.rand(), schirm[0], schirm[1]));
+            if (plus[0] != l[2][0] || plus[1] != l[2][1] + Einstellungen.SYMBOL + 2) {
+                throw new AssertionError("„+“ nicht unter der Form " + Arrays.toString(l[2]) + ": " + Arrays.toString(plus));
+            }
+            // Ein Klick darauf öffnet die Liste darunter oder, ohne Platz, darüber; „Zeit“ kommt unten hinter die Koordinaten, in
+            // 24 Stunden.
+            spielerKlick(context, maus, k, plus[0] + plus[2] / 2.0, plus[1] + plus[3] / 2.0);
+            int[] liste = offeneListe(context);
+            if (liste[0] != plus[0] || liste[1] != plus[1] + plus[3] + 2 && liste[1] + liste[3] != plus[1] - 2) {
+                throw new AssertionError("Liste vom „+“ " + Arrays.toString(plus) + " bei " + Arrays.toString(liste));
+            }
+            spielerKlick(context, maus, k, liste[0] + liste[2] / 2.0, listenZeile(liste, 1));
+            List<Widgets.Widget> w = context.computeOnClient(mc -> Minimap.INSTANZ.widgets());
+            if (!w.equals(List.of(new Widgets.Widget(Widgets.Art.KOORDINATEN, 1, Widgets.Anker.UNTEN),
+                    new Widgets.Widget(Widgets.Art.ZEIT, 0, Widgets.Anker.UNTEN))) || listeOffen(context)) {
+                throw new AssertionError("„Zeit“ aus der Liste vom „+“: " + w + ", Liste offen " + listeOffen(context));
+            }
+            if (widgetKasten(context, 1)[1] <= widgetKasten(context, 0)[1]) {
+                throw new AssertionError("Die Zeit steht nicht unter den Koordinaten: " + Arrays.toString(widgetKasten(context, 1)));
+            }
+            // Die Uhr der Oberwelt, verglichen im selben Frame; die Uhr bleibt, wie sie ist, so ändert kein Licht die Bilder danach.
+            // Ein Rechtsklick schaltet reihum.
+            String[] versionen = {"24h", "12h", "tag", "echt", "24h"};
+            for (int i = 0; i < versionen.length; i++) {
+                if (i > 0) {
+                    int[] z = widgetKasten(context, 1);
+                    warte250();
+                    fahre(context, maus, k, z[0] + z[2] / 2.0, z[1] + z[3] / 2.0);
+                    maus.pressMouse(RECHTS);
+                    context.waitTicks(2);
+                }
+                String[] ist = context.computeOnClient(mc -> {
+                    Widgets.Widget z = Minimap.INSTANZ.widgets().get(1);
+                    long t = mc.level.getOverworldClockTime();
+                    return new String[] {z.versionName(), Minimap.INSTANZ.text(z, mc.level, mc.player).getString(), Widgets.uhr(t, false),
+                        Widgets.uhr(t, true), Component.translatable("heroicmap.widget.tag", Widgets.tag(t)).getString()};
+                });
+                boolean passt = switch (versionen[i]) {
+                    case "24h" -> ist[1].equals(ist[2]);
+                    case "12h" -> ist[1].equals(ist[3]) && ist[1].matches("[0-9]{1,2}:[0-9]{2} [AP]M");
+                    case "tag" -> ist[1].equals(ist[4]);
+                    default -> ist[1].matches("[0-9]{1,2}:[0-9]{2}");
+                };
+                if (!ist[0].equals(versionen[i]) || !passt) {
+                    throw new AssertionError("Zeit, Schritt " + i + ": " + ist[0] + " „" + ist[1] + "“ statt " + versionen[i] + ", erwartet "
+                            + String.join(" | ", ist[2], ist[3], ist[4]));
+                }
+            }
+
+            // Rechts auf freie Fläche unten links: die Liste an der Maus, darüber, denn darunter ist kein Platz.
+            double fx = 30, fy = schirm[1] - 20;
+            warte250();
+            fahre(context, maus, k, fx, fy);
+            maus.pressMouse(RECHTS);
+            context.waitTicks(2);
+            liste = offeneListe(context);
+            if (liste[0] != 30 || liste[1] + liste[3] != schirm[1] - 20) {
+                throw new AssertionError("Liste vom Rechtsklick bei (" + fx + ", " + fy + "): " + Arrays.toString(liste));
+            }
+            // „Biom“: frei dort, wo die Maus war, mit dem Namen des Bioms unter dem Spieler.
+            spielerKlick(context, maus, k, liste[0] + liste[2] / 2.0, listenZeile(liste, 2));
+            Widgets.Widget biom = context.computeOnClient(mc -> Minimap.INSTANZ.widgets().getLast());
+            int[] bk = widgetKasten(context, 2);
+            String name = context.computeOnClient(mc -> mc.level.getBiome(mc.player.blockPosition()).unwrapKey()
+                    .map(key -> Component.translatable("biome." + key.identifier().getNamespace() + "." + key.identifier().getPath()).getString())
+                    .orElse("?"));
+            if (biom.art() != Widgets.Art.BIOM || biom.anker() != Widgets.Anker.FREI || !(fx >= bk[0] && fx < bk[0] + bk[2] && fy >= bk[1]
+                    && fy < bk[1] + bk[3]) || !widgetText(context, 2).equals(name)) {
+                throw new AssertionError("„Biom“ vom Rechtsklick: " + biom + " bei " + Arrays.toString(bk) + ", „" + widgetText(context, 2)
+                        + "“ statt „" + name + "“");
+            }
+            // Rechts darauf: mit dem Punkt davor.
+            warte250();
+            fahre(context, maus, k, bk[0] + bk[2] / 2.0, bk[1] + bk[3] / 2.0);
+            maus.pressMouse(RECHTS);
+            context.waitTicks(2);
+            if (!widgetText(context, 2).equals("■ " + name)) {
+                throw new AssertionError("Biom mit Punkt: „" + widgetText(context, 2) + "“");
+            }
+
+            // Rechts knapp unter die Minimap, neben den Zeilen: Die neue rastet unten ein, an der ersten Stelle.
+            double ux = r.x() + r.seite() - 5, uy = r.y() + r.seite() + 2;
+            warte250();
+            fahre(context, maus, k, ux, uy);
+            maus.pressMouse(RECHTS);
+            context.waitTicks(2);
+            liste = offeneListe(context);
+            spielerKlick(context, maus, k, liste[0] + liste[2] / 2.0, listenZeile(liste, 0));
+            w = context.computeOnClient(mc -> Minimap.INSTANZ.widgets());
+            if (w.size() != 4 || !w.getFirst().equals(new Widgets.Widget(Widgets.Art.KOORDINATEN, 0, Widgets.Anker.UNTEN))
+                    || w.get(1).version() != 1 || widgetKasten(context, 0)[1] >= widgetKasten(context, 1)[1]) {
+                throw new AssertionError("„Koordinaten“ knapp unter der Minimap: " + w);
+            }
+
+            // Esc schliesst nur die Liste, ohne etwas hinzuzufügen; 30 Einheiten über dem Biom, das jetzt unten links liegt.
+            double ex = fx, ey = fy - 30;
+            warte250();
+            fahre(context, maus, k, ex, ey);
+            maus.pressMouse(RECHTS);
+            context.waitTicks(2);
+            offeneListe(context);
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTicks(2);
+            if (listeOffen(context) || context.computeOnClient(mc -> Minimap.INSTANZ.widgets().size()) != 4
+                    || !(context.computeOnClient(mc -> mc.gui.screen()) instanceof Einstellungen)) {
+                throw new AssertionError("Esc bei offener Liste: Liste offen " + listeOffen(context) + ", "
+                        + context.computeOnClient(mc -> Minimap.INSTANZ.widgets().size()) + " Widgets");
+            }
+
+            // Bei 16 Widgets: das „+“ grau, und der Rechtsklick öffnet nichts.
+            context.runOnClient(mc -> {
+                List<Widgets.Widget> voll = new ArrayList<>();
+                for (int i = 0; i < 16; i++) {
+                    voll.add(new Widgets.Widget(Widgets.Art.ZEIT, 0, Widgets.Anker.OBEN));
+                }
+                Minimap.INSTANZ.widgets(voll);
+            });
+            context.waitTicks(2);
+            boolean plusAn = context.computeOnClient(mc -> plusWidget(mc).active);
+            warte250();
+            fahre(context, maus, k, ex, ey);
+            maus.pressMouse(RECHTS);
+            context.waitTicks(2);
+            if (plusAn || listeOffen(context)) {
+                throw new AssertionError("Bei 16 Widgets: „+“ an " + plusAn + ", Liste offen " + listeOffen(context));
+            }
+        } finally {
+            context.runOnClient(mc -> {
+                mc.gui.setScreen(null);
+                Minimap.INSTANZ.lies(sicherung);
+            });
+            context.waitTicks(2);
+        }
+    }
+
+    /** Das „+“ im L des offenen Menüs. */
+    private static AbstractWidget plusWidget(Minecraft mc) {
+        for (Object kind : mc.gui.screen().children()) {
+            if (kind instanceof AbstractWidget f && f.getMessage().getString().equals("+")) {
+                return f;
+            }
+        }
+        throw new AssertionError("Kein „+“ im Menü");
+    }
+
+    private static int[] plusKnopf(ClientGameTestContext context) {
+        return context.computeOnClient(mc -> {
+            AbstractWidget f = plusWidget(mc);
+            return new int[] {f.getX(), f.getY(), f.getWidth(), f.getHeight()};
+        });
+    }
+
+    private static boolean listeOffen(ClientGameTestContext context) {
+        return context.computeOnClient(mc -> mc.gui.screen() instanceof Einstellungen e && e.liste() != null);
+    }
+
+    private static int[] offeneListe(ClientGameTestContext context) {
+        int[] l = context.computeOnClient(mc -> mc.gui.screen() instanceof Einstellungen e ? e.liste() : null);
+        if (l == null) {
+            throw new AssertionError("Die Liste „Widget hinzufügen“ ist nicht offen");
+        }
+        return l;
+    }
+
+    /** Die Mitte der Zeile {@code i} der Liste, senkrecht. */
+    private static double listenZeile(int[] liste, int i) {
+        return liste[1] + 2 + i * Einstellungen.LISTE_ZEILE + Einstellungen.LISTE_ZEILE / 2.0;
+    }
+
+    private static String widgetText(ClientGameTestContext context, int i) {
+        return context.computeOnClient(mc -> Minimap.INSTANZ.text(Minimap.INSTANZ.widgets().get(i), mc.level, mc.player).getString());
+    }
+
     /** Der Kasten des Widgets an Stelle {@code i}, wie die Minimap ihn zuletzt zeichnete. */
     private static int[] widgetKasten(ClientGameTestContext context, int i) {
         int[] k = context.computeOnClient(mc -> {
@@ -5057,17 +5254,22 @@ public final class Bedienung implements FabricClientGameTest {
             if (hell < 20 || dunkel > 0) {
                 throw new AssertionError("Koordinaten unter der Maus: " + hell + " gelbe Pixel, daneben " + dunkel);
             }
-            // Links, links, rechts, rechts: xyz, xz, xyz, xz; dann das × beim Darüberfahren: aus. Bei „aus“ steht die Zeile grau
-            // und bleibt anklickbar. Siehe docs/widgets.md, „Bedienung“.
+            // Links, links, rechts, rechts: xyz, xz, xyz, xz; dann das × beim Darüberfahren: aus, auch im Menü ohne Zeile; das „+“
+            // holt sie zurück. Siehe docs/widgets.md, „Bedienung“.
             Minimap.Koordinaten[] folge = {Minimap.Koordinaten.XYZ, Minimap.Koordinaten.XZ, Minimap.Koordinaten.XYZ, Minimap.Koordinaten.XZ,
                 Minimap.Koordinaten.AUS, Minimap.Koordinaten.XZ};
             for (int schritt = 0; schritt < folge.length; schritt++) {
                 Minimap.Koordinaten soll = folge[schritt];
                 int[] z = context.computeOnClient(mc -> Minimap.INSTANZ.koordinatenKasten());
-                if (z == null) {
+                if (z == null && schritt != 5) {
                     throw new AssertionError("Im Menü fehlt die Zeile der Koordinaten vor " + soll);
                 }
-                if (schritt == 2 || schritt == 3) {
+                if (schritt == 5) {
+                    int[] plus = plusKnopf(context);
+                    spielerKlick(context, maus, k, plus[0] + plus[2] / 2.0, plus[1] + plus[3] / 2.0);
+                    int[] liste = offeneListe(context);
+                    spielerKlick(context, maus, k, liste[0] + liste[2] / 2.0, listenZeile(liste, 0));
+                } else if (schritt == 2 || schritt == 3) {
                     warte250();
                     fahre(context, maus, k, z[0] + z[2] / 2.0, z[1] + z[3] / 2.0);
                     maus.pressMouse(RECHTS);
@@ -5089,11 +5291,10 @@ public final class Bedienung implements FabricClientGameTest {
                 if (soll == Minimap.Koordinaten.AUS) {
                     maus.setCursorPos(2 * k, 2 * k);
                     context.waitTicks(2);
-                    int[] grau = context.computeOnClient(mc -> Minimap.INSTANZ.koordinatenKasten());
-                    if (grau == null || grau(context, "koordinaten-aus", grau, k) < 20) {
-                        throw new AssertionError("Bei „aus“ steht im Menü keine graue Zeile: " + Arrays.toString(grau));
+                    if (context.computeOnClient(mc -> Minimap.INSTANZ.koordinatenKasten()) != null) {
+                        throw new AssertionError("Bei „aus“ steht im Menü eine Zeile der Koordinaten");
                     }
-                    // Im Spiel fehlt sie.
+                    // Im Spiel fehlt sie ebenso.
                     context.runOnClient(mc -> mc.gui.setScreen(null));
                     context.waitTicks(2);
                     if (context.computeOnClient(mc -> Minimap.INSTANZ.koordinatenKasten()) != null) {
@@ -5640,11 +5841,6 @@ public final class Bedienung implements FabricClientGameTest {
         return zaehle(context, name, kasten, k, (rot, gruen, blau) -> rot > 200 && gruen > 200 && blau < 140);
     }
 
-    /** Wie viele Pixel im Kasten grau sind wie die Zeile bei „aus“, 0xA0 in jedem Kanal. */
-    private static int grau(ClientGameTestContext context, String name, int[] kasten, int k) {
-        return zaehle(context, name, kasten, k, (rot, gruen, blau) -> Math.abs(rot - 0xA0) < 8 && Math.abs(gruen - 0xA0) < 8 && Math.abs(blau - 0xA0) < 8);
-    }
-
     private interface Farbe {
         boolean passt(int rot, int gruen, int blau);
     }
@@ -5888,6 +6084,24 @@ public final class Bedienung implements FabricClientGameTest {
         }
         server.runCommand("execute in minecraft:the_nether run tp @p 0.5 60 0.5");
         context.waitFor(mc -> mc.level.dimension() == Level.NETHER && Math.abs(mc.player.getY() - 60) < 0.01 && mc.player.onGround(), 600);
+        // Das Widget der Zeit zeigt hier die Uhr der Oberwelt, nicht die fehlende des Nethers, die 6:00 hiesse. Die Testwelt steht
+        // auf 6:00 und angehalten; darum kurz 6000 Ticks weiter, danach Zeit und Anhalten wie vorher, sonst änderte sich das Licht
+        // in den Bildern danach. Siehe docs/widgets.md, „Arten“.
+        boolean angehalten = context.computeOnClient(mc -> mc.level.clockManager()
+                .getInstance(mc.level.registryAccess().get(net.minecraft.world.clock.WorldClocks.OVERWORLD).orElseThrow()).isPaused());
+        long uhrVorher = context.computeOnClient(mc -> mc.level.getOverworldClockTime());
+        server.runCommand("time set " + (uhrVorher + 6000));
+        context.waitTicks(3);
+        String[] zeit = context.computeOnClient(mc -> new String[] {
+            Minimap.INSTANZ.text(new Widgets.Widget(Widgets.Art.ZEIT, 0, Widgets.Anker.UNTEN), mc.level, mc.player).getString(),
+            Widgets.uhr(mc.level.getOverworldClockTime(), false), Widgets.uhr(mc.level.getDefaultClockTime(), false)});
+        server.runCommand("time set " + uhrVorher);
+        if (angehalten) {
+            server.runCommand("time pause");
+        }
+        if (zeit[1].equals(zeit[2]) || !zeit[0].equals(zeit[1])) {
+            throw new AssertionError("Nether: Die Zeit zeigt „" + zeit[0] + "“; Uhr der Oberwelt „" + zeit[1] + "“, des Nethers „" + zeit[2] + "“");
+        }
         if (context.computeOnClient(mc -> mc.level.getChunkSource().getChunk(ziel >> 4, ziel >> 4, ChunkStatus.FULL, false) != null)) {
             throw new AssertionError("Nether: Der Chunk des Ziels ist schon beim Client");
         }
