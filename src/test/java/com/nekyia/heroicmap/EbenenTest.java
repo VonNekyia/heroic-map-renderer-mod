@@ -28,6 +28,10 @@ class EbenenTest {
         return "{\"id\":\"" + id + "\",\"name\":{\"de\":\"Städte\",\"en\":\"Towns\"},\"visible\":true,\"order\":100,\"version\":\"" + version + "\"}";
     }
 
+    private static String mitGrenze(String eintrag, double grenze) {
+        return eintrag.substring(0, eintrag.length() - 1) + ",\"maxBlocksPerPixel\":" + grenze + "}";
+    }
+
     /** Wie der Kanal: erst auf dem Thread des Netzes gelesen, dann an die Ebenen. */
     private static void teil(Ebenen e, String id, String version, int teil, int teile, String objekte) {
         Ebenen.Teil t = Ebenen.Teil.lies("{\"v\":1,\"typ\":\"ebene\",\"jetzt\":1,\"id\":\"" + id + "\",\"version\":\"" + version
@@ -669,6 +673,56 @@ class EbenenTest {
         // Fällt die Ebene aus der Liste, ist auch ihre version weg.
         liste(e, eintrag("b:andere", "v1"));
         assertNull(e.version("b:staedte"));
+    }
+
+    @Test
+    void zoomgrenzeLesen() {
+        // Nur eine Zahl über 0 bis 1024 ist eine Grenze; alles andere heisst keine Grenze.
+        String[][] faelle = {{"8", "8"}, {"0.5", "0.5"}, {"1024", "1024"}, {"1024.5", "0"}, {"0", "0"}, {"-1", "0"}, {"NaN", "0"},
+                {"Infinity", "0"}, {"\"8\"", "0"}, {"true", "0"}, {"[8]", "0"}, {"null", "0"}};
+        for (String[] f : faelle) {
+            JsonObject o = JsonParser.parseString("{\"maxBlocksPerPixel\":" + f[0] + "}").getAsJsonObject();
+            assertEquals(Double.parseDouble(f[1]), Ebenen.grenze(o), f[0]);
+        }
+        assertEquals(0, Ebenen.grenze(new JsonObject()));
+    }
+
+    @Test
+    void zoomgrenzePruefen() {
+        // Blöcke je Pixel der Webkarte = 0,625 / Länge eines Blocks in Einheiten des GUI; genau auf der Grenze zu sehen.
+        assertTrue(Ebenen.imZoom(8, 0.078125));
+        assertFalse(Ebenen.imZoom(8, 0.078));
+        assertTrue(Ebenen.imZoom(1, 0.625));
+        assertFalse(Ebenen.imZoom(0.99, 0.625));
+        assertTrue(Ebenen.imZoom(0, 1e-9));
+        Ebenen e = new Ebenen();
+        liste(e, mitGrenze(eintrag("b:staedte", "v1"), 2) + "," + eintrag("b:wege", "v1"));
+        assertEquals(List.of("b:wege", "b:staedte"), e.sichtbar(0.3125).stream().map(Ebenen.Eintrag::id).toList());
+        assertEquals(List.of("b:wege"), e.sichtbar(0.3).stream().map(Ebenen.Eintrag::id).toList());
+        assertEquals(2, e.sichtbar().size());
+        assertTrue(e.imZoom("b:staedte", 0.3125));
+        assertFalse(e.imZoom("b:staedte", 0.3));
+        assertTrue(e.imZoom("b:wege", 1e-9));
+        assertTrue(e.imZoom("b:fehlt", 1e-9));
+    }
+
+    @Test
+    void tafelJenseitsDerZoomgrenze() {
+        // Jenseits der Grenze geht die Tafel zu, ausser das Objekt ist angeheftet.
+        Ebenen e = new Ebenen();
+        liste(e, mitGrenze(eintrag("b:staedte", "v1"), 8));
+        teil(e, "b:staedte", "v1", 1, 1, nadel("hafen", 1) + ",{\"type\":\"circle\",\"id\":\"see\",\"center\":[0,0],\"radius\":4}");
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        Tafeln.Ziel ort = Tafeln.ziel("b:staedte", e.nadeln("b:staedte").getFirst()), kreis = Tafeln.ziel(e, "b:staedte", "see");
+        assertTrue(Tafeln.gilt(e, w, ort, 0.078125) && Tafeln.gilt(e, w, kreis, 0.078125));
+        assertFalse(Tafeln.gilt(e, w, ort, 0.078) || Tafeln.gilt(e, w, kreis, 0.078));
+        assertTrue(w.umschaltenNadel("b:staedte", "hafen"));
+        assertTrue(w.umschalten("b:staedte", "see"));
+        assertTrue(Tafeln.gilt(e, w, ort, 0.078) && Tafeln.gilt(e, w, kreis, 0.078));
+        // Ausgeschaltet gilt auch Angeheftetes nicht.
+        e.setze("b:staedte", false);
+        assertFalse(Tafeln.gilt(e, w, ort, 1));
     }
 
     @Test

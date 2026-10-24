@@ -1349,7 +1349,8 @@ public final class Minimap {
         Font font = Minecraft.getInstance().font;
         // Flächen, Kreise und Linien nur auf der Vollbildkarte; auf die Minimap kommen Flächen und Kreise erst angeheftet (mod#59, mod#36).
         Formen.zeichne(g, a, dimension, Wegpunkte.INSTANZ.minimap(Ebenen.INSTANZ), angeheftetSpeicher, font, true);
-        List<List<Ebenen.Form>> ebenen = Ebenen.INSTANZ.sichtbar().stream().map(e -> Ebenen.INSTANZ.formen(e.id())).toList();
+        // Die Länge eines Blocks in Einheiten des GUI ist hier der Zoom; jenseits der Zoomgrenze fehlt die Ebene; Angeheftetes zeichnet der Aufruf davor.
+        List<List<Ebenen.Form>> ebenen = Ebenen.INSTANZ.sichtbar(zoom).stream().map(e -> Ebenen.INSTANZ.formen(e.id())).toList();
         Formen.zeichne(g, a, dimension, ebenen, formenSpeicher, font, false);
         pose.popMatrix();
     }

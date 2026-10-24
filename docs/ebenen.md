@@ -1,6 +1,6 @@
 ---
 title: Ebenen
-description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Symbol und Namen und ihre Banner auf Minimap und Vollbildkarte zeichnet, in fester Grösse, Symbole und Bilder vom Server holt, Flächen, Kreise und Linien flach zeichnet, Kartenschrift entlang ihres Pfads, die Infotafel beim Zeigen auf der Vollbildkarte mit den Knöpfen des Plugins, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
+description: Wie der Mod die Ebenen vom Plugin empfängt, in Teilen je version, ihre Nadeln als Wappenschild mit Symbol und Namen und ihre Banner auf Minimap und Vollbildkarte zeichnet, in fester Grösse, Symbole und Bilder vom Server holt, Flächen, Kreise und Linien flach zeichnet, Kartenschrift entlang ihres Pfads, die Infotafel beim Zeigen auf der Vollbildkarte mit den Knöpfen des Plugins, die Zoomgrenze je Ebene, und wie der Spieler jede Ebene im Menü an- und abschaltet; was noch fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Ebenen.java
   - src/main/java/com/nekyia/heroicmap/EbenenMenue.java
@@ -39,8 +39,8 @@ die Nachrichten das Plugin:
 
 ## Empfang
 
-- **`ebenen`:** die Liste, je Ebene `id`, `name`, `visible`, `order` und
-  `version` (`Ebenen.liste`). Was nicht mehr darin steht, ist weg, mit
+- **`ebenen`:** die Liste, je Ebene `id`, `name`, `visible`, `order`,
+  `version` und `maxBlocksPerPixel`, siehe „Zoomgrenze“ (`Ebenen.liste`). Was nicht mehr darin steht, ist weg, mit
   seinen Nadeln, Formen und halben Teilen. Steht eine Kennung zweimal darin, gilt
   der erste Eintrag. Die Ebenen von Client-Mods kommen dazu und bleiben,
   bei gleicher Kennung gilt die vom Server, siehe
@@ -423,6 +423,45 @@ umgerechnet für den Mod, siehe
 - **Nicht:** Namen von Regionen und Linien und die Kartenschrift, siehe
   „Kartenschrift“; sie wachsen schon mit den Blöcken. Die Zeit unter
   einem Todespunkt bleibt fest.
+
+## Zoomgrenze
+
+Eine Ebene mit `maxBlocksPerPixel` in der Liste zeigt der Mod nur, solange
+die Karte nah genug ist, wie die Webkarte. Den Vertrag beschreibt der
+Renderer:
+[Ebenen](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/ebenen.md),
+„Zoomgrenze“; das Feld schickt das Plugin ab 0.20.0. Entschieden in
+[0043](entscheidungen/0043-zoomgrenze-je-ebene.md).
+
+- **Lesen** (`Ebenen.grenze`): eine Zahl über 0 bis 1024
+  (`Ebenen.MAX_BLOECKE_JE_PIXEL`); alles andere, auch ein Text oder ein
+  fehlendes Feld, heisst keine Grenze. Ändert sich die Grenze, ändert sich
+  die `version` der Ebene, und Liste und Teile kommen neu.
+- **Einheit wie bei den Namen:** 10 Einheiten im Mod sind 16 px der
+  Webkarte, siehe „Namen weit draussen“. Blöcke je Pixel im Sinn der
+  Webkarte sind also 0,625 / Länge eines Blocks in Einheiten des GUI
+  (`Ebenen.imZoom`). Auf der Vollbildkarte ist die Länge
+  `Karte.blockBreite()`, auf der Minimap der Zoom.
+- **Sichtbar,** solange dieser Wert höchstens `maxBlocksPerPixel` ist;
+  genau auf der Grenze ist die Ebene zu sehen. Eine Grenze von 1 zeigt die
+  Ebene auf der Vollbildkarte ab 1 Einheit je Block, auf der Minimap ab
+  Zoom 1.
+- **Jenseits der Grenze** fallen ihre Nadeln, Köpfe, Banner, Flächen,
+  Kreise, Linien und ihre Kartenschrift weg, auf Vollbildkarte und
+  Minimap (`Ebenen.sichtbar(double)`, `Wegpunkte.karte(Ebenen, double)`).
+  Sie sind dann kein Ziel für Zeigen und Doppelklick, und eine offene
+  Tafel eines ihrer Objekte geht zu (`Tafeln.gilt`).
+- **Angeheftetes bleibt,** auf beiden Karten, mit seiner Tafel: Der
+  Spieler hat es ausdrücklich gewählt. Entschieden vom Reviewer; der User
+  kann es ändern.
+- **Empfangen** werden die Teile wie bisher, auch jenseits der Grenze; der
+  Mod zeichnet sie nur nicht. Anders als die Webkarte, die die Datei erst
+  an der Grenze holt: Im Mod schickt das Plugin die Teile ohne Anfrage.
+- **In der Liste** auf der Vollbildkarte bleibt die Ebene angehakt; ihr
+  Name steht jenseits der Grenze grau, mit dem Tooltip „Erst beim
+  Hineinzoomen zu sehen“, siehe [Vollbildkarte](vollbildkarte.md),
+  „Ebenen“.
+- **Ältere Server** ohne das Feld: keine Grenze, alles wie bisher.
 
 ## Flächen, Kreise und Linien
 

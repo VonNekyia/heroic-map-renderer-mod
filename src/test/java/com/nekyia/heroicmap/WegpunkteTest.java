@@ -784,6 +784,26 @@ class WegpunkteTest {
         assertEquals(List.of(), w.karte(e));
     }
 
+    @Test
+    void karteJenseitsDerZoomgrenze() {
+        Ebenen e = new Ebenen();
+        e.empfange(JsonParser.parseString("{\"v\":1,\"typ\":\"ebenen\",\"jetzt\":1,\"ebenen\":[{\"id\":\"b:wald\",\"version\":\"v1\","
+                + "\"maxBlocksPerPixel\":8}]}").getAsJsonObject());
+        assertTrue(e.teil(Ebenen.Teil.lies("{\"v\":1,\"typ\":\"ebene\",\"jetzt\":1,\"id\":\"b:wald\",\"version\":\"v1\",\"teil\":1,"
+                + "\"teile\":1,\"objects\":[" + FLAECHE + "," + KREIS + "]}")));
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        // Diesseits und genau auf der Grenze dieselbe Liste wie ohne Zoom, so bleibt der Speicher der Formen gültig.
+        assertTrue(w.karte(e, 0.078125) == w.karte(e));
+        assertEquals(List.of(), w.karte(e, 0.078));
+        // Jenseits nur das Angeheftete, breiter, als dieselbe Liste in jedem Frame.
+        w.umschalten("b:wald", "see");
+        List<List<Ebenen.Form>> weit = w.karte(e, 0.078);
+        assertEquals(1, weit.size());
+        assertTrue(weit.getFirst() == w.karte(e, 0.01).getFirst());
+        assertEquals(List.of(w.karte(e).getFirst().get(1)), weit.getFirst());
+    }
+
     private static final String NADEL = "{\"type\":\"pin\",\"id\":\"hafen\",\"at\":[1,2],\"name\":\"Hafen\"}";
     private static final String BANNER = "{\"type\":\"banner\",\"id\":\"mark\",\"at\":[3,4],\"name\":\"Mark\",\"image\":\"images/b.png\"}";
     private static final String NADEL_OHNE_ID = "{\"type\":\"pin\",\"at\":[5,6],\"name\":\"Furt\"}";
