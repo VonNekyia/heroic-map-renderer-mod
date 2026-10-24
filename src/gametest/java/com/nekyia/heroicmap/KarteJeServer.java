@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicBoolean;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
@@ -55,15 +56,21 @@ public final class KarteJeServer implements FabricClientGameTest {
             context.waitTicks(2);
             pruefe(welt, eigene, "nach „Selbst · ruht“");
 
-            // Esc: Nichts ändert sich, keine Datei.
-            Laden.loesche(welt.resolve(eigene));
+            // Esc: Nichts ändert sich, keine Datei. Die eigene Karte löscht der Worker, nach dem, was er noch in sie
+            // zeichnet; von hier aus gelöscht, legte er sie wieder an.
+            AtomicBoolean weg = new AtomicBoolean();
+            context.runOnClient(mc -> Selbst.INSTANZ.loesche(welt.resolve(eigene), weg::set));
+            context.waitFor(mc -> weg.get(), 600);
             Files.deleteIfExists(welt.resolve(Zeigt.DATEI));
             selbst(context);
             context.waitFor(mc -> mc.gui.screen() instanceof AlteKarte, 100);
             context.getInput().pressKey(InputConstants.KEY_ESCAPE);
             context.waitTicks(2);
-            if (Files.exists(welt.resolve(eigene)) || Files.exists(welt.resolve(Zeigt.DATEI))) {
-                throw new AssertionError("Esc legte eine Karte oder zeigt.txt an");
+            if (Files.exists(welt.resolve(eigene))) {
+                throw new AssertionError("Esc legte eine eigene Karte an");
+            }
+            if (Files.exists(welt.resolve(Zeigt.DATEI))) {
+                throw new AssertionError("Esc schrieb zeigt.txt");
             }
             pruefe(welt, DOWNLOAD, "nach Esc");
 
