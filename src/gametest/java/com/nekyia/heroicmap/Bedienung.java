@@ -4595,7 +4595,8 @@ public final class Bedienung implements FabricClientGameTest {
         Minimap.Rahmen o = rahmen(context);
         spielerKlick(context, maus, k, o.x() + o.seite() + 1.5, o.y() + o.seite() / 2.0);
         waehlerOffen(context, true, "Klick auf die halbe Marke O, ohne Rahmen");
-        // Die Vorschauen zeigen die Marken so, wie sie gestellt sind: Durchsichtig fehlt N oben auf der Vorschau „schild“.
+        // Die Vorschauen zeigen die Marken so, wie sie gestellt sind: Durchsichtig fehlt N oben auf der Vorschau „schild“. Gezählt
+        // nur in der deckenden Karte der Vorschau; hinter der Tafel läuft die Welt weiter.
         double[] vorschau = context.computeOnClient(mc -> waehler(mc).vorschauMitte(Skin.FAMILIEN.indexOf("schild"),
                 mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight()));
         BufferedImage mitN = foto(context, "waehler-n-da");
@@ -4605,8 +4606,9 @@ public final class Bedienung implements FabricClientGameTest {
         });
         BufferedImage ohneN = foto(context, "waehler-n-weg");
         context.runOnClient(mc -> Minimap.INSTANZ.schalteVerzierung(0));
-        int nWeg = anders(mitN, ohneN, vorschau[0], vorschau[1] - Waehler.SEITE / 2.0, k);
-        if (nWeg < 20) {
+        double oben = vorschau[1] - Waehler.SEITE / 2.0;
+        int nWeg = anders(mitN, ohneN, vorschau[0] - 3, oben, vorschau[0] + 3, oben + 4, k);
+        if (nWeg < 6 * k * k) {
             throw new AssertionError("Wähler mit N durchsichtig: in der Vorschau „schild“ nur " + nWeg + " Pixel bei N anders");
         }
         // Das zweite Farbfeld unter „schild“ färbt nur die Vorschau; erst die Vorschau übernimmt Familie und Farbe.
@@ -5398,9 +5400,14 @@ public final class Bedienung implements FabricClientGameTest {
 
     /** Wie viele Pixel zweier Bildschirmfotos in 16 × 16 Einheiten um (x, y) anders sind, soweit im Bild. */
     private static int anders(BufferedImage a, BufferedImage b, double x, double y, int k) {
+        return anders(a, b, x - 8, y - 8, x + 8, y + 8, k);
+    }
+
+    /** Wie viele Pixel zweier Bildschirmfotos im Rechteck (x0, y0) bis (x1, y1) in Einheiten anders sind, soweit im Bild. */
+    private static int anders(BufferedImage a, BufferedImage b, double x0, double y0, double x1, double y1, int k) {
         int n = 0;
-        for (int py = Math.max(0, (int) ((y - 8) * k)); py < Math.min(a.getHeight(), (y + 8) * k); py++) {
-            for (int px = Math.max(0, (int) ((x - 8) * k)); px < Math.min(a.getWidth(), (x + 8) * k); px++) {
+        for (int py = Math.max(0, (int) (y0 * k)); py < Math.min(a.getHeight(), y1 * k); py++) {
+            for (int px = Math.max(0, (int) (x0 * k)); px < Math.min(a.getWidth(), x1 * k); px++) {
                 n += a.getRGB(px, py) != b.getRGB(px, py) ? 1 : 0;
             }
         }
