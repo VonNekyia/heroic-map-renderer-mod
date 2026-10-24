@@ -36,8 +36,8 @@ final class Ausweise {
     /** Die letzte Spielzeit vom Server, oder -1. */
     private long alter = -1;
     private boolean geschrieben;
-    /** Die Welt, wie der Ausweis sie vor diesem Besuch kannte, oder null; daran misst sich ein Reset. */
-    private Ausweis.Welt vorher;
+    /** Der Ausweis, wie er vor diesem Besuch war, oder null; daran misst sich ein Reset. */
+    private Ausweis vorher;
     /** Ist der Reset für diesen Besuch entschieden? Ticks seit dem ersten Wert der Spielzeit. */
     private boolean geprueft;
     private int ticks;
@@ -57,7 +57,7 @@ final class Ausweise {
         ordner = o;
         schluessel = mc.level.dimension().identifier().toString();
         Ausweis a = Ausweis.lies(o);
-        vorher = a == null ? null : a.welten().get(schluessel);
+        vorher = a;
         ausweis = (a != null ? a : Ausweis.neu(o.getFileName().toString().replaceFirst("^welt-", "")))
                 .mit(netz(), server()).besucht(schluessel, Instant.now(), ZoneId.systemDefault());
         alter = -1;
@@ -82,14 +82,17 @@ final class Ausweise {
         }
     }
 
-    /** Mit UID vom Plugin: eine andere als im Ausweis heisst sicher zurückgesetzt, dann sind die Bäume der Welt weg. */
+    /**
+     * Mit UID vom Plugin: eine andere als im Ausweis unter derselben eingetippten Adresse heisst sicher zurückgesetzt, dann
+     * sind die Bäume der Welt weg. Unter einer anderen Adresse trägt er die UID nur ein.
+     */
     private void pruefeUid(Minecraft mc) {
         String uid = Downloads.uids().get(schluessel);
         if (uid == null || geprueft) {
             return;
         }
         geprueft = true;
-        if (Reset.pruefe(vorher, uid, -1) != Reset.Art.SICHER) {
+        if (Reset.pruefe(vorher, schluessel, ausweis.netz(), uid, -1) != Reset.Art.SICHER) {
             ausweis = ausweis.uid(schluessel, uid);
             return;
         }
@@ -130,10 +133,13 @@ final class Ausweise {
         return baeume.size();
     }
 
-    /** Ohne UID: Fällt die Spielzeit weit, ruhen die Bäume der Welt unter einem neuen Namen, und eine neue Karte beginnt. */
+    /**
+     * Ohne UID: Fällt die Spielzeit unter derselben eingetippten Adresse weit, ruhen die Bäume der Welt unter einem neuen Namen,
+     * und eine neue Karte beginnt.
+     */
     private void pruefeOhneUid(Minecraft mc) {
         geprueft = true;
-        if (Reset.pruefe(vorher, null, alter) != Reset.Art.UNSICHER) {
+        if (Reset.pruefe(vorher, schluessel, ausweis.netz(), null, alter) != Reset.Art.UNSICHER) {
             return;
         }
         List<Path> baeume = Reset.baeume(ordner, schluessel);
@@ -142,7 +148,7 @@ final class Ausweise {
         }
         Path welt = ordner, eigene = welt.resolve(Selbst.baum(schluessel, Downloads.INSTANZ.wer()));
         Satz satz = Satz.lies(eigene);
-        long von = vorher.alterZuletzt(), bis = alter;
+        long von = vorher.welten().get(schluessel).alterZuletzt(), bis = alter;
         Set<String> belegt = new HashSet<>();
         Downloads.INSTANZ.baeume().forEach(b -> belegt.add(b.id()));
         ausweis = ausweis.neueGeneration(schluessel, alter, null);

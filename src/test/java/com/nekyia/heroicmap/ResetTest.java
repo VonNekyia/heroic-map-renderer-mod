@@ -51,6 +51,24 @@ class ResetTest {
     }
 
     @Test
+    void nurUnterDerselbenAdresse() {
+        // Server und Spiegel teilen einen Ordner, gleicher Name und Hash, jeder mit eigener UID: Ein Wechsel trägt nur ein.
+        String server = "play.example.net", spiegel = "spiegel.example.net:25566", dritte = "3b2c0000-5555-4666-8777-888899990000";
+        Ausweis a = Ausweis.neu("1111111111111111").mit(server, "main").besucht(OBEN, T, ZoneOffset.UTC).uid(OBEN, UID);
+        assertEquals(Reset.Art.GLEICH, Reset.pruefe(a, OBEN, spiegel, ANDERE, -1), "andere Adresse, andere UID: kein Löschen");
+        Ausweis b = a.mit(spiegel, "main").uid(OBEN, ANDERE);
+        assertEquals(Reset.Art.SICHER, Reset.pruefe(b, OBEN, spiegel, dritte, -1), "dieselbe Adresse, neue UID: löschen");
+        assertEquals(Reset.Art.GLEICH, Reset.pruefe(b, OBEN, server, UID, -1), "zurück zum Server: wieder nur eintragen");
+        // Ohne UID ebenso: Die Spielzeit fällt nur gegen die unter derselben Adresse.
+        Ausweis c = a.alter(OBEN, 1_000_000);
+        assertEquals(Reset.Art.GLEICH, Reset.pruefe(c, OBEN, spiegel, null, 1_000));
+        assertEquals(Reset.Art.UNSICHER, Reset.pruefe(c, OBEN, server, null, 1_000));
+        assertEquals(Reset.Art.GLEICH, Reset.pruefe(null, OBEN, server, UID, -1), "ohne Ausweis");
+        assertEquals(Reset.Art.GLEICH, Reset.pruefe(a.mit("", "main"), OBEN, server, ANDERE, -1), "nach „Ort …“ ohne Netz");
+        assertEquals(Reset.Art.GLEICH, Reset.pruefe(a, NETHER, server, ANDERE, -1), "eine Welt, die der Ausweis nicht kennt");
+    }
+
+    @Test
     void uidAusDerAntwort() {
         assertTrue(Reset.uid(UID));
         assertFalse(Reset.uid(UID.toUpperCase()));
