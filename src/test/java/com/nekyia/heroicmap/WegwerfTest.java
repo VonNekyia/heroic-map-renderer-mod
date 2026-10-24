@@ -47,10 +47,12 @@ class WegwerfTest {
         assertEquals(List.of(b), Wegwerf.weg(List.of(new Wegwerf.Karte(b, frisch, 500_000_001L)), JETZT));
     }
 
-    /** Ein Baum der Oberwelt, eigene Karte oder Download, mit map.json. */
-    private static Path baum(Path welt, boolean eigene) throws IOException {
-        if (eigene) {
-            return Selbst.anlegen(welt, OBEN, 4, "main");
+    /** Ein Baum der Oberwelt mit map.json: ein Download, eine eigene Karte von Hand oder eine ohne Klick begonnene. */
+    private static Path baum(Path welt, String art) throws IOException {
+        if (!"download".equals(art)) {
+            Path baum = Selbst.anlegen(welt, OBEN, 4, "main");
+            Selbst.ohneKlick(baum, "ohne Klick".equals(art));
+            return baum;
         }
         Path baum = welt.resolve("top");
         Satz.schreibe(baum, "Karte", OBEN, 4);
@@ -59,26 +61,54 @@ class WegwerfTest {
         return baum;
     }
 
-    @Test
-    void sammeltNurEigeneKartenVonWegwerfwelten(@TempDir Path wurzel) throws IOException {
-        Instant zuletzt = JETZT.minus(Duration.ofDays(3));
-        Path runde = wurzel.resolve("play.example.net/karte-main/welt-1111111111111111");
-        Path eigene = baum(runde, true);
-        baum(runde, false);
-        new Ausweis("play.example.net", "main", "1111111111111111", Map.of(OBEN, welt(4, 2, zuletzt))).schreibe(runde);
-        Path dauer = wurzel.resolve("play.example.net/karte-main/welt-2222222222222222");
-        baum(dauer, true);
-        new Ausweis("play.example.net", "main", "2222222222222222", Map.of(OBEN, welt(4, 0, zuletzt))).schreibe(dauer);
-        Path ohne = wurzel.resolve("play.example.net/karte-main/welt-3333333333333333");
-        baum(ohne, true);
-        Path einzel = wurzel.resolve("einzelspieler_probe/welt-4444444444444444");
-        baum(einzel, true);
-        new Ausweis("", "", "4444444444444444", Map.of(OBEN, welt(1, 0, zuletzt))).schreibe(einzel);
+    private static Path welt(Path wurzel, String ordner, int tage, int rueckfaelle, Instant zuletzt) throws IOException {
+        Path welt = Files.createDirectories(wurzel.resolve(ordner));
+        String hash = welt.getFileName().toString().substring("welt-".length());
+        new Ausweis("play.example.net", "main", hash, Map.of(OBEN, welt(tage, rueckfaelle, zuletzt))).schreibe(welt);
+        return welt;
+    }
 
-        List<Wegwerf.Karte> karten = Wegwerf.sammle(wurzel, Laden.bestand(wurzel, () -> false).karten());
-        // Nur die eigene Karte der Runde: kein Download, keine Dauerwelt, nichts ohne Ausweis, nichts im Einzelspieler.
-        assertEquals(1, karten.size(), karten.toString());
-        assertEquals(eigene, karten.getFirst().baum());
-        assertEquals(zuletzt, karten.getFirst().zuletzt());
+    @Test
+    void nurOhneKlickBegonnene(@TempDir Path wurzel) throws IOException {
+        // Review mod#218: Nach dem Update auf den Ausweis hat jede alte Welt einen Besuchstag. Eine von Hand begonnene Karte
+        // dort bleibt, auch 8 Tage ohne Besuch; dieselbe ohne Klick begonnen geht.
+        Path welt = welt(wurzel, "play.example.net/karte-main/welt-1111111111111111", 1, 0, JETZT.minus(Duration.ofDays(8)));
+        Path eigene = baum(welt, "von Hand");
+        assertEquals(List.of(), Wegwerf.weg(Wegwerf.sammle(wurzel), JETZT));
+        Selbst.ohneKlick(eigene, true);
+        assertEquals(List.of(eigene), Wegwerf.weg(Wegwerf.sammle(wurzel), JETZT));
+        // Ein Klick nimmt die Marke wieder weg.
+        Selbst.ohneKlick(eigene, false);
+        assertFalse(Files.exists(eigene.resolve(Selbst.OHNE_KLICK)));
+        assertEquals(List.of(), Wegwerf.sammle(wurzel));
+    }
+
+    @Test
+    void sammeltNurOhneKlickBegonneneVonWegwerfwelten(@TempDir Path wurzel) throws IOException {
+        Instant zuletzt = JETZT.minus(Duration.ofDays(3));
+        Path runde = welt(wurzel, "play.example.net/karte-main/welt-1111111111111111", 4, 2, zuletzt);
+        Path eigene = baum(runde, "ohne Klick");
+        baum(runde, "download");
+        Path tag = welt(wurzel, "zweit.example.net/welt-2222222222222222", 1, 0, zuletzt);
+        Path eintag = baum(tag, "ohne Klick");
+        baum(welt(wurzel, "play.example.net/karte-main/welt-3333333333333333", 4, 0, zuletzt), "ohne Klick");
+        baum(welt(wurzel, "play.example.net/karte-main/welt-4444444444444444", 4, 2, zuletzt), "von Hand");
+        baum(Files.createDirectories(wurzel.resolve("play.example.net/welt-5555555555555555")), "ohne Klick");
+        baum(welt(wurzel, "einzelspieler_probe/welt-6666666666666666", 1, 0, zuletzt), "ohne Klick");
+        Path hash = welt(wurzel, "welt-7777777777777777", 1, 0, zuletzt);
+        Path ablageHash = baum(hash, "ohne Klick");
+
+        List<Wegwerf.Karte> karten = Wegwerf.sammle(wurzel);
+        // Die Runde und die Eintagswelt, auch in der Ablage Hash; keine Dauerwelt, kein von Hand begonnener, keiner ohne
+        // Ausweis, keiner im Einzelspieler, kein Download.
+        assertEquals(List.of(eigene, eintag, ablageHash).stream().sorted().toList(),
+                karten.stream().map(Wegwerf.Karte::baum).sorted().toList(), karten.toString());
+        Wegwerf.Karte k = karten.stream().filter(x -> x.baum().equals(eigene)).findFirst().orElseThrow();
+        assertEquals(zuletzt, k.zuletzt());
+        long bytes;
+        try (var alle = Files.walk(eigene)) {
+            bytes = alle.filter(Files::isRegularFile).mapToLong(f -> f.toFile().length()).sum();
+        }
+        assertEquals(bytes, k.bytes(), "nur die Dateien des Baums");
     }
 }

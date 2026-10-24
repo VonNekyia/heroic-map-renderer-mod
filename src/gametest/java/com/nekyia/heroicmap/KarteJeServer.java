@@ -30,6 +30,9 @@ public final class KarteJeServer implements FabricClientGameTest {
             Bilder.leereWelt(context);
             Path welt = context.computeOnClient(mc -> Downloads.weltOrdner());
             download(welt);
+            // Eine Marke „ohne Klick“ von früher im Ordner der eigenen Karte: Der Klick unten nimmt sie weg (B6).
+            Path marke = Files.createDirectories(welt.resolve(Selbst.baum(OBEN))).resolve(Selbst.OHNE_KLICK);
+            Files.writeString(marke, "ohne Klick");
 
             // Behalten: Die eigene Karte ist an, der Download ruht und bleibt auf der Platte.
             selbst(context);
@@ -38,6 +41,9 @@ public final class KarteJeServer implements FabricClientGameTest {
             context.waitTicks(2);
             String eigene = Selbst.baum(OBEN);
             pruefe(welt, eigene, "nach „Behalten, ruht“");
+            if (Files.exists(marke)) {
+                throw new AssertionError("Nach dem Klick auf „Selbst“ trägt die eigene Karte noch die Marke ohne Klick");
+            }
             if (!Files.isDirectory(welt.resolve(DOWNLOAD)) || !Downloads.ruht(welt.resolve(DOWNLOAD), Zeigt.OHNE)) {
                 throw new AssertionError("Der Download ruht nicht oder ist weg");
             }

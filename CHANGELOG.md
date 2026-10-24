@@ -6,7 +6,6 @@ The release notes on GitHub and Modrinth come from here
 
 ## 0.2.71
 
-- **Draw it yourself in new worlds and rounds.** Once you switch on "Draw it yourself" on a server, the mod also draws new worlds and rounds of that server, but never over a map the server offers. Your own maps of rounds and one-day worlds go away 7 days after your last visit, and all of them together stay under 500 MB.
 - **"Automatic" for the biome frame.** The frame chooser now shows "Automatic" first for the biome frame, and it's the default: the frame follows the biome you stand in. Pick a biome there instead to keep that frame everywhere.
 - **The flower stands on the frame.** With the "biome" frame, the marks east, south and west now stand outside on the edge of the minimap, foot on the frame and bloom pointing out; the letters of "lettern" turn their head outward too. The minimap keeps a little more distance to the screen edge for that.
 - **The same world under another address.** If you join under a new address or port and you already have a map of that world under the old one, the map list suggests "Use the map of …" for it. Nothing changes until you click it.

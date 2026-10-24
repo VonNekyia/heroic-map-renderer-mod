@@ -127,6 +127,8 @@ final class Ausweise {
         }
         Path eigene = welt.resolve(Selbst.baum(schluessel, Downloads.INSTANZ.wer()));
         Satz satz = hier ? Satz.lies(eigene) : null;
+        // Die neue eigene Karte behält, ob „Selbst“ sie ohne Klick begonnen hatte.
+        boolean ohneKlick = satz != null && Files.exists(eigene.resolve(Selbst.OHNE_KLICK));
         for (Path b : baeume) {
             Kartenliste.loescheBaum(b, ok -> {
                 Downloads.INSTANZ.gibFrei(b);
@@ -134,7 +136,7 @@ final class Ausweise {
                     LOGGER.warn("Heroic Map: {} nach dem Reset nicht ganz gelöscht", b);
                 }
                 if (satz != null && b.equals(eigene)) {
-                    Selbst.INSTANZ.waehle(mc, satz.massstab());
+                    Selbst.INSTANZ.waehle(mc, satz.massstab(), ohneKlick);
                 }
             });
         }
@@ -173,6 +175,7 @@ final class Ausweise {
         }
         Path welt = ordner, eigene = welt.resolve(Selbst.baum(schluessel, Downloads.INSTANZ.wer()));
         Satz satz = Satz.lies(eigene);
+        boolean ohneKlick = satz != null && Files.exists(eigene.resolve(Selbst.OHNE_KLICK));
         long von = vorher.welten().get(schluessel).alterZuletzt(), bis = alter;
         Set<String> belegt = new HashSet<>();
         Downloads.INSTANZ.baeume().forEach(b -> belegt.add(b.id()));
@@ -198,7 +201,7 @@ final class Ausweise {
             mc.execute(() -> {
                 baeume.forEach(Downloads.INSTANZ::gibFrei);
                 if (satz != null) {
-                    Selbst.INSTANZ.waehle(mc, satz.massstab());
+                    Selbst.INSTANZ.waehle(mc, satz.massstab(), ohneKlick);
                 }
                 Selbst.INSTANZ.neuGewaehlt(mc);
                 HeroicMap.weltOrdnerGewechselt();

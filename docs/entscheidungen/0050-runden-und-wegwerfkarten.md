@@ -51,14 +51,26 @@ Den Plan hat der Reviewer freigegeben.
   wenn die Spielzeit wieder höchstens eine Stunde vom Anfang der letzten
   Generation entfernt ist. Die Karte bleibt und füllt sich mit jeder
   Runde. Der erste Rückfall ohne UID ruht wie bisher.
-- **Wegwerfkarte:** die eigene Karte einer Welt eines Servers, die nur an
-  einem Tag besucht wurde oder mindestens zwei Rückfälle hat. Sie geht
-  7 Tage nach dem letzten Besuch der Welt; liegen alle übrigen zusammen
-  über 500 MB, gehen die am längsten nicht besuchten. Nie Downloads, nie
-  im Einzelspieler, nie ohne Ausweis. Einmal je Start im Hintergrund.
+- **Wegwerfkarte:** nur eine eigene Karte, die „Selbst“ ohne Klick des
+  Spielers in einer neuen Welt begonnen hat (Marke `ohne-klick.txt`), in
+  einer Welt eines Servers, die nur an einem Tag besucht wurde oder
+  mindestens zwei Rückfälle hat. Ein Klick des Spielers auf „Selbst“,
+  „Behalten“ oder „an“ in dieser Welt nimmt die Marke weg. Sie geht 7 Tage
+  nach dem letzten Besuch der Welt; liegen alle übrigen zusammen über
+  500 MB, gehen die am längsten nicht besuchten. Nie Downloads, nie von
+  Hand begonnene Karten, nie im Einzelspieler, nie ohne Ausweis. Einmal je
+  Start im Hintergrund, flach gesucht bis zur Tiefe der Bäume.
 
 ## Verworfen
 
+- **Jede eigene Karte mit einem Besuchstag oder zwei Rückfällen:** Der
+  Ausweis kam erst mit 0.2.71; nach dem Update hat jede alte Welt einen
+  Besuchstag. Eine seit Wochen von Hand gezeichnete Karte eines Servers,
+  den der Spieler danach eine Woche nicht besucht, wäre weg. 3b meint die
+  Karten der Runden, nicht von Hand gezeichnete. Gefunden im Review.
+- **Den ganzen Bestand zählen:** `Laden.bestand` geht über jede Datei,
+  auch über die Kacheln aller Downloads, bei jedem Start. Gesucht wird
+  flach nach Bäumen mit Marke, und nur deren Bytes zählen. Aus dem Review.
 - **Runde schon ab dem ersten Rückfall ohne UID:** Eine echte
   Zurücksetzung auf eine frische Welt sähe gleich aus; die Karte stünde
   über der falschen Welt. Der Plan nannte den zweiten.

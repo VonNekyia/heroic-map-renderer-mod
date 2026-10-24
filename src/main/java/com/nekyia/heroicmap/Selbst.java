@@ -56,6 +56,8 @@ public final class Selbst {
     static final String MARKE = "selbst.txt";
     /** In {@code heroicmap/}: je Netz und Server der Massstab, mit dem „Selbst“ auch neue Welten zeichnet. Siehe docs/selbst.md, „Neue Welten“. */
     static final String WEITER = "selbst-weiter.txt";
+    /** Im Baum: „Selbst“ hat ihn ohne Klick des Spielers begonnen; nur so kann er eine Wegwerfkarte sein. Siehe docs/selbst.md, „Wegwerfkarten“. */
+    static final String OHNE_KLICK = "ohne-klick.txt";
     /** So viele Chunks hat der Worker höchstens vor sich. */
     private static final int IN_ARBEIT = 4;
     /** Zeit je Tick auf dem Render-Thread für Abzüge. */
@@ -135,6 +137,16 @@ public final class Selbst {
         Path baum = welt.resolve(baum(dimension, server));
         Satz satz = Satz.lies(baum);
         return satz != null && dimension.equals(satz.dimension()) && gehoert(baum, server);
+    }
+
+    /** Setzt die Marke {@link #OHNE_KLICK} im Baum oder nimmt sie weg; ein Klick des Spielers nimmt sie immer weg. */
+    static void ohneKlick(Path baum, boolean ohneKlick) throws IOException {
+        Path marke = baum.resolve(OHNE_KLICK);
+        if (ohneKlick) {
+            Files.writeString(marke, "Heroic Map: ohne Klick begonnen, „Selbst“ für neue Welten\n", StandardCharsets.UTF_8);
+        } else {
+            Files.deleteIfExists(marke);
+        }
     }
 
     /** Der Massstab, mit dem „Selbst“ unter {@code netz} für {@code server} auch neue Welten zeichnet, 0 ohne. */
@@ -218,7 +230,7 @@ public final class Selbst {
         }
         String wer = Downloads.INSTANZ.wer(), dimension = dimension(mc.level);
         int massstab = weiter(Downloads.wurzel(), netz, wer);
-        if (weiterHier(weltOrdner(), dimension, wer, massstab) && waehle(mc, massstab) == null) {
+        if (weiterHier(weltOrdner(), dimension, wer, massstab) && waehle(mc, massstab, true) == null) {
             LOGGER.info("Heroic Map: zeichnet {} in {} selbst, wie auf diesem Server gewählt, {} px", dimension, weltOrdner(), massstab);
         }
     }
@@ -290,6 +302,8 @@ public final class Selbst {
         }
         try {
             Zeigt.setze(weltOrdner(), Downloads.INSTANZ.wer(), dimension(mc.level), eigenerBaum(mc).getFileName().toString());
+            // Ein Klick des Spielers: Die Karte ist keine zum Wegwerfen mehr.
+            ohneKlick(eigenerBaum(mc), false);
         } catch (IOException e) {
             LOGGER.warn("Heroic Map: Wahl der Karte nicht gespeichert", e);
             return Component.translatable("heroicmap.selbst.fehler");
@@ -320,16 +334,22 @@ public final class Selbst {
     }
 
     /**
-     * Die Wahl „Selbst“ mit {@code massstab} Pixeln je Block: legt den Baum an und zeichnet die
+     * Die Wahl „Selbst“ mit {@code massstab} Pixeln je Block durch einen Klick des Spielers: legt den Baum an und zeichnet die
      * geladenen Chunks. Gibt den Fehler zurück, oder null.
      */
     Component waehle(Minecraft mc, int massstab) {
+        return waehle(mc, massstab, false);
+    }
+
+    /** Wie oben; mit {@code ohneKlick} begonnen von „Selbst“ für neue Welten, dann trägt der Baum die Marke {@link #OHNE_KLICK}. */
+    Component waehle(Minecraft mc, int massstab, boolean ohneKlick) {
         if (!moeglich(mc) || mc.player == null) {
             return Component.translatable("heroicmap.selbst.geht_nicht");
         }
         try {
             String wer = Downloads.INSTANZ.wer();
             Path baum = anlegen(weltOrdner(), dimension(mc.level), massstab, wer);
+            ohneKlick(baum, ohneKlick);
             // Gewählt ist gewählt: Ab jetzt zeigt dieser Server sie, auch wenn ein Download der Dimension daliegt.
             Zeigt.setze(weltOrdner(), wer, dimension(mc.level), baum.getFileName().toString());
         } catch (IOException e) {

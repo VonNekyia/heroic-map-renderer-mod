@@ -2,20 +2,23 @@ package com.nekyia.heroicmap;
 
 import com.mojang.logging.LogUtils;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.function.BooleanSupplier;
+import java.util.stream.Stream;
 import net.minecraft.client.Minecraft;
 import org.slf4j.Logger;
 
 /**
- * Wegwerf- und Rundenkarten: eigene Karten von Welten eines Servers, die nur an einem Tag besucht oder schon mindestens
- * zweimal zurückgesetzt wurden. Nach 7 Tagen ohne Besuch gehen sie, und alle zusammen höchstens 500 MB, die ältesten
- * zuerst. Nie Downloads, nie im Einzelspieler. Siehe docs/selbst.md, „Wegwerfkarten“.
+ * Wegwerf- und Rundenkarten: eigene Karten, die „Selbst“ ohne Klick des Spielers in einer neuen Welt eines Servers begonnen
+ * hat ({@link Selbst#OHNE_KLICK}), wenn die Welt nur an einem Tag besucht oder schon mindestens zweimal zurückgesetzt wurde.
+ * Nach 7 Tagen ohne Besuch gehen sie, und alle zusammen höchstens 500 MB, die ältesten zuerst. Nie Downloads, nie von Hand
+ * begonnene Karten, nie im Einzelspieler. Siehe docs/selbst.md, „Wegwerfkarten“.
  */
 final class Wegwerf {
 
@@ -26,6 +29,7 @@ final class Wegwerf {
     static final long GRENZE = 500_000_000L;
     /** Ab so vielen Rückfällen ist eine Welt eine Runde. */
     static final int RUNDE = 2;
+    private static final String WELT = "welt-";
 
     /** Eine Wegwerfkarte: der Baum, der letzte Besuch seiner Welt und seine Grösse. */
     record Karte(Path baum, Instant zuletzt, long bytes) {
@@ -40,23 +44,39 @@ final class Wegwerf {
     }
 
     /**
-     * Die Wegwerfkarten im {@code bestand} unter {@code wurzel}: eigene Bäume ({@link Selbst#selbst}), deren Welt nach dem
-     * Ausweis ihres Ordners {@link #wegwerf} ist; nicht im Einzelspieler.
+     * Die Wegwerfkarten unter {@code wurzel}: in jedem Ordner {@code welt-…} bis zur Tiefe der Bäume die eigenen Bäume mit der
+     * Marke {@link Selbst#OHNE_KLICK}, deren Welt nach dem Ausweis {@link #wegwerf} ist; nicht im Einzelspieler. Nur ihre
+     * Dateien zählt es, nie die Kacheln der Downloads.
      */
-    static List<Karte> sammle(Path wurzel, List<Laden.AufPlatte> bestand) {
+    static List<Karte> sammle(Path wurzel) throws IOException {
         List<Karte> aus = new ArrayList<>();
-        for (Laden.AufPlatte e : bestand) {
-            Path baum = e.ordner(), welt = baum.getParent();
-            if (e.satz() == null || !Selbst.selbst(baum) || welt == null || einzelspieler(wurzel, welt)) {
-                continue;
+        List<Path> welten;
+        try (Stream<Path> alle = Files.walk(wurzel, 3)) {
+            welten = alle.filter(p -> p.getFileName().toString().startsWith(WELT) && Files.isDirectory(p, LinkOption.NOFOLLOW_LINKS)
+                    && !einzelspieler(wurzel, p)).toList();
+        }
+        for (Path welt : welten) {
+            List<Path> baeume;
+            try (Stream<Path> alle = Files.list(welt)) {
+                baeume = alle.filter(b -> b.getFileName().toString().startsWith(Selbst.PRAEFIX) && Files.exists(b.resolve(Selbst.OHNE_KLICK))).toList();
             }
-            Ausweis a = Ausweis.lies(welt);
-            Ausweis.Welt w = a == null ? null : a.welten().get(e.satz().dimension());
-            if (wegwerf(w)) {
-                aus.add(new Karte(baum, w.zuletzt(), e.bytes()));
+            Ausweis a = baeume.isEmpty() ? null : Ausweis.lies(welt);
+            for (Path baum : baeume) {
+                Satz satz = Satz.lies(baum);
+                Ausweis.Welt w = a == null || satz == null ? null : a.welten().get(satz.dimension());
+                if (wegwerf(w)) {
+                    aus.add(new Karte(baum, w.zuletzt(), bytes(baum)));
+                }
             }
         }
         return aus;
+    }
+
+    /** Die Bytes aller Dateien im Baum. */
+    private static long bytes(Path baum) throws IOException {
+        try (Stream<Path> alle = Files.walk(baum)) {
+            return alle.filter(Files::isRegularFile).mapToLong(p -> p.toFile().length()).sum();
+        }
     }
 
     private static boolean einzelspieler(Path wurzel, Path welt) {
@@ -91,14 +111,14 @@ final class Wegwerf {
     }
 
     /**
-     * Einmal nach dem Start im Hintergrund: zählt den Bestand, wählt die Wegwerfkarten, die weg sollen, und löscht sie im Worker
+     * Einmal nach dem Start im Hintergrund: sammelt die Wegwerfkarten, wählt die, die weg sollen, und löscht sie im Worker
      * von „Selbst“, nie die, in die er gerade zeichnet. Eine Zeile im Log.
      */
-    static void raeume(BooleanSupplier abbruch) {
+    static void raeume() {
         Path wurzel = Downloads.wurzel();
         List<Path> weg;
         try {
-            weg = weg(sammle(wurzel, Laden.bestand(wurzel, abbruch).karten()), Instant.now());
+            weg = Files.isDirectory(wurzel) ? weg(sammle(wurzel), Instant.now()) : List.of();
         } catch (IOException | RuntimeException e) {
             LOGGER.warn("Heroic Map: Wegwerfkarten nicht gezählt", e);
             return;
