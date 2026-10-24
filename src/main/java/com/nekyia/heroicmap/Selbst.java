@@ -314,7 +314,8 @@ public final class Selbst {
             gesucht = true;
             String wer = Downloads.INSTANZ.wer();
             Satz s = level.dimensionType().hasCeiling() ? null : Satz.fuer(weltOrdner(), dimension(level), wer);
-            satz = s != null && gehoert(s.ordner().getParent(), wer) ? s : null;
+            // Nie in das Ziel eines Zeigers: nur ein Baum im eigenen Ordner der Welt. Siehe docs/selbst.md, „Wahl“.
+            satz = s != null && gehoert(s.ordner().getParent(), wer) && s.ordner().getParent().getParent().equals(weltOrdner()) ? s : null;
             if (satz == null) {
                 offen.clear();
             }

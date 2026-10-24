@@ -575,6 +575,32 @@ eines Proxys von einem des Netzes (`Laden.Fehler.status`).
     „Selbst“, wenn dieser Server für dessen Dimension seine eigene Karte
     zeigt (`Downloads.fragtNachSelbst`). „Behalten, ruht“ merkt den neuen
     Baum in `zeigt.txt`; bis er ganz daliegt, bleibt die eigene Karte an.
+- **Zeiger** (`Zeiger`): Ein Server nutzt die Karte eines anderen mit
+  derselben Welt unter derselben Adresse, ohne Kopie. Warum so:
+  [0031](entscheidungen/0031-ein-zeiger-statt-geteilter-ordner.md).
+  - **Wo:** `zeiger.txt` im eigenen Ordner der Welt, eine Zeile mit dem
+    Namen der Karte des Ziels, `-` für den Ordner ohne Karte. Das Ziel ist
+    so immer der Nachbar mit demselben Hash, etwa
+    `<host>/karte-main/welt-<hash>` für `<host>/karte-build/welt-<hash>`,
+    nie ein Pfad oder eine Adresse. Ein Name, der nicht wie eine Karte
+    aussieht, gilt nicht; einem Link oder einer Junction folgt der Mod
+    nicht.
+  - **Wirkung:** Die Downloads im Ziel zählen hier wie eigene, nur zum
+    Lesen, nach den eigenen Downloads und vor der eigenen Karte
+    (`Satz.fuer`). In `zeigt.txt` steht ein Baum im Ziel mit `@` davor. Die
+    eigene Karte des Ziels zeigt der Mod nie, und „Selbst“ zeichnet nie
+    hinein: Der Worker zeichnet nur in einen Baum im eigenen Ordner.
+  - **Fehlt das Ziel,** gilt die Regel ohne Zeiger. Der Zeiger bleibt, bis
+    der Spieler ihn löst; die Karte des Ziels kann wiederkommen.
+  - **Übergang von `karte.von`** (`Uebergang`): Meldet ein Server die Karte
+    eines anderen, also `karte` ungleich `backend`, merkt der Mod das in
+    `heroicmap/server.txt`, je Adresse, Hash und Server. Meldet derselbe
+    Server später seine eigene, setzt der Mod genau einmal einen Zeiger
+    auf die andere, wenn es ihren Ordner gibt, und vergisst die Zeile. Ein
+    gelöster Zeiger kommt so nicht wieder.
+  - **Wegpunkte und Kartenlage** bleiben im eigenen Ordner. Die Ebenen des
+    anderen Servers kommen nicht über den Zeiger, sondern wie bisher über
+    den Server, auf dem der Spieler ist.
 - **Schreiben** über eine Zwischendatei in `tmp/`, dann verschieben; nie
   liegt eine halbe Kachel da. `tmp/` leert der Mod zu Beginn jedes Downloads.
 - **`satz.json`** je Baum gehört zur [Vollbildkarte](vollbildkarte.md),
@@ -644,6 +670,14 @@ Platte (`Kartenliste`), auch die anderer Server und Welten:
   - Die eigene Karte eines anderen Servers: grau „von main“.
   - Eine eigene Karte ohne Server: „übernehmen“, siehe
     [Selbst gezeichnete Karte](selbst.md), „Wahl“.
+  - Ein Baum im Ziel des Zeigers zählt wie einer im Ordner der Welt, eine
+    eigene Karte dort zeigt grau „von main“.
+- **Zeiger,** unauffällig unten über „Zurück“, nur im Ordner einer Welt
+  (`Kartenliste.zeiger`): Ohne Zeiger, und nur, wenn unter derselben
+  Adresse ein anderer Ordner mit demselben Hash liegt, „Gleiche Welt auf
+  main“ und je Ordner „Karte von main nutzen“. Mit Zeiger „build zeigt auf:
+  `<pfad>`“, „(fehlt)“, wenn das Ziel nicht daliegt, und „lösen“. Kein
+  Dialog und kein Hinweis beim Betreten, so will es der User.
 - **Mausrad** blättert, wenn nicht alle Karten auf den Schirm passen.
 
 ## Was bleibt eine Näherung

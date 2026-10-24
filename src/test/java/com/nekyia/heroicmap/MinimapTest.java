@@ -41,11 +41,25 @@ class MinimapTest {
         Files.writeString(alt, "verzierungen=true");
         m.lies(alt);
         assertTrue(m.verzierungen());
-        // Rechtsklick hin und zurück.
+        // Die mittlere Taste reihum: Pixel, HD, durchsichtig, Pixel; nur die eine Marke.
         m.schalteVerzierung(3);
-        assertTrue(m.verzierungAus(3) && !m.verzierungAus(0));
+        assertTrue(m.hd(3) && !m.verzierungAus(3) && !m.hd(0) && m.verzierungen());
         m.schalteVerzierung(3);
-        assertTrue(m.verzierungen());
+        assertTrue(!m.hd(3) && m.verzierungAus(3) && !m.verzierungAus(0));
+        m.schalteVerzierung(3);
+        assertTrue(!m.hd(3) && m.verzierungen());
+        // Eine Marke nach ihrer Wahl, der Griff in HD, sobald eine Marke HD zeigt.
+        Minimap.Ornament griff = new Minimap.Ornament(Skin.GRIFF, 3, 0, 0, 0, -1), s = new Minimap.Ornament(Skin.MARKE, 0, 0, 0, 0, 2);
+        assertTrue(Minimap.hd(griff, 0b0100) && !Minimap.hd(griff, 0));
+        assertTrue(Minimap.hd(s, 0b0100) && !Minimap.hd(s, 0b0001));
+        // Alle durchsichtig nimmt HD zurück: Eine Marke ist nie beides.
+        m.schalteVerzierung(1);
+        m.setzeVerzierungen(false);
+        assertEquals(0, m.hdMarken());
+        // HD gilt nur für Marken, die nicht durchsichtig sind, auch aus einer Datei.
+        Files.writeString(alt, "verzierungen_aus=N\nverzierungen_hd=N,O");
+        m.lies(alt);
+        assertTrue(m.verzierungAus(0) && !m.hd(0) && m.hd(1));
         // Ohne N zeichnet der Rahmen drei Marken, nicht oben.
         Minimap.Rahmen r = new Minimap.Rahmen(0, 0, 128);
         List<Minimap.Ornament> drei = Minimap.ornamente(r, 2, false, Skin.Marken.STARR, null, 2, 1, -1, false, -1);
@@ -276,8 +290,12 @@ class MinimapTest {
         vorher.setzeChunklinien(true);
         vorher.setzeEffekte(false);
         vorher.setzeDrehen(true);
+        // N durchsichtig, S durchsichtig, O in HD.
+        vorher.schalteVerzierung(0);
         vorher.schalteVerzierung(0);
         vorher.schalteVerzierung(2);
+        vorher.schalteVerzierung(2);
+        vorher.schalteVerzierung(1);
         vorher.setzeTechnikOffen(true);
         vorher.stelle(20, 30, 200, 640, 360);
         vorher.schreibe(datei);
@@ -288,6 +306,7 @@ class MinimapTest {
         nachher.lies(datei);
         // N und S durchsichtig, O und W nicht; Technik offen (mod#175).
         assertTrue(nachher.verzierungAus(0) && !nachher.verzierungAus(1) && nachher.verzierungAus(2) && !nachher.verzierungAus(3));
+        assertEquals(0b0010, nachher.hdMarken(), "O in HD");
         assertTrue(nachher.technikOffen());
         assertFalse(nachher.sichtbar());
         assertEquals(4, nachher.aufloesung());
