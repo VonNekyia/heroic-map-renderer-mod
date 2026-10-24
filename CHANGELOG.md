@@ -12,6 +12,7 @@ The release notes on GitHub and Modrinth come from here
 - **Choose the time under death points.** Click the death point in the settings to switch between date and time, date, time or none. Date and time now always shows both, also on the day you died.
 - **Teleporting from the map uses the plain `tp` command.** The server no longer needs to allow `execute`, only `tp`. Without a known height you first go up into the air and land on the ground as soon as your game has the destination; this costs no hearts any more. If the server doesn't send the destination within 5 seconds, or there's no place to stand, you go back where you were. If the server doesn't allow you `/tp`, the map says so and sends nothing.
 - **A progress bar under the minimap.** While the map downloads or syncs, a thin bar with the percentage sits under the minimap, so you see it without opening the full map. The coordinates move one line down meanwhile. If a sync finds nothing missing, there's no bar.
+- **The coordinates are the first minimap widget.** Nothing changes on screen; your choice of coordinates carries over and is now saved as `widgets`, ready for more widgets to come.
 
 ## 0.2.68
 

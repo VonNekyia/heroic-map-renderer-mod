@@ -38,11 +38,8 @@ final class Widgets {
     /** Wo ein Widget eingerastet ist; oben und frei kommen mit dem Ziehen. */
     enum Anker { UNTEN }
 
-    /**
-     * Ein Widget: seine Art, die Version als Stelle in {@link Art#versionen}, die Grösse in Pixeln des Geräts je Pixel der
-     * Schrift, 0 wie der GUI-Massstab, und sein Anker; im Stapel stehen die Widgets in der Reihe der Liste.
-     */
-    record Widget(Art art, int version, int groesse, Anker anker) {
+    /** Ein Widget: seine Art, die Version als Stelle in {@link Art#versionen}, und sein Anker; im Stapel in der Reihe der Liste. */
+    record Widget(Art art, int version, Anker anker) {
 
         String versionName() {
             return art.versionen.get(version);
@@ -53,8 +50,8 @@ final class Widgets {
     }
 
     /**
-     * Die Widgets aus dem Text {@code art:version:groesse:anker;…}, etwa {@code koordinaten:xz:0:unten}. Ein Eintrag mit
-     * unbekannter Art, Version oder Anker, mit Grösse ausser 0 bis 8 oder mit falscher Zahl Teile fehlt; die übrigen bleiben.
+     * Die Widgets aus dem Text {@code art:version:anker;…}, etwa {@code koordinaten:xz:unten}. Ein Eintrag mit unbekannter
+     * Art, Version oder Anker oder mit falscher Zahl Teile fehlt; die übrigen bleiben, höchstens {@link #MAX}.
      */
     static List<Widget> lies(String text) {
         List<Widget> widgets = new ArrayList<>();
@@ -63,20 +60,13 @@ final class Widgets {
         }
         for (String eintrag : text.trim().split(";")) {
             String[] t = eintrag.trim().split(":");
-            Art art = t.length == 4 ? Art.von(t[0]) : null;
+            Art art = t.length == 3 ? Art.von(t[0]) : null;
             if (art == null || widgets.size() >= MAX) {
                 continue;
             }
             int version = art.versionen.indexOf(t[1]);
-            Anker anker = t[3].equals("unten") ? Anker.UNTEN : null;
-            int groesse;
-            try {
-                groesse = Integer.parseInt(t[2]);
-            } catch (NumberFormatException e) {
-                continue;
-            }
-            if (version >= 0 && anker != null && groesse >= 0 && groesse <= 8) {
-                widgets.add(new Widget(art, version, groesse, anker));
+            if (version >= 0 && t[2].equals("unten")) {
+                widgets.add(new Widget(art, version, Anker.UNTEN));
             }
         }
         return widgets;
@@ -86,7 +76,7 @@ final class Widgets {
     static String schreibe(List<Widget> widgets) {
         List<String> teile = new ArrayList<>();
         for (Widget w : widgets) {
-            teile.add(w.art().name + ":" + w.versionName() + ":" + w.groesse() + ":" + w.anker().name().toLowerCase(Locale.ROOT));
+            teile.add(w.art().name + ":" + w.versionName() + ":" + w.anker().name().toLowerCase(Locale.ROOT));
         }
         return String.join(";", teile);
     }
@@ -98,8 +88,8 @@ final class Widgets {
     static List<Widget> ausKoordinaten(String alt) {
         return switch (String.valueOf(alt).trim()) {
             case "aus" -> new ArrayList<>();
-            case "xyz" -> new ArrayList<>(List.of(new Widget(Art.KOORDINATEN, 1, 0, Anker.UNTEN)));
-            default -> new ArrayList<>(List.of(new Widget(Art.KOORDINATEN, 0, 0, Anker.UNTEN)));
+            case "xyz" -> new ArrayList<>(List.of(new Widget(Art.KOORDINATEN, 1, Anker.UNTEN)));
+            default -> new ArrayList<>(List.of(new Widget(Art.KOORDINATEN, 0, Anker.UNTEN)));
         };
     }
 }

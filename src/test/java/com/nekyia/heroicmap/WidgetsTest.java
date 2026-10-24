@@ -8,13 +8,13 @@ import org.junit.jupiter.api.Test;
 /** Lesen, Schreiben und Übernahme der Widgets. Siehe docs/widgets.md. */
 class WidgetsTest {
 
-    private static final Widgets.Widget XZ = new Widgets.Widget(Widgets.Art.KOORDINATEN, 0, 0, Widgets.Anker.UNTEN);
-    private static final Widgets.Widget XYZ = new Widgets.Widget(Widgets.Art.KOORDINATEN, 1, 0, Widgets.Anker.UNTEN);
+    private static final Widgets.Widget XZ = new Widgets.Widget(Widgets.Art.KOORDINATEN, 0, Widgets.Anker.UNTEN);
+    private static final Widgets.Widget XYZ = new Widgets.Widget(Widgets.Art.KOORDINATEN, 1, Widgets.Anker.UNTEN);
 
     @Test
     void hinUndZurueck() {
-        List<Widgets.Widget> w = List.of(XZ, new Widgets.Widget(Widgets.Art.KOORDINATEN, 1, 4, Widgets.Anker.UNTEN));
-        assertEquals("koordinaten:xz:0:unten;koordinaten:xyz:4:unten", Widgets.schreibe(w));
+        List<Widgets.Widget> w = List.of(XZ, XYZ);
+        assertEquals("koordinaten:xz:unten;koordinaten:xyz:unten", Widgets.schreibe(w));
         assertEquals(w, Widgets.lies(Widgets.schreibe(w)));
         assertEquals(List.of(), Widgets.lies(""));
         assertEquals(List.of(), Widgets.lies(null));
@@ -23,11 +23,10 @@ class WidgetsTest {
 
     @Test
     void kaputteEintraegeFehlenDieUebrigenBleiben() {
-        assertEquals(List.of(XZ, XYZ), Widgets.lies(" koordinaten:xz:0:unten ; uhr:24h:0:unten;koordinaten:xy:0:unten;"
-                + "koordinaten:xz:9:unten;koordinaten:xz:-1:unten;koordinaten:xz:a:unten;koordinaten:xz:0:mitte;koordinaten:xz:0;"
-                + "koordinaten:xyz:0:unten"));
+        assertEquals(List.of(XZ, XYZ), Widgets.lies(" koordinaten:xz:unten ; uhr:24h:unten;koordinaten:xy:unten;koordinaten:xz:mitte;"
+                + "koordinaten:xz;koordinaten:xz:0:unten;koordinaten:xyz:unten"));
         // Höchstens 16.
-        assertEquals(Widgets.MAX, Widgets.lies("koordinaten:xz:0:unten;".repeat(20)).size());
+        assertEquals(Widgets.MAX, Widgets.lies("koordinaten:xz:unten;".repeat(20)).size());
     }
 
     @Test
