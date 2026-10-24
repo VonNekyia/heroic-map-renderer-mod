@@ -52,10 +52,11 @@ einer Datei findet `git grep -l "<pfad>" docs/` ihre Seiten.
 - [0022](entscheidungen/0022-marken-nach-aussen.md): Bei „kompass“ und „biom“ zeigt das Bild jeder Marke von der Mitte weg, genordet wie gedreht; die anderen Skins bleiben starr.
 - [0024](entscheidungen/0024-browser-ohne-bestaetigung.md): „Im Browser öffnen“ öffnet direkt nach dem Klick, ohne Bestätigungsschirm und nicht über Blaze3D.openUri, mit dem Link aus der eigenen Basis.
 - [0025](entscheidungen/0025-neue-version-von-modrinth.md): Einmal je Start Modrinth nach einer neueren Version fragen, Vorabversionen nach Semver statt nach dem Kanal, das Repo als Kontakt, Vorgabe an, der feste Link hinter dem Bestätigungsschirm.
-- [0028](entscheidungen/0028-rahmen-familien-und-waehler.md): Die Rahmen als Familien mit Varianten (Recolors) in varianten.txt, Stellung und Lage der Marken in info.txt, `kante` für „biom“; ein Wähler mit Vorschau statt Durchschalten, die mittlere Taste für durchsichtige Marken, alte Wahlen ziehen um; ergänzt 0005, 0012 und 0022.
+- [0028](entscheidungen/0028-teleport-mit-tp.md): Der Teleport schickt den normalen `tp`; ohne Höhe erst in die Luft, sobald der Chunk beim Client ist auf den Boden, alle 10 Ticks zurück nach oben, nach 5 s an den Start, ohne Schaden.
+- [0029](entscheidungen/0029-rahmen-familien-und-waehler.md): Die Rahmen als Familien mit Varianten (Recolors) in varianten.txt, Stellung und Lage der Marken in info.txt, `kante` für „biom“; ein Wähler mit Vorschau statt Durchschalten, die mittlere Taste für durchsichtige Marken, alte Wahlen ziehen um; ergänzt 0005, 0012 und 0022.
 - [0027](entscheidungen/0027-abgleich-bis-zur-haelfte.md): Ein Abgleich lädt still bis zur Hälfte des Satzes statt bis zu einem Zehntel, ohne Stand gemessen am Doppelten, und zeigt den Kasten des Fortschritts wie der Strom.
 - [0026](entscheidungen/0026-gametests-und-gegenproben-in-der-ci.md): Gametests und Gegenproben laufen in der CI per Dispatch auf eigenen Branches, nebeneinander; lokal nur Unit-Tests, Gametests nur für Fehlersuche und Bilder unter der Sperre.
-- [0023](entscheidungen/0023-teleport-mit-korrektur.md): „Hierher teleportieren“ immer im Menü; ohne Höhe zuerst der Server, nach 5 Ticks die Höhe des Spielers; danach einmal korrigieren, sobald der Chunk beim Client ist; löst 0019 in Punkt 3 ab.
+- [0023](entscheidungen/0023-teleport-mit-korrektur.md): „Hierher teleportieren“ immer im Menü; ohne Höhe zuerst der Server, nach 5 Ticks die Höhe des Spielers; danach einmal korrigieren, sobald der Chunk beim Client ist; löst 0019 in Punkt 3 ab. Abgelöst durch 0028.
 
 ## Messungen
 

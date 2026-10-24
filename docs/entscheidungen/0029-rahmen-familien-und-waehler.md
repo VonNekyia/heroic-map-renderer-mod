@@ -1,5 +1,5 @@
 ---
-title: "0028: Rahmen als Familien mit Varianten, gewählt im Wähler"
+title: "0029: Rahmen als Familien mit Varianten, gewählt im Wähler"
 description: Warum die Rahmen Familien mit Recolors sind statt einzelner Skins, wie Varianten, Stellung und Lage der Marken in Dateien stehen, warum ein Wähler mit Vorschau das Durchschalten ersetzt und die mittlere Taste Marken durchsichtig macht; ergänzt 0005, 0012 und 0022.
 status: gilt
 date: 2026-10-24
@@ -11,7 +11,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/Minimap.java
 ---
 
-# 0028: Rahmen als Familien mit Varianten, gewählt im Wähler
+# 0029: Rahmen als Familien mit Varianten, gewählt im Wähler
 
 ## Anlass
 
