@@ -1485,6 +1485,17 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Name des Wegpunkts auf Stufe 11, 4 und 2: " + Arrays.toString(wegpunkt)
                         + " Pixel; voll, kleiner, weg erwartet");
             }
+            // Mit „Schrift“ 2 auf Stufe 4 steht er grösser als mit 1; in einem Kasten, der beide fasst.
+            zoomeAuf(context, maus, k, mx, my, 4);
+            double[] breit = {mx - 40, my + 5, mx + 40, my + 40};
+            int eins = farbig(context.takeScreenshot(TestScreenshotOptions.of("namen-weit-schrift-1").disableCounterPrefix()), k, breit, farbe);
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.stil(punktImSpiel(dimension, mitte), 2, false));
+            context.waitTicks(2);
+            int zwei = farbig(context.takeScreenshot(TestScreenshotOptions.of("namen-weit-schrift-2").disableCounterPrefix()), k, breit, farbe);
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.stil(punktImSpiel(dimension, mitte), 1, false));
+            if (zwei < eins * 3 / 2) {
+                throw new AssertionError("Schrift 2 auf Stufe 4: " + zwei + " Pixel, mit Schrift 1 " + eins);
+            }
 
             // Dieselbe Regel für eine Nadel, wie eine Stadt; ihr Name in der hellen Kontur.
             context.runOnClient(mc -> {
@@ -1501,6 +1512,14 @@ public final class Bedienung implements FabricClientGameTest {
                 zoomeAuf(context, maus, k, mx, my, stufen[i]);
                 int mit = farbig(context.takeScreenshot(TestScreenshotOptions.of("nadel-weit-" + namen[i]).disableCounterPrefix()), k,
                         unterFuss, Ebenen.KONTURFARBE);
+                // Ausgeblendet ist der Name kein Ziel: Der Kasten endet am Fuss.
+                float unten = context.computeOnClient(mc -> {
+                    Karte karte = (Karte) mc.gui.screen();
+                    return Ebenen.kasten(mc.font, Ebenen.INSTANZ.nadeln("test:fern").getFirst(), k, karte.blockBreite())[3];
+                });
+                if (unten != (i == 2 ? 0 : Ebenen.NAME_UNTEN)) {
+                    throw new AssertionError("Kasten der Nadel auf Stufe " + stufen[i] + " endet " + unten + " unter dem Fuss");
+                }
                 context.runOnClient(mc -> Ebenen.INSTANZ.setze("test:fern", false));
                 context.waitTicks(2);
                 int ohne = farbig(context.takeScreenshot(TestScreenshotOptions.of("nadel-weit-" + namen[i] + "-ohne").disableCounterPrefix()), k,

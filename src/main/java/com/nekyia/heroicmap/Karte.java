@@ -991,7 +991,7 @@ final class Karte extends Screen {
                 // Der Name nur an einer Marke, die nicht am Rand klemmt. Siehe docs/wegpunkte.md, „Namen an Wegpunkten“.
                 float[] s = zug != null ? null : schirm(p.x() + 0.5, p.z() + 0.5);
                 if (p.name() != null && (zug != null || Math.abs(s[0] - m.x()) <= 1 && Math.abs(s[1] - m.y()) <= 1)) {
-                    Minimap.wegpunktName(g, font, m.x(), m.y(), Minimap.KOPF, p, blick.chunkAbstand(satz.scale()) / 16);
+                    Minimap.wegpunktName(g, font, m.x(), m.y(), Minimap.KOPF, p, blockBreite());
                 }
             }
         }
@@ -1018,7 +1018,7 @@ final class Karte extends Screen {
     private void nadeln(GuiGraphicsExtractor g, String dimension, int bunt) {
         int k = minecraft.getWindow().getGuiScale();
         int[] namen = {Ebenen.MAX_NAMEN};
-        double block = blick.chunkAbstand(satz.scale()) / 16;
+        double block = blockBreite();
         for (Ebenen.Eintrag e : Ebenen.INSTANZ.sichtbar()) {
             for (Ebenen.Ort n : Ebenen.INSTANZ.nadeln(e.id())) {
                 double x = blick.rasterX(Projektion.zuPixel(n.x(), satz.scale()), width);
@@ -1111,6 +1111,11 @@ final class Karte extends Screen {
             }
         }
         return null;
+    }
+
+    /** Die Länge eines Blocks auf dem Schirm, in Einheiten des GUI. */
+    double blockBreite() {
+        return blick.chunkAbstand(satz.scale()) / 16;
     }
 
     /** Für die Gametests: Stufe und Lupe, oder null ohne Satz. */
@@ -2030,7 +2035,7 @@ final class Karte extends Screen {
                 if (!drin(Ebenen.kastenOhneHolen(font, o), x, y, mx, my)) {
                     continue;
                 }
-                float[] m = Ebenen.kasten(font, o, gs, blick.chunkAbstand(scale) / 16);
+                float[] m = Ebenen.kasten(font, o, gs, blockBreite());
                 if (m != null && drin(m, x, y, mx, my)) {
                     // Die version der gezeichneten Daten, nicht die der Liste; die kann schon neuer sein.
                     treffer = Tafeln.ziel(e.id(), o);
