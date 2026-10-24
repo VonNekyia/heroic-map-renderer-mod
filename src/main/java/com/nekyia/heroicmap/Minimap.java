@@ -1108,23 +1108,23 @@ public final class Minimap {
         koordinatenKasten = null;
         stapelKasten = balkenKasten;
         boolean klickbar = mc.gui.screen() instanceof Einstellungen;
-        int sw = g.guiWidth(), sh = g.guiHeight(), gs = mc.getWindow().getGuiScale(), n = widgets.size();
-        Component[] texte = new Component[n];
-        float[] massstab = new float[n];
+        int sw = g.guiWidth(), sh = g.guiHeight(), anzahl = widgets.size();
+        Component[] texte = new Component[anzahl];
+        float[] massstab = new float[anzahl];
         int obenHoehe = 0;
-        for (int i = 0; i < n; i++) {
+        for (int i = 0; i < anzahl; i++) {
             Widgets.Widget w = widgets.get(i);
             Object[] werte = werte(w.version() == 0 ? Koordinaten.XZ : Koordinaten.XYZ, spieler.getX(), spieler.getY(), spieler.getZ());
             texte[i] = Component.translatable(werte.length == 3 ? "heroicmap.koordinaten_xyz" : "heroicmap.koordinaten", werte);
-            massstab[i] = Math.min(w.pixel(gs) / (float) gs, koordinatenMassstab(sw, abstand, mc.font.width(texte[i])));
+            massstab[i] = Math.min(w.pixel(k) / (float) k, koordinatenMassstab(sw, abstand, mc.font.width(texte[i])));
             obenHoehe += w.anker() == Widgets.Anker.OBEN ? Mth.ceil(mc.font.lineHeight * massstab[i]) + 2 : 0;
         }
         // Passt der obere Stapel ganz über die Minimap, steht er dort, sonst neben dem Nordpfeil, bündig mit ihrer Oberkante.
         int obenWeg = rahmen == null ? 1 : abstand, nebenY = r.y();
         boolean darueber = r.y() - obenWeg - obenHoehe >= 0;
         int zoomX = Einstellungen.zoomLage(r, abstand, sw)[0];
-        widgetKaesten = new int[n][];
-        for (int i = 0; i < n; i++) {
+        widgetKaesten = new int[anzahl][];
+        for (int i = 0; i < anzahl; i++) {
             Widgets.Widget w = widgets.get(i);
             int breite = Mth.ceil(mc.font.width(texte[i]) * massstab[i]), zeile = Mth.ceil(mc.font.lineHeight * massstab[i]);
             int[] wo = switch (w.anker()) {
@@ -1157,7 +1157,7 @@ public final class Minimap {
             float f = koordinatenMassstab(sw, abstand, mc.font.width(aus));
             int breite = Mth.ceil(mc.font.width(aus) * f), zeile = Mth.ceil(mc.font.lineHeight * f);
             koordinatenKasten = zeile(g, mc.font, koordinatenLage(r, ueberstand, abstand, sw, sh, breite, zeile), aus, f, breite, zeile,
-                    hell == n ? KOORDINATEN_HELL : KOORDINATEN_AUS);
+                    hell == anzahl ? KOORDINATEN_HELL : KOORDINATEN_AUS);
             stapelKasten = vereint(stapelKasten, koordinatenKasten);
         }
     }
