@@ -24,7 +24,7 @@ class EbenenreiheTest {
     private static final List<Ebenen.Eintrag> SERVER = List.of(eintrag("c", 0), eintrag("b", 2), eintrag("a", 5));
 
     private static Ebenen.Eintrag eintrag(String id, int order) {
-        return new Ebenen.Eintrag(id, id, id, true, order, "1");
+        return new Ebenen.Eintrag(id, id, id, true, order, "1", 0);
     }
 
     @Test
