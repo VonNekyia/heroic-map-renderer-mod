@@ -4970,7 +4970,6 @@ public final class Bedienung implements FabricClientGameTest {
             Minimap.INSTANZ.stelle(b, 0, Minimap.GROESSE, b, h);
             mc.gui.setScreen(new Einstellungen());
         });
-        long zeit = context.computeOnClient(mc -> mc.level.getOverworldClockTime());
         server.runCommand("time set 13500");
         context.waitTicks(3);
         try {
@@ -5103,8 +5102,8 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Bei 16 Widgets: „+“ an " + plusAn + ", Liste offen " + listeOffen(context));
             }
         } finally {
-            // Die Zeit von vorher: Nachts kämen Monster, und die Bilder der Tests danach rechnen mit dem Himmel von vorher.
-            server.runCommand("time set " + zeit);
+            // Mittag, wie in den anderen Bildtests: ruhiges Licht für die Bildschirmfotos danach, und nachts kämen Monster.
+            server.runCommand("time set noon");
             context.runOnClient(mc -> {
                 mc.gui.setScreen(null);
                 Minimap.INSTANZ.lies(sicherung);
@@ -6037,7 +6036,6 @@ public final class Bedienung implements FabricClientGameTest {
         server.runCommand("execute in minecraft:the_nether run tp @p 0.5 60 0.5");
         context.waitFor(mc -> mc.level.dimension() == Level.NETHER && Math.abs(mc.player.getY() - 60) < 0.01 && mc.player.onGround(), 600);
         // Das Widget der Zeit zeigt hier die Uhr der Oberwelt; der Nether hat keine eigene. Siehe docs/widgets.md, „Arten“.
-        long vorher = context.computeOnClient(mc -> mc.level.getOverworldClockTime());
         server.runCommand("time set 13500");
         context.waitTicks(3);
         String zeit = context.computeOnClient(mc -> Minimap.INSTANZ.text(new Widgets.Widget(Widgets.Art.ZEIT, 0, Widgets.Anker.UNTEN), mc.level,
@@ -6045,8 +6043,8 @@ public final class Bedienung implements FabricClientGameTest {
         if (!zeit.startsWith("19:")) {
             throw new AssertionError("Nether: Die Zeit zeigt „" + zeit + "“ statt der Uhr der Oberwelt nach „time set 13500“");
         }
-        // Die Zeit von vorher, sonst kämen in der Oberwelt Monster.
-        server.runCommand("time set " + vorher);
+        // Mittag, sonst kämen in der Oberwelt Monster.
+        server.runCommand("time set noon");
         if (context.computeOnClient(mc -> mc.level.getChunkSource().getChunk(ziel >> 4, ziel >> 4, ChunkStatus.FULL, false) != null)) {
             throw new AssertionError("Nether: Der Chunk des Ziels ist schon beim Client");
         }
