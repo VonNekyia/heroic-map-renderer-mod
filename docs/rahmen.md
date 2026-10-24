@@ -434,7 +434,7 @@ Untermenü gibt es dafür nicht mehr.
 
 Jede Marke kann statt der Pixelfassung eine feinere zeigen, mit 4 Texeln je
 Einheit (`Skin.D`), vom Designer gezeichnet. Warum so:
-[0035](entscheidungen/0035-hd-marken-ausserhalb-des-atlas.md).
+[0036](entscheidungen/0036-hd-marken-ausserhalb-des-atlas.md).
 
 - **Wahl** je Marke mit der mittleren Taste, siehe „Verzierungen“. Der
   Griff im Menü steht in HD, sobald eine Marke HD zeigt; eine eigene Wahl

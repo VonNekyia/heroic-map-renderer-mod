@@ -1,5 +1,5 @@
 ---
-title: "0035: HD-Marken ausserhalb des Atlas, je Marke gewählt"
+title: "0036: HD-Marken ausserhalb des Atlas, je Marke gewählt"
 description: Warum die HD-Bilder der Marken nicht im Atlas des GUI liegen, sondern nur für die gezeigte Variante geladen und je GUI-Massstab nach Fläche gemittelt werden, wie die Wahl je Marke gespeichert ist und wann der Griff HD zeigt; ergänzt 0032 und 0034.
 status: gilt
 date: 2026-10-24
@@ -10,7 +10,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/MinimapKlick.java
 ---
 
-# 0035: HD-Marken ausserhalb des Atlas, je Marke gewählt
+# 0036: HD-Marken ausserhalb des Atlas, je Marke gewählt
 
 ## Anlass
 
