@@ -17,6 +17,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 
@@ -38,7 +39,8 @@ public final class OrtAendern implements FabricClientGameTest {
             spiel.getConnection().waitForChunksRender();
             Bilder.leereWelt(context);
             Path adresse = Downloads.wurzel().resolve(ADRESSE), einzel = Downloads.wurzel().resolve("einzelspieler_ort_probe");
-            for (Path rest : new Path[] {adresse, einzel}) {
+            Path alteAblage = adresse.resolveSibling(ADRESSE + "_25565");
+            for (Path rest : new Path[] {adresse, einzel, alteAblage}) {
                 if (Files.exists(rest)) {
                     Laden.loesche(rest);
                 }
@@ -146,8 +148,10 @@ public final class OrtAendern implements FabricClientGameTest {
                 throw new AssertionError("Zurück auf dem Server fehlt der Download, oder die eigene Karte gehört nicht build");
             }
 
+            doppelt(context, adresse.resolve("karte-main/welt-" + HASH + "/top"), alteAblage.resolve("karte-main/welt-" + HASH + "/top"));
             groessen(context, build.resolve("probe"));
             Laden.loesche(adresse);
+            Laden.loesche(alteAblage);
             context.runOnClient(mc -> mc.gui.setScreen(null));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -168,7 +172,7 @@ public final class OrtAendern implements FabricClientGameTest {
                 context.runOnClient(mc -> {
                     mc.options.guiScale().set(f[2]);
                     mc.resizeGui();
-                    Laden.AufPlatte karte = new Laden.AufPlatte(baum, baum.toString(), Satz.lies(baum), 0);
+                    Laden.AufPlatte karte = new Laden.AufPlatte(baum, baum.toString(), Satz.lies(baum), 0, 0);
                     mc.gui.setScreen(new OrtFenster(new Kartenliste(null), karte, Ort.teile(Downloads.wurzel(), baum.getParent())));
                 });
                 context.waitTicks(3);
@@ -294,6 +298,69 @@ public final class OrtAendern implements FabricClientGameTest {
     private static List<Button> orte(Minecraft mc) {
         return mc.gui.screen() instanceof Kartenliste l ? l.children().stream()
                 .filter(w -> w instanceof Button b && schluessel(b, "heroicmap.liste.ort")).map(w -> (Button) w).toList() : List.of();
+    }
+
+    /**
+     * Zwei gleiche Bäume unter {@code <host>} und {@code <host>_25565}, die Ablage ist IP: Die Zeile des ungenutzten zeigt gelb
+     * „doppelt“, die des genutzten nicht. Mit der Maus über ihrer zweiten Zeile zeigt bei beiden ein Tooltip die andere.
+     * „Löschen“ mit Rückfrage nimmt den ungenutzten weg. Gesehen im Bildschirmfoto. Siehe docs/download.md, „Kartenliste“.
+     */
+    private static void doppelt(ClientGameTestContext context, Path genutzt, Path ungenutzt) throws IOException {
+        download(genutzt);
+        download(ungenutzt);
+        int k = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+        for (Path baum : new Path[] {genutzt, ungenutzt}) {
+            liste(context);
+            Button zeile = ort(context, baum);
+            int y = context.computeOnClient(mc -> zeile.getY()), platz = context.computeOnClient(mc -> zeile.getX() - 16);
+            context.getInput().setCursorPos(1, 1);
+            context.waitTicks(2);
+            String name = baum == genutzt ? "genutzt" : "ungenutzt";
+            Path ohne = context.takeScreenshot(TestScreenshotOptions.of("doppelt-" + name).disableCounterPrefix());
+            int gelb = gelb(ohne, k, new int[] {8, y + 10, 8 + platz, y + 20});
+            if ((gelb > 0) != (baum == ungenutzt)) {
+                throw new AssertionError("„doppelt“ " + (gelb > 0 ? "an der genutzten Karte" : "fehlt an der ungenutzten") + ", " + gelb + " gelbe Pixel");
+            }
+            context.getInput().setCursorPos(12 * k, (y + 15) * k);
+            context.waitTicks(2);
+            Path mit = context.takeScreenshot(TestScreenshotOptions.of("doppelt-" + name + "-tooltip").disableCounterPrefix());
+            int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+            if (unterschied(ohne, mit, k, new int[] {0, Math.max(0, y - 30), breite, y + 70}) < 100) {
+                throw new AssertionError(name + ": kein Tooltip mit der anderen Karte");
+            }
+        }
+        // Löschen mit Rückfrage, wie ein Spieler.
+        liste(context);
+        Button zeile = ort(context, ungenutzt);
+        Button loeschen = context.computeOnClient(mc -> mc.gui.screen().children().stream()
+                .filter(w -> w instanceof Button b && schluessel(b, "heroicmap.liste.loeschen") && b.getY() == zeile.getY())
+                .map(w -> (Button) w).findFirst().orElseThrow(() -> new AssertionError("Kein „Löschen“ in der Zeile")));
+        klicke(context, loeschen);
+        context.waitFor(mc -> mc.gui.screen() instanceof ConfirmScreen, 100);
+        klicke(context, knopf(context, "gui.yes"));
+        context.waitFor(mc -> !Files.exists(ungenutzt), 200);
+        if (!Files.exists(genutzt.resolve("satz.json"))) {
+            throw new AssertionError("Die genutzte Karte ist weg");
+        }
+    }
+
+    /** Wie viele gelbe Pixel, wie die Marke „doppelt“, das Bildschirmfoto im Kasten {x0, y0, x1, y1} in Einheiten hat. */
+    private static int gelb(Path bild, int k, int[] kasten) {
+        try {
+            BufferedImage b = ImageIO.read(bild.toFile());
+            int n = 0;
+            for (int py = kasten[1] * k; py < Math.min(kasten[3] * k, b.getHeight()); py++) {
+                for (int px = kasten[0] * k; px < Math.min(kasten[2] * k, b.getWidth()); px++) {
+                    int c = b.getRGB(px, py);
+                    if ((c >> 16 & 0xFF) > 200 && (c >> 8 & 0xFF) > 200 && (c & 0xFF) < 130) {
+                        n++;
+                    }
+                }
+            }
+            return n;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /** Blättert mit dem Mausrad, bis die Zeile des Baums zu sehen ist, und gibt ihr „Ort …“. Die Liste ist frisch, oben. */

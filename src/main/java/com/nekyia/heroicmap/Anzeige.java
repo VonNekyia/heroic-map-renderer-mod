@@ -38,6 +38,8 @@ final class Anzeige extends Screen {
     /** Der Wähler der Rahmen über dem Untermenü, wie im Menü. Siehe docs/rahmen.md, „Wähler“. */
     private final Waehler waehler = new Waehler();
     private final MinimapKlick klick = new MinimapKlick(waehler);
+    /** Die Ablage, nach der Wegpunkte, Ebenen und Karten gerade liegen; ändert sie das Menü, ziehen sie nach. */
+    private Downloads.Ablage ablage = Minimap.INSTANZ.ablage();
 
     /** Für die Gametests. */
     Waehler waehler() {
@@ -310,10 +312,21 @@ final class Anzeige extends Screen {
         Minimap.INSTANZ.schreibe(HeroicMap.einstellungen());
         // Erst hier, nicht beim Ziehen des Reglers: Von 8 auf 1 und zurück nimmt sonst sieben weg.
         Wegpunkte.INSTANZ.kappeTode(Minimap.INSTANZ.todespunkte());
-        // Eine andere Ablage heisst ein anderer Ordner der Welt, auch für Wegpunkte und Ebenen.
-        Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());
-        Ebenen.INSTANZ.wechsel(Downloads.weltOrdner());
-        Ebenenreihe.INSTANZ.wechsel(Downloads.weltOrdner());
+        // Eine andere Ablage heisst ein anderer Ordner der Welt, auch für Wegpunkte und Ebenen; die Welt zieht erst um.
+        Runnable lies = () -> {
+            Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());
+            Ebenen.INSTANZ.wechsel(Downloads.weltOrdner());
+            Ebenenreihe.INSTANZ.wechsel(Downloads.weltOrdner());
+        };
+        if (Minimap.INSTANZ.ablage() == ablage) {
+            lies.run();
+            return;
+        }
+        ablage = Minimap.INSTANZ.ablage();
+        Downloads.INSTANZ.ablageGewechselt(() -> {
+            lies.run();
+            Selbst.INSTANZ.neuGewaehlt(Minecraft.getInstance());
+        });
     }
 
     @Override
