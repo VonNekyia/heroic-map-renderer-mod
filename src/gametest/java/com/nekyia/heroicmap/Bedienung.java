@@ -4595,6 +4595,20 @@ public final class Bedienung implements FabricClientGameTest {
         Minimap.Rahmen o = rahmen(context);
         spielerKlick(context, maus, k, o.x() + o.seite() + 1.5, o.y() + o.seite() / 2.0);
         waehlerOffen(context, true, "Klick auf die halbe Marke O, ohne Rahmen");
+        // Die Vorschauen zeigen die Marken so, wie sie gestellt sind: Durchsichtig fehlt N oben auf der Vorschau „schild“.
+        double[] vorschau = context.computeOnClient(mc -> waehler(mc).vorschauMitte(Skin.FAMILIEN.indexOf("schild"),
+                mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight()));
+        BufferedImage mitN = foto(context, "waehler-n-da");
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.schalteVerzierung(0);
+            Minimap.INSTANZ.schalteVerzierung(0);
+        });
+        BufferedImage ohneN = foto(context, "waehler-n-weg");
+        context.runOnClient(mc -> Minimap.INSTANZ.schalteVerzierung(0));
+        int nWeg = anders(mitN, ohneN, vorschau[0], vorschau[1] - Waehler.SEITE / 2.0, k);
+        if (nWeg < 20) {
+            throw new AssertionError("Wähler mit N durchsichtig: in der Vorschau „schild“ nur " + nWeg + " Pixel bei N anders");
+        }
         // Das zweite Farbfeld unter „schild“ färbt nur die Vorschau; erst die Vorschau übernimmt Familie und Farbe.
         klickImWaehler(context, maus, k, "feld", Skin.FAMILIEN.indexOf("schild"), 1);
         waehlerOffen(context, true, "Klick auf ein Farbfeld unter „schild“");
@@ -5369,6 +5383,16 @@ public final class Bedienung implements FabricClientGameTest {
         if (ist[0] != hd || ist[1] != aus) {
             throw new AssertionError(was + ": HD " + Minimap.marken(ist[0]) + ", durchsichtig " + Minimap.marken(ist[1]) + " statt HD "
                     + Minimap.marken(hd) + ", durchsichtig " + Minimap.marken(aus));
+        }
+    }
+
+    /** Ein Bildschirmfoto, wie es ist, ohne das Menü zu schliessen. */
+    private static BufferedImage foto(ClientGameTestContext context, String name) {
+        context.waitTicks(2);
+        try {
+            return ImageIO.read(context.takeScreenshot(TestScreenshotOptions.of(name).disableCounterPrefix()).toFile());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 

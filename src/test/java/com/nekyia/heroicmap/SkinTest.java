@@ -249,6 +249,10 @@ class SkinTest {
             streifen[y * 4] = 0xFFFF0000;
         }
         int[] drei = Skin.verkleinere(streifen, 4, 4, 3, 3);
+        // HD erst ab GUI-Massstab 2, und nur gewählt.
+        assertFalse(Skin.mitHd(true, 1));
+        assertTrue(Skin.mitHd(true, 2));
+        assertFalse(Skin.mitHd(false, 4));
         for (int y = 0; y < 3; y++) {
             assertEquals(0xBFFF0000, drei[y * 3], "Zeile " + y);
             assertEquals(0, drei[y * 3 + 1]);

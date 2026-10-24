@@ -47,6 +47,10 @@ class MinimapTest {
         assertTrue(!m.hd(3) && m.verzierungAus(3) && !m.verzierungAus(0));
         m.schalteVerzierung(3);
         assertTrue(!m.hd(3) && m.verzierungen());
+        // Eine Marke nach ihrer Wahl, der Griff in HD, sobald eine Marke HD zeigt.
+        Minimap.Ornament griff = new Minimap.Ornament(Skin.GRIFF, 3, 0, 0, 0, -1), s = new Minimap.Ornament(Skin.MARKE, 0, 0, 0, 0, 2);
+        assertTrue(Minimap.hd(griff, 0b0100) && !Minimap.hd(griff, 0));
+        assertTrue(Minimap.hd(s, 0b0100) && !Minimap.hd(s, 0b0001));
         // Alle durchsichtig nimmt HD zurück: Eine Marke ist nie beides.
         m.schalteVerzierung(1);
         m.setzeVerzierungen(false);

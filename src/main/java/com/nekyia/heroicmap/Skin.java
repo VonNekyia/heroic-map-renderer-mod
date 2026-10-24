@@ -530,6 +530,11 @@ final class Skin {
         return id;
     }
 
+    /** Ob ein Teil in HD gezeichnet wird: gewählt und ab GUI-Massstab 2; bei 1 wäre HD Brei. */
+    static boolean mitHd(boolean hd, int k) {
+        return hd && k >= 2;
+    }
+
     /** Der Dateiname des HD-Bilds eines Teils: {@code norden_hd}, {@code norden_hd_aktiv}. */
     static String hdName(int teil) {
         String n = TEILE[teil];
@@ -743,7 +748,7 @@ final class Skin {
     void ornament(GuiGraphicsExtractor g, int teil, int e, double px, double py, float deckung, double winkel, boolean hd) {
         TextureAtlasSprite s = gui().getSprite(sprites[teil]);
         int w = s.contents().width(), h = s.contents().height(), k = Minecraft.getInstance().getWindow().getGuiScale();
-        Identifier bild = hd && k >= 2 ? hd(teil, w, h, k) : null;
+        Identifier bild = mitHd(hd, k) ? hd(teil, w, h, k) : null;
         boolean griff = teil == GRIFF || teil == GRIFF + 1, sx = spiegeltX(e, griff), sy = spiegeltY(e, griff);
         float ua = bild == null ? s.getU0() : 0, ub = bild == null ? s.getU1() : 1, va = bild == null ? s.getV0() : 0, vb = bild == null ? s.getV1() : 1;
         float u0 = sx ? ub : ua, u1 = sx ? ua : ub, v0 = sy ? vb : va, v1 = sy ? va : vb;
