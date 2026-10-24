@@ -31,8 +31,10 @@ feste Kategorie gab es nicht. Den Plan hat der Reviewer freigegeben.
   Tooltip nennt sie.
 - **Eine feste Kategorie** bleibt fest, wo der Spieler auch steht.
 - **Übernommen** mit dem Klick auf die Vorschau, wie Familie und Variante.
-- **Gespeichert** als `rahmen_biom`, `auto` oder die Kategorie. Eine Datei
-  ohne den Schlüssel, etwa aus 0.2.70, ist automatisch.
+- **Gespeichert** als `rahmen_biom=<kategorie>`, nur eine feste Kategorie;
+  automatisch steht als Vorgabe nicht in der Datei, wie die anderen
+  Vorgaben. Eine Datei ohne den Schlüssel, etwa aus 0.2.70, ist
+  automatisch.
 
 ## Verworfen
 

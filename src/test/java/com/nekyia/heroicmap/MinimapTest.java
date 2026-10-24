@@ -506,7 +506,7 @@ class MinimapTest {
         assertEquals("schnee", gelesen.biomFest());
         gelesen.setzeBiomFest(null);
         gelesen.schreibe(datei);
-        assertTrue(Files.readString(datei).contains("rahmen_biom=auto"));
+        assertFalse(Files.readString(datei).contains("rahmen_biom"), "automatisch ist die Vorgabe und steht nicht in der Datei");
         gelesen.lies(datei);
         assertNull(gelesen.biomFest());
         // Eine unbekannte Kategorie ist automatisch.

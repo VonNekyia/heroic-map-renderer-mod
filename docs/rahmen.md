@@ -45,8 +45,8 @@ bekommt keinen Rahmen. Warum so:
 - **Die Variante** je Familie als `rahmen_variante.<familie>`, bei „biom“
   je Kategorie `rahmen_variante.biom/<kategorie>`; ohne Eintrag gilt die
   erste aus `varianten.txt` (`Minimap.variante`).
-- **„biom“ automatisch oder fest** als `rahmen_biom`, `auto` oder eine
-  Kategorie; ohne Eintrag oder mit einem unbekannten Wert automatisch
+- **„biom“ fest** als `rahmen_biom=<kategorie>`, nur mit fester Kategorie;
+  ohne Eintrag oder mit einem unbekannten Wert automatisch, die Vorgabe
   (`Minimap.biomFest`), siehe „Biom“.
 - **Umzug aus 0.2.68 und älter** (`Skin.ALT`): `rahmen_wahl` oder ein
   altes `rahmen` mit einem Skin von vorher wird Familie und Variante:

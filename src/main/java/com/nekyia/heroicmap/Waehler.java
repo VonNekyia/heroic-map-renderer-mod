@@ -47,7 +47,7 @@ final class Waehler {
                 vorschau.put(f, v.name());
             }
         }
-        kategorie = Biom.KATEGORIEN.indexOf(m.biomFest()) + 1;
+        kategorie = m.biomFest() == null ? 0 : Biom.KATEGORIEN.indexOf(m.biomFest()) + 1;
         offen = true;
     }
 

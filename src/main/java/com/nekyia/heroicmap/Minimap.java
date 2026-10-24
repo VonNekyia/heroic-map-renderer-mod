@@ -579,7 +579,8 @@ public final class Minimap {
 
     /** Setzt die feste Kategorie von „biom“; null oder eine unbekannte heisst automatisch. */
     void setzeBiomFest(String kategorie) {
-        biomFest = Biom.KATEGORIEN.contains(kategorie) ? kategorie : null;
+        // List.of wirft bei contains(null); darum erst die Prüfung auf null.
+        biomFest = kategorie != null && Biom.KATEGORIEN.contains(kategorie) ? kategorie : null;
     }
 
     /** Der Skin der gewählten Variante dieser Familie, sonst ihrer ersten; null für „ohne“. */
@@ -860,7 +861,8 @@ public final class Minimap {
             }
         }
         // Ohne den Schlüssel, etwa aus 0.2.70, automatisch wie bisher.
-        setzeBiomFest(String.valueOf(p.getProperty("rahmen_biom")).trim());
+        String fest = p.getProperty("rahmen_biom");
+        setzeBiomFest(fest == null ? null : fest.trim());
         // Vor mod#175 galt ein Schalter für alle vier; aus heisst alle vier durchsichtig, so springt nichts.
         String aus = p.getProperty("verzierungen_aus");
         verzierungenAus = aus != null ? marken(aus) : "false".equals(p.getProperty("verzierungen")) ? ALLE_MARKEN : 0;
@@ -903,7 +905,10 @@ public final class Minimap {
             p.setProperty("rahmen_wahl", skin);
         }
         varianten.forEach((familie, v) -> p.setProperty("rahmen_variante." + familie, v));
-        p.setProperty("rahmen_biom", biomFest == null ? "auto" : biomFest);
+        // Automatisch ist die Vorgabe und steht wie die anderen Vorgaben nicht in der Datei.
+        if (biomFest != null) {
+            p.setProperty("rahmen_biom", biomFest);
+        }
         p.setProperty("verzierungen_aus", marken(verzierungenAus));
         p.setProperty("verzierungen_hd", marken(hd));
         p.setProperty("technik", technikOffen ? "auf" : "zu");
