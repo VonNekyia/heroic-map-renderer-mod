@@ -5,7 +5,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import net.minecraft.ChatFormatting;
@@ -33,6 +37,9 @@ final class Kartenliste extends Screen {
     private final Screen zurueck;
     /** Null, solange gezählt wird. */
     private Laden.Bestand bestand;
+    /** Je doppeltem Baum die anderen, nach dem Zählen ({@link Ort#doppelt}). */
+    private Map<Path, List<Path>> doppelt = Map.of();
+    private static final DateTimeFormatter ZEIT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
     /** Bricht das laufende Zählen ab, oder null, wenn keins läuft. */
     private AtomicBoolean zaehlt;
     private int erste;
@@ -67,6 +74,7 @@ final class Kartenliste extends Screen {
                 }
                 zaehlt = null;
                 bestand = fertig;
+                doppelt = Ort.doppelt(Downloads.wurzel(), fertig.karten().stream().map(Laden.AufPlatte::ordner).toList());
                 erste = Math.min(erste, Math.max(0, fertig.karten().size() - 1));
                 rebuildWidgets();
             });
@@ -372,7 +380,15 @@ final class Kartenliste extends Screen {
                 if (!pfad.equals(e.pfad()) && mausX >= 8 && mausX < 8 + platz && mausY >= y && mausY < y + 10) {
                     g.setTooltipForNextFrame(font.split(Component.literal(e.pfad()), width - 16), mausX, mausY);
                 }
-                g.text(font, font.plainSubstrByWidth(was + " · " + Downloads.groesse(e.bytes()), platz), 8, y + 11, 0xFFB0B0B0);
+                List<Path> andere = doppelt.get(e.ordner());
+                boolean genutzt = andere == null || Ort.genutzt(Downloads.wurzel(), e.ordner(), Minimap.INSTANZ.ablage());
+                String marke = genutzt ? "" : " · " + Component.translatable("heroicmap.liste.doppelt").getString();
+                String info = font.plainSubstrByWidth(was + " · " + Downloads.groesse(e.bytes()), platz - font.width(marke));
+                g.text(font, info, 8, y + 11, 0xFFB0B0B0);
+                g.text(font, marke, 8 + font.width(info), y + 11, 0xFFFFFF55);
+                if (andere != null && mausX >= 8 && mausX < 8 + platz && mausY >= y + 10 && mausY < y + 20) {
+                    g.setTooltipForNextFrame(font.split(doppeltText(e, andere, genutzt), Math.min(300, width - 16)), mausX, mausY);
+                }
             }
         }
         if (zeigerText != null) {
@@ -382,6 +398,25 @@ final class Kartenliste extends Screen {
             g.centeredText(font, hinweis, width / 2, height - 42 - (zeigerZeile ? ZEIGER : 0), TEXT);
         }
         super.extractRenderState(g, mausX, mausY, delta);
+    }
+
+    /**
+     * Der Tooltip an einem doppelten Baum: wo die anderen liegen und wann je zuletzt eine Datei geschrieben wurde, und
+     * welchen der Mod nach der jetzigen Ablage nutzt. Siehe docs/download.md, „Kartenliste“.
+     */
+    private Component doppeltText(Laden.AufPlatte e, List<Path> andere, boolean genutzt) {
+        Path wurzel = Downloads.wurzel();
+        boolean andererGenutzt = andere.stream().anyMatch(p -> Ort.genutzt(wurzel, p, Minimap.INSTANZ.ablage()));
+        String liste = String.join("; ", andere.stream().map(p -> {
+            long zuletzt = bestand.karten().stream().filter(k -> k.ordner().equals(p)).mapToLong(Laden.AufPlatte::zuletzt).findFirst().orElse(0);
+            return wurzel.relativize(p).toString().replace('\\', '/') + " (" + zeit(zuletzt) + ")";
+        }).toList());
+        return Component.translatable(genutzt ? "heroicmap.liste.doppelt.genutzt" : andererGenutzt ? "heroicmap.liste.doppelt.andere"
+                : "heroicmap.liste.doppelt.keine", liste, zeit(e.zuletzt()));
+    }
+
+    private static String zeit(long ms) {
+        return ms == 0 ? "–" : ZEIT.format(Instant.ofEpochMilli(ms));
     }
 
     /** Die Breite der Zeilen links der Knöpfe. */

@@ -4,6 +4,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -17,6 +18,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -104,7 +106,7 @@ final class Downloads {
                     if (name != null && Servername.gueltig(name) == null) {
                         LOGGER.warn("Heroic Map: Name des Servers kein Hostname, übergangen");
                     }
-                    Servername.merke(wurzel(), server.ip, Servername.gueltig(name));
+                    Servername.nachAngebot(wurzel(), server.ip, Servername.gueltig(name));
                 }
                 baeume().forEach(b -> zieheUm(b.id()));
             }
@@ -824,6 +826,7 @@ final class Downloads {
         }
         long seed = level.getBiomeManager().biomeZoomSeed;
         if (!nameGilt.containsKey(seed)) {
+            ablageNachziehen(server, seed);
             Path alt = wurzel().resolve(weltOrdner(Minimap.INSTANZ.ablage(), server.ip, null, seed));
             Path neu = wurzel().resolve(weltOrdner(Minimap.INSTANZ.ablage(), server.ip, servername, seed));
             nameGilt.put(seed, Servername.gilt(alt, neu, reihe.belegtUnter(alt.toString())));
@@ -840,6 +843,40 @@ final class Downloads {
                 freigabe(wartend.remove(baum));
             }
         }
+    }
+
+    /**
+     * Zieht die Welt aus den Ordnern anderer Ablagen in den der jetzigen, für die Adresse und, falls gemerkt, für den
+     * Namen; nicht, solange ein Download in den alten Ordner läuft. Siehe docs/download.md, „Ablage“.
+     */
+    private void ablageNachziehen(ServerData server, long seed) {
+        String hash = "welt-" + HexFormat.of().toHexDigits(seed);
+        for (String name : servername == null ? new String[] {null} : new String[] {null, servername}) {
+            Path ziel = adressOrdner(wurzel(), Minimap.INSTANZ.ablage(), server.ip, name, seed);
+            Ort.zieheAblagen(wurzel(), ziel, andereAblagen(wurzel(), Minimap.INSTANZ.ablage(), server.ip, name, seed), hash,
+                    alt -> reihe.belegtUnter(alt + File.separator));
+        }
+    }
+
+    /**
+     * Nach einem Wechsel der Ablage im Menü: Die Welt, in der der Spieler ist, zieht in den Ordner der neuen Ablage, im
+     * Worker von „Selbst“ nach allem, was er noch schreibt; dann läuft {@code danach} auf dem Render-Thread. Im
+     * Einzelspieler gibt es keine Ablage, dort gleich {@code danach}. Siehe docs/download.md, „Ablage“.
+     */
+    void ablageGewechselt(Runnable danach) {
+        Minecraft mc = Minecraft.getInstance();
+        ServerData server = server();
+        if (server == null || mc.level == null) {
+            danach.run();
+            return;
+        }
+        long seed = mc.level.getBiomeManager().biomeZoomSeed;
+        Minimap.INSTANZ.leeren();
+        Selbst.INSTANZ.leeren();
+        Selbst.INSTANZ.nachArbeit(() -> {
+            ablageNachziehen(server, seed);
+            mc.execute(danach);
+        });
     }
 
     /**
@@ -881,18 +918,51 @@ final class Downloads {
      * Der Pfad einer Welt unter {@code heroicmap/}: {@code welt-<hash>}, davor der Host oder Host
      * und Port; meldet der Server einen {@code name}, steht er statt des Hosts. Mit einer {@code karte}
      * vom Plugin steht {@code karte-<karte>} vor {@code welt-<hash>}. {@code seed} ist der Hash des
-     * Seeds, den der Server dem Client schickt. Ein Punkt am Ende des Hosts fällt weg.
+     * Seeds, den der Server dem Client schickt. Ein Punkt am Ende des Hosts fällt weg; der Standardport
+     * hängt bei IP:Port nichts an.
      */
     static String weltOrdner(Ablage ablage, String adresse, String name, String karte, long seed) {
         String welt = (karte != null ? "karte-" + karte + "/" : "") + "welt-" + HexFormat.of().toHexDigits(seed);
         ServerAddress a = ServerAddress.parseString(adresse);
-        // Windows nimmt einem Ordner den Punkt am Ende ohnehin; so liegt example.net. überall bei example.net, auch vor dem Port.
-        String host = (name != null ? name : a.getHost()).replaceAll("\\.+$", "");
+        String host = host(a, name);
         return switch (ablage) {
             case HASH -> welt;
             case IP -> name(host) + "/" + welt;
-            case IP_PORT -> name(host + "_" + a.getPort()) + "/" + welt;
+            // Mit dem Standardport wie bei IP: Ein Wechsel zwischen beiden ändert für die meisten Server nichts.
+            case IP_PORT -> name(a.getPort() == STANDARDPORT ? host : host + "_" + a.getPort()) + "/" + welt;
         };
+    }
+
+    /** Der Port, den das Spiel ohne Angabe nimmt. */
+    static final int STANDARDPORT = 25565;
+
+    /** Der Host für den Ordner: der Name vom Server oder der eingetippte. */
+    private static String host(ServerAddress a, String name) {
+        // Windows nimmt einem Ordner den Punkt am Ende ohnehin; so liegt example.net. überall bei example.net, auch vor dem Port.
+        return (name != null ? name : a.getHost()).replaceAll("\\.+$", "");
+    }
+
+    /** Der Ordner der Adresse dieser Welt unter {@code wurzel} nach {@code ablage}; bei der Ablage Hash {@code wurzel} selbst. */
+    static Path adressOrdner(Path wurzel, Ablage ablage, String adresse, String name, long seed) {
+        return wurzel.resolve(weltOrdner(ablage, adresse, name, null, seed)).getParent();
+    }
+
+    /**
+     * Die Ordner der Adresse dieser Welt nach den anderen Ablagen, dazu {@code <host>_25565} von vor der Regel zum
+     * Standardport; ohne den nach {@code ablage}. Aus ihnen zieht die Welt um ({@link Ort#zieheAblagen}). Siehe
+     * docs/download.md, „Ablage“.
+     */
+    static List<Path> andereAblagen(Path wurzel, Ablage ablage, String adresse, String name, long seed) {
+        Set<Path> aus = new LinkedHashSet<>();
+        for (Ablage a : Ablage.values()) {
+            aus.add(adressOrdner(wurzel, a, adresse, name, seed));
+        }
+        ServerAddress s = ServerAddress.parseString(adresse);
+        if (s.getPort() == STANDARDPORT) {
+            aus.add(wurzel.resolve(name(host(s, name) + "_" + STANDARDPORT)));
+        }
+        aus.remove(adressOrdner(wurzel, ablage, adresse, name, seed));
+        return List.copyOf(aus);
     }
 
     /**

@@ -9,7 +9,10 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
@@ -38,8 +41,26 @@ class AblageTest {
             assertEquals(Downloads.weltOrdner(ablage, "0", "play.example.net", SEED), Downloads.weltOrdner(ablage, "0", "play.example.net.", SEED));
         }
         assertEquals("mc.example.com_25566/welt-0123456789abcdef", Downloads.weltOrdner(Downloads.Ablage.IP_PORT, "mc.example.com.:25566", SEED));
+        // Der Standardport hängt bei IP:Port nichts an, wie bei IP; ein anderer Port bleibt.
+        assertEquals(Downloads.weltOrdner(Downloads.Ablage.IP, "mc.example.com", SEED), Downloads.weltOrdner(Downloads.Ablage.IP_PORT, "mc.example.com", SEED));
+        assertEquals("mc.example.com/welt-0123456789abcdef", Downloads.weltOrdner(Downloads.Ablage.IP_PORT, "mc.example.com:25565", SEED));
+        assertEquals("play.example.net/welt-0123456789abcdef", Downloads.weltOrdner(Downloads.Ablage.IP_PORT, "0", "play.example.net", SEED));
         // Ein negativer Hash bleibt 16 Stellen hex.
         assertEquals("welt-ffffffffffffffff", Downloads.weltOrdner(Downloads.Ablage.HASH, "x", -1));
+    }
+
+    @Test
+    void andereAblagen(@TempDir Path w) {
+        // Standardport: Hash und der alte Ordner mit _25565; IP und IP:Port sind derselbe Ordner wie der jetzige.
+        assertEquals(List.of(w, w.resolve("mc.example.com_25565")), Downloads.andereAblagen(w, Downloads.Ablage.IP, "Mc.Example.com", null, SEED));
+        assertEquals(List.of(w.resolve("mc.example.com"), w.resolve("mc.example.com_25565")),
+                Downloads.andereAblagen(w, Downloads.Ablage.HASH, "mc.example.com", null, SEED));
+        // Ein anderer Port: IP und IP:Port verschieden, kein _25565.
+        assertEquals(List.of(w, w.resolve("mc.example.com_25566")), Downloads.andereAblagen(w, Downloads.Ablage.IP, "mc.example.com:25566", null, SEED));
+        // Mit Namen vom Server zählt der Name.
+        assertEquals(List.of(w, w.resolve("play.example.net_25565")), Downloads.andereAblagen(w, Downloads.Ablage.IP_PORT, "0", "play.example.net", SEED));
+        assertEquals(w.resolve("play.example.net"), Downloads.adressOrdner(w, Downloads.Ablage.IP_PORT, "0", "play.example.net", SEED));
+        assertEquals(w, Downloads.adressOrdner(w, Downloads.Ablage.HASH, "0", null, SEED));
     }
 
     @Test

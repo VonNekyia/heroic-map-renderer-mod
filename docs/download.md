@@ -403,7 +403,7 @@ eines Proxys von einem des Netzes (`Laden.Fehler.status`).
   |---|---|---|
   | Hash | `hash` | `welt-<hash>` |
   | IP + Hash, die Vorgabe | `ip` | `<host>/welt-<hash>` |
-  | IP:Port + Hash | `ip_port` | `<host>_<port>/welt-<hash>` |
+  | IP:Port + Hash | `ip_port` | `<host>_<port>/welt-<hash>`, beim Standardport 25565 `<host>/welt-<hash>` |
 
   Mit einer Karte vom Plugin steht `karte-<karte>/` vor `welt-<hash>`,
   siehe unten, etwa `<host>/karte-main/welt-<hash>`.
@@ -419,10 +419,34 @@ eines Proxys von einem des Netzes (`Laden.Fehler.status`).
   dem Port. Windows nähme ihn dem Ordner ohnehin; so ist es überall gleich.
   In „Ort …“ lehnt der Mod eine Adresse mit Punkt am Ende ab, siehe „Ort
   ändern“.
+
+  Den Standardport 25565 hängt `ip_port` nicht an: Für Server auf ihm
+  sind `ip` und `ip_port` derselbe Ordner. Siehe
+  [0040](entscheidungen/0040-ablage-ohne-doppelte-karten.md).
+  - **Wechsel der Ablage:** Beim ersten Betreten einer Welt je Sitzung
+    zieht sie aus den Ordnern der anderen Ablagen in den der jetzigen
+    (`Downloads.andereAblagen`, `Ort.zieheAblagen`), je für die Adresse und
+    für einen gemerkten Namen: `welt-<hash>` und jedes
+    `karte-<k>/welt-<hash>`, auch aus `<host>_25565` von vor der Regel zum
+    Standardport. Ganz oder gar nicht wie bei „Ort …“, nie auf Bestehendes,
+    nicht, solange ein Download in den alten Ordner läuft. Liegt die Welt
+    schon an beiden Orten, bleibt alles, und die Kartenliste zeigt
+    „doppelt“.
+  - **Im Menü:** Schliesst das Untermenü mit einer anderen Ablage, zieht
+    die Welt, in der der Spieler ist, gleich um, im Worker von „Selbst
+    zeichnen“ nach allem, was er noch schreibt (`Downloads.ablageGewechselt`).
+    Erst danach lesen Wegpunkte, Ebenen, Minimap und eigene Karte neu. Die
+    übrigen Welten ziehen beim nächsten Betreten um; Seed und Adresse kennt
+    der Mod nur von der Welt, in der der Spieler ist.
   - **Gedächtnis:** `heroicmap/namen.txt`, je Zeile die eingetippte Adresse,
-    klein, und der Name (`Servername`). Ein `angebot` mit Namen trägt ihn
-    ein, eines ohne nimmt ihn heraus. Ohne `angebot`, etwa auf einem Server
-    ohne Baum zum Download, bleibt der gemerkte Name.
+    klein, und der Name (`Servername`). Ein `angebot` mit einem anderen
+    Namen trägt ihn ein; eines ohne Namen lässt den gemerkten stehen
+    (`Servername.nachAngebot`). Sonst nähme ein Server ohne Namen hinter
+    derselben Adresse, etwa ein Bauserver mit Download, dem anderen bei
+    jedem Besuch seinen Ordner, siehe
+    [0040](entscheidungen/0040-ablage-ohne-doppelte-karten.md). Der
+    Randfall: Ein Server, der seinen Namen absichtlich entfernt, behält ihn
+    bei Spielern, die ihn schon kannten.
   - **Einmal je Sitzung:** Den Namen liest der Mod beim ersten Betreten
     nach einem Login (`Downloads.weltBetreten` nach `neueSitzung`), nicht
     bei jedem Wechsel der Dimension und nicht beim Respawn. Wegpunkte,
@@ -697,6 +721,17 @@ Platte (`Kartenliste`), auch die anderer Server und Welten:
 - **Ort …:** je Baum links von an/ruht, siehe „Ort ändern“; grau mit
   Tooltip bei Karten aus der Ablage vor dem Hash und solange ein Download
   in den Baum läuft (`Kartenliste.ort`).
+- **Doppelt:** Gleicher Baum, gleicher Server (`karte-`) und gleicher Hash
+  unter Ordnern, die denselben Host meinen, sind doppelt (`Ort.doppelt`):
+  `<host>` und `<host>_25565`, und die Ablage Hash ohne Adresse zu jeder
+  Adresse. Ein anderer Port ist ein anderer Server.
+  - Der Baum, den der Mod nach der jetzigen Ablage nicht nutzt
+    (`Ort.genutzt`), zeigt in seiner zweiten Zeile gelb „doppelt“.
+  - Mit der Maus über der zweiten Zeile nennt ein Tooltip bei jedem
+    doppelten Baum die anderen und je das Datum der jüngsten Datei, beim
+    Zählen gelesen (`Laden.AufPlatte.zuletzt`), und welchen der Mod nutzt.
+    Manchmal ist der ungenutzte der neuere.
+  - Gelöscht wird nur mit „Löschen“ und Rückfrage, nie von selbst.
 - **Mausrad** blättert, wenn nicht alle Karten auf den Schirm passen.
 
 ## Ort ändern

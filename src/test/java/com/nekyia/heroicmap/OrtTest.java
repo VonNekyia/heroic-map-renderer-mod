@@ -10,7 +10,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -140,6 +142,62 @@ class OrtTest {
         }
         // Zwei Teile, etwa die Ablage nach dem Hash: nur das Ende.
         assertEquals("…" + HASH + "/baum", Ort.kurz("welt-" + HASH + "/baum", 22, String::length));
+    }
+
+    @Test
+    void ablagenZiehenUm(@TempDir Path w) throws IOException {
+        String welt = "welt-" + HASH;
+        Path host = w.resolve("play.example.net"), alt = w.resolve("play.example.net_25565");
+        // Ablage Hash ohne Adresse, mit und ohne Karte, und der alte Ordner mit _25565.
+        Satz.schreibe(w.resolve(welt + "/hauptwelt"), "Hauptwelt", DIM, 4);
+        Satz.schreibe(w.resolve("karte-main/" + welt + "/hauptwelt"), "Hauptwelt", DIM, 4);
+        Satz.schreibe(alt.resolve("karte-build/" + welt + "/baum"), "Baum", DIM, 4);
+        Files.writeString(alt.resolve("karte-build/" + welt + "/wegpunkte.json"), "{}");
+        // Eine andere Welt bleibt, wo sie ist.
+        Satz.schreibe(alt.resolve("karte-build/welt-0123456789abcdef/baum"), "Baum", DIM, 4);
+        List<Path> neu = Ort.zieheAblagen(w, host, List.of(w, alt), welt, p -> false);
+        assertEquals(3, neu.size(), neu.toString());
+        assertTrue(Files.exists(host.resolve(welt + "/hauptwelt/satz.json")));
+        assertTrue(Files.exists(host.resolve("karte-main/" + welt + "/hauptwelt/satz.json")));
+        assertTrue(Files.exists(host.resolve("karte-build/" + welt + "/wegpunkte.json")), "mit allem darin");
+        assertFalse(Files.exists(w.resolve(welt)));
+        assertTrue(Files.exists(alt.resolve("karte-build/welt-0123456789abcdef/baum/satz.json")));
+        // Nie auf Bestehendes; nicht, solange ein Download in den alten Ordner läuft.
+        Satz.schreibe(alt.resolve("karte-x/" + welt + "/baum"), "Baum", DIM, 4);
+        Satz.schreibe(host.resolve("karte-x/" + welt + "/baum"), "Baum", DIM, 2);
+        Satz.schreibe(alt.resolve("karte-y/" + welt + "/baum"), "Baum", DIM, 4);
+        Map<String, String> vorher = stand(w);
+        assertEquals(List.of(), Ort.zieheAblagen(w, host, List.of(alt), welt, p -> p.toString().contains("karte-y")));
+        assertEquals(vorher, stand(w));
+        // Ohne Ordner nichts.
+        assertEquals(List.of(), Ort.zieheAblagen(w, host, List.of(w.resolve("fehlt")), welt, p -> false));
+    }
+
+    @Test
+    void doppeltUndGenutzt(@TempDir Path w) {
+        String welt = "/karte-main/welt-" + HASH + "/top";
+        Path a = w.resolve("play.example.net" + welt), b = w.resolve("play.example.net_25565" + welt), c = w.resolve("welt-" + HASH + "/top");
+        Path anders = w.resolve("play.example.net_25566" + welt), fremd = w.resolve("andere.example.net" + welt);
+        Path ohneKarte = w.resolve("play.example.net/welt-" + HASH + "/top"), einzel = w.resolve("einzelspieler_x/welt-" + HASH + "/top");
+        Path hashMitKarte = w.resolve("karte-main/welt-" + HASH + "/top");
+        Map<Path, List<Path>> d = Ort.doppelt(w, List.of(a, b, anders, fremd, ohneKarte, einzel, hashMitKarte));
+        assertEquals(Set.of(b, hashMitKarte), Set.copyOf(d.get(a)));
+        assertEquals(Set.of(a, hashMitKarte), Set.copyOf(d.get(b)));
+        // Hash ohne Adresse passt zu jeder Adresse derselben Karte und Welt.
+        assertEquals(Set.of(a, b, anders, fremd), Set.copyOf(d.get(hashMitKarte)));
+        // Ein anderer Port ist ein anderer Server, ein anderer Host auch; ohne karte- ist eine andere Karte; Einzelspieler nie.
+        assertEquals(List.of(hashMitKarte), d.get(anders));
+        assertEquals(List.of(hashMitKarte), d.get(fremd));
+        assertNull(d.get(ohneKarte));
+        assertNull(d.get(einzel));
+        assertNull(d.get(c));
+        // Genutzt nach der Ablage: IP und IP:Port den Ordner mit Adresse ohne _25565, Hash den ohne Adresse.
+        assertTrue(Ort.genutzt(w, a, Downloads.Ablage.IP));
+        assertTrue(Ort.genutzt(w, a, Downloads.Ablage.IP_PORT));
+        assertFalse(Ort.genutzt(w, b, Downloads.Ablage.IP_PORT));
+        assertFalse(Ort.genutzt(w, hashMitKarte, Downloads.Ablage.IP));
+        assertTrue(Ort.genutzt(w, hashMitKarte, Downloads.Ablage.HASH));
+        assertFalse(Ort.genutzt(w, a, Downloads.Ablage.HASH));
     }
 
     /** Eine Welt unter play.example.net ohne Server: ein Download, eine eigene Karte ohne Server, Wegpunkte und zeigt.txt. */
