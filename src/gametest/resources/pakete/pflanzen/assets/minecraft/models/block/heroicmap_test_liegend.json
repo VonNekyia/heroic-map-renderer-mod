@@ -1,6 +1,6 @@
 {
   "ambientocclusion": false,
-  "textures": {"particle": "#flach", "flach": "minecraft:block/moss_block", "stehend": "minecraft:block/oak_leaves"},
+  "textures": {"particle": "#flach", "flach": "minecraft:block/red_wool", "stehend": "minecraft:block/oak_leaves"},
   "elements": [
     {"from": [0, 1, 0], "to": [8, 1, 16],
       "faces": {"up": {"uv": [0, 0, 8, 16], "texture": "#flach"}}},
