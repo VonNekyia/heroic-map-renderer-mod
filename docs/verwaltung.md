@@ -78,7 +78,10 @@ Objekte aus Ebenen vom Server nicht.
   stehen je Objekt zwei Zeilen, 170 breit: oben Art, Farbe, Name,
   Anheften, Hinspringen, Löschen, darunter rechtsbündig Schrift, Biegung, Schriftart,
   Ebene (`Verwaltung.spalten`). Oben steht dann die Suche allein, darunter
-  die drei Filter. So passt es auch bei 1280 × 720 und GUI-Massstab 4.
+  die drei Filter. Eine Zeile passt, solange das GUI mindestens 416
+  Einheiten breit ist; in 16:9 also bis zum grössten GUI-Massstab, den das
+  Spiel erlaubt, etwa 3 bei 1280 × 720 und 4 bei 1920 × 1080. Zwei
+  Zeilen braucht es etwa bei 1280 × 960 und GUI-Massstab 4, 320 breit.
 
 ## Suche, Filter, Sortierung
 

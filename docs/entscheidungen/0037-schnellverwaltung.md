@@ -51,8 +51,9 @@ E4 freigegeben; die Ergänzungen dieser Seite ebenso.
 - **Speichern erst beim Schliessen des Panels:** Ein Absturz oder das
   Schliessen des Spiels nähme alles mit; ein Klick schreibt nur eine kleine
   Datei.
-- **Alles in einer Zeile, auch wenn es nicht passt:** Bei 1280 × 720 und
-  GUI-Massstab 4 ragte das Panel über den Schirm.
+- **Alles in einer Zeile, auch wenn es nicht passt:** Bei einem GUI
+  schmaler als 416 Einheiten, etwa 1280 × 960 und GUI-Massstab 4, ragte das
+  Panel über den Schirm.
 
 ## Folgen
 

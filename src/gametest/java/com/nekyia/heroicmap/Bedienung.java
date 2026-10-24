@@ -3383,8 +3383,9 @@ public final class Bedienung implements FabricClientGameTest {
      * Die Schnellverwaltung mit Klicks wie von Hand, siehe docs/verwaltung.md: Der Knopf öffnet das Panel. In einer Zeile umbenennen;
      * die Kartentaste und Esc im Feld schliessen die Karte nicht, Esc verwirft, Enter speichert. Farbe reihum, Schrift, Schriftart,
      * Ebene, anheften, hinspringen; Löschen nur mit dem zweiten Klick in Folge. Die Taste öffnet die Karte mit Panel und schaltet es
-     * auf ihr. 40 Wegpunkte auf Seiten, das Mausrad blättert. Bei GS 3 und 4 und bei 1280 × 720 alles ganz auf dem Schirm und nichts
-     * übereinander, bei 1280 × 720 in zwei Zeilen.
+     * auf ihr. 40 Wegpunkte auf Seiten, das Mausrad blättert. Bei 1920 × 1080 mit GS 3 und 4, bei 1280 × 720 mit GS 3, dem grössten,
+     * den das Spiel dort erlaubt, und bei 1280 × 960 mit GS 4 alles ganz auf dem Schirm und nichts übereinander; nur der letzte ist
+     * schmaler als 416 Einheiten und braucht zwei Zeilen je Objekt.
      */
     private static void verwaltung(ClientGameTestContext context, TestInput maus, int k) {
         Path baum = Bilder.testsatz();
@@ -3520,9 +3521,9 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Blättern: erste Seite " + ersteSeite + ", nach dem Mausrad " + zweiteSeite);
             }
 
-            // Ganz auf dem Schirm, nichts übereinander; bei 1280 × 720 und GS 4 in zwei Zeilen.
+            // Ganz auf dem Schirm, nichts übereinander; zwei Zeilen nur bei 1280 × 960 und GS 4, 320 Einheiten breit.
             List<String> fehler = new ArrayList<>();
-            int[][] faelle = {{1920, 1080, 3}, {1920, 1080, 4}, {1280, 720, 4}};
+            int[][] faelle = {{1920, 1080, 3}, {1920, 1080, 4}, {1280, 720, 3}, {1280, 960, 4}};
             for (int[] f : faelle) {
                 context.getInput().resizeWindow(f[0], f[1]);
                 context.runOnClient(mc -> {
@@ -3553,8 +3554,11 @@ public final class Bedienung implements FabricClientGameTest {
                         }
                     }
                     boolean zwei = Verwaltung.zweiZeilen(((Karte) mc.gui.screen()).verwaltung().kasten[0] + ((Karte) mc.gui.screen()).verwaltung().kasten[2] - 4);
-                    if (f[0] == 1280 && !zwei) {
-                        fl.add(fall + ": eine Zeile je Objekt statt zwei");
+                    if (mc.options.guiScale().get() != f[2] || mc.getWindow().getGuiScale() != f[2]) {
+                        fl.add(fall + ": GS " + mc.getWindow().getGuiScale());
+                    }
+                    if (zwei != (f[1] == 960)) {
+                        fl.add(fall + ": " + (zwei ? "zwei Zeilen" : "eine Zeile") + " je Objekt bei " + b + " Einheiten Breite");
                     }
                     if (l.stream().noneMatch(w -> w instanceof VerwaltungsPanel.NameFeld)) {
                         fl.add(fall + ": keine Zeile");
