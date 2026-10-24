@@ -21,6 +21,7 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.data.AtlasIds;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
+import net.minecraft.util.Util;
 import org.joml.Matrix3x2fStack;
 import org.slf4j.Logger;
 
@@ -59,10 +60,28 @@ final class Skin {
     /** Die Varianten je Familie, eine unlesbare leer, bis der Atlas des GUI neu lädt. */
     private static final Map<String, List<Variante>> VARIANTEN = new HashMap<>();
     private static List<?> atlasStand;
+    /** Texel des Designers je Einheit des GUI, so breit ist ein Band; die Formel der Bänder rechnet in Texeln. */
+    static final int D = 4;
+    /** Die Texturen der Bänder aller Skins nach Name und Art, siehe {@link #textur}. */
+    private static final Map<String, Textur> TEXTUREN = new HashMap<>();
 
-    /** Ein Rechteck eines Bands, Enden ausschliesslich; licht heisst die Farbe oben und links. */
-    interface Band {
-        void fill(int xa, int ya, int xb, int yb, int band, boolean licht);
+    /** Eine Textur der Bänder und wann sie zuletzt gezeichnet wurde. */
+    private static final class Textur {
+        final Identifier id;
+        long benutzt;
+
+        Textur(Identifier id) {
+            this.id = id;
+        }
+    }
+
+    /** Ein Stück der Bänder eckig: wohin auf den Schirm in Einheiten, woher aus der Textur der Ecken von 0 bis 1. */
+    record Stueck(int x1, int x2, int y1, int y2, float u1, float u2, float v1, float v2) {
+    }
+
+    /** Die Farbe eines Pixels einer Textur. */
+    interface Farbe {
+        int an(int x, int y);
     }
 
     /** Wie das Bild einer Marke steht: starr mit der Karte, von der Mitte weg oder immer aufrecht. Siehe docs/rahmen.md, „Drehen“. */
@@ -104,10 +123,6 @@ final class Skin {
     /** Wie weit die Minimap mit diesem Rahmen mindestens vom Rand des Schirms bleibt, siehe {@link #einrueckung(Marken, int, int)}. */
     private final int einrueckung;
     private final Identifier[] sprites = new Identifier[TEILE.length];
-    /** Die Ringe für die runde Minimap, zwei Seiten zugleich: die der Minimap und die der Vorschau im Wähler. */
-    private final Identifier[] ringe = new Identifier[2];
-    private final int[] ringSeiten = {-1, -1};
-    private int ringNeu;
 
     private Skin(String name, String ordner, int[] licht, int[] schatten, boolean mitSchatten, Marken marken, int groesste) {
         this.name = name;
@@ -154,15 +169,12 @@ final class Skin {
         return von(familie + "/" + v.name(), n -> laden(n, familie + "/" + v.ordner(), v.schalter()));
     }
 
-    /** Ein Ressourcenpaket oder F3+T lädt den Atlas neu: Paletten, Varianten und Ringe neu. */
+    /** Ein Ressourcenpaket oder F3+T lädt den Atlas neu: Paletten, Varianten und Texturen der Bänder neu. */
     private static void pruefeAtlas() {
         TextureAtlas atlas = gui();
         if (atlas.sprites != atlasStand) {
-            GELADEN.values().forEach(s -> {
-                if (s != null) {
-                    s.freigeben();
-                }
-            });
+            TEXTUREN.values().forEach(t -> Minecraft.getInstance().getTextureManager().release(t.id));
+            TEXTUREN.clear();
             GELADEN.clear();
             VARIANTEN.clear();
             atlasStand = atlas.sprites;
@@ -370,86 +382,136 @@ final class Skin {
         return (int) Math.ceil(groesste * Math.sqrt(2) / 2);
     }
 
-    /** Das Band des Pixels (x, y) im Rechteck w × h, von aussen gezählt. */
-    static int bandEckig(int x, int y, int w, int h) {
-        return Math.min(Math.min(x, y), Math.min(w - 1 - x, h - 1 - y));
+    /** t² · (3 − 2t), t auf [0, 1] begrenzt. */
+    static double glatt(double t) {
+        t = Math.clamp(t, 0, 1);
+        return t * t * (3 - 2 * t);
     }
 
-    static boolean lichtEckig(int x, int y, int w, int h) {
-        return Math.min(x, y) < Math.min(w - 1 - x, h - 1 - y);
-    }
-
-    /** Das Band des Pixels (x, y) im Kreis in das Quadrat mit der Seite s: R − d abgerundet, d ab der Mitte des Pixels. */
-    static int bandRund(int x, int y, int s) {
-        double r = s / 2.0, dx = x + 0.5 - r, dy = y + 0.5 - r;
-        return (int) Math.floor(r - Math.sqrt(dx * dx + dy * dy));
-    }
-
-    static boolean lichtRund(int x, int y, int s) {
-        return x + y + 1 < s;
+    /** Wie weit Bänder der Breite b einen Pixel der Seite p decken, dessen Mitte v vom Aussenrand liegt, alles in Texeln. */
+    static double deckung(double v, double b, double p) {
+        return Math.clamp(v / p + 0.5, 0, 1) * Math.clamp((b - v) / p + 0.5, 0, 1);
     }
 
     /**
-     * Die Bänder um das Rechteck (x, y, w, h) als Rechtecke, je Band vier: oben und links in Licht,
-     * unten und rechts in Schatten, die Ecke oben rechts und unten links im Schatten.
+     * Die Farbe eines Pixels der Bänder samt ihrem Schatten auf die Karte, ARGB, 0 ohne beides: v ist der Abstand seiner Mitte vom
+     * Aussenrand, l das Licht von 0 (Schatten) bis 1, p seine Seite, alles in Texeln. Siehe docs/rahmen.md, „Bänder“.
      */
-    static void baender(int x, int y, int w, int h, int anzahl, Band aus) {
-        for (int i = 0; i < anzahl; i++) {
-            int a = x + i, b = y + i, c = x + w - 1 - i, d = y + h - 1 - i;
-            aus.fill(a, b, c, b + 1, i, true);
-            aus.fill(a, b + 1, a + 1, d, i, true);
-            aus.fill(a, d, c + 1, d + 1, i, false);
-            aus.fill(c, b, c + 1, d, i, false);
+    int bandFarbe(double v, double l, double p) {
+        int n = baender();
+        double b = n * D, deckt = deckung(v, b, p);
+        double dunkel = v > b - p / 2 ? 0.38 * Math.clamp(1 - (v - b) / 3, 0, 1) : 0, a = deckt + dunkel * (1 - deckt);
+        if (a <= 0) {
+            return 0;
         }
+        double[] rgb = new double[3];
+        double summe = 0;
+        for (int i = 0; deckt > 0 && i < n; i++) {
+            // Das äusserste Band reicht nach aussen, das innerste nach innen ohne Übergang.
+            double w = (i == 0 ? 1 : glatt((v - i * D) / 1.6 + 0.5)) * (i == n - 1 ? 1 : glatt(((i + 1) * D - v) / 1.6 + 0.5));
+            if (w <= 0) {
+                continue;
+            }
+            double f = 0.10 * (1 - 2 * Math.clamp((v - i * D) / D, 0, 1));
+            for (int c = 0; c < 3; c++) {
+                int bit = 16 - 8 * c, s = schatten[i] >> bit & 0xFF, h = licht[i] >> bit & 0xFF;
+                double farbe = s + (h - s) * l;
+                rgb[c] += w * (f > 0 ? farbe + (255 - farbe) * f : farbe * (1 + f));
+            }
+            summe += w;
+        }
+        // Das Band liegt über dem schwarzen Schatten: Farbe trägt nur das Band.
+        double k = summe > 0 ? deckt / a / summe : 0;
+        return ARGB.color((int) Math.round(a * 255), (int) Math.round(rgb[0] * k), (int) Math.round(rgb[1] * k), (int) Math.round(rgb[2] * k));
     }
 
-    /** Zeichnet die Bänder um das Rechteck (x, y, w, h), in Einheiten des GUI, zu {@code deckung} deckend. */
-    void baender(GuiGraphicsExtractor g, int x, int y, int w, int h, float deckung) {
-        baender(x, y, w, h, baender(), (xa, ya, xb, yb, i, l) -> g.fill(xa, ya, xb, yb, ARGB.multiplyAlpha(l ? licht[i] : schatten[i], deckung)));
+    /** Die Farbe des Rings an Pixel (x, y) der runden Minimap mit der Seite s, k Pixel je Einheit; Licht oben links bis 45°. */
+    int ringFarbe(int x, int y, int s, int k) {
+        double p = (double) D / k, r = s * D / 2.0, dx = (x + 0.5) * p - r, dy = (y + 0.5) * p - r;
+        return bandFarbe(r - Math.sqrt(dx * dx + dy * dy), glatt(0.5 - (dx + dy) / 12), p);
     }
 
-    /** Die Farbe des Rings im Quadrat mit der Seite s an (x, y), oder 0 ausserhalb der Bänder. */
-    int ringFarbe(int x, int y, int s) {
-        int band = bandRund(x, y, s);
-        return band < 0 || band >= baender() ? 0 : lichtRund(x, y, s) ? licht[band] : schatten[band];
+    /** Die Farbe der Bänder an Pixel (x, y) der eckigen Minimap mit der Seite s, k Pixel je Einheit; Licht oben und links. */
+    int eckigFarbe(int x, int y, int s, int k) {
+        double p = (double) D / k, seite = s * D, tx = (x + 0.5) * p, ty = (y + 0.5) * p;
+        double obenLinks = Math.min(tx, ty), untenRechts = Math.min(seite - tx, seite - ty);
+        return bandFarbe(Math.min(obenLinks, untenRechts), glatt(0.5 + (untenRechts - obenLinks) / 3), p);
     }
 
-    /** Der Ring für die runde Minimap mit der Seite s, ein Texel je Einheit des GUI; nur der für die letzte Seite bleibt. */
-    Identifier ring(int s) {
-        for (int i = 0; i < ringe.length; i++) {
-            if (ringe[i] != null && ringSeiten[i] == s) {
-                return ringe[i];
+    /** Die Seite der Ecken in der Textur der Ecken, in Einheiten: Bänder und Schatten mit Rand, siehe {@link #stuecke}. */
+    int ecke() {
+        return baender() + 2;
+    }
+
+    /**
+     * Die Bänder eckig um das Quadrat (x, y, Seite s) aus der Textur der Ecken, einem Quadrat der Seite 2c + 1: vier Ecken c × c,
+     * dazwischen die Mitte der Textur, eine Einheit breit, gestreckt. Bis c Einheiten vom Rand hängt die Farbe nur vom Abstand zur
+     * nächsten Kante ab, darum ist das genau.
+     */
+    static List<Stueck> stuecke(int x, int y, int s, int c) {
+        float m = 2 * c + 1;
+        int[][] abschnitte = {{0, c, 0, c}, {c, s - c, c, c + 1}, {s - c, s, c + 1, 2 * c + 1}};
+        List<Stueck> aus = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                int[] a = abschnitte[i], b = abschnitte[j];
+                if (i != 1 || j != 1) {
+                    aus.add(new Stueck(x + a[0], x + a[1], y + b[0], y + b[1], a[2] / m, a[3] / m, b[2] / m, b[3] / m));
+                }
             }
         }
-        // Der ältere der zwei weicht; so baut weder die Minimap noch die Vorschau je Frame neu.
-        int i = ringNeu;
-        ringNeu = (ringNeu + 1) % ringe.length;
-        if (ringe[i] != null) {
-            Minecraft.getInstance().getTextureManager().release(ringe[i]);
-        }
-        Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "rahmen/" + name + "/ring_" + s);
-        DynamicTexture textur = new DynamicTexture(() -> "heroicmap " + id, s, s, true);
-        NativeImage pixel = textur.getPixels();
-        for (int y = 0; y < s; y++) {
-            for (int x = 0; x < s; x++) {
-                pixel.setPixel(x, y, ringFarbe(x, y, s));
-            }
-        }
-        textur.upload();
-        Minecraft.getInstance().getTextureManager().register(id, textur);
-        ringe[i] = id;
-        ringSeiten[i] = s;
-        return id;
+        return aus;
     }
 
-    private void freigeben() {
-        for (int i = 0; i < ringe.length; i++) {
-            if (ringe[i] != null) {
-                Minecraft.getInstance().getTextureManager().release(ringe[i]);
-                ringe[i] = null;
-                ringSeiten[i] = -1;
-            }
+    /**
+     * Zeichnet die Bänder samt Schatten um die Minimap (x, y, Seite s), in Einheiten des GUI, gerechnet in Pixeln des Schirms (k je
+     * Einheit), zu {@code deckung} deckend: rund als Ring, eckig aus {@link #stuecke}. Siehe docs/rahmen.md, „Bänder“.
+     */
+    void baender(GuiGraphicsExtractor g, int x, int y, int s, int k, boolean rund, float deckung) {
+        int farbe = ARGB.multiplyAlpha(-1, deckung);
+        if (rund) {
+            g.innerBlit(RenderPipelines.GUI_TEXTURED, textur("ring_" + s + "_" + k, s * k, (px, py) -> ringFarbe(px, py, s, k)),
+                    x, x + s, y, y + s, 0, 1, 0, 1, farbe);
+            return;
         }
+        int c = ecke(), m = 2 * c + 1;
+        Identifier ecken = textur("ecken_" + k, m * k, (px, py) -> eckigFarbe(px, py, m, k));
+        for (Stueck t : stuecke(x, y, s, c)) {
+            g.innerBlit(RenderPipelines.GUI_TEXTURED, ecken, t.x1(), t.x2(), t.y1(), t.y2(), t.u1(), t.u2(), t.v1(), t.v2(), farbe);
+        }
+    }
+
+    /**
+     * Die Textur {@code art} dieses Skins, n × n Pixel aus {@code farbe}, gerechnet beim ersten Zeichnen. Eine neue gibt alle frei,
+     * die 2 s nicht gezeichnet wurden, gleich von welchem Skin; so bleibt im Speicher nur, was zu sehen ist, auch beim Überblenden
+     * und mit dem Wähler. Siehe docs/rahmen.md, „Kosten“.
+     */
+    private Identifier textur(String art, int n, Farbe farbe) {
+        long jetzt = Util.getMillis();
+        Textur t = TEXTUREN.get(name + "/" + art);
+        if (t == null) {
+            TEXTUREN.values().removeIf(alt -> {
+                boolean weg = jetzt - alt.benutzt > 2000;
+                if (weg) {
+                    Minecraft.getInstance().getTextureManager().release(alt.id);
+                }
+                return weg;
+            });
+            Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "rahmen/" + name + "/" + art);
+            DynamicTexture textur = new DynamicTexture(() -> "heroicmap " + id, n, n, true);
+            NativeImage pixel = textur.getPixels();
+            for (int y = 0; y < n; y++) {
+                for (int x = 0; x < n; x++) {
+                    pixel.setPixel(x, y, farbe.an(x, y));
+                }
+            }
+            textur.upload();
+            Minecraft.getInstance().getTextureManager().register(id, textur);
+            t = new Textur(id);
+            TEXTUREN.put(name + "/" + art, t);
+        }
+        t.benutzt = jetzt;
+        return t.id;
     }
 
     /**

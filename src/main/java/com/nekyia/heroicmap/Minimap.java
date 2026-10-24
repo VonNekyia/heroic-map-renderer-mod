@@ -36,7 +36,6 @@ import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
@@ -44,7 +43,6 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.data.AtlasIds;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
-import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.util.Util;
 import net.minecraft.world.level.ChunkPos;
@@ -176,7 +174,8 @@ public final class Minimap {
 
     private TodZeit todZeit = TodZeit.DATUM_UHRZEIT;
 
-    private Koordinaten koordinaten = Koordinaten.XZ;
+    /** Die Widgets an der Minimap, siehe docs/widgets.md; die Zeile der Koordinaten ist eins. */
+    private List<Widgets.Widget> widgets = Widgets.ausKoordinaten(null);
     /** Was die Minimap tut, solange der Debug-Bildschirm offen ist. Siehe docs/minimap.md, „Bei F3“. */
     enum BeiF3 { BLEIBT, AUS, MITTE }
 
@@ -187,6 +186,8 @@ public final class Minimap {
     private int[] koordinatenKasten;
     /** Wo der Balken des Fortschritts zuletzt stand: x, y, Breite, Höhe der Zeile, Länge des Balkens; null ohne. Für Gametests. */
     private int[] balkenKasten;
+    /** Der Kasten um den ganzen Stapel unter der Minimap, Balken und Widgets, {x, y, Breite, Höhe}; null ohne. Daran hängt das L. */
+    private int[] stapelKasten;
     /** Im Menü liegt die Maus auf der Zeile der Koordinaten; dann steht sie gelb. */
     private boolean koordinatenHell;
     /** Wie der eigene Spieler aussieht, auf Minimap und Vollbildkarte. Siehe docs/minimap.md, „Spieler“. */
@@ -430,8 +431,18 @@ public final class Minimap {
         schleier = Math.clamp(hoehe, Schleier.HOEHE, Schleier.MAX_HOEHE);
     }
 
+    /** Der Stil des ersten Widgets der Koordinaten, ohne eins {@link Koordinaten#AUS}. */
     Koordinaten koordinaten() {
-        return koordinaten;
+        for (Widgets.Widget w : widgets) {
+            if (w.art() == Widgets.Art.KOORDINATEN) {
+                return w.version() == 0 ? Koordinaten.XZ : Koordinaten.XYZ;
+            }
+        }
+        return Koordinaten.AUS;
+    }
+
+    List<Widgets.Widget> widgets() {
+        return List.copyOf(widgets);
     }
 
     TodZeit todZeit() {
@@ -454,6 +465,10 @@ public final class Minimap {
         return balkenKasten;
     }
 
+    int[] stapelKasten() {
+        return stapelKasten;
+    }
+
     void koordinatenHell(boolean an) {
         koordinatenHell = an;
     }
@@ -466,8 +481,23 @@ public final class Minimap {
         this.beiF3 = beiF3;
     }
 
+    /**
+     * Stellt die Koordinaten: aus nimmt ihre Widgets weg, sonst bekommt das erste die Version, und fehlt es, kommt eins unten
+     * dazu, hinter die übrigen.
+     */
     void setzeKoordinaten(Koordinaten koordinaten) {
-        this.koordinaten = koordinaten;
+        if (koordinaten == Koordinaten.AUS) {
+            widgets.removeIf(w -> w.art() == Widgets.Art.KOORDINATEN);
+            return;
+        }
+        int version = koordinaten == Koordinaten.XZ ? 0 : 1;
+        for (int i = 0; i < widgets.size(); i++) {
+            if (widgets.get(i).art() == Widgets.Art.KOORDINATEN) {
+                widgets.set(i, new Widgets.Widget(Widgets.Art.KOORDINATEN, version, widgets.get(i).anker()));
+                return;
+            }
+        }
+        widgets.add(new Widgets.Widget(Widgets.Art.KOORDINATEN, version, Widgets.Anker.UNTEN));
     }
 
     Darstellung darstellung() {
@@ -725,11 +755,9 @@ public final class Minimap {
             case "aus" -> TodZeit.AUS;
             default -> TodZeit.DATUM_UHRZEIT;
         };
-        koordinaten = switch (String.valueOf(p.getProperty("koordinaten")).trim()) {
-            case "aus" -> Koordinaten.AUS;
-            case "xyz" -> Koordinaten.XYZ;
-            default -> Koordinaten.XZ;
-        };
+        // Ohne widgets aus der alten Zeile der Koordinaten. Siehe docs/widgets.md, „Gespeichert“.
+        String w = p.getProperty("widgets");
+        widgets = w != null ? Widgets.lies(w) : Widgets.ausKoordinaten(p.getProperty("koordinaten"));
         beiF3 = switch (String.valueOf(p.getProperty("bei_f3")).trim()) {
             case "aus" -> BeiF3.AUS;
             case "mitte" -> BeiF3.MITTE;
@@ -793,7 +821,7 @@ public final class Minimap {
         p.setProperty("todespunkte", Integer.toString(todespunkte));
         p.setProperty("tod_zeit", todZeit.name().toLowerCase(Locale.ROOT));
         p.setProperty("neue_version", Boolean.toString(neueVersion));
-        p.setProperty("koordinaten", koordinaten.name().toLowerCase(Locale.ROOT));
+        p.setProperty("widgets", Widgets.schreibe(widgets));
         p.setProperty("bei_f3", beiF3.name().toLowerCase(Locale.ROOT));
         p.setProperty("spieler", darstellung.name().toLowerCase(Locale.ROOT));
         if (drehenGewaehlt) {
@@ -1053,25 +1081,51 @@ public final class Minimap {
             balkenKasten = balken(g, mc.font, wo[0], wo[1], r.seite(), zeile, laeuft);
             ueberstand += zeile + 2;
         }
-        Object[] werte = werte(koordinaten, spieler.getX(), spieler.getY(), spieler.getZ());
+        // Darunter die Widgets, je eine Zeile im Stapel. Siehe docs/widgets.md.
         koordinatenKasten = null;
-        // Im Menü steht die Zeile auch bei „aus“, grau; ein Klick darauf holt sie zurück. Siehe docs/minimap.md, „Koordinaten“.
+        stapelKasten = balkenKasten;
         boolean klickbar = mc.gui.screen() instanceof Einstellungen;
-        if (werte != null || klickbar) {
-            Component text = werte == null ? Component.translatable("heroicmap.koordinaten_aus")
-                    : Component.translatable(werte.length == 3 ? "heroicmap.koordinaten_xyz" : "heroicmap.koordinaten", werte);
-            int farbe = klickbar && koordinatenHell ? KOORDINATEN_HELL : werte == null ? KOORDINATEN_AUS : TEXT;
-            float f = koordinatenMassstab(g.guiWidth(), abstand, mc.font.width(text));
-            int breite = Mth.ceil(mc.font.width(text) * f), zeile = Mth.ceil(mc.font.lineHeight * f);
-            // Unter dem Ring oder den Ornamenten des Rahmens, die halb über die Ecken ragen.
-            int[] wo = koordinatenLage(r, ueberstand, abstand, g.guiWidth(), g.guiHeight(), breite, zeile);
-            g.pose().pushMatrix();
-            g.pose().translate(wo[0], wo[1]);
-            g.pose().scale(f);
-            g.text(mc.font, text, 0, 0, farbe, true);
-            g.pose().popMatrix();
-            koordinatenKasten = new int[] {wo[0], wo[1], breite, zeile};
+        for (Widgets.Widget w : widgets) {
+            Object[] werte = werte(w.version() == 0 ? Koordinaten.XZ : Koordinaten.XYZ, spieler.getX(), spieler.getY(), spieler.getZ());
+            boolean hell = klickbar && koordinatenHell && koordinatenKasten == null;
+            int[] kasten = zeile(g, mc.font, r, ueberstand, abstand, Component.translatable(werte.length == 3 ? "heroicmap.koordinaten_xyz"
+                    : "heroicmap.koordinaten", werte), hell ? KOORDINATEN_HELL : TEXT);
+            koordinatenKasten = koordinatenKasten == null ? kasten : koordinatenKasten;
+            ueberstand += kasten[3] + 2;
         }
+        // Ohne Koordinaten steht im Menü die Zeile grau, „aus“; ein Klick darauf holt sie zurück. Siehe docs/minimap.md, „Koordinaten“.
+        if (klickbar && koordinatenKasten == null) {
+            koordinatenKasten = zeile(g, mc.font, r, ueberstand, abstand, Component.translatable("heroicmap.koordinaten_aus"),
+                    koordinatenHell ? KOORDINATEN_HELL : KOORDINATEN_AUS);
+        }
+    }
+
+    /**
+     * Eine Zeile des Stapels unter der Minimap, {@code ueberstand} Einheiten unter ihrem Rand ({@link #koordinatenLage}), kleiner
+     * nur, wenn sie nicht zwischen die Ränder passt. Gibt ihren Kasten zurück und nimmt ihn in den Kasten des Stapels.
+     */
+    private int[] zeile(GuiGraphicsExtractor g, Font font, Rahmen r, int ueberstand, int abstand, Component text, int farbe) {
+        float f = koordinatenMassstab(g.guiWidth(), abstand, font.width(text));
+        int breite = Mth.ceil(font.width(text) * f), zeile = Mth.ceil(font.lineHeight * f);
+        // Unter dem Ring oder den Ornamenten des Rahmens, die halb über die Ecken ragen.
+        int[] wo = koordinatenLage(r, ueberstand, abstand, g.guiWidth(), g.guiHeight(), breite, zeile);
+        g.pose().pushMatrix();
+        g.pose().translate(wo[0], wo[1]);
+        g.pose().scale(f);
+        g.text(font, text, 0, 0, farbe, true);
+        g.pose().popMatrix();
+        int[] kasten = {wo[0], wo[1], breite, zeile};
+        stapelKasten = vereint(stapelKasten, kasten);
+        return kasten;
+    }
+
+    /** Der Kasten um zwei Kästen {x, y, Breite, Höhe}; einer darf null sein. */
+    static int[] vereint(int[] a, int[] b) {
+        if (a == null || b == null) {
+            return a == null ? b : a;
+        }
+        int x = Math.min(a[0], b[0]), y = Math.min(a[1], b[1]);
+        return new int[] {x, y, Math.max(a[0] + a[2], b[0] + b[2]) - x, Math.max(a[1] + a[3], b[1] + b[3]) - y};
     }
 
     /**
@@ -1544,17 +1598,12 @@ public final class Minimap {
     }
 
     /**
-     * Der Rahmen eines Skins über Karte und Linien, in Einheiten des GUI: die Bänder, eckig als
-     * Rechtecke, rund als Ring; darüber die Ornamente aus {@link #ornamente}. Die Bänder zu
+     * Der Rahmen eines Skins über Karte und Linien, in Einheiten des GUI: die Bänder samt Schatten
+     * ({@link Skin#baender}); darüber die Ornamente aus {@link #ornamente}. Die Bänder zu
      * {@code baender}, die Ornamente zu {@code deckung} deckend. Siehe docs/rahmen.md.
      */
     private void zeichneRahmen(GuiGraphicsExtractor g, Skin skin, Rahmen r, Drehung.Lage lage, int k, float baender, float deckung) {
-        if (rund) {
-            g.innerBlit(RenderPipelines.GUI_TEXTURED, skin.ring(r.seite()), r.x(), r.x() + r.seite(), r.y(), r.y() + r.seite(),
-                    0, 1, 0, 1, ARGB.multiplyAlpha(-1, baender));
-        } else {
-            skin.baender(g, r.x(), r.y(), r.seite(), r.seite(), baender);
-        }
+        skin.baender(g, r.x(), r.y(), r.seite(), k, rund, baender);
         for (Ornament o : ornamente(r, skin.baender(), rund, skin.marken, lage, k, verzierungenAus, griffEcke, griffAktiv, hervor)) {
             skin.ornament(g, o.teil(), o.ecke(), o.x(), o.y(), deckung, o.winkel());
         }

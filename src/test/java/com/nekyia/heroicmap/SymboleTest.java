@@ -21,7 +21,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -295,6 +297,107 @@ class SymboleTest {
         liste.addProperty("url", basis.toString());
         s.basis(liste, InetAddress.getLoopbackAddress());
         return new Aufbau(s, abgelegt, freigegeben);
+    }
+
+    @Test
+    void kopfUnterKoepfeNurMitHexNamen() {
+        String name = "0123456789abcdef".repeat(4);
+        assertEquals(URI.create("http://h/tiles/koepfe/" + name + ".png"), Symbole.kopfUri(URI.create("http://h/tiles"), name));
+        assertEquals(URI.create("http://h/tiles/koepfe/" + name + ".png"), Symbole.kopfUri(URI.create("http://h/tiles/"), name));
+        for (String falsch : new String[] {name.toUpperCase(Locale.ROOT), name.substring(1), name + "0", "../" + name.substring(3), null}) {
+            assertNull(Symbole.kopfUri(basis, falsch), String.valueOf(falsch));
+        }
+        assertNull(Symbole.kopfUri(null, name));
+    }
+
+    @Test
+    void kopfEinmalJeNamenGenau8Mal8Hoechstens16KiB() throws Exception {
+        String gut = "1".repeat(64), genau = "2".repeat(64), gross = "3".repeat(64), breit = "4".repeat(64), fehlt = "5".repeat(64);
+        dateien.put("/tiles/koepfe/" + gut + ".png", png(8));
+        // 16 KiB wie die Webkarte, als Zahl: so prüft der Test die Grenze, nicht die Konstante.
+        dateien.put("/tiles/koepfe/" + genau + ".png", aufgefuellt(png(8), 16 << 10));
+        dateien.put("/tiles/koepfe/" + gross + ".png", aufgefuellt(png(8), (16 << 10) + 1));
+        dateien.put("/tiles/koepfe/" + breit + ".png", png(9, 8));
+        Aufbau a = aufbau();
+        Symbole s = a.symbole();
+        for (String n : List.of(gut, genau, gross, breit, fehlt)) {
+            assertNull(s.kopf(n));
+        }
+        s.warte();
+        assertNotNull(s.kopf(gut));
+        assertNotNull(s.kopf(genau));
+        assertNull(s.kopf(gross));
+        assertNull(s.kopf(breit));
+        assertNull(s.kopf(fehlt));
+        // Einmal je Name, auch nach dem Laden kein zweiter Abruf; nur unter koepfe/.
+        s.kopf(gut);
+        s.warte();
+        assertEquals(1, anfragen.stream().filter(p -> p.equals("/tiles/koepfe/" + gut + ".png")).count());
+        assertTrue(anfragen.stream().allMatch(p -> p.startsWith("/tiles/koepfe/")));
+        // Beim Leeren frei, danach holt er neu.
+        s.leeren();
+        assertEquals(2, a.abgelegt().size());
+        assertEquals(Set.copyOf(a.abgelegt()), Set.copyOf(a.frei()));
+        assertNull(s.kopf(gut));
+        s.warte();
+        assertEquals(2, anfragen.stream().filter(p -> p.equals("/tiles/koepfe/" + gut + ".png")).count());
+    }
+
+    @Test
+    void kopfNeuNach1Und5DannAlle15Minuten() throws Exception {
+        // Kommt ein Kopf später, etwa weil ein Proxy ihn erst durchreicht, holt der Mod ihn wie ein Symbol neu.
+        long[] jetzt = {0};
+        Symbole s = aufbau(() -> jetzt[0]).symbole();
+        String spaet = "6".repeat(64), nie = "7".repeat(64);
+        assertNull(s.kopf(spaet));
+        s.warte();
+        dateien.put("/tiles/koepfe/" + spaet + ".png", png(8));
+        jetzt[0] = 60_000 - 1;
+        assertNull(s.kopf(spaet));
+        s.warte();
+        assertEquals(1, anfragen.size());
+        jetzt[0] = 60_000;
+        assertNull(s.kopf(spaet));
+        s.warte();
+        assertNotNull(s.kopf(spaet));
+        long t = 10_000_000;
+        jetzt[0] = t;
+        s.kopf(nie);
+        s.warte();
+        int vorher = anfragen.size();
+        for (long abstand : new long[] {60_000, 300_000, 900_000, 900_000}) {
+            jetzt[0] = t + abstand - 1;
+            s.kopf(nie);
+            s.warte();
+            assertEquals(vorher, anfragen.size(), "zu früh nach " + abstand);
+            t += abstand;
+            jetzt[0] = t;
+            s.kopf(nie);
+            s.warte();
+            assertEquals(++vorher, anfragen.size(), "nicht neu nach " + abstand);
+        }
+    }
+
+    @Test
+    void hoechstens1024KoepfeDerAeltesteZuerstFrei() throws Exception {
+        Aufbau a = aufbau();
+        Symbole s = a.symbole();
+        String erster = "8".repeat(64);
+        dateien.put("/tiles/koepfe/" + erster + ".png", png(8));
+        s.kopf(erster);
+        s.warte();
+        Identifier id = s.kopf(erster);
+        assertNotNull(id);
+        // 1023 weitere passen noch; der nächste verdrängt den am längsten nicht gezeigten, den ersten, und gibt ihn frei.
+        for (int i = 0; i < 1024 - 1; i++) {
+            s.kopf(String.format(Locale.ROOT, "%064x", i));
+        }
+        s.warte();
+        assertEquals(List.of(), a.frei());
+        s.kopf(String.format(Locale.ROOT, "%064x", 1024));
+        s.warte();
+        assertEquals(List.of(id), a.frei());
+        assertNull(s.kopf(erster));
     }
 
     @Test
