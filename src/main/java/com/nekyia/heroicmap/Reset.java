@@ -57,6 +57,18 @@ final class Reset {
     }
 
     /**
+     * Wie {@link #pruefe(Ausweis.Welt, String, long)} für die Welt {@code schluessel} im Ausweis {@code vorher}, wie er vor dem
+     * Besuch war, aber nur, wenn er dieselbe eingetippte Adresse {@code netz} nennt. Unter einer anderen Adresse kann derselbe
+     * Ordner eine andere Welt zeigen, etwa ein Spiegel als Kopie mit eigener UID und Spielzeit; dann trägt der Besuch nur ein.
+     */
+    static Art pruefe(Ausweis vorher, String schluessel, String netz, String uid, long alter) {
+        if (vorher == null || !vorher.netz().equals(netz)) {
+            return Art.GLEICH;
+        }
+        return pruefe(vorher.welten().get(schluessel), uid, alter);
+    }
+
+    /**
      * Die Ordner, deren Welt {@code schluessel} durch den Ordner {@code welt} mit dem Ausweis {@code jetzt} ersetzt ist: derselbe
      * Server, also dieselbe eingetippte Adresse und derselbe Name, dieselbe Welt, ein anderer Hash, und der alte Ordner war
      * zuletzt besucht, bevor der neue zum ersten Mal. Nur Geschwister unter {@code karte-<server>}; ohne Netz oder Namen

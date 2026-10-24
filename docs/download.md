@@ -726,6 +726,13 @@ immer.
 - **Wann:** beim Betreten einer Dimension und wenn die Antwort auf `show`
   kommt, denn sie kommt nach dem Betreten; ohne UID 10 s nach dem ersten
   Wert der Spielzeit. Je Besuch einmal.
+- **Nur unter derselben Adresse** (`Reset.pruefe` mit `netz`): UID und
+  Spielzeit vergleicht der Mod nur, wenn der Ausweis vor dem Besuch
+  dieselbe eingetippte Adresse nennt; sonst trägt er sie nur ein. Derselbe
+  Ordner kann unter zwei Adressen zwei Welten zeigen, etwa ein Spiegel als
+  Kopie mit gleichem Namen und Hash, aber eigener UID und Spielzeit. Sonst
+  löschte jeder Wechsel zwischen beiden die Karte. Ein Reset fällt darum
+  nur auf, wenn der Besuch davor unter derselben Adresse war.
 - **Sicher, UID** (`Reset.pruefe`): Der Ausweis kennt eine UID der Welt,
   und das Plugin schickt eine andere. Die Bäume dieser Welt im Ordner
   werden gelöscht, Download und eigene Karte; die eigene beginnt gleich

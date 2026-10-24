@@ -38,6 +38,9 @@ Kartenliste bietet das Löschen an. Baustein 3 des Konzepts
   `<baum>-bis-<jjjjmmtt>` mit der Marke `ruht.txt`, und eine neue Karte
   beginnt. Viertel und Stunde sind vorläufige Werte, die wir an echten
   Servern nachschärfen.
+- **Nur unter derselben eingetippten Adresse** vergleicht der Mod UID
+  und Spielzeit mit dem Ausweis; unter einer anderen trägt er sie nur
+  ein.
 - **Die Wegpunkte bleiben,** auch wenn sie in der neuen Welt nicht mehr
   stimmen; die Zeile im Chat sagt es. Der User kann das später ändern.
 - **Nie bei laufendem Download;** dann versucht es der nächste Besuch.
@@ -50,6 +53,10 @@ Kartenliste bietet das Löschen an. Baustein 3 des Konzepts
   hat dort eine andere Welt; jeder Besuch löschte die Karte des anderen.
   Darum zählt die eingetippte Adresse mit, und die Zeitbedingung schliesst
   ein Wechselspiel aus.
+- **Die UID allein, ohne Adresse:** Ein Spiegel als Kopie teilt mit dem
+  Server Namen und Hash, also den Ordner, hat aber eine eigene UID und
+  Spielzeit. Jeder Wechsel zwischen beiden löschte die Karte und lüde sie
+  neu. Gefunden im Review.
 - **Die Spielzeit auch mit UID prüfen:** Die UID ist eindeutig; ein
   Rückgang der Spielzeit, etwa nach dem Einspielen einer Sicherung, ist
   dann kein Reset.
@@ -59,6 +66,9 @@ Kartenliste bietet das Löschen an. Baustein 3 des Konzepts
 
 ## Folgen
 
+- Ein Reset fällt nur auf, wenn der Besuch davor unter derselben Adresse
+  war. Wer zwischen Server und Spiegel wechselt, merkt den Reset eines
+  der beiden erst beim zweiten Besuch dort in Folge.
 - Ohne Plugin 0.20.1 gibt es keinen sicheren Reset mit festem Seed; dann
   greift nur „unsicher“.
 - Nach einem Reset steht im Ausweis die neue Generation: Spielzeit von
