@@ -14,9 +14,8 @@ Die gekippten Pflanzen kosten im Worker je Chunk rund 0,5 ms mehr, auf jeder
 Auflösung fast gleich viel: bei 4 px +18 % (2,76 → 3,26 ms), bei 1 px +36 %,
 bei 16 px +1 %. Der Grund: Die flache Fläche nahm das vorgemittelte Raster,
 die gekippten Flächen tasten je Pixel n × n Proben ab, je Fläche und Block
-256. Das liegt über dem Ziel von +5 %. Der User nimmt die Pflanzen mit dem
-Aufpreis in 0.2.72; mit 0.2.73 sollen auch die gekippten Flächen das
-Raster nehmen, mit neuer Messung danach.
+256. Das liegt über dem Ziel von +5 %. Darum nehmen auch die gekippten
+Flächen das Raster; Reihe 2 misst das gegen main.
 
 ## Aufbau
 
@@ -85,7 +84,7 @@ Zeichnen je Chunk im Worker, Median der Läufe, in Klammern die Spanne:
 - **Entschieden** (24.10.): Der Reviewer wählte, auch gekippte Flächen das
   Raster nehmen zu lassen, eine Probe je Pixel; Ziel: Median höchstens +5 %
   bei 4, 8 und 16 px gegen main, 1 und 2 px mit Zahlen. Höchstens 4 × 4
-  Proben hülfe nur bei 1 und 2 px. Der User nimmt die Pflanzen mit dem
-  Aufpreis in 0.2.72, der Fix folgt in 0.2.73.
+  Proben hülfe nur bei 1 und 2 px. Der User nimmt die Pflanzen erst mit
+  dem Raster.
 - Diese Reihe ist keine Vergleichsbasis für spätere: ohne Lastprüfung, mit
   einem Ausreisser.

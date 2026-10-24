@@ -66,12 +66,12 @@ Der Versuch steht auf dem Tag `versuch/pflanzen-kippen`.
 - Ein volles Kreuz verliert beim Stauchen seinen Versatz entlang der
   Kipprichtung; der quer dazu bleibt.
 - **Kosten:** Je Pflanze werden statt einer Fläche zwei bis vier
-  abgetastet, je Pixel n × n Proben. Im Worker kostet das je Chunk rund
+  abgetastet. Mit n × n Proben je Pixel kostete das im Worker je Chunk rund
   0,5 ms mehr: bei 1 px +36 %, bei 2 px +25 %, bei 4 px +18 %, bei 8 px
   +7 %, bei 16 px +1 %. Siehe
   [Pflanzen gekippt, Zeit je Chunk](../messungen/2026-10-24-pflanzen-gekippt.md).
-- **Geplanter Fix:** Gekippte Flächen nehmen das gemittelte Raster des
+- **Darum das Raster:** Gekippte Flächen nehmen das gemittelte Raster des
   Sprites, eine Probe je Pixel, wie die flache Fläche bisher. Ziel: höchstens
-  +5 % bei 4, 8 und 16 px gegen main. Der User nimmt die Pflanzen mit dem
-  Aufpreis in 0.2.72; der Fix folgt in 0.2.73.
+  +5 % bei 4, 8 und 16 px gegen main. Auftrag des Users: die Pflanzen erst
+  mit dem Raster, nicht schon in 0.2.72.
 - Die eigene Karte zeichnet mit demselben Maler und kippt also mit.

@@ -4,10 +4,6 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
-## 0.2.72
-
-- **Plants lean to the north on the minimap and your own map.** Crops, grass, flowers, kelp and seagrass now tilt 45° so you see them from the side instead of a flat patch of texture. Each plant stays inside its block, plants in water stay under the surface, and bamboo leaves and pumpkin and melon stems show too.
-
 ## 0.2.71
 
 - **"Automatic" for the biome frame.** The frame chooser now shows "Automatic" first for the biome frame, and it's the default: the frame follows the biome you stand in. Pick a biome there instead to keep that frame everywhere.
