@@ -218,6 +218,8 @@ public final class Minimap {
     /** Die Gruppe „Technik“ im Untermenü ist aufgeklappt. Siehe docs/minimap.md, „Bedienung“. */
     private boolean technikOffen;
     private Biom biom = new Biom();
+    /** Die feste Kategorie von „biom“, null für automatisch, die Vorgabe. Siehe docs/rahmen.md, „Biom“. */
+    private String biomFest;
     /** Solange das Menü offen ist: die Ecke des Griffs, 0 bis 3, sonst -1; und ob die Maus auf ihm liegt. */
     private int griffEcke = -1;
     private boolean griffAktiv;
@@ -560,9 +562,25 @@ public final class Minimap {
         }
     }
 
-    /** Die Kategorie, deren Rahmen „biom“ gerade zeigt. */
+    /** Die Kategorie, deren Rahmen „biom“ gerade zeigt: die feste, sonst die des Bioms unter dem Spieler. */
     String kategorie() {
+        return biomFest != null ? biomFest : biom.gezeigt();
+    }
+
+    /** Die Kategorie des Bioms unter dem Spieler, wie „biom“ sie automatisch zeigt, auch wenn eine feste gewählt ist. */
+    String kategorieAutomatisch() {
         return biom.gezeigt();
+    }
+
+    /** Die feste Kategorie von „biom“, null für automatisch nach dem Biom. Siehe docs/rahmen.md, „Biom“. */
+    String biomFest() {
+        return biomFest;
+    }
+
+    /** Setzt die feste Kategorie von „biom“; null oder eine unbekannte heisst automatisch. */
+    void setzeBiomFest(String kategorie) {
+        // List.of wirft bei contains(null); darum erst die Prüfung auf null.
+        biomFest = kategorie != null && Biom.KATEGORIEN.contains(kategorie) ? kategorie : null;
     }
 
     /** Der Skin der gewählten Variante dieser Familie, sonst ihrer ersten; null für „ohne“. */
@@ -623,7 +641,7 @@ public final class Minimap {
 
     /** Der Skin, den die Minimap gerade zeichnet, bei „biom“ der der gezeigten Kategorie; null ohne Rahmen. */
     Skin skinJetzt() {
-        return skin(Skin.BIOM.equals(skin) ? Biom.ORDNER.get(biom.gezeigt()) : skin);
+        return skin(Skin.BIOM.equals(skin) ? Biom.ORDNER.get(kategorie()) : skin);
     }
 
     /** Vom Menü je Frame: wo der Griff liegt, -1 ohne Menü. Mit Skin zeichnet die Minimap ihn über den Bändern. */
@@ -842,6 +860,9 @@ public final class Minimap {
                 varianten.put(familie, v.trim());
             }
         }
+        // Ohne den Schlüssel, etwa aus 0.2.70, automatisch wie bisher.
+        String fest = p.getProperty("rahmen_biom");
+        setzeBiomFest(fest == null ? null : fest.trim());
         // Vor mod#175 galt ein Schalter für alle vier; aus heisst alle vier durchsichtig, so springt nichts.
         String aus = p.getProperty("verzierungen_aus");
         verzierungenAus = aus != null ? marken(aus) : "false".equals(p.getProperty("verzierungen")) ? ALLE_MARKEN : 0;
@@ -884,6 +905,10 @@ public final class Minimap {
             p.setProperty("rahmen_wahl", skin);
         }
         varianten.forEach((familie, v) -> p.setProperty("rahmen_variante." + familie, v));
+        // Automatisch ist die Vorgabe und steht wie die anderen Vorgaben nicht in der Datei.
+        if (biomFest != null) {
+            p.setProperty("rahmen_biom", biomFest);
+        }
         p.setProperty("verzierungen_aus", marken(verzierungenAus));
         p.setProperty("verzierungen_hd", marken(hd));
         p.setProperty("technik", technikOffen ? "auf" : "zu");
@@ -1097,7 +1122,7 @@ public final class Minimap {
         if (rahmen != null) {
             // Beim Wechsel des Bioms: Die Bänder sind in allen Kategorien gleich gebaut, die neuen decken die alten zu t;
             // nur die alten Ornamente blenden aus. So sinkt die Deckung der Bänder nie.
-            String vorher = Skin.BIOM.equals(skin) ? biom.vorher(ms) : null;
+            String vorher = Skin.BIOM.equals(skin) && biomFest == null ? biom.vorher(ms) : null;
             Skin alt = vorher == null ? null : skin(Biom.ORDNER.get(vorher));
             float t = alt == null ? 1 : biom.anteil(ms);
             if (alt != null) {

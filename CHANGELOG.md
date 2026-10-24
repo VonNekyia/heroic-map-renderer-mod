@@ -6,6 +6,7 @@ The release notes on GitHub and Modrinth come from here
 
 ## 0.2.71
 
+- **"Automatic" for the biome frame.** The frame chooser now shows "Automatic" first for the biome frame, and it's the default: the frame follows the biome you stand in. Pick a biome there instead to keep that frame everywhere.
 - **The flower stands on the frame.** With the "biome" frame, the marks east, south and west now stand outside on the edge of the minimap, foot on the frame and bloom pointing out; the letters of "lettern" turn their head outward too. The minimap keeps a little more distance to the screen edge for that.
 - **The same world under another address.** If you join under a new address or port and you already have a map of that world under the old one, the map list suggests "Use the map of …" for it. Nothing changes until you click it.
 - **A reset world gets a fresh map.** When a server resets a world, the mod notices it and deletes the old map, so nothing is drawn over the wrong terrain; your waypoints stay. It's sure with plugin 0.20.1, which tells the mod each world's ID, or when the same server shows the same world with a new seed. Without that, if the world's time jumps far back, the old map only rests and you can delete it in the map list.
