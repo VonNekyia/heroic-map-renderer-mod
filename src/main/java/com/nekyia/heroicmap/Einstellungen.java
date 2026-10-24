@@ -110,7 +110,7 @@ final class Einstellungen extends Screen {
         // bekommen den Klick, wie vorher über der Minimap. Siehe docs/minimap.md, „Bedienung“.
         int[] z = zoomLage(m.rahmen(width, height), m.rand(), width);
         zoom = addRenderableOnly(new ZoomRegler(z[0], z[1], z[2], m));
-        int[] a = aufloesungLage(m.rahmen(width, height), m.koordinatenKasten(), m.rand(), height);
+        int[] a = aufloesungLage(m.rahmen(width, height), m.stapelKasten(), m.rand(), height);
         aufloesung = addRenderableOnly(new AufloesungRegler(a[0], a[1], a[2], m));
         nord = addRenderableOnly(new Symbol(Symbol.NORD));
         form = addRenderableOnly(new Symbol(Symbol.FORM));
@@ -191,7 +191,7 @@ final class Einstellungen extends Screen {
     /** Legt das L um die Minimap ({@link #lLage}); ist sie aus, fehlt es. */
     private void lege() {
         Minimap m = Minimap.INSTANZ;
-        int[][] l = lLage(m.rahmen(width, height), m.koordinatenKasten(), m.rand(), width, height);
+        int[][] l = lLage(m.rahmen(width, height), m.stapelKasten(), m.rand(), width, height);
         AbstractWidget[] w = {nord, zoom, form, aufloesung, raster};
         for (int i = 0; i < w.length; i++) {
             w[i].setRectangle(l[i][2], l[i][3], l[i][0], l[i][1]);
