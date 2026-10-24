@@ -438,6 +438,11 @@ final class Skin {
         return bandFarbe(Math.min(obenLinks, untenRechts), glatt(0.5 + (untenRechts - obenLinks) / 3), p);
     }
 
+    /** Die Seite der Ecken in der Textur der Ecken, in Einheiten: Bänder und Schatten mit Rand, siehe {@link #stuecke}. */
+    int ecke() {
+        return baender() + 2;
+    }
+
     /**
      * Die Bänder eckig um das Quadrat (x, y, Seite s) aus der Textur der Ecken, einem Quadrat der Seite 2c + 1: vier Ecken c × c,
      * dazwischen die Mitte der Textur, eine Einheit breit, gestreckt. Bis c Einheiten vom Rand hängt die Farbe nur vom Abstand zur
@@ -469,7 +474,7 @@ final class Skin {
                     x, x + s, y, y + s, 0, 1, 0, 1, farbe);
             return;
         }
-        int c = baender() + 2, m = 2 * c + 1;
+        int c = ecke(), m = 2 * c + 1;
         Identifier ecken = textur("ecken_" + k, m * k, (px, py) -> eckigFarbe(px, py, m, k));
         for (Stueck t : stuecke(x, y, s, c)) {
             g.innerBlit(RenderPipelines.GUI_TEXTURED, ecken, t.x1(), t.x2(), t.y1(), t.y2(), t.u1(), t.u2(), t.v1(), t.v2(), farbe);

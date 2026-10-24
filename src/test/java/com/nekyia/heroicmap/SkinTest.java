@@ -177,6 +177,9 @@ class SkinTest {
         assertEquals(0x51000000, gras.bandFarbe(8.5, 1, 1));
         assertEquals(0, gras.bandFarbe(11.5, 1, 1));
         assertEquals(0, gras.bandFarbe(-0.5, 1, 1));
+        // Bei GUI-Massstab 1 ist ein Pixel 4 Texel: aussen über ihn weich, innen das Band zu 75 % über 38 % Schatten.
+        assertEquals(0xBF292624, gras.bandFarbe(1, 1, 4));
+        assertEquals(0xD7A9C459, gras.bandFarbe(7, 1, 4));
         // Ein Band mit Licht und Schatten.
         Skin drei = Skin.lies("t", "#111111\n#222222 #333333\n#444444", "", 7);
         assertEquals(0xFF222222, drei.bandFarbe(6, 1, 1));
@@ -187,23 +190,28 @@ class SkinTest {
         assertEquals(0xFF383838, drei.ringFarbe(256, 506, 128, 4));
         assertEquals(0, drei.ringFarbe(256, 256, 128, 4));
         assertEquals(0, drei.ringFarbe(0, 0, 128, 4));
+        // Eckig ebenso: oben Licht, unten Schatten.
+        assertEquals(0xFF282828, drei.eckigFarbe(256, 5, 128, 4));
+        assertEquals(0xFF383838, drei.eckigFarbe(256, 506, 128, 4));
     }
 
     @Test
     void eckigAusStueckenGenau() {
         // Die Stücke aus der Textur der Ecken geben jeden Pixel so, wie ihn die Formel für die ganze Seite rechnet: abgetastet
-        // wie mit Nearest an der Mitte des Pixels. Jeder Pixel nahe dem Rand liegt in genau einem Stück, die Mitte in keinem.
+        // wie mit Nearest an der Mitte des Pixels. Jeder Pixel bis c vom Rand liegt in genau einem Stück, die Mitte in keinem und
+        // ist leer; eine Einheit hinter c ganz geprüft, weiter innen jeder siebte.
         for (String palette : new String[] {"#1E1B18\n#C8E86A", "#111111\n#222222 #333333\n#444444",
                 "#101010\n#202020\n#303030 #404040\n#505050\n#606060"}) {
             Skin skin = Skin.lies("t", palette, "", 7);
-            int c = skin.baender() + 2, m = 2 * c + 1;
+            int c = skin.ecke(), m = 2 * c + 1;
             for (int k = 1; k <= 4; k++) {
                 for (int s : new int[] {56, Minimap.GROESSE, Minimap.GROESSTE}) {
                     List<Skin.Stueck> stuecke = Skin.stuecke(0, 0, s, c);
                     for (int py = 0; py < s * k; py++) {
                         for (int px = 0; px < s * k; px++) {
-                            boolean rand = Math.min(Math.min(px, py), Math.min(s * k - 1 - px, s * k - 1 - py)) < c * k;
-                            if (!rand && (px % 7 != 0 || py % 7 != 0)) {
+                            int weg = Math.min(Math.min(px, py), Math.min(s * k - 1 - px, s * k - 1 - py));
+                            boolean rand = weg < c * k;
+                            if (weg >= (c + 1) * k && (px % 7 != 0 || py % 7 != 0)) {
                                 continue;
                             }
                             double ux = (px + 0.5) / k, uy = (py + 0.5) / k;
