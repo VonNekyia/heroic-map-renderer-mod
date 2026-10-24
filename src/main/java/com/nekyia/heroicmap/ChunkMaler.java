@@ -35,6 +35,7 @@ import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.CardinalLighting;
 import net.minecraft.world.level.block.AbstractChestBlock;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.CopperChestBlock;
 import net.minecraft.world.level.block.EnderChestBlock;
@@ -165,6 +166,18 @@ final class ChunkMaler {
     /** Die flache Fläche des aktuellen Blocks, wenn er eine Bodenpflanze ist, und ob er eine Fläche nach oben hat. */
     private Flaeche flach;
     private boolean oben;
+
+    /**
+     * Versuch, nie mergen: wie Pflanzen von oben stehen. 0 heute (0108, flach), 1 alle Flächen 45° nach Norden gekippt,
+     * 4 wie 1 mit einer Richtung je Block, 5 wie 1 mit 60°, 6 das ganze Modell 90° nach Norden. Nur für den Bildlauf.
+     */
+    static volatile int kippen = 0;
+    private static final double[][] RICHTUNGEN = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
+    private final List<Kippflaeche> kippliste = new ArrayList<>();
+
+    /** Eine Fläche, die gekippt wird: Ecken samt Versatz, UV, Sprite, Schicht und Ecken, nach oben schattiert. */
+    private record Kippflaeche(float[] p, float[] uv, TextureAtlasSprite sprite, ChunkSectionLayer schicht, float[][] ecken) {
+    }
     /** Je Pixel der Spalte vormultipliziert in sRGB: r, g, b, a. */
     private float[] summe = new float[0];
 
@@ -254,14 +267,20 @@ final class ChunkMaler {
             return;
         }
         boolean pflanze = Pflanzen.bodenpflanze(state);
+        boolean bambus = state.is(Blocks.BAMBOO);
+        int variante = kippen;
         flach = null;
         oben = false;
+        kippliste.clear();
         tesselator.tesselateBlock((x, y, z, quad, instanz) -> {
             // Bei einer Pflanze zählt nur eine liegende Fläche; eine gekippte aus einem Paket legt sie flach. Siehe docs/minimap.md,
             // „Pflanzen aus Paketen“.
             if (pflanze ? !liegt(quad) : !nachOben(quad)) {
                 if (pflanze && flach == null) {
                     flach = flach(quad, instanz);
+                }
+                if (variante != 0 && (pflanze || bambus && quad.materialInfo().sprite().contents().name().getPath().contains("leaves"))) {
+                    kippliste.add(kippflaeche(quad, instanz, x, y, z));
                 }
                 return;
             }
@@ -281,9 +300,84 @@ final class ChunkMaler {
             flaechen.add(new Flaeche(hoehe, xz, uv, quad.materialInfo().sprite(), quad.materialInfo().layer(),
                     ecken(instanz, quad.materialInfo().lightEmission())));
         }, 0, 0, 0, welt, pos, state, model, state.getSeed(pos));
+        if (!kippliste.isEmpty() && (bambus || !oben)) {
+            kippe(variante);
+            return;
+        }
         // Ein Modell mit einer Fläche nach oben, etwa ein Blütenteppich, bleibt, wie es ist.
         if (flach != null && !oben) {
             flaechen.add(flach);
+        }
+    }
+
+    private Kippflaeche kippflaeche(BakedQuad quad, QuadInstance instanz, float x, float y, float z) {
+        float[] p = new float[12], uv = new float[8];
+        for (int k = 0; k < 4; k++) {
+            Vector3fc e = quad.position(k);
+            p[3 * k] = e.x() + x;
+            p[3 * k + 1] = e.y() + y;
+            p[3 * k + 2] = e.z() + z;
+            long packed = quad.packedUV(k);
+            uv[2 * k] = UVPair.unpackU(packed);
+            uv[2 * k + 1] = UVPair.unpackV(packed);
+        }
+        float faktor = schattenNachOben(welt.cardinalLighting(), quad.materialInfo().shadeDirectionOverride(), quad.direction());
+        float[][] ecken = ecken(instanz, quad.materialInfo().lightEmission());
+        for (float[] ecke : ecken) {
+            for (int c = 0; c < 3; c++) {
+                ecke[c] *= faktor;
+            }
+        }
+        return new Kippflaeche(p, uv, quad.materialInfo().sprite(), quad.materialInfo().layer(), ecken);
+    }
+
+    /**
+     * Kippt die Flächen der Pflanze starr um die waagrechte Achse durch die Mitte ihres Bodens, so dass oben nach der Richtung
+     * wandert; dann wieder auf ihre alte Tiefe. Was danach nach oben zeigt, kommt in die Spalte. Wie die Skizzen.
+     */
+    private void kippe(int variante) {
+        double[] d = RICHTUNGEN[0];
+        double winkel = 45;
+        if (variante == 4) {
+            long h = ((long) pos.getX() * 73856093L) ^ ((long) pos.getZ() * 19349663L);
+            h = ((h ^ (h >> 13)) * 1274126177L) & 0xFFFFFFFFL;
+            d = RICHTUNGEN[(int) (h % 4)];
+        } else if (variante == 5) {
+            winkel = 60;
+        } else if (variante == 6) {
+            winkel = 90;
+        }
+        double c = Math.cos(Math.toRadians(winkel)), s = Math.sin(Math.toRadians(winkel));
+        float alt = Float.MAX_VALUE, neu = Float.MAX_VALUE;
+        List<float[]> gekippt = new ArrayList<>();
+        for (Kippflaeche f : kippliste) {
+            float[] q = new float[12];
+            for (int k = 0; k < 4; k++) {
+                double x = f.p()[3 * k] - 0.5, y = f.p()[3 * k + 1], z = f.p()[3 * k + 2] - 0.5;
+                double t = x * d[0] + z * d[1], w = -x * d[1] + z * d[0];
+                double t2 = t * c + y * s, y2 = -t * s + y * c;
+                q[3 * k] = (float) (0.5 + t2 * d[0] - w * d[1]);
+                q[3 * k + 1] = (float) y2;
+                q[3 * k + 2] = (float) (0.5 + t2 * d[1] + w * d[0]);
+                alt = Math.min(alt, f.p()[3 * k + 1]);
+                neu = Math.min(neu, q[3 * k + 1]);
+            }
+            gekippt.add(q);
+        }
+        for (int i = 0; i < gekippt.size(); i++) {
+            float[] q = gekippt.get(i);
+            if (obenAnteil(q[3] - q[0], q[4] - q[1], q[5] - q[2], q[6] - q[0], q[7] - q[1], q[8] - q[2]) <= 1e-4f) {
+                continue;
+            }
+            Kippflaeche f = kippliste.get(i);
+            float[] xz = new float[8];
+            float hoehe = Float.NEGATIVE_INFINITY;
+            for (int k = 0; k < 4; k++) {
+                xz[2 * k] = q[3 * k];
+                xz[2 * k + 1] = q[3 * k + 2];
+                hoehe = Math.max(hoehe, q[3 * k + 1] + alt - neu);
+            }
+            flaechen.add(new Flaeche(hoehe, xz, f.uv(), f.sprite(), f.schicht(), f.ecken()));
         }
     }
 

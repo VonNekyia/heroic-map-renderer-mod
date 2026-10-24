@@ -108,6 +108,11 @@ public final class Bilder implements FabricClientGameTest {
                 Minimap.INSTANZ.setzeDrehen(false);
                 Minimap.INSTANZ.setzeSkin(Skin.OHNE);
             });
+            // Versuch, nie mergen: nur die Vorschau der gekippten Pflanzen.
+            if (Boolean.TRUE) {
+                kippVorschau(context, server);
+                return;
+            }
             for (int scale : new int[] {1, 2, 4}) {
                 context.runOnClient(mc -> {
                     Minimap.INSTANZ.setzeScale(scale);
@@ -154,6 +159,141 @@ public final class Bilder implements FabricClientGameTest {
     }
 
     private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
+
+    /** Die Mitte der Vorschau; die vier Szenen liegen je 16 × 16 Blöcke in den Ecken um sie, 6 Blöcke Abstand. */
+    private static final int KX = 400, KZ = 400;
+
+    /** Die vier Szenen als Befehle; (x0, z0) ist ihre Ecke im Nordwesten. */
+    private static List<String> kippSzenen() {
+        List<String> b = new ArrayList<>();
+        b.add("gamerule random_tick_speed 0");
+        b.add("fill " + (KX - 30) + " -61 " + (KZ - 30) + " " + (KX + 30) + " -61 " + (KZ + 30) + " grass_block");
+        // Höchstens 32768 Blöcke je fill: in vier Vierteln.
+        for (int qx = 0; qx < 2; qx++) {
+            for (int qz = 0; qz < 2; qz++) {
+                int ax = KX - 30 + 31 * qx, az = KZ - 30 + 31 * qz;
+                b.add("fill " + ax + " -60 " + az + " " + (ax + 30) + " -45 " + (az + 30) + " air");
+            }
+        }
+        // Feld im Nordwesten: Weizen, Karotten, Kartoffeln, Rote Bete, Kürbis- und Melonenstiele; Wasser in z 2 und 10.
+        int x0 = KX - 22, z0 = KZ - 22;
+        b.add("fill " + x0 + " -61 " + z0 + " " + (x0 + 15) + " -61 " + (z0 + 12) + " farmland[moisture=7]");
+        b.add("fill " + x0 + " -61 " + (z0 + 2) + " " + (x0 + 15) + " -61 " + (z0 + 2) + " water");
+        b.add("fill " + x0 + " -61 " + (z0 + 10) + " " + (x0 + 15) + " -61 " + (z0 + 10) + " water");
+        String[] reihen = {"wheat", "carrots", "potatoes"};
+        for (int r = 0; r < 3; r++) {
+            for (int i = 0; i < 16; i++) {
+                b.add("setblock " + (x0 + i) + " -60 " + (z0 + 1 + 2 * r) + " " + reihen[r] + "[age=" + Math.min(i, 7) + "]");
+            }
+        }
+        for (int i = 0; i < 16; i++) {
+            b.add("setblock " + (x0 + i) + " -60 " + (z0 + 7) + " beetroots[age=" + Math.min(i / 2, 3) + "]");
+        }
+        String[][] kuerbisse = {{"pumpkin_stem", "attached_pumpkin_stem", "pumpkin"}, {"melon_stem", "attached_melon_stem", "melon"}};
+        for (int r = 0; r < 2; r++) {
+            int z = z0 + 9 + 2 * r;
+            for (int i = 0; i < 8; i++) {
+                b.add("setblock " + (x0 + i) + " -60 " + z + " " + kuerbisse[r][0] + "[age=" + i + "]");
+            }
+            b.add("setblock " + (x0 + 10) + " -60 " + z + " " + kuerbisse[r][2]);
+            b.add("setblock " + (x0 + 9) + " -60 " + z + " " + kuerbisse[r][1] + "[facing=east]");
+            b.add("setblock " + (x0 + 13) + " -60 " + z + " " + kuerbisse[r][2]);
+            b.add("setblock " + (x0 + 14) + " -60 " + z + " " + kuerbisse[r][1] + "[facing=west]");
+        }
+        // Seegras im Nordosten über Sand: Norden 3 tief, Süden 1 tief.
+        x0 = KX + 6;
+        b.add("fill " + (x0 - 1) + " -60 " + (z0 - 1) + " " + (x0 + 16) + " -60 " + (z0 + 16) + " stone");
+        b.add("fill " + x0 + " -63 " + z0 + " " + (x0 + 15) + " -60 " + (z0 + 15) + " water");
+        b.add("fill " + x0 + " -63 " + z0 + " " + (x0 + 15) + " -63 " + (z0 + 7) + " sand");
+        b.add("fill " + x0 + " -63 " + (z0 + 8) + " " + (x0 + 15) + " -61 " + (z0 + 15) + " sand");
+        b.add("fill " + x0 + " -62 " + (z0 + 1) + " " + (x0 + 15) + " -62 " + (z0 + 1) + " seagrass");
+        b.add("fill " + x0 + " -62 " + (z0 + 3) + " " + (x0 + 15) + " -62 " + (z0 + 3) + " tall_seagrass[half=lower]");
+        b.add("fill " + x0 + " -61 " + (z0 + 3) + " " + (x0 + 15) + " -61 " + (z0 + 3) + " tall_seagrass[half=upper]");
+        b.add("fill " + x0 + " -62 " + (z0 + 5) + " " + (x0 + 15) + " -62 " + (z0 + 6) + " seagrass");
+        b.add("fill " + x0 + " -60 " + (z0 + 9) + " " + (x0 + 15) + " -60 " + (z0 + 9) + " seagrass");
+        b.add("fill " + x0 + " -60 " + (z0 + 11) + " " + (x0 + 15) + " -60 " + (z0 + 13) + " seagrass");
+        // Wiese im Südwesten: Reihen je Art, dann gemischt.
+        x0 = KX - 22;
+        z0 = KZ + 6;
+        String[] blumen = {"poppy", "dandelion", "red_tulip", "orange_tulip", "white_tulip", "pink_tulip", "cornflower", "oxeye_daisy"};
+        for (int i = 0; i < 16; i++) {
+            b.add("setblock " + (x0 + i) + " -60 " + (z0 + 1) + " " + blumen[i / 2]);
+            b.add("setblock " + (x0 + i) + " -60 " + (z0 + 3) + " short_grass");
+            b.add("setblock " + (x0 + i) + " -60 " + (z0 + 5) + " " + (i < 8 ? "fern" : "short_grass"));
+            String hoch = i < 8 ? "tall_grass" : "large_fern";
+            b.add("setblock " + (x0 + i) + " -60 " + (z0 + 7) + " " + hoch + "[half=lower]");
+            b.add("setblock " + (x0 + i) + " -59 " + (z0 + 7) + " " + hoch + "[half=upper]");
+        }
+        String[] mix = {"short_grass", "poppy", "short_grass", "dandelion", "fern", "short_grass", "red_tulip", "short_grass", "oxeye_daisy"};
+        for (int z = 9; z < 16; z++) {
+            for (int i = 0; i < 16; i++) {
+                int k = Math.floorMod(i * 7 + z * 3 + i * z, mix.length + 2);
+                if (k < mix.length) {
+                    b.add("setblock " + (x0 + i) + " -60 " + (z0 + z) + " " + mix[k]);
+                } else {
+                    b.add("setblock " + (x0 + i) + " -60 " + (z0 + z) + " tall_grass[half=lower]");
+                    b.add("setblock " + (x0 + i) + " -59 " + (z0 + z) + " tall_grass[half=upper]");
+                }
+            }
+        }
+        // Bambus im Südosten: Stangen 1 bis 6 hoch, oben Blätter wie gewachsen.
+        x0 = KX + 6;
+        for (int gz = 0; gz < 8; gz++) {
+            for (int gx = 0; gx < 8; gx++) {
+                int hoehe = 1 + (gx + gz * 3) % 6;
+                int x = x0 + 2 * gx, z = z0 + 2 * gz;
+                for (int h = 0; h < hoehe; h++) {
+                    String blatt = h == hoehe - 1 || h == hoehe - 2 ? (hoehe >= 3 ? "large" : "small") : h == hoehe - 3 ? "small" : "none";
+                    b.add("setblock " + x + " " + (-60 + h) + " " + z + " bamboo[age=" + (hoehe >= 4 ? 1 : 0) + ",leaves=" + blatt + "]");
+                }
+            }
+        }
+        return b;
+    }
+
+    /**
+     * Versuch, nie mergen: die vier Szenen bei 4, 2 und 1 px in den Varianten 0, 1, 4, 5 und 6 von {@link ChunkMaler#kippen},
+     * je ein Bildschirmfoto; die Minimap gross, damit alle vier Szenen neben der Marke des Spielers stehen. Dazu die Lage in
+     * {@code kippen-lage.txt} neben den Bildern, zum Schneiden.
+     */
+    private static void kippVorschau(ClientGameTestContext context, TestServerContext server) {
+        // Erst hin, damit die Chunks geladen sind; dann bauen.
+        server.runCommand("tp @a " + (KX + 0.5) + " -30 " + (KZ + 0.5) + " 0 90");
+        context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - KX - 0.5) < 0.1, 600);
+        context.waitTicks(60);
+        for (String befehl : kippSzenen()) {
+            server.runCommand(befehl);
+        }
+        context.waitTicks(20);
+        context.runOnClient(mc -> {
+            int w = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+            Minimap.INSTANZ.stelle(4, 4, 256, w, h);
+        });
+        StringBuilder lage = new StringBuilder();
+        for (int v : new int[] {0, 1, 4, 5, 6}) {
+            ChunkMaler.kippen = v;
+            for (int scale : new int[] {4, 2, 1}) {
+                context.runOnClient(mc -> {
+                    Minimap.INSTANZ.leeren();
+                    Minimap.INSTANZ.setzeScale(scale);
+                    Minimap.INSTANZ.setzeZoom(scale);
+                });
+                context.waitTicks(5);
+                String name = "kippen-v" + v + "-" + scale + "px";
+                minimapBei(context, server, KX + 0.5, KZ + 0.5, name);
+                Minimap.Rahmen r = context.computeOnClient(mc -> Minimap.INSTANZ.zuletzt());
+                int gs = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+                lage.append(name).append(' ').append(r.x()).append(' ').append(r.y()).append(' ').append(r.seite()).append(' ')
+                        .append(gs).append(' ').append(scale).append('\n');
+            }
+        }
+        ChunkMaler.kippen = 0;
+        try {
+            Files.writeString(FabricLoader.getInstance().getGameDir().resolve("screenshots").resolve("kippen-lage.txt"), lage);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
     private static final String[] ECKEN = {"oben links", "oben rechts", "unten links", "unten rechts"};
 
     /**

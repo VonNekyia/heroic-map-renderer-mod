@@ -6,21 +6,7 @@
   "environment": "client",
   "entrypoints": {
     "fabric-client-gametest": [
-      "com.nekyia.heroicmap.Api",
-      "com.nekyia.heroicmap.Anmeldung",
-      "com.nekyia.heroicmap.Bilder",
-      "com.nekyia.heroicmap.Messung",
-      "com.nekyia.heroicmap.Uebernahme",
-      "com.nekyia.heroicmap.Server",
-      "com.nekyia.heroicmap.Bedienung",
-      "com.nekyia.heroicmap.Strom",
-      "com.nekyia.heroicmap.OhneTp",
-      "com.nekyia.heroicmap.Blockentities",
-      "com.nekyia.heroicmap.Spieler",
-      "com.nekyia.heroicmap.Zoomstufen",
-      "com.nekyia.heroicmap.SelbstZoom",
-      "com.nekyia.heroicmap.KarteJeServer",
-      "com.nekyia.heroicmap.OrtAendern"
+      "com.nekyia.heroicmap.Bilder"
     ],
     "heroicmap": [
       "com.nekyia.heroicmap.ProbeEbene"
