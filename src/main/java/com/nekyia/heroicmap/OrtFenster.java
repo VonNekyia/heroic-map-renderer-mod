@@ -126,18 +126,9 @@ final class OrtFenster extends Screen {
         } else {
             Path neuWelt = Ort.ordner(wurzel, neu);
             ziel = ganz ? neuWelt : neuWelt.resolve(baumName(neu));
-            Path hier = Downloads.weltOrdner();
-            if (neuWelt.equals(welt)) {
-                grund = Component.translatable("heroicmap.ort.gleich");
-            } else if (Files.exists(ziel, LinkOption.NOFOLLOW_LINKS)) {
-                grund = Component.translatable("heroicmap.ort.da");
-            } else if (ganz && (welt.equals(hier) || neuWelt.equals(hier))) {
-                grund = Component.translatable("heroicmap.ort.hier");
-            } else if (Selbst.INSTANZ.zeichnetIn(welt) || Selbst.INSTANZ.zeichnetIn(neuWelt)) {
-                grund = Component.translatable("heroicmap.ort.selbst");
-            } else if (halten().stream().anyMatch(Downloads.INSTANZ::belegt)) {
-                grund = Component.translatable("heroicmap.ort.belegt");
-            }
+            String gegen = Ort.grund(welt, neuWelt, ziel, ganz, Downloads.weltOrdner(), Selbst.INSTANZ::zeichnetIn,
+                    halten().stream().anyMatch(Downloads.INSTANZ::belegt));
+            grund = gegen == null ? null : Component.translatable(gegen);
             boolean eigen = ganz ? eigene : Selbst.selbst(karte.ordner());
             Component wem = !eigen || neu.wer().equals(jetzt.wer()) ? Component.empty()
                     : Component.literal(" ").append(Zeigt.OHNE.equals(neu.wer()) ? Component.translatable("heroicmap.ort.eigene.ohne")

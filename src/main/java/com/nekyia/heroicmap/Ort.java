@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -114,6 +115,28 @@ final class Ort {
             p = p.resolve(KARTE + t.server());
         }
         return p.resolve(WELT + t.hash());
+    }
+
+    /**
+     * Was gegen den Umzug von {@code welt} nach {@code neuWelt} spricht, als Schlüssel der Meldung, oder null. {@code ziel} ist
+     * bei „Ganzer Ordner“ ({@code ganz}) der neue Ordner, sonst der neue Baum. Dagegen sprechen: derselbe Ort; etwas am Ziel,
+     * denn zusammengeführt wird nie; bei „Ganzer Ordner“ die Welt, in der der Spieler ist ({@code hier}); „Selbst“ zeichnet in
+     * eine der beiden Welten; ein Download in einen der Bäume ({@code belegt}).
+     */
+    static String grund(Path welt, Path neuWelt, Path ziel, boolean ganz, Path hier, Predicate<Path> zeichnet, boolean belegt) {
+        if (neuWelt.equals(welt)) {
+            return "heroicmap.ort.gleich";
+        }
+        if (Files.exists(ziel, LinkOption.NOFOLLOW_LINKS)) {
+            return "heroicmap.ort.da";
+        }
+        if (ganz && (welt.equals(hier) || neuWelt.equals(hier))) {
+            return "heroicmap.ort.hier";
+        }
+        if (zeichnet.test(welt) || zeichnet.test(neuWelt)) {
+            return "heroicmap.ort.selbst";
+        }
+        return belegt ? "heroicmap.ort.belegt" : null;
     }
 
     /**

@@ -53,6 +53,26 @@ class OrtTest {
         assertNull(Ort.eingabe("karte-x", "", HASH, f));
     }
 
+    @Test
+    void gruende(@TempDir Path w) throws IOException {
+        Path welt = w.resolve("a/welt-" + HASH), neu = w.resolve("a/karte-build/welt-" + HASH), hier = w.resolve("b/welt-" + HASH);
+        assertNull(Ort.grund(welt, neu, neu, true, hier, p -> false, false));
+        assertEquals("heroicmap.ort.gleich", Ort.grund(welt, welt, welt, true, hier, p -> false, false));
+        Files.createDirectories(neu);
+        assertEquals("heroicmap.ort.da", Ort.grund(welt, neu, neu, true, hier, p -> false, false));
+        assertNull(Ort.grund(welt, neu, neu.resolve("baum"), false, hier, p -> false, false), "nur diese Karte: der Ordner dort stört nicht");
+        Files.createDirectories(neu.resolve("baum"));
+        assertEquals("heroicmap.ort.da", Ort.grund(welt, neu, neu.resolve("baum"), false, hier, p -> false, false));
+        Path frei = w.resolve("a/karte-x/welt-" + HASH);
+        // Die Welt, in der der Spieler ist, nur bei „Ganzer Ordner“, als alter wie als neuer Ort.
+        assertEquals("heroicmap.ort.hier", Ort.grund(hier, frei, frei, true, hier, p -> false, false));
+        assertEquals("heroicmap.ort.hier", Ort.grund(welt, hier, hier, true, hier, p -> false, false));
+        assertNull(Ort.grund(hier, frei, frei.resolve("baum"), false, hier, p -> false, false));
+        assertEquals("heroicmap.ort.selbst", Ort.grund(welt, frei, frei, true, hier, welt::equals, false));
+        assertEquals("heroicmap.ort.selbst", Ort.grund(welt, frei, frei.resolve("baum"), false, hier, frei::equals, false));
+        assertEquals("heroicmap.ort.belegt", Ort.grund(welt, frei, frei, true, hier, p -> false, true));
+    }
+
     /** Eine Welt unter play.example.net ohne Server: ein Download, eine eigene Karte ohne Server, Wegpunkte und zeigt.txt. */
     private static Path welt(Path w) throws IOException {
         Path welt = w.resolve("play.example.net/welt-" + HASH);

@@ -19,7 +19,8 @@
       "com.nekyia.heroicmap.Spieler",
       "com.nekyia.heroicmap.Zoomstufen",
       "com.nekyia.heroicmap.SelbstZoom",
-      "com.nekyia.heroicmap.KarteJeServer"
+      "com.nekyia.heroicmap.KarteJeServer",
+      "com.nekyia.heroicmap.OrtAendern"
     ],
     "heroicmap": [
       "com.nekyia.heroicmap.ProbeEbene"
