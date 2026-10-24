@@ -53,6 +53,7 @@ public final class OrtAendern implements FabricClientGameTest {
             // Aus dem Einzelspieler: „Ort …“ grau.
             liste(context);
             Button grau = ort(context, hier.resolve("probe-hier"));
+            context.takeScreenshot(TestScreenshotOptions.of("ort-liste").disableCounterPrefix());
             if (context.computeOnClient(mc -> grau.active)) {
                 throw new AssertionError("„Ort …“ einer Karte aus dem Einzelspieler ist nicht grau");
             }

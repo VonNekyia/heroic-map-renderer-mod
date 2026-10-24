@@ -77,6 +77,14 @@ jobs:
           # Die Meldung der Wache, siehe docs/entwicklung.md, „Gametests“, als Fehler an der PR.
           wait "$lauf" || { grep -m1 -o 'Gametest h[^ ]*ngt: .*Alle Threads' build/run/clientGameTest/logs/latest.log | sed 's/^/::error::/'; exit 1; }
 
+      - name: Bilder für die PR
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bilder-${{ matrix.mods }}
+          path: build/run/clientGameTest/screenshots/ort-*.png
+          if-no-files-found: error
+
       - name: Log und Bildschirmfotos
         if: failure()
         uses: actions/upload-artifact@v7
