@@ -2743,8 +2743,8 @@ public final class Bedienung implements FabricClientGameTest {
 
             String teleport = context.computeOnClient(mc -> Component.translatable("heroicmap.karte.teleport", frei.x(), frei.z()).getString());
             List<String> punktSoll = new java.util.ArrayList<>(List.of(teleport));
-            punktSoll.addAll(texte(context, "heroicmap.karte.koordinaten", "heroicmap.karte.form_von_hier", "heroicmap.karte.ebene",
-                    "heroicmap.karte.wegpunkt_loeschen"));
+            punktSoll.addAll(texte(context, "heroicmap.karte.koordinaten", "heroicmap.karte.name", "heroicmap.karte.form_von_hier",
+                    "heroicmap.karte.ebene", "heroicmap.karte.wegpunkt_loeschen"));
             Karte.Marke m = marke(context, frei);
             List<String> ist = eintraegeBei(context, maus, k, m.x(), m.y());
             if (!ist.equals(punktSoll)) {
