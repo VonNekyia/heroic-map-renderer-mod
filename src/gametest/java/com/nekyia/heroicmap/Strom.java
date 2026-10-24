@@ -193,7 +193,7 @@ public final class Strom implements FabricClientGameTest {
                 throw new AssertionError("Nach dem Abgleich ohne Fehlendes: Balken " + Arrays.toString(balkenDanach) + ", Koordinaten bei "
                         + danach[1] + " statt " + ohne[1]);
             }
-            context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(Downloads.weltOrdner(), DIMENSION))));
+            context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(Downloads.weltOrdner(), DIMENSION, Downloads.INSTANZ.wer()))));
             context.waitTicks(2);
 
             // Gegenprobe: Ein Name mit .. bricht ab; ausserhalb liegt nichts, eine Karte entsteht nicht.
@@ -292,7 +292,7 @@ public final class Strom implements FabricClientGameTest {
         if (Math.abs(weiss - erwartet) > gs) {
             throw new AssertionError("Balken " + wann + ": " + weiss + " weisse Pixel statt " + erwartet + " bei " + f.prozent());
         }
-        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(Downloads.weltOrdner(), DIMENSION))));
+        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(Downloads.weltOrdner(), DIMENSION, Downloads.INSTANZ.wer()))));
         context.waitTicks(2);
     }
 
