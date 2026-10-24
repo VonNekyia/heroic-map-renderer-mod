@@ -328,8 +328,8 @@ public final class Bilder implements FabricClientGameTest {
         String[] szenen = {"feld", "seegras", "kelp", "wiese", "bambus"};
         int[][] mitten = {{KX - 14, KZ - 14}, {KX + 14, KZ - 14}, {KX + 42, KZ - 14}, {KX - 14, KZ + 14}, {KX + 14, KZ + 14}};
         for (int s = 0; s < szenen.length; s++) {
-            boolean wasser = szenen[s].equals("seegras") || szenen[s].equals("kelp");
-            for (int v : wasser ? new int[] {0, 1, 11, 5, 15} : new int[] {0, 1, 5}) {
+            // Eingepasst (21, 25), im Wasser auch geklemmt; im Feld dazu V1 bisher (1) zum Vergleich.
+            for (int v : szenen[s].equals("feld") ? new int[] {0, 1, 21, 25} : new int[] {0, 21, 25}) {
                 ChunkMaler.kippen = v;
                 for (int scale : new int[] {16, 8, 4}) {
                     context.runOnClient(mc -> {

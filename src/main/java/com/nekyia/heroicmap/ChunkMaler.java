@@ -170,7 +170,8 @@ final class ChunkMaler {
     /**
      * Versuch, nie mergen: wie Pflanzen von oben stehen. 0 heute (0108, flach), 1 alle Flächen 45° nach Norden gekippt,
      * 4 wie 1 mit einer Richtung je Block, 5 wie 1 mit 60°, 6 das ganze Modell 90° nach Norden; 10 dazu: im Wasser jede
-     * gekippte Fläche unter die Oberfläche geklemmt. Nur für den Bildlauf.
+     * gekippte Fläche unter die Oberfläche geklemmt; 20 dazu: geklemmt und entlang der Kipprichtung in den Block eingepasst.
+     * Nur für den Bildlauf.
      */
     static volatile int kippen = 0;
     private static final double[][] RICHTUNGEN = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
@@ -303,7 +304,8 @@ final class ChunkMaler {
         }, 0, 0, 0, welt, pos, state, model, state.getSeed(pos));
         if (!kippliste.isEmpty() && (bambus || !oben)) {
             FluidState wasser = state.getFluidState();
-            kippe(variante % 10, variante >= 10 && !wasser.isEmpty() ? wasser.getHeight(welt, pos) - 1 / 64f : Float.POSITIVE_INFINITY);
+            kippe(variante % 10, variante >= 10 && !wasser.isEmpty() ? wasser.getHeight(welt, pos) - 1 / 64f : Float.POSITIVE_INFINITY,
+                    variante >= 20);
             return;
         }
         // Ein Modell mit einer Fläche nach oben, etwa ein Blütenteppich, bleibt, wie es ist.
@@ -337,7 +339,7 @@ final class ChunkMaler {
      * Kippt die Flächen der Pflanze starr um die waagrechte Achse durch die Mitte ihres Bodens, so dass oben nach der Richtung
      * wandert; dann wieder auf ihre alte Tiefe. Was danach nach oben zeigt, kommt in die Spalte. Wie die Skizzen.
      */
-    private void kippe(int variante, float hoechstens) {
+    private void kippe(int variante, float hoechstens, boolean einpassen) {
         double[] d = RICHTUNGEN[0];
         double winkel = 45;
         if (variante == 4) {
@@ -366,9 +368,34 @@ final class ChunkMaler {
             }
             gekippt.add(q);
         }
+        boolean[] sichtbar = new boolean[gekippt.size()];
+        double uMin = Double.MAX_VALUE, uMax = -Double.MAX_VALUE;
         for (int i = 0; i < gekippt.size(); i++) {
             float[] q = gekippt.get(i);
-            if (obenAnteil(q[3] - q[0], q[4] - q[1], q[5] - q[2], q[6] - q[0], q[7] - q[1], q[8] - q[2]) <= 1e-4f) {
+            sichtbar[i] = obenAnteil(q[3] - q[0], q[4] - q[1], q[5] - q[2], q[6] - q[0], q[7] - q[1], q[8] - q[2]) > 1e-4f;
+            for (int k = 0; k < 4 && sichtbar[i]; k++) {
+                double u = (q[3 * k] - 0.5) * d[0] + (q[3 * k + 2] - 0.5) * d[1];
+                uMin = Math.min(uMin, u);
+                uMax = Math.max(uMax, u);
+            }
+        }
+        // Eingepasst: die gezeichneten Flächen entlang d so wenig wie nötig in den Block schieben, über 1 Block Spanne auf 1
+        // stauchen; quer zu d bleibt alles. Ohne das schneidet die Spalte ab, was über die Kante ragt.
+        if (einpassen && uMax >= uMin) {
+            double spanne = uMax - uMin, stauchen = spanne > 1 ? 1 / spanne : 1;
+            double schieben = spanne > 1 ? -0.5 - uMin * stauchen : uMin < -0.5 ? -0.5 - uMin : uMax > 0.5 ? 0.5 - uMax : 0;
+            for (float[] q : gekippt) {
+                for (int k = 0; k < 4; k++) {
+                    double u = (q[3 * k] - 0.5) * d[0] + (q[3 * k + 2] - 0.5) * d[1];
+                    double neuU = u * stauchen + schieben;
+                    q[3 * k] += (float) ((neuU - u) * d[0]);
+                    q[3 * k + 2] += (float) ((neuU - u) * d[1]);
+                }
+            }
+        }
+        for (int i = 0; i < gekippt.size(); i++) {
+            float[] q = gekippt.get(i);
+            if (!sichtbar[i]) {
                 continue;
             }
             Kippflaeche f = kippliste.get(i);
