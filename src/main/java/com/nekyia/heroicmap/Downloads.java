@@ -117,7 +117,8 @@ final class Downloads {
                 boolean mitNamen = backend(json);
                 // Wer der Server ist, entscheidet, welche Karte er zeigt und in welche „Selbst“ zeichnet. Siehe
                 // docs/selbst.md, „Wahl“.
-                if (!karte(json) && mitNamen) {
+                boolean gewechselt = karte(json);
+                if (uebergang() || !gewechselt && mitNamen) {
                     Minimap.INSTANZ.leeren();
                     Selbst.INSTANZ.leeren();
                     HeroicMap.weltOrdnerGewechselt();
@@ -175,6 +176,51 @@ final class Downloads {
      */
     boolean serverFest() {
         return server() == null || beantwortet || !Kanal.offen() && System.currentTimeMillis() - sitzungAb >= OHNE_KANAL_MS;
+    }
+
+    /** Kam in dieser Sitzung schon eine Antwort auf show? */
+    boolean beantwortet() {
+        return beantwortet;
+    }
+
+    /**
+     * Übergang vom geteilten Ordner zum Zeiger: Zeigt dieser Server die Karte eines anderen, merkt der Mod das je
+     * Adresse und Hash. Meldet er später seine eigene, setzt der Mod einmal einen Zeiger auf die andere. True, wenn ein
+     * Zeiger dazukam. Siehe docs/download.md, „Ablage“.
+     */
+    private boolean uebergang() {
+        ServerData server = server();
+        String b = backend, k = KARTE.karte();
+        if (server == null || b == null) {
+            return false;
+        }
+        boolean neu = false;
+        for (long hash : nameGilt.keySet()) {
+            if (k != null && !k.equals(b)) {
+                Uebergang.merke(wurzel(), server.ip, hash, b, k);
+                continue;
+            }
+            String alt = Uebergang.einmal(wurzel(), server.ip, hash, b);
+            if (alt != null) {
+                Path welt = wurzel().resolve(weltOrdner(Minimap.INSTANZ.ablage(), server.ip, name(hash), KARTE.fuer(hash), hash));
+                neu |= zeigeEinmal(welt, alt);
+            }
+        }
+        return neu;
+    }
+
+    /** Setzt im Ordner {@code welt} den Zeiger auf die Karte {@code alt}, wenn es sie neben ihm gibt und noch keinen. */
+    static boolean zeigeEinmal(Path welt, String alt) {
+        if (Zeiger.name(welt) != null || !Files.isDirectory(Zeiger.ordner(welt, alt))) {
+            return false;
+        }
+        try {
+            Zeiger.setze(welt, alt);
+            return true;
+        } catch (IOException e) {
+            LOGGER.warn("Heroic Map: Zeiger in {} nicht gesetzt", welt, e);
+            return false;
+        }
     }
 
     /** Die erste Antwort auf show in der Sitzung setzt den Namen dieses Servers; true, wenn sie einen nennt. */
