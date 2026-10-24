@@ -1588,7 +1588,8 @@ public final class Bedienung implements FabricClientGameTest {
             maus.scroll(jetzt[0] > stufe || jetzt[1] > 1 ? -1 : 1);
             context.waitTick();
         }
-        throw new AssertionError("Stufe " + stufe + " nicht erreicht: " + Arrays.toString(context.computeOnClient(mc -> ((Karte) mc.gui.screen()).stufe())));
+        int[] ende = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).stufe());
+        throw new AssertionError("Stufe " + stufe + " nicht erreicht: " + Arrays.toString(ende));
     }
 
     private static Wegpunkte.Punkt punktImSpiel(String dimension, int[] block) {
