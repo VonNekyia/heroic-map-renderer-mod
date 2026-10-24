@@ -37,7 +37,8 @@ final class MinimapKlick {
 
     /**
      * Drücken: Mit der linken Taste auf einem Ziel, mit der rechten oder mittleren auf einer Marke merkt es sich das Ziel; true,
-     * wenn eins getroffen ist. Siehe docs/rahmen.md, „Verzierungen“ und „Wähler“.
+     * wenn eins getroffen ist. Siehe docs/rahmen.md, „Verzierungen“.
+     * Siehe docs/rahmen.md, „Wähler“.
      */
     boolean druecke(MouseButtonEvent e) {
         int z = Minimap.INSTANZ.ziel(e.x(), e.y());

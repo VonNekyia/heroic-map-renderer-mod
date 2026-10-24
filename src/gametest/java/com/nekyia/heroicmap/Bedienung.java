@@ -4521,7 +4521,8 @@ public final class Bedienung implements FabricClientGameTest {
      * ein Klick daneben nichts. Im Wähler übernimmt ein Klick auf eine Vorschau, ein Farbfeld färbt nur die Vorschau, Esc und ein
      * Klick daneben schliessen ihn ohne Änderung und lassen das Menü offen. Ziehen von einer Marke verschiebt nur, der Griff
      * ändert nur die Grösse, der Zoom nur den Zoom. Im Untermenü dasselbe, dort mit der mittleren Taste eine Marke durchsichtig.
-     * Siehe docs/minimap.md, „Aussehen an der Minimap“, und docs/rahmen.md, „Wähler“.
+     * Siehe docs/minimap.md, „Aussehen an der Minimap“.
+     * Siehe docs/rahmen.md, „Wähler“.
      */
     private static void aussehen(ClientGameTestContext context, TestInput maus, int k) {
         context.runOnClient(mc -> {
