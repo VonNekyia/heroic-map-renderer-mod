@@ -214,6 +214,7 @@
   "heroicmap.ort.da": "Dort liegt schon etwas; zusammengeführt wird nicht.",
   "heroicmap.ort.hier": "Das ist der Ordner der Welt, in der du bist; erst die Welt verlassen.",
   "heroicmap.ort.selbst": "„Selbst zeichnen“ zeichnet gerade in diese Welt.",
+  "heroicmap.ort.gezeigt": "Minimap und Vollbildkarte zeigen gerade diese Karte; erst die Welt verlassen oder eine andere Karte zeigen.",
   "heroicmap.ort.belegt": "Gerade läuft ein Download in eine dieser Karten.",
   "heroicmap.ort.fehler": "Umzug gescheitert; Einzelheiten im Log.",
   "heroicmap.ort.fehler.hash": "Der Hash hat genau 16 Stellen hex: 0–9 und a–f, klein.",

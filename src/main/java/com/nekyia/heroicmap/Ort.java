@@ -118,12 +118,15 @@ final class Ort {
     }
 
     /**
-     * Was gegen den Umzug von {@code welt} nach {@code neuWelt} spricht, als Schlüssel der Meldung, oder null. {@code ziel} ist
-     * bei „Ganzer Ordner“ ({@code ganz}) der neue Ordner, sonst der neue Baum. Dagegen sprechen: derselbe Ort; etwas am Ziel,
-     * denn zusammengeführt wird nie; bei „Ganzer Ordner“ die Welt, in der der Spieler ist ({@code hier}); „Selbst“ zeichnet in
-     * eine der beiden Welten; ein Download in einen der Bäume ({@code belegt}).
+     * Was gegen den Umzug aus dem Ordner {@code welt} nach {@code neuWelt} spricht, als Schlüssel der Meldung, oder null.
+     * {@code quelle} ist, was umzieht: bei „Ganzer Ordner“ {@code welt} selbst, sonst ein Baum darin; {@code ziel} der neue
+     * Ordner oder der neue Baum. Dagegen sprechen: derselbe Ort; etwas am Ziel, denn zusammengeführt wird nie; bei „Ganzer
+     * Ordner“ die Welt, in der der Spieler ist ({@code hier}); „Selbst“ zeichnet in eine der beiden Welten; Minimap und
+     * Vollbildkarte zeigen einen Baum, der umzöge ({@code gezeigt}, oder null); ein Download in einen der Bäume ({@code belegt}).
      */
-    static String grund(Path welt, Path neuWelt, Path ziel, boolean ganz, Path hier, Predicate<Path> zeichnet, boolean belegt) {
+    static String grund(Path welt, Path quelle, Path neuWelt, Path ziel, Path hier, Predicate<Path> zeichnet, Path gezeigt,
+            boolean belegt) {
+        boolean ganz = quelle.equals(welt);
         if (neuWelt.equals(welt)) {
             return "heroicmap.ort.gleich";
         }
@@ -135,6 +138,10 @@ final class Ort {
         }
         if (zeichnet.test(welt) || zeichnet.test(neuWelt)) {
             return "heroicmap.ort.selbst";
+        }
+        // Die Anzeige läse sonst weiter aus den alten Pfaden.
+        if (gezeigt != null && gezeigt.startsWith(quelle)) {
+            return "heroicmap.ort.gezeigt";
         }
         return belegt ? "heroicmap.ort.belegt" : null;
     }

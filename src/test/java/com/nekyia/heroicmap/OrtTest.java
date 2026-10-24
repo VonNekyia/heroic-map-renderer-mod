@@ -56,21 +56,28 @@ class OrtTest {
     @Test
     void gruende(@TempDir Path w) throws IOException {
         Path welt = w.resolve("a/welt-" + HASH), neu = w.resolve("a/karte-build/welt-" + HASH), hier = w.resolve("b/welt-" + HASH);
-        assertNull(Ort.grund(welt, neu, neu, true, hier, p -> false, false));
-        assertEquals("heroicmap.ort.gleich", Ort.grund(welt, welt, welt, true, hier, p -> false, false));
+        Path baum = welt.resolve("baum");
+        assertNull(Ort.grund(welt, welt, neu, neu, hier, p -> false, null, false));
+        assertEquals("heroicmap.ort.gleich", Ort.grund(welt, welt, welt, welt, hier, p -> false, null, false));
         Files.createDirectories(neu);
-        assertEquals("heroicmap.ort.da", Ort.grund(welt, neu, neu, true, hier, p -> false, false));
-        assertNull(Ort.grund(welt, neu, neu.resolve("baum"), false, hier, p -> false, false), "nur diese Karte: der Ordner dort stört nicht");
+        assertEquals("heroicmap.ort.da", Ort.grund(welt, welt, neu, neu, hier, p -> false, null, false));
+        assertNull(Ort.grund(welt, baum, neu, neu.resolve("baum"), hier, p -> false, null, false), "nur diese Karte: der Ordner dort stört nicht");
         Files.createDirectories(neu.resolve("baum"));
-        assertEquals("heroicmap.ort.da", Ort.grund(welt, neu, neu.resolve("baum"), false, hier, p -> false, false));
-        Path frei = w.resolve("a/karte-x/welt-" + HASH);
+        assertEquals("heroicmap.ort.da", Ort.grund(welt, baum, neu, neu.resolve("baum"), hier, p -> false, null, false));
+        Path frei = w.resolve("a/karte-x/welt-" + HASH), hierBaum = hier.resolve("baum");
         // Die Welt, in der der Spieler ist, nur bei „Ganzer Ordner“, als alter wie als neuer Ort.
-        assertEquals("heroicmap.ort.hier", Ort.grund(hier, frei, frei, true, hier, p -> false, false));
-        assertEquals("heroicmap.ort.hier", Ort.grund(welt, hier, hier, true, hier, p -> false, false));
-        assertNull(Ort.grund(hier, frei, frei.resolve("baum"), false, hier, p -> false, false));
-        assertEquals("heroicmap.ort.selbst", Ort.grund(welt, frei, frei, true, hier, welt::equals, false));
-        assertEquals("heroicmap.ort.selbst", Ort.grund(welt, frei, frei.resolve("baum"), false, hier, frei::equals, false));
-        assertEquals("heroicmap.ort.belegt", Ort.grund(welt, frei, frei, true, hier, p -> false, true));
+        assertEquals("heroicmap.ort.hier", Ort.grund(hier, hier, frei, frei, hier, p -> false, null, false));
+        assertEquals("heroicmap.ort.hier", Ort.grund(welt, welt, hier, hier, hier, p -> false, null, false));
+        assertNull(Ort.grund(hier, hierBaum, frei, frei.resolve("baum"), hier, p -> false, null, false));
+        assertEquals("heroicmap.ort.selbst", Ort.grund(welt, welt, frei, frei, hier, welt::equals, null, false));
+        assertEquals("heroicmap.ort.selbst", Ort.grund(welt, baum, frei, frei.resolve("baum"), hier, frei::equals, null, false));
+        // Was Minimap und Vollbildkarte zeigen, zieht nicht unter ihnen weg: der Baum selbst, oder ein Ordner mit ihm, etwa
+        // das Ziel eines Zeigers. Ein anderer Baum, auch einer, dessen Name mit dem gezeigten beginnt, zieht um.
+        assertEquals("heroicmap.ort.gezeigt", Ort.grund(hier, hierBaum, frei, frei.resolve("baum"), hier, p -> false, hierBaum, false));
+        assertNull(Ort.grund(hier, hierBaum, frei, frei.resolve("baum"), hier, p -> false, hier.resolve("anderer"), false));
+        assertNull(Ort.grund(hier, hierBaum, frei, frei.resolve("baum"), hier, p -> false, hier.resolve("baum2"), false));
+        assertEquals("heroicmap.ort.gezeigt", Ort.grund(welt, welt, frei, frei, hier, p -> false, baum, false));
+        assertEquals("heroicmap.ort.belegt", Ort.grund(welt, welt, frei, frei, hier, p -> false, null, true));
     }
 
     /** Eine Welt unter play.example.net ohne Server: ein Download, eine eigene Karte ohne Server, Wegpunkte und zeigt.txt. */

@@ -721,6 +721,10 @@ eine Karte nach einem Reset der Welt in den Ordner des neuen Hashs.
     Karte;
   - „Selbst zeichnen“ zeichnet in den alten oder den neuen Ordner
     (`Selbst.zeichnetIn`);
+  - Minimap und Vollbildkarte zeigen einen Baum, der umzöge, auch im Ziel
+    eines Zeigers; sie läsen sonst weiter aus den alten Pfaden. Gesucht wie
+    von ihnen, mit `Satz.fuer` für die Dimension des Spielers, beim Öffnen
+    und vor dem Umzug (`OrtFenster.gezeigt`);
   - ein Download wartet oder läuft in einen der Bäume, siehe „Reihe“.
 - **Ganzer Ordner:** Der Ordner der Welt zieht als ein Umbenennen um
   (`Ort.zieheOrdner`, `ATOMIC_MOVE`), mit allen Karten, Wegpunkten,

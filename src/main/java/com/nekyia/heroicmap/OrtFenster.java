@@ -46,6 +46,8 @@ final class OrtFenster extends Screen {
     private Ort.Teile neu;
     private Component grund, mit;
     private Path ziel;
+    /** Der Baum, den Minimap und Vollbildkarte zeigen, oder null; gelesen beim Aufbau und vor dem Umzug. */
+    private Path gezeigt;
 
     OrtFenster(Kartenliste zurueck, Laden.AufPlatte karte, Ort.Teile jetzt) {
         super(Component.translatable("heroicmap.ort.titel"));
@@ -82,6 +84,7 @@ final class OrtFenster extends Screen {
         feld(2, "heroicmap.ort.hash", hash, 16, t -> hash = t);
         umziehen = addRenderableWidget(Button.builder(Component.translatable("heroicmap.ort.umziehen"), b -> umziehe())
                 .bounds(mitte - 104, height - 28, 100, 20).build());
+        gezeigt = gezeigt();
         abbrechen = addRenderableWidget(Button.builder(Component.translatable("gui.cancel"), b -> onClose())
                 .bounds(mitte + 4, height - 28, 100, 20).build());
         pruefe();
@@ -138,8 +141,8 @@ final class OrtFenster extends Screen {
         } else {
             Path neuWelt = Ort.ordner(wurzel, neu);
             ziel = ganz ? neuWelt : neuWelt.resolve(baumName(neu));
-            String gegen = Ort.grund(welt, neuWelt, ziel, ganz, Downloads.weltOrdner(), Selbst.INSTANZ::zeichnetIn,
-                    halten().stream().anyMatch(Downloads.INSTANZ::belegt));
+            String gegen = Ort.grund(welt, ganz ? welt : karte.ordner(), neuWelt, ziel, Downloads.weltOrdner(), Selbst.INSTANZ::zeichnetIn,
+                    gezeigt, halten().stream().anyMatch(Downloads.INSTANZ::belegt));
             grund = gegen == null ? null : Component.translatable(gegen);
             boolean eigen = ganz ? eigene : Selbst.selbst(karte.ordner());
             Component wem = !eigen || neu.wer().equals(jetzt.wer()) ? Component.empty()
@@ -152,6 +155,14 @@ final class OrtFenster extends Screen {
         }
     }
 
+    /** Der Baum der Dimension des Spielers, den Minimap und Vollbildkarte zeigen, wie sie ihn suchen; sonst null. */
+    private Path gezeigt() {
+        Path hier = Downloads.weltOrdner();
+        Satz s = hier == null || minecraft.level == null ? null
+                : Satz.fuer(hier, minecraft.level.dimension().identifier().toString(), Downloads.INSTANZ.wer());
+        return s == null ? null : s.ordner().getParent();
+    }
+
     /** Die Schlüssel, die der Umzug in der Reihe hält: alle Bäume des Ordners, oder diese Karte und ihr neuer Ort. */
     private List<Path> halten() {
         return ganz ? baeume : List.of(karte.ordner(), ziel);
@@ -159,6 +170,7 @@ final class OrtFenster extends Screen {
 
     /** Hält die Schlüssel, zieht im Worker um, gibt sie danach frei und kehrt in die Kartenliste zurück, die neu zählt. */
     private void umziehe() {
+        gezeigt = gezeigt();
         pruefe();
         if (grund != null || laeuft) {
             return;

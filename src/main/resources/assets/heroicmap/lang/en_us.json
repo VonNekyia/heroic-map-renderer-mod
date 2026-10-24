@@ -214,6 +214,7 @@
   "heroicmap.ort.da": "Something is already there; nothing gets merged.",
   "heroicmap.ort.hier": "That is the folder of the world you are in; leave the world first.",
   "heroicmap.ort.selbst": "“Draw it yourself” is drawing in this world right now.",
+  "heroicmap.ort.gezeigt": "The minimap and the full map are showing this map right now; leave the world first or show another map.",
   "heroicmap.ort.belegt": "A download into one of these maps is running.",
   "heroicmap.ort.fehler": "The move failed; see the log for details.",
   "heroicmap.ort.fehler.hash": "The hash has exactly 16 hex digits: 0–9 and a–f, lower case.",

@@ -34,7 +34,8 @@ Reviewer hat ihn freigegeben und die Vorgabe und Einzelspieler entschieden.
   Zwischendatei ersetzt. Scheitert ein Schritt, gehen die vorigen zurück.
 - **Nie zusammenführen:** Liegt am Ziel etwas, ist „Umziehen“ grau.
 - **Grau** auch, solange ein Download in einen der Bäume wartet oder läuft,
-  solange „Selbst zeichnen“ in den alten oder neuen Ordner zeichnet, und
+  solange „Selbst zeichnen“ in den alten oder neuen Ordner zeichnet,
+  solange Minimap und Vollbildkarte einen Baum zeigen, der umzöge, und
   bei „Ganzer Ordner“, wenn der Spieler in der Welt des alten oder neuen
   Ordners ist.
 - **Der Hash** hat genau 16 Stellen hex, klein, wie der Mod ihn schreibt.
@@ -52,8 +53,12 @@ Reviewer hat ihn freigegeben und die Vorgabe und Einzelspieler entschieden.
   nach ihrem Speicherordner, nicht nach einer Adresse; der Reviewer hat es
   ausgeschlossen.
 - **„Ort …“ ganz grau in der Welt, in der der Spieler ist,** wie im Plan:
-  „Nur diese Karte“ geht dort. Grau ist nur „Umziehen“ bei „Ganzer Ordner“,
-  mit dem Grund in Rot.
+  „Nur diese Karte“ geht dort, ausser für den Baum, den Minimap und
+  Vollbildkarte zeigen. Grau ist nur „Umziehen“, mit dem Grund in Rot; der
+  Reviewer hat es angenommen.
+- **Die Anzeige nach dem Umzug neu laden** statt „Umziehen“ grau für den
+  gezeigten Baum: mehr Code für einen seltenen Fall; der Reviewer wählte
+  das Graue.
 
 ## Folgen
 
@@ -61,6 +66,6 @@ Reviewer hat ihn freigegeben und die Vorgabe und Einzelspieler entschieden.
   als „(fehlt)“, bis der Spieler ihn löst.
 - Was der Server meldet, ändert „Ort …“ nicht. Beim nächsten Betreten gilt
   die Ablage nach seiner Meldung.
-- Die Gründe „Welt, in der du bist“ und „Selbst zeichnen“ prüft nur
-  `OrtTest`: Im Gametest ist der Spieler in einer Einzelspielerwelt, deren
-  Ordner nicht umzieht.
+- Die Gründe „Welt, in der du bist“, „Selbst zeichnen“ und „gezeigt“
+  prüft nur `OrtTest`: Im Gametest ist der Spieler in einer
+  Einzelspielerwelt, deren Ordner nicht umzieht.
