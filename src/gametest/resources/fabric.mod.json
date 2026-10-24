@@ -20,7 +20,8 @@
       "com.nekyia.heroicmap.Zoomstufen",
       "com.nekyia.heroicmap.SelbstZoom",
       "com.nekyia.heroicmap.KarteJeServer",
-      "com.nekyia.heroicmap.OrtAendern"
+      "com.nekyia.heroicmap.OrtAendern",
+      "com.nekyia.heroicmap.BiomRahmen"
     ],
     "heroicmap": [
       "com.nekyia.heroicmap.ProbeEbene"

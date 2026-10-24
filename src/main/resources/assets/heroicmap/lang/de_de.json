@@ -296,6 +296,8 @@
   "heroicmap.waehler.titel": "Rahmen – ein Klick auf eine Vorschau übernimmt sie, ein Farbfeld färbt sie um, Esc schliesst",
   "heroicmap.waehler.innen": "innen",
   "heroicmap.waehler.aussen": "aussen",
+  "heroicmap.waehler.automatisch": "Automatisch",
+  "heroicmap.waehler.automatisch.beschreibung": "Wechselt mit dem Biom unter dir; jetzt: %s",
   "heroicmap.menue.mitte": "Mittlere Maustaste: Pixel, HD oder durchsichtig (jetzt: %s)",
   "heroicmap.menue.mitte.pixel": "Pixel",
   "heroicmap.menue.mitte.hd": "HD",
