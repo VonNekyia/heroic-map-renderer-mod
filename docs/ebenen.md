@@ -358,7 +358,7 @@ unter
 [Ebenen](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/ebenen.md),
 „Nadel“, und in
 [0118](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entscheidungen/0118-koepfe-in-ebenen.md);
-für den Mod siehe [0029](entscheidungen/0029-koepfe-an-nadeln.md).
+für den Mod siehe [0030](entscheidungen/0030-koepfe-an-nadeln.md).
 
 - **Gelesen:** `head` gilt nur mit genau 64 Zeichen `0–9 a–f`, dem
   SHA-256 der Datei (`Symbole.KOPF`); jeder andere Wert gilt wie ohne

@@ -1,5 +1,5 @@
 ---
-title: "0029: Köpfe an Nadeln"
+title: "0030: Köpfe an Nadeln"
 description: Wie der Mod den Kopf einer Nadel zeigt, fest 8 × 8 Einheiten mit Rand und pixelgenau, warum er Köpfe je Name über alle Ebenen hält, höchstens 1024, und warum er keinen Hash über die Bytes rechnet.
 status: gilt
 date: 2026-10-24
@@ -9,7 +9,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/Ebenen.java
 ---
 
-# 0029: Köpfe an Nadeln
+# 0030: Köpfe an Nadeln
 
 ## Anlass
 
