@@ -122,7 +122,8 @@ die Nachrichten das Plugin:
   und
   [0097](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entscheidungen/0097-banner-feste-groesse-tafel-beim-zeigen.md).
 - **Grösse:** fest, auf jeder Stufe gleich, die Nadel in ihrer `size`, in
-  Einheiten der Oberfläche des Mods wie die Wegpunkte, siehe
+  Einheiten der Oberfläche des Mods wie die Wegpunkte; nur der Name wird
+  weit draussen kleiner, siehe „Namen weit draussen“; siehe
   [0097](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entscheidungen/0097-banner-feste-groesse-tafel-beim-zeigen.md).
   Bis zur Version 0.2.7 wurde sie beim Hinauszoomen kleiner und fiel
   zuletzt weg.
@@ -391,6 +392,37 @@ für den Mod siehe [0030](entscheidungen/0030-koepfe-an-nadeln.md).
   Kasten zum Treffen folgt dem, was gezeichnet ist (`Ebenen.kopfKasten`);
   kommt der Kopf an, sucht die Vollbildkarte ihr Ziel neu
   (`Symbole.stand`). Der Kasten ohne Holen umfasst Schild und Gesicht.
+
+## Namen weit draussen
+
+Die Namen von Nadeln, Köpfen, Bannern und Wegpunkten werden weit draussen
+stufenlos kleiner und blenden zuletzt aus; die Symbole bleiben gleich
+gross. Wie auf der Webkarte nach
+[0119](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entscheidungen/0119-namen-stufenlos-icons-fest.md),
+umgerechnet für den Mod, siehe
+[0035](entscheidungen/0035-namen-weit-draussen-kleiner.md).
+
+- **Faktor** (`Ebenen.nameFaktor`): t = min(1, Länge eines Blocks in
+  Einheiten des GUI / (10 / 256)). Bis 25,6 Blöcke je Einheit steht der
+  Name voll, darunter folgt er dem Massstab. 10 Einheiten im Mod sind 16 px
+  auf der Webkarte (`Ebenen.NAME_GROESSE`), so ist die Grenze dieselbe wie
+  dort, 16 Blöcke je px.
+- **Ausblenden** (`Ebenen.nameDeckung`): ab 5 Einheiten Schrift deckt der
+  Name ganz, ab 3,125 nicht mehr, dazwischen linear (`Ebenen.NAME_VOLL`,
+  `Ebenen.NAME_WEG`), wie 8 und 5 px auf der Webkarte. Ohne Deckung fehlt
+  er und ist kein Ziel für den Zeiger (`Ebenen.kasten`); er zählt nicht zu
+  den 500 Namen je Frame.
+- **Um welchen Punkt:** der gerade Name um seine Oberkante, der Name im
+  Bogen um den Fuss.
+- **Wegpunkte:** ihre „Schrift“ zählt obendrauf, siehe
+  [Wegpunkte](wegpunkte.md), „Namen an Wegpunkten“.
+- **Minimap:** an angehefteten im Massstab der Minimap, dort ist die Länge
+  eines Blocks der Zoom.
+- **Ohne Animation:** Die Karte im Mod zoomt in Rasten, der Name springt
+  mit ihr; auf der Webkarte folgt er dem Zoom in 250 ms.
+- **Nicht:** Namen von Regionen und Linien und die Kartenschrift, siehe
+  „Kartenschrift“; sie wachsen schon mit den Blöcken. Die Zeit unter
+  einem Todespunkt bleibt fest.
 
 ## Flächen, Kreise und Linien
 

@@ -778,6 +778,43 @@ am 18.10. (mod#128); Plan, Farbe und Ort hat der Reviewer freigegeben.
 
   ![Links die Minimap mit „Westmark“, ⅔× und 90° nach unten, angeheftet; rechts die Vollbildkarte mit „Hafenstadt“, ½× und 60° nach oben, und „Westmark“](bilder/namen-bogen.png)
 
+## Namen an Wegpunkten
+
+Auch ein Wegpunkt trägt einen Namen, wenn der Spieler ihm einen gibt.
+Gewünscht vom User am 24.10., Plan mit Skizzen vom Reviewer freigegeben;
+siehe [0035](entscheidungen/0035-namen-weit-draussen-kleiner.md).
+
+- **Geben:** Rechtsklick auf den Wegpunkt, „Name…“, mit Namen „Name
+  ändern…“ (`Karte.benennen`). Dasselbe Feld wie an Formen, mit denselben
+  Regeln für Tasten, erlaubte Zeichen und Speichern, siehe „Namen“.
+  Darunter „Schrift“ und „Schriftart“, ohne „Biegung“: Ein Punkt hat keinen
+  Bogen. Sie wirken gleich, nur im Speicher (`Wegpunkte.stil`); Enter
+  speichert alles (`Wegpunkte.benenne`), `Esc` nimmt alles zurück.
+- **Todespunkt:** behält seine Zeit, siehe „Todespunkt“, und hat kein
+  „Name…“.
+- **Gezeichnet** mittig unter der Raute, die Oberkante der Grossbuchstaben
+  2 Einheiten unter ihrer Spitze, in der Farbe des Wegpunkts mit dunkler
+  Kontur `#2B2B2B`, in der Kartenschrift oder der Schrift des Spiels mit
+  gleich hohen Grossbuchstaben (`Minimap.wegpunktName`, `Ebenen.name`).
+- **Grösse:** 10 Einheiten je Geviert wie der Name einer Nadel, mal
+  „Schrift“; weit draussen kleiner und zuletzt aus wie die Namen der
+  Nadeln, siehe [Ebenen](ebenen.md), „Namen weit draussen“. Mit „Schrift“ 2
+  blendet ein Name erst bei halb so grossem Massstab aus.
+- **Am Rand:** Klemmt die Marke am Rand der Karte oder der Minimap, steht
+  kein Name; er deckte sonst die Marke.
+- **Minimap:** nur an angehefteten Wegpunkten, im Quadrat der Minimap, im
+  Massstab der Minimap.
+- **Gespeichert** in `wegpunkte.json` an dem Wegpunkt als `name`,
+  `schrift` und `"schriftart": "minecraft"`, je nur ohne Vorgabe, wie an
+  Formen; gelesen ebenso, ein falscher Wert fällt auf die Vorgabe, der
+  Wegpunkt bleibt. Ältere Versionen überlesen die Felder.
+- **Teilen:** Der Code einer Ebene trägt dieselben Felder am Wegpunkt,
+  siehe „Ebenen teilen“; ein falscher Wert macht den Code kaputt, wie an
+  Formen (`EbenenCode.name`, `EbenenCode.schrift`, `EbenenCode.minecraft`).
+  Ältere Versionen überlesen sie.
+- **Bleibt** beim Verschieben, Verbinden, Anheften und beim Wechsel der
+  Ebene.
+
 ## Farbe
 
 Eigene Linien und Regionen bekommen auf Wunsch eine eigene Farbe als

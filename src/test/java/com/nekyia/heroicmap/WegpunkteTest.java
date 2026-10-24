@@ -972,6 +972,56 @@ class WegpunkteTest {
         assertEquals("Rot", fremd.eigeneFormen().get(1).name());
     }
 
+    /** Namen an Wegpunkten: geben, Schrift und Schriftart, gespeichert nur ohne Vorgabe, bleiben bei Änderungen. Siehe docs/wegpunkte.md. */
+    @Test
+    void namenAnWegpunkten(@TempDir Path ordner) {
+        Wegpunkte w = new Wegpunkte();
+        w.lies(ordner);
+        w.setze(WELT, 3, 4);
+        w.setze(WELT, 9, 9);
+        w.benenne(w.stil(w.punkte().get(0), 2, true), " Mine ");
+        Wegpunkte.Punkt p = w.punkte().get(0);
+        assertEquals("Mine", p.name());
+        assertEquals(2, p.schrift());
+        assertTrue(p.minecraft());
+        JsonObject o = w.json().getAsJsonArray("wegpunkte").get(0).getAsJsonObject();
+        assertEquals("Mine", o.get("name").getAsString());
+        assertEquals(2, o.get("schrift").getAsDouble());
+        assertEquals("minecraft", o.get("schriftart").getAsString());
+        // Ohne Namen keine Felder.
+        JsonObject ohne = w.json().getAsJsonArray("wegpunkte").get(1).getAsJsonObject();
+        assertFalse(ohne.has("name") || ohne.has("schrift") || ohne.has("schriftart"), ohne.toString());
+        // Verschieben und Anheften lassen ihn.
+        assertTrue(w.verschiebe(p, 5, 5));
+        w.umschalten(w.punkte().get(0));
+        assertEquals("Mine", w.punkte().get(0).name());
+        assertTrue(w.punkte().get(0).angeheftet());
+        Wegpunkte nachher = new Wegpunkte();
+        nachher.lies(ordner);
+        assertEquals(w.punkte(), nachher.punkte());
+        // Leer nimmt ihn weg.
+        nachher.benenne(nachher.punkte().get(0), " ");
+        assertEquals(null, nachher.punkte().get(0).name());
+        // Der Todespunkt bekommt keinen.
+        nachher.setzeTod(WELT, 20, 20, 3, 1000);
+        Wegpunkte.Punkt tod = nachher.punkte().stream().filter(Wegpunkte.Punkt::tod).findFirst().orElseThrow();
+        nachher.benenne(tod, "Grab");
+        assertEquals(null, nachher.punkte().stream().filter(Wegpunkte.Punkt::tod).findFirst().orElseThrow().name());
+        // Falsche Werte fallen auf die Vorgabe, der Wegpunkt bleibt.
+        Wegpunkte fremd = new Wegpunkte();
+        fremd.lies(JsonParser.parseString("""
+                {"wegpunkte":[{"id":1,"dimension":"minecraft:overworld","x":0,"z":0,"farbe":0,"minimap":false,"name":{"a":1},
+                  "schrift":9,"schriftart":7},
+                  {"id":2,"dimension":"minecraft:overworld","x":1,"z":0,"farbe":0,"minimap":false,"name":"§cRot","schrift":0.5}]}
+                """).getAsJsonObject());
+        assertEquals(2, fremd.punkte().size());
+        assertEquals(null, fremd.punkte().get(0).name());
+        assertEquals(1, fremd.punkte().get(0).schrift());
+        assertFalse(fremd.punkte().get(0).minecraft());
+        assertEquals("Rot", fremd.punkte().get(1).name());
+        assertEquals(0.5, fremd.punkte().get(1).schrift());
+    }
+
     @Test
     void namenEineSchrifthoeheNebenDemGriff() {
         // Region: waagrecht, ein Punkt eine Schrifthöhe unter dem Griff im Schwerpunkt; so hoch wie die halbe kürzere Seite, hier 5.

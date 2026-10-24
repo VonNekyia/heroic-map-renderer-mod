@@ -731,6 +731,25 @@ class EbenenTest {
         assertArrayEquals(new float[] {-7, -80 / 3f, 7, 0}, Ebenen.bannerKasten(21, 40, 3, new double[0]));
     }
 
+    /** Namen weit draussen nach 0035, als Zahlen, nicht aus den Konstanten. Siehe docs/ebenen.md, „Namen weit draussen“. */
+    @Test
+    void namenWeitDraussen() {
+        // Voll bis 10/256 Einheiten je Block, das sind 25,6 Blöcke je Einheit; darunter mit dem Massstab.
+        assertEquals(1, Ebenen.nameFaktor(2));
+        assertEquals(1, Ebenen.nameFaktor(10 / 256.0), 1e-9);
+        assertEquals(0.5, Ebenen.nameFaktor(10 / 512.0), 1e-9);
+        assertEquals(0.25, Ebenen.nameFaktor(10 / 1024.0), 1e-9);
+        // Deckend ab 5 Einheiten Schrift, weg ab 3,125, dazwischen linear.
+        assertEquals(1, Ebenen.nameDeckung(10));
+        assertEquals(1, Ebenen.nameDeckung(5));
+        assertEquals(0.5, Ebenen.nameDeckung(4.0625), 1e-6);
+        assertEquals(0, Ebenen.nameDeckung(3.125));
+        assertEquals(0, Ebenen.nameDeckung(1));
+        // Ein Name von 10 Einheiten ist also bei Faktor ½ noch ganz da und bei 5/16 weg.
+        assertEquals(1, Ebenen.nameDeckung(10 * Ebenen.nameFaktor(10 / 512.0)), 1e-6);
+        assertEquals(0, Ebenen.nameDeckung(10 * Ebenen.nameFaktor(10 / 256.0 * 5 / 16)), 1e-6);
+    }
+
     @Test
     void kastenWieGezeichnet() {
         // Ungerade Breite: links ⌊21 / 2⌋ wie beim Zeichnen, also -10 bis 11, nicht ±10,5.

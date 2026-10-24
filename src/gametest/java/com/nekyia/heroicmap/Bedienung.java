@@ -108,6 +108,7 @@ public final class Bedienung implements FabricClientGameTest {
             todUndRegion(context, maus, k);
 
             karte(context, maus, k);
+            namenWeitDraussen(context, maus, k);
             // Vor tod: Der lässt den Spieler am Ende fallen, und ein toter Spieler hat statt der Karte den Todesschirm.
             knoepfeGross(context, maus);
             teleport(context, spiel.getServer(), maus, k);
@@ -1410,6 +1411,253 @@ public final class Bedienung implements FabricClientGameTest {
         return pixel(bild, k, mitte, r, p -> (p >> 16 & 0xFF) >= 0xF0 && (p >> 8 & 0xFF) >= 0xF0 && (p & 0xFF) >= 0xF0);
     }
 
+    /**
+     * Ein Satz mit den Kacheln des Testsatzes auf den Stufen 9 bis 11, gröber leer: So zoomt die Karte bis 4/2048 Einheiten je
+     * Block hinaus, weit genug, dass Namen ausblenden.
+     */
+    private static Path fernSatz() {
+        Path baum = FabricLoader.getInstance().getGameDir().resolve(HeroicMap.ID).resolve("test").resolve("fern");
+        Path quelle = Bilder.testsatz().resolve("4");
+        try (var dateien = Files.walk(quelle)) {
+            for (Path d : dateien.filter(d -> d.toString().endsWith(".webp")).toList()) {
+                Path rel = quelle.relativize(d);
+                Path ziel = baum.resolve("4").resolve(Integer.toString(Integer.parseInt(rel.getName(0).toString()) + 9))
+                        .resolve(rel.subpath(1, rel.getNameCount()).toString());
+                Files.createDirectories(ziel.getParent());
+                Files.copy(d, ziel, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+            Files.writeString(baum.resolve("4").resolve("map.json"), "{\"tileSize\":256,\"scale\":4,\"minZoom\":0,\"maxZoom\":11}");
+            Satz.schreibe(baum, "Fern", "minecraft:overworld", 4);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return baum;
+    }
+
+    /**
+     * Namen weit draussen (0035): ein Wegpunkt, mit Klicks benannt, dann eine Nadel, auf einem Satz bis Stufe 11, in der Mitte
+     * des Schirms. Mit dem Mausrad auf Stufe 11 (4 Einheiten je Block) steht der Name voll, auf Stufe 4 (1/32) kleiner, auf
+     * Stufe 2 (1/128) nicht mehr; je ein Bildschirmfoto. Gezählt werden die Pixel des Namens: mit Namen weniger ohne, beim
+     * Wegpunkt in seiner Farbe, bei der Nadel in ihrer hellen Kontur. Zuletzt der Wegpunkt angeheftet auf der Minimap, mit seinem
+     * Namen. Siehe docs/ebenen.md, „Namen weit draussen“.
+     */
+    private static void namenWeitDraussen(ClientGameTestContext context, TestInput maus, int k) {
+        Path baum = fernSatz();
+        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
+        context.waitTicks(5);
+        double mx = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth()) / 2.0;
+        double my = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight()) / 2.0;
+        int[] mitte = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blockUnter(mx, my));
+        String dimension = context.computeOnClient(mc -> mc.level.dimension().identifier().toString());
+        // Für die Minimap: 10 Blöcke südlich des Spielers.
+        int[] sueden = context.computeOnClient(mc -> new int[] {mc.player.getBlockX(), mc.player.getBlockZ() + 10});
+        Path sicherung = FabricLoader.getInstance().getGameDir().resolve("heroicmap-namen-weit-test.properties");
+        context.runOnClient(mc -> Minimap.INSTANZ.schreibe(sicherung));
+        int[] stufen = {11, 4, 2};
+        String[] namen = {"voll", "kleiner", "weg"};
+        // Unter der Spitze der Raute, 3,2 Einheiten unter ihrer Mitte, und unter dem Fuss der Nadel, über dem ihr Schild steht.
+        double[] unterRaute = {mx - 20, my + 5, mx + 20, my + 20}, unterFuss = {mx - 24, my + 2, mx + 24, my + 18};
+        try {
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.setze(dimension, mitte[0], mitte[1]));
+            context.waitTicks(2);
+            eintrag(context, maus, k, mx, my, "heroicmap.karte.name");
+            maus.typeChars("Mine");
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(2);
+            Wegpunkte.Punkt p = punktBei(context, dimension, mitte);
+            if (!"Mine".equals(p.name())) {
+                throw new AssertionError("Der Wegpunkt heisst nicht „Mine“: " + p);
+            }
+            int farbe = Wegpunkte.FARBEN[p.farbe()];
+            int[] wegpunkt = new int[3];
+            double[] wegpunktBreite = new double[3];
+            for (int i = 0; i < 3; i++) {
+                zoomeAuf(context, maus, k, mx, my, stufen[i]);
+                Path mit = context.takeScreenshot(TestScreenshotOptions.of("namen-weit-" + namen[i]).disableCounterPrefix());
+                context.runOnClient(mc -> Wegpunkte.INSTANZ.benenne(punktImSpiel(dimension, mitte), ""));
+                context.waitTicks(2);
+                Path ohne = context.takeScreenshot(TestScreenshotOptions.of("namen-weit-" + namen[i] + "-ohne").disableCounterPrefix());
+                context.runOnClient(mc -> Wegpunkte.INSTANZ.benenne(punktImSpiel(dimension, mitte), "Mine"));
+                context.waitTicks(2);
+                wegpunkt[i] = farbig(mit, k, unterRaute, farbe) - farbig(ohne, k, unterRaute, farbe);
+                wegpunktBreite[i] = breiteDesUnterschieds(mit, ohne, k, unterRaute);
+            }
+            // Kleiner heisst schmaler: auf Stufe 4 der Faktor 0,8; die Zahl der Pixel allein schwankt mit dem Hintergrund.
+            if (wegpunkt[0] < 40 || wegpunkt[1] < 10 || wegpunkt[2] > 2 || wegpunktBreite[0] < 15
+                    || wegpunktBreite[1] > 0.9 * wegpunktBreite[0] || wegpunktBreite[1] < 0.6 * wegpunktBreite[0]) {
+                throw new AssertionError("Name des Wegpunkts auf Stufe 11, 4 und 2: " + Arrays.toString(wegpunkt) + " Pixel, "
+                        + Arrays.toString(wegpunktBreite) + " Einheiten breit; voll, um 0,8 schmaler, weg erwartet");
+            }
+            // Mit „Schrift“ 2 auf Stufe 4 steht er grösser als mit 1; in einem Kasten, der beide fasst.
+            zoomeAuf(context, maus, k, mx, my, 4);
+            double[] breit = {mx - 40, my + 5, mx + 40, my + 40};
+            int eins = farbig(context.takeScreenshot(TestScreenshotOptions.of("namen-weit-schrift-1").disableCounterPrefix()), k, breit, farbe);
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.stil(punktImSpiel(dimension, mitte), 2, false));
+            context.waitTicks(2);
+            int zwei = farbig(context.takeScreenshot(TestScreenshotOptions.of("namen-weit-schrift-2").disableCounterPrefix()), k, breit, farbe);
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.stil(punktImSpiel(dimension, mitte), 1, false));
+            if (zwei < eins * 3 / 2) {
+                throw new AssertionError("Schrift 2 auf Stufe 4: " + zwei + " Pixel, mit Schrift 1 " + eins);
+            }
+
+            // Dieselbe Regel für eine Nadel, wie eine Stadt; ihr Name in der hellen Kontur.
+            context.runOnClient(mc -> {
+                Wegpunkte.INSTANZ.loesche(punktImSpiel(dimension, mitte));
+                Ebenen.INSTANZ.empfange(JsonParser.parseString("""
+                        {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:fern","name":{"de":"Fern","en":"Far"},
+                          "visible":true,"order":1,"version":"1"}]}""").getAsJsonObject());
+                Ebenen.INSTANZ.teil(Ebenen.Teil.lies("{\"v\":1,\"typ\":\"ebene\",\"id\":\"test:fern\",\"version\":\"1\",\"teil\":1,"
+                        + "\"teile\":1,\"objects\":[{\"type\":\"pin\",\"at\":[" + (mitte[0] + 0.5) + "," + (mitte[1] + 0.5) + "],"
+                        + "\"size\":\"small\",\"name\":\"Stadt\"}]}"));
+            });
+            int[] nadel = new int[3];
+            double[] nadelBreite = new double[3];
+            for (int i = 0; i < 3; i++) {
+                zoomeAuf(context, maus, k, mx, my, stufen[i]);
+                Path mit = context.takeScreenshot(TestScreenshotOptions.of("nadel-weit-" + namen[i]).disableCounterPrefix());
+                // Ausgeblendet ist der Name kein Ziel: Der Kasten endet am Fuss.
+                float unten = context.computeOnClient(mc -> {
+                    Karte karte = (Karte) mc.gui.screen();
+                    return Ebenen.kasten(mc.font, Ebenen.INSTANZ.nadeln("test:fern").getFirst(), k, karte.blockBreite())[3];
+                });
+                if (unten != (i == 2 ? 0 : Ebenen.NAME_UNTEN)) {
+                    throw new AssertionError("Kasten der Nadel auf Stufe " + stufen[i] + " endet " + unten + " unter dem Fuss");
+                }
+                context.runOnClient(mc -> Ebenen.INSTANZ.setze("test:fern", false));
+                context.waitTicks(2);
+                Path ohne = context.takeScreenshot(TestScreenshotOptions.of("nadel-weit-" + namen[i] + "-ohne").disableCounterPrefix());
+                context.runOnClient(mc -> Ebenen.INSTANZ.setze("test:fern", true));
+                context.waitTicks(2);
+                nadel[i] = farbig(mit, k, unterFuss, Ebenen.KONTURFARBE) - farbig(ohne, k, unterFuss, Ebenen.KONTURFARBE);
+                nadelBreite[i] = breiteDesUnterschieds(mit, ohne, k, unterFuss);
+            }
+            if (nadel[0] < 30 || nadel[1] < 5 || nadel[2] > 2 || nadelBreite[0] < 15 || nadelBreite[1] > 0.9 * nadelBreite[0]
+                    || nadelBreite[1] < 0.6 * nadelBreite[0]) {
+                throw new AssertionError("Name der Nadel auf Stufe 11, 4 und 2: " + Arrays.toString(nadel) + " Pixel, "
+                        + Arrays.toString(nadelBreite) + " Einheiten breit; voll, um 0,8 schmaler, weg erwartet");
+            }
+
+            // Angeheftet auf der Minimap, genordet bei Zoom 2: der Name unter der Raute, im Spiel.
+            context.runOnClient(mc -> {
+                Ebenen.INSTANZ.leeren();
+                Minimap.INSTANZ.setzeZoom(2);
+                Minimap.INSTANZ.setzeDrehen(false);
+                Wegpunkte.INSTANZ.setze(dimension, sueden[0], sueden[1]);
+                Wegpunkte.INSTANZ.umschalten(punktImSpiel(dimension, sueden));
+                Wegpunkte.INSTANZ.benenne(punktImSpiel(dimension, sueden), "Mine");
+                mc.gui.setScreen(null);
+            });
+            context.waitTicks(3);
+            double[] raute = context.computeOnClient(mc -> {
+                Minimap.Rahmen r = Minimap.INSTANZ.rahmen(mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+                return new double[] {r.x() + r.seite() / 2.0 + (sueden[0] + 0.5 - mc.player.getX()) * 2,
+                    r.y() + r.seite() / 2.0 + (sueden[1] + 0.5 - mc.player.getZ()) * 2};
+            });
+            double[] unterMinimapRaute = {raute[0] - 20, raute[1] + 5, raute[0] + 20, raute[1] + 20};
+            int farbeMinimap = context.computeOnClient(mc -> Wegpunkte.FARBEN[punktImSpiel(dimension, sueden).farbe()]);
+            int mit = farbig(context.takeScreenshot(TestScreenshotOptions.of("namen-minimap").disableCounterPrefix()), k, unterMinimapRaute,
+                    farbeMinimap);
+            context.runOnClient(mc -> Wegpunkte.INSTANZ.benenne(punktImSpiel(dimension, sueden), ""));
+            context.waitTicks(2);
+            int ohne = farbig(context.takeScreenshot(TestScreenshotOptions.of("namen-minimap-ohne").disableCounterPrefix()), k, unterMinimapRaute,
+                    farbeMinimap);
+            if (mit - ohne < 30) {
+                throw new AssertionError("Name des angehefteten Wegpunkts auf der Minimap: " + (mit - ohne) + " Pixel bei " + Arrays.toString(raute));
+            }
+        } finally {
+            context.runOnClient(mc -> {
+                for (int[] b : new int[][] {mitte, sueden}) {
+                    Wegpunkte.Punkt rest = punktImSpiel(dimension, b);
+                    if (rest != null) {
+                        Wegpunkte.INSTANZ.loesche(rest);
+                    }
+                }
+                Ebenen.INSTANZ.leeren();
+                Minimap.INSTANZ.lies(sicherung);
+                mc.gui.setScreen(null);
+            });
+            context.waitTicks(2);
+        }
+    }
+
+    /** Mit dem Mausrad an (x, y) auf die Stufe {@code stufe}, ohne Lupe. */
+    private static void zoomeAuf(ClientGameTestContext context, TestInput maus, int k, double x, double y, int stufe) {
+        maus.setCursorPos(x * k, y * k);
+        context.waitTick();
+        for (int i = 0; i < 16; i++) {
+            int[] jetzt = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).stufe());
+            if (jetzt[0] == stufe && jetzt[1] == 1) {
+                context.waitTicks(2);
+                return;
+            }
+            maus.scroll(jetzt[0] > stufe || jetzt[1] > 1 ? -1 : 1);
+            context.waitTick();
+        }
+        int[] ende = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).stufe());
+        throw new AssertionError("Stufe " + stufe + " nicht erreicht: " + Arrays.toString(ende));
+    }
+
+    private static Wegpunkte.Punkt punktImSpiel(String dimension, int[] block) {
+        return Wegpunkte.INSTANZ.punkte().stream().filter(q -> q.dimension().equals(dimension) && q.x() == block[0] && q.z() == block[1])
+                .findFirst().orElse(null);
+    }
+
+    private static Wegpunkte.Punkt punktBei(ClientGameTestContext context, String dimension, int[] block) {
+        Wegpunkte.Punkt p = context.computeOnClient(mc -> punktImSpiel(dimension, block));
+        if (p == null) {
+            throw new AssertionError("Kein Wegpunkt auf " + Arrays.toString(block));
+        }
+        return p;
+    }
+
+    /**
+     * Wie breit in Einheiten der Bereich ist, in dem sich zwei Bildschirmfotos im Kasten {x0, y0, x1, y1} unterscheiden, um mehr
+     * als 16 in einem Kanal; 0 ohne Unterschied.
+     */
+    private static double breiteDesUnterschieds(Path a, Path b, int k, double[] kasten) {
+        try {
+            BufferedImage x = ImageIO.read(a.toFile()), y = ImageIO.read(b.toFile());
+            int links = Integer.MAX_VALUE, rechts = Integer.MIN_VALUE;
+            for (int py = (int) (kasten[1] * k); py < kasten[3] * k; py++) {
+                for (int px = (int) (kasten[0] * k); px < kasten[2] * k; px++) {
+                    int p = x.getRGB(px, py), q = y.getRGB(px, py);
+                    boolean anders = false;
+                    for (int s = 0; s < 24; s += 8) {
+                        anders |= Math.abs((p >> s & 0xFF) - (q >> s & 0xFF)) > 16;
+                    }
+                    if (anders) {
+                        links = Math.min(links, px);
+                        rechts = Math.max(rechts, px);
+                    }
+                }
+            }
+            return rechts < links ? 0 : (rechts - links + 1) / (double) k;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** Die Pixel nah an {@code farbe}, auf 24 je Kanal genau, im Kasten {x0, y0, x1, y1} in Einheiten. */
+    private static int farbig(Path bild, int k, double[] kasten, int farbe) {
+        try {
+            BufferedImage b = ImageIO.read(bild.toFile());
+            int n = 0;
+            for (int y = (int) (kasten[1] * k); y < kasten[3] * k; y++) {
+                for (int x = (int) (kasten[0] * k); x < kasten[2] * k; x++) {
+                    int p = b.getRGB(x, y);
+                    boolean nah = true;
+                    for (int s = 0; s < 24; s += 8) {
+                        nah &= Math.abs((p >> s & 0xFF) - (farbe >> s & 0xFF)) <= 24;
+                    }
+                    n += nah ? 1 : 0;
+                }
+            }
+            return n;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     /** Die Pixel in der Farbe der Kartenschrift, auf 16 je Kanal genau, im Quadrat ±{@code r} Einheiten um (x, y). */
     private static int dunkle(Path bild, int k, double[] mitte, int r) {
         return pixel(bild, k, mitte, r, p -> {
@@ -2527,8 +2775,8 @@ public final class Bedienung implements FabricClientGameTest {
 
             String teleport = context.computeOnClient(mc -> Component.translatable("heroicmap.karte.teleport", frei.x(), frei.z()).getString());
             List<String> punktSoll = new java.util.ArrayList<>(List.of(teleport));
-            punktSoll.addAll(texte(context, "heroicmap.karte.koordinaten", "heroicmap.karte.form_von_hier", "heroicmap.karte.ebene",
-                    "heroicmap.karte.wegpunkt_loeschen"));
+            punktSoll.addAll(texte(context, "heroicmap.karte.koordinaten", "heroicmap.karte.name", "heroicmap.karte.form_von_hier",
+                    "heroicmap.karte.ebene", "heroicmap.karte.wegpunkt_loeschen"));
             Karte.Marke m = marke(context, frei);
             List<String> ist = eintraegeBei(context, maus, k, m.x(), m.y());
             if (!ist.equals(punktSoll)) {

@@ -28,6 +28,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
 import org.joml.Matrix3x2fStack;
@@ -98,6 +99,11 @@ public final class Ebenen {
     static final int KOPF_HALB = 5;
     /** So weit reicht kein Name unter den Fuss, auch keiner im Bogen; zum Vorfiltern vor dem Kasten. */
     static final int UNTEN_HOECHSTENS = 32;
+    /**
+     * Bis zu so vielen Einheiten Schrift deckt ein Name ganz, ab so wenigen nicht mehr: 8 und 5 px der Webkarte, umgerechnet
+     * wie {@link #NAME_GROESSE}. Siehe docs/ebenen.md, „Namen weit draussen“.
+     */
+    static final double NAME_VOLL = NAME_GROESSE * 8 / 16.0, NAME_WEG = NAME_GROESSE * 5 / 16.0;
     /**
      * So viele Namen zeichnet eine Ansicht je Frame, je neun Texte; ein Name im Bogen zählt je Zeichen einen, denn er
      * zeichnet je Zeichen neun. Die übrigen fehlen, das Log sagt es einmal.
@@ -954,11 +960,12 @@ public final class Ebenen {
 
     /**
      * Zeichnet den Ort mit dem Fuss bei (x, y), in Einheiten des GUI auf ganzen Pixeln, in fester
-     * Grösse, darunter den Namen; ein Banner bei GUI-Massstab {@code gs} mit der Deckung {@code deckung},
-     * der Name bleibt deckend. Siehe docs/ebenen.md, „Nadeln“,
+     * Grösse, darunter den Namen, auf einer Karte mit {@code block} Einheiten je Block weit draussen kleiner und zuletzt aus
+     * ({@link #nameFaktor}, {@link #nameDeckung}); ein Banner bei GUI-Massstab {@code gs} mit der Deckung {@code deckung}, sein
+     * Name nicht. Siehe docs/ebenen.md, „Nadeln“,
      * und docs/ebenen.md, „Banner“.
      */
-    static void zeichne(GuiGraphicsExtractor g, Font font, float x, float y, Ort o, int[] namen, int gs, float deckung) {
+    static void zeichne(GuiGraphicsExtractor g, Font font, float x, float y, Ort o, int[] namen, int gs, float deckung, double block) {
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.translate(x, y);
@@ -987,19 +994,23 @@ public final class Ebenen {
                 hoehe = t.hoehe() * f / (double) gs;
             }
         }
-        // Eine Nadel trägt ihren Namen gerade, ein Banner im Bogen, so wählte es der User (0102 des Renderers).
-        Zeichen z = o instanceof Banner && o.name() != null ? zeichen(font, o.name()) : null;
+        // Eine Nadel trägt ihren Namen gerade, ein Banner im Bogen, so wählte es der User (0102 des Renderers). Ein ausgeblendeter
+        // Name kostet nichts.
+        double faktor = nameFaktor(block);
+        float sicht = nameDeckung(NAME_GROESSE * faktor);
+        String name = sicht > 0 ? o.name() : null;
+        Zeichen z = o instanceof Banner && name != null ? zeichen(font, name) : null;
         int kosten = z == null ? 1 : Math.max(1, z.zeichen().length);
-        if (o.name() != null && namen[0] >= kosten) {
+        if (name != null && namen[0] >= kosten) {
             namen[0] -= kosten;
             if (z == null) {
                 // Unter einem Kopf beginnt der Name erst unter dem Gesicht.
                 pose.translate(0, unten);
-                name(g, font, o.name());
+                name(g, font, name, false, faktor, ARGB.multiplyAlpha(SCHRIFTFARBE, sicht), ARGB.multiplyAlpha(KONTURFARBE, sicht));
             } else {
-                bogenName(g, font, z, hoehe);
+                bogenName(g, font, z, hoehe, faktor, sicht);
             }
-        } else if (o.name() != null && !namenGewarnt) {
+        } else if (name != null && !namenGewarnt) {
             namenGewarnt = true;
             LOGGER.warn("Heroic Map: mehr als {} Namen auf einmal; die übrigen fehlen", MAX_NAMEN);
         }
@@ -1008,20 +1019,24 @@ public final class Ebenen {
 
     /**
      * Der Kasten von Bild und Name relativ zum Fuss, {links, oben, rechts, unten} in Einheiten des GUI,
-     * so wie {@link #zeichne} ihn bei GUI-Massstab {@code gs} füllt; null bei einem Banner, dessen Bild
-     * noch fehlt. Misst den Namen und holt das Bild eines Banners, also erst die Lage prüfen.
+     * so wie {@link #zeichne} ihn bei GUI-Massstab {@code gs} auf einer Karte mit {@code block} Einheiten je Block füllt, ohne
+     * einen ausgeblendeten Namen; null bei einem Banner, dessen Bild noch fehlt. Misst den Namen und holt das Bild eines
+     * Banners, also erst die Lage prüfen.
      */
-    static float[] kasten(Font font, Ort o, int gs) {
+    static float[] kasten(Font font, Ort o, int gs, double block) {
+        // Ein ausgeblendeter Name ist kein Ziel für den Zeiger, wie in 0119 des Renderers.
+        String name = nameDeckung(NAME_GROESSE * nameFaktor(block)) > 0 ? o.name() : null;
+        float breite = name == null ? 0 : nameBreite(font, name);
         return switch (o) {
-            case Nadel n -> kopf(n) != null ? kopfKasten(o.name() == null ? 0 : nameBreite(font, o.name()))
-                    : kasten(SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe(), o.name() == null ? 0 : nameBreite(font, o.name()));
+            case Nadel n -> kopf(n) != null ? kopfKasten(breite) : kasten(SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe(), breite);
             case Banner b -> {
+                double[] breiten = name == null ? new double[0] : zeichen(font, name).breiten();
                 Symbole.Sprite sp = sprite(b);
                 if (sp != null) {
-                    yield spriteKasten(sp.textur().breite(), sp.textur().hoehe(), sp.fussX(), sp.fussY(), gs, breiten(font, o));
+                    yield spriteKasten(sp.textur().breite(), sp.textur().hoehe(), sp.fussX(), sp.fussY(), gs, breiten);
                 }
                 Symbole.Textur t = bild(b);
-                yield t == null ? null : bannerKasten(t.breite(), t.hoehe(), gs, breiten(font, o));
+                yield t == null ? null : bannerKasten(t.breite(), t.hoehe(), gs, breiten);
             }
         };
     }
@@ -1244,25 +1259,51 @@ public final class Ebenen {
     }
 
     /**
+     * Wie gross ein Name auf einer Karte mit {@code block} Einheiten je Block steht, als Faktor: 1 bis {@link #NAME_GROESSE} / 256
+     * Einheiten je Block, darunter mit dem Massstab kleiner. Wie 0119 des Renderers mit 16 Blöcken je px, umgerechnet wie
+     * {@link #NAME_GROESSE}. Siehe docs/ebenen.md, „Namen weit draussen“.
+     */
+    static double nameFaktor(double block) {
+        return Math.min(1, block * 256 / NAME_GROESSE);
+    }
+
+    /** Wie deckend ein Name in {@code schrift} Einheiten steht: ab {@link #NAME_VOLL} ganz, bis {@link #NAME_WEG} nicht mehr, dazwischen linear. */
+    static float nameDeckung(double schrift) {
+        return (float) Math.clamp((schrift - NAME_WEG) / (NAME_VOLL - NAME_WEG), 0, 1);
+    }
+
+    /**
      * Der Name mittig unter dem Fuss, wie die Kartenschrift: erst die Kontur als acht versetzte Kopien,
      * dann die Schrift. Siehe docs/ebenen.md, „Nadeln“.
      */
     static void name(GuiGraphicsExtractor g, Font font, String name) {
-        Component c = Component.literal(name).withStyle(Formen.STIL);
-        float m = (float) NAME_MASSSTAB, breite = font.width(c) * m;
+        name(g, font, name, false, 1, SCHRIFTFARBE, KONTURFARBE);
+    }
+
+    /**
+     * Ebenso um seine Oberkante {@code faktor} mal so gross, mit {@code minecraft} in der Schrift des Spiels, die Grossbuchstaben
+     * so hoch wie in der Kartenschrift, in {@code farbe} mit der Kontur {@code kontur}; deren Alpha gilt. Siehe docs/ebenen.md,
+     * „Namen weit draussen“, und docs/wegpunkte.md, „Namen an Wegpunkten“.
+     */
+    static void name(GuiGraphicsExtractor g, Font font, String name, boolean minecraft, double faktor, int farbe, int kontur) {
+        Component c = Component.literal(name).withStyle(minecraft ? Style.EMPTY : Formen.STIL);
+        float kappe = minecraft ? Formen.minecraftKappe : Formen.KAPPE;
+        float m = (float) NAME_MASSSTAB * Formen.KAPPE / kappe, breite = font.width(c) * m;
         double r = NAME_KONTUR / m;
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
-        // Die Oberkante der Grossbuchstaben liegt KAPPE − GRUNDLINIE Einheiten der Schrift über dem y des Texts.
-        pose.translate(-breite / 2, NAME_OBEN + (Formen.KAPPE - Formen.GRUNDLINIE) * m);
+        pose.translate(0, NAME_OBEN);
+        pose.scale((float) faktor);
+        // Die Oberkante der Grossbuchstaben liegt kappe − GRUNDLINIE Einheiten der Schrift über dem y des Texts.
+        pose.translate(-breite / 2, (kappe - Formen.GRUNDLINIE) * m);
         pose.scale(m);
         for (int k = 0; k < 8; k++) {
             pose.pushMatrix();
             pose.translate((float) Formen.versatzX(k, r), (float) Formen.versatzY(k, r));
-            g.text(font, c, 0, 0, KONTURFARBE, false);
+            g.text(font, c, 0, 0, kontur, false);
             pose.popMatrix();
         }
-        g.text(font, c, 0, 0, SCHRIFTFARBE, false);
+        g.text(font, c, 0, 0, farbe, false);
         pose.popMatrix();
     }
 
@@ -1271,11 +1312,15 @@ public final class Ebenen {
      * Kartenschrift: erst die Kontur aller Zeichen als acht versetzte Kopien, dann die Zeichen, so deckt keine Kontur ein
      * Zeichen. Siehe docs/ebenen.md, „Banner“.
      */
-    private static void bogenName(GuiGraphicsExtractor g, Font font, Zeichen z, double h) {
+    private static void bogenName(GuiGraphicsExtractor g, Font font, Zeichen z, double h, double faktor, float deckung) {
         double[] lage = bogen(z.breiten(), radius(z.breiten(), h));
         float m = (float) NAME_MASSSTAB;
         double r = NAME_KONTUR / m;
+        int schrift = ARGB.multiplyAlpha(SCHRIFTFARBE, deckung), kontur = ARGB.multiplyAlpha(KONTURFARBE, deckung);
         Matrix3x2fStack pose = g.pose();
+        // Um den Fuss, der im Ursprung liegt.
+        pose.pushMatrix();
+        pose.scale((float) faktor);
         for (int k = 0; k <= 8; k++) {
             // k 0 bis 7: die Kopien der Kontur rundum; 8: die Zeichen.
             float dx = k < 8 ? (float) Formen.versatzX(k, r) : 0, dy = k < 8 ? (float) Formen.versatzY(k, r) : 0;
@@ -1286,10 +1331,11 @@ public final class Ebenen {
                 pose.scale(m);
                 // Die Mitte des Zeichens auf dem Punkt, die Mitte der Grossbuchstaben auf dem Bogen.
                 pose.translate((float) (dx - z.breiten()[i] / m / 2), dy + Formen.KAPPE / 2 - Formen.GRUNDLINIE);
-                g.text(font, z.zeichen()[i], 0, 0, k < 8 ? KONTURFARBE : SCHRIFTFARBE, false);
+                g.text(font, z.zeichen()[i], 0, 0, k < 8 ? kontur : schrift, false);
                 pose.popMatrix();
             }
         }
+        pose.popMatrix();
     }
 
     /** Der Kopf der Nadel, wenn sie einen nennt und er geladen ist; sonst null, dann zeichnet die Ansicht das Schild. */
