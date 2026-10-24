@@ -183,6 +183,12 @@ public final class KarteJeServer implements FabricClientGameTest {
         download(dort, "probe-netz");
         context.runOnClient(mc -> mc.gui.setScreen(new Kartenliste(null)));
         context.waitFor(mc -> knopf(mc, "heroicmap.liste.zeiger_setzen", "play.example.net") != null, 600);
+        long kopien = context.computeOnClient(mc -> mc.gui.screen().children().stream()
+                .filter(w -> w instanceof Button b && b.getMessage().getContents() instanceof TranslatableContents t
+                        && t.getKey().equals("heroicmap.liste.kopie")).count());
+        if (kopien != 1) {
+            throw new AssertionError("„Kopie“ " + kopien + "-mal, erwartet nur bei main, nicht unter der anderen Adresse");
+        }
         klicke(context, "heroicmap.liste.zeiger_setzen", "play.example.net");
         context.waitTicks(2);
         if (!"@play.example.net".equals(Zeiger.name(welt))) {
