@@ -326,6 +326,18 @@ final class Ort {
     }
 
     /**
+     * Nach „Ort …“ mit dem ganzen Ordner: Der Ausweis nennt den Server des neuen Orts, und das Netz ist unbekannt bis zum
+     * nächsten Besuch, denn die eingetippte Adresse kennt nur der Login. Ohne Ausweis nichts. Siehe docs/download.md,
+     * „Ausweis“.
+     */
+    static void ausweisNachUmzug(Path welt, Teile neu) throws IOException {
+        Ausweis a = Ausweis.lies(welt);
+        if (a != null) {
+            a.mit("", neu.server()).schreibe(welt);
+        }
+    }
+
+    /**
      * Zieht den Baum {@code baum} in den Ordner der Welt {@code neuWelt}, die dort {@code werNeu} gehört. Eine eigene Karte
      * gehört danach diesem Server. Die Zeilen des alten Ordners in {@code zeigt.txt}, die auf den Baum zeigen, fallen weg.
      * Nie auf einen Baum, der schon da ist.
