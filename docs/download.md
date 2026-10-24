@@ -413,6 +413,12 @@ eines Proxys von einem des Netzes (`Laden.Fehler.status`).
   Adresse. So landet derselbe Server immer im selben Ordner, ob jemand
   `play.example.net`, die IP oder `0` eintippt, und die Kartenliste zeigt
   den Namen. So will es der User (mod#113).
+
+  Ein Punkt am Ende des Hosts oder Namens fällt weg (`Downloads.weltOrdner`):
+  `example.net.` liegt im Ordner von `example.net`, auch bei `ip_port` vor
+  dem Port. Windows nähme ihn dem Ordner ohnehin; so ist es überall gleich.
+  In „Ort …“ lehnt der Mod eine Adresse mit Punkt am Ende ab, siehe „Ort
+  ändern“.
   - **Gedächtnis:** `heroicmap/namen.txt`, je Zeile die eingetippte Adresse,
     klein, und der Name (`Servername`). Ein `angebot` mit Namen trägt ihn
     ein, eines ohne nimmt ihn heraus. Ohne `angebot`, etwa auf einem Server

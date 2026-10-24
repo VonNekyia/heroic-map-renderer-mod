@@ -41,8 +41,11 @@ gilt.
   der Umzug trotzdem; die Karte gilt, sobald es ihn gibt.
 - **Eigene Karten** gehören danach dem neuen Server. Im Einzelspieler
   gehören sie keinem, wie bei einem Server ohne Namen (`-`).
-- **Ein Punkt am Ende** eines Ordnernamens geht nicht, auch nicht bei einer
-  Adresse: Windows nähme ihn weg, und der Ordner hiesse anders.
+- **Ein Punkt am Ende** eines Ordnernamens geht in „Ort …“ nicht, auch
+  nicht bei einer Adresse: Windows nähme ihn weg, und der Ordner hiesse
+  anders. Bei der automatischen Ablage lehnt der Mod nichts ab; dort fällt
+  der Punkt am Ende des Hosts weg, und `example.net.` liegt bei
+  `example.net`. So will es der Reviewer.
 
 ## Verworfen
 

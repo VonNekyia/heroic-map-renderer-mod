@@ -31,6 +31,13 @@ class AblageTest {
         // Ohne Port gilt der des Spiels; derselbe Server mit und ohne Port ist ein Ordner.
         assertEquals(Downloads.weltOrdner(Downloads.Ablage.IP_PORT, "mc.example.com:25565", SEED),
                 Downloads.weltOrdner(Downloads.Ablage.IP_PORT, "mc.example.com", SEED));
+        // Ein Punkt am Ende des Hosts: derselbe Ordner wie ohne, auch vor dem Port und beim Namen vom Server.
+        for (Downloads.Ablage ablage : Downloads.Ablage.values()) {
+            assertEquals(Downloads.weltOrdner(ablage, "mc.example.com:25566", SEED), Downloads.weltOrdner(ablage, "Mc.Example.com.:25566", SEED));
+            assertEquals(Downloads.weltOrdner(ablage, "mc.example.com", SEED), Downloads.weltOrdner(ablage, "mc.example.com..", SEED));
+            assertEquals(Downloads.weltOrdner(ablage, "0", "play.example.net", SEED), Downloads.weltOrdner(ablage, "0", "play.example.net.", SEED));
+        }
+        assertEquals("mc.example.com_25566/welt-0123456789abcdef", Downloads.weltOrdner(Downloads.Ablage.IP_PORT, "mc.example.com.:25566", SEED));
         // Ein negativer Hash bleibt 16 Stellen hex.
         assertEquals("welt-ffffffffffffffff", Downloads.weltOrdner(Downloads.Ablage.HASH, "x", -1));
     }
