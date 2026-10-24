@@ -1661,6 +1661,7 @@ public final class Bilder implements FabricClientGameTest {
         "setblock -36 -61 20 seagrass",
         "setblock -34 -60 20 pink_petals[facing=north,flower_amount=1]",
         "setblock -32 -60 21 stone", "setblock -32 -60 20 ladder[facing=north]",
+        "setblock -30 -60 20 bamboo[age=0,leaves=large]",
     };
 
     /**
@@ -1819,7 +1820,7 @@ public final class Bilder implements FabricClientGameTest {
     /** Was an ihrer Stelle steht, wenn die Pflanzen weg sind. */
     private static final String[] OHNE_PFLANZEN = {
         "setblock -40 -60 20 air", "setblock -38 -60 20 air", "setblock -36 -61 20 water", "setblock -34 -60 20 air",
-        "setblock -32 -60 20 air",
+        "setblock -32 -60 20 air", "setblock -30 -60 20 bamboo[age=0,leaves=none]",
     };
 
     /**
@@ -1878,9 +1879,9 @@ public final class Bilder implements FabricClientGameTest {
         // Die Ecke des Blocks (x, 20) im Bild; der Spieler steht bei (-35,5, 26,5) in der Mitte, seine Marke deckt die Reihe nicht.
         java.util.function.IntUnaryOperator links = x -> mit.getWidth() / 2 + Math.round((x + 35.5f) * block);
         int oben = mit.getHeight() / 2 - Math.round(6.5f * block);
-        int[] anders = new int[5];
-        int rot = 0;
-        for (int i = 0; i < 5; i++) {
+        int[] anders = new int[6];
+        int rot = 0, gruen = 0;
+        for (int i = 0; i < 6; i++) {
             int x0 = links.applyAsInt(-40 + 2 * i);
             // Der Block ohne den Rand; beim Blütenteppich ohne das Viertel im Nordwesten, wo die Blüte liegt.
             for (int y = oben + 1; y < oben + block - 1; y++) {
@@ -1895,9 +1896,13 @@ public final class Bilder implements FabricClientGameTest {
                     }
                     anders[i] += gleich ? 0 : 1;
                     rot += i == 0 && (a >> 16 & 0xFF) > (a >> 8 & 0xFF) + 60 ? 1 : 0;
+                    // Seegras ohne die Tönung des Wassers: grüner als blau.
+                    gruen += i == 2 && (a >> 8 & 0xFF) > (a & 0xFF) + 20 ? 1 : 0;
                 }
             }
         }
+        LOGGER.info("Pflanzen 4 px, anders als ohne: Mohn {} (rot {}), Weizen {}, Seegras {} (grün {}), Blütenteppich {}, Leiter {}, Bambus {}",
+                anders[0], rot, anders[1], anders[2], gruen, anders[3], anders[4], anders[5]);
         // Bei 4 px deckt ein Pixel 4 × 4 Texel, ausgeschnitten: Mohn und Seegras sind spärlich, nur einzelne Pixel decken.
         int innen = (block - 2) * (block - 2);
         if (rot == 0 || anders[1] < innen / 2 || anders[2] < gs * gs || anders[3] != 0 || anders[4] != 0) {
