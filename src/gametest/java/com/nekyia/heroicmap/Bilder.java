@@ -1676,10 +1676,13 @@ public final class Bilder implements FabricClientGameTest {
         "assets/minecraft/models/block/potatoes_stage3.json",
     };
 
-    /** Ein Feld: Weizen jung bis reif, Karotten, Kartoffeln, Gras und Farn, um (-56, 43). */
+    /**
+     * Ein Feld: Weizen jung bis reif, Karotten, Kartoffeln, Gras und Farn, um (-56, 43). Wasser an beiden Enden hält das ganze
+     * Ackerland feucht; ein Zufallstick liesse es sonst trocknen, und trockenes sieht anders aus.
+     */
     private static final String[] FELD = {
         "fill -62 -61 38 -48 -61 48 grass_block", "fill -62 -60 38 -48 -50 48 air",
-        "fill -60 -61 40 -53 -61 42 farmland[moisture=7]", "setblock -52 -61 41 water",
+        "fill -60 -61 40 -53 -61 42 farmland[moisture=7]", "setblock -52 -61 41 water", "setblock -61 -61 41 water",
         "setblock -60 -60 40 wheat[age=0]", "setblock -59 -60 40 wheat[age=2]", "setblock -58 -60 40 wheat[age=4]",
         "setblock -57 -60 40 wheat[age=6]", "fill -56 -60 40 -53 -60 40 wheat[age=7]",
         "fill -60 -60 42 -57 -60 42 carrots[age=7]", "fill -56 -60 42 -53 -60 42 potatoes[age=7]",
