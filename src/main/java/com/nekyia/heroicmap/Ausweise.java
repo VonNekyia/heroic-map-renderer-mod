@@ -100,6 +100,7 @@ final class Ausweise {
         // Läuft ein Download, bleibt die alte UID im Ausweis, und der nächste Besuch versucht es wieder.
         if (geloescht >= 0) {
             ausweis = ausweis.neueGeneration(schluessel, alter, uid);
+            loeseZeiger(mc);
         }
         if (geloescht > 0) {
             melde(mc, "heroicmap.reset.sicher", "Heroic Map: {} in {} mit neuer UID, alte Karten gelöscht: {}", List.of(schluessel, ordner, geloescht));
@@ -142,6 +143,7 @@ final class Ausweise {
         if (Reset.pruefe(vorher, schluessel, ausweis.netz(), null, alter) != Reset.Art.UNSICHER) {
             return;
         }
+        loeseZeiger(mc);
         List<Path> baeume = Reset.baeume(ordner, schluessel);
         if (baeume.isEmpty() || !halte(baeume)) {
             return;
@@ -180,6 +182,18 @@ final class Ausweise {
                 melde(mc, "heroicmap.reset.unsicher", "Heroic Map: {} wohl zurückgesetzt, ruhen: {}", List.of(welt, geruht));
             });
         });
+    }
+
+    /** Löst nach einem Reset einen Zeiger unter eine andere Adresse ({@link Zeiger#loeseNachReset}); dann wählt „Selbst“ neu. */
+    private void loeseZeiger(Minecraft mc) {
+        try {
+            if (Zeiger.loeseNachReset(ordner)) {
+                LOGGER.info("Heroic Map: Zeiger in {} nach dem Reset gelöst", ordner);
+                Selbst.INSTANZ.neuGewaehlt(mc);
+            }
+        } catch (IOException e) {
+            LOGGER.warn("Heroic Map: Zeiger in {} nach dem Reset nicht gelöst", ordner, e);
+        }
     }
 
     /** Hält die Schlüssel aller Bäume gegen einen Download; geht einer nicht, gibt es alle frei und sagt nein. */
