@@ -4,6 +4,11 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.70
+
+- **Move a map to another place.** "Move …" in the map list changes the address, server and world hash of a map. "Whole folder", the default, moves the folder of the world with all its maps, waypoints and map view, for example to say which of two folders of the same world belongs to which server; your own map then belongs to the new server. "Only this map" moves just this map, for example into the folder of the new hash after a world reset. Nothing is ever merged: if something is already there, "Move" stays grey and says why. A move happens completely or not at all.
+- **"Server without a name" explains itself.** Hover it in "Maps of this server" to see what it means and what helps.
+
 ## 0.2.69
 
 - **Two servers, one world: each keeps its own map.** What the full map shows for a dimension now counts per server, and your own map ("Myself") belongs to the server you drew it on. Drawing your own map on one server no longer hides the map you downloaded on another server behind the same proxy. Choosing "Myself" while a downloaded map is shown asks whether to delete the old map, keep it resting, or cancel; the map list switches each map on or to resting for the server you are on. A resting map gets no sync. The servers need plugin 0.17.2, which tells the mod their names.

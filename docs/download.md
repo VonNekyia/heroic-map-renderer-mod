@@ -1,6 +1,6 @@
 ---
 title: Download
-description: Wie der Mod die Karte vom Plugin lädt, beim ersten Mal als ein Strom, mit dem Kanal heroicmap:karte, den Befehlen, Zustimmung und Grösse, der Prüfung der Adresse, Manifest und Prüfsumme, Fristen, den harten Grenzen, der Reihe der Downloads, der Ablage je Welt nach dem Hash des Seeds, Baum und Massstab, der Kartenliste mit Löschen, Fortsetzen und Abgleich, und was der Offline-Modus heisst.
+description: Wie der Mod die Karte vom Plugin lädt, beim ersten Mal als ein Strom, mit dem Kanal heroicmap:karte, den Befehlen, Zustimmung und Grösse, der Prüfung der Adresse, Manifest und Prüfsumme, Fristen, den harten Grenzen, der Reihe der Downloads, der Ablage je Welt nach dem Hash des Seeds, Baum und Massstab, der Kartenliste mit Löschen, „Ort …“, Fortsetzen und Abgleich, und was der Offline-Modus heisst.
 code:
   - src/main/java/com/nekyia/heroicmap/Kanal.java
   - src/main/java/com/nekyia/heroicmap/Downloads.java
@@ -18,6 +18,10 @@ code:
   - src/test/java/com/nekyia/heroicmap/ReiheTest.java
   - src/test/java/com/nekyia/heroicmap/AdresseTest.java
   - src/main/java/com/nekyia/heroicmap/Kartenliste.java
+  - src/main/java/com/nekyia/heroicmap/Ort.java
+  - src/main/java/com/nekyia/heroicmap/OrtFenster.java
+  - src/test/java/com/nekyia/heroicmap/OrtTest.java
+  - src/gametest/java/com/nekyia/heroicmap/OrtAendern.java
   - src/test/java/com/nekyia/heroicmap/AblageTest.java
   - src/main/resources/heroicmap.accesswidener
   - src/gametest/java/com/nekyia/heroicmap/Anmeldung.java
@@ -678,7 +682,77 @@ Platte (`Kartenliste`), auch die anderer Server und Welten:
   main“ und je Ordner „Karte von main nutzen“. Mit Zeiger „build zeigt auf:
   `<pfad>`“, „(fehlt)“, wenn das Ziel nicht daliegt, und „lösen“. Kein
   Dialog und kein Hinweis beim Betreten, so will es der User.
+- **Ort …:** je Baum links von an/ruht, siehe „Ort ändern“; grau mit
+  Tooltip bei Karten aus dem Einzelspieler und aus der Ablage vor dem
+  Hash und solange ein Download in den Baum läuft (`Kartenliste.ort`).
 - **Mausrad** blättert, wenn nicht alle Karten auf den Schirm passen.
+
+## Ort ändern
+
+„Ort …“ in der Kartenliste ändert Adresse, Server und Hash einer Karte
+(`OrtFenster`, `Ort`), siehe
+[0038](entscheidungen/0038-ort-einer-karte-aendern.md). So sagt ein Spieler
+bei zwei Ordnern derselben Welt, welcher welchem Server gehört, oder holt
+eine Karte nach einem Reset der Welt in den Ordner des neuen Hashs.
+
+- **Das Fenster:** oben Name, Dimension, Massstab und Grösse und der
+  jetzige Ort. Darunter „Ganzer Ordner“, die Vorgabe, und „Nur diese
+  Karte“, die gewählte Art grün und grau. Drei Felder: **Adresse**,
+  **Server**, leer ohne, und **Hash der Welt**. Darunter grün der neue Ort
+  und was mitzieht, oder rot, was dagegen spricht; dann „Umziehen“ und
+  „Abbrechen“. `Esc` bricht ab, solange nichts umzieht.
+- **Welche Karten:** die in einem Ordner
+  `[<adresse>/][karte-<server>/]welt-<hash>` (`Ort.teile`). Bei Karten aus
+  dem Einzelspieler und aus der Ablage vor dem Hash ist „Ort …“ grau, mit
+  Tooltip. Zwischen Einzelspieler und einer Adresse zieht nichts um.
+- **Prüfungen wie beim Anlegen** (`Ort.eingabe`):
+  - die Adresse bereinigt wie `<host>` (`Downloads.name`), vorn nicht
+    `einzelspieler_`, `karte-` oder `welt-`;
+  - der Server nach `Kartenname.gueltig`;
+  - der Hash genau 16 Stellen hex, klein (`Ort.HASH`).
+
+  Der neue Ort liegt immer unter `heroicmap/` (`Ort.ordner`).
+- **„Umziehen“ grau,** mit dem Grund darunter (`Ort.grund`):
+  - derselbe Ort, grau statt rot;
+  - am neuen Ort liegt schon etwas: bei „Ganzer Ordner“ der Ordner, bei
+    „Nur diese Karte“ ein Baum mit dem Namen. Zusammengeführt wird nie;
+  - bei „Ganzer Ordner“ die Welt, in der der Spieler ist, als alter oder
+    neuer Ort; dort schreibt der Mod Wegpunkte, Kartenlage und die eigene
+    Karte;
+  - „Selbst zeichnen“ zeichnet in den alten oder den neuen Ordner
+    (`Selbst.zeichnetIn`);
+  - ein Download wartet oder läuft in einen der Bäume, siehe „Reihe“.
+- **Ganzer Ordner:** Der Ordner der Welt zieht als ein Umbenennen um
+  (`Ort.zieheOrdner`, `ATOMIC_MOVE`), mit allen Karten, Wegpunkten,
+  Kartenlage, `zeigt.txt` und `zeiger.txt`. Leere Ordner über dem alten Ort
+  gehen mit. Wechselt der Server, gehört eine eigene Karte des alten
+  Servers danach dem neuen, wie bei „übernehmen“: neuer Name nach
+  `Selbst.baum` und `server` in `satz.json`. Seine Zeilen in `zeigt.txt`
+  gelten dann für den neuen.
+- **Nur diese Karte:** Ein Baum zieht in den Ordner am neuen Ort; fehlt
+  er, legt der Mod ihn an (`Ort.zieheBaum`). Wegpunkte und Kartenlage
+  bleiben. Eine eigene Karte gehört danach dem Server des neuen Ordners.
+  Die Zeilen in `zeigt.txt` des alten Ordners, die auf den Baum zeigen,
+  fallen weg; im neuen gilt die Regel ohne Zeile, siehe
+  [Selbst gezeichnete Karte](selbst.md), „Wahl“.
+- **Ganz oder gar nicht:** Jeder Schritt merkt sich, wie er zurückgeht.
+  Scheitert einer, etwa an einem offenen Handle unter Windows, gehen die
+  vorigen rückwärts zurück, auch neu angelegte Ordner, und die Liste nennt
+  den Fehler. Einzelheiten stehen im Log.
+- **Ablauf:** Vor dem Umzug hält das Fenster die Schlüssel in der Reihe,
+  siehe „Reihe“: bei „Ganzer Ordner“ die aller Bäume im Ordner, sonst den
+  des Baums und seines neuen Orts. Der Umzug läuft im Worker von „Selbst
+  zeichnen“ (`Selbst.nachArbeit`), nach allem, was dieser noch schreibt.
+  Danach gibt das Fenster die Schlüssel frei, und die Liste zählt neu.
+- **Ein Zeiger,** der danach auf keinen Ordner zeigt, steht in der
+  Kartenliste als „(fehlt)“, bis der Spieler ihn löst.
+- **Was „Ort …“ nicht ändert:** wie der Server sich meldet, also
+  `karten.txt`, `namen.txt` und `backend`. Beim nächsten Betreten liest der
+  Mod nach den Regeln unter „Ablage“. Wer `welt-X` nach
+  `karte-build/welt-X` zieht, findet die Karte auf build, sobald build sich
+  als build meldet.
+- **Kosten:** ein Umbenennen, dazu je eigener Karte ein Umbenennen und
+  `satz.json` neu; kein Kopieren, kein Rendern.
 
 ## Was bleibt eine Näherung
 
