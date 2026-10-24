@@ -8,7 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -334,6 +336,33 @@ class MinimapTest {
             neu.lies(datei);
             assertEquals(k, neu.koordinaten());
         }
+    }
+
+    @Test
+    void zeitAmTodespunktReihumUndGespeichert(@TempDir Path ordner) throws Exception {
+        // Ein Klick geht reihum, nach keiner wieder Datum und Uhrzeit; Vorgabe Datum und Uhrzeit, auch bei einem unbekannten Wert.
+        assertEquals(Minimap.TodZeit.DATUM_UHRZEIT, new Minimap().todZeit());
+        Minimap.TodZeit stil = Minimap.TodZeit.DATUM_UHRZEIT;
+        List<Minimap.TodZeit> reihe = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            stil = stil.naechste();
+            reihe.add(stil);
+        }
+        assertEquals(List.of(Minimap.TodZeit.DATUM, Minimap.TodZeit.UHRZEIT, Minimap.TodZeit.AUS, Minimap.TodZeit.DATUM_UHRZEIT), reihe);
+        Path datei = ordner.resolve("heroicmap.properties");
+        for (Minimap.TodZeit z : Minimap.TodZeit.values()) {
+            Minimap m = new Minimap();
+            m.setzeTodZeit(z);
+            m.schreibe(datei);
+            assertTrue(Files.readString(datei).contains("tod_zeit=" + z.name().toLowerCase(Locale.ROOT)), z.name());
+            Minimap neu = new Minimap();
+            neu.lies(datei);
+            assertEquals(z, neu.todZeit());
+        }
+        Files.writeString(datei, "tod_zeit=morgen\n");
+        Minimap neu = new Minimap();
+        neu.lies(datei);
+        assertEquals(Minimap.TodZeit.DATUM_UHRZEIT, neu.todZeit());
     }
 
     @Test

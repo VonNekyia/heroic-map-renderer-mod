@@ -533,6 +533,11 @@ final class Einstellungen extends Screen {
             Component naechster(Minimap m);
 
             void schalte(Minimap m);
+
+            /** Eine Zeile mehr im Tooltip, die sagt, was das Symbol schaltet; null ohne. */
+            default Component beschreibung() {
+                return null;
+            }
         }
 
         private final Art art;
@@ -549,7 +554,8 @@ final class Einstellungen extends Screen {
 
         private void tooltip() {
             Minimap m = Minimap.INSTANZ;
-            setTooltip(Tooltip.create(Component.translatable("heroicmap.menue.symbol.klick", art.name(), art.zustand(m), art.naechster(m))));
+            Component klick = Component.translatable("heroicmap.menue.symbol.klick", art.name(), art.zustand(m), art.naechster(m));
+            setTooltip(Tooltip.create(art.beschreibung() == null ? klick : klick.copy().append("\n").append(art.beschreibung())));
         }
 
         @Override
@@ -659,6 +665,37 @@ final class Einstellungen extends Screen {
 
             public void schalte(Minimap m) {
                 m.setzeChunklinien(!m.chunklinien());
+            }
+        };
+
+        /** Effekte in der Welt, an der Region im Untermenü: hell an, dunkel aus. Siehe docs/wegpunkte.md, „Strahl“. */
+        static final Art EFFEKTE = new Art() {
+            public Identifier sprite(Minimap m) {
+                return bild("effekte");
+            }
+
+            public int farbe(Minimap m) {
+                return m.effekte() ? 0xFFFFFFFF : 0xFF404040;
+            }
+
+            public Component name() {
+                return Component.translatable("heroicmap.menue.effekte");
+            }
+
+            public Component zustand(Minimap m) {
+                return an(m.effekte());
+            }
+
+            public Component naechster(Minimap m) {
+                return an(!m.effekte());
+            }
+
+            public void schalte(Minimap m) {
+                m.setzeEffekte(!m.effekte());
+            }
+
+            public Component beschreibung() {
+                return Component.translatable("heroicmap.menue.effekte.beschreibung");
             }
         };
     }

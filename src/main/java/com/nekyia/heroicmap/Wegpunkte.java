@@ -843,20 +843,15 @@ final class Wegpunkte {
         return punkte.removeAll(weg);
     }
 
-    /** Die festen Muster der Zeit unter dem Todespunkt, wenn das der Sprache nicht taugt. */
-    static final String TOD_ZEIT_HEUTE = "HH:mm", TOD_ZEIT = "dd.MM. HH:mm";
     /** Die Formatierer je Muster aus der Sprache, einmal gebaut statt in jedem Frame. */
     private static final Map<String, DateTimeFormatter> FORMATE = new ConcurrentHashMap<>();
 
     /**
-     * Die Zeit des Todes {@code zeit} unter dem Todespunkt, in der Zeitzone {@code zone}: am Tag von {@code jetzt} nach dem Muster
-     * {@code heute}, sonst nach {@code frueher}; die Muster kommen aus der Sprache des Spiels. Siehe docs/wegpunkte.md,
-     * „Todespunkt“.
+     * Die Zeit des Todes {@code zeit} unter dem Todespunkt, in der Zeitzone {@code zone}, nach dem Muster {@code muster} aus der
+     * Sprache des Spiels; taugt es nicht, nach {@code fest}. Siehe docs/wegpunkte.md, „Todespunkt“.
      */
-    static String todZeit(long zeit, long jetzt, ZoneId zone, String heute, String frueher) {
-        ZonedDateTime t = Instant.ofEpochMilli(zeit).atZone(zone);
-        boolean amTag = t.toLocalDate().equals(Instant.ofEpochMilli(jetzt).atZone(zone).toLocalDate());
-        return format(amTag ? heute : frueher, amTag ? TOD_ZEIT_HEUTE : TOD_ZEIT).format(t);
+    static String todZeit(long zeit, ZoneId zone, String muster, String fest) {
+        return format(muster, fest).format(Instant.ofEpochMilli(zeit).atZone(zone));
     }
 
     /**

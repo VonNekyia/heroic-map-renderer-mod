@@ -199,18 +199,32 @@ vom Reviewer freigegeben. Das Gewicht vom Server ist `order`, siehe
 ### Teleportieren
 
 - **Der Eintrag** „Hierher teleportieren“ steht in jedem Menü der Karte,
-  sobald es eine Verbindung gibt, in jeder Dimension. Fehlen dem Spieler
-  die Rechte für `execute` und `tp`, lehnt der Server ab und sagt es im
-  Chat; der Mod umgeht nichts. So hat es der User gewünscht (mod#131),
+  sobald es eine Verbindung gibt, in jeder Dimension. Der Mod umgeht
+  nichts.
+  - **Ohne Recht auf `tp`** schickt der Mod nichts. Unten links steht
+    „Teleport: Der Server erlaubt dir /tp nicht.“, die Karte bleibt offen
+    (`Karte.teleportiere`). Ob er darf, liest er aus dem Befehlsbaum, den
+    der Server dem Client schickt: Darin steht nur, was der Spieler darf
+    (`Commands.fillUsableCommands`, per javap in 26.3; `Teleport.erlaubt`).
+    Sonst kämen ohne Höhe bis zu 12 Absagen in den Chat und danach eine
+    falsche Zeile. Gefunden vom Reviewer in mod#192. Bis 0.2.68 lehnte der
+    Server ab und sagte es im Chat. So hat es der User gewünscht (mod#131),
   siehe [0023](entscheidungen/0023-teleport-mit-korrektur.md). Bis 0.2.48
   fehlte der Eintrag ohne beide Befehle im Befehlsbaum und unter einer
   Decke.
-- **Befehl** (`Teleport.befehl`): `execute in <dimension> run tp @s
-  <x+0,5> <y> <z+0,5>`, mit fester Höhe, so geht er auch in Chunks, die
-  weder Client noch Server geladen haben. So hat es der User gewünscht
-  (mod#111), siehe [0019](entscheidungen/0019-teleport-mit-fester-hoehe.md).
-  Der Mod schickt ihn mit `sendCommand`; darin stehen nur die Dimension des
-  Spielers und die drei Zahlen, kein Text vom Server.
+- **Befehl** (`Teleport.befehl`): der normale `tp <x+0,5> <y> <z+0,5>`,
+  ohne `execute`. Mit fester Höhe geht er auch in Chunks, die weder Client
+  noch Server geladen haben (mod#111,
+  [0019](entscheidungen/0019-teleport-mit-fester-hoehe.md)). Der Mod
+  schickt ihn mit `sendCommand`; darin stehen nur die drei Zahlen, kein
+  Text vom Server. So hat es der User gewünscht, siehe
+  [0028](entscheidungen/0028-teleport-mit-tp.md).
+  - **Die Dimension** ist immer die des Spielers: Die Karte zeigt nur den
+    Satz seiner Dimension (`Satz.fuer`), und ein Wechsel schliesst sie.
+    `tp` bleibt in der Dimension des Spielers, so wie bis 0.2.68
+    `execute in <dimension>`.
+  - **Rechte:** Der Server verlangt nur noch das Recht für `tp`, bis
+    0.2.68 auch das für `execute`.
 - **Die Höhe,** in dieser Reihenfolge (`Teleport.los`):
   1. **Beim Client:** Hat er den Chunk, der freie Platz darin
      (`Teleport.frei`). Ob der Client den Chunk hat, fragt der Mod den
@@ -250,21 +264,33 @@ vom Reviewer freigegeben. Das Gewicht vom Server ist `order`, siehe
      - **Über einem Stamm** von 1 × 1 nennt der Boden durch seinen Median
        die Erde darunter; dort landet der Spieler im Stamm. Selten, darum
        so gelassen.
-  3. **Ohne Höhe,** etwa auf der selbst gezeichneten Karte, ohne
-     Webserver oder in einer anderen Dimension als der des Satzes:
-     - **Zuerst der Server,** mit dem alten Befehl `execute in <dimension>
-       positioned <x+0,5> 0 <z+0,5> positioned over
-       motion_blocking_no_leaves run tp @s ~ ~ ~`. Hat er den Chunk
-       geladen, landet der Spieler auf dem Boden, ohne Schaden; im Nether
-       auf dem Dach, dann folgt die Korrektur. Hat er ihn nicht, weist er
-       den Befehl ab, „That position is not loaded“, und der Chat zeigt
-       es. Bis 0.2.35 galt dieser Befehl immer.
-     - **Dann die feste Höhe:** Steht der Spieler 5 Ticks danach
-       (`Teleport.SERVER_TICKS`) nicht am Ziel, geht der Befehl mit fester
-       Höhe ab: die Höhe des Spielers beim Klick, mindestens der
-       Meeresspiegel der Dimension, in der Welt (`Teleport.hoehe`). Danach
-       folgt die Korrektur. Bis 0.2.48 sagte der Chat nur „Höhe unbekannt
-       …“, und wo der Server ablehnte, geschah nichts.
+  3. **Ohne Höhe,** etwa auf der selbst gezeichneten Karte oder ohne
+     Webserver: erst ein `tp` in die Luft, dann eines auf den Boden, so
+     schnell, dass man es kaum merkt. So hat es der User gewünscht, siehe
+     [0028](entscheidungen/0028-teleport-mit-tp.md).
+     - **Die sichere Höhe** (`Teleport.sicher`): ohne Decke zwei Blöcke
+       unter dem obersten Block der Welt, in der Oberwelt y = 317; dort
+       steckt niemand im Block. Mit Decke, etwa im Nether, die Höhe des
+       Spielers beim Klick, mindestens der Meeresspiegel, in der Welt;
+       oben läge das Dach.
+     - **Dann der Boden:** Jeden Tick fragt der Mod, ob der Client den
+       Chunk hat. Sobald ja, geht das zweite `tp` auf den freien Platz
+       aus 1, über die Korrektur unten.
+     - **Bis dahin alle 10 Ticks zurück nach oben**
+       (`Teleport.NACH_OBEN_TICKS`). Jedes `tp` setzt die Geschwindigkeit
+       auf 0, so fällt der Spieler zwischen zwei Befehlen nur rund
+       3 Blöcke und wird nie schnell.
+     - **Nach 5 s ohne Chunk** (`Teleport.SCHWEBEN_TICKS`) gibt der Mod
+       auf: zurück an die Stelle des Klicks, mit einer Zeile im Chat
+       (`heroicmap.teleport.frist`). Ebenso, wenn der Chunk da ist, aber
+       kein Platz zum Stehen, etwa über der Leere im End oder über einem
+       Lavasee unter der Decke (`heroicmap.teleport.kein_platz`). Länger
+       als 5 s ginge nicht: Wer zu viele Befehle schickt, den wirft der
+       Server hinaus, siehe 0028.
+     - **Bis 0.2.68** suchte zuerst der Server den Boden mit `execute …
+       positioned over motion_blocking_no_leaves`; stand der Spieler nach
+       5 Ticks nicht am Ziel, folgte seine eigene Höhe, siehe
+       [0023](entscheidungen/0023-teleport-mit-korrektur.md).
 - **Korrektur nach dem Landen** (`Teleport.tick`, je Tick des Clients):
   für jeden Teleport aus dem Menü, auch mit Höhe aus der Karte, denn die
   kann veraltet sein.
@@ -277,28 +303,32 @@ vom Reviewer freigegeben. Das Gewicht vom Server ist `order`, siehe
     einer Höhle unter dem Ziel (`Teleport.korrigieren`). Dann geht ein
     zweiter Befehl mit fester Höhe auf den freien Platz.
   - **Grenzen gegen Schleifen:** höchstens eine Korrektur je Teleport.
-    Nach 10 s (`Teleport.FRIST_TICKS`) gibt der Mod auf, ebenso, wenn der
-    Spieler nach der Ankunft mehr als 4 Blöcke weggeht (`Teleport.WEG`),
-    die Dimension wechselt oder die Verbindung endet. Ein neuer Teleport
-    ersetzt den offenen. Andere Teleports, etwa ein Befehl im Chat, prüft
-    der Mod nicht.
-  - **Schaden:** Hat der Server den Chunk, landet man ohne Schaden. Muss
-    er ihn erst laden oder erzeugen, liegt die feste Höhe vielleicht im
-    Block oder in der Luft, bis der Chunk beim Client ist. Im schlimmen
-    Fall kostet das ½ bis wenige Herzen. Belegt per javap in 26.3:
-    - **Ersticken:** Steckt der Kopf im Block, schadet das Spiel mit
-      `damageSources().inWall()`. Wegen der Unverwundbarkeit nach einem
-      Treffer ist das ½ Herz beim Landen und dann ½ je 10 Ticks bis zur
-      Korrektur.
+    Mit Höhe hört der Mod nach 10 s auf (`Teleport.FRIST_TICKS`), ohne
+    Höhe gilt 3. Er hört auch auf, wenn der Spieler nach der Ankunft mehr
+    als 4 Blöcke weggeht (`Teleport.WEG`), etwa fliegend, die Dimension
+    wechselt oder die Verbindung endet; zurückgeholt wird er dann nicht.
+    Ein neuer Teleport ersetzt den offenen. Andere Teleports, etwa ein
+    Befehl im Chat, prüft der Mod nicht.
+  - **Schaden:** Ohne Daten keiner, auch wenn der Server den Chunk erst
+    laden oder erzeugen muss. Belegt per javap in 26.3:
     - **Fallen:** Der Client lässt den Spieler auch über einem Chunk
       fallen, den er noch nicht hat. `tp` setzt die Fallstrecke nicht
       zurück, der Server nur, wenn der Spieler steigt
-      (`ServerGamePacketListenerImpl.handleMovePlayer`). Fällt man vor der
-      Korrektur mehr als 3 Blöcke, kostet die Landung danach Schaden.
-    - **Im Gametest `Bedienung`,** in der flachen Welt, die der Server
-      schnell erzeugt, kostet der Teleport ohne Daten in einen Chunk, den
-      er nicht hat, ½ Herz: Der Spieler landet in der Erde und erstickt
-      einmal, bis die Korrektur kommt (Stand 18.10.).
+      (`ServerGamePacketListenerImpl.handlePlayerPositionChange`). Er
+      zählt den Fall aber nicht, solange der Spieler einen Chunk berührt,
+      den er nicht geladen hat (`Entity.doCheckFallDamage`). So zählt nur
+      der langsame Fall vom Laden bis zum zweiten `tp`, wenige Ticks und
+      weit unter den 3 Blöcken, ab denen eine Landung schadet; siehe
+      [0028](entscheidungen/0028-teleport-mit-tp.md).
+    - **Ersticken:** Mit veralteter Höhe aus der Karte landet der Spieler
+      vielleicht im Block. Steckt der Kopf darin, schadet das Spiel mit
+      `damageSources().inWall()`. Wegen der Unverwundbarkeit nach einem
+      Treffer ist das ½ Herz beim Landen und dann ½ je 10 Ticks bis zur
+      Korrektur.
+    - **Im Gametest `Bedienung`,** in der flachen Welt, landet der
+      Spieler ohne Daten ohne Schaden auf dem Boden: in einem Chunk, den
+      der Server hat, nach 5 Ticks, in einem, den er erst erzeugt, nach
+      10 bis 14 Ticks, gezählt ab dem Klick (Stand 24.10.).
 - **Das Menü** bleibt ganz auf dem Schirm, auch bei grossem GUI-Massstab.
 - **Nach dem Klick** schliesst sich die Karte. Holt der Mod die Höhe, geht
   der Befehl ab, sobald sie da ist, höchstens 10 s später.

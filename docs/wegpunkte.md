@@ -163,9 +163,9 @@ Leuchtfeuers in seiner Farbe, so wünscht es der Maintainer (mod#36).
   höchstens die Sichtweite entfernt liegt, also Sichtweite × 16 Blöcke wie
   beim Leuchtfeuer (`Strahlen.waehle`). Höchstens 64 je Frame
   (`Strahlen.MAX_STRAHLEN`), die ersten in der Reihe der Wegpunkte.
-- **Schalter** „Effekte in der Welt“ im Untermenü „Einstellungen …“, Vorgabe
-  an, siehe [Minimap](minimap.md), „Bedienung“. Aus zeichnet der Mod
-  keinen Strahl und keinen Schleier.
+- **Schalter** „Effekte in der Welt“, ein Symbol am Bild der Region im
+  Untermenü „Einstellungen …“, Vorgabe an, siehe [Minimap](minimap.md),
+  „Bedienung“. Aus zeichnet der Mod keinen Strahl und keinen Schleier.
 - **Kosten:** 64 Strahlen, die Grenze, kosten je Frame im Median 0,05 bis
   0,06 ms und im p95 0,07 bis 0,12 ms, gemessen am 11.10., siehe
   [Strahl, Kosten je Frame](messungen/2026-10-11-strahl.md).
@@ -202,8 +202,9 @@ nach oben immer durchsichtiger.
 - **Höhe:** 4 Blöcke (`Schleier.HOEHE`). Unten ist der Schleier zur Hälfte
   so deckend wie seine Farbe (`Schleier.DECKUNG`), oben ganz durchsichtig,
   dazwischen linear.
-- **Regler** „Schleier“ im Untermenü „Einstellungen …“, neben „Effekte in
-  der Welt“ (`Anzeige.SchleierRegler`): für eigene Regionen und alte
+- **Regler** „Schleier“ im Untermenü „Einstellungen …“, am Bild einer
+  Region mit Schleier, das ihm folgt, siehe [Minimap](minimap.md),
+  „Bedienung“ (`Anzeige.SchleierRegler`): für eigene Regionen und alte
   Rechtecke 4 bis 16 Blöcke hoch, in ganzen Blöcken, Vorgabe 4
   (`Minimap.schleier`, gespeichert als `schleier`, gekappt auch beim
   Lesen). Höhe und Deckung steigen zusammen: unten von 50 % bei 4 Blöcken
@@ -327,14 +328,24 @@ Reviewer freigegeben.
   bekommt sie, als gäbe es ihn nicht.
 - **Zeit des Todes** unter der Marke auf der Vollbildkarte, gewünscht vom
   User am 20.10. (mod#166): im Stil der Namen von Nadeln (`Ebenen.name`),
-  am selben Tag nur die Uhrzeit, etwa „14:32“, an früheren Tagen mit
-  Datum, etwa „18.10. 14:32“ (`Wegpunkte.todZeit`, `Karte.todZeit`). Die
-  Muster kommen aus der Sprache des Spiels
-  (`heroicmap.karte.tod_zeit_heute`, `heroicmap.karte.tod_zeit`), die Zeit
+  im Stil, den ein Klick auf den Todespunkt im Untermenü wählt
+  (`Minimap.TodZeit`, gespeichert als `tod_zeit`), siehe
+  [Minimap](minimap.md), „Bedienung“:
+
+  | Stil | Beispiel | Muster | `tod_zeit` |
+  |---|---|---|---|
+  | Datum und Uhrzeit, Vorgabe | „18.10. 14:32“ | `heroicmap.karte.tod_zeit` | `datum_uhrzeit` |
+  | Datum | „18.10.“ | `heroicmap.karte.tod_datum` | `datum` |
+  | Uhrzeit | „14:32“ | `heroicmap.karte.tod_uhrzeit` | `uhrzeit` |
+  | keine | – | – | `aus` |
+
+  Streng, auch am Tag des Todes, so hat es der User am 24.10. gewählt;
+  bis 0.2.68 stand am selben Tag nur die Uhrzeit (`Wegpunkte.todZeit`,
+  `Karte.todZeit`). Die Muster kommen aus der Sprache des Spiels, die Zeit
   aus der Uhr und der Zeitzone des Rechners. Ein Ressourcenpaket, auch vom
   Server, kann die Muster überschreiben; eines, das nicht geht, gibt das
-  feste `HH:mm` bzw. `dd.MM. HH:mm`, gebaut einmal je Muster
-  (`Wegpunkte.format`, Review von #172). Nicht am Rand, wo die Marke
+  feste Muster des Stils, `dd.MM. HH:mm`, `dd.MM.` oder `HH:mm`, gebaut
+  einmal je Muster (`Wegpunkte.format`, Review von #172). Nicht am Rand, wo die Marke
   nur die Richtung zeigt, und nicht auf der Minimap; dort wäre sie zu
   klein. Ein Todespunkt aus einer älteren Datei hat keine Zeit und also
   keine Schrift.
@@ -345,7 +356,7 @@ Reviewer freigegeben.
   Fabric API). Die Karte öffnet sich in der jetzigen Dimension; wer in
   einer anderen gestorben ist, sieht den Todespunkt erst dort.
 - **Regler** „Todespunkte: aus, 1 … 16“ im Untermenü „Einstellungen …“,
-  neben „Auflösung“, Vorgabe 1 (`Anzeige.TodRegler`, `Minimap.todespunkte`,
+  am Bild des Todespunkts, Vorgabe 1 (`Anzeige.TodRegler`, `Minimap.todespunkte`,
   gespeichert als `todespunkte`). Weniger nimmt die ältesten weg, aus alle,
   aber erst beim Schliessen des Untermenüs (`Anzeige.removed`,
   `Wegpunkte.kappeTode`): So löscht der Regler beim Ziehen keinen, von 8
@@ -1334,7 +1345,8 @@ Schleier am Rand, siehe „Schleier“.
   angeheftet; aus setzt ein Tod keinen. Zeit des Todes (`todZeit`): nach
   `kill @a` steht sie auf der Vollbildkarte unter dem Todespunkt, im Bild
   `tod-zeit.png` deutlich mehr dunkle Schrift als derselbe Todespunkt ohne
-  Zeit; auf der Minimap ändert sie nichts. Regler „Todespunkte“ (`todRegler`):
+  Zeit, mit dem Stil „keine“ so wenig wie ohne Zeit; auf der Minimap ändert
+  sie nichts. Regler „Todespunkte“ (`todRegler`):
   Klicks ans rechte Ende, ans linke und in die Mitte geben 16, aus und 8,
   gespeichert beim Schliessen; mit acht Todespunkten nehmen diese Klicks und
   ein Ziehen von 8 auf 1 und zurück keinen weg, nach `Esc` sind es acht; auf
