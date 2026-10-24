@@ -182,9 +182,9 @@ public final class KarteJeServer implements FabricClientGameTest {
         Laden.loesche(dort);
         download(dort, "probe-netz");
         context.runOnClient(mc -> mc.gui.setScreen(new Kartenliste(null)));
-        // Erst die Zeile mit main, die es in jedem Fall gibt, dann eine eigene Meldung: Ein Warten bis zur Zeitgrenze zählte als
-        // Fang nicht.
-        context.waitFor(mc -> knopf(mc, "heroicmap.liste.zeiger_setzen", "main") != null, 600);
+        // Erst die gezählte Liste mit der Zeile von main, die es in jedem Fall gibt, dann eine eigene Meldung: Ein Warten bis zur
+        // Zeitgrenze zählte als Fang nicht. Die Vorschläge unter anderen Adressen kommen mit dem Zählen.
+        context.waitFor(mc -> knopf(mc, "heroicmap.liste.zeiger_setzen", "main") != null && knopf(mc, "heroicmap.liste.loeschen") != null, 600);
         context.waitTicks(2);
         if (context.computeOnClient(mc -> knopf(mc, "heroicmap.liste.zeiger_setzen", "play.example.net")) == null) {
             throw new AssertionError("Kein Vorschlag „Karte von play.example.net nutzen“ neben dem von main");

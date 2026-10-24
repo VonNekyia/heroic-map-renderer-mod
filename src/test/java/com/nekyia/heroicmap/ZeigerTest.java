@@ -204,4 +204,40 @@ class ZeigerTest {
         Zeiger.setze(build, "@tief.example.net");
         assertNull(Zeiger.ziel(build), "keinem Link folgen");
     }
+
+    @Test
+    void fremdNurMitDerselbenWelt() throws Exception {
+        // Ein gesetzter Zeiger unter eine andere Adresse gilt nur, solange die Ausweise keine verschiedene UID kennen; sonst
+        // zeigte nach einem Reset dort die neue Karte über der alten Welt (Review mod#214). Unter derselben Adresse zählt die
+        // UID nicht. Ein Reset löst nur den Zeiger unter eine andere Adresse.
+        Path build = Files.createDirectories(wurzel.resolve("heroicmap/play.example.net/karte-build/" + HASH));
+        ausweis(build, "play.example.net", UID);
+        Path zweit = woanders("zweit.example.net", null);
+        ausweis(zweit, "zweit.example.net", UID);
+        Zeiger.setze(build, "@zweit.example.net");
+        assertEquals(zweit, Zeiger.ziel(build, OBEN));
+        assertEquals(HASH + "/top-north-s", gezeigt(build, "build"));
+        // Dort zurückgesetzt: eine andere UID. Der Zeiger bleibt, gilt aber nicht; für eine Welt ohne UID im Ausweis schon.
+        ausweis(zweit, "zweit.example.net", ANDERE);
+        assertNull(Zeiger.ziel(build, OBEN));
+        assertEquals(zweit, Zeiger.ziel(build), "der Ordner liegt noch da");
+        assertNull(gezeigt(build, "build"), "keine Karte einer anderen Welt");
+        assertEquals(zweit, Zeiger.ziel(build, NETHER));
+        assertFalse(Zeiger.gleicheWelt(Ausweis.lies(build), Ausweis.lies(zweit), OBEN));
+        assertTrue(Zeiger.gleicheWelt(null, Ausweis.lies(zweit), OBEN));
+        assertTrue(Zeiger.loeseNachReset(build));
+        assertNull(Zeiger.name(build));
+        assertFalse(Zeiger.loeseNachReset(build), "ohne Zeiger nichts");
+
+        // Unter derselben Adresse: build zeigt mit Absicht auf main, auch mit anderer UID, und ein Reset löst ihn nicht.
+        Path main = welt("main");
+        download(main, "top-north-s");
+        Path b = welt("build");
+        ausweis(b, "play.example.net", UID);
+        ausweis(main, "play.example.net", ANDERE);
+        Zeiger.setze(b, "main");
+        assertEquals(main, Zeiger.ziel(b, OBEN));
+        assertFalse(Zeiger.loeseNachReset(b));
+        assertEquals("main", Zeiger.name(b));
+    }
 }

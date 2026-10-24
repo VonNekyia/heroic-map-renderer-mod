@@ -23,7 +23,6 @@ final class Zeiger {
     static final String DORT = "@";
     /** Vor einem Ziel in zeiger.txt: Es liegt unter einer anderen Adresse. */
     static final String FREMD = "@";
-    private static final String KARTE = "karte-";
 
     private Zeiger() {
     }
@@ -46,7 +45,7 @@ final class Zeiger {
     private static Path adresse(Path welt) {
         Path eltern = welt.getParent();
         String name = eltern.getFileName() == null ? "" : eltern.getFileName().toString();
-        return name.startsWith(KARTE) && Kartenname.gueltig(name.substring(KARTE.length())) != null ? eltern.getParent() : eltern;
+        return name.startsWith(Ort.KARTE) && Kartenname.gueltig(name.substring(Ort.KARTE.length())) != null ? eltern.getParent() : eltern;
     }
 
     /** {@code heroicmap/} über der Adresse von {@code welt}; null, wenn {@code welt} unter keiner Adresse liegt, etwa bei der Ablage Hash. */
@@ -74,7 +73,7 @@ final class Zeiger {
         String a = teile[0];
         return teile.length <= 2 && Downloads.name(a).equals(a) && !a.startsWith(Ort.EINZELSPIELER)
                 && !host(a).equals(host(adresse(welt).getFileName().toString()))
-                && (teile.length == 1 || teile[1].startsWith(KARTE) && Kartenname.gueltig(teile[1].substring(KARTE.length())) != null);
+                && (teile.length == 1 || teile[1].startsWith(Ort.KARTE) && Kartenname.gueltig(teile[1].substring(Ort.KARTE.length())) != null);
     }
 
     /** Der Ordner der Welt mit demselben Hash für die Karte {@code name}, {@link Zeigt#OHNE} ohne Karte, {@link #fremd} unter einer anderen Adresse. */
@@ -83,7 +82,7 @@ final class Zeiger {
             return wurzel(welt).resolve(name.substring(FREMD.length())).resolve(welt.getFileName().toString());
         }
         Path a = adresse(welt);
-        return (Zeigt.OHNE.equals(name) ? a : a.resolve(KARTE + name)).resolve(welt.getFileName().toString());
+        return (Zeigt.OHNE.equals(name) ? a : a.resolve(Ort.KARTE + name)).resolve(welt.getFileName().toString());
     }
 
     /** Das Ziel des Zeigers, wenn es als Ordner daliegt; sonst null, etwa ohne Zeiger oder wenn es fehlt. */
@@ -94,6 +93,36 @@ final class Zeiger {
         }
         Path ziel = ordner(welt, name);
         return taugt(welt, ziel) ? ziel : null;
+    }
+
+    /**
+     * Wie {@link #ziel(Path)} für die Welt {@code schluessel}; ein Ziel unter einer anderen Adresse nur, solange die Ausweise
+     * keine verschiedene UID für sie kennen ({@link #gleicheWelt}). Sonst zeigte nach einem Reset dort die neue Karte über
+     * der alten Welt. Siehe docs/download.md, „Ablage“.
+     */
+    static Path ziel(Path welt, String schluessel) {
+        Path ziel = ziel(welt);
+        return ziel == null || !name(welt).startsWith(FREMD) || gleicheWelt(Ausweis.lies(welt), Ausweis.lies(ziel), schluessel) ? ziel : null;
+    }
+
+    /** Kennen beide Ausweise für die Welt {@code schluessel} eine UID, ist es dieselbe? Ohne Ausweis oder UID ja. */
+    static boolean gleicheWelt(Ausweis a, Ausweis b, String schluessel) {
+        Ausweis.Welt e = a == null ? null : a.welten().get(schluessel), d = b == null ? null : b.welten().get(schluessel);
+        return e == null || d == null || e.uid() == null || d.uid() == null || e.uid().equals(d.uid());
+    }
+
+    /**
+     * Nach einem Reset im Ordner {@code welt}: Ein Zeiger unter eine andere Adresse geht, denn dort liegt die alte Welt; ob er
+     * ging, sagt das Ergebnis. Einer unter derselben Adresse bleibt; build zeigt mit Absicht die Karte von main. Siehe
+     * docs/download.md, „Reset“.
+     */
+    static boolean loeseNachReset(Path welt) throws IOException {
+        String name = name(welt);
+        if (name == null || !name.startsWith(FREMD)) {
+            return false;
+        }
+        loese(welt);
+        return true;
     }
 
     /**
@@ -124,8 +153,8 @@ final class Zeiger {
         try (Stream<Path> ordner = Files.list(a)) {
             for (Path k : ordner.sorted(Comparator.comparing((Path p) -> p.getFileName().toString())).toList()) {
                 String n = k.getFileName().toString();
-                if (n.startsWith(KARTE) && Kartenname.gueltig(n.substring(KARTE.length())) != null && taugt(welt, k.resolve(hash))) {
-                    namen.add(n.substring(KARTE.length()));
+                if (n.startsWith(Ort.KARTE) && Kartenname.gueltig(n.substring(Ort.KARTE.length())) != null && taugt(welt, k.resolve(hash))) {
+                    namen.add(n.substring(Ort.KARTE.length()));
                 }
             }
         } catch (IOException e) {
@@ -176,12 +205,8 @@ final class Zeiger {
             return false;
         }
         Ausweis dort = Ausweis.lies(ziel);
-        if (eigen == null || dort == null) {
-            return true;
-        }
-        Ausweis.Welt e = eigen.welten().get(schluessel), d = dort.welten().get(schluessel);
-        return (eigen.netz().isEmpty() || !eigen.netz().equals(dort.netz()))
-                && (e == null || d == null || e.uid() == null || d.uid() == null || e.uid().equals(d.uid()));
+        return (eigen == null || dort == null || eigen.netz().isEmpty() || !eigen.netz().equals(dort.netz()))
+                && gleicheWelt(eigen, dort, schluessel);
     }
 
     /** Dieser Ordner der Welt zeigt ab jetzt auf die Karte {@code name}. */

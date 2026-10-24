@@ -646,6 +646,13 @@ eines Proxys von einem des Netzes (`Laden.Fehler.status`).
     hinein: Der Worker zeichnet nur in einen Baum im eigenen Ordner.
   - **Fehlt das Ziel,** gilt die Regel ohne Zeiger. Der Zeiger bleibt, bis
     der Spieler ihn löst; die Karte des Ziels kann wiederkommen.
+  - **Unter einer anderen Adresse** gilt das Ziel nur, solange die
+    Ausweise für die Welt keine verschiedene UID kennen
+    (`Zeiger.ziel` mit der Welt, `Zeiger.gleicheWelt`, dieselbe Regel wie
+    beim Vorschlag). Sonst gilt die Regel ohne Zeiger; er bleibt und steht
+    mit „(andere Welt)“ in der Kartenliste. Ein Zeiger unter derselben
+    Adresse zählt die UID nicht, build zeigt mit Absicht die Karte von
+    main.
   - **Übergang von `karte.von`** (`Uebergang`): Meldet ein Server die Karte
     eines anderen, also `karte` ungleich `backend`, merkt der Mod das in
     `heroicmap/server.txt`, je Adresse, Hash und Server. Meldet derselbe
@@ -773,6 +780,10 @@ immer.
   und die neue UID; eine Zeile im Chat und im Log sagt, was geschah, bei
   „sicher“ mit dem Satz, dass die Wegpunkte bleiben, aber vielleicht nicht
   mehr stimmen.
+- **Zeiger:** Ein Reset, sicher oder ruhend, löst einen Zeiger unter eine
+  andere Adresse (`Zeiger.loeseNachReset`), denn dort liegt die alte Welt;
+  sonst nähme `Satz.fuer` deren Karte über der neuen. Ein Zeiger unter
+  derselben Adresse bleibt.
 
 ## Kartenliste
 
@@ -827,7 +838,8 @@ Platte (`Kartenliste`), auch die anderer Server und Welten:
   (`Kartenliste.zeiger`): Ohne Zeiger, und nur, wenn ein anderer Ordner
   mit demselben Hash liegt, „Gleiche Welt auf main“ und je Ordner „Karte
   von main nutzen“, so viele, wie in die Zeile passen. Mit Zeiger „build
-  zeigt auf: `<pfad>`“, „(fehlt)“, wenn das Ziel nicht daliegt, und
+  zeigt auf: `<pfad>`“, „(fehlt)“, wenn das Ziel nicht daliegt, „(andere
+  Welt)“, wenn es unter einer anderen Adresse eine andere UID hat, und
   „lösen“. Kein Dialog und kein Hinweis beim Betreten, so will es der
   User. Daneben je „Kopie“, siehe
   [Selbst gezeichnete Karte](selbst.md), „Kopie“.

@@ -379,9 +379,17 @@ public final class OrtAendern implements FabricClientGameTest {
     /**
      * Ein unsicherer Reset im Einzelspieler, ohne UID: Im Nether bekommt der Ausweis für die Oberwelt eine Spielzeit von 10⁸,
      * dann zurück. Nach dem Warten ohne UID ruht der Download der Oberwelt unter {@code …-bis-<tag>} mit Marke, und die Welt
-     * zeigt ihn nicht mehr. Siehe docs/download.md, „Reset“.
+     * zeigt ihn nicht mehr. Ein Zeiger unter eine andere Adresse geht mit, denn dort liegt die alte Welt. Siehe docs/download.md,
+     * „Reset“.
      */
-    private static void ruhen(ClientGameTestContext context, TestSingleplayerContext spiel, Path hier) {
+    private static void ruhen(ClientGameTestContext context, TestSingleplayerContext spiel, Path hier) throws IOException {
+        Path dort = hier.getParent().getParent().resolve("zweit.example.net").resolve(hier.getFileName().toString());
+        Laden.loesche(dort);
+        download(dort.resolve("probe-dort"));
+        Zeiger.setze(hier, "@zweit.example.net");
+        if (Zeiger.ziel(hier) == null) {
+            throw new AssertionError("Der Zeiger auf zweit.example.net gilt vor dem Reset nicht");
+        }
         String stelle = context.computeOnClient(mc -> mc.player.getX() + " " + mc.player.getY() + " " + mc.player.getZ());
         spiel.getServer().runCommand("execute in minecraft:the_nether run tp @a 0 100 0");
         context.waitFor(mc -> mc.level != null && mc.level.dimension().identifier().toString().equals("minecraft:the_nether"), 600);
@@ -394,6 +402,10 @@ public final class OrtAendern implements FabricClientGameTest {
         if (Files.exists(hier.resolve("probe-hier")) || !Files.exists(hier.resolve(ruht).resolve(Reset.RUHT))) {
             throw new AssertionError("Nach dem Reset ruht der Download nicht unter " + ruht);
         }
+        if (Zeiger.name(hier) != null) {
+            throw new AssertionError("Nach dem Reset steht der Zeiger unter eine andere Adresse noch: " + Zeiger.name(hier));
+        }
+        Laden.loesche(dort);
         if (context.computeOnClient(mc -> Satz.fuer(hier, "minecraft:overworld", Zeigt.OHNE)) != null) {
             throw new AssertionError("Die Welt zeigt den ruhenden Baum noch");
         }

@@ -7,6 +7,8 @@ issues: []
 code:
   - src/main/java/com/nekyia/heroicmap/Zeiger.java
   - src/main/java/com/nekyia/heroicmap/Kartenliste.java
+  - src/main/java/com/nekyia/heroicmap/Satz.java
+  - src/main/java/com/nekyia/heroicmap/Ausweise.java
 ---
 
 # 0047: Zeiger über Adressen
@@ -57,6 +59,13 @@ des Konzepts „Kartenausweis“; den Plan hat der Reviewer freigegeben.
 
 ## Folgen
 
+- Ein gesetzter Zeiger über Adressen wird weiter geprüft (Review): Ein
+  Reset im eigenen Ordner löst ihn, und mit verschiedener UID in den
+  Ausweisen gilt sein Ziel nicht; sonst stünde nach einem Reset die alte
+  oder die neue Karte über der falschen Welt. Siehe
+  [Download](../download.md), „Reset“.
+- Die Vorschläge zählt die Kartenliste einmal je Öffnen mit dem Bestand,
+  im Hintergrund, nicht bei jedem Neuaufbau.
 - Ein älterer Mod liest `@…` nicht als Namen einer Karte und lässt den
   Zeiger aus.
 - Liegt der eigene Ordner später unter keiner Adresse, etwa mit der Ablage
