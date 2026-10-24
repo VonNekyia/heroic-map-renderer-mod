@@ -36,7 +36,6 @@ import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
@@ -44,7 +43,6 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.data.AtlasIds;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
-import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.util.Util;
 import net.minecraft.world.level.ChunkPos;
@@ -1600,17 +1598,12 @@ public final class Minimap {
     }
 
     /**
-     * Der Rahmen eines Skins über Karte und Linien, in Einheiten des GUI: die Bänder, eckig als
-     * Rechtecke, rund als Ring; darüber die Ornamente aus {@link #ornamente}. Die Bänder zu
+     * Der Rahmen eines Skins über Karte und Linien, in Einheiten des GUI: die Bänder samt Schatten
+     * ({@link Skin#baender}); darüber die Ornamente aus {@link #ornamente}. Die Bänder zu
      * {@code baender}, die Ornamente zu {@code deckung} deckend. Siehe docs/rahmen.md.
      */
     private void zeichneRahmen(GuiGraphicsExtractor g, Skin skin, Rahmen r, Drehung.Lage lage, int k, float baender, float deckung) {
-        if (rund) {
-            g.innerBlit(RenderPipelines.GUI_TEXTURED, skin.ring(r.seite()), r.x(), r.x() + r.seite(), r.y(), r.y() + r.seite(),
-                    0, 1, 0, 1, ARGB.multiplyAlpha(-1, baender));
-        } else {
-            skin.baender(g, r.x(), r.y(), r.seite(), r.seite(), baender);
-        }
+        skin.baender(g, r.x(), r.y(), r.seite(), k, rund, baender);
         for (Ornament o : ornamente(r, skin.baender(), rund, skin.marken, lage, k, verzierungenAus, griffEcke, griffAktiv, hervor)) {
             skin.ornament(g, o.teil(), o.ecke(), o.x(), o.y(), deckung, o.winkel());
         }
