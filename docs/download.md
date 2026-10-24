@@ -640,6 +640,12 @@ Platte (`Kartenliste`), auch die anderer Server und Welten:
 
 - **Je Baum** der Pfad unter `heroicmap/`, darunter Name, Dimension und
   Massstab aus `satz.json`, oder „unvollständig“, und die Grösse.
+  - Passt der Pfad nicht, fehlt ein Stück in der Mitte, „…“ an seiner
+    Stelle (`Ort.kurz`): vorn die Adresse, so viel Platz ist, hinten
+    `welt-<hash>/<baum>`. Reicht es nicht einmal dafür, bleibt das Ende mit
+    dem Namen des Baums.
+  - Mit der Maus über einem gekürzten Pfad zeigt ein Tooltip ihn ganz,
+    umbrochen auf die Breite des Schirms.
 - **Oben** die Summe aller Dateien unter `heroicmap/`, immer in GB, so will
   es der User, und die Zahl der Karten.
 - **Ein Baum** ist ein Ordner mit `massstab.txt` oder `satz.json`, bis zu

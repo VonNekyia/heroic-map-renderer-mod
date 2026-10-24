@@ -80,6 +80,29 @@ class OrtTest {
         assertEquals("heroicmap.ort.belegt", Ort.grund(welt, welt, frei, frei, hier, p -> false, null, true));
     }
 
+    @Test
+    void kurz() {
+        String pfad = "play.example.net/karte-main/welt-" + HASH + "/hauptwelt", ende = "welt-" + HASH + "/hauptwelt";
+        assertEquals(pfad, Ort.kurz(pfad, pfad.length(), String::length), "passt, bleibt");
+        // Vorn die Adresse, so viel passt, hinten Welt und Baum ganz; die Breite ganz genutzt.
+        String s = Ort.kurz(pfad, 50, String::length);
+        assertEquals("play.example.net/k…" + ende, s);
+        assertEquals("play.exam…" + ende, Ort.kurz(pfad, 41, String::length));
+        assertEquals("…" + ende, Ort.kurz(pfad, ende.length() + 1, String::length));
+        // Schmaler als Welt und Baum: das Ende mit dem Baum.
+        assertEquals("…" + HASH.substring(10) + "/hauptwelt", Ort.kurz(pfad, 17, String::length));
+        assertEquals("…", Ort.kurz(pfad, 0, String::length), "nie leer");
+        // Jede Breite: ein Anfang des Pfads, „…“, ein Ende des Pfads; ab 11 Zeichen mit dem ganzen Baum.
+        for (int b = 1; b < pfad.length(); b++) {
+            String k = Ort.kurz(pfad, b, String::length);
+            int m = k.indexOf('…');
+            assertTrue(k.length() <= b && m >= 0 && pfad.startsWith(k.substring(0, m)) && pfad.endsWith(k.substring(m + 1)), b + ": " + k);
+            assertTrue(b < 11 || k.endsWith("/hauptwelt"), "der Baum bleibt: " + k);
+        }
+        // Zwei Teile, etwa die Ablage nach dem Hash: nur das Ende.
+        assertEquals("…" + HASH + "/baum", Ort.kurz("welt-" + HASH + "/baum", 22, String::length));
+    }
+
     /** Eine Welt unter play.example.net ohne Server: ein Download, eine eigene Karte ohne Server, Wegpunkte und zeigt.txt. */
     private static Path welt(Path w) throws IOException {
         Path welt = w.resolve("play.example.net/welt-" + HASH);

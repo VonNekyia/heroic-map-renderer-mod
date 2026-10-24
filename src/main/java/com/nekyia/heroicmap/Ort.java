@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
+import java.util.function.ToIntFunction;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -106,6 +107,33 @@ final class Ort {
             return null;
         }
         return new Teile(ordner, s, h);
+    }
+
+    /**
+     * Der Pfad {@code pfad} unter {@code heroicmap/} für eine Zeile von {@code breite}, gemessen mit {@code mass}. Passt er nicht,
+     * fehlt ein Stück in der Mitte, „…“ an seiner Stelle: Vorn bleibt die Adresse, hinten {@code welt-…/<baum>}, so viel davon
+     * passt. Reicht die Breite nicht einmal dafür, bleibt das Ende mit dem Namen des Baums. Siehe docs/download.md, „Kartenliste“.
+     */
+    static String kurz(String pfad, int breite, ToIntFunction<String> mass) {
+        if (mass.applyAsInt(pfad) <= breite) {
+            return pfad;
+        }
+        // Die letzten beiden Teile, der Ordner der Welt und der Baum.
+        int hinten = pfad.lastIndexOf('/', pfad.lastIndexOf('/') - 1) + 1;
+        String ende = pfad.substring(hinten);
+        for (int vorn = hinten - 1; vorn >= 0; vorn--) {
+            String s = pfad.substring(0, vorn) + "…" + ende;
+            if (mass.applyAsInt(s) <= breite) {
+                return s;
+            }
+        }
+        for (int ab = hinten + 1; ab < pfad.length(); ab++) {
+            String s = "…" + pfad.substring(ab);
+            if (mass.applyAsInt(s) <= breite) {
+                return s;
+            }
+        }
+        return "…";
     }
 
     /** Der Ordner der Welt mit diesen Teilen unter {@code wurzel}. */
