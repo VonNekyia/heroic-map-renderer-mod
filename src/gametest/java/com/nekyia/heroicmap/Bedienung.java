@@ -4599,13 +4599,17 @@ public final class Bedienung implements FabricClientGameTest {
         // nur in der deckenden Karte der Vorschau; hinter der Tafel läuft die Welt weiter.
         double[] vorschau = context.computeOnClient(mc -> waehler(mc).vorschauMitte(Skin.FAMILIEN.indexOf("schild"),
                 mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight()));
+        // Hier sind alle Marken durchsichtig; für den Vergleich erst alle in Pixeln, dann N durchsichtig, danach wieder alle.
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeVerzierungen(true));
+        zierIst(context, 0, 0, "Wähler, alle Marken in Pixeln");
         BufferedImage mitN = foto(context, "waehler-n-da");
         context.runOnClient(mc -> {
             Minimap.INSTANZ.schalteVerzierung(0);
             Minimap.INSTANZ.schalteVerzierung(0);
         });
+        zierIst(context, 0, 0b0001, "Wähler, N durchsichtig");
         BufferedImage ohneN = foto(context, "waehler-n-weg");
-        context.runOnClient(mc -> Minimap.INSTANZ.schalteVerzierung(0));
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeVerzierungen(false));
         double vorschauOben = vorschau[1] - Waehler.SEITE / 2.0;
         int nWeg = anders(mitN, ohneN, vorschau[0] - 3, vorschauOben, vorschau[0] + 3, vorschauOben + 4, k);
         if (nWeg < 6 * k * k) {
