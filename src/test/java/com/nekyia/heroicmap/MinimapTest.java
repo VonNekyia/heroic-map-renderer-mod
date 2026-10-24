@@ -395,6 +395,19 @@ class MinimapTest {
     }
 
     @Test
+    void balkenStehtWoSonstDieKoordinaten() {
+        // Der Balken des Fortschritts nimmt die erste Zeile unter der Minimap, so breit wie sie; die Koordinaten rücken um eine
+        // Zeile und 2 Einheiten weiter, unten am Schirm nach oben. So rechnet Minimap.zeichne. Siehe docs/minimap.md, „Fortschritt“.
+        Minimap.Rahmen r = new Minimap.Rahmen(100, 10, 128);
+        assertArrayEquals(new int[] {100, 10 + 128 + 1 + 2}, Minimap.koordinatenLage(r, 1, 4, 640, 360, 128, 9));
+        assertArrayEquals(new int[] {100 + (128 - 60) / 2, 10 + 128 + 1 + 9 + 2 + 2}, Minimap.koordinatenLage(r, 1 + 9 + 2, 4, 640, 360, 60, 9));
+        Minimap.Rahmen unten = new Minimap.Rahmen(100, 360 - 128 - 4, 128);
+        assertArrayEquals(new int[] {100, 360 - 128 - 4 - 4 - 2 - 9}, Minimap.koordinatenLage(unten, 4, 4, 640, 360, 128, 9));
+        assertArrayEquals(new int[] {100 + (128 - 60) / 2, 360 - 128 - 4 - 4 - 9 - 2 - 2 - 9},
+                Minimap.koordinatenLage(unten, 4 + 9 + 2, 4, 640, 360, 60, 9));
+    }
+
+    @Test
     void koordinatenGanzAufDemSchirm() {
         // Die Zeile mit y am Rand der Welt, 180 Einheiten, unter einer Minimap mit 64 Seite auf 320 × 240 (mod#157).
         // In der Ecke links und rechts bündig mit der Aussenkante der Minimap, in der Mitte mittig darunter.
