@@ -4569,10 +4569,10 @@ public final class Bedienung implements FabricClientGameTest {
         // Esc schliesst nur den Wähler, das Menü bleibt offen, der Rahmen bleibt.
         maus.pressKey(InputConstants.KEY_ESCAPE);
         context.waitTicks(2);
-        waehlerOffen(context, false, "Esc im Wähler");
         if (!context.computeOnClient(mc -> mc.gui.screen() instanceof Einstellungen)) {
             throw new AssertionError("Esc im Wähler schloss das Menü");
         }
+        waehlerOffen(context, false, "Esc im Wähler");
         aussehenIst(context, Minimap.Darstellung.PFEIL, "rose", "Esc im Wähler");
 
         // Verzierungen aus: Das Menü zeigt die Marken halb, W links.
@@ -5362,7 +5362,11 @@ public final class Bedienung implements FabricClientGameTest {
 
     /** Der Wähler der Rahmen im offenen Menü oder Untermenü. */
     private static Waehler waehler(Minecraft mc) {
-        return mc.gui.screen() instanceof Einstellungen e ? e.waehler() : ((Anzeige) mc.gui.screen()).waehler();
+        return switch (mc.gui.screen()) {
+            case Einstellungen e -> e.waehler();
+            case Anzeige a -> a.waehler();
+            case null, default -> throw new AssertionError("Kein Menü offen, sondern " + mc.gui.screen());
+        };
     }
 
     private static void waehlerOffen(ClientGameTestContext context, boolean soll, String was) {
