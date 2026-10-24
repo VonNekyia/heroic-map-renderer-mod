@@ -1,5 +1,5 @@
 ---
-title: "0031: Widgets an der Minimap"
+title: "0033: Widgets an der Minimap"
 description: Warum die Zeile der Koordinaten ein Widget wird, welche Arten und Versionen es gibt, wie man sie im Menü hinzufügt, verschiebt, skaliert und löscht, wohin sie einrasten und wie sie gespeichert werden; in drei Schritten.
 status: gilt
 date: 2026-10-24
@@ -10,7 +10,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/Einstellungen.java
 ---
 
-# 0031: Widgets an der Minimap
+# 0033: Widgets an der Minimap
 
 ## Anlass
 

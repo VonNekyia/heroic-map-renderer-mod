@@ -14,7 +14,7 @@ Ein Widget ist eine Zeile Text an der Minimap, im Spiel nur Anzeige. Heute
 gibt es eine Art, die Koordinaten des Spielers; sie sind das, was bis
 0.2.68 die Zeile der Koordinaten war. Gewünscht vom User am 23.10., Plan
 vom Reviewer freigegeben am 24.10., siehe
-[0031](entscheidungen/0031-widgets-an-der-minimap.md). Bearbeiten im Menü,
+[0033](entscheidungen/0033-widgets-an-der-minimap.md). Bearbeiten im Menü,
 weitere Arten und das Einrasten oben kommen in eigenen Schritten.
 
 ## Arten
