@@ -58,7 +58,7 @@ steht unter „Kosten“.
 | Form | eckig | eckig oder rund; im Menü das Symbol ◻/◯ in der Ecke des L, siehe „Symbole an der Minimap“ und „Form“ |
 | Drehen | an | die Minimap dreht mit der Blickrichtung; im Menü der Nordpfeil, siehe „Symbole an der Minimap“ und „Drehen“ |
 | Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte; im Menü das Raster, siehe „Symbole an der Minimap“ und „Chunklinien“ |
-| Verzierungen | alle an | jede Marke N, O, S, W des Rahmens für sich; im Menü die mittlere Maustaste auf die Marke, siehe [Rahmen](rahmen.md), „Verzierungen“ |
+| Verzierungen | alle in Pixeln | jede Marke N, O, S, W des Rahmens für sich in Pixeln, in HD oder durchsichtig; im Menü die mittlere Maustaste auf die Marke, siehe [Rahmen](rahmen.md), „Verzierungen“ |
 | Mitspieler | Simple Voice Chat | siehe „Mitspieler“ |
 | Knopf „Karte laden …“ | – | die Karten des Servers, wie in der [Vollbildkarte](vollbildkarte.md), „Bedienung“ |
 | Knopf „Kartenliste …“ | – | alle Karten auf der Platte mit Grösse und Summe in GB, mit Löschen, siehe [Download](download.md), „Kartenliste“ |
@@ -304,8 +304,8 @@ Das weicht vom Wortlaut des Wunsches ab, „oben an der Minimap“; der
 Reviewer hat es so freigegeben. Gründe:
 
 - Über der Mitte liegt schon die Marke N des Rahmens. Ein Klick dort
-  öffnet den Wähler der Rahmen, die mittlere Taste macht sie durchsichtig,
-  siehe [Rahmen](rahmen.md), „Verzierungen“. Ein Pfeil daneben wäre ein
+  öffnet den Wähler der Rahmen, die mittlere Taste schaltet sie zwischen
+  Pixel, HD und durchsichtig, siehe [Rahmen](rahmen.md), „Verzierungen“. Ein Pfeil daneben wäre ein
   drittes Ziel auf wenigen Einheiten.
 - Steht die Minimap oben am Schirm, ist über ihr kein Platz.
 - Steht die Minimap unten, liegt die Reihe über ihr und belegt die obere
@@ -323,8 +323,8 @@ hat es der User gewünscht (mod#105); das Menü wird kürzer.
   2 Einheiten, bei 128 Einheiten Seite 11 × 11.
 - **Marken:** Ein Klick mit der linken oder rechten Taste auf eine der
   Marken N, O, S, W öffnet den Wähler der Rahmen, siehe [Rahmen](rahmen.md),
-  „Wähler“; die mittlere Taste macht die Marke durchsichtig oder holt sie
-  zurück, siehe [Rahmen](rahmen.md), „Verzierungen“. Bis 0.2.68 schaltete
+  „Wähler“; die mittlere Taste schaltet die Marke reihum zwischen Pixel,
+  HD und durchsichtig, siehe [Rahmen](rahmen.md), „Verzierungen“. Bis 0.2.68 schaltete
   ein Linksklick zum nächsten Rahmen. Eine Marke trifft man
   dort, wo die Minimap sie in diesem Frame gezeichnet hat, auch gedreht,
   mindestens 9 × 9 Einheiten um ihre Mitte (`Minimap.ziel`). Die Bänder

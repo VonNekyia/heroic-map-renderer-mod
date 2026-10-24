@@ -235,6 +235,59 @@ class SkinTest {
     }
 
     @Test
+    void hdNachFlaeche() {
+        // Gleich gross bleibt jeder Pixel, wie er ist, auch durchsichtige mit Farbe: GUI-Massstab 4 zeigt das HD-Bild 1:1.
+        int[] bild = {0xFF102030, 0x00FFFFFF, 0x80FF0000, 0xFF00FF00};
+        assertArrayEquals(bild, Skin.verkleinere(bild, 2, 2, 2, 2));
+        // Auf die Hälfte: 2 × 2 gemittelt, mit vormultipliziertem Alpha. Weiss neben Durchsichtig wird halb deckendes Weiss,
+        // kein Grau.
+        assertArrayEquals(new int[] {0x80FFFFFF}, Skin.verkleinere(new int[] {0xFFFFFFFF, 0x00000000, 0x00000000, 0xFFFFFFFF}, 2, 2, 1, 1));
+        assertArrayEquals(new int[] {0xFF808080}, Skin.verkleinere(new int[] {0xFFFFFFFF, 0xFF000000, 0xFF000000, 0xFFFFFFFF}, 2, 2, 1, 1));
+        // 4 auf 3 nach Fläche: Die erste Spalte des Ziels deckt die erste der Quelle ganz und ein Drittel der zweiten.
+        int[] streifen = new int[16];
+        for (int y = 0; y < 4; y++) {
+            streifen[y * 4] = 0xFFFF0000;
+        }
+        int[] drei = Skin.verkleinere(streifen, 4, 4, 3, 3);
+        // HD erst ab GUI-Massstab 2, und nur gewählt.
+        assertFalse(Skin.mitHd(true, 1));
+        assertTrue(Skin.mitHd(true, 2));
+        assertFalse(Skin.mitHd(false, 4));
+        for (int y = 0; y < 3; y++) {
+            assertEquals(0xBFFF0000, drei[y * 3], "Zeile " + y);
+            assertEquals(0, drei[y * 3 + 1]);
+            assertEquals(0, drei[y * 3 + 2]);
+        }
+    }
+
+    @Test
+    void hdBilderViermalSoGross() throws IOException {
+        // Zu jedem Bild einer Marke und des Griffs im Paket gibt es die HD-Fassung, genau D-mal so breit und hoch, samt _aktiv.
+        int gezaehlt = 0;
+        for (String familie : Skin.MIT_VARIANTEN) {
+            for (Skin.Variante v : Skin.liesVarianten(text(familie, "varianten.txt"))) {
+                for (String teil : new String[] {"griff", "norden", "marke", "marke_quer", "osten", "sueden", "westen"}) {
+                    for (String aktiv : new String[] {"", "_aktiv"}) {
+                        BufferedImage pixel = bild(familie + "/" + v.ordner(), teil + aktiv);
+                        if (pixel == null) {
+                            continue;
+                        }
+                        String hd = "/assets/heroicmap/textures/rahmen/" + familie + "/" + v.ordner() + "/" + teil + "_hd" + aktiv + ".png";
+                        try (InputStream rein = SkinTest.class.getResourceAsStream(hd)) {
+                            assertNotNull(rein, hd);
+                            BufferedImage gross = ImageIO.read(rein);
+                            assertEquals(pixel.getWidth() * Skin.D, gross.getWidth(), hd);
+                            assertEquals(pixel.getHeight() * Skin.D, gross.getHeight(), hd);
+                        }
+                        gezaehlt++;
+                    }
+                }
+            }
+        }
+        assertTrue(gezaehlt >= 100, "nur " + gezaehlt);
+    }
+
+    @Test
     void ornamenteAufDerMitteDerBaender() {
         double[][] eckig = Skin.ecken(10, 20, 100, 60, 3, false);
         assertEquals(11.5, eckig[0][0], 1e-9);

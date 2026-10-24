@@ -2,6 +2,7 @@ package com.nekyia.heroicmap;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.logging.LogUtils;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -123,6 +124,8 @@ final class Skin {
     /** Wie weit die Minimap mit diesem Rahmen mindestens vom Rand des Schirms bleibt, siehe {@link #einrueckung(Marken, int, int)}. */
     private final int einrueckung;
     private final Identifier[] sprites = new Identifier[TEILE.length];
+    /** Je Teil: Fehlt sein HD-Bild oder ist es unlesbar? Dann zeichnet er die Pixelfassung. */
+    private final boolean[] ohneHd = new boolean[TEILE.length];
 
     private Skin(String name, String ordner, int[] licht, int[] schatten, boolean mitSchatten, Marken marken, int groesste) {
         this.name = name;
@@ -487,31 +490,125 @@ final class Skin {
      * und mit dem Wähler. Siehe docs/rahmen.md, „Kosten“.
      */
     private Identifier textur(String art, int n, Farbe farbe) {
-        long jetzt = Util.getMillis();
+        Identifier id = gemerkt(art);
+        return id != null ? id : neu(art, n, n, farbe);
+    }
+
+    /** Die Textur {@code art} dieses Skins, als eben gezeichnet vermerkt; null, wenn es sie nicht gibt. */
+    private Identifier gemerkt(String art) {
         Textur t = TEXTUREN.get(name + "/" + art);
         if (t == null) {
-            TEXTUREN.values().removeIf(alt -> {
-                boolean weg = jetzt - alt.benutzt > 2000;
-                if (weg) {
-                    Minecraft.getInstance().getTextureManager().release(alt.id);
-                }
-                return weg;
-            });
-            Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "rahmen/" + name + "/" + art);
-            DynamicTexture textur = new DynamicTexture(() -> "heroicmap " + id, n, n, true);
-            NativeImage pixel = textur.getPixels();
-            for (int y = 0; y < n; y++) {
-                for (int x = 0; x < n; x++) {
-                    pixel.setPixel(x, y, farbe.an(x, y));
+            return null;
+        }
+        t.benutzt = Util.getMillis();
+        return t.id;
+    }
+
+    /** Legt die Textur {@code art} mit w × h Pixeln aus {@code farbe} an; vorher fällt jede, die 2 s nicht gezeichnet wurde. */
+    private Identifier neu(String art, int w, int h, Farbe farbe) {
+        long jetzt = Util.getMillis();
+        TEXTUREN.values().removeIf(alt -> {
+            boolean weg = jetzt - alt.benutzt > 2000;
+            if (weg) {
+                Minecraft.getInstance().getTextureManager().release(alt.id);
+            }
+            return weg;
+        });
+        Identifier id = Identifier.fromNamespaceAndPath(HeroicMap.ID, "rahmen/" + name + "/" + art);
+        DynamicTexture textur = new DynamicTexture(() -> "heroicmap " + id, w, h, true);
+        NativeImage pixel = textur.getPixels();
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                pixel.setPixel(x, y, farbe.an(x, y));
+            }
+        }
+        textur.upload();
+        Minecraft.getInstance().getTextureManager().register(id, textur);
+        Textur t = new Textur(id);
+        t.benutzt = jetzt;
+        TEXTUREN.put(name + "/" + art, t);
+        return id;
+    }
+
+    /** Ob ein Teil in HD gezeichnet wird: gewählt und ab GUI-Massstab 2; bei 1 wäre HD Brei. */
+    static boolean mitHd(boolean hd, int k) {
+        return hd && k >= 2;
+    }
+
+    /** Der Dateiname des HD-Bilds eines Teils: {@code norden_hd}, {@code norden_hd_aktiv}. */
+    static String hdName(int teil) {
+        String n = TEILE[teil];
+        return n.endsWith("_aktiv") ? n.substring(0, n.length() - "_aktiv".length()) + "_hd_aktiv" : n + "_hd";
+    }
+
+    /**
+     * Die HD-Fassung des Teils mit w × h Einheiten für GUI-Massstab k: das Bild mit D Texeln je Einheit nach Fläche auf k Pixel
+     * je Einheit gemittelt ({@link #verkleinere}), bei k = D unverändert. Null, wenn es das Bild nicht gibt oder es unlesbar ist.
+     * Siehe docs/rahmen.md, „HD“.
+     */
+    private Identifier hd(int teil, int w, int h, int k) {
+        if (ohneHd[teil]) {
+            return null;
+        }
+        String art = "hd_" + TEILE[teil] + "_" + k;
+        Identifier id = gemerkt(art);
+        if (id != null) {
+            return id;
+        }
+        Identifier datei = Identifier.fromNamespaceAndPath(HeroicMap.ID, "textures/rahmen/" + ordner + "/" + hdName(teil) + ".png");
+        int[] quelle = new int[w * D * h * D];
+        try (InputStream rein = Minecraft.getInstance().getResourceManager().open(datei); NativeImage bild = NativeImage.read(rein)) {
+            if (bild.getWidth() != w * D || bild.getHeight() != h * D) {
+                throw new IOException("HD-Bild " + bild.getWidth() + " × " + bild.getHeight() + " statt " + w * D + " × " + h * D);
+            }
+            for (int y = 0; y < h * D; y++) {
+                for (int x = 0; x < w * D; x++) {
+                    quelle[y * w * D + x] = bild.getPixel(x, y);
                 }
             }
-            textur.upload();
-            Minecraft.getInstance().getTextureManager().register(id, textur);
-            t = new Textur(id);
-            TEXTUREN.put(name + "/" + art, t);
+        } catch (FileNotFoundException e) {
+            ohneHd[teil] = true;
+            return null;
+        } catch (IOException | RuntimeException e) {
+            LOGGER.warn("Heroic Map: HD-Bild {} unlesbar", datei, e);
+            ohneHd[teil] = true;
+            return null;
         }
-        t.benutzt = jetzt;
-        return t.id;
+        int[] klein = verkleinere(quelle, w * D, h * D, w * k, h * k);
+        return neu(art, w * k, h * k, (x, y) -> klein[y * w * k + x]);
+    }
+
+    /**
+     * Ein Bild (ARGB, Zeile für Zeile) von sw × sh auf tw × th nach Fläche: Jeder Pixel des Ziels mittelt die Pixel der Quelle
+     * unter sich, anteilig nach Überdeckung, mit vormultipliziertem Alpha, so bleibt am Rand kein dunkler Saum. Gleich gross
+     * bleibt es unverändert.
+     */
+    static int[] verkleinere(int[] quelle, int sw, int sh, int tw, int th) {
+        if (sw == tw && sh == th) {
+            return quelle.clone();
+        }
+        int[] ziel = new int[tw * th];
+        double fx = (double) sw / tw, fy = (double) sh / th;
+        for (int ty = 0; ty < th; ty++) {
+            double y0 = ty * fy, y1 = y0 + fy;
+            for (int tx = 0; tx < tw; tx++) {
+                double x0 = tx * fx, x1 = x0 + fx, a = 0, r = 0, gr = 0, b = 0;
+                for (int sy = (int) y0; sy < Math.min(sh, Math.ceil(y1 - 1e-9)); sy++) {
+                    double wy = Math.min(y1, sy + 1) - Math.max(y0, sy);
+                    for (int sx = (int) x0; sx < Math.min(sw, Math.ceil(x1 - 1e-9)); sx++) {
+                        int c = quelle[sy * sw + sx];
+                        double w = wy * (Math.min(x1, sx + 1) - Math.max(x0, sx)) * (c >>> 24);
+                        a += w;
+                        r += w * (c >> 16 & 0xFF);
+                        gr += w * (c >> 8 & 0xFF);
+                        b += w * (c & 0xFF);
+                    }
+                }
+                ziel[ty * tw + tx] = a <= 0 ? 0 : ARGB.color((int) Math.round(a / (fx * fy)), (int) Math.round(r / a),
+                        (int) Math.round(gr / a), (int) Math.round(b / a));
+            }
+        }
+        return ziel;
     }
 
     /**
@@ -644,27 +741,30 @@ final class Skin {
     /**
      * Zeichnet das Ornament {@code teil} (etwa {@link #NORDEN} oder {@link #GRIFF}, plus 1 für aktiv) der
      * Ecke e mit der Mitte auf (px, py), um {@code winkel} gedreht, zu {@code deckung} deckend, mit
-     * Schatten, wenn der Skin ihn will; der Schatten bleibt auf dem Schirm um (+1, +1). Gespiegelt über
-     * vertauschte UV: Die Ecken des Quads bleiben in derselben Reihenfolge, das GUI verwirft es nicht.
+     * Schatten, wenn der Skin ihn will; der Schatten bleibt auf dem Schirm um (+1, +1). Mit {@code hd} ab GUI-Massstab 2 die
+     * HD-Fassung ({@link #hd}), sonst und ohne sie die Pixelfassung aus dem Atlas. Gespiegelt über vertauschte UV: Die Ecken des
+     * Quads bleiben in derselben Reihenfolge, das GUI verwirft es nicht.
      */
-    void ornament(GuiGraphicsExtractor g, int teil, int e, double px, double py, float deckung, double winkel) {
+    void ornament(GuiGraphicsExtractor g, int teil, int e, double px, double py, float deckung, double winkel, boolean hd) {
         TextureAtlasSprite s = gui().getSprite(sprites[teil]);
+        int w = s.contents().width(), h = s.contents().height(), k = Minecraft.getInstance().getWindow().getGuiScale();
+        Identifier bild = mitHd(hd, k) ? hd(teil, w, h, k) : null;
         boolean griff = teil == GRIFF || teil == GRIFF + 1, sx = spiegeltX(e, griff), sy = spiegeltY(e, griff);
-        float u0 = sx ? s.getU1() : s.getU0(), u1 = sx ? s.getU0() : s.getU1();
-        float v0 = sy ? s.getV1() : s.getV0(), v1 = sy ? s.getV0() : s.getV1();
+        float ua = bild == null ? s.getU0() : 0, ub = bild == null ? s.getU1() : 1, va = bild == null ? s.getV0() : 0, vb = bild == null ? s.getV1() : 1;
+        float u0 = sx ? ub : ua, u1 = sx ? ua : ub, v0 = sy ? vb : va, v1 = sy ? va : vb;
+        Identifier textur = bild == null ? s.atlasLocation() : bild;
         if (mitSchatten) {
-            blit(g, s, px + 1, py + 1, winkel, u0, u1, v0, v1, ARGB.multiplyAlpha(SCHATTEN, deckung));
+            blit(g, textur, w, h, px + 1, py + 1, winkel, u0, u1, v0, v1, ARGB.multiplyAlpha(SCHATTEN, deckung));
         }
-        blit(g, s, px, py, winkel, u0, u1, v0, v1, ARGB.multiplyAlpha(-1, deckung));
+        blit(g, textur, w, h, px, py, winkel, u0, u1, v0, v1, ARGB.multiplyAlpha(-1, deckung));
     }
 
     /**
      * Das Bild mit der Mitte auf (px, py): ungedreht und um ganze Vierteldrehungen auf ganzen Einheiten
      * ({@link #lage}), sonst starr um seine Mitte gedreht; dann werden die Kanten treppig wie die der gedrehten Karte.
      */
-    private static void blit(GuiGraphicsExtractor g, TextureAtlasSprite s, double px, double py, double winkel,
+    private static void blit(GuiGraphicsExtractor g, Identifier textur, int w, int h, double px, double py, double winkel,
             float u0, float u1, float v0, float v1, int farbe) {
-        int w = s.contents().width(), h = s.contents().height();
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         long viertel = Math.round(winkel / (Math.PI / 2));
@@ -676,7 +776,7 @@ final class Skin {
         } else {
             pose.translate((float) px, (float) py).rotate((float) winkel).translate(-w / 2f, -h / 2f);
         }
-        g.innerBlit(RenderPipelines.GUI_TEXTURED, s.atlasLocation(), 0, w, 0, h, u0, u1, v0, v1, farbe);
+        g.innerBlit(RenderPipelines.GUI_TEXTURED, textur, 0, w, 0, h, u0, u1, v0, v1, farbe);
         pose.popMatrix();
     }
 }
