@@ -268,7 +268,7 @@ final class ChunkMaler {
         kippAnzahl = 0;
         tesselator.tesselateBlock((x, y, z, quad, instanz) -> {
             // Bei einer Pflanze zählt nur eine liegende Fläche; die übrigen kippen, auch die gekippten eines Pakets. Bei Bambus
-            // kippen nur die Blätter. Siehe docs/minimap.md, „Pflanzen von oben“, und „Pflanzen aus Paketen“.
+            // kippen nur die Blätter. Siehe docs/minimap.md, „Pflanzen von oben“, und docs/minimap.md, „Pflanzen aus Paketen“.
             if (pflanze ? !liegt(quad) : !nachOben(quad)) {
                 if (pflanze || bambus && quad.materialInfo().sprite().contents().name().getPath().contains("leaves")) {
                     merke(quad, instanz, x, y, z);

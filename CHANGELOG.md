@@ -8,6 +8,7 @@ The release notes on GitHub and Modrinth come from here
 
 - **A reset world gets a fresh map.** When a server resets a world, the mod notices it and deletes the old map, so nothing is drawn over the wrong terrain; your waypoints stay. It's sure with plugin 0.20.1, which tells the mod each world's ID, or when the same server shows the same world with a new seed. Without that, if the world's time jumps far back, the old map only rests and you can delete it in the map list.
 - **Copy another server's map and draw over it.** In the map list, next to "Use the map of …", "Copy" makes the other server's map of the same world your own map on this server, and "Draw it yourself" then draws what changes here. The copy costs hardly any space: until a tile is drawn anew, both maps share its file.
+- **Plants lean to the north on the minimap and your own map.** Crops, grass, flowers, kelp and seagrass now tilt 45° so you see them from the side instead of a flat patch of texture. Each plant stays inside its block, plants in water stay under the surface, and bamboo leaves and pumpkin and melon stems show too.
 
 ## 0.2.70
 

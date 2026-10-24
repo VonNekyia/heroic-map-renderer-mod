@@ -846,13 +846,14 @@ Tönung (`putQuadWithTint`).
 - **Nach oben:** Der Mod behält Flächen, deren Normale nach oben zeigt,
   n_y > 10⁻⁴ · |n|. Die Normale ist (p1 − p0) × (p2 − p0); die Ecken einer
   Oberseite liegen so, dass sie nach oben zeigt (`FaceInfo.UP`). Kreuze wie
-  Gras, Blumen und Getreide stehen senkrecht; sie legt der Mod flach, siehe
-  „Pflanzen von oben“.
+  Gras, Blumen und Getreide stehen senkrecht; sie kippt der Mod 45° nach
+  Norden, siehe „Pflanzen von oben“.
 - **Reihenfolge:** In einem Block zuerst die höchste Fläche, dann die Blöcke
   darunter.
 - **Versatz:** `tesselateBlock` gibt den Versatz des Blocks (`getOffset`)
-  mit, etwa bei Bambus und Blumen; der Mod schiebt die Fläche um ihn, nur
-  die flache Pflanze nicht, siehe „Pflanzen von oben“. Was
+  mit, etwa bei Bambus und Blumen; der Mod schiebt die Fläche um ihn, auch
+  bei gekippten Pflanzen, die er danach nur entlang der Kipprichtung in den
+  Block einpasst, siehe „Pflanzen von oben“. Was
   dabei über die eigene Spalte hinausragt, fällt weg, siehe „Was anders ist
   als top-north“.
 - **Leuchten** einzelner Flächen (`lightEmission`) hebt ihr Licht wie im
@@ -863,21 +864,24 @@ Tönung (`putQuadWithTint`).
 
 ## Pflanzen von oben
 
-Wie der Renderer von oben legt der Mod Bodenpflanzen flach, nach derselben
-Regel, siehe
+Bodenpflanzen kippt der Mod 45° nach Norden, so dass man von oben ihre
+Seite sieht. Gewählt vom User am 24.10. aus echten Vorschauen der Minimap
+bei 16, 8 und 4 px; entschieden in
+[0049](entscheidungen/0049-pflanzen-gekippt.md). Der Renderer bekommt
+dieselbe Regel, siehe
 [Kamera](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/renderer/kamera.md),
-„Pflanzen von oben“. So stimmen Minimap und Kacheln überein, Wunsch des
-Users (mod#133). Bis 0.2.49 fielen Gras, Blumen, Getreide und Seegras von
-oben weg.
+„Pflanzen von oben“. Bis 0.2.70 lag die erste Fläche einer Pflanze flach
+über dem Block, bis 0.2.49 fielen Pflanzen von oben weg.
 
-![Die Minimap der Szene bei 4 px oben und 2 px unten, links bis 0.2.49, rechts mit Pflanzen von oben: das Weizenfeld, Gras und Mohn; Szene des Gametests `Bilder`](bilder/pflanzen-vergleich.png)
+![Die Minimap der Szene bei 16 px je Block, links ohne Pflanzen, rechts mit ihnen gekippt: Mohn, reifer Weizen, Seegras, Blütenteppich, Leiter und Bambus; Szene des Gametests `Bilder`](bilder/pflanzen-vergleich.png)
 
 - **Welche Blöcke** (`Pflanzen.bodenpflanze`): Jedes Modell des Zustands
   erbt über `parent` von `minecraft:block/cross`, `tinted_cross`,
-  `cross_emissive`, `crop`, `template_seagrass`, `flowerbed_*` oder
-  `template_leaf_litter_*` (`Pflanzen.vorlage`), dieselben Vorlagen wie im
-  Renderer. Dazu gehören auch Setzlinge, Pilze, Spinnennetz und die
-  Amethystknospen.
+  `cross_emissive`, `crop`, `template_seagrass`, `flowerbed_*`,
+  `template_leaf_litter_*`, `stem_growth0` bis `stem_growth7` oder
+  `stem_fruit` (`Pflanzen.vorlage`), dieselben Vorlagen wie im Renderer.
+  Dazu gehören auch Setzlinge, Pilze, Spinnennetz, die Amethystknospen,
+  Kelp, Seegras und die Stiele von Kürbis und Melone.
   - **Die Blockstate-Datei** liest das Spiel selbst
     (`BlockStateModelDispatcher.CODEC`, `instantiate`), aus der untersten
     Quelle, dem Spiel oder dem Mod, der den Block bringt, siehe
@@ -894,26 +898,41 @@ oben weg.
 - **Welche Modelle:** Hat das Modell eine liegende Fläche, deren Normale
   höchstens 45° von oben steht (`ChunkMaler.liegt`), bleibt es, wie es ist,
   mit allen Flächen nach oben, etwa Blütenteppiche und Laub am Boden.
-- **Was flach liegt** (`ChunkMaler.flach`): die erste Fläche aus dem
-  Tesselator, die nicht liegt, als Fläche über den ganzen Block, 1/16 über
-  seinem Boden.
-  - **UV:** das Rechteck aus min und max über alle vier Ecken
-    (`ChunkMaler.rechteck`), u0 und v0 im Nordwesten wie das Bild in der
-    Datei. Drehung und Spiegelung zählen nicht.
-  - **Ohne den Versatz des Blocks,** wie im Renderer, der keinen kennt.
-    So deckt sie die eigene Spalte ganz.
-  - **Licht und Tönung** im Mittel der vier Ecken der Vorlage, Gras also
-    in der Farbe des Bioms. Das Spiel schattiert jede Fläche nach
-    `shadeDirectionOverride`, sonst nach ihrer Richtung
-    (`BlockModelLighter.getDirectionalBrightness`, per javap am Client
-    26.3); der Mod teilt das heraus und schattiert nach oben
-    (`CardinalLighting.up`). Die Vorlagen des Spiels schattieren schon nach
-    oben.
-  - **Seegras** liegt so unter seiner Wasseroberfläche, die sich höher
-    einreiht.
+- **Bambus:** Seine Stange hat eine Oberseite und bleibt, wie sie ist. Von
+  seinen übrigen Flächen kippen nur die Blätter, deren Sprite `leaves` im
+  Namen trägt.
+- **Kippen** (`ChunkMaler.kippe`, `ChunkMaler.kippen`): jede Fläche, die
+  nicht liegt, starr 45° um die waagrechte Achse in x durch die Mitte des
+  Blockbodens, oben nach Norden. Danach setzt der Mod die Pflanze auf ihre
+  alte Tiefe: Ihr tiefster Punkt über alle Flächen liegt, wo er vorher lag.
+  Gezeichnet wird, was danach nach oben zeigt, n_y > 10⁻⁴ · |n|. Eine
+  Fläche, die beim Kippen in sich dreht, steht hochkant und fällt weg.
+- **Einpassen** (`ChunkMaler.einpassFaktor`, `ChunkMaler.einpassVerschiebung`):
+  Die Spalte malt nur den eigenen Block. Darum misst der Mod die
+  gezeichneten Flächen entlang der Kipprichtung und schiebt sie so wenig wie
+  nötig in den Block; reichen sie über mehr als 1 Block, staucht er sie auf
+  1. Quer dazu bleibt alles, auch der Versatz des Blocks. Ohne das endete
+  reifer Weizen oben in einer geraden Linie an der Nordkante.
+  - Ein `crop` reicht gekippt von −0,384 bis 0,677, Spanne 1,06, gestaucht
+    um 0,94.
+  - Ein volles Kreuz reicht von −0,525 bis 0,818, Spanne 1,34, gestaucht um
+    0,74; sein Versatz nach Norden oder Süden geht dabei verloren, der nach
+    Osten oder Westen bleibt.
+  - Was kleiner ist und passt, bleibt, wo es ist.
+- **Im Wasser** reiht sich eine gekippte Fläche höchstens 1/64 unter der
+  Wasseroberfläche ihres Blocks ein, bei Kelp, Seegras und jeder Pflanze
+  mit Wasser im Block. Gekippt und auf die alte Tiefe gesetzt, ragt eine
+  Pflanze über 1 Block hoch, Seegras bis 1,24, und stünde im flachen Wasser
+  ungetönt über der Oberfläche, die bei 0,89 liegt.
+- **Licht und Tönung** je Ecke wie im Spiel, Gras also in der Farbe des
+  Bioms. Das Spiel schattiert jede Fläche nach `shadeDirectionOverride`,
+  sonst nach ihrer Richtung (`BlockModelLighter.getDirectionalBrightness`,
+  per javap am Client 26.3); der Mod teilt das heraus und schattiert nach
+  oben (`CardinalLighting.up`, `ChunkMaler.schattenNachOben`).
 - **Deckung** wie jede ausgeschnittene Fläche, siehe „Flächen und Pixel“.
-  Bei 4 px deckt ein Pixel 4 × 4 Texel: Vom Mohn bleibt ein Pixel, vom
-  Seegras ein Viertel des Blocks, Weizen deckt fast ganz.
+- **Ohne Allokation je Block:** Die Flächen zum Kippen liegen in Puffern,
+  die der Maler über alle Blöcke wiederverwendet (`ChunkMaler.merke`); neu
+  angelegt wird nur je gezeichnete Fläche, wie bei jeder Oberseite.
 - **Die eigene Karte** zeichnet mit demselben Maler, siehe
   [Selbst gezeichnete Karte](selbst.md).
 
@@ -939,11 +958,11 @@ Feldfrüchte und Gras; entschieden in
   Fläche liegt, wenn ihre Normale höchstens 45° von oben steht,
   n_y ≥ cos 45° · |n| (`ChunkMaler.liegt`). Eine Fläche eines Kreuzes, die
   ein Paket um 22,5° kippt, steht 67,5° von oben und liegt also nicht; die
-  Pflanze liegt flach wie ohne Paket. Für andere Blöcke bleibt die Grenze
-  aus „Flächen aus dem Tesselator“.
-- **Die flache Textur** ist die der ersten Fläche, die nicht liegt, wie
-  bei jeder Pflanze. Zeigt ein Paket auf seinen Flächen nur die halbe
-  Textur, liegt diese Hälfte über dem Block.
+  Pflanze kippt wie ohne Paket, siehe „Pflanzen von oben“. Für andere
+  Blöcke bleibt die Grenze aus „Flächen aus dem Tesselator“.
+- **Gekippt** werden die Flächen, wie das Paket sie baut: Eine schon
+  gekippte Fläche kippt um 45° weiter, eine zwei Blöcke hohe wird beim
+  Einpassen auf einen gestaucht.
 - **Geprüft** mit einem eigenen Testpaket, das die Eigenschaften
   nachbildet, ohne fremden Inhalt, siehe [Entwicklung](entwicklung.md),
   „Tests“, `Bilder.pflanzenAusPaketen`.
@@ -1163,12 +1182,12 @@ bei 1/32 alle rund 200 s eine neue Kachel. Speicher: typisch 9 Kacheln,
 rund 2,3 MiB auf der Grafikkarte und ebenso viel im RAM, höchstens 64. Auf
 der Platte nichts Neues.
 
-**Pflanzen von oben,** geschätzt, nicht gemessen: Je Spalte mit Pflanze
-kommt eine volle Fläche über das gemittelte Raster dazu, rund 0,5 bis 1 µs,
-gegen rund 10 µs je Spalte bei 4 px (2,6 ms je Chunk). Getroffen und
-gezeichnet wurde die Pflanze schon vorher, nur ihre Flächen fielen weg. Auf
-dichter Wiese also rund 2 bis 5 % je Chunk, auf Stein, Sand und Wasser
-nichts. Die Messung läuft nachts mit `-Pmessung`.
+**Pflanzen gekippt,** geschätzt, nicht gemessen: Je Spalte mit Pflanze
+kommen statt einer vollen Fläche über das gemittelte Raster zwei bis vier
+gekippte Flächen, abgetastet wie jede ausgeschnittene, rund 1 bis 3 µs,
+gegen rund 10 µs je Spalte bei 4 px (2,6 ms je Chunk). Auf dichter Wiese
+also rund 5 bis 15 % je Chunk, auf Stein, Sand und Wasser nichts. Die
+Messung läuft mit `-Pmessung` in einem Fenster, das der Reviewer freigibt.
 
 **Der Umriss rund ohne Rahmen** (`Minimap.umrissRing`), geschätzt, nicht
 gemessen:
@@ -1234,8 +1253,8 @@ Chunklinien auf Vollbildkarte und Minimap (siehe „Chunklinien“):
 Ein Becken mit Wasser von 1 bis 6 Blöcken Tiefe, nach Osten tiefer; im
 Westen ragen Mangrovenwurzeln und obere Stufen aus dem Wasser. Dazu ein
 Haus mit einem Schild an der Wand, Bambus, ein Kopf, drei Bäume, ein Weg, Glas, Eis, Schnee, Lava, eine Truhe, Teppich und
-ein Feld. Gras, Blumen und Weizen liegen von oben flach, siehe „Pflanzen
-von oben“.
+ein Feld. Gras, Blumen und Weizen kippen von oben 45° nach Norden, siehe
+„Pflanzen von oben“.
 
 Danach die Ebenen (siehe [ebenen.md](ebenen.md)): Flächen, Kreis, Linie und
 Kartenschrift, der Kreis und eine eigene Region aus drei Wegpunkten angeheftet (`formen.png`,

@@ -1824,8 +1824,9 @@ public final class Bilder implements FabricClientGameTest {
     };
 
     /**
-     * Pflanzen von oben, bei 4 px und Zoom 4, verglichen mit derselben Stelle ohne sie: Mohn, Weizen und Seegras kippen
-     * 45° nach Norden; der Blütenteppich mit einer Blüte im Nordwesten hat eine Oberseite und bleibt, ausserhalb der Blüte Gras; die
+     * Pflanzen von oben, bei 4 px und Zoom 4 und nah bei 16 px und Zoom 8, verglichen mit derselben Stelle ohne sie: Mohn,
+     * Weizen und Seegras kippen 45° nach Norden, der Weizen eingepasst, das Seegras unter dem Wasser; Bambus kippt seine
+     * Blätter; der Blütenteppich mit einer Blüte im Nordwesten hat eine Oberseite und bleibt, ausserhalb der Blüte Gras; die
      * Leiter erbt von keiner Vorlage und fehlt wie bisher. Siehe docs/minimap.md, „Pflanzen von oben“.
      */
     private static void pflanzen(ClientGameTestContext context, TestServerContext server) {
@@ -1858,6 +1859,14 @@ public final class Bilder implements FabricClientGameTest {
         BufferedImage ohne = minimapBei(context, server, -35.5, 26.5, "pflanzen-ohne");
         int gs16 = context.computeOnClient(mc -> mc.getWindow().getGuiScale()), block16 = 8 * gs16;
         int wx = mit16.getWidth() / 2 + Math.round((-38 + 35.5f) * block16), wz = mit16.getHeight() / 2 - Math.round(6.5f * block16);
+        // Der Mohn bei 16 px: seine rote Blüte.
+        int px = mit16.getWidth() / 2 + Math.round((-40 + 35.5f) * block16), rot16 = 0;
+        for (int y = wz; y < wz + block16; y++) {
+            for (int x = px; x < px + block16; x++) {
+                int a = mit16.getRGB(x, y);
+                rot16 += (a >> 16 & 0xFF) > (a >> 8 & 0xFF) + 60 ? 1 : 0;
+            }
+        }
         double[] reihen = new double[16];
         for (int r = 0; r < 16; r++) {
             int anders16 = 0, alle16 = 0;
@@ -1874,7 +1883,7 @@ public final class Bilder implements FabricClientGameTest {
             }
             reihen[r] = Math.round(100.0 * anders16 / alle16) / 100.0;
         }
-        LOGGER.info("Pflanzen 16 px, reifer Weizen je Texelreihe von Norden, Anteil anders: {}", Arrays.toString(reihen));
+        LOGGER.info("Pflanzen 16 px, reifer Weizen je Texelreihe von Norden, Anteil anders: {}; Mohn rot {}", Arrays.toString(reihen), rot16);
         int gs = context.computeOnClient(mc -> mc.getWindow().getGuiScale()), block = 4 * gs;
         // Die Ecke des Blocks (x, 20) im Bild; der Spieler steht bei (-35,5, 26,5) in der Mitte, seine Marke deckt die Reihe nicht.
         java.util.function.IntUnaryOperator links = x -> mit.getWidth() / 2 + Math.round((x + 35.5f) * block);
@@ -1904,11 +1913,18 @@ public final class Bilder implements FabricClientGameTest {
         LOGGER.info("Pflanzen 4 px, anders als ohne: Mohn {} (rot {}), Weizen {}, Seegras {} (grün {}), Blütenteppich {}, Leiter {}, Bambus {}",
                 anders[0], rot, anders[1], anders[2], gruen, anders[3], anders[4], anders[5]);
         // Bei 4 px deckt ein Pixel 4 × 4 Texel, ausgeschnitten: Mohn und Seegras sind spärlich, nur einzelne Pixel decken.
+        // Gekippt zeigt der Mohn bei 4 px kein Rot mehr; das prüft der Blick bei 16 px. Eingepasst endet der Weizen im Norden in
+        // seinen Ähren und reicht bis an den Süden; ohne Einpassen stünde im Norden eine gerade Linie und der Süden bliebe leer.
+        // Siehe docs/minimap.md, „Pflanzen von oben“.
         int innen = (block - 2) * (block - 2);
-        if (rot == 0 || anders[1] < innen / 2 || anders[2] < gs * gs || anders[3] != 0 || anders[4] != 0) {
-            throw new AssertionError("Pflanzen von oben: Pixel anders als ohne Pflanze, Mohn " + anders[0] + " (rot " + rot
-                    + "), Weizen " + anders[1] + ", Seegras " + anders[2] + " von " + innen + "; Blütenteppich ausser im Nordwesten "
-                    + anders[3] + " und Leiter " + anders[4] + " statt 0");
+        double sueden = Math.min(Math.min(reihen[12], reihen[13]), Math.min(reihen[14], reihen[15]));
+        if (rot16 == 0 || anders[1] < innen / 2 || anders[2] < gs * gs || gruen != 0 || anders[3] != 0 || anders[4] != 0 || anders[5] == 0
+                || reihen[0] > 0.3 || sueden < 0.3) {
+            throw new AssertionError("Pflanzen von oben: Pixel anders als ohne Pflanze, Mohn " + anders[0] + " (rot bei 16 px " + rot16
+                    + "), Weizen " + anders[1] + ", Seegras " + anders[2] + " von " + innen + " (grün ohne Wasser " + gruen
+                    + " statt 0); Blütenteppich ausser im Nordwesten " + anders[3] + " und Leiter " + anders[4] + " statt 0; Bambus "
+                    + anders[5] + " statt mehr als 0; Weizen bei 16 px im Norden " + reihen[0] + " statt höchstens 0,3, im Süden "
+                    + sueden + " statt mindestens 0,3");
         }
         if (!AUSGABE.isEmpty()) {
             try {
