@@ -123,8 +123,8 @@ final class VerwaltungsPanel {
                             s.neuBauen = true;
                         }));
         y = fy + Verwaltung.ZEILE;
-        // Die Zeilen bis über die Seiten unten.
-        int unten = hoehe - 4 - 20, jeSeite = Verwaltung.jeSeite(unten - 2 - y, zwei);
+        // Die Zeilen bis über die Seiten unten; die stehen über Satz und Koordinaten unten links.
+        int unten = hoehe - 36, jeSeite = Verwaltung.jeSeite(unten - 2 - y, zwei);
         List<Verwaltung.Zeile> alle = Verwaltung.auswahl(Verwaltung.zeilen(Wegpunkte.INSTANZ.punkte(), Wegpunkte.INSTANZ.eigeneFormen(),
                 Wegpunkte.INSTANZ.regionen(), dimension), s.suche, s.art, s.ebene, s.sortierung, spieler[0], spieler[1]);
         int seiten = Verwaltung.seiten(alle.size(), jeSeite);

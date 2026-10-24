@@ -31,7 +31,7 @@ final class Verwaltung {
     static final int ALLE_EBENEN = -1;
 
     /** Die Breiten der Spalten in Einheiten: Art, Farbe, Name, Schrift, Biegung, Schriftart, Ebene, je Knopf, Lücke dazwischen. */
-    static final int ART = 10, FARBE = 12, NAME = 92, SCHRIFT = 32, BIEGUNG = 40, SCHRIFTART = 20, EBENE = 48, KNOPF = 14, LUECKE = 2;
+    static final int ART = 10, FARBE = 12, NAME = 88, SCHRIFT = 32, BIEGUNG = 40, SCHRIFTART = 24, EBENE = 48, KNOPF = 14, LUECKE = 2;
     /** Die Spalten in einer Zeile, 314 Einheiten breit; in zwei Zeilen je Objekt 170. */
     static final int BREITE = ART + FARBE + NAME + SCHRIFT + BIEGUNG + SCHRIFTART + EBENE + 3 * KNOPF + 9 * LUECKE, BREITE_ZWEI = 170;
     /** So hoch ist eine Zeile samt Lücke. */

@@ -40,8 +40,8 @@ Code Map, der Reviewer hat ihn freigegeben. Warum so:
   Panel hebt die Karte nichts hervor.
 - **Oben:** Suche, Art (Alle, Wegpunkte, Regionen, Linien), Ebene (Alle
   oder eine eigene), Sortierung (Name, Nähe, Neu).
-- **Unten:** `<` und `>` mit „Seite / Seiten“; das Mausrad über dem Panel
-  blättert.
+- **Unten:** `<` und `>` mit „Seite / Seiten“, über Satz und Koordinaten
+  unten links; das Mausrad über dem Panel blättert.
 - **Neu gebaut** im nächsten Tick der Karte, wenn sich am Panel oder an den
   Wegpunkten etwas ändert (`Karte.tick`). Nie mitten in einem Klick, und
   nicht, solange ein Name getippt wird.
@@ -64,10 +64,10 @@ Objekte aus Ebenen vom Server nicht.
 | Spalte | Breite | tut |
 |---|---|---|
 | Farbe | 12 | Wegpunkt und Rechteck: reihum die 8 Farben (`Wegpunkte.faerbe`). Form: öffnet das Feld „Farbe…“ mit „Gewicht“ darunter, wie im Menü der Form, siehe [Wegpunkte](wegpunkte.md), „Farbe“ |
-| Name | 92 | direkt bearbeitbar; ohne Namen grau der Ort „x …, z …“. Enter, ein Klick daneben oder in eine andere Zeile speichert, `Esc` verwirft, was getippt ist; leer nimmt den Namen weg |
+| Name | 88 | direkt bearbeitbar; ohne Namen grau der Ort „x …, z …“. Enter, ein Klick daneben oder in eine andere Zeile speichert, `Esc` verwirft, was getippt ist; leer nimmt den Namen weg |
 | Schrift | 32 | `−` und `+` durch die Stufen ¼ bis 4; grau ohne Namen |
 | Biegung | 40 | `−` und `+` in 15° bis ±180°, nur Regionen; grau ohne Namen |
-| Schriftart | 20 | K für die Karte, MC für Minecraft; grau ohne Namen |
+| Schriftart | 24 | K für die Karte, MC für Minecraft; grau ohne Namen |
 | Ebene | 48 | der Name der Ebene; ein Klick legt das Objekt in die nächste eigene Ebene, nach der letzten in die erste |
 | Anheften | 14 | eine Nadel; heftet an die Minimap oder löst, gelb umrandet, solange angeheftet. Für Regionen gilt die Grenze wie sonst, siehe [Wegpunkte](wegpunkte.md), „Anheften“ |
 | Hinspringen | 14 | ein Fadenkreuz; legt die Mitte des Objekts in die Mitte der Karte, das Panel bleibt offen |
