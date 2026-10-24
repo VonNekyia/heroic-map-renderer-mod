@@ -561,6 +561,20 @@ eines Proxys von einem des Netzes (`Laden.Fehler.status`).
   in seinem Manifest steht, also die Kacheln des anderen. Würfelt ein
   Server den Wert bei jedem Beitritt, entsteht jedes Mal ein neuer Ordner.
   Beides zeigt die Kartenliste; dort lässt sich aufräumen.
+- **Was ein Server zeigt:** `zeigt.txt` im Ordner der Welt, je Zeile
+  Server, Dimension und Baum, getrennt durch ein Leerzeichen (`Zeigt`); der
+  Server ist sein Name aus `backend`, ohne Namen `-`. Eine Zeile auf einen
+  Baum, den es nicht gibt, gilt nicht. Die Regel ohne Zeile steht in
+  [Selbst gezeichnete Karte](selbst.md), „Wahl“; warum je Server:
+  [0029](entscheidungen/0029-was-ein-server-zeigt-gilt-je-server.md).
+  - **Ein Baum ruht** für einen Server, wenn der für seine Dimension einen
+    anderen zeigt (`Downloads.ruht`). Auf diesem Server bekommt er keinen
+    Abgleich, weder beim Beitritt noch über den Knopf, sonst wüchse er
+    unbemerkt; ist er auf einem anderen an, gleicht der ihn ab.
+  - **Vor dem ersten vollen Download** eines Baums fragt der Mod wie bei
+    „Selbst“, wenn dieser Server für dessen Dimension seine eigene Karte
+    zeigt (`Downloads.fragtNachSelbst`). „Behalten, ruht“ merkt den neuen
+    Baum in `zeigt.txt`; bis er ganz daliegt, bleibt die eigene Karte an.
 - **Schreiben** über eine Zwischendatei in `tmp/`, dann verschieben; nie
   liegt eine halbe Kachel da. `tmp/` leert der Mod zu Beginn jedes Downloads.
 - **`satz.json`** je Baum gehört zur [Vollbildkarte](vollbildkarte.md),
@@ -622,6 +636,14 @@ Platte (`Kartenliste`), auch die anderer Server und Welten:
   der Worker, der in sie zeichnet, siehe [Selbst gezeichnete Karte](selbst.md), „Wahl“.
   Scheitert das Löschen, nennt die Liste den Fehler; Einzelheiten stehen
   im Log.
+- **An und ruht:** je Baum ein Knopf für den Server, auf dem der Spieler
+  ist, nur im Ordner seiner Welt (`Kartenliste.zustand`): „an“ grün und
+  grau, „ruht“ gelb; ein Klick zeigt den Baum, der bisherige ruht dann.
+  - In anderen Ordnern ist der Knopf grau, der Tooltip nennt, auf welchen
+    Servern der Baum an ist („An auf: main“, aus `zeigt.txt`).
+  - Die eigene Karte eines anderen Servers: grau „von main“.
+  - Eine eigene Karte ohne Server: „übernehmen“, siehe
+    [Selbst gezeichnete Karte](selbst.md), „Wahl“.
 - **Mausrad** blättert, wenn nicht alle Karten auf den Schirm passen.
 
 ## Was bleibt eine Näherung
