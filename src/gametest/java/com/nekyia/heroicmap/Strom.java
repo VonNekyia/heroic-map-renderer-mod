@@ -41,7 +41,8 @@ import net.minecraft.client.Minecraft;
  * Der erste Download als ein Strom gegen einen Server auf 127.0.0.1: Die Vollbildkarte ohne Satz zeigt
  * den Kasten des Fortschritts statt des Hinweises, ab der gröbsten Stufe die Karte; am Ende liegt der
  * Satz ganz da, bei 100 % der angekündigten Bytes. Ein Abgleich danach zeigt denselben Kasten mit eigener
- * Zeile 1; gesamt sind die Bytes der Kacheln, die laut Manifest fehlen. Gegenproben: Ein Name mit {@code ..} bricht ab,
+ * Zeile 1; gesamt sind die Bytes der Kacheln, die laut Manifest fehlen. Im Spiel steht dabei der Balken unter der Minimap, ohne
+ * Fehlendes keiner. Gegenproben: Ein Name mit {@code ..} bricht ab,
  * ohne etwas ausserhalb abzulegen; ein Abbruch im Netz lässt keine halbe Kachel. Siehe docs/download.md, „Strom“.
  */
 public final class Strom implements FabricClientGameTest {
@@ -95,6 +96,8 @@ public final class Strom implements FabricClientGameTest {
             spiel.getConnection().waitForChunksRender();
             welt = context.computeOnClient(mc -> Downloads.weltOrdner());
             raeume(welt);
+            // Wo die Koordinaten ohne Balken stehen.
+            int[] ohne = context.computeOnClient(mc -> Minimap.INSTANZ.koordinatenKasten().clone());
             context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(Downloads.weltOrdner(), DIMENSION, Downloads.INSTANZ.wer()))));
             context.waitTick();
             if (context.computeOnClient(mc -> !(mc.gui.screen() instanceof Karte k) || k.satz() != null)) {
@@ -150,6 +153,7 @@ public final class Strom implements FabricClientGameTest {
             if (zeileEins(context, bildAbgleich).equals(zeileEins(context, bild))) {
                 throw new AssertionError("Zeile 1 des Kastens beim Abgleich wie beim Strom");
             }
+            pruefeBalken(context, imAbgleich, "abgleich", ohne);
             abgleich.gesehen().countDown();
             warte(context, "das Ende des Abgleichs", mc -> !Downloads.INSTANZ.belegt(strom));
             if (imAbgleich.gesamt != fehlen || imAbgleich.empfangen.get() != fehlen) {
@@ -174,11 +178,23 @@ public final class Strom implements FabricClientGameTest {
             if (punkte * 3 > mitBytes) {
                 throw new AssertionError("Zeile 2 vor dem Vergleich zeigt mehr als „…“: " + punkte + " Pixel, mit Bytes " + mitBytes);
             }
+            pruefeBalken(context, vorher, "vor-dem-vergleich", ohne);
             abgleich.zweitesFrei().countDown();
             warte(context, "das Ende des zweiten Abgleichs", mc -> !Downloads.INSTANZ.belegt(strom));
             if (vorher.gesamt != 0 || vorher.empfangen.get() != 0 || vorher.zeigen()) {
                 throw new AssertionError("Zweiter Abgleich: " + vorher.empfangen.get() + " von " + vorher.gesamt + " Byte statt nichts");
             }
+            // Fehlte nichts, steht kein Balken mehr, und die Koordinaten stehen wieder, wo sie standen.
+            context.runOnClient(mc -> mc.gui.setScreen(null));
+            context.waitTicks(5);
+            int[] danach = context.computeOnClient(mc -> Minimap.INSTANZ.koordinatenKasten().clone());
+            int[] balkenDanach = context.computeOnClient(mc -> Minimap.INSTANZ.balkenKasten());
+            if (balkenDanach != null || danach[1] != ohne[1]) {
+                throw new AssertionError("Nach dem Abgleich ohne Fehlendes: Balken " + Arrays.toString(balkenDanach) + ", Koordinaten bei "
+                        + danach[1] + " statt " + ohne[1]);
+            }
+            context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(Downloads.weltOrdner(), DIMENSION))));
+            context.waitTicks(2);
 
             // Gegenprobe: Ein Name mit .. bricht ab; ausserhalb liegt nichts, eine Karte entsteht nicht.
             starte(context, basis, "boese", welt, manifest, bytes, kacheln.size());
@@ -248,6 +264,36 @@ public final class Strom implements FabricClientGameTest {
         Freigabe f = new Freigabe(baum, "voll", 4, bytes, url, TOKEN, Laden.sha256(manifest));
         Laden.Auftrag a = new Laden.Auftrag(url, TOKEN, Laden.sha256(manifest), bytes, 4, false, bytes, zahl, InetAddress.getLoopbackAddress());
         context.runOnClient(mc -> Downloads.INSTANZ.reiheEin(f, a, welt.resolve(baum), "Strom", DIMENSION));
+    }
+
+    /**
+     * Im Spiel, die Karte zu: der Balken in der ersten Zeile unter der Minimap, wo ohne ihn die Koordinaten stehen, weiss gefüllt
+     * nach dem Anteil von {@code f}; die Koordinaten eine Zeile tiefer. Danach die Karte wieder auf. Siehe docs/minimap.md,
+     * „Fortschritt“.
+     */
+    private static void pruefeBalken(ClientGameTestContext context, Laden.Fortschritt f, String wann, int[] ohne) throws IOException {
+        context.runOnClient(mc -> mc.gui.setScreen(null));
+        context.waitTicks(5);
+        Path bild = context.takeScreenshot(TestScreenshotOptions.of("balken-" + wann).disableCounterPrefix());
+        int[] balken = context.computeOnClient(mc -> Minimap.INSTANZ.balkenKasten());
+        int[] koordinaten = context.computeOnClient(mc -> Minimap.INSTANZ.koordinatenKasten());
+        if (balken == null || koordinaten == null || balken[1] != ohne[1] || koordinaten[1] != ohne[1] + balken[3] + 2) {
+            throw new AssertionError("Balken " + wann + ": " + Arrays.toString(balken) + ", Koordinaten " + Arrays.toString(koordinaten)
+                    + ", ohne Balken bei " + Arrays.toString(ohne));
+        }
+        // Eine Zeile Pixel mitten durch den Balken, 2 Einheiten hoch ab y + 3: weiss so weit wie der Anteil.
+        int gs = context.computeOnClient(mc -> mc.getWindow().getGuiScale()), weiss = 0;
+        BufferedImage b = ImageIO.read(bild.toFile());
+        int y = (balken[1] + 4) * gs;
+        for (int px = balken[0] * gs; px < (balken[0] + balken[4]) * gs; px++) {
+            weiss += (b.getRGB(px, y) & 0xFFFFFF) == 0xFFFFFF ? 1 : 0;
+        }
+        int erwartet = (int) Math.round(balken[4] * f.anteil()) * gs;
+        if (Math.abs(weiss - erwartet) > gs) {
+            throw new AssertionError("Balken " + wann + ": " + weiss + " weisse Pixel statt " + erwartet + " bei " + f.prozent());
+        }
+        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(Downloads.weltOrdner(), DIMENSION))));
+        context.waitTicks(2);
     }
 
     /** Ein Abgleich des Baums strom gegen das neue Manifest, mit dem Satz als Deckel. */

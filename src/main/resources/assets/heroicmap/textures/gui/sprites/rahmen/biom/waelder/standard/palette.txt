@@ -1,0 +1,4 @@
+// heroicmap Rahmen 'biom/waelder', Variante 'standard': Linie aussen -> innen, eine Zeile je Band.
+// Zwei Werte = Licht (oben/links) Schatten (unten/rechts).
+#1E1B18
+#76C24E

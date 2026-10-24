@@ -309,6 +309,20 @@ class LadenTest {
     }
 
     @Test
+    void prozentAbgerundetSonstPunkte() {
+        // Wie Karte und Minimap sie zeigen: abgerundet, nie über 100, ohne gesamt „…“.
+        Laden.Fortschritt f = new Laden.Fortschritt(1000);
+        assertEquals("0 %", f.prozent());
+        f.empfangen.set(499);
+        assertEquals("49 %", f.prozent());
+        f.empfangen.set(1000);
+        assertEquals("100 %", f.prozent());
+        f.empfangen.set(1500);
+        assertEquals("100 %", f.prozent());
+        assertEquals("…", new Laden.Fortschritt(Laden.Fortschritt.UNBEKANNT, true).prozent());
+    }
+
+    @Test
     void nurBisZurStufeDesMassstabs() throws Exception {
         // maxZoom 2: 2 px reicht bis Stufe 1, 1 px bis Stufe 0.
         assertEquals(3, new Laden().lade(auftrag(2, summe()), ziel).geladen());

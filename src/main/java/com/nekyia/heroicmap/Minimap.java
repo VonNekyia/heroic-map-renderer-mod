@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -184,6 +185,8 @@ public final class Minimap {
     private Rahmen zuletzt;
     /** Wo die Zeile der Koordinaten im letzten Frame stand: x, y, Breite, Höhe; null ohne Zeile. Für die Gametests. */
     private int[] koordinatenKasten;
+    /** Wo der Balken des Fortschritts zuletzt stand: x, y, Breite, Höhe der Zeile, Länge des Balkens; null ohne. Für Gametests. */
+    private int[] balkenKasten;
     /** Im Menü liegt die Maus auf der Zeile der Koordinaten; dann steht sie gelb. */
     private boolean koordinatenHell;
     /** Wie der eigene Spieler aussieht, auf Minimap und Vollbildkarte. Siehe docs/minimap.md, „Spieler“. */
@@ -194,9 +197,11 @@ public final class Minimap {
     private boolean drehen = true;
     /** Hat der Spieler Drehen selbst gewählt? Nur dann steht es in der Datei, sonst gilt die Vorgabe. */
     private boolean drehenGewaehlt;
-    /** Der Rahmen, ein Name aus {@link Skin#NAMEN}; „ohne“ ist der Umriss. Siehe docs/rahmen.md. */
+    /** Der Rahmen, eine Familie aus {@link Skin#FAMILIEN}; „ohne“ ist der Umriss. Siehe docs/rahmen.md. */
     private String skin = Skin.BIOM;
     private boolean skinGewaehlt;
+    /** Die gewählte Variante je Familie, bei „biom“ je Kategorie {@code biom/<kategorie>}; ohne Eintrag gilt die erste. */
+    private final Map<String, String> varianten = new HashMap<>();
     /** Die Marken N, O, S, W des Rahmens, die durchsichtig sind: Bit i für Richtung i, 0 N bis 3 W. Siehe docs/rahmen.md, „Verzierungen“. */
     private int verzierungenAus;
     /** Alle vier Marken. */
@@ -445,6 +450,10 @@ public final class Minimap {
         return koordinatenKasten;
     }
 
+    int[] balkenKasten() {
+        return balkenKasten;
+    }
+
     void koordinatenHell(boolean an) {
         koordinatenHell = an;
     }
@@ -474,8 +483,32 @@ public final class Minimap {
     }
 
     void setzeSkin(String skin) {
-        this.skin = Skin.NAMEN.contains(skin) ? skin : Skin.BIOM;
+        this.skin = Skin.FAMILIEN.contains(skin) ? skin : Skin.BIOM;
         skinGewaehlt = true;
+    }
+
+    /** Die gewählte Variante der Familie, bei „biom“ je Kategorie {@code biom/<kategorie>}; null ohne Wahl. */
+    String variante(String familie) {
+        return varianten.get(familie);
+    }
+
+    /** Setzt die Variante der Familie; null nimmt die Wahl zurück, dann gilt die erste. */
+    void setzeVariante(String familie, String variante) {
+        if (variante == null) {
+            varianten.remove(familie);
+        } else {
+            varianten.put(familie, variante);
+        }
+    }
+
+    /** Die Kategorie, deren Rahmen „biom“ gerade zeigt. */
+    String kategorie() {
+        return biom.gezeigt();
+    }
+
+    /** Der Skin der gewählten Variante dieser Familie, sonst ihrer ersten; null für „ohne“. */
+    Skin skin(String familie) {
+        return Skin.von(familie, varianten.get(familie));
     }
 
     /** Sind alle vier Marken zu sehen? */
@@ -508,7 +541,7 @@ public final class Minimap {
 
     /** Der Skin, den die Minimap gerade zeichnet, bei „biom“ der der gezeigten Kategorie; null ohne Rahmen. */
     Skin skinJetzt() {
-        return Skin.von(Skin.BIOM.equals(skin) ? Biom.ORDNER.get(biom.gezeigt()) : skin);
+        return skin(Skin.BIOM.equals(skin) ? Biom.ORDNER.get(biom.gezeigt()) : skin);
     }
 
     /** Vom Menü je Frame: wo der Griff liegt, -1 ohne Menü. Mit Skin zeichnet die Minimap ihn über den Bändern. */
@@ -624,13 +657,12 @@ public final class Minimap {
 
     /** Der Abstand zum Rand des Schirms: {@link #RAND}, mit Rahmen mindestens dessen Einrückung, so bleiben die Marken ganz auf dem Schirm. */
     int rand() {
-        if (!Skin.BIOM.equals(skin)) {
-            return rand(Skin.von(skin));
-        }
-        // Der grösste Abstand aller Kategorien: So springt die Minimap beim Wechsel nicht.
+        // Der grösste Abstand aller Varianten, bei „biom“ aller Kategorien: So springt die Minimap beim Wechsel nicht.
         int rand = RAND;
-        for (String ordner : Biom.ORDNER.values()) {
-            rand = Math.max(rand, rand(Skin.von(ordner)));
+        for (String familie : Skin.BIOM.equals(skin) ? Biom.ORDNER.values() : List.of(skin)) {
+            for (Skin.Variante v : Skin.varianten(familie)) {
+                rand = Math.max(rand, rand(Skin.von(familie, v.name())));
+            }
         }
         return rand;
     }
@@ -715,8 +747,21 @@ public final class Minimap {
         // Vorgabe biom. Ein alter rahmen ausser „ohne“ war gewählt, denn die Vorgabe war ohne; ein altes rahmen=ohne nicht unterscheidbar.
         String rahmenWahl = p.getProperty("rahmen_wahl");
         String rahmen = String.valueOf(rahmenWahl != null ? rahmenWahl : p.getProperty("rahmen")).trim();
-        skinGewaehlt = Skin.NAMEN.contains(rahmen) && (rahmenWahl != null || !Skin.OHNE.equals(rahmen));
+        // Bis 0.2.68 hiessen die Rahmen grau, holz und so weiter; sie ziehen in ihre Familie und Variante um.
+        varianten.clear();
+        List<String> alt = Skin.ALT.get(rahmen);
+        if (alt != null) {
+            rahmen = alt.getFirst();
+            varianten.put(rahmen, alt.getLast());
+        }
+        skinGewaehlt = Skin.FAMILIEN.contains(rahmen) && (rahmenWahl != null || !Skin.OHNE.equals(rahmen));
         skin = skinGewaehlt ? rahmen : Skin.BIOM;
+        for (String familie : Skin.MIT_VARIANTEN) {
+            String v = p.getProperty("rahmen_variante." + familie);
+            if (v != null) {
+                varianten.put(familie, v.trim());
+            }
+        }
         // Vor mod#175 galt ein Schalter für alle vier; aus heisst alle vier durchsichtig, so springt nichts.
         String aus = p.getProperty("verzierungen_aus");
         verzierungenAus = aus != null ? marken(aus) : "false".equals(p.getProperty("verzierungen")) ? ALLE_MARKEN : 0;
@@ -757,6 +802,7 @@ public final class Minimap {
         if (skinGewaehlt) {
             p.setProperty("rahmen_wahl", skin);
         }
+        varianten.forEach((familie, v) -> p.setProperty("rahmen_variante." + familie, v));
         p.setProperty("verzierungen_aus", marken(verzierungenAus));
         p.setProperty("technik", technikOffen ? "auf" : "zu");
         p.setProperty("ablage", ablage.name().toLowerCase(Locale.ROOT));
@@ -970,7 +1016,7 @@ public final class Minimap {
             // Beim Wechsel des Bioms: Die Bänder sind in allen Kategorien gleich gebaut, die neuen decken die alten zu t;
             // nur die alten Ornamente blenden aus. So sinkt die Deckung der Bänder nie.
             String vorher = Skin.BIOM.equals(skin) ? biom.vorher(ms) : null;
-            Skin alt = vorher == null ? null : Skin.von(Biom.ORDNER.get(vorher));
+            Skin alt = vorher == null ? null : skin(Biom.ORDNER.get(vorher));
             float t = alt == null ? 1 : biom.anteil(ms);
             if (alt != null) {
                 zeichneRahmen(g, alt, r, lage, k, 1, 1 - t);
@@ -985,16 +1031,27 @@ public final class Minimap {
         float sy = lage == null ? (r.y() * k + n / 2) / (float) k : (float) (lage.cy() / k);
         avatar(g, spieler, sx, sy, a, kopf, lage != null, darstellung);
         if (imMenue) {
-            // Ziele für Klicks im Menü. Ohne Marken am Rahmen zeichnet das Menü sie halb, bei „ohne“ die von „grau“ auf dem Umriss.
+            // Ziele für Klicks im Menü. Ohne Marken am Rahmen zeichnet das Menü sie halb, bei „ohne“ die von schild/grau auf dem Umriss.
             spielerX = sx;
             spielerY = sy;
             spielerHalb = kopf / 2 + 2;
             menueHalb = rahmen == null;
-            menueSkin = rahmen != null ? rahmen : Skin.von("grau");
+            menueSkin = rahmen != null ? rahmen : Skin.von("schild", "grau");
             if (menueSkin != null) {
                 menueMarken = ornamente(rahmen != null ? r : new Rahmen(r.x() - 2, r.y() - 2, r.seite() + 4),
-                        rahmen != null ? rahmen.baender() : 1, rund, menueSkin.nachAussen, menueSkin.auflage, lage, k, 0, -1, false, KEIN_ZIEL);
+                        rahmen != null ? rahmen.baender() : 1, rund, menueSkin.marken, lage, k, 0, -1, false, KEIN_ZIEL);
             }
+        }
+        // Solange ein Download oder Abgleich läuft, steht der Balken in der ersten Zeile unter der Minimap, die Koordinaten eine
+        // Zeile weiter. Siehe docs/minimap.md, „Fortschritt“.
+        int abstand = rand(), ueberstand = rahmen == null ? 1 : abstand;
+        Laden.Fortschritt laeuft = Downloads.INSTANZ.fortschritt();
+        balkenKasten = null;
+        if (laeuft != null && laeuft.zeigen()) {
+            int zeile = mc.font.lineHeight;
+            int[] wo = koordinatenLage(r, ueberstand, abstand, g.guiWidth(), g.guiHeight(), r.seite(), zeile);
+            balkenKasten = balken(g, mc.font, wo[0], wo[1], r.seite(), zeile, laeuft);
+            ueberstand += zeile + 2;
         }
         Object[] werte = werte(koordinaten, spieler.getX(), spieler.getY(), spieler.getZ());
         koordinatenKasten = null;
@@ -1004,11 +1061,10 @@ public final class Minimap {
             Component text = werte == null ? Component.translatable("heroicmap.koordinaten_aus")
                     : Component.translatable(werte.length == 3 ? "heroicmap.koordinaten_xyz" : "heroicmap.koordinaten", werte);
             int farbe = klickbar && koordinatenHell ? KOORDINATEN_HELL : werte == null ? KOORDINATEN_AUS : TEXT;
-            int abstand = rand();
             float f = koordinatenMassstab(g.guiWidth(), abstand, mc.font.width(text));
             int breite = Mth.ceil(mc.font.width(text) * f), zeile = Mth.ceil(mc.font.lineHeight * f);
             // Unter dem Ring oder den Ornamenten des Rahmens, die halb über die Ecken ragen.
-            int[] wo = koordinatenLage(r, rahmen == null ? 1 : abstand, abstand, g.guiWidth(), g.guiHeight(), breite, zeile);
+            int[] wo = koordinatenLage(r, ueberstand, abstand, g.guiWidth(), g.guiHeight(), breite, zeile);
             g.pose().pushMatrix();
             g.pose().translate(wo[0], wo[1]);
             g.pose().scale(f);
@@ -1057,6 +1113,20 @@ public final class Minimap {
             case XZ -> new Object[] {Mth.floor(x), Mth.floor(z)};
             case XYZ -> new Object[] {Mth.floor(x), Mth.floor(y), Mth.floor(z)};
         };
+    }
+
+    /**
+     * Der Balken des Fortschritts in einer Zeile ab (x, y), {@code breite} Einheiten: 2 Einheiten hoch auf dunklem Grund, weiss
+     * gefüllt nach dem Anteil, rechts die Prozent. Gibt x, y, Breite, Höhe und die Länge des Balkens zurück. Siehe
+     * docs/minimap.md, „Fortschritt“.
+     */
+    private static int[] balken(GuiGraphicsExtractor g, Font font, int x, int y, int breite, int zeile, Laden.Fortschritt f) {
+        Component prozent = Component.literal(f.prozent());
+        int text = font.width(prozent), lang = Math.max(0, breite - text - 3);
+        g.fill(x, y + 3, x + lang, y + 5, HALB_SCHWARZ);
+        g.fill(x, y + 3, x + (int) Math.round(lang * f.anteil()), y + 5, TEXT);
+        g.text(font, prozent, x + breite - text, y, TEXT, true);
+        return new int[] {x, y, breite, zeile, lang};
     }
 
     /**
@@ -1485,8 +1555,7 @@ public final class Minimap {
         } else {
             skin.baender(g, r.x(), r.y(), r.seite(), r.seite(), baender);
         }
-        for (Ornament o : ornamente(r, skin.baender(), rund, skin.nachAussen, skin.auflage, lage, k, verzierungenAus, griffEcke, griffAktiv,
-                hervor)) {
+        for (Ornament o : ornamente(r, skin.baender(), rund, skin.marken, lage, k, verzierungenAus, griffEcke, griffAktiv, hervor)) {
             skin.ornament(g, o.teil(), o.ecke(), o.x(), o.y(), deckung, o.winkel());
         }
     }
@@ -1499,21 +1568,28 @@ public final class Minimap {
      * Was der Rahmen über den Bändern zeichnet, in dieser Reihenfolge: die Marken O, S, W, N ausser denen in
      * {@code ohne} (Bit i für Richtung i) auf der Mitte der Bänder, ungedreht fest rechts, unten, links und oben, gedreht starr
      * mit der Karte, die Marke {@code hervor} (0 bis 3, N, O, S, W) aktiv; im Menü zuletzt der Griff an seiner
-     * Ecke, nie gedreht. In den Ecken sonst nichts. Mit {@code aussen} zeigt jedes Bild von der Mitte weg:
-     * O, S und W nehmen {@code marke}, um eine, zwei und drei Vierteldrehungen weiter; mit {@code auflage} ({@link Skin#auflage})
-     * liegt eine Marke samt Schatten innen an der äusseren Kante, ohne auf der Mitte. Siehe docs/rahmen.md, „Marken“.
+     * Ecke, nie gedreht. In den Ecken sonst nichts. Das Bild steht nach {@link Skin.Marken#stellung}: starr mit der Karte, von
+     * der Mitte weg (O, S und W nehmen {@code marke}, um eine, zwei und drei Vierteldrehungen weiter) oder aufrecht, mit eigenen
+     * Bildern je Richtung, wenn es sie gibt. Jede Marke liegt nach ihrem {@link Skin.Platz}, ohne auf der Mitte der Bänder.
+     * Siehe docs/rahmen.md, „Marken“.
      */
-    static List<Ornament> ornamente(Rahmen r, int baender, boolean rund, boolean aussen, int[][] auflage, Drehung.Lage lage, int k,
+    static List<Ornament> ornamente(Rahmen r, int baender, boolean rund, Skin.Marken marken, Drehung.Lage lage, int k,
             int ohne, int griffEcke, boolean griffAktiv, int hervor) {
         List<Ornament> aus = new ArrayList<>(5);
         double winkel = lage == null ? 0 : lage.winkel();
         for (int i : MARKEN) {
             if ((ohne & 1 << i) == 0) {
-                int[] auf = auflage == null ? null : auflage[i];
-                double[] p = lage == null ? Skin.marke(r.x(), r.y(), r.seite(), baender, rund, RICHTUNGEN[i][0], RICHTUNGEN[i][1], auf)
-                        : verzierung(r, baender, rund, lage, RICHTUNGEN[i], k, auf);
-                int teil = aussen && i != 0 ? Skin.MARKE : Skin.MARKE_JE_RICHTUNG[i];
-                aus.add(new Ornament(teil + (i == hervor ? 1 : 0), 0, p[0], p[1], aussen ? winkel + i * Math.PI / 2 : winkel));
+                Skin.Platz platz = marken.platz(i);
+                double[] p = lage == null ? Skin.marke(r.x(), r.y(), r.seite(), baender, rund, RICHTUNGEN[i][0], RICHTUNGEN[i][1], platz)
+                        : verzierung(r, baender, rund, lage, RICHTUNGEN[i], k, platz);
+                int teil = marken.eigene() ? Skin.EIGENE_JE_RICHTUNG[i]
+                        : marken.stellung() == Skin.Stellung.AUSSEN && i != 0 ? Skin.MARKE : Skin.MARKE_JE_RICHTUNG[i];
+                double w = switch (marken.stellung()) {
+                    case KARTE -> winkel;
+                    case AUSSEN -> winkel + i * Math.PI / 2;
+                    case AUFRECHT -> 0;
+                };
+                aus.add(new Ornament(teil + (i == hervor ? 1 : 0), 0, p[0], p[1], w));
             }
         }
         if (griffEcke >= 0) {
@@ -1528,9 +1604,9 @@ public final class Minimap {
      * ({@link Skin#marke}), die Mitte auf ganzen Pixeln des Schirms, sonst zitterte sie beim Laufen.
      * Siehe docs/rahmen.md, „Drehen“.
      */
-    static double[] verzierung(Rahmen r, int baender, boolean rund, Drehung.Lage lage, double[] richtung, int k, int[] auflage) {
+    static double[] verzierung(Rahmen r, int baender, boolean rund, Drehung.Lage lage, double[] richtung, int k, Skin.Platz platz) {
         double[] p = Skin.marke(r.x(), r.y(), r.seite(), baender, rund,
-                lage.richtungX(richtung[0], richtung[1]), lage.richtungY(richtung[0], richtung[1]), auflage);
+                lage.richtungX(richtung[0], richtung[1]), lage.richtungY(richtung[0], richtung[1]), platz);
         return new double[] {Math.round(p[0] * k) / (double) k, Math.round(p[1] * k) / (double) k};
     }
 

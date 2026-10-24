@@ -500,8 +500,8 @@ Abgleich wünschte der User am 20.10., siehe [0027](entscheidungen/0027-abgleich
   neu mit dem Satz (`Karte.tick`, `Downloads.stufen`), und die offene
   Karte fragt fehlende Kacheln neu an (`Kacheln.satzGeladen`). Bis eine
   Stufe da ist, zeigt sie den Ausschnitt der gröberen.
-- **Sonst:** Der Chat meldet Beginn und Ende wie bisher, die Minimap
-  zeigt nichts. Der einzelne Download, wenn der Renderer den Strom nicht
+- **Sonst:** Der Chat meldet Beginn und Ende wie bisher, unter der
+  Minimap steht ein Balken, siehe [Minimap](minimap.md), „Fortschritt“. Der einzelne Download, wenn der Renderer den Strom nicht
   kennt, zeigt keinen Kasten.
 
 ## Stufen und Lupe

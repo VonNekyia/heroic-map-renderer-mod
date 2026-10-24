@@ -1,0 +1,10 @@
+// heroicmap Rahmen 'lettern': eine Variante je Zeile, die erste ist die Vorgabe; die mittlere Maustaste schaltet weiter.
+// Name, dann wahlweise ordner=<Unterordner> (sonst wie der Name) und Schalter wie in info.txt, die dort Gesagtes ueberschreiben.
+tinte_innen ordner=tinte lage=innen
+tinte_aussen ordner=tinte lage=aussen
+nacht_innen ordner=nacht lage=innen
+nacht_aussen ordner=nacht lage=aussen
+gold_innen ordner=gold lage=innen
+gold_aussen ordner=gold lage=aussen
+rubrik_innen ordner=rubrik lage=innen
+rubrik_aussen ordner=rubrik lage=aussen
