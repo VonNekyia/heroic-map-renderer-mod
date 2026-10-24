@@ -134,9 +134,14 @@ public final class KarteJeServer implements FabricClientGameTest {
         context.waitFor(mc -> knopf(mc, "heroicmap.liste.kopie") != null && knopf(mc, "heroicmap.liste.kopie").active, 600);
         klicke(context, "heroicmap.liste.kopie");
         Path kopie = welt.resolve(eigene);
-        context.waitFor(mc -> Files.exists(kopie.resolve("satz.json")) && eigene.equals(Zeigt.baum(welt, Zeigt.OHNE, OBEN)), 600);
+        // Erst die Datei, dann eine eigene Meldung: Ein Warten bis zur Zeitgrenze zählte als Fang nicht.
+        context.waitFor(mc -> Files.exists(kopie.resolve("satz.json")), 600);
+        context.waitTicks(20);
         if (!Selbst.gehoert(kopie, Zeigt.OHNE)) {
             throw new AssertionError("Die Kopie ist keine eigene Karte");
+        }
+        if (!eigene.equals(Zeigt.baum(welt, Zeigt.OHNE, OBEN))) {
+            throw new AssertionError("Dieser Server zeigt die Kopie nicht: " + Zeigt.baum(welt, Zeigt.OHNE, OBEN));
         }
         pruefe(welt, eigene, "nach „Kopie“");
         // Selbst zeichnet die geladenen Chunks über die Kopie.
