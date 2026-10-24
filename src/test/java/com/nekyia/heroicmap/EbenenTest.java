@@ -697,7 +697,7 @@ class EbenenTest {
         assertTrue(Ebenen.imZoom(0, 1e-9));
         Ebenen e = new Ebenen();
         liste(e, mitGrenze(eintrag("b:staedte", "v1"), 2) + "," + eintrag("b:wege", "v1"));
-        assertEquals(List.of("b:staedte", "b:wege"), e.sichtbar(0.3125).stream().map(Ebenen.Eintrag::id).toList());
+        assertEquals(List.of("b:wege", "b:staedte"), e.sichtbar(0.3125).stream().map(Ebenen.Eintrag::id).toList());
         assertEquals(List.of("b:wege"), e.sichtbar(0.3).stream().map(Ebenen.Eintrag::id).toList());
         assertEquals(2, e.sichtbar().size());
         assertTrue(e.imZoom("b:staedte", 0.3125));

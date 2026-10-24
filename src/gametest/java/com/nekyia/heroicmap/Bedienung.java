@@ -1617,7 +1617,7 @@ public final class Bedienung implements FabricClientGameTest {
                         {"v":1,"typ":"ebene","jetzt":1,"id":"test:nah","version":"1","teil":1,"teile":1,"objects":[
                           {"type":"pin","id":"stadt","at":[%s,%s],"size":"small","name":"Stadt"},
                           {"type":"circle","id":"see","center":[%s,%s],"radius":10,"fill":"#FF00FFFF"},
-                          {"type":"label","text":"Nahe","path":[[%s,%s],[%s,%s]],"size":4}]}"""
+                          {"type":"label","text":"Nahe","path":[[%s,%s],[%s,%s]],"size":20}]}"""
                         .formatted(mitte[0] + 0.5, mitte[1] + 0.5, mitte[0] + 40.5, mitte[1] + 0.5,
                                 spieler[0] - 10, spieler[1] - 15, spieler[0] + 10, spieler[1] - 15)));
             });
@@ -1726,7 +1726,8 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Angeheftet auf Stufe 8: Nadel " + nadel + " Einheiten breit, Kreis " + kreis8 + " Pixel");
             }
 
-            // Die Kartenschrift auf der Minimap, genordet: bei Zoom 2 (0,3125 Blöcke je Pixel) da, bei 0,5 (1,25) nicht.
+            // Die Kartenschrift auf der Minimap, genordet: bei Zoom 2 (0,3125 Blöcke je Pixel) da, bei 0,5 (1,25) nicht. Mit size 20
+            // stünde sie bei 0,5 noch 10 Einheiten hoch, über den 8, unter denen Kartenschrift ohnehin fehlt.
             context.runOnClient(mc -> {
                 Wegpunkte.INSTANZ.umschaltenNadel("test:nah", "stadt");
                 Minimap.INSTANZ.setzeDrehen(false);
