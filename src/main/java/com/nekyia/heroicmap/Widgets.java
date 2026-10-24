@@ -22,7 +22,9 @@ final class Widgets {
 
     /** Was ein Widget zeigt, und seine Versionen in der Reihe, in der sie wechseln. */
     enum Art {
-        KOORDINATEN("koordinaten", "xz", "xyz");
+        KOORDINATEN("koordinaten", "xz", "xyz"),
+        ZEIT("zeit", "24h", "12h", "tag", "echt"),
+        BIOM("biom", "name", "punkt");
 
         final String name;
         final List<String> versionen;
@@ -223,6 +225,22 @@ final class Widgets {
         }
         neu.add(stelle, w);
         return new Gesetzt(neu, stelle);
+    }
+
+    /**
+     * Die Uhrzeit des Spiels zu {@code ticks} der Uhr der Oberwelt: Tick 0 ist 6:00, 1000 Ticks sind eine Stunde. 24 Stunden
+     * „14:32“, 12 Stunden „2:32 PM“. Siehe docs/widgets.md, „Arten“.
+     */
+    static String uhr(long ticks, boolean zwoelf) {
+        long t = Math.floorMod(ticks + 6000, 24000);
+        int stunde = (int) (t / 1000), minute = (int) (t % 1000 * 60 / 1000);
+        return zwoelf ? String.format(Locale.ROOT, "%d:%02d %s", (stunde + 11) % 12 + 1, minute, stunde < 12 ? "AM" : "PM")
+                : String.format(Locale.ROOT, "%d:%02d", stunde, minute);
+    }
+
+    /** Der Tag zu {@code ticks} der Uhr der Oberwelt, ab 1. */
+    static long tag(long ticks) {
+        return Math.floorDiv(ticks, 24000) + 1;
     }
 
     /** Das × zu einem Widget mit dem Kasten {x, y, Breite, Höhe}: {@link #KREUZ} im Quadrat, halb über seiner rechten oberen Ecke. */
