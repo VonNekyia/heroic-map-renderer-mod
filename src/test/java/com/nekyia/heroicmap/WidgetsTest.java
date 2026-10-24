@@ -25,8 +25,8 @@ class WidgetsTest {
     void kaputteEintraegeFehlenDieUebrigenBleiben() {
         assertEquals(List.of(XZ, XYZ), Widgets.lies(" koordinaten:xz:unten ; uhr:24h:unten;koordinaten:xy:unten;koordinaten:xz:mitte;"
                 + "koordinaten:xz;koordinaten:xz:0:unten;koordinaten:xyz:unten"));
-        // Höchstens 16.
-        assertEquals(Widgets.MAX, Widgets.lies("koordinaten:xz:unten;".repeat(20)).size());
+        // Höchstens 16, als Zahl, nicht die Konstante.
+        assertEquals(16, Widgets.lies("koordinaten:xz:unten;".repeat(20)).size());
     }
 
     @Test
