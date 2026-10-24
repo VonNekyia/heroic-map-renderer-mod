@@ -6035,11 +6035,21 @@ public final class Bedienung implements FabricClientGameTest {
         }
         server.runCommand("execute in minecraft:the_nether run tp @p 0.5 60 0.5");
         context.waitFor(mc -> mc.level.dimension() == Level.NETHER && Math.abs(mc.player.getY() - 60) < 0.01 && mc.player.onGround(), 600);
-        // Das Widget der Zeit zeigt hier die Uhr der Oberwelt, nicht die fehlende des Nethers, die 6:00 hiesse; im selben Frame
-        // verglichen, die Uhr bleibt. Siehe docs/widgets.md, „Arten“.
+        // Das Widget der Zeit zeigt hier die Uhr der Oberwelt, nicht die fehlende des Nethers, die 6:00 hiesse. Die Testwelt steht
+        // auf 6:00 und angehalten; darum kurz 6000 Ticks weiter, danach Zeit und Anhalten wie vorher, sonst änderte sich das Licht
+        // in den Bildern danach. Siehe docs/widgets.md, „Arten“.
+        boolean angehalten = context.computeOnClient(mc -> mc.level.clockManager()
+                .getInstance(mc.level.registryAccess().get(net.minecraft.world.clock.WorldClocks.OVERWORLD).orElseThrow()).isPaused());
+        long uhrVorher = context.computeOnClient(mc -> mc.level.getOverworldClockTime());
+        server.runCommand("time set " + (uhrVorher + 6000));
+        context.waitTicks(3);
         String[] zeit = context.computeOnClient(mc -> new String[] {
             Minimap.INSTANZ.text(new Widgets.Widget(Widgets.Art.ZEIT, 0, Widgets.Anker.UNTEN), mc.level, mc.player).getString(),
             Widgets.uhr(mc.level.getOverworldClockTime(), false), Widgets.uhr(mc.level.getDefaultClockTime(), false)});
+        server.runCommand("time set " + uhrVorher);
+        if (angehalten) {
+            server.runCommand("time pause");
+        }
         if (zeit[1].equals(zeit[2]) || !zeit[0].equals(zeit[1])) {
             throw new AssertionError("Nether: Die Zeit zeigt „" + zeit[0] + "“; Uhr der Oberwelt „" + zeit[1] + "“, des Nethers „" + zeit[2] + "“");
         }
