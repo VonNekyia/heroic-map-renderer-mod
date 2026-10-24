@@ -2,6 +2,7 @@ package com.nekyia.heroicmap;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.mojang.logging.LogUtils;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -16,6 +17,7 @@ import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import org.slf4j.Logger;
 
 /**
  * Der Ort einer Welt unter {@code heroicmap/}: Adresse, Server und Hash, und der Umzug eines Ordners einer Welt oder eines
@@ -48,6 +50,10 @@ final class Ort {
             return einzelspieler() ? adresse.substring(EINZELSPIELER.length()) : "";
         }
     }
+
+    private static final Logger LOGGER = LogUtils.getLogger();
+    /** Was der Standardport bei IP:Port vor der Regel 0040 an den Ordner hängte. */
+    private static final String STANDARD = "_" + Downloads.STANDARDPORT;
 
     /** Ein Schritt eines Umzugs, den {@link #zurueck} wieder aufhebt. */
     private interface Schritt {
@@ -242,6 +248,81 @@ final class Ort {
             throw fehler;
         }
         raeumeAuf(wurzel, alt.getParent());
+    }
+
+    /**
+     * Zieht die Welt mit dem Ordnernamen {@code hash}, etwa {@code welt-<hash>}, aus den Ordnern {@code andere} anderer
+     * Ablagen in den Ordner {@code ziel} der jetzigen: {@code welt-<hash>} und jedes {@code karte-<k>/welt-<hash>}, je ganz
+     * oder gar nicht ({@link #zieheOrdner}). Nie auf Bestehendes, nicht aus einem Ordner, den {@code belegt} nennt, etwa für
+     * einen Download. Gibt zurück, wohin umgezogen wurde. Siehe docs/download.md, „Ablage“.
+     */
+    static List<Path> zieheAblagen(Path wurzel, Path ziel, List<Path> andere, String hash, Predicate<Path> belegt) {
+        List<Path> neu = new ArrayList<>();
+        for (Path adresse : andere) {
+            List<Path> welten = new ArrayList<>();
+            welten.add(adresse.resolve(hash));
+            try (Stream<Path> karten = Files.list(adresse)) {
+                karten.filter(k -> k.getFileName().toString().startsWith(KARTE)).forEach(k -> welten.add(k.resolve(hash)));
+            } catch (IOException e) {
+                // Ohne Ordner nichts umzuziehen.
+                continue;
+            }
+            for (Path alt : welten) {
+                Path hin = ziel.resolve(adresse.relativize(alt));
+                if (!Files.isDirectory(alt, LinkOption.NOFOLLOW_LINKS) || Files.exists(hin, LinkOption.NOFOLLOW_LINKS) || belegt.test(alt)) {
+                    continue;
+                }
+                try {
+                    // Derselbe Server: Eigene Karten und zeigt.txt bleiben, wie sie sind.
+                    zieheOrdner(wurzel, alt, hin, Zeigt.OHNE, Zeigt.OHNE);
+                    neu.add(hin);
+                    LOGGER.info("Heroic Map: {} nach {} umgezogen, andere Ablage", alt, hin);
+                } catch (IOException e) {
+                    LOGGER.warn("Heroic Map: {} nicht nach {} umgezogen", alt, hin, e);
+                }
+            }
+        }
+        return neu;
+    }
+
+    /**
+     * Die Bäume, die doppelt liegen: gleicher Name, gleicher Server ({@code karte-}) und gleicher Hash unter Ordnern, die
+     * denselben Host meinen. Das sind {@code <host>} und {@code <host>_25565} von vor der Regel zum Standardport, und die
+     * Ablage Hash ohne Adresse zu jeder Adresse. Je doppeltem Baum die anderen; Einzelspieler und die Ablage vor dem Hash
+     * nie. Siehe docs/download.md, „Kartenliste“.
+     */
+    static Map<Path, List<Path>> doppelt(Path wurzel, List<Path> baeume) {
+        Map<String, List<Path>> gruppen = new HashMap<>();
+        for (Path b : baeume) {
+            Teile t = teile(wurzel, b.getParent());
+            if (t != null && !t.einzelspieler()) {
+                gruppen.computeIfAbsent(t.server() + "/" + t.hash() + "/" + b.getFileName(), k -> new ArrayList<>()).add(b);
+            }
+        }
+        Map<Path, List<Path>> aus = new HashMap<>();
+        for (List<Path> gruppe : gruppen.values()) {
+            for (Path a : gruppe) {
+                for (Path b : gruppe) {
+                    String ha = host(wurzel, a), hb = host(wurzel, b);
+                    if (!a.equals(b) && (ha.isEmpty() || hb.isEmpty() || ha.equals(hb))) {
+                        aus.computeIfAbsent(a, k -> new ArrayList<>()).add(b);
+                    }
+                }
+            }
+        }
+        return aus;
+    }
+
+    /** Der Host des Ordners eines Baums, ohne {@code _25565}; leer bei der Ablage Hash. */
+    private static String host(Path wurzel, Path baum) {
+        String a = teile(wurzel, baum.getParent()).adresse();
+        return a.endsWith(STANDARD) ? a.substring(0, a.length() - STANDARD.length()) : a;
+    }
+
+    /** Nutzt der Mod den Ordner dieses Baums nach {@code ablage}? Bei Hash der ohne Adresse, sonst der mit, ohne {@code _25565}. */
+    static boolean genutzt(Path wurzel, Path baum, Downloads.Ablage ablage) {
+        Teile t = teile(wurzel, baum.getParent());
+        return t != null && (ablage == Downloads.Ablage.HASH ? t.adresse().isEmpty() : !t.adresse().isEmpty() && !t.adresse().endsWith(STANDARD));
     }
 
     /**

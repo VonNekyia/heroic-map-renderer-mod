@@ -57,6 +57,21 @@ class ServernameTest {
     }
 
     @Test
+    void angebotOhneNamenLaesstIhnStehen(@TempDir Path wurzel) {
+        // Erst ein Angebot mit Namen, dann eines ohne, etwa von einem anderen Server hinter derselben Adresse; die nächste
+        // Sitzung liest den Namen noch, und die Karte liegt weiter in seinem Ordner. Siehe docs/download.md, „Ablage“.
+        Servername.nachAngebot(wurzel, "0", "play.example.net");
+        Servername.nachAngebot(wurzel, "0", null);
+        assertEquals("play.example.net", Servername.lies(wurzel, "0"));
+        // Ein anderer Name ersetzt ihn.
+        Servername.nachAngebot(wurzel, "0", "neu.example.net");
+        assertEquals("neu.example.net", Servername.lies(wurzel, "0"));
+        // Ohne gemerkten Namen bleibt es ohne.
+        Servername.nachAngebot(wurzel, "1", null);
+        assertNull(Servername.lies(wurzel, "1"));
+    }
+
+    @Test
     void ordnerZiehtEinmalUm(@TempDir Path wurzel) throws Exception {
         Path alt = wurzel.resolve("0").resolve("welt-0123456789abcdef"), neu = wurzel.resolve("play.example.net").resolve("welt-0123456789abcdef");
         Files.createDirectories(alt.resolve("survival").resolve("4"));

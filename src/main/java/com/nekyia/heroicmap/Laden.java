@@ -1006,7 +1006,8 @@ final class Laden {
     }
 
     /** Ein Baum auf der Platte: sein Ordner, der Pfad unter {@code heroicmap/}, der Satz oder null, solange er unvollständig ist, und seine Bytes. */
-    record AufPlatte(Path ordner, String pfad, Satz satz, long bytes) {
+    /** Ein Baum auf der Platte; {@code zuletzt} ist die jüngste Änderung einer Datei darin, in ms seit 1970, 0 ohne. */
+    record AufPlatte(Path ordner, String pfad, Satz satz, long bytes, long zuletzt) {
     }
 
     /** Die Bäume und die Bytes aller Dateien unter {@code heroicmap/}. Siehe docs/download.md, „Kartenliste“. */
@@ -1028,7 +1029,7 @@ final class Laden {
         // Ist heroicmap/ selbst eine Verbindung, etwa auf ein anderes Laufwerk, läuft der Durchlauf über ihr Ziel;
         // die Pfade rechnet er auf die Wurzel zurück, wie Downloads sie kennt.
         Path echt = wurzel.toRealPath();
-        // Bytes je Ordner der ersten vier Ebenen; ein Baum liegt höchstens dort.
+        // Bytes und jüngste Änderung je Ordner der ersten vier Ebenen; ein Baum liegt höchstens dort.
         Map<Path, long[]> jeOrdner = new HashMap<>();
         Set<Path> baeume = new HashSet<>();
         long[] summe = {0};
@@ -1054,7 +1055,9 @@ final class Laden {
                 }
                 summe[0] += a.size();
                 for (int i = 1; i < relativ.getNameCount() && i <= 4; i++) {
-                    jeOrdner.computeIfAbsent(wurzel.resolve(relativ.subpath(0, i).toString()), k -> new long[1])[0] += a.size();
+                    long[] o = jeOrdner.computeIfAbsent(wurzel.resolve(relativ.subpath(0, i).toString()), k -> new long[2]);
+                    o[0] += a.size();
+                    o[1] = Math.max(o[1], a.lastModifiedTime().toMillis());
                 }
                 return FileVisitResult.CONTINUE;
             }
@@ -1070,8 +1073,8 @@ final class Laden {
         }
         List<AufPlatte> karten = new ArrayList<>();
         for (Path ordner : new TreeSet<>(baeume)) {
-            long[] bytes = jeOrdner.getOrDefault(ordner, new long[1]);
-            karten.add(new AufPlatte(ordner, wurzel.relativize(ordner).toString().replace('\\', '/'), Satz.lies(ordner), bytes[0]));
+            long[] bytes = jeOrdner.getOrDefault(ordner, new long[2]);
+            karten.add(new AufPlatte(ordner, wurzel.relativize(ordner).toString().replace('\\', '/'), Satz.lies(ordner), bytes[0], bytes[1]));
         }
         return new Bestand(List.copyOf(karten), summe[0]);
     }

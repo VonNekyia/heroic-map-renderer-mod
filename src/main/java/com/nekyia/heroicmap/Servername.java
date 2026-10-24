@@ -48,6 +48,17 @@ final class Servername {
         return null;
     }
 
+    /**
+     * Nach einem Angebot: Ein gültiger Name, der noch nicht gemerkt ist, ersetzt den gemerkten; ein Angebot ohne Namen
+     * lässt ihn stehen. Sonst nähme ein Server ohne Namen hinter derselben Adresse dem anderen seinen Ordner. Siehe
+     * docs/download.md, „Ablage“, und docs/entscheidungen/0040-ablage-ohne-doppelte-karten.md.
+     */
+    static void nachAngebot(Path wurzel, String adresse, String name) {
+        if (name != null && !name.equals(lies(wurzel, adresse))) {
+            merke(wurzel, adresse, name);
+        }
+    }
+
     /** Merkt {@code name} für die {@code adresse}; null nimmt ihn heraus. Nur der Render-Thread. */
     static void merke(Path wurzel, String adresse, String name) {
         String schluessel = schluessel(adresse);
