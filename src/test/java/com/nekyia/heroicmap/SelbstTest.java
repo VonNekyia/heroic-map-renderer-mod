@@ -178,9 +178,9 @@ class SelbstTest {
         assertTrue(Selbst.baum("x:" + "a".repeat(100)).length() <= 64);
         // Ein Baum vom Server, nach dem Namen vor dem eigenen (Satz.fuer sortiert): Der eigene geht trotzdem vor.
         satzVomServer(welt.resolve("a-server"), "minecraft:overworld");
-        assertEquals("Survival", Satz.fuer(welt, "minecraft:overworld").name());
+        assertEquals("Survival", Satz.fuer(welt, "minecraft:overworld", Zeigt.OHNE).name());
         Path baum = Selbst.anlegen(welt, "minecraft:overworld", Selbst.MASSSTAB);
-        Satz satz = Satz.fuer(welt, "minecraft:overworld");
+        Satz satz = Satz.fuer(welt, "minecraft:overworld", Zeigt.OHNE);
         assertEquals(baum.resolve("4"), satz.ordner());
         assertEquals(Selbst.MAX_ZOOM, satz.stufe());
         assertEquals(Selbst.SCALE, satz.scale());
@@ -214,7 +214,7 @@ class SelbstTest {
         for (int massstab : Selbst.MASSSTAEBE) {
             Path welt = welten.resolve(String.valueOf(massstab));
             Path baum = Selbst.anlegen(welt, "minecraft:overworld", massstab);
-            Satz satz = Satz.fuer(welt, "minecraft:overworld");
+            Satz satz = Satz.fuer(welt, "minecraft:overworld", Zeigt.OHNE);
             assertEquals(baum.resolve(String.valueOf(massstab)), satz.ordner());
             assertEquals(massstab, satz.massstab());
             assertEquals(Selbst.SCALE, satz.scale());
