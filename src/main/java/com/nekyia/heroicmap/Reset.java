@@ -19,8 +19,8 @@ import java.util.stream.Stream;
  */
 final class Reset {
 
-    /** Wie sicher ein Reset ist. */
-    enum Art { GLEICH, SICHER, UNSICHER }
+    /** Wie sicher ein Reset ist; {@code RUNDE} ist keiner, nur eine neue Runde derselben Welt. Siehe docs/download.md, „Runden“. */
+    enum Art { GLEICH, SICHER, UNSICHER, RUNDE }
 
     /** Die Marke eines ruhenden Baums; {@link Satz#fuer} zeigt ihn nie. */
     static final String RUHT = "ruht.txt";
@@ -42,18 +42,27 @@ final class Reset {
 
     /**
      * Der Entscheid für eine Welt beim Betreten: {@code alt}, wie der Ausweis sie kennt, oder null; die UID vom Plugin oder
-     * null; die Spielzeit jetzt oder -1. Mit beiden UIDs entscheidet nur die UID. Ohne UID vom Plugin ist ein Reset unsicher,
-     * wenn die Spielzeit unter ein Viertel der letzten fällt und um mehr als eine Stunde.
+     * null; die Spielzeit jetzt oder -1. Eine andere UID ist ein sicherer Reset. Fällt die Spielzeit weit ({@link #rueckfall}),
+     * ist das mit derselben UID eine neue Runde, etwa aus einer Vorlage; ohne UID ein unsicherer Reset, ausser sie fällt wieder
+     * nahe an den Anfang der letzten Generation, dann auch eine Runde. Siehe docs/download.md, „Runden“.
      */
     static Art pruefe(Ausweis.Welt alt, String uid, long alter) {
         if (alt == null) {
             return Art.GLEICH;
         }
-        if (uid != null) {
-            return alt.uid() == null || alt.uid().equals(uid) ? Art.GLEICH : Art.SICHER;
+        if (uid != null && alt.uid() != null && !alt.uid().equals(uid)) {
+            return Art.SICHER;
         }
+        if (!rueckfall(alt, alter)) {
+            return Art.GLEICH;
+        }
+        return uid != null || alt.rueckfaelle() >= 1 && Math.abs(alter - alt.alterErstes()) <= STUNDE ? Art.RUNDE : Art.UNSICHER;
+    }
+
+    /** Fällt die Spielzeit {@code alter} unter ein Viertel der zuletzt gesehenen und um mehr als eine Stunde? */
+    static boolean rueckfall(Ausweis.Welt alt, long alter) {
         long zuletzt = alt.alterZuletzt();
-        return alter >= 0 && zuletzt > 0 && alter < zuletzt / TEIL && zuletzt - alter > STUNDE ? Art.UNSICHER : Art.GLEICH;
+        return alter >= 0 && zuletzt > 0 && alter < zuletzt / TEIL && zuletzt - alter > STUNDE;
     }
 
     /**

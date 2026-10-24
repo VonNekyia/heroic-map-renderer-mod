@@ -409,6 +409,31 @@ public final class OrtAendern implements FabricClientGameTest {
         if (context.computeOnClient(mc -> Satz.fuer(hier, "minecraft:overworld", Zeigt.OHNE)) != null) {
             throw new AssertionError("Die Welt zeigt den ruhenden Baum noch");
         }
+
+        // Ein zweiter Rückfall nahe am Anfang der neuen Generation ist eine Runde (B6): Der neue Download ruht nicht, der Ausweis
+        // zählt den zweiten Rückfall. Siehe docs/download.md, „Runden“.
+        download(hier.resolve("probe-runde"));
+        spiel.getServer().runCommand("execute in minecraft:the_nether run tp @a 0 100 0");
+        context.waitFor(mc -> mc.level != null && mc.level.dimension().identifier().toString().equals("minecraft:the_nether"), 600);
+        context.runOnClient(mc -> Ausweise.INSTANZ.fuerTest(a -> a.alter("minecraft:overworld", 100_000_000L)));
+        spiel.getServer().runCommand("execute in minecraft:overworld run tp @a " + stelle);
+        context.waitFor(mc -> mc.level != null && mc.level.dimension().identifier().toString().equals("minecraft:overworld"), 600);
+        context.waitTicks(300);
+        if (!Files.exists(hier.resolve("probe-runde")) || Files.exists(hier.resolve("probe-runde").resolve(Reset.RUHT))) {
+            throw new AssertionError("Bei einer Runde ruht der Download probe-runde doch");
+        }
+        int rueckfaelle = context.computeOnClient(mc -> {
+            int[] n = new int[1];
+            Ausweise.INSTANZ.fuerTest(a -> {
+                n[0] = a.welten().get("minecraft:overworld").rueckfaelle();
+                return a;
+            });
+            return n[0];
+        });
+        if (rueckfaelle != 2) {
+            throw new AssertionError("Nach Reset und Runde " + rueckfaelle + " Rückfälle statt 2");
+        }
+        Laden.loesche(hier.resolve("probe-runde"));
     }
 
     /** Wie viele gelbe Pixel, wie die Marke „doppelt“, das Bildschirmfoto im Kasten {x0, y0, x1, y1} in Einheiten hat. */

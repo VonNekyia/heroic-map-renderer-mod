@@ -36,7 +36,8 @@ class ResetTest {
         assertEquals(Reset.Art.GLEICH, Reset.pruefe(null, UID, 5), "ohne Ausweis nichts zu vergleichen");
         // Mit UID vom Plugin entscheidet nur die UID; ohne alte wird sie eingetragen.
         assertEquals(Reset.Art.GLEICH, Reset.pruefe(welt(1_000_000, null), UID, 5));
-        assertEquals(Reset.Art.GLEICH, Reset.pruefe(welt(1_000_000, UID), UID, 5), "gleiche UID, auch wenn die Zeit fällt");
+        assertEquals(Reset.Art.RUNDE, Reset.pruefe(welt(1_000_000, UID), UID, 5), "gleiche UID, die Zeit fällt: eine neue Runde, kein Reset");
+        assertEquals(Reset.Art.GLEICH, Reset.pruefe(welt(1_000_000, UID), UID, 900_000), "gleiche UID, die Zeit fällt wenig");
         assertEquals(Reset.Art.SICHER, Reset.pruefe(welt(5, UID), ANDERE, 1_000_000), "andere UID, auch wenn die Zeit steigt");
         // Ohne UID: unter ein Viertel der letzten und um mehr als eine Stunde, 72 000 Ticks.
         assertEquals(Reset.Art.UNSICHER, Reset.pruefe(welt(1_000_000, null), null, 1_000));
@@ -171,5 +172,23 @@ class ResetTest {
         // Danach ist derselbe Stand gleich, kein zweiter Reset.
         assertEquals(Reset.Art.GLEICH, Reset.pruefe(w, null, 30));
         assertEquals(Reset.Art.GLEICH, Reset.pruefe(w, ANDERE, 30));
+    }
+
+    @Test
+    void runden() {
+        // Ohne UID: Der erste Rückfall ruht, der zweite nahe am Anfang der letzten Generation ist eine Runde (plan.md, B6).
+        Ausweis.Welt erste = new Ausweis.Welt(T, T, 3, 5_000, 1_000_000, 1_000_000, null, 0);
+        assertEquals(Reset.Art.UNSICHER, Reset.pruefe(erste, null, 5_000), "der erste Rückfall, auch nahe am Anfang");
+        Ausweis.Welt zweite = new Ausweis.Welt(T, T, 3, 5_000, 900_000, 900_000, null, 1);
+        assertEquals(Reset.Art.RUNDE, Reset.pruefe(zweite, null, 5_000));
+        assertEquals(Reset.Art.RUNDE, Reset.pruefe(zweite, null, 5_000 + 72_000), "eine Stunde weit ist noch nahe");
+        assertEquals(Reset.Art.UNSICHER, Reset.pruefe(zweite, null, 5_000 + 72_001), "weiter weg ein Reset");
+        assertEquals(Reset.Art.GLEICH, Reset.pruefe(zweite, null, 800_000), "ohne Rückfall nichts");
+        assertTrue(Reset.rueckfall(zweite, 5_000));
+        assertFalse(Reset.rueckfall(zweite, 300_000));
+        // Mit UID entscheidet bei gleicher UID der Rückfall allein, schon beim ersten.
+        assertEquals(Reset.Art.RUNDE, Reset.pruefe(new Ausweis.Welt(T, T, 3, 5_000, 900_000, 900_000, UID, 0), UID, 400_000));
+        // Jede neue Generation zählt einen Rückfall.
+        assertEquals(1, Ausweis.neu("1111111111111111").besucht(OBEN, T, ZoneOffset.UTC).neueGeneration(OBEN, 7, null).welten().get(OBEN).rueckfaelle());
     }
 }

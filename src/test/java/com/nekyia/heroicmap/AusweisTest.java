@@ -33,7 +33,9 @@ class AusweisTest {
         String uid = "0d9c1a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b";
         a = a.uid(OBEN, uid);
         assertEquals(uid, a.alter(OBEN, 950).welten().get(OBEN).uid());
-        assertEquals(new Ausweis.Welt(t1, t1, 1, 30, 30, 30, "neu"), a.neueGeneration(OBEN, 30, "neu").welten().get(OBEN));
+        assertEquals(new Ausweis.Welt(t1, t1, 1, 30, 30, 30, "neu", 1), a.neueGeneration(OBEN, 30, "neu").welten().get(OBEN), "ein Rückfall mehr");
+        assertEquals(2, a.neueGeneration(OBEN, 30, "neu").neueGeneration(OBEN, 40, "neu").besucht(OBEN, t1, ZONE).alter(OBEN, 50)
+                .uid(OBEN, "x").welten().get(OBEN).rueckfaelle(), "Besuch, Spielzeit und UID behalten die Rückfälle");
         assertSame(a, a.neueGeneration("minecraft:farm", 1, null));
         a = a.neueGeneration(OBEN, 400, null).alter(OBEN, 900).alter(OBEN, 400);
         // Am selben Tag kein Tag mehr, am nächsten einer; der Tag zählt in der Zone, nicht in UTC.
@@ -58,9 +60,11 @@ class AusweisTest {
     void schreibenUndLesen(@TempDir Path w) throws IOException {
         Instant t = Instant.parse("2026-10-24T10:00:00Z");
         Ausweis a = Ausweis.neu(HASH).mit("0", "main").besucht(OBEN, t, ZONE).alter(OBEN, 1234).besucht(NETHER, t, ZONE)
-                .uid(OBEN, "0d9c1a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b");
+                .uid(OBEN, "0d9c1a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b").neueGeneration(NETHER, 7, null);
         a.schreibe(w);
         assertEquals(a, Ausweis.lies(w));
+        assertEquals(1, Ausweis.lies(w).welten().get(NETHER).rueckfaelle());
+        assertFalse(Files.readString(w.resolve(Ausweis.DATEI)).contains("\"rueckfaelle\":0"), "ohne Rückfall kein Feld");
         assertFalse(Files.exists(w.resolve(Ausweis.DATEI + ".tmp")), "keine Zwischendatei bleibt");
         // Gleicher Inhalt, gleiche Datei.
         String datei = Files.readString(w.resolve(Ausweis.DATEI));

@@ -54,6 +54,8 @@ public final class Selbst {
     static final int NEUBAU_KACHELN = 16;
     /** Die Datei, die einen Baum als selbst gezeichnet ausweist. */
     static final String MARKE = "selbst.txt";
+    /** In {@code heroicmap/}: je Netz und Server der Massstab, mit dem „Selbst“ auch neue Welten zeichnet. Siehe docs/selbst.md, „Neue Welten“. */
+    static final String WEITER = "selbst-weiter.txt";
     /** So viele Chunks hat der Worker höchstens vor sich. */
     private static final int IN_ARBEIT = 4;
     /** Zeit je Tick auf dem Render-Thread für Abzüge. */
@@ -133,6 +135,92 @@ public final class Selbst {
         Path baum = welt.resolve(baum(dimension, server));
         Satz satz = Satz.lies(baum);
         return satz != null && dimension.equals(satz.dimension()) && gehoert(baum, server);
+    }
+
+    /** Der Massstab, mit dem „Selbst“ unter {@code netz} für {@code server} auch neue Welten zeichnet, 0 ohne. */
+    static int weiter(Path wurzel, String netz, String server) {
+        for (String[] z : weiterZeilen(wurzel)) {
+            if (z[0].equals(netz) && z[1].equals(server)) {
+                return Integer.parseInt(z[2]);
+            }
+        }
+        return 0;
+    }
+
+    /** Merkt {@code massstab} für {@code netz} und {@code server}; 0 vergisst ihn. Eine leere Liste fällt weg. */
+    static void merkeWeiter(Path wurzel, String netz, String server, int massstab) throws IOException {
+        List<String> zeilen = new ArrayList<>();
+        for (String[] z : weiterZeilen(wurzel)) {
+            if (!z[0].equals(netz) || !z[1].equals(server)) {
+                zeilen.add(String.join("\t", z));
+            }
+        }
+        if (massstab > 0) {
+            zeilen.add(netz + "\t" + server + "\t" + massstab);
+        }
+        Path datei = wurzel.resolve(WEITER);
+        if (zeilen.isEmpty()) {
+            Files.deleteIfExists(datei);
+        } else {
+            Files.createDirectories(wurzel);
+            Files.write(datei, zeilen, StandardCharsets.UTF_8);
+        }
+    }
+
+    /** Die Zeilen von {@link #WEITER}: Netz, Server, Massstab; was nicht so aussieht, fällt weg. */
+    private static List<String[]> weiterZeilen(Path wurzel) {
+        List<String[]> aus = new ArrayList<>();
+        try {
+            for (String zeile : Files.readAllLines(wurzel.resolve(WEITER), StandardCharsets.UTF_8)) {
+                String[] z = zeile.split("\t", -1);
+                if (z.length == 3 && !z[0].isEmpty() && !z[1].isEmpty() && MASSSTAEBE.stream().anyMatch(m -> String.valueOf(m).equals(z[2]))) {
+                    aus.add(z);
+                }
+            }
+        } catch (IOException e) {
+            // Ohne Datei keine.
+        }
+        return aus;
+    }
+
+    /**
+     * Zeichnet „Selbst“ in der Welt {@code welt} für {@code server} ohne Klick, weil es auf diesem Server mit {@code massstab}
+     * gewählt ist? Nur, wenn es für die Dimension weder eine eigene Karte noch eine andere Karte zu zeigen gibt und zeigt.txt
+     * nichts wählt; so ersetzt es nie still einen Download. Siehe docs/selbst.md, „Neue Welten“.
+     */
+    static boolean weiterHier(Path welt, String dimension, String server, int massstab) {
+        return massstab > 0 && !an(welt, dimension, server) && Zeigt.baum(welt, server, dimension) == null
+                && Satz.fuer(welt, dimension, server) == null;
+    }
+
+    /**
+     * Nach der Wahl oder dem Löschen durch den Spieler auf einem Server unter der eingetippten Adresse {@code netz}: „Selbst“
+     * gilt hier auch für neue Welten, mit {@code massstab}; 0 hebt das auf. Im Einzelspieler nichts.
+     */
+    void weiterAn(String netz, int massstab) {
+        if (netz.isEmpty()) {
+            return;
+        }
+        try {
+            merkeWeiter(Downloads.wurzel(), netz, Downloads.INSTANZ.wer(), massstab);
+        } catch (IOException e) {
+            LOGGER.warn("Heroic Map: {} nicht geschrieben", WEITER, e);
+        }
+    }
+
+    /**
+     * Beim Betreten einer Welt unter der eingetippten Adresse {@code netz}: Hat der Spieler auf diesem Server „Selbst“ gewählt,
+     * zeichnet der Mod auch hier, ohne Klick ({@link #weiterHier}). Nie im Einzelspieler.
+     */
+    void weiter(Minecraft mc, String netz) {
+        if (netz.isEmpty() || !moeglich(mc) || mc.player == null) {
+            return;
+        }
+        String wer = Downloads.INSTANZ.wer(), dimension = dimension(mc.level);
+        int massstab = weiter(Downloads.wurzel(), netz, wer);
+        if (weiterHier(weltOrdner(), dimension, wer, massstab) && waehle(mc, massstab) == null) {
+            LOGGER.info("Heroic Map: zeichnet {} in {} selbst, wie auf diesem Server gewählt, {} px", dimension, weltOrdner(), massstab);
+        }
     }
 
     /**
