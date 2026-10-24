@@ -1822,8 +1822,8 @@ public final class Bilder implements FabricClientGameTest {
     };
 
     /**
-     * Pflanzen von oben, bei 4 px und Zoom 4, verglichen mit derselben Stelle ohne sie: Mohn, Weizen und Seegras liegen
-     * flach; der Blütenteppich mit einer Blüte im Nordwesten hat eine Oberseite und bleibt, ausserhalb der Blüte Gras; die
+     * Pflanzen von oben, bei 4 px und Zoom 4, verglichen mit derselben Stelle ohne sie: Mohn, Weizen und Seegras kippen
+     * 45° nach Norden; der Blütenteppich mit einer Blüte im Nordwesten hat eine Oberseite und bleibt, ausserhalb der Blüte Gras; die
      * Leiter erbt von keiner Vorlage und fehlt wie bisher. Siehe docs/minimap.md, „Pflanzen von oben“.
      */
     private static void pflanzen(ClientGameTestContext context, TestServerContext server) {
