@@ -26,22 +26,41 @@ record Satz(Path ordner, String name, String dimension, int massstab, int kachel
 
     /**
      * Der Satz, den {@code server} für {@code dimension} unter dem Ordner einer Welt zeigt, oder null: seine Wahl in
-     * {@link Zeigt}, sonst der erste Download nach dem Namen, dann seine eigene Karte. Ein Server ohne Namen nimmt wie
-     * bisher seine eigene vor dem Download. Die eigene Karte eines anderen Servers zeigt er nie. Siehe docs/selbst.md,
-     * „Wahl“.
+     * {@link Zeigt}, sonst der erste Download nach dem Namen, dann einer im Ziel des {@link Zeiger}s, dann seine eigene
+     * Karte. Ein Server ohne Namen nimmt wie bisher seine eigene vor dem Download. Die eigene Karte eines anderen
+     * Servers zeigt er nie, auch nicht im Ziel. Siehe docs/selbst.md, „Wahl“.
      */
     static Satz fuer(Path welt, String dimension, String server) {
         if (welt == null || !Files.isDirectory(welt)) {
             return null;
         }
+        Path ziel = Zeiger.ziel(welt);
         String gewaehlt = Zeigt.baum(welt, server, dimension);
         if (gewaehlt != null) {
-            Path baum = welt.resolve(gewaehlt);
-            Satz satz = lies(baum);
-            if (satz != null && dimension.equals(satz.dimension()) && (!Selbst.selbst(baum) || Selbst.gehoert(baum, server))) {
+            boolean dort = gewaehlt.startsWith(Zeiger.DORT);
+            Path baum = !dort ? welt.resolve(gewaehlt) : ziel == null ? null : ziel.resolve(gewaehlt.substring(Zeiger.DORT.length()));
+            Satz satz = baum == null ? null : lies(baum);
+            if (satz != null && dimension.equals(satz.dimension())
+                    && (!Selbst.selbst(baum) || !dort && Selbst.gehoert(baum, server))) {
                 return satz;
             }
         }
+        Satz[] hier = baeume(welt, dimension, server);
+        if (hier == null) {
+            return null;
+        }
+        Satz dort = hier[0] == null && ziel != null ? baeume(ziel, dimension, null)[0] : null;
+        if (Zeigt.OHNE.equals(server)) {
+            return hier[1] != null ? hier[1] : hier[0] != null ? hier[0] : dort;
+        }
+        return hier[0] != null ? hier[0] : dort != null ? dort : hier[1];
+    }
+
+    /**
+     * Im Ordner einer Welt der erste Download der Dimension und die eigene Karte von {@code server}, ohne Server keine;
+     * null, wenn der Ordner nicht zu lesen ist, und im Ziel eines Zeigers dann keiner.
+     */
+    private static Satz[] baeume(Path welt, String dimension, String server) {
         Satz download = null, eigene = null;
         // Nach dem Namen als Zeichenkette, nicht in der Folge des Dateisystems und nicht nach Path.compareTo,
         // das unter Windows Gross und Klein gleich nimmt: So ist das Ergebnis überall gleich.
@@ -53,17 +72,14 @@ record Satz(Path ordner, String name, String dimension, int massstab, int kachel
                 }
                 if (!Selbst.selbst(baum)) {
                     download = download == null ? satz : download;
-                } else if (eigene == null && Selbst.gehoert(baum, server)) {
+                } else if (eigene == null && server != null && Selbst.gehoert(baum, server)) {
                     eigene = satz;
                 }
             }
         } catch (IOException e) {
-            return null;
+            return server == null ? new Satz[2] : null;
         }
-        if (Zeigt.OHNE.equals(server)) {
-            return eigene != null ? eigene : download;
-        }
-        return download != null ? download : eigene;
+        return new Satz[] {download, eigene};
     }
 
     /** Der Server, dem ein selbst gezeichneter Baum gehört, aus {@code satz.json}; {@link Zeigt#OHNE} ohne Angabe. */

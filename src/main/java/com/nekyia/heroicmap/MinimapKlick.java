@@ -93,8 +93,9 @@ final class MinimapKlick {
         List<FormattedCharSequence> zeilen = new ArrayList<>(font.split(
                 Component.translatable(spieler ? "heroicmap.menue.klick.spieler" : "heroicmap.menue.klick.rahmen", jetzt), TOOLTIP));
         if (!spieler) {
-            zeilen.addAll(font.split(Component.translatable(m.verzierungAus(z) ? "heroicmap.menue.mitte.zeigen"
-                    : "heroicmap.menue.mitte.durchsichtig"), TOOLTIP));
+            String jetztZier = m.verzierungAus(z) ? "aus" : m.hd(z) ? "hd" : "pixel";
+            zeilen.addAll(font.split(Component.translatable("heroicmap.menue.mitte",
+                    Component.translatable("heroicmap.menue.mitte." + jetztZier)), TOOLTIP));
         }
         zeilen.addAll(font.split(Component.translatable(spieler ? "heroicmap.menue.spieler.beschreibung"
                 : "heroicmap.rahmen." + m.skin() + ".beschreibung").withStyle(ChatFormatting.GRAY), TOOLTIP));

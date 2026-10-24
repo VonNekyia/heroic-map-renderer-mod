@@ -224,9 +224,11 @@ final class Waehler {
             return;
         }
         skin.baender(g, x, y, SEITE, Minecraft.getInstance().getWindow().getGuiScale(), rund, 1);
-        for (Minimap.Ornament o : Minimap.ornamente(new Minimap.Rahmen(x, y, SEITE), skin.baender(), rund, skin.marken, null, 1, 0, -1,
-                false, Minimap.KEIN_ZIEL)) {
-            skin.ornament(g, o.teil(), o.ecke(), o.x(), o.y(), 1, o.winkel());
+        // Die Marken so, wie sie je Marke gestellt sind: durchsichtige fehlen, HD in HD.
+        Minimap m = Minimap.INSTANZ;
+        for (Minimap.Ornament o : Minimap.ornamente(new Minimap.Rahmen(x, y, SEITE), skin.baender(), rund, skin.marken, null, 1,
+                m.ausMarken(), -1, false, Minimap.KEIN_ZIEL)) {
+            skin.ornament(g, o.teil(), o.ecke(), o.x(), o.y(), 1, o.winkel(), Minimap.hd(o, m.hdMarken()));
         }
     }
 }

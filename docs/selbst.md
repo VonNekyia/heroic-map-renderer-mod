@@ -77,8 +77,10 @@ Server, [0029](entscheidungen/0029-was-ein-server-zeigt-gilt-je-server.md).
 - **Was ein Server zeigt,** je Dimension (`Satz.fuer`):
   1. seine Wahl in `zeigt.txt` im Ordner der Welt, siehe
      [Download](download.md), „Ablage“;
-  2. ohne Wahl, mit Namen: der erste Download nach dem Namen, dann seine
-     eigene Karte; ohne Namen wie bis 0.2.68 die eigene vor dem Download.
+  2. ohne Wahl, mit Namen: der erste Download nach dem Namen, dann einer im
+     Ziel seines Zeigers, siehe [Download](download.md), „Ablage“, dann
+     seine eigene Karte; ohne Namen wie bis 0.2.68 die eigene vor dem
+     Download, dann der im Ziel.
 
   Die eigene Karte eines anderen Servers zeigt er nie, auch nicht mit einer
   Wahl. Gezeichnet wird nur in die eigene Karte dieses Servers, und nur,
@@ -99,6 +101,10 @@ Server, [0029](entscheidungen/0029-was-ein-server-zeigt-gilt-je-server.md).
   Drei Knöpfe wie beim Öffnen einer alten Welt in Vanilla. Ebenso fragt der
   Mod vor dem ersten vollen Download, wenn dieser Server seine eigene Karte
   zeigt, siehe [Download](download.md), „Ablage“.
+- **Die Zeile „Server“** im Fenster „Karten dieses Servers“ unter dem Titel:
+  grün „Server: build · erkannt“ mit Namen, gelb „wartet auf Antwort“, grau
+  „Server ohne Namen“ bei einem Plugin ohne `backend` oder „Server ohne
+  Heroic Map“; im Einzelspieler keine (`Auswahl.server`).
 - **Ruht die eigene Karte,** heisst der Knopf „Selbst · ruht · `<n>` px“;
   ein Klick zeigt sie wieder, der Download ruht dann (`Selbst.wiederAn`).
 - **Alte eigene Karten** ohne `server` gehören einem Server ohne Namen. Ein
