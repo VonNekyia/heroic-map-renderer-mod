@@ -30,8 +30,13 @@ final class EbenenCode {
     private static final int MAX_DIMENSION = 64;
     private static final Pattern DIMENSION = Pattern.compile("[a-z0-9_.-]+:[a-z0-9_./-]+");
 
-    /** Ein Wegpunkt im Code. */
-    record Ort(String dimension, int x, int z, int farbe) {
+    /** Ein Wegpunkt im Code; {@code name}, {@code schrift} und {@code minecraft} wie bei {@link Wegpunkte.Punkt}. */
+    record Ort(String dimension, int x, int z, int farbe, String name, double schrift, boolean minecraft) {
+
+        /** Ohne Namen, wie vor 0.2.69. */
+        Ort(String dimension, int x, int z, int farbe) {
+            this(dimension, x, z, farbe, null, 1, false);
+        }
     }
 
     /** Eine Form im Code; {@code hex}, {@code schrift} und {@code biegung} wie bei {@link Wegpunkte.EigeneForm}, {@code name} null ohne. */
@@ -63,6 +68,16 @@ final class EbenenCode {
                 q.addProperty("x", p.x());
                 q.addProperty("z", p.z());
                 q.addProperty("farbe", p.farbe());
+                // Wie an Formen nur ohne Vorgabe; ältere Versionen überlesen sie.
+                if (p.name() != null) {
+                    q.addProperty("name", p.name());
+                }
+                if (p.schrift() != 1) {
+                    q.addProperty("schrift", p.schrift());
+                }
+                if (p.minecraft()) {
+                    q.addProperty("schriftart", Wegpunkte.SCHRIFTART_MINECRAFT);
+                }
                 orte.add(q);
             }
         }
@@ -187,7 +202,8 @@ final class EbenenCode {
             List<Ort> orte = new ArrayList<>();
             for (JsonElement e : w) {
                 JsonObject q = e.getAsJsonObject();
-                orte.add(new Ort(dimension(q), koordinate(q.get("x")), koordinate(q.get("z")), index(q.get("farbe"))));
+                orte.add(new Ort(dimension(q), koordinate(q.get("x")), koordinate(q.get("z")), index(q.get("farbe")), name(q), schrift(q),
+                        minecraft(q)));
             }
             List<Form> formen = new ArrayList<>();
             for (JsonElement e : f) {
@@ -227,21 +243,6 @@ final class EbenenCode {
         } else {
             index = index(farbe);
         }
-        String name = null;
-        if (q.has("name") && !q.get("name").isJsonNull()) {
-            if (!q.get("name").isJsonPrimitive() || !q.get("name").getAsJsonPrimitive().isString()) {
-                throw new IllegalArgumentException("Name");
-            }
-            name = Wegpunkte.name(q.get("name").getAsString());
-        }
-        double schrift = 1;
-        if (q.has("schrift")) {
-            JsonElement s = q.get("schrift");
-            if (!s.isJsonPrimitive() || !s.getAsJsonPrimitive().isNumber() || !Wegpunkte.schriftGilt(s.getAsDouble())) {
-                throw new IllegalArgumentException("Schrift");
-            }
-            schrift = Wegpunkte.schrift(s.getAsDouble());
-        }
         int biegung = 0;
         if (q.has("biegung")) {
             int b = ganz(q.get("biegung"));
@@ -257,16 +258,42 @@ final class EbenenCode {
                 throw new IllegalArgumentException("Gewicht " + gewicht);
             }
         }
-        // Eine andere Schriftart, auch eine spätere, heisst die Kartenschrift; was kein Text ist, ist kaputt.
-        boolean minecraft = false;
-        if (q.has("schriftart")) {
-            JsonElement a = q.get("schriftart");
-            if (!a.isJsonPrimitive() || !a.getAsJsonPrimitive().isString()) {
-                throw new IllegalArgumentException("Schriftart");
-            }
-            minecraft = Wegpunkte.SCHRIFTART_MINECRAFT.equals(a.getAsString());
+        return new Form(dimension(q), gueltig, index, hex, name(q), schrift(q), biegung, gewicht, minecraft(q));
+    }
+
+    /** Der Name eines Wegpunkts oder einer Form, null ohne; was kein Text ist, ist kaputt. */
+    private static String name(JsonObject q) {
+        if (!q.has("name") || q.get("name").isJsonNull()) {
+            return null;
         }
-        return new Form(dimension(q), gueltig, index, hex, name, schrift, biegung, gewicht, minecraft);
+        if (!q.get("name").isJsonPrimitive() || !q.get("name").getAsJsonPrimitive().isString()) {
+            throw new IllegalArgumentException("Name");
+        }
+        return Wegpunkte.name(q.get("name").getAsString());
+    }
+
+    /** Die Schrift, ohne 1; ausserhalb der Rasten oder ohne Zahl kaputt. */
+    private static double schrift(JsonObject q) {
+        if (!q.has("schrift")) {
+            return 1;
+        }
+        JsonElement s = q.get("schrift");
+        if (!s.isJsonPrimitive() || !s.getAsJsonPrimitive().isNumber() || !Wegpunkte.schriftGilt(s.getAsDouble())) {
+            throw new IllegalArgumentException("Schrift");
+        }
+        return Wegpunkte.schrift(s.getAsDouble());
+    }
+
+    /** Die Schriftart: eine andere als „minecraft“, auch eine spätere, heisst die Kartenschrift; was kein Text ist, ist kaputt. */
+    private static boolean minecraft(JsonObject q) {
+        if (!q.has("schriftart")) {
+            return false;
+        }
+        JsonElement a = q.get("schriftart");
+        if (!a.isJsonPrimitive() || !a.getAsJsonPrimitive().isString()) {
+            throw new IllegalArgumentException("Schriftart");
+        }
+        return Wegpunkte.SCHRIFTART_MINECRAFT.equals(a.getAsString());
     }
 
     private static Gelesen fehler(String schluessel) {

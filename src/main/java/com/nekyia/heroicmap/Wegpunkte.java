@@ -58,12 +58,24 @@ final class Wegpunkte {
      * {@code tod} ein Todespunkt, ohne eigene Farbe; ihre Folge in der Liste ist die der Tode, der letzte der neueste. Siehe
      * docs/wegpunkte.md, „Todespunkt“. {@code bund} über 0 verbindet ihn mit den Ecken desselben Bunds, 0 heisst lose; siehe
      * docs/wegpunkte.md, „Verbinden“. {@code zeit} ist bei einem Todespunkt die Zeit des Todes in ms der Uhr, 0 unbekannt; siehe
-     * docs/wegpunkte.md, „Todespunkt“.
+     * docs/wegpunkte.md, „Todespunkt“. {@code name} wie aus {@link #name}, null ohne, mit {@code schrift} und {@code minecraft}
+     * wie an einer eigenen Form; siehe docs/wegpunkte.md, „Namen an Wegpunkten“.
      */
-    record Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet, boolean tod, int ebene, int bund, long zeit) {
+    record Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet, boolean tod, int ebene, int bund, long zeit,
+            String name, double schrift, boolean minecraft) {
 
         Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet, boolean tod, int ebene) {
             this(id, dimension, x, z, farbe, angeheftet, tod, ebene, 0, 0);
+        }
+
+        /** Ohne Namen, mit Schrift 1 in der Kartenschrift, wie vor 0.2.69. */
+        Punkt(int id, String dimension, int x, int z, int farbe, boolean angeheftet, boolean tod, int ebene, int bund, long zeit) {
+            this(id, dimension, x, z, farbe, angeheftet, tod, ebene, bund, zeit, null, 1, false);
+        }
+
+        /** Derselbe Wegpunkt mit Name, Schrift und Schriftart. */
+        Punkt stil(String name, double schrift, boolean minecraft) {
+            return new Punkt(id, dimension, x, z, farbe, angeheftet, tod, ebene, bund, zeit, name, schrift, minecraft);
         }
     }
 
@@ -282,6 +294,21 @@ final class Wegpunkte {
         }
     }
 
+    /** Der Name eines Eintrags; einer, der kein Text ist, fehlt, der Eintrag bleibt. */
+    private static String nameAus(JsonObject o) {
+        return o.has("name") && o.get("name").isJsonPrimitive() ? name(o.get("name").getAsString()) : null;
+    }
+
+    /** Die Schrift eines Eintrags; ausserhalb der Grenzen oder ohne Zahl die Vorgabe 1, der Eintrag bleibt. */
+    private static double schriftAus(JsonObject o) {
+        return o.get("schrift") instanceof JsonPrimitive s && s.isNumber() && schriftGilt(s.getAsDouble()) ? schrift(s.getAsDouble()) : 1;
+    }
+
+    /** Die Schriftart eines Eintrags; eine andere als „minecraft“, auch eine spätere, heisst die Kartenschrift. */
+    private static boolean minecraftAus(JsonObject o) {
+        return o.get("schriftart") instanceof JsonPrimitive a && a.isString() && SCHRIFTART_MINECRAFT.equals(a.getAsString());
+    }
+
     void lies(JsonObject json) {
         stand++;
         ebenenStand++;
@@ -308,7 +335,7 @@ final class Wegpunkte {
                 int id = o.has("id") ? o.get("id").getAsInt() : 0;
                 Punkt p = new Punkt(id, o.get("dimension").getAsString(), o.get("x").getAsInt(), o.get("z").getAsInt(),
                         Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length), o.get("minimap").getAsBoolean(), false, ebeneAus(o),
-                        bund(o.get("bund")), 0);
+                        bund(o.get("bund")), 0).stil(nameAus(o), schriftAus(o), minecraftAus(o));
                 if (finde(p.dimension(), p.x(), p.z()) < 0) {
                     punkte.add(p);
                 }
@@ -391,17 +418,14 @@ final class Wegpunkte {
                 }
                 List<Ecke> gueltig = gueltig(ecken);
                 if (dimension != null && gueltig != null && eigene.size() < MAX_EIGENE_FORMEN) {
-                    // Ein Name, der kein Text ist, fehlt; die Form bleibt.
-                    String name = o.has("name") && o.get("name").isJsonPrimitive() ? name(o.get("name").getAsString()) : null;
+                    String name = nameAus(o);
                     int hex = o.has("hex") && o.get("hex").isJsonPrimitive() ? hex(o.get("hex").getAsString()) : KEIN_HEX;
-                    // Schrift und Biegung ausserhalb der Grenzen oder ohne Zahl: die Vorgabe; die Form bleibt.
-                    double schrift = o.get("schrift") instanceof JsonPrimitive s && s.isNumber() && schriftGilt(s.getAsDouble())
-                            ? schrift(s.getAsDouble()) : 1;
+                    double schrift = schriftAus(o);
+                    // Biegung ausserhalb der Grenzen oder ohne Zahl: die Vorgabe; die Form bleibt.
                     int biegung = o.get("biegung") instanceof JsonPrimitive b && b.isNumber() && Math.abs(b.getAsDouble()) <= MAX_BIEGUNG
                             ? biegung(b.getAsDouble()) : 0;
                     int gewicht = o.get("gewicht") instanceof JsonPrimitive g && g.isNumber() && gewichtGilt(g.getAsDouble()) ? g.getAsInt() : 0;
-                    // Eine andere Schriftart als „minecraft“, auch eine spätere, heisst die Kartenschrift.
-                    boolean minecraft = o.get("schriftart") instanceof JsonPrimitive a && a.isString() && SCHRIFTART_MINECRAFT.equals(a.getAsString());
+                    boolean minecraft = minecraftAus(o);
                     eigene.add(new EigeneForm(dimension, gueltig, Math.floorMod(o.get("farbe").getAsInt(), FARBEN.length),
                             o.get("minimap").getAsBoolean() && angeheftet() < MAX_ANGEHEFTET, name, hex, ebeneAus(o), schrift, biegung, gewicht,
                             minecraft));
@@ -491,6 +515,16 @@ final class Wegpunkte {
             o.addProperty("ebene", p.ebene());
             if (p.bund() != 0) {
                 o.addProperty("bund", p.bund());
+            }
+            // Nur ohne Vorgabe, wie an Formen; ältere Versionen überlesen die Felder.
+            if (p.name() != null) {
+                o.addProperty("name", p.name());
+            }
+            if (p.schrift() != 1) {
+                o.addProperty("schrift", p.schrift());
+            }
+            if (p.minecraft()) {
+                o.addProperty("schriftart", SCHRIFTART_MINECRAFT);
             }
             liste.add(o);
         }
@@ -717,7 +751,8 @@ final class Wegpunkte {
         int n = 0;
         for (EbenenCode.Ort o : inhalt.orte()) {
             if (finde(o.dimension(), o.x(), o.z()) < 0) {
-                punkte.add(new Punkt(naechsteId++, o.dimension(), o.x(), o.z(), o.farbe(), false, false, id));
+                punkte.add(new Punkt(naechsteId++, o.dimension(), o.x(), o.z(), o.farbe(), false, false, id).stil(o.name(), o.schrift(),
+                        o.minecraft()));
                 n++;
             }
         }
@@ -775,7 +810,8 @@ final class Wegpunkte {
     }
 
     private static Punkt mitEbene(Punkt p, int ebene) {
-        return new Punkt(p.id(), p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), ebene, p.bund(), p.zeit());
+        return new Punkt(p.id(), p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), ebene, p.bund(), p.zeit())
+                .stil(p.name(), p.schrift(), p.minecraft());
     }
 
     private static Region mitEbene(Region r, int ebene) {
@@ -1061,7 +1097,8 @@ final class Wegpunkte {
                 if (dort != null && !dort.equals(p)) {
                     return false;
                 }
-                punkte.set(i, new Punkt(p.id(), p.dimension(), p.x() + dx, p.z() + dz, p.farbe(), p.angeheftet(), p.tod(), p.ebene(), b, p.zeit()));
+                punkte.set(i, new Punkt(p.id(), p.dimension(), p.x() + dx, p.z() + dz, p.farbe(), p.angeheftet(), p.tod(), p.ebene(), b, p.zeit())
+                        .stil(p.name(), p.schrift(), p.minecraft()));
             }
         }
         for (int i = 0; i < eigene.size(); i++) {
@@ -1246,7 +1283,8 @@ final class Wegpunkte {
     }
 
     private static Punkt mitBund(Punkt p, int b) {
-        return new Punkt(p.id(), p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), p.ebene(), b, p.zeit());
+        return new Punkt(p.id(), p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), p.ebene(), b, p.zeit())
+                .stil(p.name(), p.schrift(), p.minecraft());
     }
 
     private int neuerBund() {
@@ -1381,6 +1419,30 @@ final class Wegpunkte {
         return neu;
     }
 
+    /** Gibt dem Wegpunkt {@code p} den Namen {@code name} wie {@link #benenne(EigeneForm, String)}; ein Todespunkt bleibt ohne. */
+    void benenne(Punkt p, String name) {
+        int i = punkte.indexOf(p);
+        if (i >= 0 && !p.tod()) {
+            punkte.set(i, p.stil(name(name), p.schrift(), p.minecraft()));
+            schreibe();
+        }
+    }
+
+    /**
+     * Gibt dem Wegpunkt {@code p} Schrift und Schriftart, nur im Speicher wie {@link #stil(EigeneForm, double, int, int)};
+     * gespeichert wird mit dem Namen. Gibt den Wegpunkt zurück, wie er danach ist, ohne Fund {@code p}.
+     */
+    Punkt stil(Punkt p, double schrift, boolean minecraft) {
+        int i = punkte.indexOf(p);
+        if (i < 0) {
+            return p;
+        }
+        Punkt neu = p.stil(p.name(), schrift, minecraft);
+        punkte.set(i, neu);
+        stand++;
+        return neu;
+    }
+
     /** Ist {@code g} ein Gewicht: eine ganze Zahl von −{@link #MAX_GEWICHT} bis {@link #MAX_GEWICHT}? */
     static boolean gewichtGilt(double g) {
         return g == Math.rint(g) && Math.abs(g) <= MAX_GEWICHT;
@@ -1503,7 +1565,7 @@ final class Wegpunkte {
             Punkt p = punkte.get(i);
             if (p.id() <= 0 || !gesehen.add(p.id())) {
                 punkte.set(i, new Punkt(naechsteId++, p.dimension(), p.x(), p.z(), p.farbe(), p.angeheftet(), p.tod(), p.ebene(), p.bund(),
-                        p.zeit()));
+                        p.zeit()).stil(p.name(), p.schrift(), p.minecraft()));
             }
         }
     }
@@ -1527,7 +1589,8 @@ final class Wegpunkte {
                 return false;
             }
         } else {
-            punkte.set(i, new Punkt(alt.id(), alt.dimension(), x, z, alt.farbe(), alt.angeheftet(), alt.tod(), alt.ebene(), 0, alt.zeit()));
+            punkte.set(i, new Punkt(alt.id(), alt.dimension(), x, z, alt.farbe(), alt.angeheftet(), alt.tod(), alt.ebene(), 0, alt.zeit())
+                    .stil(alt.name(), alt.schrift(), alt.minecraft()));
         }
         schreibe();
         return true;
@@ -1539,7 +1602,7 @@ final class Wegpunkte {
         if (i >= 0) {
             Punkt alt = punkte.get(i);
             punkte.set(i, new Punkt(alt.id(), alt.dimension(), alt.x(), alt.z(), alt.farbe(), !alt.angeheftet(), alt.tod(), alt.ebene(), alt.bund(),
-                    alt.zeit()));
+                    alt.zeit()).stil(alt.name(), alt.schrift(), alt.minecraft()));
             schreibe();
         }
     }

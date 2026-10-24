@@ -43,6 +43,7 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.data.AtlasIds;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.util.Util;
 import net.minecraft.world.level.ChunkPos;
@@ -1270,7 +1271,8 @@ public final class Minimap {
                 float[] m = marke(r, n.x(), n.z(), links, oben, k, zoom, rund, r.seite() / 2.0 - baender, false, lage);
                 if (m != null) {
                     float d = n instanceof Ebenen.Banner ? deckung(Math.hypot(n.x() - sx, n.z() - sz)) : 1;
-                    Ebenen.zeichne(g, font, m[0], m[1], n, namen, k, d);
+                    // Die Länge eines Blocks in Einheiten des GUI ist hier der Zoom.
+                    Ebenen.zeichne(g, font, m[0], m[1], n, namen, k, d, zoom);
                 }
             }
         }
@@ -1287,15 +1289,24 @@ public final class Minimap {
         return (float) (NAH_DECKUNG + (1 - NAH_DECKUNG) * t);
     }
 
-    /** Die angehefteten Wegpunkte dieser Dimension, ausserhalb der Form an ihrem Rand. Siehe docs/wegpunkte.md. */
+    /**
+     * Die angehefteten Wegpunkte dieser Dimension, ausserhalb der Form an ihrem Rand; ihre Namen nur an denen, die nicht am Rand
+     * klemmen, im Quadrat der Minimap. Siehe docs/wegpunkte.md, „Namen an Wegpunkten“.
+     */
     private void wegpunkte(GuiGraphicsExtractor g, Rahmen r, String dimension, int links, int oben, int k, float kopf, Drehung.Lage lage) {
         double innen = r.seite() / 2.0 - kopf / 2 - 1;
+        Font font = Minecraft.getInstance().font;
+        g.enableScissor(r.x(), r.y(), r.x() + r.seite(), r.y() + r.seite());
         for (Wegpunkte.Punkt p : Wegpunkte.INSTANZ.punkte()) {
             if (p.angeheftet() && p.dimension().equals(dimension) && Wegpunkte.INSTANZ.sichtbar(p)) {
                 float[] m = marke(r, p.x() + 0.5, p.z() + 0.5, links, oben, k, zoom, rund, innen, true, lage);
                 wegpunkt(g, m[0], m[1], kopf, p, 0);
+                if (p.name() != null && marke(r, p.x() + 0.5, p.z() + 0.5, links, oben, k, zoom, rund, innen, false, lage) != null) {
+                    wegpunktName(g, font, m[0], m[1], kopf, p, zoom);
+                }
             }
         }
+        g.disableScissor();
     }
 
     /**
@@ -1905,6 +1916,25 @@ public final class Minimap {
 
     static void wegpunkt(GuiGraphicsExtractor g, float x, float y, float groesse, int farbe, int hervor) {
         wegpunkt(g, x, y, groesse, farbe, hervor, false);
+    }
+
+    /**
+     * Der Name des Wegpunkts {@code p} mittig unter seiner Raute mit der Mitte bei (x, y), {@code groesse} gross, in seiner Farbe
+     * mit dunkler Kontur, in seiner Schrift; auf einer Karte mit {@code block} Einheiten je Block weit draussen kleiner und
+     * zuletzt aus wie die Namen der Nadeln ({@link Ebenen#nameFaktor}). Siehe docs/wegpunkte.md, „Namen an Wegpunkten“.
+     */
+    static void wegpunktName(GuiGraphicsExtractor g, Font font, float x, float y, float groesse, Wegpunkte.Punkt p, double block) {
+        double faktor = p.schrift() * Ebenen.nameFaktor(block);
+        float sicht = Ebenen.nameDeckung(Ebenen.NAME_GROESSE * faktor);
+        if (p.name() == null || sicht <= 0) {
+            return;
+        }
+        g.pose().pushMatrix();
+        // Der Fuss ist die untere Spitze der Raute, ihre halbe Diagonale unter der Mitte.
+        g.pose().translate(x, y + (float) (6 * Math.sqrt(2) * groesse / 16));
+        Ebenen.name(g, font, p.name(), p.minecraft(), faktor, ARGB.multiplyAlpha(Wegpunkte.FARBEN[p.farbe()], sicht),
+                ARGB.multiplyAlpha(Ebenen.SCHRIFTFARBE, sicht));
+        g.pose().popMatrix();
     }
 
     /** Ein Todespunkt ohne Wegpunkt dahinter, etwa im Untermenü. */

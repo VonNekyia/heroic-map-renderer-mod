@@ -113,6 +113,32 @@ class EbenenCodeTest {
         assertTrue(andere.eigeneFormen().getFirst().minecraft());
     }
 
+    /** Namen an Wegpunkten im Code: hin und zurück, eingefügt am Wegpunkt; ein falscher Wert ist kaputt. Siehe docs/wegpunkte.md. */
+    @Test
+    void namenAnWegpunktenImCode() {
+        Wegpunkte w = new Wegpunkte();
+        w.lies((Path) null);
+        w.setze(WELT, 1, 2);
+        w.setze(WELT, 3, 4);
+        w.benenne(w.stil(w.punkte().get(0), 3, true), "Hafen");
+        String code = EbenenCode.schreibe(w, Wegpunkte.BASE);
+        List<EbenenCode.Ort> orte = EbenenCode.lies(code).inhalt().orte();
+        assertEquals(new EbenenCode.Ort(WELT, 1, 2, w.punkte().get(0).farbe(), "Hafen", 3, true), orte.get(0));
+        assertEquals(new EbenenCode.Ort(WELT, 3, 4, w.punkte().get(1).farbe()), orte.get(1));
+        Wegpunkte andere = new Wegpunkte();
+        andere.lies((Path) null);
+        andere.fuegeEin(EbenenCode.lies(code).inhalt());
+        Wegpunkte.Punkt p = andere.punkte().getFirst();
+        assertEquals("Hafen", p.name());
+        assertEquals(3, p.schrift());
+        assertTrue(p.minecraft());
+        String gut = "{\"v\":1,\"name\":\"N\",\"wegpunkte\":[{\"dimension\":\"a:b\",\"x\":0,\"z\":0,\"farbe\":0";
+        assertEquals("kaputt", EbenenCode.lies(EbenenCode.packe(gut + ",\"name\":7}]}")).fehler());
+        assertEquals("kaputt", EbenenCode.lies(EbenenCode.packe(gut + ",\"schrift\":9}]}")).fehler());
+        assertEquals("kaputt", EbenenCode.lies(EbenenCode.packe(gut + ",\"schriftart\":7}]}")).fehler());
+        assertEquals("Mine", EbenenCode.lies(EbenenCode.packe(gut + ",\"name\":\" Mine \"}]}")).inhalt().orte().getFirst().name());
+    }
+
     @Test
     void gleicherNameBekommtEineZahlUndBelegteBloeckeBleiben() {
         Wegpunkte w = new Wegpunkte();

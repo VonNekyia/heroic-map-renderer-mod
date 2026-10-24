@@ -154,6 +154,8 @@ final class Karte extends Screen {
     /** Unter dem Farbfeld einer Form der Regler „Gewicht“, sonst null. Siehe docs/wegpunkte.md, „Gewicht“. */
     private Raster gewichtRegler;
     private Wegpunkte.EigeneForm stilForm, stilVorher;
+    /** Ebenso der Wegpunkt, dessen Namen das Feld gerade bearbeitet, und wie er vorher war. */
+    private Wegpunkte.Punkt stilPunkt, stilPunktVorher;
     /** So breit ist das Eingabefeld, in Einheiten des GUI. */
     private static final int EINGABE_BREITE = 160;
     /** Ein Regler unter dem Namensfeld samt Abstand, in Einheiten des GUI. */
@@ -986,6 +988,11 @@ final class Karte extends Screen {
                 if (p.tod() && p.zeit() > 0) {
                     todZeit(g, m, p);
                 }
+                // Der Name nur an einer Marke, die nicht am Rand klemmt. Siehe docs/wegpunkte.md, „Namen an Wegpunkten“.
+                float[] s = zug != null ? null : schirm(p.x() + 0.5, p.z() + 0.5);
+                if (p.name() != null && (zug != null || Math.abs(s[0] - m.x()) <= 1 && Math.abs(s[1] - m.y()) <= 1)) {
+                    Minimap.wegpunktName(g, font, m.x(), m.y(), Minimap.KOPF, p, blick.chunkAbstand(satz.scale()) / 16);
+                }
             }
         }
         // Mitspieler mit Namen. Siehe docs/minimap.md, „Mitspieler“.
@@ -1011,6 +1018,7 @@ final class Karte extends Screen {
     private void nadeln(GuiGraphicsExtractor g, String dimension, int bunt) {
         int k = minecraft.getWindow().getGuiScale();
         int[] namen = {Ebenen.MAX_NAMEN};
+        double block = blick.chunkAbstand(satz.scale()) / 16;
         for (Ebenen.Eintrag e : Ebenen.INSTANZ.sichtbar()) {
             for (Ebenen.Ort n : Ebenen.INSTANZ.nadeln(e.id())) {
                 double x = blick.rasterX(Projektion.zuPixel(n.x(), satz.scale()), width);
@@ -1023,7 +1031,7 @@ final class Karte extends Screen {
                 float[] r = Ebenen.kastenOhneHolen(font, n);
                 if (x + r[2] > 0 && x + r[0] < width && y + r[3] > 0 && y + r[1] < height) {
                     float px = aufPixel(x, k), py = aufPixel(y, k);
-                    Ebenen.zeichne(g, font, px, py, n, namen, k, 1);
+                    Ebenen.zeichne(g, font, px, py, n, namen, k, 1, block);
                     if (Wegpunkte.INSTANZ.angeheftet(Ebenen.INSTANZ, n)) {
                         // Zwischen Fuss und Name, der erst NAME_OBEN darunter beginnt; unter einem Kopf zwischen Gesicht und Name.
                         g.pose().pushMatrix();
@@ -2022,7 +2030,7 @@ final class Karte extends Screen {
                 if (!drin(Ebenen.kastenOhneHolen(font, o), x, y, mx, my)) {
                     continue;
                 }
-                float[] m = Ebenen.kasten(font, o, gs);
+                float[] m = Ebenen.kasten(font, o, gs, blick.chunkAbstand(scale) / 16);
                 if (m != null && drin(m, x, y, mx, my)) {
                     // Die version der gezeichneten Daten, nicht die der Liste; die kann schon neuer sein.
                     treffer = Tafeln.ziel(e.id(), o);
@@ -2229,6 +2237,31 @@ final class Karte extends Screen {
         reglerStand();
     }
 
+    /**
+     * Das Feld für den Namen des Wegpunkts {@code p}, darunter „Schrift“ und „Schriftart“ wie an einer Form, ohne „Biegung“: Ein
+     * Punkt hat keinen Bogen. Enter speichert, Esc und ein Klick daneben nehmen alles zurück. Siehe docs/wegpunkte.md,
+     * „Namen an Wegpunkten“.
+     */
+    private void benennen(Wegpunkte.Punkt p) {
+        stilPunkt = p;
+        stilPunktVorher = p;
+        oeffne(p.name() == null ? "" : p.name(), Wegpunkte.MAX_NAME, "heroicmap.karte.name_hinweis", t -> {
+            Wegpunkte.INSTANZ.benenne(stilPunkt, t);
+            stilPunktVorher = null;
+            return true;
+        });
+        eingabe.setY(Math.max(0, Math.min(eingabe.getY(), height - 20 - 2 * REGLER_ZEILE)));
+        int x = eingabe.getX(), y = eingabe.getY() + REGLER_ZEILE, b = eingabe.getWidth();
+        schriftRegler = addRenderableWidget(new Raster(x, y, b, Wegpunkte.SCHRIFTEN.length, raste(p.schrift()),
+                i -> Component.translatable("heroicmap.karte.schrift", SCHRIFT_TEXTE[i]),
+                i -> stilPunkt = Wegpunkte.INSTANZ.stil(stilPunkt, Wegpunkte.SCHRIFTEN[i], stilPunkt.minecraft())));
+        schriftartKnopf = addRenderableWidget(CycleButton.booleanBuilder(Component.translatable("heroicmap.karte.schriftart_minecraft"),
+                Component.translatable("heroicmap.karte.schriftart_karte"), p.minecraft()).create(x, y + REGLER_ZEILE, b, 20,
+                Component.translatable("heroicmap.karte.schriftart"),
+                (knopf, mc) -> stilPunkt = Wegpunkte.INSTANZ.stil(stilPunkt, stilPunkt.schrift(), mc)));
+        reglerStand();
+    }
+
     /** Liegt (x, y) auf {@code w}, auch wenn es grau ist? {@code isMouseOver} zählt nur, was an ist. */
     private static boolean auf(AbstractWidget w, double x, double y) {
         return w != null && x >= w.getX() && x < w.getX() + w.getWidth() && y >= w.getY() && y < w.getY() + w.getHeight();
@@ -2288,14 +2321,19 @@ final class Karte extends Screen {
         }
     }
 
-    /** Nicht gespeichert: Schrift, Biegung, Gewicht und Schriftart der Form wieder, wie sie vorher waren. */
+    /** Nicht gespeichert: Schrift, Biegung, Gewicht und Schriftart der Form oder des Wegpunkts wieder, wie sie vorher waren. */
     private void stilZurueck() {
         if (stilVorher != null && stilForm != null) {
             Wegpunkte.INSTANZ.schriftart(Wegpunkte.INSTANZ.stil(stilForm, stilVorher.schrift(), stilVorher.biegung(), stilVorher.gewicht()),
                     stilVorher.minecraft());
         }
+        if (stilPunktVorher != null && stilPunkt != null) {
+            Wegpunkte.INSTANZ.stil(stilPunkt, stilPunktVorher.schrift(), stilPunktVorher.minecraft());
+        }
         stilForm = null;
         stilVorher = null;
+        stilPunkt = null;
+        stilPunktVorher = null;
     }
 
     /** Ein Regler mit {@code anzahl} Rasten; {@code text} beschriftet die Raste, {@code setze} wirkt, sobald eine andere erreicht ist. */
@@ -2409,6 +2447,8 @@ final class Karte extends Screen {
                 return false;
             })));
             verbinden(Wegpunkte.Glied.von(punkt), schirm(punkt.x() + 0.5, punkt.z() + 0.5), neu);
+            neu.add(new Eintrag(Component.translatable(punkt.name() == null ? "heroicmap.karte.name" : "heroicmap.karte.name_aendern"),
+                    () -> benennen(punkt)));
             int[] k = menueKante;
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.form_von_hier"), () -> beginne(k[0], k[1])));
             neu.add(new Eintrag(Component.translatable("heroicmap.karte.ebene"), () -> ebenenWahl(punkt.ebene(), id -> Wegpunkte.INSTANZ.ordne(punkt, id))));

@@ -886,7 +886,7 @@ public final class Bilder implements FabricClientGameTest {
         }
         // Der Kasten: mit Kopf das Gesicht samt Rand um den Fuss, ohne Kopf das Schild in medium, 23 hoch über dem Fuss.
         float[][] kaesten = context.computeOnClient(mc -> Ebenen.INSTANZ.nadeln("test:koepfe").stream()
-                .map(o -> Ebenen.kasten(mc.font, o, gs)).toArray(float[][]::new));
+                .map(o -> Ebenen.kasten(mc.font, o, gs, 1)).toArray(float[][]::new));
         if (kaesten.length != 2 || kaesten[0][1] != -Ebenen.KOPF_HALB || kaesten[1][1] != -23) {
             throw new AssertionError("Kästen der Köpfe: " + Arrays.deepToString(kaesten));
         }
