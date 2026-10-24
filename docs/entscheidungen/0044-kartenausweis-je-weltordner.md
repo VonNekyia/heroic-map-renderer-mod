@@ -15,8 +15,8 @@ code:
 ## Anlass
 
 Der User will ein lückenloses Konzept dafür, zu welchem Server und welcher
-Welt eine Karte gehört: auf TerraNova, auf grossen Netzwerken ohne Plugin,
-mit mehreren Welten und mit Resets. Das Konzept „Kartenausweis“ des
+Welt eine Karte gehört: auf Servern mit unserem Plugin, auf grossen
+Netzwerken ohne Plugin, mit mehreren Welten und mit Resets. Das Konzept „Kartenausweis“ des
 Reviewers nennt sechs Teile: Netz, Server, Welt, Seed-Hash, Generation und
 Inhalt. Heute steckt die ID nur im Pfad. Der Reviewer hat die Bausteine
 freigegeben, in der Reihenfolge B1 → B4 → B3 → B5 → B6; dies ist B1.
