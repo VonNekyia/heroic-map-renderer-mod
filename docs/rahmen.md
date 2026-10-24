@@ -165,7 +165,7 @@ Kategorie gewählt ist. So hat es der User gewünscht, als Vorgabe.
   Kategorie rechnet sie nur neu, wenn sich das Biom ändert. Während der
   Überblendung zeichnet sie zwei Rahmen, siehe „Kosten“.
 
-![Der Rahmen „biom“ eckig und rund in der Szene des Gametests, einer Ebene, also Grasland; die Blumen O, S und W zeigen nach aussen und sitzen innen an der Kante](bilder/rahmen-biom.png)
+![Der Rahmen „biom“ eckig und rund in der Szene des Gametests, einer Ebene, also Grasland; die Blumen O, S und W stehen aussen auf dem Rand, die Blüte nach aussen, N auf den Bändern](bilder/rahmen-biom.png)
 
 ## Dateien
 
@@ -608,6 +608,6 @@ alten Namen.
 
 ![Der Rahmen „schild“ in „grau“](bilder/rahmen-schild.png)
 
-![Der Rahmen „lettern“ in „tinte“, innen](bilder/rahmen-lettern.png)
+![Der Rahmen „lettern“ in „tinte“, innen, der Kopf der Buchstaben nach aussen](bilder/rahmen-lettern.png)
 
-![Der Rahmen „lettern“ in „tinte“, aussen](bilder/rahmen-lettern-aussen.png)
+![Der Rahmen „lettern“ in „tinte“, aussen, der Kopf der Buchstaben nach aussen](bilder/rahmen-lettern-aussen.png)
