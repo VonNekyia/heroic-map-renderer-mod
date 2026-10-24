@@ -488,6 +488,34 @@ class MinimapTest {
     }
 
     @Test
+    void biomAutomatischOderFest(@TempDir Path ordner) throws Exception {
+        // „biom“ ist automatisch, auch aus einer Datei ohne den Schlüssel; eine feste Kategorie bleibt fest. Siehe docs/rahmen.md, „Biom“.
+        Path datei = ordner.resolve("heroicmap.properties");
+        Files.writeString(datei, "rahmen_wahl=biom\n");
+        Minimap m = new Minimap();
+        m.lies(datei);
+        assertNull(m.biomFest());
+        assertEquals(Biom.GRASLAND, m.kategorie(), "automatisch, vor dem ersten Biom Grasland");
+        m.setzeBiomFest("schnee");
+        assertEquals("schnee", m.kategorie());
+        assertEquals(Biom.GRASLAND, m.kategorieAutomatisch(), "das Biom unter dem Spieler zählt weiter");
+        m.schreibe(datei);
+        assertTrue(Files.readString(datei).contains("rahmen_biom=schnee"));
+        Minimap gelesen = new Minimap();
+        gelesen.lies(datei);
+        assertEquals("schnee", gelesen.biomFest());
+        gelesen.setzeBiomFest(null);
+        gelesen.schreibe(datei);
+        assertTrue(Files.readString(datei).contains("rahmen_biom=auto"));
+        gelesen.lies(datei);
+        assertNull(gelesen.biomFest());
+        // Eine unbekannte Kategorie ist automatisch.
+        Files.writeString(datei, "rahmen_biom=quatsch\n");
+        gelesen.lies(datei);
+        assertNull(gelesen.biomFest());
+    }
+
+    @Test
     void rahmenNurGewaehltGespeichert(@TempDir Path ordner) throws Exception {
         Path datei = ordner.resolve("heroicmap.properties");
         Minimap m = new Minimap();

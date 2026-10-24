@@ -45,6 +45,9 @@ bekommt keinen Rahmen. Warum so:
 - **Die Variante** je Familie als `rahmen_variante.<familie>`, bei „biom“
   je Kategorie `rahmen_variante.biom/<kategorie>`; ohne Eintrag gilt die
   erste aus `varianten.txt` (`Minimap.variante`).
+- **„biom“ automatisch oder fest** als `rahmen_biom`, `auto` oder eine
+  Kategorie; ohne Eintrag oder mit einem unbekannten Wert automatisch
+  (`Minimap.biomFest`), siehe „Biom“.
 - **Umzug aus 0.2.68 und älter** (`Skin.ALT`): `rahmen_wahl` oder ein
   altes `rahmen` mit einem Skin von vorher wird Familie und Variante:
 
@@ -87,7 +90,8 @@ die der alten Skins, unverändert; die Recolors und `lettern` sind neu.
 
 Der Rahmen `biom` zeigt eine von acht Familien, je nach dem Biom unter dem
 Spieler (`Biom`, `Minimap.skinJetzt`), in der Variante, die für diese
-Kategorie gewählt ist. So hat es der User gewünscht, als Vorgabe.
+Kategorie gewählt ist. So hat es der User gewünscht, als Vorgabe. Fest auf
+eine Kategorie geht auch, siehe unten.
 
 - **Kategorien:** `waelder`, `grasland`, `gebirge`, `schnee`, `wueste`,
   `tropen`, `feuchtgebiete`, `gewaesser`; je eine Familie
@@ -103,9 +107,16 @@ Kategorie gewählt ist. So hat es der User gewünscht, als Vorgabe.
   | `tropen` | `standard`, `regenwald` |
   | `waelder` | `standard`, `herbst`, `kirschhain` |
   | `wueste` | `standard`, `rotfels` |
-- **Je Kategorie gewählt:** Im Wähler stellt „&lt; Kategorie &gt;“ unter der
-  Vorschau ein, welche Kategorie die Farbfelder meinen; so lässt sich jede
-  einstellen, ohne hinzulaufen. Er öffnet mit der, die gerade gezeigt ist.
+- **Automatisch oder fest** (`Minimap.biomFest`,
+  [0048](entscheidungen/0048-biom-automatisch-oder-fest.md)): Im Wähler
+  wählt „&lt; Automatisch &gt;“ unter der Vorschau, der erste Eintrag und
+  die Vorgabe, den Rahmen nach dem Biom; die Pfeile führen weiter durch die
+  acht Kategorien. Eine Kategorie dort, mit dem Klick auf die Vorschau
+  übernommen, bleibt fest, wo der Spieler auch steht; dann blendet der
+  Rahmen nicht über. Der Wähler öffnet mit der Wahl von jetzt.
+- **Je Kategorie gewählt:** Die Farbfelder meinen die Kategorie in der
+  Reihe darunter, bei „Automatisch“ die unter dem Spieler, die ein Tooltip
+  nennt; so lässt sich jede einstellen, ohne hinzulaufen.
 - **Zuordnung** in fester Rangfolge, die erste passende Zeile gewinnt
   (`Biom.kategorie`). Je Zeile Tags der Biome und Biome des Spiels mit
   Namen:
@@ -501,8 +512,9 @@ schalten, siehe [0032](entscheidungen/0032-rahmen-familien-und-waehler.md).
   nennt die Variante. Ein Klick färbt nur die Vorschau um.
 - **`lettern`** dazu „innen | aussen“: wählt in derselben Farbe die
   Variante mit dieser Lage.
-- **`biom`** dazu „&lt; Kategorie &gt;“: wechselt die Kategorie, deren Rahmen
-  die Vorschau zeigt und deren Variante die Felder stellen.
+- **`biom`** dazu „&lt; Automatisch &gt;“ und „&lt; Kategorie &gt;“: wählt
+  automatisch oder eine feste Kategorie, siehe „Biom“; die Vorschau zeigt
+  deren Rahmen, die Felder stellen deren Variante.
 - **Übernehmen:** Ein Klick auf eine Vorschau setzt Familie und Variante
   und schliesst; gespeichert wird beim Schliessen des Menüs wie sonst.
 - **Schliessen ohne Änderung:** Esc oder ein Klick neben die Tafel. Esc

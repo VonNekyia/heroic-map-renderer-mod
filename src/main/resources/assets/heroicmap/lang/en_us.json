@@ -295,6 +295,8 @@
   "heroicmap.waehler.titel": "Frame – click a preview to use it, a colour to recolour it, Esc closes",
   "heroicmap.waehler.innen": "inside",
   "heroicmap.waehler.aussen": "outside",
+  "heroicmap.waehler.automatisch": "Automatic",
+  "heroicmap.waehler.automatisch.beschreibung": "Follows the biome you stand in; now: %s",
   "heroicmap.menue.mitte": "Middle mouse button: pixel, HD or see-through (now: %s)",
   "heroicmap.menue.mitte.pixel": "pixel",
   "heroicmap.menue.mitte.hd": "HD",

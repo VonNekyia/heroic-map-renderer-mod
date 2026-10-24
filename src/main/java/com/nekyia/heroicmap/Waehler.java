@@ -15,7 +15,8 @@ import net.minecraft.resources.Identifier;
  * Der Wähler der Rahmen, über dem Menü: je Familie eine kleine Minimap mit ihrem Rahmen auf einer festen Beispielkarte, darunter
  * ein Farbfeld je Ordner ihrer Varianten. Ein Klick auf ein Feld färbt nur die Vorschau; ein Klick auf eine Vorschau übernimmt
  * Familie und Variante und schliesst; Esc oder ein Klick daneben schliesst ohne Änderung. Bei „lettern“ wählt „innen | aussen“
- * die Lage, bei „biom“ „&lt; Kategorie &gt;“ die Kategorie, deren Variante die Felder stellen. Siehe docs/rahmen.md, „Wähler“.
+ * die Lage, bei „biom“ „&lt; Kategorie &gt;“ „Automatisch“ oder eine feste Kategorie; deren Variante stellen die Felder, bei
+ * „Automatisch“ die der Kategorie unter dem Spieler. Siehe docs/rahmen.md, „Wähler“.
  */
 final class Waehler {
 
@@ -28,7 +29,7 @@ final class Waehler {
     private boolean offen;
     /** Je Familie, bei „biom“ je Kategorie, die Variante in der Vorschau. */
     private final Map<String, String> vorschau = new HashMap<>();
-    /** Die Kategorie von „biom“ in der Vorschau. */
+    /** Die Kategorie von „biom“ in der Vorschau: 0 automatisch, sonst 1 + ihr Index in {@link Biom#KATEGORIEN}. */
     private int kategorie;
     private int x0, y0;
 
@@ -36,7 +37,7 @@ final class Waehler {
         return offen;
     }
 
-    /** Öffnet mit den gewählten Varianten in der Vorschau und der Kategorie, die „biom“ gerade zeigt. */
+    /** Öffnet mit den gewählten Varianten in der Vorschau und der Wahl von „biom“: automatisch oder die feste Kategorie. */
     void oeffne() {
         Minimap m = Minimap.INSTANZ;
         vorschau.clear();
@@ -46,7 +47,7 @@ final class Waehler {
                 vorschau.put(f, v.name());
             }
         }
-        kategorie = Math.max(0, Biom.KATEGORIEN.indexOf(m.kategorie()));
+        kategorie = Biom.KATEGORIEN.indexOf(m.biomFest()) + 1;
         offen = true;
     }
 
@@ -54,10 +55,21 @@ final class Waehler {
         offen = false;
     }
 
-    /** Die Familie der Karte j, bei „biom“ die der Kategorie in der Vorschau. */
+    /** Die Familie der Karte j, bei „biom“ die der Kategorie in der Vorschau, bei „Automatisch“ die unter dem Spieler. */
     private String familie(int j) {
         String f = Skin.FAMILIEN.get(j);
-        return Skin.BIOM.equals(f) ? Biom.ORDNER.get(Biom.KATEGORIEN.get(kategorie)) : f;
+        return Skin.BIOM.equals(f) ? Biom.ORDNER.get(kategorie == 0 ? Minimap.INSTANZ.kategorieAutomatisch() : Biom.KATEGORIEN.get(kategorie - 1)) : f;
+    }
+
+    /** Für die Gametests: die Kategorie von „biom“ in der Vorschau, null für „Automatisch“. */
+    String kategorieVorschau() {
+        return kategorie == 0 ? null : Biom.KATEGORIEN.get(kategorie - 1);
+    }
+
+    /** Für die Gametests: die Mitte der Zeile unter den Farbfeldern der Familie j, links oder rechts. */
+    double[] zeileMitte(int j, boolean rechts, int breite, int hoehe) {
+        lege(breite, hoehe);
+        return new double[] {karteX(j) + (rechts ? KARTE * 3 / 4.0 : KARTE / 4.0), karteY() + KARTE + 24 + 5};
     }
 
     /** Je Ordner die erste Variante: ein Farbfeld je Recolor; bei „lettern“ unterscheiden sich Varianten eines Ordners nur in der Lage. */
@@ -140,7 +152,7 @@ final class Waehler {
                     String ordner = Skin.variante(f, vorschau.get(f)).ordner();
                     vorschau.put(f, variante(f, ordner, mx < x + KARTE / 2.0 ? "innen" : "aussen"));
                 } else if (Skin.BIOM.equals(Skin.FAMILIEN.get(j))) {
-                    int k = Biom.KATEGORIEN.size();
+                    int k = Biom.KATEGORIEN.size() + 1;
                     kategorie = (kategorie + (mx < x + KARTE / 2.0 ? k - 1 : 1)) % k;
                 }
                 return;
@@ -152,10 +164,13 @@ final class Waehler {
         }
     }
 
-    /** Übernimmt Familie und Variante der Karte j und schliesst. Gespeichert wird beim Schliessen des Menüs. */
+    /** Übernimmt Familie und Variante der Karte j, bei „biom“ auch „Automatisch“ oder die Kategorie, und schliesst. Gespeichert wird beim Schliessen des Menüs. */
     private void uebernimm(int j, String familie) {
         Minimap m = Minimap.INSTANZ;
         m.setzeSkin(Skin.FAMILIEN.get(j));
+        if (Skin.BIOM.equals(Skin.FAMILIEN.get(j))) {
+            m.setzeBiomFest(kategorie == 0 ? null : Biom.KATEGORIEN.get(kategorie - 1));
+        }
         if (vorschau.containsKey(familie)) {
             m.setzeVariante(familie, vorschau.get(familie));
         }
@@ -199,8 +214,14 @@ final class Waehler {
                 g.text(font, Component.translatable("heroicmap.waehler.innen"), x + 4, zeile, innen ? TEXT : GRAU, true);
                 g.text(font, Component.translatable("heroicmap.waehler.aussen"), x + KARTE / 2 + 2, zeile, innen ? GRAU : TEXT, true);
             } else if (Skin.BIOM.equals(familieJ)) {
-                g.centeredText(font, Component.literal("< ").append(Component.translatable("heroicmap.rahmen.biom." + Biom.KATEGORIEN.get(kategorie)))
-                        .append(" >"), x + KARTE / 2, zeile, TEXT);
+                Component wahl = kategorie == 0 ? Component.translatable("heroicmap.waehler.automatisch")
+                        : Component.translatable("heroicmap.rahmen.biom." + Biom.KATEGORIEN.get(kategorie - 1));
+                g.centeredText(font, Component.literal("< ").append(wahl).append(" >"), x + KARTE / 2, zeile, TEXT);
+                // „Automatisch“ nennt die Kategorie, die gerade unter dem Spieler ist.
+                if (kategorie == 0 && mausX >= x && mausX < x + KARTE && mausY >= zeile - 1 && mausY < zeile + 10) {
+                    tooltip = Component.translatable("heroicmap.waehler.automatisch.beschreibung",
+                            Component.translatable("heroicmap.rahmen.biom." + Minimap.INSTANZ.kategorieAutomatisch()));
+                }
             }
             if (ueber && tooltip == null) {
                 tooltip = Component.translatable("heroicmap.rahmen." + familieJ + ".beschreibung");
