@@ -169,7 +169,8 @@ final class ChunkMaler {
 
     /**
      * Versuch, nie mergen: wie Pflanzen von oben stehen. 0 heute (0108, flach), 1 alle Flächen 45° nach Norden gekippt,
-     * 4 wie 1 mit einer Richtung je Block, 5 wie 1 mit 60°, 6 das ganze Modell 90° nach Norden. Nur für den Bildlauf.
+     * 4 wie 1 mit einer Richtung je Block, 5 wie 1 mit 60°, 6 das ganze Modell 90° nach Norden; 10 dazu: im Wasser jede
+     * gekippte Fläche unter die Oberfläche geklemmt. Nur für den Bildlauf.
      */
     static volatile int kippen = 0;
     private static final double[][] RICHTUNGEN = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
@@ -301,7 +302,8 @@ final class ChunkMaler {
                     ecken(instanz, quad.materialInfo().lightEmission())));
         }, 0, 0, 0, welt, pos, state, model, state.getSeed(pos));
         if (!kippliste.isEmpty() && (bambus || !oben)) {
-            kippe(variante);
+            FluidState wasser = state.getFluidState();
+            kippe(variante % 10, variante >= 10 && !wasser.isEmpty() ? wasser.getHeight(welt, pos) - 1 / 64f : Float.POSITIVE_INFINITY);
             return;
         }
         // Ein Modell mit einer Fläche nach oben, etwa ein Blütenteppich, bleibt, wie es ist.
@@ -335,7 +337,7 @@ final class ChunkMaler {
      * Kippt die Flächen der Pflanze starr um die waagrechte Achse durch die Mitte ihres Bodens, so dass oben nach der Richtung
      * wandert; dann wieder auf ihre alte Tiefe. Was danach nach oben zeigt, kommt in die Spalte. Wie die Skizzen.
      */
-    private void kippe(int variante) {
+    private void kippe(int variante, float hoechstens) {
         double[] d = RICHTUNGEN[0];
         double winkel = 45;
         if (variante == 4) {
@@ -377,7 +379,7 @@ final class ChunkMaler {
                 xz[2 * k + 1] = q[3 * k + 2];
                 hoehe = Math.max(hoehe, q[3 * k + 1] + alt - neu);
             }
-            flaechen.add(new Flaeche(hoehe, xz, f.uv(), f.sprite(), f.schicht(), f.ecken()));
+            flaechen.add(new Flaeche(Math.min(hoehe, hoechstens), xz, f.uv(), f.sprite(), f.schicht(), f.ecken()));
         }
     }
 

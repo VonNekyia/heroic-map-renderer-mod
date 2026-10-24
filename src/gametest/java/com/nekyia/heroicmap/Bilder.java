@@ -324,13 +324,14 @@ public final class Bilder implements FabricClientGameTest {
         Minimap.ohneMarke = true;
         // Nah: Zoom 8, 16 Pixel des Schirms je Block bei GUI-Massstab 2; die Auflösung 16, 8 und 4. Je Szene ein Bild um ihre Mitte.
         // Die anderen vier Szenen liegen schon vor (Lauf 40092909926); dieser Lauf nur Kelp.
-        String[] szenen = {"kelp", "redstone"};
-        int[][] mitten = {{KX + 42, KZ - 14}, {KX + 42, KZ + 14}};
+        // 45° gegen 60°: V0, V1, V5; unter Wasser dazu V1 und V5 mit geklemmter Höhe (11, 15).
+        String[] szenen = {"feld", "seegras", "kelp", "wiese", "bambus"};
+        int[][] mitten = {{KX - 14, KZ - 14}, {KX + 14, KZ - 14}, {KX + 42, KZ - 14}, {KX - 14, KZ + 14}, {KX + 14, KZ + 14}};
         for (int s = 0; s < szenen.length; s++) {
-            boolean redstone = szenen[s].equals("redstone");
-            for (int v : redstone ? new int[] {0} : new int[] {0, 1, 4, 5, 6}) {
+            boolean wasser = szenen[s].equals("seegras") || szenen[s].equals("kelp");
+            for (int v : wasser ? new int[] {0, 1, 11, 5, 15} : new int[] {0, 1, 5}) {
                 ChunkMaler.kippen = v;
-                for (int scale : redstone ? new int[] {16, 4} : new int[] {16, 8, 4}) {
+                for (int scale : new int[] {16, 8, 4}) {
                     context.runOnClient(mc -> {
                         Minimap.INSTANZ.leeren();
                         Minimap.INSTANZ.setzeScale(scale);
