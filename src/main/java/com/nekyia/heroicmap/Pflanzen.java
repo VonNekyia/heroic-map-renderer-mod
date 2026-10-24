@@ -145,6 +145,8 @@ final class Pflanzen {
         return modell.getNamespace().equals("minecraft")
                 && (p.equals("block/cross") || p.equals("block/tinted_cross") || p.equals("block/cross_emissive")
                         || p.equals("block/crop") || p.equals("block/template_seagrass")
-                        || p.startsWith("block/flowerbed_") || p.startsWith("block/template_leaf_litter_"));
+                        || p.startsWith("block/flowerbed_") || p.startsWith("block/template_leaf_litter_")
+                        // Versuch, nie mergen: Kürbis- und Melonenstiele.
+                        || p.startsWith("block/stem_growth") || p.equals("block/stem_fruit"));
     }
 }
