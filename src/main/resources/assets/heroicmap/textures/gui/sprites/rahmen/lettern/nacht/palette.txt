@@ -1,0 +1,4 @@
+// heroicmap Rahmen 'lettern', Variante 'nacht' (hell auf dunkel): Linie aussen -> innen, eine Zeile je Band.
+// Zwei Werte = Licht (oben/links) Schatten (unten/rechts).
+#101318
+#C9CED6 #8E96A3
