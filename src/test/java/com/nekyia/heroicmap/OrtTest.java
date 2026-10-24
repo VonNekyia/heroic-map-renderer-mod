@@ -27,13 +27,21 @@ class OrtTest {
         assertEquals(new Ort.Teile("play.example.net", "", HASH), Ort.teile(w, w.resolve("play.example.net/welt-" + HASH)));
         assertEquals(new Ort.Teile("", "", HASH), Ort.teile(w, w.resolve("welt-" + HASH)), "Ablage Hash");
         assertEquals(new Ort.Teile("", "build", HASH), Ort.teile(w, w.resolve("karte-build/welt-" + HASH)));
-        // Keine Welt unter einer Adresse: Einzelspieler, alte Ablage, zu tief, Hash gross oder kurz.
-        assertNull(Ort.teile(w, w.resolve("einzelspieler_neu/welt-" + HASH)));
+        Ort.Teile einzel = Ort.teile(w, w.resolve("einzelspieler_neu/welt-" + HASH));
+        assertEquals(new Ort.Teile("einzelspieler_neu", "", HASH), einzel);
+        assertTrue(einzel.einzelspieler());
+        assertEquals("neu", einzel.speicherstand());
+        assertEquals(Zeigt.OHNE, einzel.wer());
+        // Keine Welt: im Einzelspieler mit karte- oder ohne Namen, alte Ablage, zu tief, Hash gross oder kurz.
+        assertNull(Ort.teile(w, w.resolve("einzelspieler_neu/karte-x/welt-" + HASH)));
+        assertNull(Ort.teile(w, w.resolve("einzelspieler_/welt-" + HASH)));
+        assertNull(Ort.teile(w, w.resolve("a/einzelspieler_neu/welt-" + HASH)));
         assertNull(Ort.teile(w, w.resolve("play.example.net/hauptwelt")));
         assertNull(Ort.teile(w, w.resolve("a/b/karte-c/welt-" + HASH)));
         assertNull(Ort.teile(w, w.resolve("a/welt-3FA1C2D4E5F60718")));
         assertNull(Ort.teile(w, w.resolve("a/welt-3fa1c2d4e5f6071")));
-        for (String p : new String[] {"play.example.net/karte-main/welt-" + HASH, "welt-" + HASH, "karte-build/welt-" + HASH}) {
+        for (String p : new String[] {"play.example.net/karte-main/welt-" + HASH, "welt-" + HASH, "karte-build/welt-" + HASH,
+                "einzelspieler_neu/welt-" + HASH}) {
             assertEquals(w.resolve(p), Ort.ordner(w, Ort.teile(w, w.resolve(p))), p);
         }
     }
@@ -51,6 +59,37 @@ class OrtTest {
         assertNull(Ort.eingabe("einzelspieler_welt", "", HASH, f), "nicht in den Einzelspieler");
         assertEquals("heroicmap.ort.fehler.adresse", f[0]);
         assertNull(Ort.eingabe("karte-x", "", HASH, f));
+        assertNull(Ort.eingabe("play.example.net.", "", HASH, f), "ein Punkt am Ende fiele unter Windows weg");
+        assertEquals("heroicmap.ort.fehler.adresse", f[0]);
+    }
+
+    @Test
+    void speicherstand(@TempDir Path w) {
+        String[] f = new String[1];
+        Ort.Teile t = Ort.einzelspieler(" Neue Welt (2) ", HASH, f);
+        assertEquals(new Ort.Teile("einzelspieler_neue_welt__2_", "", HASH), t);
+        assertEquals(w.resolve("einzelspieler_neue_welt__2_/welt-" + HASH), Ort.ordner(w, t));
+        assertEquals(t.adresse(), Ort.speicherordner("Neue Welt (2)"), "wie beim Anlegen");
+        assertNull(Ort.einzelspieler("", HASH, f));
+        assertEquals("heroicmap.ort.fehler.speicherstand", f[0]);
+        assertNull(Ort.einzelspieler("welt.", HASH, f), "ein Punkt am Ende fiele unter Windows weg");
+        assertEquals("heroicmap.ort.fehler.speicherstand", f[0]);
+        assertNull(Ort.einzelspieler("welt", "nein", f));
+        assertEquals("heroicmap.ort.fehler.hash", f[0]);
+        // Frei getippt: ..-Teile, Schrägstriche und Laufwerke werden ein Name direkt unter heroicmap/, oder gar keiner.
+        for (String s : new String[] {"..", "../x", "../../x", "a/b", "a\\b", "\\x", "/x", "C:", "C:\\x", "c:/x", "..\\..", ".", "x/.."}) {
+            Ort.Teile u = Ort.einzelspieler(s, HASH, f);
+            if (u == null) {
+                assertEquals("heroicmap.ort.fehler.speicherstand", f[0], s);
+                continue;
+            }
+            Path ordner = Ort.ordner(w, u);
+            assertEquals(w, ordner.getParent().getParent(), s + ": " + ordner);
+            assertEquals(ordner, ordner.normalize(), s);
+            assertTrue(ordner.normalize().startsWith(w), s);
+            assertFalse(u.adresse().contains("/") || u.adresse().contains("\\") || u.adresse().contains(":"), s + ": " + u.adresse());
+            assertTrue(u.einzelspieler(), s);
+        }
     }
 
     @Test
@@ -143,6 +182,25 @@ class OrtTest {
         Ort.zieheOrdner(w, neu, dritt, "build", "build");
         assertTrue(Files.exists(dritt.resolve(selbst.getFileName())));
         assertFalse(Files.exists(w.resolve("play.example.net")), "leere Ordner darüber gehen mit");
+    }
+
+    @Test
+    void einzelspielerUndZurueck(@TempDir Path w) throws IOException {
+        // Vom Server build in den Einzelspieler: Die eigene Karte gehört danach keinem Server, wie bei einem ohne Namen.
+        Path build = w.resolve("play.example.net/karte-build/welt-" + HASH), einzel = w.resolve("einzelspieler_neue_welt/welt-" + HASH);
+        Path selbst = Selbst.anlegen(build, DIM, 4, "build");
+        Files.writeString(build.resolve(Zeigt.DATEI), "build " + DIM + " " + selbst.getFileName() + "\n");
+        Ort.zieheOrdner(w, build, einzel, "build", Zeigt.OHNE);
+        Path ohne = einzel.resolve(Selbst.baum(DIM, Zeigt.OHNE));
+        assertTrue(Selbst.gehoert(ohne, Zeigt.OHNE));
+        assertFalse(Files.readString(ohne.resolve("satz.json")).contains("server"), "server fällt weg");
+        assertEquals(ohne.getFileName().toString(), Zeigt.baum(einzel, Zeigt.OHNE, DIM));
+        assertFalse(Files.exists(w.resolve("play.example.net")));
+        // Zurück: wieder build.
+        Ort.zieheOrdner(w, einzel, build, Zeigt.OHNE, "build");
+        assertTrue(Selbst.gehoert(build.resolve(selbst.getFileName()), "build"));
+        assertEquals(selbst.getFileName().toString(), Zeigt.baum(build, "build", DIM));
+        assertFalse(Files.exists(w.resolve("einzelspieler_neue_welt")));
     }
 
     @Test

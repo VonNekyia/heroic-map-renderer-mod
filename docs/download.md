@@ -689,31 +689,49 @@ Platte (`Kartenliste`), auch die anderer Server und Welten:
   `<pfad>`“, „(fehlt)“, wenn das Ziel nicht daliegt, und „lösen“. Kein
   Dialog und kein Hinweis beim Betreten, so will es der User.
 - **Ort …:** je Baum links von an/ruht, siehe „Ort ändern“; grau mit
-  Tooltip bei Karten aus dem Einzelspieler und aus der Ablage vor dem
-  Hash und solange ein Download in den Baum läuft (`Kartenliste.ort`).
+  Tooltip bei Karten aus der Ablage vor dem Hash und solange ein Download
+  in den Baum läuft (`Kartenliste.ort`).
 - **Mausrad** blättert, wenn nicht alle Karten auf den Schirm passen.
 
 ## Ort ändern
 
 „Ort …“ in der Kartenliste ändert Adresse, Server und Hash einer Karte
 (`OrtFenster`, `Ort`), siehe
-[0038](entscheidungen/0038-ort-einer-karte-aendern.md). So sagt ein Spieler
-bei zwei Ordnern derselben Welt, welcher welchem Server gehört, oder holt
-eine Karte nach einem Reset der Welt in den Ordner des neuen Hashs.
+[0038](entscheidungen/0038-ort-einer-karte-aendern.md), zwischen
+Einzelspieler und Server
+[0039](entscheidungen/0039-ort-zwischen-einzelspieler-und-server.md). So
+sagt ein Spieler bei zwei Ordnern derselben Welt, welcher welchem Server
+gehört, oder holt eine Karte nach einem Reset der Welt in den Ordner des
+neuen Hashs.
 
 - **Das Fenster:** oben Name, Dimension, Massstab und Grösse und der
   jetzige Ort. Darunter „Ganzer Ordner“, die Vorgabe, und „Nur diese
-  Karte“, die gewählte Art grün und grau. Drei Felder: **Adresse**,
-  **Server**, leer ohne, und **Hash der Welt**. Darunter grün der neue Ort
-  und was mitzieht, oder rot, was dagegen spricht; dann „Umziehen“ und
+  Karte“, dann das Ziel „Server“ oder „Einzelspieler“, vorgewählt nach der
+  Herkunft; das Gewählte grün und grau. Zum Server drei Felder:
+  **Adresse**, **Server**, leer ohne, und **Hash der Welt**. In den
+  Einzelspieler zwei: **Speicherstand** und **Hash der Welt**, darunter, ob
+  es den Speicherstand in `saves/` gibt. Darunter grün der neue Ort und was
+  mitzieht, oder rot, was dagegen spricht; dann „Umziehen“ und
   „Abbrechen“. `Esc` bricht ab, solange nichts umzieht.
 - **Welche Karten:** die in einem Ordner
-  `[<adresse>/][karte-<server>/]welt-<hash>` (`Ort.teile`). Bei Karten aus
-  dem Einzelspieler und aus der Ablage vor dem Hash ist „Ort …“ grau, mit
-  Tooltip. Zwischen Einzelspieler und einer Adresse zieht nichts um.
+  `[<adresse>/][karte-<server>/]welt-<hash>` oder
+  `einzelspieler_<speicherstand>/welt-<hash>` (`Ort.teile`). Bei Karten
+  aus der Ablage vor dem Hash ist „Ort …“ grau, mit Tooltip: Ohne Hash gibt
+  es keinen Ort.
+- **Einzelspieler ↔ Server:** Der Hash ist an beiden Orten der
+  `biomeZoomSeed` der Welt im Client (`Downloads.weltOrdner`). Dieselbe
+  Welt mit demselben Seed hat also denselben Hash, und ein Umbenennen
+  reicht. Im Einzelspieler gehört eine eigene Karte keinem Server, wie bei
+  einem Server ohne Namen; fehlt der Speicherstand, gilt die Karte, sobald
+  es ihn gibt.
 - **Prüfungen wie beim Anlegen** (`Ort.eingabe`):
   - die Adresse bereinigt wie `<host>` (`Downloads.name`), vorn nicht
-    `einzelspieler_`, `karte-` oder `welt-`;
+    `einzelspieler_`, `karte-` oder `welt-`, hinten kein Punkt, den
+    Windows dem Namen eines Ordners nähme;
+  - der Speicherstand nicht leer, bereinigt wie beim Anlegen
+    (`Ort.speicherordner`, wie `Downloads.einzelspieler`), hinten kein
+    Punkt. `..`, Schrägstriche und Laufwerke werden dabei ein Name direkt
+    unter `heroicmap/`;
   - der Server nach `Kartenname.gueltig`;
   - der Hash genau 16 Stellen hex, klein (`Ort.HASH`).
 

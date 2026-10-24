@@ -28,6 +28,8 @@ Reviewer hat ihn freigegeben und die Vorgabe und Einzelspieler entschieden.
 - **„Nur diese Karte“** zieht einen Baum in einen anderen Ordner; Wegpunkte
   und Kartenlage bleiben.
 - **Nur zwischen Adressen** und der Ablage nach dem Hash, nie zwischen
+  Einzelspieler und Server. Ergänzt durch
+  [0039](0039-ort-zwischen-einzelspieler-und-server.md): auch zwischen
   Einzelspieler und Server.
 - **Ganz oder gar nicht:** Ordner und Bäume ziehen als Umbenennen mit
   `ATOMIC_MOVE` um, `satz.json` und `zeigt.txt` werden über eine
@@ -51,7 +53,8 @@ Reviewer hat ihn freigegeben und die Vorgabe und Einzelspieler entschieden.
   des Baums, und ein Abbruch liesse zwei halbe Stände.
 - **Einzelspieler ↔ Server:** Der Ordner einer Einzelspielerwelt heisst
   nach ihrem Speicherordner, nicht nach einer Adresse; der Reviewer hat es
-  ausgeschlossen.
+  ausgeschlossen. Später doch, siehe
+  [0039](0039-ort-zwischen-einzelspieler-und-server.md).
 - **„Ort …“ ganz grau in der Welt, in der der Spieler ist,** wie im Plan:
   „Nur diese Karte“ geht dort, ausser für den Baum, den Minimap und
   Vollbildkarte zeigen. Grau ist nur „Umziehen“, mit dem Grund in Rot; der

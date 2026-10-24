@@ -29,14 +29,23 @@ final class Ort {
     private static final String WELT = "welt-", KARTE = "karte-", EINZELSPIELER = "einzelspieler_";
 
     /**
-     * Wo eine Welt liegt: die Adresse, leer bei der Ablage Hash; der Server, leer ohne Namen; der Hash. Die Adresse ist der
-     * Name ihres Ordners, also schon bereinigt.
+     * Wo eine Welt liegt: die Adresse, leer bei der Ablage Hash, {@code einzelspieler_<speicherstand>} im Einzelspieler; der
+     * Server, leer ohne Namen und im Einzelspieler; der Hash. Die Adresse ist der Name ihres Ordners, also schon bereinigt.
      */
     record Teile(String adresse, String server, String hash) {
 
-        /** Der Schlüssel des Servers für zeigt.txt und eigene Karten: sein Name, ohne Namen {@link Zeigt#OHNE}. */
+        /** Der Schlüssel des Servers für zeigt.txt und eigene Karten: sein Name, ohne Namen und im Einzelspieler {@link Zeigt#OHNE}. */
         String wer() {
             return server.isEmpty() ? Zeigt.OHNE : server;
+        }
+
+        boolean einzelspieler() {
+            return adresse.startsWith(EINZELSPIELER);
+        }
+
+        /** Im Einzelspieler der Speicherstand, wie sein Ordner unter {@code heroicmap/} ihn nennt; sonst leer. */
+        String speicherstand() {
+            return einzelspieler() ? adresse.substring(EINZELSPIELER.length()) : "";
         }
     }
 
@@ -49,8 +58,8 @@ final class Ort {
     }
 
     /**
-     * Die Teile des Ordners einer Welt unter {@code wurzel}: {@code [adresse/][karte-<server>/]welt-<hash>}. Null für alles
-     * andere, auch für Einzelspielerwelten und die Ablage vor dem Hash.
+     * Die Teile des Ordners einer Welt unter {@code wurzel}: {@code [adresse/][karte-<server>/]welt-<hash>}, im Einzelspieler
+     * {@code einzelspieler_<speicherstand>/welt-<hash>}. Null für alles andere, auch für die Ablage vor dem Hash.
      */
     static Teile teile(Path wurzel, Path welt) {
         Path rel;
@@ -79,7 +88,10 @@ final class Ort {
         }
         if (i >= 0) {
             adresse = n.get(i);
-            if (adresse.startsWith(EINZELSPIELER) || adresse.startsWith(KARTE) || adresse.startsWith(WELT)) {
+            // Im Einzelspieler gibt es keinen Server und damit kein karte-.
+            boolean einzel = adresse.startsWith(EINZELSPIELER);
+            if (einzel && (!server.isEmpty() || adresse.length() == EINZELSPIELER.length()) || adresse.startsWith(KARTE)
+                    || adresse.startsWith(WELT)) {
                 return null;
             }
             i--;
@@ -102,11 +114,35 @@ final class Ort {
             return null;
         }
         String ordner = a.isEmpty() ? "" : Downloads.name(a);
-        if (ordner.startsWith(EINZELSPIELER) || ordner.startsWith(KARTE) || ordner.startsWith(WELT)) {
+        // Einen Punkt am Ende nimmt Windows dem Namen eines Ordners; der Ordner hiesse dann anders.
+        if (ordner.startsWith(EINZELSPIELER) || ordner.startsWith(KARTE) || ordner.startsWith(WELT) || ordner.endsWith(".")) {
             fehler[0] = "heroicmap.ort.fehler.adresse";
             return null;
         }
         return new Teile(ordner, s, h);
+    }
+
+    /**
+     * Die Teile einer Welt im Einzelspieler aus der Eingabe: der Speicherstand, also der Name seines Ordners in {@code saves/},
+     * bereinigt wie beim Anlegen ({@link #speicherordner}), und der Hash. Null mit {@code fehler[0]} wie {@link #eingabe}.
+     */
+    static Teile einzelspieler(String speicherstand, String hash, String[] fehler) {
+        String s = speicherstand.strip(), h = hash.strip();
+        if (!HASH.matcher(h).matches()) {
+            fehler[0] = "heroicmap.ort.fehler.hash";
+            return null;
+        }
+        String ordner = speicherordner(s);
+        if (s.isEmpty() || ordner.endsWith(".")) {
+            fehler[0] = "heroicmap.ort.fehler.speicherstand";
+            return null;
+        }
+        return new Teile(ordner, "", h);
+    }
+
+    /** Der Ordner unter {@code heroicmap/} für den Speicherstand {@code speicherstand}, wie {@link Downloads#einzelspieler}. */
+    static String speicherordner(String speicherstand) {
+        return Downloads.name(EINZELSPIELER + speicherstand);
     }
 
     /**
