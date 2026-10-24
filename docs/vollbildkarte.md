@@ -50,6 +50,7 @@ sagt sie das und zeigt nichts.
 | Knopf „Abgleich“ | fragt einen Abgleich des gezeigten Satzes an, wie `/hmap abgleich`; nur mit einem Satz vom Server, nicht auf der selbst gezeichneten Karte. Lehnt der Server mit `wieder` ab, ist der Knopf bis dahin aus und nennt die Uhrzeit |
 | Knopf „Zum Spieler“ | legt den eigenen Spieler in die Mitte, für den Fall, dass man sich verirrt hat, wie auf der Webkarte; Stufe und Lupe bleiben (mod#75) |
 | Knopf „Ebenen +“ unter „Zum Spieler“ | klappt die Liste der Ebenen auf, „Ebenen -“ wieder zu; nur, wenn der Server Ebenen schickt, siehe „Ebenen“ (mod#76) |
+| Knopf „Verwalten +“ unter den Ebenen | öffnet links daneben die Schnellverwaltung aller eigenen Objekte, „Verwalten −“ schliesst sie; ebenso die Taste „Schnellverwaltung“, ohne Belegung, siehe [Schnellverwaltung](verwaltung.md) |
 | Klick auf „An“/„Aus“ in der Liste | schaltet die Ebene an oder aus, sonst nichts, siehe „Ebenen“ |
 | Doppelklick auf den Namen einer Ebene in der Liste | heftet alles von ihr an die Minimap oder löst es, siehe „Ebenen“ |
 | Knopf „Im Browser öffnen“ über „Optionen …“ | öffnet die Webkarte des Servers im Browser, angemeldet, wie `/hmap web`; nur mit dem Plugin auf dem Server, siehe „Im Browser öffnen“ |

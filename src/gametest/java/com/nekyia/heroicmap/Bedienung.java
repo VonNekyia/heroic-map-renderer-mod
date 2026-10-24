@@ -22,6 +22,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.IntPredicate;
+import java.util.function.Predicate;
 import java.util.zip.Deflater;
 import javax.imageio.ImageIO;
 import net.fabricmc.fabric.api.client.gametest.v1.TestInput;
@@ -34,7 +35,9 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.MouseHandler;
 import net.minecraft.SharedConstants;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -108,6 +111,7 @@ public final class Bedienung implements FabricClientGameTest {
 
             karte(context, maus, k);
             namenWeitDraussen(context, maus, k);
+            verwaltung(context, maus, k);
             // Vor tod: Der lässt den Spieler am Ende fallen, und ein toter Spieler hat statt der Karte den Todesschirm.
             knoepfeGross(context, maus);
             teleport(context, spiel.getServer(), maus, k);
@@ -3373,6 +3377,237 @@ public final class Bedienung implements FabricClientGameTest {
         context.waitTick();
         maus.pressMouse(LINKS);
         context.waitTicks(2);
+    }
+
+    /**
+     * Die Schnellverwaltung mit Klicks wie von Hand, siehe docs/verwaltung.md: Der Knopf öffnet das Panel. In einer Zeile umbenennen;
+     * die Kartentaste und Esc im Feld schliessen die Karte nicht, Esc verwirft, Enter speichert. Farbe reihum, Schrift, Schriftart,
+     * Ebene, anheften, hinspringen; Löschen nur mit dem zweiten Klick in Folge. Die Taste öffnet die Karte mit Panel und schaltet es
+     * auf ihr. 40 Wegpunkte auf Seiten, das Mausrad blättert. Bei GS 3 und 4 und bei 1280 × 720 alles ganz auf dem Schirm und nichts
+     * übereinander, bei 1280 × 720 in zwei Zeilen.
+     */
+    private static void verwaltung(ClientGameTestContext context, TestInput maus, int k) {
+        Path baum = Bilder.testsatz();
+        String dimension = context.computeOnClient(mc -> mc.level.dimension().identifier().toString());
+        JsonObject vorher = context.computeOnClient(mc -> Wegpunkte.INSTANZ.json());
+        int[] fenster = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        try {
+            int[] spieler = context.computeOnClient(mc -> new int[] {mc.player.getBlockX(), mc.player.getBlockZ()});
+            int[] alpha = {spieler[0] + 30, spieler[1] + 30};
+            int pruefung = context.computeOnClient(mc -> {
+                Wegpunkte.INSTANZ.setze(dimension, alpha[0], alpha[1]);
+                Wegpunkte.INSTANZ.benenne(Wegpunkte.INSTANZ.punktAuf(dimension, alpha[0], alpha[1]), "Alpha");
+                return Wegpunkte.INSTANZ.neueEbene("Prüfung");
+            });
+            context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
+            context.waitTicks(3);
+            double[] knopf = mitteVon(context, context.computeOnClient(mc -> Component.translatable("heroicmap.karte.verwalten").getString()));
+            spielerKlick(context, maus, k, knopf[0], knopf[1]);
+            context.waitTicks(3);
+            if (!context.computeOnClient(mc -> ((Karte) mc.gui.screen()).verwaltung().offen)) {
+                throw new AssertionError("Klick auf „Verwalten +“: kein Panel");
+            }
+            // Die Suche lässt nur „Alpha“ übrig.
+            double[] suche = mitteDes(context, VerwaltungsPanel.SuchFeld.class, w -> true, "Suchfeld");
+            spielerKlick(context, maus, k, suche[0], suche[1]);
+            maus.typeChars("Alpha");
+            context.waitTicks(3);
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(3);
+            int felder = context.computeOnClient(mc -> (int) mc.gui.screen().children().stream().filter(c -> c instanceof VerwaltungsPanel.NameFeld).count());
+            if (felder != 1) {
+                throw new AssertionError("Suche „Alpha“: " + felder + " Zeilen statt einer");
+            }
+            // Im Feld: Die Kartentaste schliesst nicht, Esc verwirft und schliesst nicht.
+            double[] name = mitteDes(context, VerwaltungsPanel.NameFeld.class, w -> true, "Namensfeld");
+            spielerKlick(context, maus, k, name[0], name[1]);
+            maus.pressKey(InputConstants.KEY_END);
+            maus.typeChars("2");
+            maus.pressKey(InputConstants.KEY_PERIOD);
+            context.waitTicks(2);
+            if (!(context.computeOnClient(mc -> mc.gui.screen()) instanceof Karte)) {
+                throw new AssertionError("Die Kartentaste im Namensfeld schloss die Karte");
+            }
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTicks(3);
+            if (!(context.computeOnClient(mc -> mc.gui.screen()) instanceof Karte)) {
+                throw new AssertionError("Esc im Namensfeld schloss die Karte");
+            }
+            alphaIst(context, dimension, alpha, p -> "Alpha".equals(p.name()), "nach Esc im Feld noch „Alpha“");
+            // Enter speichert.
+            name = mitteDes(context, VerwaltungsPanel.NameFeld.class, w -> true, "Namensfeld");
+            spielerKlick(context, maus, k, name[0], name[1]);
+            maus.pressKey(InputConstants.KEY_END);
+            maus.typeChars("X");
+            maus.pressKey(InputConstants.KEY_RETURN);
+            context.waitTicks(3);
+            alphaIst(context, dimension, alpha, p -> "AlphaX".equals(p.name()), "nach Enter „AlphaX“");
+            // Farbe reihum, Schrift grösser, Schriftart Minecraft, Ebene weiter, angeheftet.
+            int farbe = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punktAuf(dimension, alpha[0], alpha[1]).farbe());
+            klickeIm(context, maus, k, VerwaltungsPanel.Feld.class, w -> true, "Farbfeld");
+            alphaIst(context, dimension, alpha, p -> p.farbe() == (farbe + 1) % Wegpunkte.FARBEN.length, "Farbe reihum");
+            klickeIm(context, maus, k, Button.class, w -> w.getMessage().getString().equals("+"), "Knopf „+“ der Schrift");
+            alphaIst(context, dimension, alpha, p -> p.schrift() == 1.5, "Schrift 1½");
+            String karteText = context.computeOnClient(mc -> Component.translatable("heroicmap.verwaltung.schriftart.karte").getString());
+            klickeIm(context, maus, k, Button.class, w -> w.getMessage().getString().equals(karteText), "Knopf der Schriftart");
+            alphaIst(context, dimension, alpha, Wegpunkte.Punkt::minecraft, "Schriftart Minecraft");
+            klickeIm(context, maus, k, Button.class, w -> w.getMessage().getString().equals("Base"), "Knopf der Ebene „Base“");
+            alphaIst(context, dimension, alpha, p -> p.ebene() == pruefung, "Ebene „Prüfung“");
+            klickeIm(context, maus, k, VerwaltungsPanel.Zeichen.class, w -> w.art() == VerwaltungsPanel.Zeichen.NADEL, "Nadel");
+            alphaIst(context, dimension, alpha, Wegpunkte.Punkt::angeheftet, "angeheftet");
+            // Hinspringen legt Alpha in die Mitte der Karte.
+            klickeIm(context, maus, k, VerwaltungsPanel.Zeichen.class, w -> w.art() == VerwaltungsPanel.Zeichen.ZIEL, "Fadenkreuz");
+            context.waitTicks(3);
+            int[] mitte = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blockUnter(mc.getWindow().getGuiScaledWidth() / 2.0,
+                    mc.getWindow().getGuiScaledHeight() / 2.0));
+            if (Math.abs(mitte[0] - alpha[0]) > 2 || Math.abs(mitte[1] - alpha[1]) > 2) {
+                throw new AssertionError("Hinspringen: Mitte der Karte bei " + Arrays.toString(mitte) + " statt " + Arrays.toString(alpha));
+            }
+            // Löschen nur mit dem zweiten Klick in Folge: einmal ×, dann die Suche, dann wieder ×, Alpha bleibt; ein zweites × löscht.
+            klickeIm(context, maus, k, VerwaltungsPanel.Zeichen.class, w -> w.art() == VerwaltungsPanel.Zeichen.WEG, "×");
+            alphaIst(context, dimension, alpha, p -> true, "ein Klick auf ×");
+            suche = mitteDes(context, VerwaltungsPanel.SuchFeld.class, w -> true, "Suchfeld");
+            spielerKlick(context, maus, k, suche[0], suche[1]);
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTicks(2);
+            klickeIm(context, maus, k, VerwaltungsPanel.Zeichen.class, w -> w.art() == VerwaltungsPanel.Zeichen.WEG, "×");
+            alphaIst(context, dimension, alpha, p -> true, "× nach einem Klick dazwischen");
+            klickeIm(context, maus, k, VerwaltungsPanel.Zeichen.class, w -> w.art() == VerwaltungsPanel.Zeichen.WEG, "×");
+            if (context.computeOnClient(mc -> Wegpunkte.INSTANZ.punktAuf(dimension, alpha[0], alpha[1])) != null) {
+                throw new AssertionError("Zwei Klicks in Folge auf × löschten Alpha nicht");
+            }
+
+            // Die Taste: im Spiel die Karte mit Panel, auf der Karte schaltet sie es.
+            context.runOnClient(mc -> {
+                HeroicMap.verwaltung.setKey(InputConstants.Type.KEYBOARD.getOrCreate(InputConstants.KEY_K));
+                KeyMapping.resetMapping();
+                mc.gui.setScreen(null);
+            });
+            context.waitTicks(3);
+            maus.pressKey(InputConstants.KEY_K);
+            context.waitTicks(3);
+            if (!context.computeOnClient(mc -> mc.gui.screen() instanceof Karte karte && karte.verwaltung().offen)) {
+                throw new AssertionError("Die Taste der Schnellverwaltung öffnete keine Karte mit Panel");
+            }
+            maus.pressKey(InputConstants.KEY_K);
+            context.waitTicks(3);
+            if (context.computeOnClient(mc -> !(mc.gui.screen() instanceof Karte karte) || karte.verwaltung().offen)) {
+                throw new AssertionError("Die Taste auf der Karte schloss das Panel nicht");
+            }
+
+            // 40 Wegpunkte: Sie füllen mehr als eine Seite, das Mausrad blättert.
+            context.runOnClient(mc -> {
+                for (int i = 0; i < 40; i++) {
+                    Wegpunkte.INSTANZ.setze(dimension, spieler[0] + 100 + i, spieler[1] - 100);
+                    Wegpunkte.INSTANZ.benenne(Wegpunkte.INSTANZ.punktAuf(dimension, spieler[0] + 100 + i, spieler[1] - 100), String.format("Seite%02d", i));
+                }
+                Karte karte = new Karte(Satz.lies(baum)).mitVerwaltung();
+                karte.verwaltung().suche = "Seite";
+                mc.gui.setScreen(karte);
+            });
+            context.waitTicks(3);
+            List<String> ersteSeite = namenImPanel(context);
+            double[] panel = context.computeOnClient(mc -> {
+                int[] kasten = ((Karte) mc.gui.screen()).verwaltung().kasten;
+                return new double[] {kasten[0] + kasten[2] / 2.0, kasten[1] + kasten[3] / 2.0};
+            });
+            fahre(context, maus, k, panel[0], panel[1]);
+            maus.scroll(-1);
+            context.waitTicks(3);
+            List<String> zweiteSeite = namenImPanel(context);
+            if (ersteSeite.size() < 2 || ersteSeite.size() >= 40 || !ersteSeite.getFirst().equals("Seite00") || zweiteSeite.isEmpty()
+                    || !zweiteSeite.getFirst().equals(String.format("Seite%02d", ersteSeite.size()))) {
+                throw new AssertionError("Blättern: erste Seite " + ersteSeite + ", nach dem Mausrad " + zweiteSeite);
+            }
+
+            // Ganz auf dem Schirm, nichts übereinander; bei 1280 × 720 und GS 4 in zwei Zeilen.
+            List<String> fehler = new ArrayList<>();
+            int[][] faelle = {{1920, 1080, 3}, {1920, 1080, 4}, {1280, 720, 4}};
+            for (int[] f : faelle) {
+                context.getInput().resizeWindow(f[0], f[1]);
+                context.runOnClient(mc -> {
+                    mc.options.guiScale().set(f[2]);
+                    mc.resizeGui();
+                    Karte karte = new Karte(Satz.lies(baum)).mitVerwaltung();
+                    karte.verwaltung().suche = "Seite";
+                    mc.gui.setScreen(karte);
+                });
+                context.waitTicks(3);
+                String fall = f[0] + " × " + f[1] + " GS " + f[2];
+                fehler.addAll(context.computeOnClient(mc -> {
+                    int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+                    List<AbstractWidget> l = mc.gui.screen().children().stream().filter(c -> c instanceof AbstractWidget)
+                            .map(c -> (AbstractWidget) c).filter(w -> w.visible).toList();
+                    List<String> fl = new ArrayList<>();
+                    for (int i = 0; i < l.size(); i++) {
+                        AbstractWidget w = l.get(i);
+                        if (w.getX() < 0 || w.getY() < 0 || w.getX() + w.getWidth() > b || w.getY() + w.getHeight() > h) {
+                            fl.add(fall + ": " + w.getMessage().getString() + " nicht ganz auf dem Schirm");
+                        }
+                        for (int j = i + 1; j < l.size(); j++) {
+                            AbstractWidget v = l.get(j);
+                            if (w.getX() < v.getX() + v.getWidth() && v.getX() < w.getX() + w.getWidth() && w.getY() < v.getY() + v.getHeight()
+                                    && v.getY() < w.getY() + w.getHeight()) {
+                                fl.add(fall + ": " + w.getMessage().getString() + " über " + v.getMessage().getString());
+                            }
+                        }
+                    }
+                    boolean zwei = Verwaltung.zweiZeilen(((Karte) mc.gui.screen()).verwaltung().kasten[0] + ((Karte) mc.gui.screen()).verwaltung().kasten[2] - 4);
+                    if (f[0] == 1280 && !zwei) {
+                        fl.add(fall + ": eine Zeile je Objekt statt zwei");
+                    }
+                    if (l.stream().noneMatch(w -> w instanceof VerwaltungsPanel.NameFeld)) {
+                        fl.add(fall + ": keine Zeile");
+                    }
+                    return fl;
+                }));
+            }
+            if (!fehler.isEmpty()) {
+                throw new AssertionError(String.join("; ", fehler));
+            }
+        } finally {
+            context.getInput().resizeWindow(fenster[0], fenster[1]);
+            context.runOnClient(mc -> {
+                HeroicMap.verwaltung.setKey(InputConstants.UNKNOWN);
+                KeyMapping.resetMapping();
+                mc.options.guiScale().set(fenster[2]);
+                mc.resizeGui();
+                mc.gui.setScreen(null);
+                Wegpunkte.INSTANZ.lies(vorher);
+                Wegpunkte.INSTANZ.speichere();
+            });
+            context.waitTicks(2);
+        }
+    }
+
+    /** Prüft den Wegpunkt an {@code ort}: Es gibt ihn, und er erfüllt {@code soll}. */
+    private static void alphaIst(ClientGameTestContext context, String dimension, int[] ort, Predicate<Wegpunkte.Punkt> soll, String was) {
+        context.waitTicks(3);
+        Wegpunkte.Punkt p = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punktAuf(dimension, ort[0], ort[1]));
+        if (p == null || !soll.test(p)) {
+            throw new AssertionError("Schnellverwaltung, " + was + ": " + p);
+        }
+    }
+
+    /** Die Mitte des ersten Widgets der Art {@code art} auf dem Schirm, das {@code wahl} erfüllt. */
+    private static <T extends AbstractWidget> double[] mitteDes(ClientGameTestContext context, Class<T> art, Predicate<T> wahl, String was) {
+        return context.computeOnClient(mc -> mc.gui.screen().children().stream().filter(art::isInstance).map(art::cast).filter(wahl)
+                .map(w -> new double[] {w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0}).findFirst()
+                .orElseThrow(() -> new AssertionError("Kein " + was)));
+    }
+
+    /** Ein Klick von Hand auf das erste Widget der Art {@code art}, das {@code wahl} erfüllt. */
+    private static <T extends AbstractWidget> void klickeIm(ClientGameTestContext context, TestInput maus, int k, Class<T> art, Predicate<T> wahl,
+            String was) {
+        double[] m = mitteDes(context, art, wahl, was);
+        spielerKlick(context, maus, k, m[0], m[1]);
+        context.waitTicks(3);
+    }
+
+    /** Die Namen in den Zeilen des Panels, von oben. */
+    private static List<String> namenImPanel(ClientGameTestContext context) {
+        return context.computeOnClient(mc -> mc.gui.screen().children().stream().filter(c -> c instanceof VerwaltungsPanel.NameFeld)
+                .map(c -> ((VerwaltungsPanel.NameFeld) c).getValue()).toList());
     }
 
     /** Die Mitte des Knopfs mit genau diesem Text auf dem Schirm. */

@@ -283,6 +283,11 @@ final class Karte extends Screen {
     /** Die Schnellverwaltung, solange die Karte offen ist. Siehe docs/verwaltung.md. */
     private final VerwaltungsPanel.Stand verwaltung = new VerwaltungsPanel.Stand();
 
+    /** Für den Gametest: der Stand der Schnellverwaltung. */
+    VerwaltungsPanel.Stand verwaltung() {
+        return verwaltung;
+    }
+
     /** Die Karte mit offener Schnellverwaltung, für ihre Taste. */
     Karte mitVerwaltung() {
         verwaltung.offen = true;
@@ -350,7 +355,9 @@ final class Karte extends Screen {
                     : "heroicmap.karte.verwalten"), b -> schalteVerwaltung()).bounds(x, unterster.getY() + 24, KNOPF, 20).build());
             if (verwaltung.offen && minecraft.level != null) {
                 LocalPlayer p = minecraft.player;
-                VerwaltungsPanel.baue(verwaltung, gastgeber(), font, x - 4, height, minecraft.level.dimension().identifier().toString(),
+                // Unter dem Hinweis auf eine neue Version oben links, sonst läge es bei schmalem Fenster auf ihm.
+                int oben = NeueVersion.neu != null && Minimap.INSTANZ.neueVersion() ? 28 : 4;
+                VerwaltungsPanel.baue(verwaltung, gastgeber(), font, x - 4, oben, height, minecraft.level.dimension().identifier().toString(),
                         p == null ? new double[] {0, 0} : new double[] {p.getX(), p.getZ()});
             }
         }

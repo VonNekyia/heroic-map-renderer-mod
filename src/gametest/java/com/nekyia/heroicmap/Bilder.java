@@ -1724,9 +1724,26 @@ public final class Bilder implements FabricClientGameTest {
         });
         context.waitTicks(40);
         Path bild = context.takeScreenshot(TestScreenshotOptions.of("vollbildkarte").disableCounterPrefix());
+        // Die Schnellverwaltung mit benannten Wegpunkten, einer Region, einer Linie und einem Todespunkt. Siehe docs/verwaltung.md.
+        context.runOnClient(mc -> {
+            Wegpunkte w = Wegpunkte.INSTANZ;
+            String d = "minecraft:overworld";
+            w.benenne(w.punktAuf(d, 20, -12), "Mine");
+            w.benenne(w.punktAuf(d, 900, 300), "Hafen");
+            w.setzeForm(d, List.of(new Wegpunkte.Ecke(-30, -20, 0), new Wegpunkte.Ecke(-10, -20, 0), new Wegpunkte.Ecke(-10, 0, 0),
+                    new Wegpunkte.Ecke(-30, 0, 0)));
+            w.benenne(w.eigeneFormen().getLast(), "Hof");
+            w.setzeForm(d, List.of(new Wegpunkte.Ecke(0, 10, 0), new Wegpunkte.Ecke(30, 25, 0)));
+            w.benenne(w.eigeneFormen().getLast(), "Weg zum Hafen");
+            w.setzeTod(d, 5, 5, 16, System.currentTimeMillis());
+            mc.gui.setScreen(new Karte(Satz.lies(baum)).mitVerwaltung());
+        });
+        context.waitTicks(10);
+        Path verwaltung = context.takeScreenshot(TestScreenshotOptions.of("verwaltung").disableCounterPrefix());
         if (!AUSGABE.isEmpty()) {
             try {
                 Files.copy(bild, Path.of(AUSGABE, "vollbildkarte.png"), StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(verwaltung, Path.of(AUSGABE, "verwaltung.png"), StandardCopyOption.REPLACE_EXISTING);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }

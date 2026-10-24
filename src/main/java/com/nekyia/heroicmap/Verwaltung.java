@@ -139,7 +139,7 @@ final class Verwaltung {
 
     /**
      * Wo jede Spalte steht: in einer Zeile alle nebeneinander; in zwei oben Art, Farbe, Name, Anheften, Hinspringen, Löschen, darunter
-     * unter dem Namen Schrift, Biegung, Schriftart, Ebene.
+     * rechtsbündig Schrift, Biegung, Schriftart, Ebene.
      */
     static Lage[] spalten(boolean zwei) {
         Lage[] aus = new Lage[Spalte.values().length];
@@ -159,7 +159,8 @@ final class Verwaltung {
             aus[s[0]] = new Lage(x, 0, s[1]);
             x += s[1] + LUECKE;
         }
-        x = ART + FARBE + 2 * LUECKE;
+        // Die zweite Zeile rechtsbündig, so endet sie wie die erste.
+        x = BREITE_ZWEI - (SCHRIFT + BIEGUNG + SCHRIFTART + EBENE + 3 * LUECKE);
         int[][] unten = {{Spalte.SCHRIFT.ordinal(), SCHRIFT}, {Spalte.BIEGUNG.ordinal(), BIEGUNG}, {Spalte.SCHRIFTART.ordinal(), SCHRIFTART},
             {Spalte.EBENE.ordinal(), EBENE}};
         for (int[] s : unten) {

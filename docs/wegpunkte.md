@@ -837,7 +837,9 @@ vom User am 18.10.; Plan vom Reviewer freigegeben.
   obwohl `Integer.parseInt` sie läse.
 - **Datei:** `hex` neben dem Index `farbe`, siehe „Ablage“; ohne eigene
   Farbe fehlt das Feld. Eine ältere Version nimmt die Farbe des Index.
-- **Wegpunkte** haben weiter nur die 8 Farben, siehe „Was fehlt“.
+- **Wegpunkte** haben weiter nur die 8 Farben, siehe „Was fehlt“. In der
+  Schnellverwaltung wechseln sie und alte Rechtecke reihum durch sie, siehe
+  [Schnellverwaltung](verwaltung.md), „Spalten“.
 
 ## Gewicht
 

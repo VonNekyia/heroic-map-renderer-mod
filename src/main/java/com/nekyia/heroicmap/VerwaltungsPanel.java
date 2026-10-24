@@ -79,14 +79,14 @@ final class VerwaltungsPanel {
     }
 
     /**
-     * Baut das Panel mit der rechten Kante bei {@code rechts}, von oben bis {@code hoehe}: die eigenen Objekte in {@code dimension},
-     * nach Nähe zu {@code spieler} (x, z) sortierbar.
+     * Baut das Panel mit der rechten Kante bei {@code rechts}, von {@code oben} bis {@code hoehe}: die eigenen Objekte in
+     * {@code dimension}, nach Nähe zu {@code spieler} (x, z) sortierbar.
      */
-    static void baue(Stand s, Gastgeber k, Font font, int rechts, int hoehe, String dimension, double[] spieler) {
+    static void baue(Stand s, Gastgeber k, Font font, int rechts, int oben, int hoehe, String dimension, double[] spieler) {
         s.texte.clear();
         s.wegpunkte = Wegpunkte.INSTANZ.stand();
         boolean zwei = Verwaltung.zweiZeilen(rechts - 4);
-        int breite = zwei ? Verwaltung.BREITE_ZWEI : Verwaltung.BREITE, x0 = rechts - breite, y = 4;
+        int breite = zwei ? Verwaltung.BREITE_ZWEI : Verwaltung.BREITE, x0 = rechts - breite, y = oben;
         // Oben Suche, Art, Ebene, Sortierung; in zwei Zeilen die Suche allein.
         SuchFeld suche = k.dazu(new SuchFeld(font, x0, y, zwei ? breite : 116, s));
         if (s.sucheFokus) {
@@ -149,7 +149,7 @@ final class VerwaltungsPanel {
         zurueck.active = s.seite > 0;
         weiter.active = s.seite < seiten - 1;
         s.texte.add(new Text(Component.literal((s.seite + 1) + " / " + seiten), x0 + breite / 2, unten + 6, TEXT, true));
-        s.kasten = new int[] {x0, 4, breite, unten + 20 - 4};
+        s.kasten = new int[] {x0, oben, breite, unten + 20 - oben};
     }
 
     /** Eine Zeile für das Objekt {@code z} mit ihrer linken oberen Ecke bei (x0, y). */
@@ -424,6 +424,11 @@ final class VerwaltungsPanel {
             this.rot = rot;
             this.klick = klick;
             setTooltip(Tooltip.create(tooltip));
+        }
+
+        /** Für den Gametest: {@link #NADEL}, {@link #ZIEL} oder {@link #WEG}. */
+        int art() {
+            return art;
         }
 
         @Override
