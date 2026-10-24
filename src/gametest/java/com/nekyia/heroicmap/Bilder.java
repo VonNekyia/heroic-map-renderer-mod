@@ -236,6 +236,32 @@ public final class Bilder implements FabricClientGameTest {
                 }
             }
         }
+        // Kelp östlich vom Seegras: Becken 3 bis 10 tief, nach Süden je zwei Reihen einen tiefer, Westen Sand, Osten Kies.
+        // In der ersten Reihe jedes Paars Kelp verschieden hoch, in der zweiten Seegras, kurz und hoch im Wechsel.
+        x0 = KX + 34;
+        z0 = KZ - 22;
+        b.add("fill " + (x0 - 1) + " -60 " + (z0 - 1) + " " + (x0 + 16) + " -51 " + (z0 + 16) + " stone");
+        b.add("fill " + x0 + " -61 " + z0 + " " + (x0 + 15) + " -51 " + (z0 + 15) + " water");
+        for (int band = 0; band < 8; band++) {
+            int tiefe = 3 + band, boden = -51 - tiefe, z = z0 + 2 * band;
+            b.add("fill " + x0 + " -61 " + z + " " + (x0 + 7) + " " + boden + " " + (z + 1) + " sand");
+            b.add("fill " + (x0 + 8) + " -61 " + z + " " + (x0 + 15) + " " + boden + " " + (z + 1) + " gravel");
+            for (int i = 0; i < 16; i += 2) {
+                int hoehe = 1 + (i / 2) % (tiefe - 1);
+                for (int h = 1; h < hoehe; h++) {
+                    b.add("setblock " + (x0 + i) + " " + (boden + h) + " " + z + " kelp_plant");
+                }
+                b.add("setblock " + (x0 + i) + " " + (boden + hoehe) + " " + z + " kelp[age=" + (i * 3 % 25) + "]");
+            }
+            for (int i = 0; i < 16; i++) {
+                if (i % 2 == 0) {
+                    b.add("setblock " + (x0 + i) + " " + (boden + 1) + " " + (z + 1) + " seagrass");
+                } else {
+                    b.add("setblock " + (x0 + i) + " " + (boden + 1) + " " + (z + 1) + " tall_seagrass[half=lower]");
+                    b.add("setblock " + (x0 + i) + " " + (boden + 2) + " " + (z + 1) + " tall_seagrass[half=upper]");
+                }
+            }
+        }
         // Bambus im Südosten: Stangen 1 bis 6 hoch, oben Blätter wie gewachsen.
         x0 = KX + 6;
         for (int gz = 0; gz < 8; gz++) {
@@ -272,8 +298,9 @@ public final class Bilder implements FabricClientGameTest {
         StringBuilder lage = new StringBuilder();
         Minimap.ohneMarke = true;
         // Nah: Zoom 8, 16 Pixel des Schirms je Block bei GUI-Massstab 2; die Auflösung 16, 8 und 4. Je Szene ein Bild um ihre Mitte.
-        String[] szenen = {"seegras", "feld", "wiese", "bambus"};
-        int[][] mitten = {{KX + 14, KZ - 14}, {KX - 14, KZ - 14}, {KX - 14, KZ + 14}, {KX + 14, KZ + 14}};
+        // Die anderen vier Szenen liegen schon vor (Lauf 40092909926); dieser Lauf nur Kelp.
+        String[] szenen = {"kelp"};
+        int[][] mitten = {{KX + 42, KZ - 14}};
         for (int s = 0; s < szenen.length; s++) {
             for (int v : new int[] {0, 1, 4, 5, 6}) {
                 ChunkMaler.kippen = v;
