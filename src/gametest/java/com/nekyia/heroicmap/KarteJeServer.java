@@ -8,6 +8,9 @@ import java.nio.file.Path;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.network.chat.contents.TranslatableContents;
 
 /**
  * „Selbst“ über einem Download, wie ein Spieler: die Frage nach der alten Karte mit „Behalten, ruht“, Esc und
@@ -40,9 +43,7 @@ public final class KarteJeServer implements FabricClientGameTest {
 
             // In der Kartenliste den Download wieder an: Dann ruht die eigene Karte.
             context.runOnClient(mc -> mc.gui.setScreen(new Kartenliste(null)));
-            context.waitFor(mc -> mc.gui.screen().children().stream().anyMatch(w -> w instanceof net.minecraft.client.gui.components.Button b
-                    && b.getMessage().getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents t
-                    && t.getKey().equals("heroicmap.liste.ruht")), 600);
+            context.waitFor(mc -> knopf(mc, "heroicmap.liste.ruht") != null, 600);
             context.clickScreenButton("heroicmap.liste.ruht");
             context.waitTicks(2);
             pruefe(welt, DOWNLOAD, "nach „ruht“ in der Kartenliste");
@@ -50,7 +51,7 @@ public final class KarteJeServer implements FabricClientGameTest {
             // Im Fenster der Karten heisst der Knopf jetzt „Selbst · ruht“; ein Klick zeigt die eigene wieder.
             context.runOnClient(mc -> mc.gui.setScreen(new Auswahl(null)));
             context.waitTicks(2);
-            context.clickScreenButton("heroicmap.selbst.ruht");
+            klicke(context, "heroicmap.selbst.ruht");
             context.waitTicks(2);
             pruefe(welt, eigene, "nach „Selbst · ruht“");
 
@@ -76,6 +77,31 @@ public final class KarteJeServer implements FabricClientGameTest {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /** Der Knopf mit diesem Schlüssel auf dem Schirm, sonst null. */
+    private static Button knopf(Minecraft mc, String schluessel) {
+        return mc.gui.screen() == null ? null : mc.gui.screen().children().stream()
+                .filter(w -> w instanceof Button b && b.getMessage().getContents() instanceof TranslatableContents t && t.getKey().equals(schluessel))
+                .map(w -> (Button) w).findFirst().orElse(null);
+    }
+
+    /**
+     * Klickt mit der Maus auf den Knopf mit diesem Schlüssel. clickScreenButton vergleicht den Text ohne Argumente und
+     * findet einen Knopf wie „Selbst · ruht · 4 px“ nicht.
+     */
+    private static void klicke(ClientGameTestContext context, String schluessel) {
+        double[] mitte = context.computeOnClient(mc -> {
+            Button b = knopf(mc, schluessel);
+            if (b == null) {
+                throw new AssertionError("Kein Knopf " + schluessel);
+            }
+            return new double[] {b.getX() + b.getWidth() / 2.0, b.getY() + b.getHeight() / 2.0};
+        });
+        int k = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+        context.getInput().setCursorPos(mitte[0] * k, mitte[1] * k);
+        context.waitTick();
+        context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
     }
 
     /** Das Fenster der Karten und darin „Selbst“, mit dem Massstab der Vorgabe. */
