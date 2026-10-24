@@ -86,14 +86,15 @@ class SkinTest {
                     assertNotNull(bild(ordner, teil), wo + "/" + teil);
                     assertNotNull(bild(ordner, teil + "_aktiv"), wo + "/" + teil + "_aktiv");
                 }
-                // Stellung und Lage, wie der Designer sie je Familie festlegt.
+                // Stellung und Lage, wie sie je Familie festgelegt sind: biom O, S, W aussen auf dem Rand, N auf den Bändern,
+                // lettern mit dem Kopf nach aussen. Siehe docs/rahmen.md, „Lage“, und 0041.
                 if (familie.startsWith(Skin.BIOM + "/")) {
                     assertEquals(Skin.Stellung.AUSSEN, s.marken.stellung(), wo);
                     BufferedImage m = bild(ordner, "marke");
-                    Skin.Platz kante = new Skin.Platz(Skin.Lage.KANTE, m.getWidth(), m.getHeight(), 1);
-                    assertArrayEquals(new Skin.Platz[] {null, kante, kante, kante}, s.marken.plaetze(), wo);
+                    Skin.Platz aussen = new Skin.Platz(Skin.Lage.AUSSEN, m.getWidth(), m.getHeight(), 1);
+                    assertArrayEquals(new Skin.Platz[] {null, aussen, aussen, aussen}, s.marken.plaetze(), wo);
                 } else if ("lettern".equals(familie)) {
-                    assertEquals(Skin.Stellung.AUFRECHT, s.marken.stellung(), wo);
+                    assertEquals(Skin.Stellung.AUSSEN, s.marken.stellung(), wo);
                     assertTrue(s.marken.eigene(), wo);
                     Skin.Lage lage = v.name().endsWith("_aussen") ? Skin.Lage.AUSSEN : Skin.Lage.INNEN;
                     for (int i = 0; i < 4; i++) {
@@ -111,17 +112,17 @@ class SkinTest {
                 // Die zier gibt es nicht mehr, auch nicht im Jar.
                 assertNull(bild(ordner, "zier"), wo);
                 // Mit Rahmen hält die Minimap so viel Abstand, dass jede Marke in jeder Drehung ganz auf dem Schirm bleibt, auch ihr
-                // Schatten um (+1, +1); siehe auch letternLiegenInnenUndAussen.
+                // Schatten um (+1, +1); siehe auch jedeLageMitJederDrehung.
                 int rand = Minimap.rand(s);
                 assertTrue(rand + s.baender() / 2.0 - s.groesste * Math.sqrt(2) / 2 - 1 >= 0, wo);
                 biomRand = familie.startsWith(Skin.BIOM + "/") ? Math.max(biomRand, rand) : biomRand;
                 letternRand = "lettern".equals(familie) ? Math.max(letternRand, rand) : letternRand;
             }
         }
-        // „biom“ hält den grössten Abstand seiner Kategorien, so springt die Minimap beim Wechsel nicht; „lettern“ aussen 11 wie
-        // beim Designer.
-        assertEquals(11, biomRand);
-        assertEquals(11, letternRand);
+        // „biom“ hält den grössten Abstand seiner Kategorien, so springt die Minimap beim Wechsel nicht: 16 mit O, S und W aussen,
+        // getrieben von den Marken 11 × 8 und 9 × 10. „lettern“ aussen 14 mit dem Kopf nach aussen. Siehe 0041.
+        assertEquals(16, biomRand);
+        assertEquals(14, letternRand);
         // Die alten Skins sind weg; eine gespeicherte Wahl zieht um, siehe MinimapTest.
         for (String alt : Skin.ALT.keySet()) {
             assertNull(SkinTest.class.getResourceAsStream(ORDNER + alt + "/palette.txt"), alt);
@@ -316,15 +317,16 @@ class SkinTest {
     }
 
     @Test
-    void biomMarkenLiegenAmRahmen() throws IOException {
-        // Bei „biom“ liegen O, S und W samt Schatten um (+1, +1) innen an der äusseren Kante und ragen nicht darüber, eckig und
-        // rund, genordet und gedreht, bei GS 1 bis 4; N bleibt auf der Mitte der Bänder. Wunsch des Users vom 23.10.
-        // Siehe docs/rahmen.md, „Nach aussen“.
+    void kanteLiegtAmRahmen() throws IOException {
+        // lage=kante: O, S und W liegen samt Schatten um (+1, +1) innen an der äusseren Kante und ragen nicht darüber, eckig und
+        // rund, genordet und gedreht, bei GS 1 bis 4; N bleibt auf der Mitte der Bänder. So lag biom bis 0041. Siehe docs/rahmen.md,
+        // „Lage“.
         for (String kategorie : Biom.KATEGORIEN) {
             String name = Skin.BIOM + "/" + kategorie + "/standard";
             BufferedImage bild = bild(name, "marke");
             int w = bild.getWidth(), h = bild.getHeight();
-            Skin skin = Skin.lies(name, name, text(name, "palette.txt"), text(name, "info.txt"), Map.of("norden", new int[] {15, 15}, "marke", new int[] {w, h}));
+            Skin skin = Skin.lies(name, name, text(name, "palette.txt"), "schatten=ja\ndrehung=aussen\nlage=kante\nlage_norden=mitte",
+                    Map.of("norden", new int[] {15, 15}, "marke", new int[] {w, h}));
             for (int seite : new int[] {64, 101, 128, 256}) {
                 Minimap.Rahmen r = new Minimap.Rahmen(10, 21, seite);
                 double cx = r.x() + seite / 2.0, cy = r.y() + seite / 2.0, halb = seite / 2.0;
@@ -358,12 +360,7 @@ class SkinTest {
                                     assertTrue(rund ? luecke >= 0 && luecke <= 1 : luecke == 0, m + ": " + luecke + " Einheiten vor der Kante");
                                 } else {
                                     // Gedreht die Ecken des gedrehten Bilds und seines Schattens; die Mitte liegt auf ganzen Pixeln.
-                                    double nx = Math.sin(o.winkel()), ny = -Math.cos(o.winkel()), weit = 0, spiel = 0.5 / k * Math.sqrt(2) + 1e-9;
-                                    for (int j = 0; j < 8; j++) {
-                                        double a = (j & 1) == 0 ? h / 2.0 : -h / 2.0, b = (j & 2) == 0 ? w / 2.0 : -w / 2.0, sch = j < 4 ? 0 : 1;
-                                        double x = o.x() + a * nx - b * ny + sch - cx, y = o.y() + a * ny + b * nx + sch - cy;
-                                        weit = Math.max(weit, rund ? Math.hypot(x, y) : Math.max(Math.abs(x), Math.abs(y)));
-                                    }
+                                    double weit = weit(ecken(o, w, h, 1), cx, cy, rund), spiel = 0.5 / k * Math.sqrt(2) + 1e-9;
                                     assertTrue(weit <= halb + spiel, m + ": ragt " + (weit - halb) + " über die Kante");
                                     assertTrue(weit >= halb - spiel, m + ": liegt " + (halb - weit) + " vor der Kante");
                                 }
@@ -376,29 +373,68 @@ class SkinTest {
     }
 
     @Test
-    void lageInInfoTxt() {
-        // lage_norden gilt wie lage, wenn die Zeile fehlt; kante nur mit drehung=aussen, innen und aussen nur mit drehung=aufrecht.
+    void jedeLageMitJederDrehung() {
+        // Jede Lage geht mit jeder Drehung (0041): Der Kasten des Bilds, wie es auf dem Schirm gedreht steht, liegt nach der Lage,
+        // eckig und rund, genordet und gedreht. Das Bild steht starr, mit dem Kopf von der Mitte weg, zu ihr hin oder aufrecht.
         Map<String, int[]> bilder = Map.of("norden", new int[] {15, 15}, "marke", new int[] {5, 9}, "marke_quer", new int[] {9, 5});
-        Skin.Platz n = new Skin.Platz(Skin.Lage.KANTE, 15, 15, 1), m = new Skin.Platz(Skin.Lage.KANTE, 5, 9, 1);
-        assertNull(Skin.lies("t", "t", "#000000\n#111111", "aussen=ja\nlage=mitte", bilder).marken.plaetze());
-        assertArrayEquals(new Skin.Platz[] {n, m, m, m}, Skin.lies("t", "t", "#000000\n#111111", "schatten=ja\naussen=ja\nlage=kante", bilder).marken.plaetze());
-        Skin.Platz m0 = new Skin.Platz(Skin.Lage.KANTE, 5, 9, 0);
-        assertArrayEquals(new Skin.Platz[] {null, m0, m0, m0},
-                Skin.lies("t", "t", "#000000\n#111111", "drehung=aussen\nlage=kante\nlage_norden=mitte", bilder).marken.plaetze());
-        // Aufrecht ohne eigene Bilder nimmt O und W marke_quer, S marke, so wie sie stehen.
-        Skin.Platz[] innen = Skin.lies("t", "t", "#000000\n#111111", "drehung=aufrecht\nlage=innen", bilder).marken.plaetze();
-        assertEquals(new Skin.Platz(Skin.Lage.INNEN, 9, 5, 0), innen[1]);
-        assertEquals(new Skin.Platz(Skin.Lage.INNEN, 5, 9, 0), innen[2]);
-        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "t", "#000000\n#111111", "lage=kante", bilder));
-        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "t", "#000000\n#111111", "aussen=ja\nlage=innen", bilder));
-        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "t", "#000000\n#111111", "drehung=aufrecht\nlage=kante", bilder));
-        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "t", "#000000\n#111111", "drehung=aufrecht\nlage=schief", bilder));
+        Map<Integer, int[]> je = Map.of(Skin.NORDEN, bilder.get("norden"), Skin.MARKE, bilder.get("marke"), Skin.MARKE_QUER, bilder.get("marke_quer"));
+        for (String drehung : List.of("karte", "aussen", "innen", "aufrecht")) {
+            for (String lage : List.of("kante", "innen", "aussen")) {
+                Skin skin = Skin.lies("t", "t", "#000000\n#111111", "schatten=ja\ndrehung=" + drehung + "\nlage=" + lage, bilder);
+                int baender = skin.baender();
+                for (int seite : new int[] {64, 128}) {
+                    Minimap.Rahmen r = new Minimap.Rahmen(0, 0, seite);
+                    double halb = seite / 2.0;
+                    for (boolean rund : new boolean[] {false, true}) {
+                        for (int grad = -1; grad < 360; grad += 7) {
+                            Drehung.Lage d = grad < 0 ? null : Drehung.Lage.von(Math.toRadians(grad), 0, 0, 0, 0);
+                            double karte = d == null ? 0 : d.winkel(), spiel = d == null ? 1e-5 : 0.5 / 2 * Math.sqrt(2) + 1e-5;
+                            for (Minimap.Ornament o : Minimap.ornamente(r, baender, rund, skin.marken, d, 2, 0, -1, false, -1)) {
+                                String wo = drehung + ", " + lage + ", Seite " + seite + (rund ? " rund" : " eckig") + ", "
+                                        + (grad < 0 ? "genordet" : grad + "°") + ", " + "NOSW".charAt(o.richtung());
+                                double erwartet = switch (drehung) {
+                                    case "karte" -> karte;
+                                    case "aussen" -> karte + o.richtung() * Math.PI / 2;
+                                    case "innen" -> karte + o.richtung() * Math.PI / 2 + Math.PI;
+                                    default -> 0;
+                                };
+                                assertEquals(erwartet, o.winkel(), 1e-12, wo);
+                                boolean mitDerMitte = "aussen".equals(drehung) || "innen".equals(drehung);
+                                assertEquals(o.richtung() == 0 ? Skin.NORDEN : mitDerMitte ? Skin.MARKE : Skin.MARKE_JE_RICHTUNG[o.richtung()], o.teil(), wo);
+                                int[] b = je.get(o.teil());
+                                switch (lage) {
+                                    case "kante" -> assertEquals(halb, weit(ecken(o, b[0], b[1], 1), halb, halb, rund), spiel, wo);
+                                    case "innen" -> assertEquals(halb - baender - 1, weit(ecken(o, b[0], b[1], 0), halb, halb, rund), spiel, wo);
+                                    default -> {
+                                        assertEquals(halb + 1, nah(ecken(o, b[0], b[1], 0), halb, halb, rund), spiel + 0.01, wo);
+                                        assertTrue(weit(ecken(o, b[0], b[1], 1), halb, halb, false) <= halb + skin.einrueckung() + spiel,
+                                                wo + ": über den Abstand zum Rand");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @Test
-    void letternLiegenInnenUndAussen() throws IOException {
-        // „lettern“: aufrecht, innen ganz in der Karte mit einer Einheit Abstand zu den Bändern, aussen ganz ausserhalb mit einer
-        // Einheit Abstand, eckig und rund, genordet und gedreht; aussen nie weiter als der Abstand zum Rand. Siehe docs/rahmen.md, „Lage“.
+    void biomUndLetternMitDemKopfNachAussen() throws IOException {
+        // Der Wunsch des Users (0041): biom mit O, S und W aussen auf dem Rand, der Fuss am Rand, die Blüte nach aussen, N auf den
+        // Bändern; lettern mit dem Kopf nach aussen, S kopfüber, O und W quer, innen oder aussen. Dazu der Abstand zum Rand als Zahl.
+        String grasland = Skin.BIOM + "/grasland/standard";
+        BufferedImage m = bild(grasland, "marke");
+        Skin biom = Skin.lies(grasland, grasland, text(grasland, "palette.txt"), text(grasland, "info.txt"),
+                Map.of("norden", new int[] {15, 15}, "marke", new int[] {m.getWidth(), m.getHeight()}));
+        assertEquals(13, biom.einrueckung());
+        Minimap.Rahmen r = new Minimap.Rahmen(0, 0, 128);
+        List<Minimap.Ornament> marken = Minimap.ornamente(r, 2, false, biom.marken, null, 2, 0, -1, false, -1);
+        assertEquals(Minimap.ornamente(r, 2, false, Skin.Marken.AUSSEN, null, 2, 0, -1, false, -1).get(3), marken.get(3), "N auf den Bändern");
+        // Genordet O, S und W: die Blüte aussen, der Fuss eine Einheit ausserhalb der Minimap.
+        assertArrayEquals(new double[] {128 + 1 + 4.5, 64, Math.PI / 2}, new double[] {marken.get(0).x(), marken.get(0).y(), marken.get(0).winkel()}, 1e-5);
+        assertArrayEquals(new double[] {64, 128 + 1 + 4.5, Math.PI}, new double[] {marken.get(1).x(), marken.get(1).y(), marken.get(1).winkel()}, 1e-5);
+        assertArrayEquals(new double[] {-1 - 4.5, 64, 3 * Math.PI / 2}, new double[] {marken.get(2).x(), marken.get(2).y(), marken.get(2).winkel()}, 1e-5);
         for (String lage : List.of("innen", "aussen")) {
             String ordner = "lettern/tinte";
             Map<String, int[]> bilder = new HashMap<>();
@@ -406,41 +442,94 @@ class SkinTest {
                 BufferedImage b = bild(ordner, teil);
                 bilder.put(teil, new int[] {b.getWidth(), b.getHeight()});
             }
-            Skin skin = Skin.lies("lettern/tinte_" + lage, ordner, text(ordner, "palette.txt"), text(ordner, "info.txt") + "\nlage=" + lage, bilder);
-            int baender = skin.baender(), rand = Minimap.rand(skin);
-            for (int seite : new int[] {64, 128, 256}) {
-                Minimap.Rahmen r = new Minimap.Rahmen(0, 0, seite);
-                double halb = seite / 2.0;
-                for (boolean rund : new boolean[] {false, true}) {
-                    for (int grad = -1; grad < 360; grad += 5) {
-                        Drehung.Lage d = grad < 0 ? null : Drehung.Lage.von(Math.toRadians(grad), 0, 0, 0, 0);
-                        List<Minimap.Ornament> marken = Minimap.ornamente(r, baender, rund, skin.marken, d, 2, 0, -1, false, -1);
-                        for (int j = 0; j < 4; j++) {
-                            Minimap.Ornament o = marken.get(j);
-                            String wo = lage + ", Seite " + seite + (rund ? " rund" : " eckig") + ", " + (grad < 0 ? "genordet" : grad + "°") + ", " + j;
-                            // Aufrecht: nie gedreht, das eigene Bild je Richtung. Gedreht liegt die Mitte auf ganzen Pixeln, bei GS 2 auf halben
-                            // Einheiten; daher das Spiel.
-                            assertEquals(0, o.winkel(), wo);
-                            assertEquals(Skin.EIGENE_JE_RICHTUNG[(j + 1) % 4], o.teil(), wo);
-                            int[] b = bilder.get(List.of("osten", "sueden", "westen", "norden").get(j));
-                            double w = b[0] / 2.0, h = b[1] / 2.0, x = o.x() - halb, y = o.y() - halb, spiel = 0.25 * Math.sqrt(2) + 1e-9;
-                            if ("innen".equals(lage)) {
-                                // Der weiteste Punkt des Bilds liegt auf der Linie eine Einheit innerhalb der Bänder.
-                                double innen = halb - baender - 1;
-                                double weit = rund ? Math.hypot(Math.abs(x) + w, Math.abs(y) + h) : Math.max(Math.abs(x) + w, Math.abs(y) + h);
-                                assertEquals(innen, weit, spiel + 0.01, wo);
-                            } else {
-                                // Der nächste Punkt des Bilds liegt eine Einheit ausserhalb der Minimap; samt Schatten bleibt es im Abstand zum Rand.
-                                double dx = Math.max(0, Math.abs(x) - w), dy = Math.max(0, Math.abs(y) - h);
-                                double nah = rund ? Math.hypot(dx, dy) : Math.max(dx, dy);
-                                assertEquals(halb + 1, nah, spiel + 0.01, wo);
-                                assertTrue(Math.max(Math.abs(x) + w, Math.abs(y) + h) + 1 <= halb + rand + spiel, wo + ": über den Abstand zum Rand");
-                            }
-                        }
-                    }
+            Skin lettern = Skin.lies("lettern/tinte_" + lage, ordner, text(ordner, "palette.txt"), text(ordner, "info.txt") + "\nlage=" + lage, bilder);
+            assertEquals("aussen".equals(lage) ? 14 : 7, lettern.einrueckung(), lage);
+            List<Minimap.Ornament> buchstaben = Minimap.ornamente(r, lettern.baender(), false, lettern.marken, null, 2, 0, -1, false, -1);
+            for (Minimap.Ornament o : buchstaben) {
+                assertEquals(Skin.EIGENE_JE_RICHTUNG[o.richtung()], o.teil(), lage);
+                assertEquals(o.richtung() * Math.PI / 2, o.winkel(), 1e-12, lage + ": der Kopf nach aussen");
+            }
+            // Genordet liegt S unten, mitten, eine Einheit innerhalb der Bänder oder ausserhalb der Minimap.
+            Minimap.Ornament s = buchstaben.get(1);
+            assertEquals(64, s.x(), 1e-5);
+            assertEquals("aussen".equals(lage) ? 128 + 1 + 4.5 : 128 - lettern.baender() - 1 - 4.5, s.y(), 1e-5, lage);
+        }
+    }
+
+    @Test
+    void lageInInfoTxt() {
+        // lage_norden gilt wie lage, wenn die Zeile fehlt; jede Lage geht mit jeder Drehung, nur unbekannte Werte nicht.
+        Map<String, int[]> bilder = Map.of("norden", new int[] {15, 15}, "marke", new int[] {5, 9}, "marke_quer", new int[] {9, 5});
+        Skin.Platz n = new Skin.Platz(Skin.Lage.KANTE, 15, 15, 1), m = new Skin.Platz(Skin.Lage.KANTE, 5, 9, 1);
+        assertNull(Skin.lies("t", "t", "#000000\n#111111", "aussen=ja\nlage=mitte", bilder).marken.plaetze());
+        assertArrayEquals(new Skin.Platz[] {n, m, m, m}, Skin.lies("t", "t", "#000000\n#111111", "schatten=ja\naussen=ja\nlage=kante", bilder).marken.plaetze());
+        Skin.Platz m0 = new Skin.Platz(Skin.Lage.KANTE, 5, 9, 0);
+        assertArrayEquals(new Skin.Platz[] {null, m0, m0, m0},
+                Skin.lies("t", "t", "#000000\n#111111", "drehung=aussen\nlage=kante\nlage_norden=mitte", bilder).marken.plaetze());
+        // Aufrecht und starr ohne eigene Bilder nehmen O und W marke_quer, S marke, so wie sie stehen; innen wie aussen marke.
+        Skin.Platz[] innen = Skin.lies("t", "t", "#000000\n#111111", "drehung=aufrecht\nlage=innen", bilder).marken.plaetze();
+        assertEquals(new Skin.Platz(Skin.Lage.INNEN, 9, 5, 0), innen[1]);
+        assertEquals(new Skin.Platz(Skin.Lage.INNEN, 5, 9, 0), innen[2]);
+        assertEquals(new Skin.Platz(Skin.Lage.AUSSEN, 5, 9, 0), Skin.lies("t", "t", "#000000\n#111111", "drehung=innen\nlage=aussen", bilder).marken.plaetze()[1]);
+        assertEquals(new Skin.Platz(Skin.Lage.KANTE, 9, 5, 0), Skin.lies("t", "t", "#000000\n#111111", "lage=kante", bilder).marken.plaetze()[1]);
+        assertEquals(Skin.Stellung.INNEN, Skin.lies("t", "t", "#000000\n#111111", "drehung=innen", bilder).marken.stellung());
+        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "t", "#000000\n#111111", "drehung=aufrecht\nlage=schief", bilder));
+        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "t", "#000000\n#111111", "drehung=quer", bilder));
+    }
+
+    /**
+     * Die Ecken des Bilds einer Marke von w × h Einheiten auf dem Schirm, um ihren Winkel gedreht: oben zeigt nach (sin, −cos),
+     * rechts nach (cos, sin). Mit {@code schatten} dazu die Ecken des Schattens um (+schatten, +schatten).
+     */
+    private static double[][] ecken(Minimap.Ornament o, int w, int h, int schatten) {
+        double ox = Math.sin(o.winkel()), oy = -Math.cos(o.winkel()), rx = -oy, ry = ox;
+        double[][] e = new double[schatten > 0 ? 8 : 4][];
+        for (int j = 0; j < e.length; j++) {
+            double a = (j & 1) == 0 ? h / 2.0 : -h / 2.0, b = (j & 2) == 0 ? w / 2.0 : -w / 2.0, s = j < 4 ? 0 : schatten;
+            e[j] = new double[] {o.x() + a * ox + b * rx + s, o.y() + a * oy + b * ry + s};
+        }
+        return e;
+    }
+
+    /** Wie weit die äusserste Ecke von der Mitte (cx, cy) liegt: rund im Kreis, eckig im Quadrat. */
+    private static double weit(double[][] ecken, double cx, double cy, boolean rund) {
+        double weit = 0;
+        for (double[] e : ecken) {
+            double x = e[0] - cx, y = e[1] - cy;
+            weit = Math.max(weit, rund ? Math.hypot(x, y) : Math.max(Math.abs(x), Math.abs(y)));
+        }
+        return weit;
+    }
+
+    /**
+     * Wie nah ein Bild mit diesen vier Ecken der Mitte (cx, cy) kommt: rund der nächste Punkt seines Rands, abgetastet; eckig die
+     * Seite des Quadrats, die es ganz verlassen hat, gemessen an seiner nächsten Ecke auf dieser Achse.
+     */
+    private static double nah(double[][] ecken, double cx, double cy, boolean rund) {
+        if (rund) {
+            // Der Rand in der Reihenfolge der Ecken: oben rechts, oben links, unten links, unten rechts.
+            int[] folge = {0, 2, 3, 1};
+            double nah = Double.MAX_VALUE;
+            for (int j = 0; j < 4; j++) {
+                double[] a = ecken[folge[j]], b = ecken[folge[(j + 1) % 4]];
+                for (int t = 0; t <= 2000; t++) {
+                    double x = a[0] + (b[0] - a[0]) * t / 2000.0 - cx, y = a[1] + (b[1] - a[1]) * t / 2000.0 - cy;
+                    nah = Math.min(nah, Math.hypot(x, y));
                 }
             }
+            return nah;
         }
+        double mx = 0, my = 0;
+        for (double[] e : ecken) {
+            mx += e[0] / 4 - cx / 4;
+            my += e[1] / 4 - cy / 4;
+        }
+        double nahX = Double.MAX_VALUE, nahY = Double.MAX_VALUE;
+        for (double[] e : ecken) {
+            nahX = Math.min(nahX, (e[0] - cx) * Math.signum(mx));
+            nahY = Math.min(nahY, (e[1] - cy) * Math.signum(my));
+        }
+        return Math.max(nahX, nahY);
     }
 
     @Test

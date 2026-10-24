@@ -259,9 +259,9 @@ class DrehungTest {
     void markenAufDerMitteDerBaender() {
         // Rund auf dem Kreis durch die Mitte der Bänder, eckig auf dem Quadrat; 30° gedreht.
         double ux = Math.sin(Math.toRadians(30)), uy = -Math.cos(Math.toRadians(30));
-        double[] rund = Skin.marke(10, 20, 128, 2, true, ux, uy, null);
+        double[] rund = Skin.marke(10, 20, 128, 2, true, ux, uy, null, 0);
         assertEquals(63, Math.hypot(rund[0] - 74, rund[1] - 84), 1e-9);
-        double[] eckig = Skin.marke(10, 20, 128, 2, false, ux, uy, null);
+        double[] eckig = Skin.marke(10, 20, 128, 2, false, ux, uy, null, 0);
         assertEquals(63, Math.max(Math.abs(eckig[0] - 74), Math.abs(eckig[1] - 84)), 1e-9);
         // Das Bild je Richtung steht fest und dreht mit: N norden, S marke, O und W marke_quer.
         assertArrayEquals(new int[] {Skin.NORDEN, Skin.MARKE_QUER, Skin.MARKE, Skin.MARKE_QUER}, Skin.MARKE_JE_RICHTUNG);

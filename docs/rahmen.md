@@ -76,10 +76,10 @@ Je Familie die Varianten aus `varianten.txt`, die erste ist die Vorgabe
 
 | Familie | Varianten | Bänder | Schatten | Stellung, Lage | `norden` | Abstand zum Rand |
 |---|---|---|---|---|---|---|
-| `biom` | je Kategorie `standard` und 1–2 Recolors, siehe „Biom“ | 2 | ja | aussen, O/S/W `kante`, N `mitte` | 15 × 15 | 11 |
+| `biom` | je Kategorie `standard` und 1–2 Recolors, siehe „Biom“ | 2 | ja | aussen, O/S/W `aussen`, N `mitte` | 15 × 15 | 16 |
 | `schild` | `grau`, `gold`, `papier` | 3, 4, 5 | nein | karte, `mitte` | 6 × 7 | 5 |
 | `rose` | `silber`, `gold`, `pergament` | 2 | ja | `silber` aussen, sonst karte; `mitte` | 17 × 17 | 13 |
-| `lettern` | `tinte`, `nacht`, `gold`, `rubrik`, je `_innen` und `_aussen` | 2 | ja | aufrecht, `innen` oder `aussen` | 7 × 9 | 11 |
+| `lettern` | `tinte`, `nacht`, `gold`, `rubrik`, je `_innen` und `_aussen` | 2 | ja | aussen, `innen` oder `aussen` | 7 × 9 | 14 |
 
 Die Pixelbilder von `schild`, `rose` und `biom/<kategorie>/standard` sind
 die der alten Skins, unverändert; die Recolors und `lettern` sind neu.
@@ -176,7 +176,7 @@ eine Kategorie geht auch, siehe unten.
   Kategorie rechnet sie nur neu, wenn sich das Biom ändert. Während der
   Überblendung zeichnet sie zwei Rahmen, siehe „Kosten“.
 
-![Der Rahmen „biom“ eckig und rund in der Szene des Gametests, einer Ebene, also Grasland; die Blumen O, S und W zeigen nach aussen und sitzen innen an der Kante](bilder/rahmen-biom.png)
+![Der Rahmen „biom“ eckig und rund in der Szene des Gametests, einer Ebene, also Grasland; die Blumen O, S und W stehen aussen auf dem Rand, die Blüte nach aussen, N auf den Bändern](bilder/rahmen-biom.png)
 
 ## Dateien
 
@@ -196,7 +196,7 @@ F3+T und Ressourcenpakete laden ihn neu. Bei „biom“ je Kategorie
 - **`norden.png`, `marke.png`, `marke_quer.png`,** je mit `_aktiv`: die
   Marken, siehe „Marken“. **`osten.png`, `sueden.png`, `westen.png`,** je
   mit `_aktiv`: eigene Bilder je Richtung, etwa die Buchstaben von
-  „lettern“; gibt es sie, nimmt der Mod sie bei `drehung=aufrecht` statt
+  „lettern“; gibt es sie, nimmt der Mod sie in jeder Drehung statt
   `marke` und `marke_quer`.
 - **`tafel.png`** bei `schild` und `rose`: der Grund der Infotafel auf der
   Vollbildkarte in dieser Variante (`Karte.tafelSkin`), sonst der von
@@ -211,12 +211,13 @@ F3+T und Ressourcenpakete laden ihn neu. Bei „biom“ je Kategorie
   | Schlüssel | Werte | Vorgabe |
   |---|---|---|
   | `schatten` | `ja`, `nein`: Marken und Griff mit Schatten | `nein` |
-  | `drehung` | `karte`, `aussen`, `aufrecht`, siehe „Drehen“ und „Nach aussen“; ein altes `aussen=ja` heisst `aussen` | `karte` |
+  | `drehung` | `karte`, `aussen`, `innen`, `aufrecht`, siehe „Drehen“ und „Nach aussen“; ein altes `aussen=ja` heisst `aussen` | `karte` |
   | `lage` | `mitte`, `kante`, `innen`, `aussen`, siehe „Lage“ | `mitte` |
   | `lage_norden` | wie `lage`, nur für N | wie `lage` |
 
-  `kante` nur mit `drehung=aussen`, `innen` und `aussen` nur mit
-  `drehung=aufrecht`; ein anderer Wert lässt die Variante nicht laden.
+  Jede Lage geht mit jeder Drehung, siehe
+  [0041](entscheidungen/0041-ausrichtung-der-marken.md); ein unbekannter
+  Wert lässt die Variante nicht laden.
 - **Namen und Beschreibungen** stehen in `de_de.json` und `en_us.json`
   unter `heroicmap.rahmen.<familie>` und `.beschreibung`, je Variante
   `heroicmap.rahmen.<familie>.<variante>`, bei „biom“
@@ -329,10 +330,10 @@ stehen dann die von `schild/grau`, siehe „Im Menü“.
   links, die linke obere Ecke bei `⌊p − w / 2 + 0,5⌋` (`Skin.lage`);
   gedreht wandern sie am Rahmen entlang, siehe „Drehen“.
 - **Bild:** fest je Richtung, N `norden`, S `marke`, O und W `marke_quer`
-  (`Skin.MARKE_JE_RICHTUNG`); mit `drehung=aussen` O, S und W `marke`, siehe
-  „Nach aussen“; mit `drehung=aufrecht` und eigenen Bildern `osten`,
-  `sueden`, `westen` (`Skin.EIGENE_JE_RICHTUNG`). Im Menü unter der Maus
-  `_aktiv`.
+  (`Skin.MARKE_JE_RICHTUNG`); mit `drehung=aussen` und `innen` O, S und W
+  `marke`, siehe „Nach aussen“; mit eigenen Bildern `osten`, `sueden`,
+  `westen` in jeder Drehung diese (`Skin.EIGENE_JE_RICHTUNG`). Im Menü unter
+  der Maus `_aktiv`.
 - **Reihenfolge:** Bänder, die Marken, `norden` zuletzt, im Menü darüber
   der Griff.
 
@@ -342,10 +343,11 @@ Dreht die Minimap, siehe [Minimap](minimap.md), „Drehen“, wandern die
 Marken mit der Karte; nichts steht fest ausser dem Griff im Menü. So hat es
 der User gewünscht, siehe
 [0012](entscheidungen/0012-marken-statt-verzierungen.md). Wie ihr Bild
-steht, sagt `drehung` (`Skin.Stellung`): `karte` starr mit der Karte,
-`aussen` von der Mitte weg, siehe „Nach aussen“, `aufrecht` immer
-aufrecht, nur der Platz wandert, so bleiben die Buchstaben von „lettern“
-lesbar.
+steht, sagt `drehung` (`Skin.Stellung`, `Skin.winkel`): `karte` starr mit
+der Karte, `aussen` mit dem Kopf von der Mitte weg und `innen` zu ihr hin,
+siehe „Nach aussen“, `aufrecht` immer aufrecht, nur der Platz wandert.
+`aussen`, `aufrecht` und `innen` sind die drei Ausrichtungen, die der User
+wollte, siehe [0041](entscheidungen/0041-ausrichtung-der-marken.md).
 
 - **Lage:** in ihrer Himmelsrichtung im Kartenbild, gedreht wie die Karte,
   nach ihrer Lage; rund am Kreis, eckig am Quadrat, das selbst achsparallel
@@ -361,16 +363,19 @@ lesbar.
 
 ## Nach aussen
 
-Bei `drehung=aussen`, „rose“ in „silber“ und allen Kategorien von „biom“,
-zeigt das Bild jeder Marke von der Mitte der Minimap weg, genordet wie
-gedreht; sonst zeigten alle gleich nach Norden, mit Blick nach Süden etwa
-alle nach unten. So hat es der User am 15.10. gewünscht, siehe
-[0022](entscheidungen/0022-marken-nach-aussen.md).
+Bei `drehung=aussen`, „rose“ in „silber“, allen Kategorien von „biom“ und
+„lettern“, zeigt der Kopf des Bilds jeder Marke von der Mitte der Minimap
+weg, genordet wie gedreht; sonst zeigten alle gleich nach Norden, mit Blick
+nach Süden etwa alle nach unten. So hat es der User am 15.10. gewünscht,
+siehe [0022](entscheidungen/0022-marken-nach-aussen.md), für „lettern“ am
+24.10., siehe [0041](entscheidungen/0041-ausrichtung-der-marken.md): S
+steht dort kopfüber, O und W liegen quer. `drehung=innen` dreht jedes Bild
+um 180° weiter, der Kopf zeigt zur Mitte; keine Variante nutzt es bisher.
 
 - **Bild:** N `norden` wie bisher; O, S und W nehmen `marke`, gezeichnet
   für oben, und drehen es um 90°, 180° und 270° weiter
-  (`Minimap.ornamente`). `marke_quer` bleibt bei diesen Varianten
-  ungenutzt.
+  (`Minimap.ornamente`); mit eigenen Bildern diese, ebenso gedreht.
+  `marke_quer` bleibt bei diesen Varianten ungenutzt.
 - **Pixel:** Um ganze Vierteldrehungen gedreht liegt der Kasten des Bildes
   mit vertauschten Seiten auf ganzen Einheiten wie ungedreht
   (`Skin.blit`); genordet bleibt die Pixelkunst so scharf.
@@ -386,13 +391,19 @@ Wo eine Marke liegt, sagt `lage`, für N `lage_norden` (`Skin.Lage`,
 | Lage | wo | bei |
 |---|---|---|
 | `mitte` | die Mitte des Bilds auf der Mitte der Bänder | `schild`, `rose`, N von `biom` |
-| `kante` | auf den Bändern, Bild und Schatten innen an der äusseren Kante | O, S, W von `biom` |
+| `kante` | auf den Bändern, Bild und Schatten innen an der äusseren Kante | keine; O, S, W von `biom` bis 0041 |
 | `innen` | ganz in der Karte, eine Einheit innerhalb der Bänder | `lettern` `_innen` |
-| `aussen` | ganz ausserhalb, eine Einheit ausserhalb der Minimap | `lettern` `_aussen` |
+| `aussen` | ganz ausserhalb, eine Einheit ausserhalb der Minimap | O, S, W von `biom`, `lettern` `_aussen` |
 
-- **`kante`** (`Skin.anliegend`), so hat es der User am 23.10. für „biom“
-  gewählt, aus zwei Entwürfen: aussen bündig statt kleiner im Band, denn
-  ganz im Band von 2 Einheiten wäre eine Marke ein Punkt (mod#189).
+Jede Lage geht mit jeder Drehung. Ausser bei `mitte` zählt der Kasten des
+Bilds, wie es auf dem Schirm gedreht steht (`Skin.kasten`): eckig an den
+Seiten, die es erreichen kann, rund jede Ecke.
+
+- **`kante`** (`Skin.innen` mit dem Schatten), so hat es der User am
+  23.10. für „biom“ gewählt, aus zwei Entwürfen: aussen bündig statt
+  kleiner im Band, denn ganz im Band von 2 Einheiten wäre eine Marke ein
+  Punkt (mod#189). Seit [0041](entscheidungen/0041-ausrichtung-der-marken.md)
+  stehen die Blumen dort aussen auf dem Rand.
   Ungedreht schliessen O und S mit ihrem Schatten an der Kante ab, eine
   Einheit weiter innen als das Bild allein, W mit dem Bild; rund berühren
   die äussersten Ecken den Kreis. Gedreht zählt der Kasten des gedrehten
@@ -400,13 +411,15 @@ Wo eine Marke liegt, sagt `lage`, für N `lage_norden` (`Skin.Lage`,
   innen reicht die Marke über die Bänder in die Karte. Die Lage hiess beim
   Designer zuerst `innen`; so hat es der Reviewer am 24.10. getrennt, siehe
   [0032](entscheidungen/0032-rahmen-familien-und-waehler.md).
-- **`innen`** (`Skin.innen`): Das aufrechte Bild berührt von innen die Linie
-  eine Einheit innerhalb der Bänder, eckig das Quadrat, rund mit seiner
+- **`innen`** (`Skin.innen`): Das Bild berührt von innen die Linie eine
+  Einheit innerhalb der Bänder, eckig das Quadrat, rund mit seiner
   weitesten Ecke den Kreis; genordet die Formel des Designers, Mitte bei
-  K/2 − n − 1 − a/2.
-- **`aussen`** (`Skin.aussen`): Das aufrechte Bild berührt von aussen die
-  Linie eine Einheit ausserhalb der Minimap, eckig mit einer Seite, rund mit
-  seinem nächsten Punkt; genordet die Mitte bei K/2 + 1 + a/2.
+  K/2 − n − 1 − a/2, a die Höhe des Bilds in Richtung der Mitte.
+- **`aussen`** (`Skin.aussen`): Das Bild berührt von aussen die Linie eine
+  Einheit ausserhalb der Minimap, eckig mit der Seite, die es zuerst ganz
+  verlässt, rund mit seinem nächsten Punkt; genordet die Mitte bei
+  K/2 + 1 + a/2. So steht die Blume von „biom“ mit dem Fuss eine Einheit
+  vor dem Rand.
 - **Pixel:** Gedreht liegt die Mitte auf ganzen Pixeln des Schirms; das
   kann sie um einen halben Pixel verschieben.
 - **Der Klick im Menü** trifft die Marke dort, wo sie liegt, siehe „Im
@@ -532,11 +545,14 @@ schalten, siehe [0032](entscheidungen/0032-rahmen-familien-und-waehler.md).
 Die Minimap hält 4 Einheiten Abstand zum Rand des Schirms, mit Rahmen
 mindestens die halbe Diagonale der grössten Marke, aufgerundet
 (`Minimap.rand`, `Skin.einrueckung`), siehe die Tabelle unter „Familien“:
-bei `rose` 13, bei `biom` 11. So bleibt jede Marke in jeder Drehung ganz
-auf dem Schirm, auch ihr Schatten, denn ihre Mitte liegt auf der Mitte der
-Bänder oder weiter innen. Liegen Marken aussen, wie bei `lettern`, so weit,
+bei `rose` 13. So bleibt jede Marke in jeder Drehung ganz auf dem Schirm,
+auch ihr Schatten, denn ihre Mitte liegt auf der Mitte der Bänder oder
+weiter innen. Liegen Marken aussen, wie bei `lettern` und `biom`, so weit,
 wie sie samt Schatten in irgendeiner Drehung über die Minimap reichen,
-eckig wie rund: bei `lettern` 11, wie beim Designer. Je Familie gilt der
+eckig wie rund, mit dem Kasten des gedrehten Bilds: bei `lettern` 14, bei
+`biom` 16; am weitesten reicht eine Marke in der Ecke der um 45° gedrehten
+eckigen Minimap. Je Kategorie die Zahlen in
+[0041](entscheidungen/0041-ausrichtung-der-marken.md). Je Familie gilt der
 grösste über alle Varianten, bei `biom` über alle Kategorien. Das gilt
 immer, auch ungedreht und mit dem Schalter
 „Verzierungen“ aus; so springt die Minimap beim Umschalten nicht, siehe
@@ -592,7 +608,8 @@ Geschätzt, nicht gemessen:
 Der Gametest `Bilder` nimmt jede Familie in ihrer ersten Variante eckig und
 rund bei 4 px auf, `rahmen-<familie>.png`, dazu `lettern` aussen
 (`rahmen-lettern-aussen.png`), `rose` mit allen Marken in HD
-(`rahmen-rose-hd.png`), das Menü mit `rose` in `gold`, mit
+(`rahmen-rose-hd.png`), nur mit `-Pbilder` `biom` und `lettern` bei
+GUI-Massstab 2 und 4 (`ausrichtung-<skin>-gs<k>.png`, nicht in der Doku), das Menü mit `rose` in `gold`, mit
 Verzierungen aus und der Maus auf N (`rahmen-menue-halb.png`) und mit dem
 offenen Wähler (`rahmen-waehler.png`), siehe [Minimap](minimap.md),
 „Bilder“. Diese Bilder stammen aus einem Lauf des Gametests in der CI mit
@@ -603,6 +620,6 @@ alten Namen.
 
 ![Der Rahmen „schild“ in „grau“](bilder/rahmen-schild.png)
 
-![Der Rahmen „lettern“ in „tinte“, innen](bilder/rahmen-lettern.png)
+![Der Rahmen „lettern“ in „tinte“, innen, der Kopf der Buchstaben nach aussen](bilder/rahmen-lettern.png)
 
-![Der Rahmen „lettern“ in „tinte“, aussen](bilder/rahmen-lettern-aussen.png)
+![Der Rahmen „lettern“ in „tinte“, aussen, der Kopf der Buchstaben nach aussen](bilder/rahmen-lettern-aussen.png)
