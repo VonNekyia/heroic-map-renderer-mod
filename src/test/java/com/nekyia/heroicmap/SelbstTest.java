@@ -43,6 +43,30 @@ class SelbstTest {
     }
 
     @Test
+    void webpEinerKopieAlsGrundlage(@TempDir Path w) throws Exception {
+        // Eine Kachel der Kopie ist ein Link auf die WebP der Quelle, aus dem Testsatz der Gametests: 256 Pixel, Massstab 4.
+        byte[] webp = Files.readAllBytes(Path.of("src/gametest/resources/satz/4/2/0/0.webp"));
+        Path quelle = w.resolve("quelle/2/0/0.webp"), ordner = w.resolve("kopie");
+        Files.createDirectories(quelle.getParent());
+        Files.write(quelle, webp);
+        Files.createDirectories(ordner.resolve("2/0"));
+        Files.createLink(ordner.resolve("2/0/0.webp"), quelle);
+        int[] vorher = Kacheln.dekodiere(webp, 256).argb();
+        Kachelwerk werk = new Kachelwerk(ordner, 256, 64, 0, 2);
+        werk.lege(1, 2, voll(64, ROT));
+        schreibe(werk, true);
+        // Die neue PNG: der Chunk rot, alles andere bitgleich zur WebP; der Link ist weg, die Quelle unverändert.
+        int[] nachher = lies(ordner.resolve("2/0/0.png"));
+        for (int i = 0; i < vorher.length; i++) {
+            int x = i % 256, y = i / 256;
+            boolean imChunk = x >= 64 && x < 128 && y >= 128 && y < 192;
+            assertEquals(imChunk ? ROT : vorher[i], nachher[i], "Pixel " + x + ", " + y);
+        }
+        assertFalse(Files.exists(ordner.resolve("2/0/0.webp")));
+        assertArrayEquals(webp, Files.readAllBytes(quelle));
+    }
+
+    @Test
     void vorfahrAusVierKindern(@TempDir Path ordner) throws Exception {
         // Vier Kinder in vier Farben: Vertauschte Viertel oder Achsen fielen auf.
         Kachelwerk werk = new Kachelwerk(ordner, 256, 64, 7, 8);

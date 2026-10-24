@@ -1394,18 +1394,23 @@ public final class Bilder implements FabricClientGameTest {
     static Path testsatz() {
         Path baum = FabricLoader.getInstance().getGameDir().resolve(HeroicMap.ID).resolve("test").resolve("beispiel");
         try {
-            for (String datei : liste()) {
-                Path ziel = baum.resolve("4").resolve(datei);
-                Files.createDirectories(ziel.getParent());
-                try (InputStream rein = Bilder.class.getResourceAsStream("/satz/4/" + datei)) {
-                    Files.copy(rein, ziel, StandardCopyOption.REPLACE_EXISTING);
-                }
-            }
+            testsatz(baum.resolve("4"));
             Satz.schreibe(baum, "Beispiel", "minecraft:overworld", 4);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
         return baum;
+    }
+
+    /** Legt Kacheln und map.json des Testsatzes in den Ordner {@code massstab}: 256 Pixel, Massstab 4, Stufen 0 bis 2 um den Ursprung. */
+    static void testsatz(Path massstab) throws IOException {
+        for (String datei : liste()) {
+            Path ziel = massstab.resolve(datei);
+            Files.createDirectories(ziel.getParent());
+            try (InputStream rein = Bilder.class.getResourceAsStream("/satz/4/" + datei)) {
+                Files.copy(rein, ziel, StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
     }
 
     /** Türen in vier Richtungen, offen, aus Eisen; Truhen einzeln und doppelt, Ender- und Fallentruhe, ein Fass als Gegenprobe. */

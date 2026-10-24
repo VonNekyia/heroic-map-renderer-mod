@@ -32,7 +32,7 @@ final class Kartenliste extends Screen {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final int TEXT = 0xFFFFFFFF;
-    private static final int ZEILE = 24, OBEN = 44, KNOPF = 60, ZUSTAND = 72, ORT = 44, ZEIGER = 36;
+    private static final int ZEILE = 24, OBEN = 44, KNOPF = 60, ZUSTAND = 72, ORT = 44, ZEIGER = 36, KOPIE = 44;
 
     private final Screen zurueck;
     /** Null, solange gezählt wird. */
@@ -259,6 +259,7 @@ final class Kartenliste extends Screen {
                 Selbst.INSTANZ.neuGewaehlt(minecraft);
                 rebuildWidgets();
             }).bounds(8, y, 60, 20).build());
+            kopieKnopf(welt, wer, name, 72, y);
             zeigerZeile = true;
             return;
         }
@@ -282,8 +283,90 @@ final class Kartenliste extends Screen {
                 rebuildWidgets();
             }).bounds(x, y, breite, 20).build());
             x += breite + 4;
+            x += kopieKnopf(welt, wer, k, x, y);
         }
         zeigerZeile = true;
+    }
+
+    /**
+     * Neben „Karte von … nutzen“ und „lösen“: „Kopie“ macht die Karte von {@code k} für die Dimension des Spielers zur eigenen
+     * Karte dieses Servers, über die „Selbst“ zeichnet. Kein Knopf, wenn es dort keine gibt oder „Selbst“ hier nicht geht;
+     * grau mit Grund, wenn dieser Server schon eine eigene hat oder ein Download in die Quelle läuft. Gibt die belegte Breite
+     * zurück. Siehe docs/selbst.md, „Kopie“.
+     */
+    private int kopieKnopf(Path welt, String wer, String k, int x, int y) {
+        if (!Selbst.INSTANZ.moeglich(minecraft)) {
+            return 0;
+        }
+        String dimension = minecraft.level.dimension().identifier().toString();
+        Satz satz = Satz.fuer(Zeiger.ordner(welt, k), dimension, k);
+        if (satz == null) {
+            return 0;
+        }
+        Path quelle = satz.ordner().getParent();
+        Button knopf = Button.builder(Component.translatable("heroicmap.liste.kopie"), b -> kopiere(welt, wer, quelle))
+                .bounds(x, y, KOPIE, 20).tooltip(Tooltip.create(Component.translatable("heroicmap.liste.kopie.beschreibung", anzeige(k))))
+                .build();
+        if (Files.exists(welt.resolve(Selbst.baum(dimension, wer)))) {
+            knopf.active = false;
+            knopf.setTooltip(Tooltip.create(Component.translatable("heroicmap.liste.kopie.da")));
+        } else if (Downloads.INSTANZ.belegt(quelle)) {
+            knopf.active = false;
+            knopf.setTooltip(Tooltip.create(Component.translatable("heroicmap.liste.belegt")));
+        }
+        addRenderableWidget(knopf);
+        return KOPIE + 4;
+    }
+
+    /** Kopiert per Hardlink; kann das Laufwerk keine, erst nach Rückfrage mit der Grösse, die das Zählen schon kennt. */
+    private void kopiere(Path welt, String wer, Path quelle) {
+        if (Kopie.hartMoeglich(welt.getParent())) {
+            kopiereJetzt(welt, wer, quelle, true);
+            return;
+        }
+        long bytes = bestand == null ? 0 : bestand.karten().stream().filter(e -> e.ordner().equals(quelle)).mapToLong(Laden.AufPlatte::bytes).sum();
+        minecraft.gui.setScreen(new ConfirmScreen(ja -> {
+            minecraft.gui.setScreen(this);
+            if (ja) {
+                kopiereJetzt(welt, wer, quelle, false);
+            }
+        }, Component.translatable("heroicmap.liste.kopie.frage_titel"), Component.translatable("heroicmap.liste.kopie.frage", Downloads.groesse(bytes))));
+    }
+
+    /** Hält die Quelle gegen einen Download, kopiert in einem eigenen Thread; danach zeigt dieser Server die Kopie, die Liste zählt neu. */
+    private void kopiereJetzt(Path welt, String wer, Path quelle, boolean hart) {
+        Satz satz = Satz.lies(quelle);
+        if (satz == null || !Downloads.INSTANZ.halte(quelle)) {
+            hinweis = Component.translatable("heroicmap.liste.belegt");
+            return;
+        }
+        Path ziel = welt.resolve(Selbst.baum(satz.dimension(), wer));
+        bestand = null;
+        zaehlt = new AtomicBoolean();
+        rebuildWidgets();
+        Thread.ofPlatform().daemon().name("Heroic Map Kopie").start(() -> {
+            boolean ok = true;
+            try {
+                Kopie.kopiere(quelle, ziel, wer, hart);
+                Zeigt.setze(welt, wer, satz.dimension(), ziel.getFileName().toString());
+            } catch (IOException | RuntimeException fehler) {
+                LOGGER.warn("Heroic Map: {} nicht nach {} kopiert", quelle, ziel, fehler);
+                ok = false;
+            }
+            boolean fertig = ok;
+            Minecraft.getInstance().execute(() -> {
+                Downloads.INSTANZ.gibFrei(quelle);
+                if (!fertig) {
+                    hinweis = Component.translatable("heroicmap.liste.kopie.fehler");
+                }
+                Selbst.INSTANZ.neuGewaehlt(Minecraft.getInstance());
+                if (minecraft.gui.screen() == this) {
+                    zaehle();
+                } else {
+                    zaehlt = null;
+                }
+            });
+        });
     }
 
     /** Der Name einer anderen Karte für die Zeile des Zeigers; ohne Namen ein Wort. */
