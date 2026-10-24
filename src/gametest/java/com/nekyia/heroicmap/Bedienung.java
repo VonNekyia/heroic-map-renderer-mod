@@ -64,7 +64,7 @@ public final class Bedienung implements FabricClientGameTest {
 
     @Override
     public void runTest(ClientGameTestContext context) {
-        // Mit Befehlen, sonst schickt der Server execute und tp nicht, und das Teleport-Menü fehlt.
+        // Mit Befehlen, sonst lehnt der Server den Teleport aus dem Menü ab.
         try (TestSingleplayerContext spiel = context.worldBuilder().adjustSettings(s -> s.setAllowCommands(true)).create(); var _ = Abschluss.langsamerTakt(context, spiel)) {
             spiel.getConnection().waitForChunksRender();
             Bilder.leereWelt(context);
@@ -5404,8 +5404,9 @@ public final class Bedienung implements FabricClientGameTest {
     /**
      * „Hierher teleportieren“, siehe docs/vollbildkarte.md, „Teleportieren“: über Wasser in einem Chunk, den der Client
      * hat, auf die Oberfläche, nicht auf den Grund; in einen Chunk, den weder Client noch Server geladen haben, mit dem
-     * Boden der Karte, den der Mod genau einmal per HTTP holt, auf den Boden der flachen Welt. Dazu die Korrektur: mit
-     * veralteten Höhen, ohne Daten in einen Chunk, den der Server hat, und einen, den er nicht hat, und im Nether.
+     * Boden der Karte, den der Mod genau einmal per HTTP holt, auf den Boden der flachen Welt. Dazu die Korrektur mit
+     * veralteten Höhen; ohne Daten über die sichere Höhe in einen Chunk, den der Server hat, und einen, den er nicht hat;
+     * im Nether; und zurück an den Start, wo im End kein Platz zum Stehen ist.
      */
     private static void teleport(ClientGameTestContext context, TestServerContext server, TestInput maus, int k) {
         // Ein Becken aus Glas, das Wasser darin 6 hoch: der Grund bei y = -61, die Oberfläche im Block -55.
@@ -5490,6 +5491,7 @@ public final class Bedienung implements FabricClientGameTest {
             }
             korrektur(context, server, maus, k, baum);
             nether(context, server, maus, k, baum);
+            ende(context, server, maus, k, baum);
         } finally {
             http.stop(0);
             context.runOnClient(mc -> mc.gui.setScreen(null));
@@ -5497,8 +5499,9 @@ public final class Bedienung implements FabricClientGameTest {
     }
 
     /**
-     * Die Korrektur nach dem Landen ohne Decke. Der Spieler steht vorher in einem Loch auf dem Grundgestein, bei y = -63;
-     * diese Höhe nimmt der Mod ohne Daten, und dort steckt er am Ziel in der Erde.
+     * Die Korrektur nach dem Landen ohne Decke, mit veralteten Höhen der Karte. Ohne Daten geht der Spieler erst auf die
+     * sichere Höhe, in der flachen Welt der Tests y = 317, und sobald der Chunk beim Client ist auf den Boden: in einen
+     * Chunk, den der Server hat, und einen, den er erst erzeugt; beide ohne Schaden.
      */
     private static void korrektur(ClientGameTestContext context, TestServerContext server, TestInput maus, int k, Path baum) {
         // Veraltete Höhen der Karte: Landung in der Erde, dann auf den Boden.
@@ -5506,45 +5509,37 @@ public final class Bedienung implements FabricClientGameTest {
         if (veraltet[1] > -61.9) {
             throw new AssertionError("Veraltete Höhen: nie in der Erde gelandet, tiefstes y " + veraltet[1]);
         }
-        // Ohne Daten, den Chunk hat der Server: Er sucht den Boden, ohne Schaden und ohne die feste Höhe -63. Bis der Chunk
-        // beim Client ist, fällt der Spieler dort einen Tick, 0,08 Blöcke.
+        // Ohne Daten, den Chunk hat der Server: Er zählt den Fall ab dem ersten tp, bis der Chunk beim Client ist.
         server.runCommand("forceload add 1000 1000");
         server.waitFor(s -> s.overworld().isLoaded(new BlockPos(1000, -60, 1000)), 600);
-        insLoch(context, server);
-        float leben = context.computeOnClient(mc -> mc.player.getHealth());
-        double[] geladen = landet(context, maus, k, baum, 1000, "Ohne Daten, Chunk beim Server");
-        if (geladen[0] < leben || geladen[1] < -61) {
-            throw new AssertionError("Ohne Daten, Chunk beim Server: Leben " + leben + " → " + geladen[0] + ", tiefstes y " + geladen[1]);
-        }
+        ohneDaten(context, maus, k, baum, 1000, "Ohne Daten, Chunk beim Server");
         server.runCommand("forceload remove all");
-        // Ohne Daten, den Chunk hat der Server nicht: Er lehnt ab, nach 5 Ticks die Höhe des Spielers, dann die Korrektur.
-        insLoch(context, server);
-        leben = context.computeOnClient(mc -> mc.player.getHealth());
-        double[] fremd = landet(context, maus, k, baum, 3000, "Ohne Daten, Chunk nicht beim Server");
-        if (fremd[1] > -62.9) {
-            throw new AssertionError("Ohne Daten, Chunk nicht beim Server: nie auf der festen Höhe -63, tiefstes y " + fremd[1]);
-        }
-        System.out.println("Heroic Map Gametest: Teleport ohne Daten, Chunk nicht beim Server, Schaden " + (leben - fremd[0]));
+        // Ohne Daten, den Chunk hat der Server nicht: Bis er ihn erzeugt hat, zählt er keinen Fall.
+        ohneDaten(context, maus, k, baum, 3000, "Ohne Daten, Chunk nicht beim Server");
     }
 
-    /** Ein Loch unter dem Spieler bis auf das Grundgestein, er steht darin bei y = -63. */
-    private static void insLoch(ClientGameTestContext context, TestServerContext server) {
-        server.runCommand("execute as @p at @s run fill ~ -63 ~ ~ -61 ~ air");
-        server.runCommand("execute as @p at @s run tp @s ~ -63 ~");
-        context.waitFor(mc -> Math.abs(mc.player.getY() - -63) < 0.01 && mc.player.onGround(), 100);
+    /** Ein Teleport ohne Daten nach (x, x): über die sichere Höhe auf den Boden, ohne Schaden, nie in der Erde. */
+    private static void ohneDaten(ClientGameTestContext context, TestInput maus, int k, Path baum, int x, String fall) {
+        float leben = context.computeOnClient(mc -> mc.player.getHealth());
+        double[] l = landet(context, maus, k, baum, x, fall);
+        if (l[0] < leben || l[1] < -60.01 || l[2] < 316) {
+            throw new AssertionError(fall + ": Leben " + leben + " → " + l[0] + ", tiefstes y " + l[1] + ", höchstes y " + l[2]
+                    + " statt der sicheren Höhe 317");
+        }
+        System.out.println("Heroic Map Gametest: Teleport " + fall + ": auf dem Boden " + (int) l[3] + " Ticks nach dem Klick, Schaden 0");
     }
 
     /**
      * Teleportiert über die Karte nach (x, x), in einen Chunk, den der Client nicht hat, und wartet, bis der Spieler dort
-     * auf dem Gras steht, Luft an den Füssen, und 20 Ticks so bleibt. Gibt das geringste Leben und das tiefste y am Ziel
-     * zurück.
+     * auf dem Gras steht, Luft an den Füssen, und 20 Ticks so bleibt. Gibt das geringste Leben, das tiefste und das
+     * höchste y am Ziel und die Ticks vom Schliessen der Karte bis zum ersten Stand auf dem Gras zurück.
      */
     private static double[] landet(ClientGameTestContext context, TestInput maus, int k, Path baum, int x, String fall) {
         if (context.computeOnClient(mc -> mc.level.getChunkSource().getChunk(x >> 4, x >> 4, ChunkStatus.FULL, false) != null)) {
             throw new AssertionError(fall + ": Der Chunk ist schon beim Client; der Test braucht einen fremden");
         }
         teleportiere(context, maus, k, baum, x, x);
-        double[] min = {Double.MAX_VALUE, Double.MAX_VALUE};
+        double[] min = {Double.MAX_VALUE, Double.MAX_VALUE, -Double.MAX_VALUE, -1};
         for (int i = 0, ruhig = 0; ruhig < 20; i++) {
             double[] jetzt = context.computeOnClient(mc -> new double[] {mc.player.getHealth(), mc.player.getY(),
                     Math.abs(mc.player.getX() - (x + 0.5)) < 0.01 && Math.abs(mc.player.getZ() - (x + 0.5)) < 0.01 ? 1 : 0,
@@ -5553,8 +5548,13 @@ public final class Bedienung implements FabricClientGameTest {
             min[0] = Math.min(min[0], jetzt[0]);
             if (jetzt[2] == 1) {
                 min[1] = Math.min(min[1], jetzt[1]);
+                min[2] = Math.max(min[2], jetzt[1]);
             }
-            ruhig = jetzt[2] == 1 && jetzt[3] == 1 && Math.abs(jetzt[1] - -60) < 0.01 ? ruhig + 1 : 0;
+            boolean steht = jetzt[2] == 1 && jetzt[3] == 1 && Math.abs(jetzt[1] - -60) < 0.01;
+            if (steht && min[3] < 0) {
+                min[3] = i;
+            }
+            ruhig = steht ? ruhig + 1 : 0;
             if (i == 600) {
                 throw new AssertionError(fall + ": nicht auf dem Boden, der Spieler steht bei " + context.computeOnClient(mc -> mc.player.position()));
             }
@@ -5564,9 +5564,9 @@ public final class Bedienung implements FabricClientGameTest {
     }
 
     /**
-     * Im Nether: Ohne Daten sucht der Server den obersten Block, das Dach aus Grundgestein; die Korrektur setzt den
-     * Spieler unter die Decke, auf den freien Platz nahe seiner Höhe. Start und Ziel sind Hohlräume aus Luft auf
-     * Obsidian, 3 × 3 und 3 hoch, die Füsse bei y = 60.
+     * Im Nether: Ohne Daten geht der Spieler mit Decke auf seine eigene Höhe, nie über das Dach aus Grundgestein, und
+     * bleibt auf dem freien Platz nahe seiner Höhe. Start und Ziel sind Hohlräume aus Luft auf Obsidian, 3 × 3 und 3 hoch,
+     * die Füsse bei y = 60.
      */
     private static void nether(ClientGameTestContext context, TestServerContext server, TestInput maus, int k, Path baum) {
         int ziel = 600;
@@ -5584,7 +5584,9 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("Nether: Der Chunk des Ziels ist schon beim Client");
         }
         teleportiere(context, maus, k, baum, ziel, ziel);
+        double hoechstes = -Double.MAX_VALUE;
         for (int i = 0, ruhig = 0; ruhig < 20; i++) {
+            hoechstes = Math.max(hoechstes, context.computeOnClient(mc -> mc.player.getY()));
             boolean steht = context.computeOnClient(mc -> Math.abs(mc.player.getX() - (ziel + 0.5)) < 0.01 && Math.abs(mc.player.getZ() - (ziel + 0.5)) < 0.01
                     && Math.abs(mc.player.getY() - 60) < 0.01 && mc.player.onGround());
             ruhig = steht ? ruhig + 1 : 0;
@@ -5593,8 +5595,56 @@ public final class Bedienung implements FabricClientGameTest {
             }
             context.waitTick();
         }
+        if (hoechstes >= 127) {
+            throw new AssertionError("Nether: über die Decke, höchstes y " + hoechstes);
+        }
         server.runCommand("execute in minecraft:the_nether run forceload remove all");
         // Zurück in die Oberwelt, auf das Gras; die Schritte danach rechnen dort.
+        server.runCommand("execute in minecraft:overworld run tp @p 0.5 -60 0.5");
+        context.waitFor(mc -> mc.level.dimension() == Level.OVERWORLD && Math.abs(mc.player.getY() - -60) < 0.01 && mc.player.onGround(), 600);
+    }
+
+    /**
+     * Im End über der Leere: Ohne Daten geht der Spieler auf die sichere Höhe, y = 253; am Ziel ist kein Platz zum Stehen,
+     * und er geht zurück an den Start, mit einer Zeile im Chat. Start ist ein Podest aus Obsidian, die Füsse bei y = 64;
+     * beide liegen weit weg vom Drachen in der Mitte.
+     */
+    private static void ende(ClientGameTestContext context, TestServerContext server, TestInput maus, int k, Path baum) {
+        int start = -600, ziel = 600;
+        for (int a : new int[] {start, ziel}) {
+            server.runCommand("execute in minecraft:the_end run forceload add " + a + " " + a);
+        }
+        server.waitFor(s -> s.getLevel(Level.END).isLoaded(new BlockPos(start, 64, start)) && s.getLevel(Level.END).isLoaded(new BlockPos(ziel, 64, ziel)), 1200);
+        server.runCommand("execute in minecraft:the_end run fill " + (start - 1) + " 63 " + (start - 1) + " " + (start + 1) + " 63 " + (start + 1) + " obsidian");
+        server.runCommand("execute in minecraft:the_end run fill " + (start - 1) + " 64 " + (start - 1) + " " + (start + 1) + " 66 " + (start + 1) + " air");
+        server.runCommand("execute in minecraft:the_end run fill " + ziel + " 0 " + ziel + " " + ziel + " 255 " + ziel + " air");
+        server.runCommand("execute in minecraft:the_end run tp @p " + (start + 0.5) + " 64 " + (start + 0.5));
+        context.waitFor(mc -> mc.level.dimension() == Level.END && Math.abs(mc.player.getY() - 64) < 0.01 && mc.player.onGround(), 600);
+        if (context.computeOnClient(mc -> mc.level.getChunkSource().getChunk(ziel >> 4, ziel >> 4, ChunkStatus.FULL, false) != null)) {
+            throw new AssertionError("End: Der Chunk des Ziels ist schon beim Client");
+        }
+        teleportiere(context, maus, k, baum, ziel, ziel);
+        double hoechstes = -Double.MAX_VALUE;
+        for (int i = 0, ruhig = 0; ruhig < 20; i++) {
+            hoechstes = Math.max(hoechstes, context.computeOnClient(mc -> mc.player.getY()));
+            boolean daheim = context.computeOnClient(mc -> Math.abs(mc.player.getX() - (start + 0.5)) < 0.01 && Math.abs(mc.player.getZ() - (start + 0.5)) < 0.01
+                    && Math.abs(mc.player.getY() - 64) < 0.01 && mc.player.onGround());
+            ruhig = daheim && hoechstes > 250 ? ruhig + 1 : 0;
+            if (i == 600) {
+                throw new AssertionError("End: nicht über die sichere Höhe zurück am Start, höchstes y " + hoechstes + ", der Spieler steht bei "
+                        + context.computeOnClient(mc -> mc.player.position()));
+            }
+            context.waitTick();
+        }
+        Path log = net.fabricmc.loader.api.FabricLoader.getInstance().getGameDir().resolve("logs").resolve("latest.log");
+        try {
+            if (!Files.readString(log, StandardCharsets.UTF_8).contains("[CHAT] Teleport cancelled: there is no place to stand")) {
+                throw new AssertionError("End: keine Zeile „no place to stand“ im Chat");
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        server.runCommand("execute in minecraft:the_end run forceload remove all");
         server.runCommand("execute in minecraft:overworld run tp @p 0.5 -60 0.5");
         context.waitFor(mc -> mc.level.dimension() == Level.OVERWORLD && Math.abs(mc.player.getY() - -60) < 0.01 && mc.player.onGround(), 600);
     }
