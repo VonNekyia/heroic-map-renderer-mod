@@ -1,0 +1,4 @@
+// heroicmap Rahmen 'rose', Variante 'silber' (bisher Skin 'kompass'): Linie aussen -> innen, eine Zeile je Band.
+// Zwei Werte = Licht (oben/links) Schatten (unten/rechts).
+#181717
+#D8D8D8

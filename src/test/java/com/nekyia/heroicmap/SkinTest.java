@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
@@ -34,9 +36,14 @@ class SkinTest {
         assertEquals(0xFF4F4D4D, s.schatten[1]);
         assertFalse(s.mitSchatten);
         assertTrue(Skin.lies("t", "#000000\n#111111", "schatten=ja", 7).mitSchatten);
-        // aussen=ja wie bei „kompass“: Die Marken zeigen gedreht nach aussen; ohne den Schalter drehen sie starr mit.
-        assertTrue(Skin.lies("t", "#000000\n#111111", "schatten=ja\naussen=ja\n", 7).nachAussen);
-        assertFalse(Skin.lies("t", "#000000\n#111111", "schatten=ja", 7).nachAussen);
+        // drehung=aussen, auch ein altes aussen=ja: Die Marken zeigen von der Mitte weg; ohne drehen sie starr mit der Karte.
+        assertEquals(Skin.Stellung.AUSSEN, Skin.lies("t", "#000000\n#111111", "schatten=ja\naussen=ja\n", 7).marken.stellung());
+        assertEquals(Skin.Stellung.AUSSEN, Skin.lies("t", "#000000\n#111111", "drehung=aussen", 7).marken.stellung());
+        assertEquals(Skin.Stellung.AUFRECHT, Skin.lies("t", "#000000\n#111111", "drehung=aufrecht", 7).marken.stellung());
+        assertEquals(Skin.Stellung.KARTE, Skin.lies("t", "#000000\n#111111", "schatten=ja", 7).marken.stellung());
+        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000\n#111111", "drehung=schief", 7));
+        // Je Schlüssel gilt die letzte Zeile; so überschreibt eine Zeile aus varianten.txt ihren Ordner.
+        assertFalse(Skin.lies("t", "#000000\n#111111", "schatten=ja\nschatten=nein", 7).mitSchatten);
         assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000", "", 7));
         assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000 #111111 #222222", "", 7));
         assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#00000", "", 7));
@@ -44,45 +51,92 @@ class SkinTest {
     }
 
     @Test
-    void dieSkinsDesPakets() throws IOException {
-        Map<String, Integer> baender = new HashMap<>(Map.of("grau", 3, "holz", 4, "papier", 5, "kompass", 2, "uhr", 2, "kartograph", 2));
-        // Je Kategorie des Rahmens „biom“ ein Ordner, alle mit zwei Bändern.
-        Biom.KATEGORIEN.forEach(k -> baender.put(Skin.BIOM + "/" + k, 2));
-        assertEquals(Skin.OHNE, Skin.NAMEN.getFirst());
-        assertEquals(baender.keySet(), Set.copyOf(Skin.ORDNER));
-        int biomRand = 0;
-        for (String name : Skin.ORDNER) {
-            // Wie Skin.laden: die längste Seite der Marken.
-            int groesste = 0;
-            for (String teil : List.of("norden", "marke", "marke_quer")) {
-                BufferedImage b = bild(name, teil);
-                groesste = Math.max(groesste, Math.max(b.getWidth(), b.getHeight()));
+    void dieFamilienDesPakets() throws IOException {
+        assertEquals(List.of(Skin.OHNE, Skin.BIOM, "schild", "rose", "lettern"), Skin.FAMILIEN);
+        // Drei Bänder und mehr nur bei „schild“, wie die alten grau, holz und papier; sonst zwei.
+        Map<String, Integer> baender = Map.of("schild/grau", 3, "schild/gold", 4, "schild/papier", 5);
+        Map<String, JsonObject> sprachen = new HashMap<>();
+        for (String sprache : List.of("de_de", "en_us")) {
+            try (InputStream rein = SkinTest.class.getResourceAsStream("/assets/heroicmap/lang/" + sprache + ".json")) {
+                sprachen.put(sprache, JsonParser.parseString(new String(rein.readAllBytes(), StandardCharsets.UTF_8)).getAsJsonObject());
             }
-            BufferedImage norden = bild(name, "norden"), marke = bild(name, "marke");
-            Skin s = Skin.lies(name, text(name, "palette.txt"), text(name, "info.txt"), groesste, new int[] {norden.getWidth(), norden.getHeight()},
-                    new int[] {marke.getWidth(), marke.getHeight()});
-            assertEquals(baender.get(name), s.baender(), name);
-            // Nur „biom“ legt O, S und W an die äussere Kante, N bleibt auf der Mitte; siehe biomMarkenLiegenAmRahmen.
-            if (name.startsWith(Skin.BIOM + "/")) {
-                int[] m = {marke.getWidth(), marke.getHeight(), 1};
-                assertArrayEquals(new int[][] {null, m, m, m}, s.auflage, name);
-            } else {
-                assertNull(s.auflage, name);
-            }
-            for (String teil : List.of("griff", "griff_aktiv", "norden", "norden_aktiv", "marke", "marke_aktiv", "marke_quer",
-                    "marke_quer_aktiv")) {
-                assertNotNull(bild(name, teil), name + "/" + teil);
-            }
-            // Die zier gibt es nicht mehr, auch nicht im Jar.
-            assertNull(bild(name, "zier"), name);
-            // Mit Rahmen hält die Minimap so viel Abstand, dass jede Marke in jeder Drehung ganz auf dem
-            // Schirm bleibt, auch ihr Schatten um (+1, +1): Ihre Mitte liegt auf der Mitte der Bänder.
-            int rand = Minimap.rand(s);
-            biomRand = name.startsWith(Skin.BIOM + "/") ? Math.max(biomRand, rand) : biomRand;
-            assertTrue(rand + s.baender() / 2.0 - groesste * Math.sqrt(2) / 2 - 1 >= 0, name);
         }
-        // „biom“ hält den grössten Abstand seiner Kategorien, so springt die Minimap beim Wechsel nicht.
+        for (String familie : Skin.FAMILIEN) {
+            for (JsonObject lang : sprachen.values()) {
+                assertTrue(lang.has("heroicmap.rahmen." + familie) && lang.has("heroicmap.rahmen." + familie + ".beschreibung"), familie);
+            }
+        }
+        int biomRand = 0, letternRand = 0;
+        for (String familie : Skin.MIT_VARIANTEN) {
+            for (Skin.Variante v : Skin.liesVarianten(text(familie, "varianten.txt"))) {
+                String ordner = familie + "/" + v.ordner(), wo = familie + "/" + v.name();
+                // Wie Skin.laden: die Grössen der Marken, die es gibt, und info.txt mit den Schaltern der Zeile dahinter.
+                Map<String, int[]> bilder = new HashMap<>();
+                for (String teil : List.of("norden", "marke", "marke_quer", "osten", "sueden", "westen")) {
+                    BufferedImage b = bild(ordner, teil);
+                    if (b != null) {
+                        bilder.put(teil, new int[] {b.getWidth(), b.getHeight()});
+                    }
+                }
+                Skin s = Skin.lies(wo, ordner, text(ordner, "palette.txt"), text(ordner, "info.txt") + "\n" + String.join("\n", v.schalter()), bilder);
+                assertEquals(baender.getOrDefault(ordner, 2), s.baender(), wo);
+                List<String> teile = s.marken.eigene() ? List.of("griff", "norden", "osten", "sueden", "westen")
+                        : List.of("griff", "norden", "marke", "marke_quer");
+                for (String teil : teile) {
+                    assertNotNull(bild(ordner, teil), wo + "/" + teil);
+                    assertNotNull(bild(ordner, teil + "_aktiv"), wo + "/" + teil + "_aktiv");
+                }
+                // Stellung und Lage, wie der Designer sie je Familie festlegt.
+                if (familie.startsWith(Skin.BIOM + "/")) {
+                    assertEquals(Skin.Stellung.AUSSEN, s.marken.stellung(), wo);
+                    BufferedImage m = bild(ordner, "marke");
+                    Skin.Platz kante = new Skin.Platz(Skin.Lage.KANTE, m.getWidth(), m.getHeight(), 1);
+                    assertArrayEquals(new Skin.Platz[] {null, kante, kante, kante}, s.marken.plaetze(), wo);
+                } else if ("lettern".equals(familie)) {
+                    assertEquals(Skin.Stellung.AUFRECHT, s.marken.stellung(), wo);
+                    assertTrue(s.marken.eigene(), wo);
+                    Skin.Lage lage = v.name().endsWith("_aussen") ? Skin.Lage.AUSSEN : Skin.Lage.INNEN;
+                    for (int i = 0; i < 4; i++) {
+                        assertEquals(lage, s.marken.platz(i).lage(), wo + " " + i);
+                    }
+                } else {
+                    assertNull(s.marken.plaetze(), wo);
+                }
+                if ("schild".equals(familie) || "rose".equals(familie)) {
+                    assertNotNull(bild(ordner, "tafel"), wo + ": Grund der Tafel");
+                }
+                for (JsonObject lang : sprachen.values()) {
+                    assertTrue(lang.has("heroicmap.rahmen." + familie.replace('/', '.') + "." + v.name()), wo + ": Name");
+                }
+                // Die zier gibt es nicht mehr, auch nicht im Jar.
+                assertNull(bild(ordner, "zier"), wo);
+                // Mit Rahmen hält die Minimap so viel Abstand, dass jede Marke in jeder Drehung ganz auf dem Schirm bleibt, auch ihr
+                // Schatten um (+1, +1); siehe auch letternLiegenInnenUndAussen.
+                int rand = Minimap.rand(s);
+                assertTrue(rand + s.baender() / 2.0 - s.groesste * Math.sqrt(2) / 2 - 1 >= 0, wo);
+                biomRand = familie.startsWith(Skin.BIOM + "/") ? Math.max(biomRand, rand) : biomRand;
+                letternRand = "lettern".equals(familie) ? Math.max(letternRand, rand) : letternRand;
+            }
+        }
+        // „biom“ hält den grössten Abstand seiner Kategorien, so springt die Minimap beim Wechsel nicht; „lettern“ aussen 11 wie
+        // beim Designer.
         assertEquals(11, biomRand);
+        assertEquals(11, letternRand);
+        // Die alten Skins sind weg; eine gespeicherte Wahl zieht um, siehe MinimapTest.
+        for (String alt : Skin.ALT.keySet()) {
+            assertNull(SkinTest.class.getResourceAsStream(ORDNER + alt + "/palette.txt"), alt);
+        }
+    }
+
+    @Test
+    void variantenTxt() {
+        List<Skin.Variante> v = Skin.liesVarianten("// Kopf\ntinte_innen ordner=tinte lage=innen\n\ntinte_aussen ordner=tinte lage=aussen // Kommentar\ngrau\n");
+        assertEquals(List.of(new Skin.Variante("tinte_innen", "tinte", List.of("lage=innen")),
+                new Skin.Variante("tinte_aussen", "tinte", List.of("lage=aussen")), new Skin.Variante("grau", "grau", List.of())), v);
+        assertThrows(IllegalArgumentException.class, () -> Skin.liesVarianten("// nur Kommentar"));
+        assertThrows(IllegalArgumentException.class, () -> Skin.liesVarianten("Grün"));
+        assertThrows(IllegalArgumentException.class, () -> Skin.liesVarianten("gold ordner=../x"));
+        assertThrows(IllegalArgumentException.class, () -> Skin.liesVarianten("gold lage"));
     }
 
     @Test
@@ -191,10 +245,10 @@ class SkinTest {
         // rund, genordet und gedreht, bei GS 1 bis 4; N bleibt auf der Mitte der Bänder. Wunsch des Users vom 23.10.
         // Siehe docs/rahmen.md, „Nach aussen“.
         for (String kategorie : Biom.KATEGORIEN) {
-            String name = Skin.BIOM + "/" + kategorie;
+            String name = Skin.BIOM + "/" + kategorie + "/standard";
             BufferedImage bild = bild(name, "marke");
             int w = bild.getWidth(), h = bild.getHeight();
-            Skin skin = Skin.lies(name, text(name, "palette.txt"), text(name, "info.txt"), 15, new int[] {15, 15}, new int[] {w, h});
+            Skin skin = Skin.lies(name, name, text(name, "palette.txt"), text(name, "info.txt"), Map.of("norden", new int[] {15, 15}, "marke", new int[] {w, h}));
             for (int seite : new int[] {64, 101, 128, 256}) {
                 Minimap.Rahmen r = new Minimap.Rahmen(10, 21, seite);
                 double cx = r.x() + seite / 2.0, cy = r.y() + seite / 2.0, halb = seite / 2.0;
@@ -202,9 +256,9 @@ class SkinTest {
                     for (int k = 1; k <= 4; k++) {
                         for (int grad = -1; grad < 360; grad += 3) {
                             Drehung.Lage lage = grad < 0 ? null : Drehung.Lage.von(Math.toRadians(grad), 0, 0, 0, 0);
-                            List<Minimap.Ornament> marken = Minimap.ornamente(r, 2, rund, true, skin.auflage, lage, k, 0, -1, false, -1);
+                            List<Minimap.Ornament> marken = Minimap.ornamente(r, 2, rund, skin.marken, lage, k, 0, -1, false, -1);
                             String wo = name + ", Seite " + seite + (rund ? " rund" : " eckig") + ", GS " + k + ", " + (grad < 0 ? "genordet" : grad + "°");
-                            assertEquals(Minimap.ornamente(r, 2, rund, true, null, lage, k, 0, -1, false, -1).get(3), marken.get(3), "N bleibt, " + wo);
+                            assertEquals(Minimap.ornamente(r, 2, rund, Skin.Marken.AUSSEN, lage, k, 0, -1, false, -1).get(3), marken.get(3), "N bleibt, " + wo);
                             for (int i = 0; i < 3; i++) {
                                 Minimap.Ornament o = marken.get(i);
                                 String m = "NOSW".charAt(i + 1) + ", " + wo;
@@ -247,19 +301,70 @@ class SkinTest {
 
     @Test
     void lageInInfoTxt() {
-        // lage_norden gilt wie lage, wenn die Zeile fehlt; kante nur mit aussen=ja; sonst nur mitte oder kante, innen und aussen
-        // kommen mit dem Skin der Buchstaben.
-        int[] n = {15, 15}, m = {5, 9};
-        assertNull(Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage=mitte", 15, n, m).auflage);
-        assertArrayEquals(new int[][] {{15, 15, 1}, {5, 9, 1}, {5, 9, 1}, {5, 9, 1}},
-                Skin.lies("t", "#000000\n#111111", "schatten=ja\naussen=ja\nlage=kante", 15, n, m).auflage);
-        assertArrayEquals(new int[][] {null, {5, 9, 0}, {5, 9, 0}, {5, 9, 0}},
-                Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage=kante\nlage_norden=mitte", 15, n, m).auflage);
-        assertArrayEquals(new int[][] {{15, 15, 0}, null, null, null},
-                Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage_norden=kante", 15, n, m).auflage);
-        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000\n#111111", "lage=kante", 15, n, m));
-        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage=innen", 15, n, m));
-        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "#000000\n#111111", "aussen=ja\nlage=aussen", 15, n, m));
+        // lage_norden gilt wie lage, wenn die Zeile fehlt; kante nur mit drehung=aussen, innen und aussen nur mit drehung=aufrecht.
+        Map<String, int[]> bilder = Map.of("norden", new int[] {15, 15}, "marke", new int[] {5, 9}, "marke_quer", new int[] {9, 5});
+        Skin.Platz n = new Skin.Platz(Skin.Lage.KANTE, 15, 15, 1), m = new Skin.Platz(Skin.Lage.KANTE, 5, 9, 1);
+        assertNull(Skin.lies("t", "t", "#000000\n#111111", "aussen=ja\nlage=mitte", bilder).marken.plaetze());
+        assertArrayEquals(new Skin.Platz[] {n, m, m, m}, Skin.lies("t", "t", "#000000\n#111111", "schatten=ja\naussen=ja\nlage=kante", bilder).marken.plaetze());
+        Skin.Platz m0 = new Skin.Platz(Skin.Lage.KANTE, 5, 9, 0);
+        assertArrayEquals(new Skin.Platz[] {null, m0, m0, m0},
+                Skin.lies("t", "t", "#000000\n#111111", "drehung=aussen\nlage=kante\nlage_norden=mitte", bilder).marken.plaetze());
+        // Aufrecht ohne eigene Bilder nimmt O und W marke_quer, S marke, so wie sie stehen.
+        Skin.Platz[] innen = Skin.lies("t", "t", "#000000\n#111111", "drehung=aufrecht\nlage=innen", bilder).marken.plaetze();
+        assertEquals(new Skin.Platz(Skin.Lage.INNEN, 9, 5, 0), innen[1]);
+        assertEquals(new Skin.Platz(Skin.Lage.INNEN, 5, 9, 0), innen[2]);
+        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "t", "#000000\n#111111", "lage=kante", bilder));
+        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "t", "#000000\n#111111", "aussen=ja\nlage=innen", bilder));
+        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "t", "#000000\n#111111", "drehung=aufrecht\nlage=kante", bilder));
+        assertThrows(IllegalArgumentException.class, () -> Skin.lies("t", "t", "#000000\n#111111", "drehung=aufrecht\nlage=schief", bilder));
+    }
+
+    @Test
+    void letternLiegenInnenUndAussen() throws IOException {
+        // „lettern“: aufrecht, innen ganz in der Karte mit einer Einheit Abstand zu den Bändern, aussen ganz ausserhalb mit einer
+        // Einheit Abstand, eckig und rund, genordet und gedreht; aussen nie weiter als der Abstand zum Rand. Siehe docs/rahmen.md, „Lage“.
+        for (String lage : List.of("innen", "aussen")) {
+            String ordner = "lettern/tinte";
+            Map<String, int[]> bilder = new HashMap<>();
+            for (String teil : List.of("norden", "osten", "sueden", "westen")) {
+                BufferedImage b = bild(ordner, teil);
+                bilder.put(teil, new int[] {b.getWidth(), b.getHeight()});
+            }
+            Skin skin = Skin.lies("lettern/tinte_" + lage, ordner, text(ordner, "palette.txt"), text(ordner, "info.txt") + "\nlage=" + lage, bilder);
+            int baender = skin.baender(), rand = Minimap.rand(skin);
+            for (int seite : new int[] {64, 128, 256}) {
+                Minimap.Rahmen r = new Minimap.Rahmen(0, 0, seite);
+                double halb = seite / 2.0;
+                for (boolean rund : new boolean[] {false, true}) {
+                    for (int grad = -1; grad < 360; grad += 5) {
+                        Drehung.Lage d = grad < 0 ? null : Drehung.Lage.von(Math.toRadians(grad), 0, 0, 0, 0);
+                        List<Minimap.Ornament> marken = Minimap.ornamente(r, baender, rund, skin.marken, d, 2, 0, -1, false, -1);
+                        for (int j = 0; j < 4; j++) {
+                            Minimap.Ornament o = marken.get(j);
+                            String wo = lage + ", Seite " + seite + (rund ? " rund" : " eckig") + ", " + (grad < 0 ? "genordet" : grad + "°") + ", " + j;
+                            // Aufrecht: nie gedreht, das eigene Bild je Richtung. Gedreht liegt die Mitte auf ganzen Pixeln, bei GS 2 auf halben
+                            // Einheiten; daher das Spiel.
+                            assertEquals(0, o.winkel(), wo);
+                            assertEquals(Skin.EIGENE_JE_RICHTUNG[(j + 1) % 4], o.teil(), wo);
+                            int[] b = bilder.get(List.of("osten", "sueden", "westen", "norden").get(j));
+                            double w = b[0] / 2.0, h = b[1] / 2.0, x = o.x() - halb, y = o.y() - halb, spiel = 0.25 * Math.sqrt(2) + 1e-9;
+                            if ("innen".equals(lage)) {
+                                // Der weiteste Punkt des Bilds liegt auf der Linie eine Einheit innerhalb der Bänder.
+                                double innen = halb - baender - 1;
+                                double weit = rund ? Math.hypot(Math.abs(x) + w, Math.abs(y) + h) : Math.max(Math.abs(x) + w, Math.abs(y) + h);
+                                assertEquals(innen, weit, spiel + 0.01, wo);
+                            } else {
+                                // Der nächste Punkt des Bilds liegt eine Einheit ausserhalb der Minimap; samt Schatten bleibt es im Abstand zum Rand.
+                                double dx = Math.max(0, Math.abs(x) - w), dy = Math.max(0, Math.abs(y) - h);
+                                double nah = rund ? Math.hypot(dx, dy) : Math.max(dx, dy);
+                                assertEquals(halb + 1, nah, spiel + 0.01, wo);
+                                assertTrue(Math.max(Math.abs(x) + w, Math.abs(y) + h) + 1 <= halb + rand + spiel, wo + ": über den Abstand zum Rand");
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @Test

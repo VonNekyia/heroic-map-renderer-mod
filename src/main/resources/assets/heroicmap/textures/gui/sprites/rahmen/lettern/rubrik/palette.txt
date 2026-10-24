@@ -1,0 +1,4 @@
+// heroicmap Rahmen 'lettern', Variante 'rubrik' (Rot der Rubrikatoren): Linie aussen -> innen, eine Zeile je Band.
+// Zwei Werte = Licht (oben/links) Schatten (unten/rechts).
+#24100C
+#B83A2A #7E2418

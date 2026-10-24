@@ -58,7 +58,7 @@ steht unter „Kosten“.
 | Form | eckig | eckig oder rund; im Menü das Symbol ◻/◯ in der Ecke des L, siehe „Symbole an der Minimap“ und „Form“ |
 | Drehen | an | die Minimap dreht mit der Blickrichtung; im Menü der Nordpfeil, siehe „Symbole an der Minimap“ und „Drehen“ |
 | Chunklinien | aus | Linien je 16 Blöcke auf Minimap und Vollbildkarte; im Menü das Raster, siehe „Symbole an der Minimap“ und „Chunklinien“ |
-| Verzierungen | alle an | jede Marke N, O, S, W des Rahmens für sich; im Menü ein Rechtsklick auf die Marke, siehe [Rahmen](rahmen.md), „Verzierungen“ |
+| Verzierungen | alle an | jede Marke N, O, S, W des Rahmens für sich; im Menü die mittlere Maustaste auf die Marke, siehe [Rahmen](rahmen.md), „Verzierungen“ |
 | Mitspieler | Simple Voice Chat | siehe „Mitspieler“ |
 | Knopf „Karte laden …“ | – | die Karten des Servers, wie in der [Vollbildkarte](vollbildkarte.md), „Bedienung“ |
 | Knopf „Kartenliste …“ | – | alle Karten auf der Platte mit Grösse und Summe in GB, mit Löschen, siehe [Download](download.md), „Kartenliste“ |
@@ -299,10 +299,10 @@ für die 9 Rasten des Zooms.
 Das weicht vom Wortlaut des Wunsches ab, „oben an der Minimap“; der
 Reviewer hat es so freigegeben. Gründe:
 
-- Über der Mitte liegt schon die Marke N des Rahmens. Ein Linksklick dort
-  wechselt den Rahmen, ein Rechtsklick macht sie durchsichtig, siehe
-  [Rahmen](rahmen.md), „Verzierungen“. Ein Pfeil daneben wäre ein drittes
-  Ziel auf wenigen Einheiten.
+- Über der Mitte liegt schon die Marke N des Rahmens. Ein Klick dort
+  öffnet den Wähler der Rahmen, die mittlere Taste macht sie durchsichtig,
+  siehe [Rahmen](rahmen.md), „Verzierungen“. Ein Pfeil daneben wäre ein
+  drittes Ziel auf wenigen Einheiten.
 - Steht die Minimap oben am Schirm, ist über ihr kein Platz.
 - Steht die Minimap unten, liegt die Reihe über ihr und belegt die obere
   Ecke; dann sitzt der Pfeil unten in der Spalte.
@@ -317,15 +317,17 @@ hat es der User gewünscht (mod#105); das Menü wird kürzer.
   Darstellung weiter, Kopf, Pfeil, Halb, dann wieder Kopf, siehe „Spieler“.
   Er trifft ein Quadrat um die Mitte mit der halben Seite des Kopfes plus
   2 Einheiten, bei 128 Einheiten Seite 11 × 11.
-- **Marken:** Ein Klick auf eine der Marken N, O, S, W schaltet den Rahmen
-  weiter, in der Reihenfolge von `Skin.NAMEN`: Ohne, Biom, Grau, Holz,
-  Papier, Kompass, Uhr, Kartograph, dann wieder Ohne. Eine Marke trifft man
+- **Marken:** Ein Klick mit der linken oder rechten Taste auf eine der
+  Marken N, O, S, W öffnet den Wähler der Rahmen, siehe [Rahmen](rahmen.md),
+  „Wähler“; die mittlere Taste macht die Marke durchsichtig oder holt sie
+  zurück, siehe [Rahmen](rahmen.md), „Verzierungen“. Bis 0.2.68 schaltete
+  ein Linksklick zum nächsten Rahmen. Eine Marke trifft man
   dort, wo die Minimap sie in diesem Frame gezeichnet hat, auch gedreht,
   mindestens 9 × 9 Einheiten um ihre Mitte (`Minimap.ziel`). Die Bänder
   sind kein Ziel; dort greift man wie bisher die Minimap.
 - **Ohne Marken** stehen sie im Menü trotzdem, halb deckend: mit dem
-  Schalter „Verzierungen“ aus und bei „ohne“, dort die von „grau“ auf dem
-  Umriss. So lässt sich der Rahmen immer wechseln. Siehe
+  Schalter „Verzierungen“ aus und bei „ohne“, dort die von `schild/grau`
+  auf dem Umriss. So lässt sich der Rahmen immer wechseln. Siehe
   [Rahmen](rahmen.md), „Im Menü“.
 - **Klick oder Ziehen** entscheidet erst das Loslassen: höchstens 3
   Einheiten vom Drücken (`MinimapKlick.WEG`) und über demselben Ziel, mit
@@ -482,7 +484,7 @@ seit dem 10.10. als Vorgabe.
 - **Die Gametests** `Bilder` und `Messung` schalten Drehen aus, denn ihre
   Bilder und Messreihen zeigen die Minimap genordet.
 
-![Die drehende Minimap bei Gier 30 mit Chunklinien: eckig ohne Rahmen, rund mit „uhr“, eckig mit „kompass“, die Marken gedreht, und „kompass“ ohne Marken](bilder/drehen.png)
+![Die drehende Minimap bei Gier 30 mit Chunklinien: eckig ohne Rahmen, rund mit „rose“ in „gold“, eckig mit „rose“ in „silber“, die Marken gedreht, und „rose“ in „silber“ ohne Marken](bilder/drehen.png)
 
 - **Winkel:** 180° − Gier (`Drehung.winkel`), zwischen zwei Ticks wie die
   Kamera (`LocalPlayer.getViewYRot`). Bei Blick nach Norden dreht nichts.
@@ -507,7 +509,8 @@ seit dem 10.10. als Vorgabe.
   der Maus rechnet dort ungedreht (`Einstellungen.koordinaten`). So hat es
   der User am 15.10. gewünscht.
 - **Mit Rahmen** drehen die Marken N, O, S, W mit, Lage und Bild; bei
-  „kompass“ und „biom“ zeigt jedes Bild von der Mitte weg. Der Schalter
+  `drehung=aussen`, „rose“ in „silber“ und „biom“, zeigt jedes Bild von der
+  Mitte weg, bei „lettern“ bleiben die Buchstaben aufrecht. Der Schalter
   „Verzierungen“ stellt sie ab. Siehe [Rahmen](rahmen.md), „Drehen“ und
   „Nach aussen“.
 - **Kosten** je Frame, gemessen am 09.10. bei 4 px und Zoom 4, siehe
@@ -538,7 +541,8 @@ im Debug-Bildschirm des Spiels (`Mth.floor`). So hat es der User gewünscht.
   Schatten. 2 Einheiten Abstand unter dem Ring, mit Rahmen unter den
   Ornamenten, die halb über die Ecken ragen, so weit wie der Abstand zum
   Rand (`Minimap.rand`). Sie folgt Grösse und Lage der Minimap
-  (`Minimap.koordinatenLage`).
+  (`Minimap.koordinatenLage`). Läuft ein Download, steht zwischen Minimap
+  und Zeile der Balken, siehe „Fortschritt“.
 - **Immer ganz auf dem Schirm** (mod#157, Plan vom Reviewer freigegeben am
   19.10.):
   - **Waagrecht** rückt die Zeile zum Schirm hin, bis zum selben Abstand vom
@@ -559,6 +563,31 @@ im Debug-Bildschirm des Spiels (`Mth.floor`). So hat es der User gewünscht.
 ![Die Koordinaten am Rand der Welt bei GUI-Massstab 4, links vorher, rechts nachher; oben die kleinste Minimap oben links und oben rechts, je über die ganze Breite des Schirms, unten die grösste oben links](bilder/koordinaten-vergleich.png)
 - **Nicht gedreht:** Die Zeile bleibt waagrecht, auch wenn die Minimap
   dreht.
+
+## Fortschritt
+
+Solange ein Download oder ein Abgleich läuft, steht unter der Minimap ein
+dünner Balken mit den Prozent, auch ohne offene Vollbildkarte
+(`Minimap.balken`). Gewünscht vom User am 24.10.: Beim Abgleich nach dem
+Beitritt stand bis dahin nur eine Zeile im Chat; den Kasten gab es nur auf
+der Vollbildkarte.
+
+- **Lage:** die erste Zeile unter der Minimap, so breit wie sie, wo sonst
+  die Koordinaten beginnen. Die Koordinaten rücken so lange um eine Zeile
+  und 2 Einheiten weiter. Ist unter der Minimap kein Platz, steht beides
+  darüber, der Balken näher an der Minimap (`Minimap.koordinatenLage`).
+- **Balken:** 2 Einheiten hoch, mitten in der Zeile, auf dunklem Grund,
+  weiss gefüllt nach dem Anteil; rechts daneben die Prozent, abgerundet
+  (`Laden.Fortschritt.prozent`). Nur die Zahl, kein Wort davor; so
+  entschieden vom Reviewer am 24.10.
+- **Was er zeigt:** dasselbe wie der Kasten der Vollbildkarte, siehe
+  [Vollbildkarte](vollbildkarte.md), „Fortschritt“: den vollen Download
+  als Strom und jeden Abgleich. Bis gesamt feststeht, steht „…“ und der
+  Balken ist leer. Fehlt einem Abgleich nach dem Vergleich nichts, steht
+  keiner. Der einzelne volle Download ohne Strom zeigt keinen.
+- **Sichtbar** wie die Minimap: auch im Menü an der Minimap, bei F3 nach
+  „Bei F3“, und nicht, wenn die Minimap aus ist.
+- **Kosten:** je Frame ein Lesen des Fortschritts und ein Text.
 
 ## Bei F3
 

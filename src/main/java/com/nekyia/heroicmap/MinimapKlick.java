@@ -14,7 +14,8 @@ import net.minecraft.util.FormattedCharSequence;
 
 /**
  * Klicks auf die Minimap in den Menüs, die sie zeigen ({@link Einstellungen}, {@link Anzeige}): Ein Klick auf den Spieler
- * schaltet die Darstellung weiter, einer auf eine Marke N, O, S, W den Rahmen. Erst das Loslassen entscheidet: höchstens
+ * schaltet die Darstellung weiter; einer auf eine Marke N, O, S, W mit der linken oder rechten Taste öffnet den Wähler der
+ * Rahmen, mit der mittleren macht er die Marke durchsichtig oder holt sie zurück. Erst das Loslassen entscheidet: höchstens
  * {@link #WEG} Einheiten vom Drücken und über demselben Ziel. Siehe docs/minimap.md, „Aussehen an der Minimap“.
  */
 final class MinimapKlick {
@@ -25,18 +26,25 @@ final class MinimapKlick {
     private static final int TOOLTIP = 170;
 
     private int ziel = Minimap.KEIN_ZIEL;
-    /** Rechts gedrückt: Das Ziel ist eine Marke, die durchsichtig wird oder zurückkommt. */
-    private boolean rechts;
+    /** Mit der mittleren Taste gedrückt: Das Ziel ist eine Marke, die durchsichtig wird oder zurückkommt. */
+    private boolean mitte;
     private double x, y;
+    private final Waehler waehler;
+
+    MinimapKlick(Waehler waehler) {
+        this.waehler = waehler;
+    }
 
     /**
-     * Drücken: Mit der linken Taste auf einem Ziel, mit der rechten auf einer Marke merkt es sich das Ziel; true, wenn
-     * eins getroffen ist. Siehe docs/rahmen.md, „Verzierungen“.
+     * Drücken: Mit der linken Taste auf einem Ziel, mit der rechten oder mittleren auf einer Marke merkt es sich das Ziel; true,
+     * wenn eins getroffen ist. Siehe docs/rahmen.md, „Verzierungen“.
+     * Siehe docs/rahmen.md, „Wähler“.
      */
     boolean druecke(MouseButtonEvent e) {
         int z = Minimap.INSTANZ.ziel(e.x(), e.y());
-        rechts = e.button() == InputConstants.MOUSE_BUTTON_RIGHT;
-        ziel = e.button() == InputConstants.MOUSE_BUTTON_LEFT || rechts && z != Minimap.SPIELER ? z : Minimap.KEIN_ZIEL;
+        mitte = e.button() == InputConstants.MOUSE_BUTTON_MIDDLE;
+        boolean marke = (mitte || e.button() == InputConstants.MOUSE_BUTTON_RIGHT) && z != Minimap.SPIELER;
+        ziel = e.button() == InputConstants.MOUSE_BUTTON_LEFT || marke ? z : Minimap.KEIN_ZIEL;
         x = e.x();
         y = e.y();
         return ziel != Minimap.KEIN_ZIEL;
@@ -52,24 +60,18 @@ final class MinimapKlick {
         int z = ziel;
         ziel = Minimap.KEIN_ZIEL;
         if (z != Minimap.KEIN_ZIEL && !gezogen(e) && Minimap.INSTANZ.ziel(e.x(), e.y()) == z) {
-            if (rechts) {
-                Minimap.INSTANZ.schalteVerzierung(z);
+            Minimap m = Minimap.INSTANZ;
+            if (z == Minimap.SPIELER) {
+                // Kopf, Pfeil, Halb; gespeichert wird beim Schliessen.
+                Minimap.Darstellung[] d = Minimap.Darstellung.values();
+                m.setzeDarstellung(d[(m.darstellung().ordinal() + 1) % d.length]);
+            } else if (mitte) {
+                m.schalteVerzierung(z);
             } else {
-                schalte(z);
+                waehler.oeffne();
             }
         }
         return z != Minimap.KEIN_ZIEL;
-    }
-
-    /** Der Spieler schaltet Kopf, Pfeil, Halb; eine Marke den Rahmen in der Reihenfolge von {@link Skin#NAMEN}. Gespeichert wird beim Schliessen. */
-    static void schalte(int ziel) {
-        Minimap m = Minimap.INSTANZ;
-        if (ziel == Minimap.SPIELER) {
-            Minimap.Darstellung[] d = Minimap.Darstellung.values();
-            m.setzeDarstellung(d[(m.darstellung().ordinal() + 1) % d.length]);
-        } else {
-            m.setzeSkin(Skin.NAMEN.get((Skin.NAMEN.indexOf(m.skin()) + 1) % Skin.NAMEN.size()));
-        }
     }
 
     /**
@@ -86,16 +88,24 @@ final class MinimapKlick {
         }
         g.requestCursor(CursorTypes.POINTING_HAND);
         boolean spieler = z == Minimap.SPIELER;
-        Component jetzt = Component.translatable(spieler ? "heroicmap.menue.spieler." + m.darstellung().name().toLowerCase(Locale.ROOT)
-                : "heroicmap.rahmen." + m.skin());
+        Component jetzt = spieler ? Component.translatable("heroicmap.menue.spieler." + m.darstellung().name().toLowerCase(Locale.ROOT))
+                : rahmenName(m);
         List<FormattedCharSequence> zeilen = new ArrayList<>(font.split(
                 Component.translatable(spieler ? "heroicmap.menue.klick.spieler" : "heroicmap.menue.klick.rahmen", jetzt), TOOLTIP));
         if (!spieler) {
-            zeilen.addAll(font.split(Component.translatable(m.verzierungAus(z) ? "heroicmap.menue.rechtsklick.zeigen"
-                    : "heroicmap.menue.rechtsklick.durchsichtig"), TOOLTIP));
+            zeilen.addAll(font.split(Component.translatable(m.verzierungAus(z) ? "heroicmap.menue.mitte.zeigen"
+                    : "heroicmap.menue.mitte.durchsichtig"), TOOLTIP));
         }
         zeilen.addAll(font.split(Component.translatable(spieler ? "heroicmap.menue.spieler.beschreibung"
                 : "heroicmap.rahmen." + m.skin() + ".beschreibung").withStyle(ChatFormatting.GRAY), TOOLTIP));
         g.setTooltipForNextFrame(zeilen, mausX, mausY);
+    }
+
+    /** Der Name des Rahmens für den Tooltip: die Familie, mit Variante, bei „biom“ die der gezeigten Kategorie. */
+    private static Component rahmenName(Minimap m) {
+        String f = Skin.BIOM.equals(m.skin()) ? Biom.ORDNER.get(m.kategorie()) : m.skin();
+        Skin.Variante v = Skin.variante(f, m.variante(f));
+        Component name = Component.translatable("heroicmap.rahmen." + m.skin());
+        return v == null ? name : name.copy().append(" – ").append(Component.translatable("heroicmap.rahmen." + f.replace('/', '.') + "." + v.name()));
     }
 }

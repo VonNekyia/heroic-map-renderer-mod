@@ -1,0 +1,4 @@
+// heroicmap Rahmen 'rose', Variante 'pergament' (bisher Skin 'kartograph'): Linie aussen -> innen, eine Zeile je Band.
+// Zwei Werte = Licht (oben/links) Schatten (unten/rechts).
+#3B2F22
+#F3E7CB

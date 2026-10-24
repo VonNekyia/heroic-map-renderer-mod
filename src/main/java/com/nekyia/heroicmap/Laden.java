@@ -220,6 +220,11 @@ final class Laden {
             return gesamt != 0;
         }
 
+        /** Die Prozent, abgerundet, wie Karte und Minimap sie zeigen; „…“, solange gesamt nicht feststeht. */
+        String prozent() {
+            return bekannt() ? (int) (anteil() * 100) + " %" : "…";
+        }
+
         /** Der Anteil von 0 bis 1. */
         double anteil() {
             long g = gesamt;

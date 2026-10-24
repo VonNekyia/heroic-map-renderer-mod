@@ -522,7 +522,7 @@ final class Karte extends Screen {
                 TEXT);
         // Bis gesamt feststeht, beim Abgleich vor dem Vergleich des Manifests, „…“ statt Prozent und Bytes.
         boolean bekannt = f.bekannt();
-        Component prozent = Component.literal(bekannt ? (int) (anteil * 100) + " %" : "…");
+        Component prozent = Component.literal(f.prozent());
         g.text(font, prozent, x + b - 4 - font.width(prozent), y + 5, TEXT);
         // Wie der Ladebalken des Spiels: weisser Rand, weiss gefüllt.
         g.outline(x + 5, y + 16, b - 10, 7, TEXT);
@@ -2055,9 +2055,11 @@ final class Karte extends Screen {
     }
 
     /** Der 9-Slice der Tafel zum Rahmen der Minimap; „biom“ und „ohne“ nehmen den schlichten. */
+    /** Der Ordner mit dem Grund der Tafel: bei „schild“ und „rose“ der der gewählten Variante, sonst der von „ohne“. */
     private static String tafelSkin() {
         String skin = Minimap.INSTANZ.skin();
-        return Skin.NAMEN.contains(skin) && !"biom".equals(skin) ? skin : Skin.OHNE;
+        Skin s = "schild".equals(skin) || "rose".equals(skin) ? Minimap.INSTANZ.skin(skin) : null;
+        return s != null ? s.ordner : Skin.OHNE;
     }
 
     private static Component stil(String text, boolean fett) {

@@ -1,0 +1,4 @@
+// heroicmap Rahmen 'lettern', Variante 'gold' (Blattgold): Linie aussen -> innen, eine Zeile je Band.
+// Zwei Werte = Licht (oben/links) Schatten (unten/rechts).
+#2A1A08
+#F0C75A #B8862A
