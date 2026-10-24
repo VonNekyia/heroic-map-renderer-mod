@@ -4851,7 +4851,7 @@ public final class Bedienung implements FabricClientGameTest {
             Minimap.Rahmen r = rahmen(context);
             // An die Oberkante: neben dem Nordpfeil, bündig mit der Oberkante, links vom Regler „Zoom“.
             int[] z = widgetKasten(context, 0);
-            ziehe(context, maus, k, z[0] + z[2] / 2.0, z[1] + z[3] / 2.0, r.x() + r.seite() / 2.0, r.y() + 2);
+            zieheWidget(context, maus, k, z[0] + z[2] / 2.0, z[1] + z[3] / 2.0, r.x() + r.seite() / 2.0, r.y() + 2);
             Widgets.Widget w = context.computeOnClient(mc -> Minimap.INSTANZ.widgets().getFirst());
             int[] oben = widgetKasten(context, 0);
             int zoomX = context.computeOnClient(mc -> zoomReglerWidget(mc).getX());
@@ -4861,7 +4861,7 @@ public final class Bedienung implements FabricClientGameTest {
             }
             // In die Mitte des Schirms: frei, die Mitte des Widgets bei der Maus.
             int[] schirm = context.computeOnClient(mc -> new int[] {mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight()});
-            ziehe(context, maus, k, oben[0] + oben[2] / 2.0, oben[1] + oben[3] / 2.0, schirm[0] / 2.0, schirm[1] / 2.0);
+            zieheWidget(context, maus, k, oben[0] + oben[2] / 2.0, oben[1] + oben[3] / 2.0, schirm[0] / 2.0, schirm[1] / 2.0);
             int[] frei = widgetKasten(context, 0);
             w = context.computeOnClient(mc -> Minimap.INSTANZ.widgets().getFirst());
             if (w.anker() != Widgets.Anker.FREI || Math.abs(frei[0] + frei[2] / 2.0 - schirm[0] / 2.0) > 2
@@ -4884,7 +4884,7 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Esc beim Ziehen: " + Arrays.toString(zurueck) + " statt " + Arrays.toString(frei));
             }
             // Unter die Minimap: unten eingerastet.
-            ziehe(context, maus, k, frei[0] + frei[2] / 2.0, frei[1] + frei[3] / 2.0, r.x() + r.seite() / 2.0, r.y() + r.seite() + 6);
+            zieheWidget(context, maus, k, frei[0] + frei[2] / 2.0, frei[1] + frei[3] / 2.0, r.x() + r.seite() / 2.0, r.y() + r.seite() + 6);
             w = context.computeOnClient(mc -> Minimap.INSTANZ.widgets().getFirst());
             if (w.anker() != Widgets.Anker.UNTEN) {
                 throw new AssertionError("Unter die Minimap gezogen: " + w);
@@ -4966,7 +4966,7 @@ public final class Bedienung implements FabricClientGameTest {
     }
 
     /** Zieht mit der linken Taste von (vx, vy) nach (nx, ny), in Einheiten des GUI, in zehn Schritten, wie von Hand. */
-    private static void ziehe(ClientGameTestContext context, TestInput maus, int k, double vx, double vy, double nx, double ny) {
+    private static void zieheWidget(ClientGameTestContext context, TestInput maus, int k, double vx, double vy, double nx, double ny) {
         warte250();
         fahre(context, maus, k, vx, vy);
         maus.holdMouse(LINKS);
