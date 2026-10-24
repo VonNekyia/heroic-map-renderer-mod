@@ -28,7 +28,7 @@ final class Kartenliste extends Screen {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final int TEXT = 0xFFFFFFFF;
-    private static final int ZEILE = 24, OBEN = 44, KNOPF = 60, ZUSTAND = 72;
+    private static final int ZEILE = 24, OBEN = 44, KNOPF = 60, ZUSTAND = 72, ZEIGER = 36;
 
     private final Screen zurueck;
     /** Null, solange gezählt wird. */
@@ -37,6 +37,10 @@ final class Kartenliste extends Screen {
     private AtomicBoolean zaehlt;
     private int erste;
     private Component hinweis;
+    /** Steht unten die Zeile des Zeigers? Gesetzt in init, nur mit dem Ordner einer Welt. */
+    private boolean zeigerZeile;
+    /** Ihr Text, oder null. */
+    private Component zeigerText;
 
     Kartenliste(Screen zurueck) {
         super(Component.translatable("heroicmap.liste.titel"));
@@ -80,7 +84,7 @@ final class Kartenliste extends Screen {
 
     /** So viele Zeilen passen zwischen Kopf und den Knopf unten. */
     private int zeilen() {
-        return Math.max(1, (height - OBEN - 36) / ZEILE);
+        return Math.max(1, (height - OBEN - 36 - (zeigerZeile ? ZEIGER : 0)) / ZEILE);
     }
 
     @Override
@@ -88,13 +92,19 @@ final class Kartenliste extends Screen {
         if (bestand == null && zaehlt == null) {
             zaehle();
         }
+        Path welt = Downloads.weltOrdner();
+        String wer = Downloads.INSTANZ.wer();
+        zeigerZeile = false;
+        zeigerText = null;
+        if (welt != null) {
+            zeiger(welt, wer);
+        }
         if (bestand != null) {
-            Path welt = Downloads.weltOrdner();
-            String wer = Downloads.INSTANZ.wer();
+            Path ziel = welt == null ? null : Zeiger.ziel(welt);
             for (int i = erste; i < Math.min(bestand.karten().size(), erste + zeilen()); i++) {
                 Laden.AufPlatte e = bestand.karten().get(i);
                 int y = OBEN + (i - erste) * ZEILE;
-                addRenderableWidget(zustand(e, welt, wer, width - KNOPF - ZUSTAND - 12, y));
+                addRenderableWidget(zustand(e, welt, ziel, wer, width - KNOPF - ZUSTAND - 12, y));
                 addRenderableWidget(Button.builder(Component.translatable("heroicmap.liste.loeschen"), b -> frage(e))
                         .bounds(width - KNOPF - 8, y, KNOPF, 20).build());
             }
@@ -108,10 +118,12 @@ final class Kartenliste extends Screen {
      * eines Servers ohne Namen übernimmt ein Server mit Namen; die eines anderen zeigt er nie. Siehe docs/download.md,
      * „Kartenliste“.
      */
-    private Button zustand(Laden.AufPlatte e, Path welt, String wer, int x, int y) {
+    private Button zustand(Laden.AufPlatte e, Path welt, Path ziel, String wer, int x, int y) {
         Path baum = e.ordner();
         Button knopf;
-        if (e.satz() == null || welt == null || !baum.getParent().equals(welt)) {
+        // Ein Baum im Ziel des Zeigers zählt hier wie ein eigener Download, nur zum Lesen.
+        boolean dort = ziel != null && baum.getParent().equals(ziel);
+        if (e.satz() == null || welt == null || !baum.getParent().equals(welt) && !dort) {
             List<String> wo = e.satz() == null ? List.of() : Zeigt.server(baum.getParent(), baum.getFileName().toString());
             knopf = Button.builder(Component.literal("–"), b -> {
             }).bounds(x, y, ZUSTAND, 20).tooltip(Tooltip.create(wo.isEmpty() ? Component.translatable("heroicmap.liste.nur_hier")
@@ -119,15 +131,15 @@ final class Kartenliste extends Screen {
             knopf.active = false;
             return knopf;
         }
-        if (Selbst.selbst(baum) && !Selbst.gehoert(baum, wer)) {
+        if (Selbst.selbst(baum) && (dort || !Selbst.gehoert(baum, wer))) {
             String besitzer = Satz.besitzer(baum);
-            if (Zeigt.OHNE.equals(besitzer) && !Zeigt.OHNE.equals(wer)) {
+            if (!dort && Zeigt.OHNE.equals(besitzer) && !Zeigt.OHNE.equals(wer)) {
                 knopf = Button.builder(Component.translatable("heroicmap.liste.uebernehmen"), b -> uebernimm(e, wer))
                         .bounds(x, y, ZUSTAND, 20)
                         .tooltip(Tooltip.create(Component.translatable("heroicmap.liste.uebernehmen.beschreibung", wer))).build();
                 knopf.active = !Files.exists(welt.resolve(Selbst.baum(e.satz().dimension(), wer)));
             } else {
-                knopf = Button.builder(Component.translatable("heroicmap.liste.von", besitzer), b -> {
+                knopf = Button.builder(Component.translatable("heroicmap.liste.von", anzeige(besitzer)), b -> {
                 }).bounds(x, y, ZUSTAND, 20).build();
                 knopf.active = false;
             }
@@ -136,15 +148,15 @@ final class Kartenliste extends Screen {
         Satz gezeigt = Satz.fuer(welt, e.satz().dimension(), wer);
         boolean an = gezeigt != null && gezeigt.ordner().getParent().equals(baum);
         knopf = Button.builder(Component.translatable(an ? "heroicmap.liste.an" : "heroicmap.liste.ruht")
-                .withStyle(an ? ChatFormatting.GREEN : ChatFormatting.YELLOW), b -> zeige(e, welt, wer)).bounds(x, y, ZUSTAND, 20).build();
+                .withStyle(an ? ChatFormatting.GREEN : ChatFormatting.YELLOW), b -> zeige(e, welt, wer, dort)).bounds(x, y, ZUSTAND, 20).build();
         knopf.active = !an;
         return knopf;
     }
 
-    /** Dieser Server zeigt ab jetzt diesen Baum für seine Dimension; der bisherige ruht. */
-    private void zeige(Laden.AufPlatte e, Path welt, String wer) {
+    /** Dieser Server zeigt ab jetzt diesen Baum für seine Dimension, {@code dort} im Ziel des Zeigers; der bisherige ruht. */
+    private void zeige(Laden.AufPlatte e, Path welt, String wer, boolean dort) {
         try {
-            Zeigt.setze(welt, wer, e.satz().dimension(), e.ordner().getFileName().toString());
+            Zeigt.setze(welt, wer, e.satz().dimension(), (dort ? Zeiger.DORT : "") + e.ordner().getFileName().toString());
         } catch (IOException fehler) {
             LOGGER.warn("Heroic Map: Wahl der Karte nicht gespeichert", fehler);
             hinweis = Component.translatable("heroicmap.liste.fehler");
@@ -191,6 +203,61 @@ final class Kartenliste extends Screen {
                 }
             });
         });
+    }
+
+    /**
+     * Unten, unauffällig: mit Zeiger sein Ziel, „(fehlt)“, wenn es nicht daliegt, und „lösen“; ohne Zeiger je anderem
+     * Ordner derselben Welt unter derselben Adresse „Karte von … nutzen“. Ohne solche Ordner nichts. Kein Dialog. Siehe
+     * docs/download.md, „Kartenliste“.
+     */
+    private void zeiger(Path welt, String wer) {
+        String server = Zeigt.OHNE.equals(wer) ? Component.translatable("heroicmap.liste.dieser").getString() : wer;
+        String name = Zeiger.name(welt);
+        int y = height - 28 - ZEIGER + 12;
+        if (name != null) {
+            String pfad = Downloads.wurzel().relativize(Zeiger.ordner(welt, name)).toString().replace('\\', '/');
+            zeigerText = Component.translatable(Zeiger.ziel(welt) == null ? "heroicmap.liste.zeiger_fehlt" : "heroicmap.liste.zeiger",
+                    server, pfad);
+            addRenderableWidget(Button.builder(Component.translatable("heroicmap.liste.zeiger_loesen"), b -> {
+                try {
+                    Zeiger.loese(welt);
+                } catch (IOException fehler) {
+                    LOGGER.warn("Heroic Map: Zeiger nicht gelöst", fehler);
+                    hinweis = Component.translatable("heroicmap.liste.fehler");
+                }
+                Selbst.INSTANZ.neuGewaehlt(minecraft);
+                rebuildWidgets();
+            }).bounds(8, y, 60, 20).build());
+            zeigerZeile = true;
+            return;
+        }
+        List<String> andere = Zeiger.kandidaten(welt);
+        if (andere.isEmpty()) {
+            return;
+        }
+        zeigerText = Component.translatable("heroicmap.liste.gleiche_welt", String.join(", ", andere.stream().map(Kartenliste::anzeige).toList()));
+        int x = 8;
+        for (String k : andere) {
+            Component text = Component.translatable("heroicmap.liste.zeiger_setzen", anzeige(k));
+            int breite = Math.min(160, font.width(text) + 16);
+            addRenderableWidget(Button.builder(text, b -> {
+                try {
+                    Zeiger.setze(welt, k);
+                } catch (IOException fehler) {
+                    LOGGER.warn("Heroic Map: Zeiger nicht gesetzt", fehler);
+                    hinweis = Component.translatable("heroicmap.liste.fehler");
+                }
+                Selbst.INSTANZ.neuGewaehlt(minecraft);
+                rebuildWidgets();
+            }).bounds(x, y, breite, 20).build());
+            x += breite + 4;
+        }
+        zeigerZeile = true;
+    }
+
+    /** Der Name einer anderen Karte für die Zeile des Zeigers; ohne Namen ein Wort. */
+    private static String anzeige(String karte) {
+        return Zeigt.OHNE.equals(karte) ? Component.translatable("heroicmap.liste.ohne_namen").getString() : karte;
     }
 
     /** Fragt, ob der Baum weg soll; nicht, solange ein Download in ihn läuft. */
@@ -281,8 +348,11 @@ final class Kartenliste extends Screen {
                 g.text(font, font.plainSubstrByWidth(was + " · " + Downloads.groesse(e.bytes()), platz), 8, y + 11, 0xFFB0B0B0);
             }
         }
+        if (zeigerText != null) {
+            g.text(font, font.plainSubstrByWidth(zeigerText.getString(), width - 16), 8, height - 28 - ZEIGER + 1, 0xFFB0B0B0);
+        }
         if (hinweis != null) {
-            g.centeredText(font, hinweis, width / 2, height - 42, TEXT);
+            g.centeredText(font, hinweis, width / 2, height - 42 - (zeigerZeile ? ZEIGER : 0), TEXT);
         }
         super.extractRenderState(g, mausX, mausY, delta);
     }
