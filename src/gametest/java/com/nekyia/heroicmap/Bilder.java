@@ -1730,7 +1730,7 @@ public final class Bilder implements FabricClientGameTest {
         "pack.mcmeta",
         "assets/minecraft/blockstates/short_grass.json",
         "assets/minecraft/blockstates/wheat.json",
-        "assets/minecraft/blockstates/dandelion.json",
+        "assets/minecraft/blockstates/cobweb.json",
         "assets/minecraft/models/block/crop.json",
         "assets/minecraft/models/block/heroicmap_test_gras.json",
         "assets/minecraft/models/block/heroicmap_test_hohes_getreide.json",
@@ -1750,13 +1750,13 @@ public final class Bilder implements FabricClientGameTest {
         "setblock -60 -60 40 wheat[age=0]", "setblock -59 -60 40 wheat[age=2]", "setblock -58 -60 40 wheat[age=4]",
         "setblock -57 -60 40 wheat[age=6]", "fill -56 -60 40 -53 -60 40 wheat[age=7]",
         "fill -60 -60 42 -57 -60 42 carrots[age=7]", "fill -56 -60 42 -53 -60 42 potatoes[age=7]",
-        "fill -60 -60 44 -53 -60 44 short_grass", "fill -60 -60 46 -57 -60 46 fern", "setblock -54 -60 46 dandelion",
+        "fill -60 -60 44 -53 -60 44 short_grass", "fill -60 -60 46 -57 -60 46 fern", "setblock -54 -60 46 cobweb",
     };
 
     /**
      * Pflanzen aus Paketen: das Feld bei 4 px und 1 px, Zoom 4, ohne und mit dem Testpaket. Mit dem Paket kippen Karotten und
      * Gras ähnlich wie ohne, im Mittel höchstens 45 % anders, und reifer Weizen und Kartoffeln decken das Ackerland,
-     * statt wegzufallen; der Löwenzahn des Pakets mit liegender Fläche bleibt, wie er ist; verglichen mit einem Bild derselben Stelle ohne sie, denn Ackerland in verschiedenen Reihen ist
+     * statt wegzufallen; das Spinnennetz des Pakets mit liegender Fläche bleibt, wie es ist; verglichen mit einem Bild derselben Stelle ohne sie, denn Ackerland in verschiedenen Reihen ist
      * verschieden hell. Die Kartoffeln tragen im Testpaket die Textur des reifen Weizens, denn die linke Hälfte ihrer eigenen
      * deckt nur ein Drittel des Blocks. Erst alle Bilder, dann die Prüfung. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
      */
@@ -1788,7 +1788,7 @@ public final class Bilder implements FabricClientGameTest {
         BufferedImage boden = minimapBei(context, server, -56.5, 43.5, "pakete-4px-boden");
         server.runCommand("fill -56 -60 40 -53 -60 40 wheat[age=7]");
         server.runCommand("fill -56 -60 42 -53 -60 42 potatoes[age=7]");
-        server.runCommand("setblock -54 -60 46 dandelion");
+        server.runCommand("setblock -54 -60 46 cobweb");
         context.waitTicks(10);
         List<BufferedImage> bilder = new ArrayList<>();
         try {
@@ -1835,12 +1835,13 @@ public final class Bilder implements FabricClientGameTest {
                 fehler.add("(" + b[0] + ", " + b[1] + ") zu " + Math.round(100 * wieBoden) + " % wie das Ackerland ohne Pflanze");
             }
         }
-        // Ein Modell mit liegender Fläche bleibt, wie es ist: der Löwenzahn des Pakets mit einem flachen Blatt im Westen und einer
-        // stehenden Fläche über den ganzen Block. Im Westen das Blatt, im Osten der Boden; kippte die stehende Fläche, deckte sie ihn.
+        // Ein Modell mit liegender Fläche bleibt, wie es ist: das Spinnennetz des Pakets, ohne Versatz des Blocks, mit einer flachen
+        // Fläche im Westen und einer stehenden über den ganzen Block. Im Westen die Fläche, im Osten der Boden; kippte die stehende
+        // Fläche, deckte sie ihn.
         double west = anteilAndersHaelfte(mit, boden, -54, 46, block, false), ost = anteilAndersHaelfte(mit, boden, -54, 46, block, true);
-        LOGGER.info("Pflanzen aus Paketen, Löwenzahn mit liegender Fläche: Westen anders {}, Osten anders {}", west, ost);
+        LOGGER.info("Pflanzen aus Paketen, Spinnennetz mit liegender Fläche: Westen anders {}, Osten anders {}", west, ost);
         if (west < 0.5 || ost > 0.1) {
-            fehler.add("Löwenzahn mit liegender Fläche im Westen zu " + Math.round(100 * west) + " % anders als der Boden (mindestens 50 %), im Osten zu "
+            fehler.add("Spinnennetz mit liegender Fläche im Westen zu " + Math.round(100 * west) + " % anders als der Boden (mindestens 50 %), im Osten zu "
                     + Math.round(100 * ost) + " % (höchstens 10 %)");
         }
         if (!fehler.isEmpty()) {
