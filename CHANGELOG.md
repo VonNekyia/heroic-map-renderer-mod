@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.71
+
+- **Copy another server's map and draw over it.** In the map list, next to "Use the map of …", "Copy" makes the other server's map of the same world your own map on this server, and "Draw it yourself" then draws what changes here. The copy costs hardly any space: until a tile is drawn anew, both maps share its file.
+
 ## 0.2.70
 
 - **Plants from resource packs lie flat on the minimap.** Crops and grass from packs that build their own plant models, with tilted faces or their own templates, no longer turn into stripes or vanish on the minimap and your own map; they lie flat like the game's plants.

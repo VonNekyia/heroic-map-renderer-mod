@@ -18,6 +18,8 @@ code:
   - src/main/java/com/nekyia/heroicmap/mixin/LevelExtractorMixin.java
   - src/main/java/com/nekyia/heroicmap/mixin/ClientLevelMixin.java
   - src/test/java/com/nekyia/heroicmap/SelbstTest.java
+  - src/main/java/com/nekyia/heroicmap/Kopie.java
+  - src/test/java/com/nekyia/heroicmap/KopieTest.java
   - src/test/java/com/nekyia/heroicmap/PyramideTest.java
   - src/test/java/com/nekyia/heroicmap/KachelwerkMessung.java
   - src/gametest/java/com/nekyia/heroicmap/Bilder.java
@@ -184,6 +186,9 @@ hat es der User gewünscht, siehe
 - **PNG** unter `<massstab>/<z>/<x>/<y>.png`, denn Java hat keinen Encoder für WebP.
   `Kacheln` liest `<y>.png`, wenn es keine `<y>.webp` gibt, und prüft wie
   bei WebP die Grösse aus dem Kopf, bevor es dekodiert (`Kacheln.png`).
+  Fehlt die PNG, liest das Kachelwerk die `<y>.webp` daneben als
+  Grundlage, und nach dem Schreiben der PNG löscht es sie; siehe
+  „Kopie“.
 - **Schreiben:** die zwei feinsten Stufen alle 5 s (`Selbst.SCHREIBEN_MS`),
   die gröberen alle 60 s (`Selbst.GROB_MS`), alle beim Wechsel der Welt
   und beim Trennen; über `<y>.png.tmp`, nie liegt eine halbe Kachel da,
@@ -203,6 +208,41 @@ hat es der User gewünscht, siehe
   als fehlend und entsteht aus dem neu, was jetzt kommt.
 - **Die offene Vollbildkarte** lädt jede geschriebene Kachel neu
   (`Kacheln.geaendert`); die alte bleibt sichtbar, bis die neue da ist.
+
+## Kopie
+
+„Kopie“ in der Kartenliste macht die Karte eines anderen Servers derselben
+Welt zur eigenen Karte dieses Servers, und „Selbst zeichnen“ zeichnet
+darüber (`Kopie`, `Kartenliste.kopieKnopf`), siehe
+[0045](entscheidungen/0045-karte-kopieren-per-hardlink.md). Etwa auf einem
+Bauserver, der eine Kopie der Hauptwelt ist.
+
+- **Wo:** unten in der Kartenliste, neben „Karte von main nutzen“ und
+  neben „lösen“ beim Zeiger, also nur bei einem Ordner derselben Welt unter
+  derselben Adresse. Kein Knopf, wenn es dort keine Karte der Dimension des
+  Spielers gibt oder „Selbst“ hier nicht geht.
+- **Grau** mit Grund, wenn dieser Server schon eine eigene Karte der
+  Dimension hat, oder solange ein Download in die Quelle läuft.
+- **Was kommt mit:** die Kacheln des gezeigten Massstabs, je ein Hardlink,
+  und `map.json` mit `downscale: nearest`, damit das Kachelwerk die
+  Pyramide der Quelle nicht neu baut. `satz.json` nennt Name, Dimension und
+  Massstab der Quelle und diesen Server. Nicht mit kommen der Stand des
+  Downloads und Zwischendateien.
+- **Hardlinks:** Die Kopie kostet kaum Platz, bis eine Kachel neu
+  gezeichnet ist. Das Kachelwerk und der Download ersetzen eine Kachel über
+  eine Zwischendatei mit `ATOMIC_MOVE`; der Link bricht so je Kachel auf,
+  und die Quelle bleibt unberührt, auch bei ihrem Abgleich. Löschen der
+  Kopie löscht nur Links.
+- **WebP als Grundlage:** Die Kacheln eines Downloads sind WebP. Fehlt die
+  PNG einer Kachel, liest das Kachelwerk die WebP daneben, verlustfrei,
+  also bitgleich; nach dem Schreiben der PNG löscht es den Link, denn die
+  Anzeige nimmt WebP vor PNG.
+- **Ohne Hardlinks,** etwa auf exFAT (`Kopie.hartMoeglich`), fragt der Mod
+  nach einer echten Kopie und nennt die Grösse, die die Kartenliste schon
+  gezählt hat.
+- **Ganz oder gar nicht:** Scheitert ein Schritt, löscht der Mod die
+  halbe Kopie wieder, und die Liste nennt den Fehler. Danach zeigt dieser
+  Server die Kopie (`zeigt.txt`), und die Liste zählt neu.
 
 ## Pyramide
 

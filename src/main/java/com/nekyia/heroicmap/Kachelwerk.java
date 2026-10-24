@@ -260,11 +260,17 @@ final class Kachelwerk {
         return argb;
     }
 
-    /** Die Kachel von der Platte; fehlt sie oder ist sie unlesbar, auch eine kaputte PNG, durchsichtig. */
+    /**
+     * Die Kachel von der Platte: die PNG, sonst die WebP daneben, etwa aus einer Kopie (siehe docs/selbst.md, „Kopie“); fehlt
+     * beides oder ist es unlesbar, auch eine kaputte PNG, durchsichtig.
+     */
     private int[] vonPlatte(Kachel k) {
         int[] argb = new int[seite * seite];
-        Path datei = k.datei(ordner);
+        Path datei = k.datei(ordner), webp = datei.resolveSibling(k.y() + ".webp");
         try {
+            if (!Files.exists(datei) && Files.exists(webp)) {
+                return Kacheln.dekodiere(Files.readAllBytes(webp), seite).argb();
+            }
             BufferedImage bild = Files.exists(datei) ? ImageIO.read(datei.toFile()) : null;
             if (bild != null && bild.getWidth() == seite && bild.getHeight() == seite) {
                 bild.getRGB(0, 0, seite, seite, argb, 0, seite);
@@ -292,6 +298,8 @@ final class Kachelwerk {
                 throw new IOException("Kein Schreiber für PNG");
             }
             Files.move(tmp, datei, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            // Die WebP einer Kopie ist damit ersetzt; gelöscht wird nur dieser Link, die Karte, aus der sie stammt, bleibt.
+            Files.deleteIfExists(datei.resolveSibling(k.y() + ".webp"));
         } finally {
             Files.deleteIfExists(tmp);
         }

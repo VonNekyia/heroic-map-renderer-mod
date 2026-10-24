@@ -762,7 +762,8 @@ Platte (`Kartenliste`), auch die anderer Server und Welten:
   Adresse ein anderer Ordner mit demselben Hash liegt, „Gleiche Welt auf
   main“ und je Ordner „Karte von main nutzen“. Mit Zeiger „build zeigt auf:
   `<pfad>`“, „(fehlt)“, wenn das Ziel nicht daliegt, und „lösen“. Kein
-  Dialog und kein Hinweis beim Betreten, so will es der User.
+  Dialog und kein Hinweis beim Betreten, so will es der User. Daneben je
+  „Kopie“, siehe [Selbst gezeichnete Karte](selbst.md), „Kopie“.
 - **Ort …:** je Baum links von an/ruht, siehe „Ort ändern“; grau mit
   Tooltip bei Karten aus der Ablage vor dem Hash und solange ein Download
   in den Baum läuft (`Kartenliste.ort`).

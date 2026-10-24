@@ -105,9 +105,69 @@ public final class KarteJeServer implements FabricClientGameTest {
                 throw new AssertionError("Der Zeiger ist nach „lösen“ noch da");
             }
             pruefe(welt, eigene, "nach „lösen“");
+
+            kopie(context, welt, eigene);
             context.runOnClient(mc -> mc.gui.setScreen(null));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * „Kopie“: Die Karte von main bekommt Kacheln aus dem Testsatz. Solange es die eigene Karte gibt, ist „Kopie“ grau. Nach
+     * dem Löschen macht ein Klick die Karte von main zur eigenen, und dieser Server zeigt sie. „Selbst“ zeichnet die geladenen
+     * Chunks darüber als PNG; deren WebP-Links in der Kopie sind weg, die WebP von main sind wie im Testsatz. Siehe
+     * docs/selbst.md, „Kopie“.
+     */
+    private static void kopie(ClientGameTestContext context, Path welt, String eigene) throws IOException {
+        Path main = Zeiger.ordner(welt, "main").resolve("probe-main");
+        Bilder.testsatz(main.resolve("4"));
+        context.runOnClient(mc -> mc.gui.setScreen(new Kartenliste(null)));
+        context.waitFor(mc -> knopf(mc, "heroicmap.liste.kopie") != null, 600);
+        if (context.computeOnClient(mc -> knopf(mc, "heroicmap.liste.kopie").active)) {
+            throw new AssertionError("„Kopie“ nicht grau, obwohl es die eigene Karte gibt");
+        }
+        AtomicBoolean weg = new AtomicBoolean();
+        context.runOnClient(mc -> Selbst.INSTANZ.loesche(welt.resolve(eigene), weg::set));
+        context.waitFor(mc -> weg.get(), 600);
+        context.runOnClient(mc -> mc.gui.setScreen(new Kartenliste(null)));
+        context.waitFor(mc -> knopf(mc, "heroicmap.liste.kopie") != null && knopf(mc, "heroicmap.liste.kopie").active, 600);
+        klicke(context, "heroicmap.liste.kopie");
+        Path kopie = welt.resolve(eigene);
+        // Erst die Datei, dann eine eigene Meldung: Ein Warten bis zur Zeitgrenze zählte als Fang nicht.
+        context.waitFor(mc -> Files.exists(kopie.resolve("satz.json")), 600);
+        context.waitTicks(20);
+        if (!Selbst.gehoert(kopie, Zeigt.OHNE)) {
+            throw new AssertionError("Die Kopie ist keine eigene Karte");
+        }
+        if (!eigene.equals(Zeigt.baum(welt, Zeigt.OHNE, OBEN))) {
+            throw new AssertionError("Dieser Server zeigt die Kopie nicht: " + Zeigt.baum(welt, Zeigt.OHNE, OBEN));
+        }
+        pruefe(welt, eigene, "nach „Kopie“");
+        // Selbst zeichnet die geladenen Chunks über die Kopie.
+        Path stufe = kopie.resolve("4/2");
+        context.waitFor(mc -> !pngs(stufe).isEmpty(), 2400);
+        for (Path png : pngs(stufe)) {
+            String rel = stufe.relativize(png).toString().replace('\\', '/').replace(".png", ".webp");
+            if (Files.exists(stufe.resolve(rel))) {
+                throw new AssertionError("Neben der neuen " + png + " liegt noch der Link auf die WebP");
+            }
+            byte[] vorher;
+            try (var rein = Bilder.class.getResourceAsStream("/satz/4/2/" + rel)) {
+                vorher = rein == null ? null : rein.readAllBytes();
+            }
+            if (vorher != null && !java.util.Arrays.equals(vorher, Files.readAllBytes(main.resolve("4/2/" + rel)))) {
+                throw new AssertionError("Die WebP von main hat sich geändert: " + rel);
+            }
+        }
+    }
+
+    /** Die PNG-Kacheln unter {@code stufe}; die selbst gezeichneten. */
+    private static java.util.List<Path> pngs(Path stufe) {
+        try (var alle = Files.walk(stufe)) {
+            return alle.filter(p -> p.toString().endsWith(".png")).toList();
+        } catch (IOException e) {
+            return java.util.List.of();
         }
     }
 
