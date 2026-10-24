@@ -125,6 +125,8 @@ public final class Minimap {
     /** Pixel je Block in den Texturen, wie gezeichnet: siehe {@link #effektiv}. */
     private int scale = 2;
     /** Die Stufen des Zooms, Einheiten des GUI je Block, der Reihe nach. Siehe docs/minimap.md, „Bedienung“. */
+    /** Versuch, nie mergen: ohne die Marke des Spielers, damit die Vorschau der Pflanzen frei liegt. */
+    static volatile boolean ohneMarke;
     static final double[] ZOOMS = {1.0 / 32, 1.0 / 16, 1.0 / 8, 1.0 / 4, 1.0 / 2, 1, 2, 4, 8};
     /** Ab diesem Zoom und weiter heraus zeichnet die Minimap die Kacheln des Satzes, wenn es einen gibt. Siehe docs/minimap.md, „Weit heraus“. */
     static final double KACHELN_AB = 1.0 / 4;
@@ -1982,6 +1984,9 @@ public final class Minimap {
      */
     static void avatar(GuiGraphicsExtractor g, AbstractClientPlayer spieler, float x, float y, float a, float groesse, boolean oben,
             Darstellung art) {
+        if (ohneMarke) {
+            return;
+        }
         Matrix3x2fStack pose = g.pose();
         pose.pushMatrix();
         pose.translate(x, y);

@@ -270,24 +270,33 @@ public final class Bilder implements FabricClientGameTest {
             Minimap.INSTANZ.stelle(4, 4, 256, w, h);
         });
         StringBuilder lage = new StringBuilder();
-        for (int v : new int[] {0, 1, 4, 5, 6}) {
-            ChunkMaler.kippen = v;
-            for (int scale : new int[] {4, 2, 1}) {
-                context.runOnClient(mc -> {
-                    Minimap.INSTANZ.leeren();
-                    Minimap.INSTANZ.setzeScale(scale);
-                    Minimap.INSTANZ.setzeZoom(scale);
-                });
-                context.waitTicks(5);
-                String name = "kippen-v" + v + "-" + scale + "px";
-                minimapBei(context, server, KX + 0.5, KZ + 0.5, name);
-                Minimap.Rahmen r = context.computeOnClient(mc -> Minimap.INSTANZ.zuletzt());
-                int gs = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
-                lage.append(name).append(' ').append(r.x()).append(' ').append(r.y()).append(' ').append(r.seite()).append(' ')
-                        .append(gs).append(' ').append(scale).append('\n');
+        Minimap.ohneMarke = true;
+        // Nah: Zoom 8, 16 Pixel des Schirms je Block bei GUI-Massstab 2; die Auflösung 16, 8 und 4. Je Szene ein Bild um ihre Mitte.
+        String[] szenen = {"seegras", "feld", "wiese", "bambus"};
+        int[][] mitten = {{KX + 14, KZ - 14}, {KX - 14, KZ - 14}, {KX - 14, KZ + 14}, {KX + 14, KZ + 14}};
+        for (int s = 0; s < szenen.length; s++) {
+            for (int v : new int[] {0, 1, 4, 5, 6}) {
+                ChunkMaler.kippen = v;
+                for (int scale : new int[] {16, 8, 4}) {
+                    context.runOnClient(mc -> {
+                        Minimap.INSTANZ.leeren();
+                        Minimap.INSTANZ.setzeScale(scale);
+                        Minimap.INSTANZ.setzeZoom(8);
+                    });
+                    context.waitTicks(5);
+                    String name = "nah-" + szenen[s] + "-v" + v + "-" + scale + "px";
+                    minimapBei(context, server, mitten[s][0], mitten[s][1], name);
+                    Minimap.Rahmen r = context.computeOnClient(mc -> Minimap.INSTANZ.zuletzt());
+                    int gs = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+                    int wirklich = context.computeOnClient(mc -> Minimap.INSTANZ.scale());
+                    lage.append(name).append(' ').append(r.x()).append(' ').append(r.y()).append(' ').append(r.seite()).append(' ')
+                            .append(gs).append(' ').append(wirklich).append(' ').append(mitten[s][0]).append(' ').append(mitten[s][1])
+                            .append('\n');
+                }
             }
         }
         ChunkMaler.kippen = 0;
+        Minimap.ohneMarke = false;
         try {
             Files.writeString(FabricLoader.getInstance().getGameDir().resolve("screenshots").resolve("kippen-lage.txt"), lage);
         } catch (IOException e) {
