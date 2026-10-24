@@ -1,6 +1,6 @@
 ---
 title: Selbst gezeichnete Karte
-description: Die Wahl „Selbst“ - wie der Mod die Chunks, die der Spieler lädt, in eine eigene Karte zeichnet, auch im Einzelspieler, mit Wahl und Beenden, Massstab 1, 2 oder 4 px, wann gezeichnet wird, Kacheln als PNG, Pyramide, Kosten, Bild und was fehlt.
+description: Die Wahl „Selbst“ - wie der Mod die Chunks, die der Spieler lädt, in eine eigene Karte zeichnet, auch im Einzelspieler, mit Wahl und Beenden, je Server, mit der Frage nach der alten Karte, Massstab 1, 2 oder 4 px, wann gezeichnet wird, Kacheln als PNG, Pyramide, Kosten, Bild und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Selbst.java
   - src/main/java/com/nekyia/heroicmap/Kachelwerk.java
@@ -8,6 +8,11 @@ code:
   - src/main/java/com/nekyia/heroicmap/Kacheln.java
   - src/main/java/com/nekyia/heroicmap/Satz.java
   - src/main/java/com/nekyia/heroicmap/Auswahl.java
+  - src/main/java/com/nekyia/heroicmap/Zeigt.java
+  - src/main/java/com/nekyia/heroicmap/AlteKarte.java
+  - src/main/java/com/nekyia/heroicmap/Kartenliste.java
+  - src/test/java/com/nekyia/heroicmap/KarteJeServerTest.java
+  - src/gametest/java/com/nekyia/heroicmap/KarteJeServer.java
   - src/main/java/com/nekyia/heroicmap/Downloads.java
   - src/main/java/com/nekyia/heroicmap/Freigabe.java
   - src/main/java/com/nekyia/heroicmap/mixin/LevelExtractorMixin.java
@@ -24,10 +29,11 @@ Mit der Wahl „Selbst“ zeichnet der Mod die Karte einer Dimension selbst:
 jeden Chunk, den der Spieler lädt, mit dem Maler der [Minimap](minimap.md),
 1, 2 oder 4 Pixel je Block, in Kacheln auf der Platte, auf einem Server wie
 im Einzelspieler. Die
-[Vollbildkarte](vollbildkarte.md) zeigt dann nur diese Karte, nie gemischt
-mit der des Servers. Warum: [0004](entscheidungen/0004-karte-selbst-zeichnen.md),
-[0014](entscheidungen/0014-eigene-karte-mit-massstab.md) und
-[0015](entscheidungen/0015-ordner-fuer-einzelspielerwelten.md).
+[Vollbildkarte](vollbildkarte.md) zeigt dann auf diesem Server diese Karte,
+nie gemischt mit der des Servers. Warum: [0004](entscheidungen/0004-karte-selbst-zeichnen.md),
+[0014](entscheidungen/0014-eigene-karte-mit-massstab.md),
+[0015](entscheidungen/0015-ordner-fuer-einzelspielerwelten.md) und, je
+Server, [0029](entscheidungen/0029-was-ein-server-zeigt-gilt-je-server.md).
 
 ## Wahl
 
@@ -42,24 +48,64 @@ mit der des Servers. Warum: [0004](entscheidungen/0004-karte-selbst-zeichnen.md)
   einer Decke (`DimensionType.hasCeiling`), sonst fehlt die Zeile
   (`Selbst.moeglich`).
 - **Was:** Die Wahl legt `heroicmap/<welt>/selbst-<dimension>-<crc>/` an,
-  siehe [Download](download.md), „Ablage“, mit `satz.json` (Name „Selbst“,
-  Massstab wie gewählt), `<massstab>/map.json` (`tileSize` 256, `minZoom` 0,
+  siehe [Download](download.md), „Ablage“, für den Server, auf dem der
+  Spieler ist, mit `satz.json` (Name „Selbst“, Massstab wie gewählt, mit
+  Namen des Servers `server`), `<massstab>/map.json` (`tileSize` 256, `minZoom` 0,
   `maxZoom` 8, `scale` 4, `downscale` `"nearest"`, für jeden Massstab
   gleich, siehe „Pyramide“) und der Marke
-  `selbst.txt` (`Selbst.anlegen`). Danach zeichnet
-  der Mod gleich alle geladenen Chunks.
+  `selbst.txt` (`Selbst.anlegen`), und `zeigt.txt` merkt, dass dieser
+  Server sie zeigt. Danach zeichnet der Mod gleich alle geladenen Chunks.
 - **Name:** Andere Zeichen der Kennung als `a`–`z`, `0`–`9`, `_` und `-`
   werden `_`, gekürzt auf 47 Zeichen; dazu 8 Stellen hex aus CRC32 der
-  Kennung (`Selbst.baum`). So ergeben `mod:a/b` und `mod:a_b` zwei Bäume.
+  Kennung, auf einem Server mit Namen über Namen und Kennung
+  (`Selbst.baum`). So ergeben `mod:a/b` und `mod:a_b` zwei Bäume, main und
+  build ebenso. Ohne Namen, also im Einzelspieler, auf einem Server ohne
+  Plugin und für jeden Baum von vor 0.2.69, nur aus der Kennung.
   „An“ ist eine Dimension nur, wenn auch `satz.json` ihre Kennung nennt
   (`Selbst.an`).
 - **Kein Baum vom Server:** Einen Baum, dessen Name mit `selbst-` beginnt,
   lädt der Mod nie vom Server (`Freigabe.baum`); sonst mischten sich beide
   in einem Ordner. Selbst gezeichnet ist ein Baum nur mit Präfix und Marke
   (`Selbst.selbst`).
-- **Vorrang:** Die Vollbildkarte nimmt einen selbst gezeichneten Baum vor
-  jedem anderen derselben Dimension (`Satz.fuer`), ohne den Knopf
-  „Abgleich“. Downloads vom Server gehen weiter in ihre eigenen Bäume.
+- **Welcher Server:** sein Name aus `backend` an der Antwort auf `show`,
+  ab Plugin 0.17.2 (`Downloads.wer`), sonst einer ohne Namen, Schlüssel `-`
+  (`Zeigt.OHNE`); im Einzelspieler immer ohne. Bis die erste Antwort der
+  Sitzung da ist, oder 3 s nach dem Login ohne den Kanal von Heroic Map
+  (`Downloads.OHNE_KANAL_MS`), zeichnet „Selbst“ nicht
+  (`Downloads.serverFest`); sonst landete der erste Chunk vielleicht in der
+  Karte eines anderen Servers.
+- **Was ein Server zeigt,** je Dimension (`Satz.fuer`):
+  1. seine Wahl in `zeigt.txt` im Ordner der Welt, siehe
+     [Download](download.md), „Ablage“;
+  2. ohne Wahl, mit Namen: der erste Download nach dem Namen, dann seine
+     eigene Karte; ohne Namen wie bis 0.2.68 die eigene vor dem Download.
+
+  Die eigene Karte eines anderen Servers zeigt er nie, auch nicht mit einer
+  Wahl. Gezeichnet wird nur in die eigene Karte dieses Servers, und nur,
+  solange er sie zeigt. Downloads vom Server gehen weiter in ihre eigenen
+  Bäume; einer kann auf main an sein und auf build ruhen.
+- **Die Frage** (`AlteKarte`): Zeigt dieser Server für die Dimension einen
+  Download, fragt der Mod bei „Selbst“ statt des einfachen Dialogs:
+  - er nennt Name, Herkunft, Massstab und Grösse der alten Karte, bei
+    geteiltem Ordner auch, wem der Download noch gehört, etwa main, wenn
+    build mit `karte.von` die Karte von main zeigt;
+  - „Löschen“, bei geteiltem Ordner „Löschen, auch für main“: erst, wenn
+    kein Download in den Baum wartet oder läuft (`Downloads.halte`), wie in
+    der Kartenliste; danach legt der Mod die eigene Karte an;
+  - „Behalten, ruht auf build“: Der Download ruht auf diesem Server und
+    bleibt auf der Platte;
+  - „Abbrechen“ und Esc ändern nichts, auch keine Datei.
+
+  Drei Knöpfe wie beim Öffnen einer alten Welt in Vanilla. Ebenso fragt der
+  Mod vor dem ersten vollen Download, wenn dieser Server seine eigene Karte
+  zeigt, siehe [Download](download.md), „Ablage“.
+- **Ruht die eigene Karte,** heisst der Knopf „Selbst · ruht · `<n>` px“;
+  ein Klick zeigt sie wieder, der Download ruht dann (`Selbst.wiederAn`).
+- **Alte eigene Karten** ohne `server` gehören einem Server ohne Namen. Ein
+  Server mit Namen übernimmt eine in der Kartenliste mit „übernehmen“: Der
+  Baum bekommt den Namen für diesen Server, `satz.json` nennt ihn, und er
+  zeigt ihn. Gibt es dort schon eine eigene Karte der Dimension, geht es
+  nicht.
 - **Beenden:** die Karte in der Kartenliste löschen, siehe
   [Download](download.md), „Kartenliste“; die Rückfrage sagt, dass die
   eigene Karte mit „Selbst“ von vorn beginnt. Das Löschen läuft im Worker

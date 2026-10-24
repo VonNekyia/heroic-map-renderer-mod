@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -356,6 +357,32 @@ class MinimapTest {
             neu.lies(datei);
             assertEquals(k, neu.koordinaten());
         }
+    }
+
+    @Test
+    void koordinatenAlsWidgetUebernommen(@TempDir Path ordner) throws Exception {
+        // Eine Datei von vor den Widgets: koordinaten=xyz wird das Widget der Koordinaten mit y; geschrieben wird nur noch
+        // widgets. Siehe docs/widgets.md, „Gespeichert“.
+        Path datei = ordner.resolve("heroicmap.properties");
+        Files.writeString(datei, "koordinaten=xyz\n");
+        Minimap m = new Minimap();
+        m.lies(datei);
+        assertEquals(List.of(new Widgets.Widget(Widgets.Art.KOORDINATEN, 1, Widgets.Anker.UNTEN)), m.widgets());
+        m.schreibe(datei);
+        Properties p = new Properties();
+        try (var rein = Files.newBufferedReader(datei)) {
+            p.load(rein);
+        }
+        assertEquals("koordinaten:xyz:0:unten", p.getProperty("widgets"));
+        assertNull(p.getProperty("koordinaten"));
+        // Mit widgets gilt koordinaten nicht mehr, auch leer: dann keine Koordinaten.
+        Files.writeString(datei, "koordinaten=xyz\nwidgets=\n");
+        m.lies(datei);
+        assertEquals(List.of(), m.widgets());
+        assertEquals(Minimap.Koordinaten.AUS, m.koordinaten());
+        // Aus und wieder an: das Widget kommt unten dazu.
+        m.setzeKoordinaten(Minimap.Koordinaten.XZ);
+        assertEquals(List.of(new Widgets.Widget(Widgets.Art.KOORDINATEN, 0, Widgets.Anker.UNTEN)), m.widgets());
     }
 
     @Test

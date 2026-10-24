@@ -54,7 +54,7 @@ public final class SelbstZoom implements FabricClientGameTest {
             server.runCommand("tp @a " + MITTE + " 160 " + MITTE);
             context.computeOnClient(mc -> Selbst.INSTANZ.schreibeJetzt()).join();
             Path baum = welt.resolve(Selbst.baum("minecraft:overworld"));
-            context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(welt, "minecraft:overworld")).bei(MITTE + 0.5, MITTE + 0.5)));
+            context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(welt, "minecraft:overworld", Zeigt.OHNE)).bei(MITTE + 0.5, MITTE + 0.5)));
             context.waitTicks(60);
             int k = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
             int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());

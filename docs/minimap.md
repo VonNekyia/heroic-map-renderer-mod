@@ -526,8 +526,9 @@ Unter der Minimap stehen die Blockkoordinaten des Spielers, abgerundet wie
 im Debug-Bildschirm des Spiels (`Mth.floor`). So hat es der User gewünscht.
 
 - **Stil:** aus, `xz` oder `xyz`, Vorgabe `xz` (`Minimap.Koordinaten`).
-  Gespeichert als `koordinaten` in `heroicmap.properties`, `aus`, `xz` oder
-  `xyz`; ein anderer Wert gilt als Vorgabe.
+  Die Zeile ist ein Widget: Im Menü lässt sie sich ziehen, skalieren und
+  löschen, gespeichert wird sie als Widget, siehe [Widgets](widgets.md); bis
+  0.2.68 hiess die Einstellung `koordinaten`.
 - **Im Menü per Klick** (mod#173, so hat es der User gewünscht): Ein
   Linksklick auf die Zeile wechselt den Stil reihum, aus → `xz` → `xyz` →
   aus (`Einstellungen.naechste`). Einen Knopf im Untermenü gibt es dafür

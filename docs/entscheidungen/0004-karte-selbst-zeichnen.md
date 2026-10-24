@@ -17,6 +17,9 @@ eigene Karte hat 1, 2 oder 4 Pixel je Block zur Wahl, nicht nur 4.
 
 Teilweise abgelöst durch [0015](0015-ordner-fuer-einzelspielerwelten.md):
 Auch im Einzelspieler gibt es einen Ordner der Welt und damit „Selbst“.
+Teilweise abgelöst durch [0029](0029-was-ein-server-zeigt-gilt-je-server.md):
+Die eigene Karte geht nicht mehr still vor; was ein Server zeigt, gilt je
+Server, und die eigene Karte gehört einem Server.
 
 ## Anlass
 

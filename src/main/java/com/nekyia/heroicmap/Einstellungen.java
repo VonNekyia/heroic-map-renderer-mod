@@ -2,8 +2,8 @@ package com.nekyia.heroicmap;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.cursor.CursorTypes;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -55,8 +55,11 @@ final class Einstellungen extends Screen {
     /** Seite eines Symbols an der Minimap, so breit wie der Regler „Zoom“. */
     static final int SYMBOL = 20;
 
-    /** KLICK: gedrückt auf Spieler oder Marke; wandert die Maus weiter als {@link MinimapKlick#WEG}, wird daraus LAGE. */
-    private enum Zug { KEINER, KLICK, LAGE, GROESSE }
+    /**
+     * KLICK: gedrückt auf Spieler oder Marke; wandert die Maus weiter als {@link MinimapKlick#WEG}, wird daraus LAGE. WIDGET:
+     * links gedrückt auf ein Widget; wandert die Maus weiter als {@link MinimapKlick#WEG}, zieht sie es.
+     */
+    private enum Zug { KEINER, KLICK, LAGE, GROESSE, WIDGET }
 
     private Zug zug = Zug.KEINER;
     /** Der Wähler der Rahmen über dem Menü; offen nimmt er alle Klicks und Esc. Siehe docs/rahmen.md, „Wähler“. */
@@ -73,6 +76,13 @@ final class Einstellungen extends Screen {
     private boolean griffLinks, griffOben;
     /** Beim Ziehen: Seite und Maus beim Greifen. */
     private int startSeite, startX, startY;
+    /** Das Widget unter der Maus, mit seinem ×, oder -1; beim Ziehen eines Widgets seine Stelle in der Liste. */
+    private int ueberWidget = -1, widgetZug = -1;
+    /** Beim Ziehen eines Widgets: die Liste davor und seine Stelle darin, wo die Maus es griff, und ob sie schon zog. */
+    private List<Widgets.Widget> vorZug = List.of();
+    private int vorStelle, widgetGriffX, widgetGriffY;
+    private double widgetStartX, widgetStartY;
+    private boolean widgetGezogen;
     /** Warum Mitspieler hier nicht gehen, beim Bauen der Knöpfe, oder null ({@link Mitspieler#grund}). */
     private String grund;
     /** Linker Rand, Oberkante und Breite der Knöpfe. */
@@ -110,7 +120,7 @@ final class Einstellungen extends Screen {
         // bekommen den Klick, wie vorher über der Minimap. Siehe docs/minimap.md, „Bedienung“.
         int[] z = zoomLage(m.rahmen(width, height), m.rand(), width);
         zoom = addRenderableOnly(new ZoomRegler(z[0], z[1], z[2], m));
-        int[] a = aufloesungLage(m.rahmen(width, height), m.koordinatenKasten(), m.rand(), height);
+        int[] a = aufloesungLage(m.rahmen(width, height), m.stapelKasten(), m.rand(), height);
         aufloesung = addRenderableOnly(new AufloesungRegler(a[0], a[1], a[2], m));
         nord = addRenderableOnly(new Symbol(Symbol.NORD));
         form = addRenderableOnly(new Symbol(Symbol.FORM));
@@ -191,7 +201,7 @@ final class Einstellungen extends Screen {
     /** Legt das L um die Minimap ({@link #lLage}); ist sie aus, fehlt es. */
     private void lege() {
         Minimap m = Minimap.INSTANZ;
-        int[][] l = lLage(m.rahmen(width, height), m.koordinatenKasten(), m.rand(), width, height);
+        int[][] l = lLage(m.rahmen(width, height), m.stapelKasten(), m.rand(), width, height);
         AbstractWidget[] w = {nord, zoom, form, aufloesung, raster};
         for (int i = 0; i < w.length; i++) {
             w[i].setRectangle(l[i][2], l[i][3], l[i][0], l[i][1]);
@@ -232,10 +242,64 @@ final class Einstellungen extends Screen {
         };
     }
 
-    /** Der nächste Stil der Koordinaten im Kreis: aus, xz, xyz. */
-    static Minimap.Koordinaten naechste(Minimap.Koordinaten k) {
-        Minimap.Koordinaten[] alle = Minimap.Koordinaten.values();
-        return alle[(k.ordinal() + 1) % alle.length];
+    /**
+     * Das Widget unter (x, y), oder -1: zuerst das × des Widgets unter der Maus, dann das zuletzt gezeichnete, frei über oben
+     * über unten. Siehe docs/widgets.md, „Bedienung“.
+     */
+    private int widgetUnter(double x, double y) {
+        int[][] k = Minimap.INSTANZ.widgetKaesten();
+        if (ueberWidget >= 0 && ueberWidget < k.length && k[ueberWidget] != null && imKasten(Widgets.kreuz(k[ueberWidget]), x, y)) {
+            return ueberWidget;
+        }
+        for (int i = k.length - 1; i >= 0; i--) {
+            if (imKasten(k[i], x, y)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** Liegt (x, y) auf dem × des Widgets unter der Maus? */
+    private boolean aufKreuz(double x, double y) {
+        int[][] k = Minimap.INSTANZ.widgetKaesten();
+        return ueberWidget >= 0 && ueberWidget < k.length && k[ueberWidget] != null && imKasten(Widgets.kreuz(k[ueberWidget]), x, y);
+    }
+
+    /** Das ×: dunkel mit hellem Rand, darin ein rotes Kreuz. */
+    private static void kreuz(GuiGraphicsExtractor g, int[] k) {
+        g.fill(k[0], k[1], k[0] + k[2], k[1] + k[3], 0xFF282828);
+        g.outline(k[0], k[1], k[2], k[3], TEXT);
+        for (int i = 2; i < k[2] - 2; i++) {
+            g.fill(k[0] + i, k[1] + i, k[0] + i + 1, k[1] + i + 1, 0xFFFF5A5A);
+            g.fill(k[0] + k[2] - 1 - i, k[1] + i, k[0] + k[2] - i, k[1] + i + 1, 0xFFFF5A5A);
+        }
+    }
+
+    /**
+     * Zieht das gegriffene Widget mit der Maus bei (mx, my): wohin es fällt ({@link Widgets#ziel}), die Liste neu aus der vor dem
+     * Ziehen, so zeigt der Stapel die Lücke schon jetzt. Siehe docs/widgets.md, „Ziehen“.
+     */
+    private void ziehe(int mx, int my) {
+        Minimap m = Minimap.INSTANZ;
+        int[][] k = m.widgetKaesten();
+        List<Widgets.Widget> jetzt = m.widgets();
+        if (widgetZug < 0 || widgetZug >= k.length || k[widgetZug] == null) {
+            return;
+        }
+        List<int[]> unten = new ArrayList<>(), oben = new ArrayList<>();
+        for (int i = 0; i < jetzt.size() && i < k.length; i++) {
+            if (i != widgetZug && k[i] != null && jetzt.get(i).anker() == Widgets.Anker.UNTEN) {
+                unten.add(k[i]);
+            } else if (i != widgetZug && k[i] != null && jetzt.get(i).anker() == Widgets.Anker.OBEN) {
+                oben.add(k[i]);
+            }
+        }
+        Minimap.Rahmen r = m.rahmen(width, height);
+        Widgets.Ziel ziel = Widgets.ziel(mx - widgetGriffX, my - widgetGriffY, k[widgetZug][2], k[widgetZug][3],
+                new int[] {r.x(), r.y(), r.seite()}, unten, oben, width, height, m.rand());
+        Widgets.Gesetzt neu = Widgets.setze(vorZug, vorStelle, ziel);
+        m.widgets(neu.liste());
+        widgetZug = neu.stelle();
     }
 
     private static boolean imKasten(int[] kasten, double x, double y) {
@@ -271,12 +335,20 @@ final class Einstellungen extends Screen {
         lege();
         zoom.folge(m.zoom());
         aufloesung.folge(m.aufloesung());
-        // Die Zeile der Koordinaten unter der Maus steht gelb, ab dem nächsten Frame, und nennt ihren Stil.
-        boolean aufZeile = m.sichtbar() && zug == Zug.KEINER && imKasten(m.koordinatenKasten(), mausX, mausY);
-        m.koordinatenHell(aufZeile);
-        if (aufZeile) {
-            g.setTooltipForNextFrame(Component.translatable("heroicmap.menue.koordinaten.klick", stil(m.koordinaten()), stil(naechste(m.koordinaten()))),
-                    mausX, mausY);
+        // Das Widget unter der Maus steht gelb, ab dem nächsten Frame, mit seinem ×; die Koordinaten nennen ihre nächste Version.
+        // Ohne Koordinaten gilt das für die graue Zeile.
+        ueberWidget = m.sichtbar() && zug == Zug.KEINER ? widgetUnter(mausX, mausY) : zug == Zug.WIDGET ? widgetZug : -1;
+        List<Widgets.Widget> widgets = m.widgets();
+        boolean aufAus = ueberWidget < 0 && m.sichtbar() && zug == Zug.KEINER && m.koordinaten() == Minimap.Koordinaten.AUS
+                && imKasten(m.koordinatenKasten(), mausX, mausY);
+        m.hell(aufAus ? widgets.size() : ueberWidget);
+        if (zug == Zug.KEINER && ueberWidget >= 0 && ueberWidget < widgets.size() && widgets.get(ueberWidget).art() == Widgets.Art.KOORDINATEN
+                && !aufKreuz(mausX, mausY)) {
+            Widgets.Widget w = widgets.get(ueberWidget);
+            g.setTooltipForNextFrame(Component.translatable("heroicmap.menue.koordinaten.klick", stil(w), stil(w.naechsteVersion())), mausX, mausY);
+        } else if (aufAus) {
+            g.setTooltipForNextFrame(Component.translatable("heroicmap.menue.koordinaten.klick",
+                    Component.translatable("heroicmap.menue.koordinaten.aus"), Component.translatable("heroicmap.menue.koordinaten.xz")), mausX, mausY);
         }
         super.extractRenderState(g, mausX, mausY, delta);
         // Titel und Hinweis über den Knöpfen; unten läge der Chat darüber.
@@ -314,6 +386,11 @@ final class Einstellungen extends Screen {
         boolean frei = (zug == Zug.KEINER || zug == Zug.KLICK)
                 && !(Minimap.INSTANZ.sichtbar() && imGriff(mausX, mausY, Minimap.INSTANZ.rahmen(width, height)));
         klick.zeichne(g, font, mausX, mausY, frei);
+        // Das × über allem, auch über Knöpfen, nur solange die Maus auf dem Widget oder dem × ist.
+        int[][] kaesten = Minimap.INSTANZ.widgetKaesten();
+        if (zug == Zug.KEINER && ueberWidget >= 0 && ueberWidget < kaesten.length && kaesten[ueberWidget] != null) {
+            kreuz(g, Widgets.kreuz(kaesten[ueberWidget]));
+        }
         if (waehler.offen()) {
             waehler.zeichne(g, font, echtX, echtY, width, height);
         }
@@ -326,6 +403,19 @@ final class Einstellungen extends Screen {
             if (ereignis.key() == InputConstants.KEY_ESCAPE) {
                 waehler.schliesse();
             }
+            return true;
+        }
+        // Esc beim Ziehen legt das Widget zurück; Entf oder Rücktaste löscht das unter der Maus. Siehe docs/widgets.md, „Bedienung“.
+        if (zug == Zug.WIDGET && ereignis.key() == InputConstants.KEY_ESCAPE) {
+            Minimap.INSTANZ.widgets(vorZug);
+            zug = Zug.KEINER;
+            widgetZug = -1;
+            return true;
+        }
+        if (zug == Zug.KEINER && (ereignis.key() == InputConstants.KEY_DELETE || ereignis.key() == InputConstants.KEY_BACKSPACE)
+                && ueberWidget >= 0 && ueberWidget < Minimap.INSTANZ.widgets().size()) {
+            Minimap.INSTANZ.loescheWidget(ueberWidget);
+            ueberWidget = -1;
             return true;
         }
         return super.keyPressed(ereignis);
@@ -348,8 +438,8 @@ final class Einstellungen extends Screen {
         g.text(font, Component.translatable("heroicmap.koordinaten", bx, bz), 4, height - 12, TEXT);
     }
 
-    private static Component stil(Minimap.Koordinaten k) {
-        return Component.translatable("heroicmap.menue.koordinaten." + k.name().toLowerCase(Locale.ROOT));
+    private static Component stil(Widgets.Widget w) {
+        return Component.translatable("heroicmap.menue.koordinaten." + w.versionName());
     }
 
     /** Liegt (x, y) auf der Minimap {@code r}, rund im Kreis? */
@@ -362,6 +452,12 @@ final class Einstellungen extends Screen {
     @Override
     public boolean mouseScrolled(double x, double y, double weitX, double weitY) {
         if (waehler.offen()) {
+            return true;
+        }
+        // Über einem Widget eine Stufe grösser oder kleiner, in ganzen Pixeln des Geräts je Pixel der Schrift.
+        int w = weitY != 0 && zug == Zug.KEINER && Minimap.INSTANZ.sichtbar() ? widgetUnter(x, y) : -1;
+        if (w >= 0) {
+            Minimap.INSTANZ.setzeWidget(w, Minimap.INSTANZ.widgets().get(w).stufe(minecraft.getWindow().getGuiScale(), weitY > 0 ? 1 : -1));
             return true;
         }
         if (weitY != 0 && zug == Zug.KEINER && aufloesung.isMouseOver(x, y)) {
@@ -382,6 +478,34 @@ final class Einstellungen extends Screen {
             waehler.klick(e.x(), e.y(), width, height);
             return true;
         }
+        // Vor den Knöpfen: das × des Widgets unter der Maus, dann das Widget, rechts die nächste Version, links greifen.
+        // Siehe docs/widgets.md, „Bedienung“.
+        if (Minimap.INSTANZ.sichtbar() && (e.button() == InputConstants.MOUSE_BUTTON_LEFT || e.button() == InputConstants.MOUSE_BUTTON_RIGHT)) {
+            Minimap m = Minimap.INSTANZ;
+            if (e.button() == InputConstants.MOUSE_BUTTON_LEFT && aufKreuz(e.x(), e.y()) && ueberWidget < m.widgets().size()) {
+                m.loescheWidget(ueberWidget);
+                ueberWidget = -1;
+                return true;
+            }
+            int w = widgetUnter(e.x(), e.y());
+            if (w >= 0 && w < m.widgets().size()) {
+                if (e.button() == InputConstants.MOUSE_BUTTON_RIGHT) {
+                    m.setzeWidget(w, m.widgets().get(w).naechsteVersion());
+                    return true;
+                }
+                int[] k = m.widgetKaesten()[w];
+                zug = Zug.WIDGET;
+                widgetZug = w;
+                vorZug = m.widgets();
+                vorStelle = w;
+                widgetGriffX = Mth.floor(e.x()) - k[0];
+                widgetGriffY = Mth.floor(e.y()) - k[1];
+                widgetStartX = e.x();
+                widgetStartY = e.y();
+                widgetGezogen = false;
+                return true;
+            }
+        }
         if (super.mouseClicked(e, doppelt)) {
             return true;
         }
@@ -396,9 +520,10 @@ final class Einstellungen extends Screen {
             }
             return false;
         }
-        // Ein Linksklick auf die Zeile der Koordinaten wechselt ihren Stil, auch von „aus“ zurück.
-        if (e.button() == InputConstants.MOUSE_BUTTON_LEFT && imKasten(Minimap.INSTANZ.koordinatenKasten(), e.x(), e.y())) {
-            Minimap.INSTANZ.setzeKoordinaten(naechste(Minimap.INSTANZ.koordinaten()));
+        // Ohne Koordinaten holt ein Linksklick auf die graue Zeile sie unten zurück.
+        if (e.button() == InputConstants.MOUSE_BUTTON_LEFT && Minimap.INSTANZ.koordinaten() == Minimap.Koordinaten.AUS
+                && imKasten(Minimap.INSTANZ.koordinatenKasten(), e.x(), e.y())) {
+            Minimap.INSTANZ.setzeKoordinaten(Minimap.Koordinaten.XZ);
             return true;
         }
         Minimap.Rahmen r = Minimap.INSTANZ.rahmen(width, height);
@@ -443,6 +568,12 @@ final class Einstellungen extends Screen {
                 }
             }
             case LAGE -> m.verschiebe(mx - festX, my - festY, width, height);
+            case WIDGET -> {
+                widgetGezogen |= Math.hypot(e.x() - widgetStartX, e.y() - widgetStartY) > MinimapKlick.WEG;
+                if (widgetGezogen) {
+                    ziehe(mx, my);
+                }
+            }
             case GROESSE -> {
                 // Relativ zum Griff: Der Griff sitzt rund nicht in der Ecke, die Seite springt so nicht.
                 int platz = Math.min(width, height) - 2 * m.rand();
@@ -461,6 +592,16 @@ final class Einstellungen extends Screen {
     @Override
     public boolean mouseReleased(MouseButtonEvent e) {
         if (waehler.offen() && zug == Zug.KEINER) {
+            return true;
+        }
+        // Links geklickt ohne Ziehen: die nächste Version, wie rechts.
+        if (zug == Zug.WIDGET) {
+            List<Widgets.Widget> widgets = Minimap.INSTANZ.widgets();
+            if (!widgetGezogen && widgetZug >= 0 && widgetZug < widgets.size()) {
+                Minimap.INSTANZ.setzeWidget(widgetZug, widgets.get(widgetZug).naechsteVersion());
+            }
+            zug = Zug.KEINER;
+            widgetZug = -1;
             return true;
         }
         boolean geklickt = zug == Zug.KLICK && klick.lasse(e);
@@ -544,7 +685,7 @@ final class Einstellungen extends Screen {
     public void removed() {
         Minimap.INSTANZ.griff(-1, false);
         Minimap.INSTANZ.hervor(Minimap.KEIN_ZIEL);
-        Minimap.INSTANZ.koordinatenHell(false);
+        Minimap.INSTANZ.hell(-1);
         Minimap.INSTANZ.schreibe(HeroicMap.einstellungen());
         // Eine andere Ablage heisst ein anderer Ordner der Welt, auch für die Wegpunkte.
         Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());

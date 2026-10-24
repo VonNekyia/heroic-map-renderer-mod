@@ -89,15 +89,21 @@ public final class Selbst {
         worker.scheduleWithFixedDelay(this::baueNeu, NEUBAU_MS, NEUBAU_MS, TimeUnit.MILLISECONDS);
     }
 
-    /**
-     * Der Name des Baums einer Dimension: {@link #PRAEFIX}, die Kennung, andere Zeichen als a–z,
-     * 0–9, _ und - als _, gekürzt, dazu 8 Stellen hex aus CRC32 der Kennung. So ergeben
-     * {@code mod:a/b} und {@code mod:a_b} zwei Bäume.
-     */
+    /** Der Name des Baums einer Dimension für einen Server ohne Namen, auch im Einzelspieler; siehe unten. */
     static String baum(String dimension) {
+        return baum(dimension, Zeigt.OHNE);
+    }
+
+    /**
+     * Der Name des Baums einer Dimension für {@code server}: {@link #PRAEFIX}, die Kennung, andere Zeichen als a–z,
+     * 0–9, _ und - als _, gekürzt, dazu 8 Stellen hex aus CRC32 der Kennung, mit Namen über Server und Kennung. So
+     * ergeben {@code mod:a/b} und {@code mod:a_b} zwei Bäume, ebenso main und build. Ohne Namen wie vor der Karte je
+     * Server: So bleibt jeder alte Baum der eines Servers ohne Namen.
+     */
+    static String baum(String dimension, String server) {
         String lesbar = dimension.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]", "_");
         CRC32 crc = new CRC32();
-        crc.update(dimension.getBytes(StandardCharsets.UTF_8));
+        crc.update((Zeigt.OHNE.equals(server) ? dimension : server + "\n" + dimension).getBytes(StandardCharsets.UTF_8));
         return PRAEFIX + lesbar.substring(0, Math.min(lesbar.length(), 47)) + "-" + String.format(Locale.ROOT, "%08x", crc.getValue());
     }
 
@@ -109,11 +115,24 @@ public final class Selbst {
         return baum.getFileName().toString().startsWith(PRAEFIX) && Files.exists(baum.resolve(MARKE));
     }
 
-    /** Wird die Dimension in der Welt {@code welt} selbst gezeichnet? Die Dimension aus {@code satz.json} muss passen. */
+    /** Gehört der selbst gezeichnete Baum {@code server}? Siehe docs/selbst.md, „Wahl“. */
+    static boolean gehoert(Path baum, String server) {
+        return selbst(baum) && server.equals(Satz.besitzer(baum));
+    }
+
+    /** Hat ein Server ohne Namen in der Welt {@code welt} eine eigene Karte der Dimension? */
     static boolean an(Path welt, String dimension) {
-        Path baum = welt.resolve(baum(dimension));
+        return an(welt, dimension, Zeigt.OHNE);
+    }
+
+    /**
+     * Hat {@code server} in der Welt {@code welt} eine eigene Karte der Dimension, gezeigt oder ruhend? Die Dimension
+     * aus {@code satz.json} und der Server müssen passen.
+     */
+    static boolean an(Path welt, String dimension, String server) {
+        Path baum = welt.resolve(baum(dimension, server));
         Satz satz = Satz.lies(baum);
-        return satz != null && dimension.equals(satz.dimension()) && selbst(baum);
+        return satz != null && dimension.equals(satz.dimension()) && gehoert(baum, server);
     }
 
     /**
@@ -122,7 +141,12 @@ public final class Selbst {
      * Stufe sagt {@link Satz#stufe}. Gibt den Baum zurück.
      */
     static Path anlegen(Path welt, String dimension, int massstab) throws IOException {
-        Path baum = welt.resolve(baum(dimension)), ordner = baum.resolve(String.valueOf(massstab));
+        return anlegen(welt, dimension, massstab, Zeigt.OHNE);
+    }
+
+    /** Wie oben, für {@code server}; {@code satz.json} nennt ihn. */
+    static Path anlegen(Path welt, String dimension, int massstab, String server) throws IOException {
+        Path baum = welt.resolve(baum(dimension, server)), ordner = baum.resolve(String.valueOf(massstab));
         Files.createDirectories(ordner);
         JsonObject karte = new JsonObject();
         karte.addProperty("tileSize", KACHEL);
@@ -132,7 +156,7 @@ public final class Selbst {
         karte.addProperty(Kachelwerk.DOWNSCALE, Kachelwerk.NEAREST);
         Files.writeString(ordner.resolve("map.json"), karte.toString(), StandardCharsets.UTF_8);
         Files.writeString(baum.resolve(MARKE), "Heroic Map: selbst gezeichnet, " + dimension + "\n", StandardCharsets.UTF_8);
-        Satz.schreibe(baum, "Selbst", dimension, massstab);
+        Satz.schreibe(baum, "Selbst", dimension, massstab, server);
         return baum;
     }
 
@@ -146,15 +170,65 @@ public final class Selbst {
         return weltOrdner() != null && mc.level != null && !mc.level.dimensionType().hasCeiling();
     }
 
-    /** Wird die Dimension des Spielers schon selbst gezeichnet? */
-    boolean an(Minecraft mc) {
-        return moeglich(mc) && an(weltOrdner(), dimension(mc.level));
+    /** Hat dieser Server eine eigene Karte der Dimension des Spielers, gezeigt oder ruhend? */
+    boolean vorhanden(Minecraft mc) {
+        return moeglich(mc) && an(weltOrdner(), dimension(mc.level), Downloads.INSTANZ.wer());
     }
 
-    /** Der Massstab der eigenen Karte dieser Dimension, oder 0, wenn sie nicht selbst gezeichnet wird. */
+    /** Zeigt dieser Server seine eigene Karte der Dimension des Spielers? */
+    boolean an(Minecraft mc) {
+        if (!vorhanden(mc)) {
+            return false;
+        }
+        Satz gezeigt = Satz.fuer(weltOrdner(), dimension(mc.level), Downloads.INSTANZ.wer());
+        return gezeigt != null && gezeigt.ordner().getParent().equals(eigenerBaum(mc));
+    }
+
+    /** Der Baum der eigenen Karte dieses Servers in der Dimension des Spielers, ob es ihn gibt oder nicht. */
+    Path eigenerBaum(Minecraft mc) {
+        return weltOrdner().resolve(baum(dimension(mc.level), Downloads.INSTANZ.wer()));
+    }
+
+    /** Der Massstab der eigenen Karte dieser Dimension, oder 0, wenn es keine gibt. */
     int massstab(Minecraft mc) {
-        Satz s = an(mc) ? Satz.lies(weltOrdner().resolve(baum(dimension(mc.level)))) : null;
+        Satz s = vorhanden(mc) ? Satz.lies(eigenerBaum(mc)) : null;
         return s == null ? 0 : s.massstab();
+    }
+
+    /** Die eigene Karte, die ruht, wieder an: Dieser Server zeigt sie für die Dimension statt des Downloads. */
+    Component wiederAn(Minecraft mc) {
+        if (!vorhanden(mc)) {
+            return Component.translatable("heroicmap.selbst.geht_nicht");
+        }
+        try {
+            Zeigt.setze(weltOrdner(), Downloads.INSTANZ.wer(), dimension(mc.level), eigenerBaum(mc).getFileName().toString());
+        } catch (IOException e) {
+            LOGGER.warn("Heroic Map: Wahl der Karte nicht gespeichert", e);
+            return Component.translatable("heroicmap.selbst.fehler");
+        }
+        neuGewaehlt(mc);
+        return null;
+    }
+
+    /**
+     * Nach einer neuen Wahl in zeigt.txt: neu suchen, ob und wohin gezeichnet wird, und alle geladenen Chunks
+     * vormerken; was schon geladen ist, meldet der Mixin nicht noch einmal.
+     */
+    void neuGewaehlt(Minecraft mc) {
+        satz = null;
+        gesucht = false;
+        if (mc.player == null || mc.level == null) {
+            return;
+        }
+        int r = mc.options.getEffectiveRenderDistance() + 1;
+        ChunkPos m = mc.player.chunkPosition();
+        for (int dz = -r; dz <= r; dz++) {
+            for (int dx = -r; dx <= r; dx++) {
+                if (mc.level.getChunkSource().getChunk(m.x() + dx, m.z() + dz, ChunkStatus.FULL, false) != null) {
+                    offen.add(ChunkPos.pack(m.x() + dx, m.z() + dz));
+                }
+            }
+        }
     }
 
     /**
@@ -166,23 +240,15 @@ public final class Selbst {
             return Component.translatable("heroicmap.selbst.geht_nicht");
         }
         try {
-            anlegen(weltOrdner(), dimension(mc.level), massstab);
+            String wer = Downloads.INSTANZ.wer();
+            Path baum = anlegen(weltOrdner(), dimension(mc.level), massstab, wer);
+            // Gewählt ist gewählt: Ab jetzt zeigt dieser Server sie, auch wenn ein Download der Dimension daliegt.
+            Zeigt.setze(weltOrdner(), wer, dimension(mc.level), baum.getFileName().toString());
         } catch (IOException e) {
             LOGGER.warn("Heroic Map: Karte zum selbst Zeichnen nicht angelegt", e);
             return Component.translatable("heroicmap.selbst.fehler");
         }
-        satz = null;
-        gesucht = false;
-        // Was schon geladen ist, meldet der Mixin nicht noch einmal.
-        int r = mc.options.getEffectiveRenderDistance() + 1;
-        ChunkPos m = mc.player.chunkPosition();
-        for (int dz = -r; dz <= r; dz++) {
-            for (int dx = -r; dx <= r; dx++) {
-                if (mc.level.getChunkSource().getChunk(m.x() + dx, m.z() + dz, ChunkStatus.FULL, false) != null) {
-                    offen.add(ChunkPos.pack(m.x() + dx, m.z() + dz));
-                }
-            }
-        }
+        neuGewaehlt(mc);
         return null;
     }
 
@@ -241,9 +307,14 @@ public final class Selbst {
 
     private Satz satz(ClientLevel level) {
         if (!gesucht) {
+            // Erst, wenn feststeht, welcher Server es ist; sonst zeichnete sie vielleicht in die Karte eines anderen.
+            if (!Downloads.INSTANZ.serverFest()) {
+                return null;
+            }
             gesucht = true;
-            Satz s = level.dimensionType().hasCeiling() ? null : Satz.fuer(weltOrdner(), dimension(level));
-            satz = s != null && selbst(s.ordner().getParent()) ? s : null;
+            String wer = Downloads.INSTANZ.wer();
+            Satz s = level.dimensionType().hasCeiling() ? null : Satz.fuer(weltOrdner(), dimension(level), wer);
+            satz = s != null && gehoert(s.ordner().getParent(), wer) ? s : null;
             if (satz == null) {
                 offen.clear();
             }

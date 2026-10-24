@@ -464,7 +464,7 @@ final class Karte extends Screen {
         // Ohne Satz während eines Stroms: Sobald die gröbste Stufe daliegt, zeigt sich die Karte. Siehe docs/vollbildkarte.md, „Fortschritt“.
         if (satz == null && Downloads.INSTANZ.stufen() != stufen && minecraft.level != null) {
             stufen = Downloads.INSTANZ.stufen();
-            Satz neu = Satz.fuer(Downloads.weltOrdner(), minecraft.level.dimension().identifier().toString());
+            Satz neu = Satz.fuer(Downloads.weltOrdner(), minecraft.level.dimension().identifier().toString(), Downloads.INSTANZ.wer());
             if (neu != null) {
                 minecraft.gui.setScreen(new Karte(neu));
                 return;

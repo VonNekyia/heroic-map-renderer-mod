@@ -2,11 +2,17 @@ package com.nekyia.heroicmap;
 
 import com.mojang.logging.LogUtils;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -22,7 +28,7 @@ final class Kartenliste extends Screen {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final int TEXT = 0xFFFFFFFF;
-    private static final int ZEILE = 24, OBEN = 44, KNOPF = 60;
+    private static final int ZEILE = 24, OBEN = 44, KNOPF = 60, ZUSTAND = 72;
 
     private final Screen zurueck;
     /** Null, solange gezählt wird. */
@@ -83,14 +89,108 @@ final class Kartenliste extends Screen {
             zaehle();
         }
         if (bestand != null) {
+            Path welt = Downloads.weltOrdner();
+            String wer = Downloads.INSTANZ.wer();
             for (int i = erste; i < Math.min(bestand.karten().size(), erste + zeilen()); i++) {
                 Laden.AufPlatte e = bestand.karten().get(i);
+                int y = OBEN + (i - erste) * ZEILE;
+                addRenderableWidget(zustand(e, welt, wer, width - KNOPF - ZUSTAND - 12, y));
                 addRenderableWidget(Button.builder(Component.translatable("heroicmap.liste.loeschen"), b -> frage(e))
-                        .bounds(width - KNOPF - 8, OBEN + (i - erste) * ZEILE, KNOPF, 20).build());
+                        .bounds(width - KNOPF - 8, y, KNOPF, 20).build());
             }
         }
         addRenderableWidget(Button.builder(Component.translatable("gui.back"), b -> onClose())
                 .bounds(width / 2 - 50, height - 28, 100, 20).build());
+    }
+
+    /**
+     * Der Knopf „an“ oder „ruht“ für den Server, auf dem der Spieler ist, nur im Ordner seiner Welt. Die eigene Karte
+     * eines Servers ohne Namen übernimmt ein Server mit Namen; die eines anderen zeigt er nie. Siehe docs/download.md,
+     * „Kartenliste“.
+     */
+    private Button zustand(Laden.AufPlatte e, Path welt, String wer, int x, int y) {
+        Path baum = e.ordner();
+        Button knopf;
+        if (e.satz() == null || welt == null || !baum.getParent().equals(welt)) {
+            List<String> wo = e.satz() == null ? List.of() : Zeigt.server(baum.getParent(), baum.getFileName().toString());
+            knopf = Button.builder(Component.literal("–"), b -> {
+            }).bounds(x, y, ZUSTAND, 20).tooltip(Tooltip.create(wo.isEmpty() ? Component.translatable("heroicmap.liste.nur_hier")
+                    : Component.translatable("heroicmap.liste.an_auf", String.join(", ", wo)))).build();
+            knopf.active = false;
+            return knopf;
+        }
+        if (Selbst.selbst(baum) && !Selbst.gehoert(baum, wer)) {
+            String besitzer = Satz.besitzer(baum);
+            if (Zeigt.OHNE.equals(besitzer) && !Zeigt.OHNE.equals(wer)) {
+                knopf = Button.builder(Component.translatable("heroicmap.liste.uebernehmen"), b -> uebernimm(e, wer))
+                        .bounds(x, y, ZUSTAND, 20)
+                        .tooltip(Tooltip.create(Component.translatable("heroicmap.liste.uebernehmen.beschreibung", wer))).build();
+                knopf.active = !Files.exists(welt.resolve(Selbst.baum(e.satz().dimension(), wer)));
+            } else {
+                knopf = Button.builder(Component.translatable("heroicmap.liste.von", besitzer), b -> {
+                }).bounds(x, y, ZUSTAND, 20).build();
+                knopf.active = false;
+            }
+            return knopf;
+        }
+        Satz gezeigt = Satz.fuer(welt, e.satz().dimension(), wer);
+        boolean an = gezeigt != null && gezeigt.ordner().getParent().equals(baum);
+        knopf = Button.builder(Component.translatable(an ? "heroicmap.liste.an" : "heroicmap.liste.ruht")
+                .withStyle(an ? ChatFormatting.GREEN : ChatFormatting.YELLOW), b -> zeige(e, welt, wer)).bounds(x, y, ZUSTAND, 20).build();
+        knopf.active = !an;
+        return knopf;
+    }
+
+    /** Dieser Server zeigt ab jetzt diesen Baum für seine Dimension; der bisherige ruht. */
+    private void zeige(Laden.AufPlatte e, Path welt, String wer) {
+        try {
+            Zeigt.setze(welt, wer, e.satz().dimension(), e.ordner().getFileName().toString());
+        } catch (IOException fehler) {
+            LOGGER.warn("Heroic Map: Wahl der Karte nicht gespeichert", fehler);
+            hinweis = Component.translatable("heroicmap.liste.fehler");
+        }
+        Selbst.INSTANZ.neuGewaehlt(minecraft);
+        rebuildWidgets();
+    }
+
+    /**
+     * Die eigene Karte eines Servers ohne Namen, etwa von vor der Karte je Server, gehört ab jetzt {@code wer}: Der
+     * Baum bekommt seinen Namen für diesen Server, und dieser zeigt ihn. Siehe docs/selbst.md, „Wahl“.
+     */
+    private void uebernimm(Laden.AufPlatte e, String wer) {
+        if (Downloads.INSTANZ.belegt(e.ordner())) {
+            hinweis = Component.translatable("heroicmap.liste.belegt");
+            return;
+        }
+        Path alt = e.ordner(), welt = alt.getParent();
+        Satz satz = e.satz();
+        Path neu = welt.resolve(Selbst.baum(satz.dimension(), wer));
+        bestand = null;
+        zaehlt = new AtomicBoolean();
+        rebuildWidgets();
+        Thread.ofPlatform().daemon().name("Heroic Map Übernehmen").start(() -> {
+            boolean ok = true;
+            try {
+                Files.move(alt, neu, StandardCopyOption.ATOMIC_MOVE);
+                Satz.schreibe(neu, satz.name(), satz.dimension(), satz.massstab(), wer);
+                Zeigt.setze(welt, wer, satz.dimension(), neu.getFileName().toString());
+            } catch (IOException | RuntimeException fehler) {
+                LOGGER.warn("Heroic Map: {} nicht übernommen", alt, fehler);
+                ok = false;
+            }
+            boolean fertig = ok;
+            Minecraft.getInstance().execute(() -> {
+                if (!fertig) {
+                    hinweis = Component.translatable("heroicmap.liste.fehler");
+                }
+                Selbst.INSTANZ.neuGewaehlt(Minecraft.getInstance());
+                if (minecraft.gui.screen() == this) {
+                    zaehle();
+                } else {
+                    zaehlt = null;
+                }
+            });
+        });
     }
 
     /** Fragt, ob der Baum weg soll; nicht, solange ein Download in ihn läuft. */
@@ -118,21 +218,29 @@ final class Kartenliste extends Screen {
         // Gezählt wird erst nach dem Löschen.
         zaehlt = new AtomicBoolean();
         rebuildWidgets();
-        if (Selbst.selbst(e.ordner())) {
-            // Im Worker der eigenen Karte, nach allem, was er noch in sie schreibt.
-            Selbst.INSTANZ.loesche(e.ordner(), ok -> geloescht(e, ok));
+        loescheBaum(e.ordner(), ok -> geloescht(e, ok));
+    }
+
+    /**
+     * Löscht einen Baum in einem eigenen Thread, eine eigene Karte im Worker, der in sie zeichnet, nach allem, was er
+     * noch schreibt; dann {@code danach} auf dem Render-Thread mit wahr, wenn alles weg ist. Den Baum hält der Aufrufer
+     * vorher mit {@link Downloads#halte} und gibt ihn danach frei.
+     */
+    static void loescheBaum(Path baum, Consumer<Boolean> danach) {
+        if (Selbst.selbst(baum)) {
+            Selbst.INSTANZ.loesche(baum, danach);
             return;
         }
         Thread.ofPlatform().daemon().name("Heroic Map Löschen").start(() -> {
             boolean ganz = true;
             try {
-                Laden.loesche(e.ordner());
+                Laden.loesche(baum);
             } catch (IOException | RuntimeException fehler) {
-                LOGGER.warn("Heroic Map: {} nicht ganz gelöscht", e.ordner(), fehler);
+                LOGGER.warn("Heroic Map: {} nicht ganz gelöscht", baum, fehler);
                 ganz = false;
             }
             boolean ok = ganz;
-            Minecraft.getInstance().execute(() -> geloescht(e, ok));
+            Minecraft.getInstance().execute(() -> danach.accept(ok));
         });
     }
 
@@ -161,12 +269,14 @@ final class Kartenliste extends Screen {
             if (bestand.karten().isEmpty()) {
                 g.centeredText(font, Component.translatable("heroicmap.liste.keine"), width / 2, height / 2, TEXT);
             }
-            int platz = width - KNOPF - 24;
+            int platz = width - KNOPF - ZUSTAND - 28;
             for (int i = erste; i < Math.min(bestand.karten().size(), erste + zeilen()); i++) {
                 Laden.AufPlatte e = bestand.karten().get(i);
                 int y = OBEN + (i - erste) * ZEILE;
+                String besitzer = e.satz() == null || !Selbst.selbst(e.ordner()) ? Zeigt.OHNE : Satz.besitzer(e.ordner());
                 String was = e.satz() == null ? Component.translatable("heroicmap.liste.unvollstaendig").getString()
-                        : e.satz().name() + ", " + e.satz().dimension() + ", " + e.satz().massstab() + " px";
+                        : e.satz().name() + (Zeigt.OHNE.equals(besitzer) ? "" : " (" + besitzer + ")") + ", "
+                                + e.satz().dimension() + ", " + e.satz().massstab() + " px";
                 g.text(font, font.plainSubstrByWidth(e.pfad(), platz), 8, y + 1, TEXT);
                 g.text(font, font.plainSubstrByWidth(was + " · " + Downloads.groesse(e.bytes()), platz), 8, y + 11, 0xFFB0B0B0);
             }

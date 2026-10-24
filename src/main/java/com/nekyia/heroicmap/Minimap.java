@@ -174,7 +174,8 @@ public final class Minimap {
 
     private TodZeit todZeit = TodZeit.DATUM_UHRZEIT;
 
-    private Koordinaten koordinaten = Koordinaten.XZ;
+    /** Die Widgets an der Minimap, siehe docs/widgets.md; die Zeile der Koordinaten ist eins. */
+    private List<Widgets.Widget> widgets = Widgets.ausKoordinaten(null);
     /** Was die Minimap tut, solange der Debug-Bildschirm offen ist. Siehe docs/minimap.md, „Bei F3“. */
     enum BeiF3 { BLEIBT, AUS, MITTE }
 
@@ -185,8 +186,13 @@ public final class Minimap {
     private int[] koordinatenKasten;
     /** Wo der Balken des Fortschritts zuletzt stand: x, y, Breite, Höhe der Zeile, Länge des Balkens; null ohne. Für Gametests. */
     private int[] balkenKasten;
+    /** Der Kasten um den ganzen Stapel unter der Minimap, Balken und Widgets, {x, y, Breite, Höhe}; null ohne. Daran hängt das L. */
+    private int[] stapelKasten;
     /** Im Menü liegt die Maus auf der Zeile der Koordinaten; dann steht sie gelb. */
-    private boolean koordinatenHell;
+    /** Das Widget unter der Maus im Menü, gelb; die Zahl der Widgets für die graue Zeile ohne Koordinaten, -1 für keins. */
+    private int hell = -1;
+    /** Wo jedes Widget zuletzt stand, {x, y, Breite, Höhe}, in der Reihe der Liste; null, solange nicht gezeichnet. */
+    private int[][] widgetKaesten = new int[0][];
     /** Wie der eigene Spieler aussieht, auf Minimap und Vollbildkarte. Siehe docs/minimap.md, „Spieler“. */
     enum Darstellung { KOPF, PFEIL, DURCHSICHTIG }
 
@@ -430,8 +436,35 @@ public final class Minimap {
         schleier = Math.clamp(hoehe, Schleier.HOEHE, Schleier.MAX_HOEHE);
     }
 
+    /** Der Stil des ersten Widgets der Koordinaten, ohne eins {@link Koordinaten#AUS}. */
     Koordinaten koordinaten() {
-        return koordinaten;
+        for (Widgets.Widget w : widgets) {
+            if (w.art() == Widgets.Art.KOORDINATEN) {
+                return w.version() == 0 ? Koordinaten.XZ : Koordinaten.XYZ;
+            }
+        }
+        return Koordinaten.AUS;
+    }
+
+    List<Widgets.Widget> widgets() {
+        return List.copyOf(widgets);
+    }
+
+    /** Ersetzt die Widgets, etwa beim Ziehen im Menü; höchstens {@link Widgets#MAX}. */
+    void widgets(List<Widgets.Widget> neu) {
+        widgets = new ArrayList<>(neu.subList(0, Math.min(neu.size(), Widgets.MAX)));
+    }
+
+    void setzeWidget(int i, Widgets.Widget w) {
+        widgets.set(i, w);
+    }
+
+    void loescheWidget(int i) {
+        widgets.remove(i);
+    }
+
+    int[][] widgetKaesten() {
+        return widgetKaesten;
     }
 
     TodZeit todZeit() {
@@ -454,8 +487,12 @@ public final class Minimap {
         return balkenKasten;
     }
 
-    void koordinatenHell(boolean an) {
-        koordinatenHell = an;
+    int[] stapelKasten() {
+        return stapelKasten;
+    }
+
+    void hell(int widget) {
+        hell = widget;
     }
 
     Rahmen zuletzt() {
@@ -466,8 +503,23 @@ public final class Minimap {
         this.beiF3 = beiF3;
     }
 
+    /**
+     * Stellt die Koordinaten: aus nimmt ihre Widgets weg, sonst bekommt das erste die Version, und fehlt es, kommt eins unten
+     * dazu, hinter die übrigen.
+     */
     void setzeKoordinaten(Koordinaten koordinaten) {
-        this.koordinaten = koordinaten;
+        if (koordinaten == Koordinaten.AUS) {
+            widgets.removeIf(w -> w.art() == Widgets.Art.KOORDINATEN);
+            return;
+        }
+        int version = koordinaten == Koordinaten.XZ ? 0 : 1;
+        for (int i = 0; i < widgets.size(); i++) {
+            if (widgets.get(i).art() == Widgets.Art.KOORDINATEN) {
+                widgets.set(i, new Widgets.Widget(Widgets.Art.KOORDINATEN, version, widgets.get(i).anker()));
+                return;
+            }
+        }
+        widgets.add(new Widgets.Widget(Widgets.Art.KOORDINATEN, version, Widgets.Anker.UNTEN));
     }
 
     Darstellung darstellung() {
@@ -748,11 +800,9 @@ public final class Minimap {
             case "aus" -> TodZeit.AUS;
             default -> TodZeit.DATUM_UHRZEIT;
         };
-        koordinaten = switch (String.valueOf(p.getProperty("koordinaten")).trim()) {
-            case "aus" -> Koordinaten.AUS;
-            case "xyz" -> Koordinaten.XYZ;
-            default -> Koordinaten.XZ;
-        };
+        // Ohne widgets aus der alten Zeile der Koordinaten. Siehe docs/widgets.md, „Gespeichert“.
+        String w = p.getProperty("widgets");
+        widgets = w != null ? Widgets.lies(w) : Widgets.ausKoordinaten(p.getProperty("koordinaten"));
         beiF3 = switch (String.valueOf(p.getProperty("bei_f3")).trim()) {
             case "aus" -> BeiF3.AUS;
             case "mitte" -> BeiF3.MITTE;
@@ -817,7 +867,7 @@ public final class Minimap {
         p.setProperty("todespunkte", Integer.toString(todespunkte));
         p.setProperty("tod_zeit", todZeit.name().toLowerCase(Locale.ROOT));
         p.setProperty("neue_version", Boolean.toString(neueVersion));
-        p.setProperty("koordinaten", koordinaten.name().toLowerCase(Locale.ROOT));
+        p.setProperty("widgets", Widgets.schreibe(widgets));
         p.setProperty("bei_f3", beiF3.name().toLowerCase(Locale.ROOT));
         p.setProperty("spieler", darstellung.name().toLowerCase(Locale.ROOT));
         if (drehenGewaehlt) {
@@ -1078,25 +1128,88 @@ public final class Minimap {
             balkenKasten = balken(g, mc.font, wo[0], wo[1], r.seite(), zeile, laeuft);
             ueberstand += zeile + 2;
         }
-        Object[] werte = werte(koordinaten, spieler.getX(), spieler.getY(), spieler.getZ());
+        // Die Widgets: unten im Stapel nach dem Balken, oben über der Minimap oder neben dem Nordpfeil, frei, wo sie liegen.
+        // Siehe docs/widgets.md.
         koordinatenKasten = null;
-        // Im Menü steht die Zeile auch bei „aus“, grau; ein Klick darauf holt sie zurück. Siehe docs/minimap.md, „Koordinaten“.
+        stapelKasten = balkenKasten;
         boolean klickbar = mc.gui.screen() instanceof Einstellungen;
-        if (werte != null || klickbar) {
-            Component text = werte == null ? Component.translatable("heroicmap.koordinaten_aus")
-                    : Component.translatable(werte.length == 3 ? "heroicmap.koordinaten_xyz" : "heroicmap.koordinaten", werte);
-            int farbe = klickbar && koordinatenHell ? KOORDINATEN_HELL : werte == null ? KOORDINATEN_AUS : TEXT;
-            float f = koordinatenMassstab(g.guiWidth(), abstand, mc.font.width(text));
-            int breite = Mth.ceil(mc.font.width(text) * f), zeile = Mth.ceil(mc.font.lineHeight * f);
-            // Unter dem Ring oder den Ornamenten des Rahmens, die halb über die Ecken ragen.
-            int[] wo = koordinatenLage(r, ueberstand, abstand, g.guiWidth(), g.guiHeight(), breite, zeile);
-            g.pose().pushMatrix();
-            g.pose().translate(wo[0], wo[1]);
-            g.pose().scale(f);
-            g.text(mc.font, text, 0, 0, farbe, true);
-            g.pose().popMatrix();
-            koordinatenKasten = new int[] {wo[0], wo[1], breite, zeile};
+        int sw = g.guiWidth(), sh = g.guiHeight(), anzahl = widgets.size();
+        Component[] texte = new Component[anzahl];
+        float[] massstab = new float[anzahl];
+        int obenHoehe = 0;
+        for (int i = 0; i < anzahl; i++) {
+            Widgets.Widget w = widgets.get(i);
+            Object[] werte = werte(w.version() == 0 ? Koordinaten.XZ : Koordinaten.XYZ, spieler.getX(), spieler.getY(), spieler.getZ());
+            texte[i] = Component.translatable(werte.length == 3 ? "heroicmap.koordinaten_xyz" : "heroicmap.koordinaten", werte);
+            // In ganzen Pixeln des Geräts je Pixel der Schrift; kleiner nur, wenn es nicht zwischen die Ränder passt.
+            massstab[i] = Math.min(w.pixel(k) / (float) k, (sw - 2f * abstand) / Math.max(1, mc.font.width(texte[i])));
+            obenHoehe += w.anker() == Widgets.Anker.OBEN ? Mth.ceil(mc.font.lineHeight * massstab[i]) + 2 : 0;
         }
+        // Passt der obere Stapel ganz über die Minimap, steht er dort, sonst neben dem Nordpfeil, bündig mit ihrer Oberkante.
+        int obenWeg = rahmen == null ? 1 : abstand, nebenY = r.y();
+        boolean darueber = r.y() - obenWeg - obenHoehe >= 0;
+        int zoomX = Einstellungen.zoomLage(r, abstand, sw)[0];
+        widgetKaesten = new int[anzahl][];
+        for (int i = 0; i < anzahl; i++) {
+            Widgets.Widget w = widgets.get(i);
+            int breite = Mth.ceil(mc.font.width(texte[i]) * massstab[i]), zeile = Mth.ceil(mc.font.lineHeight * massstab[i]);
+            int[] wo = switch (w.anker()) {
+                case UNTEN -> {
+                    int[] p = koordinatenLage(r, ueberstand, abstand, sw, sh, breite, zeile);
+                    ueberstand += zeile + 2;
+                    yield p;
+                }
+                case OBEN -> {
+                    int[] p = darueber ? new int[] {waagrecht(r.x() + (r.seite() - breite) / 2, abstand, sw, breite), r.y() - obenWeg - 2 - zeile}
+                            : new int[] {waagrecht(zoomX < r.x() ? zoomX - 2 - breite : zoomX + Einstellungen.ZOOM_BREITE + 2, abstand, sw, breite), nebenY};
+                    obenWeg += darueber ? zeile + 2 : 0;
+                    nebenY += darueber ? 0 : zeile + 2;
+                    yield p;
+                }
+                case FREI -> new int[] {abstand + Math.round(w.x() * Math.max(0, sw - breite - 2 * abstand)),
+                        abstand + Math.round(w.y() * Math.max(0, sh - zeile - 2 * abstand))};
+            };
+            int[] kasten = zeile(g, mc.font, wo, texte[i], massstab[i], breite, zeile, klickbar && hell == i ? KOORDINATEN_HELL : TEXT);
+            widgetKaesten[i] = kasten;
+            if (w.anker() == Widgets.Anker.UNTEN) {
+                stapelKasten = vereint(stapelKasten, kasten);
+            }
+            koordinatenKasten = koordinatenKasten == null && w.art() == Widgets.Art.KOORDINATEN ? kasten : koordinatenKasten;
+        }
+        // Ohne Koordinaten steht im Menü hinter dem Stapel grau „Koordinaten aus“; ein Klick darauf holt sie zurück. Siehe
+        // docs/widgets.md, „Bedienung“.
+        if (klickbar && koordinatenKasten == null) {
+            Component aus = Component.translatable("heroicmap.koordinaten_aus");
+            float f = koordinatenMassstab(sw, abstand, mc.font.width(aus));
+            int breite = Mth.ceil(mc.font.width(aus) * f), zeile = Mth.ceil(mc.font.lineHeight * f);
+            koordinatenKasten = zeile(g, mc.font, koordinatenLage(r, ueberstand, abstand, sw, sh, breite, zeile), aus, f, breite, zeile,
+                    hell == anzahl ? KOORDINATEN_HELL : KOORDINATEN_AUS);
+            stapelKasten = vereint(stapelKasten, koordinatenKasten);
+        }
+    }
+
+    /** Links bei {@code x}, ganz auf dem Schirm im Abstand {@code abstand} vom Rand. */
+    private static int waagrecht(int x, int abstand, int schirmBreite, int breite) {
+        return Math.clamp(x, abstand, Math.max(abstand, schirmBreite - abstand - breite));
+    }
+
+    /** Eine Zeile Text bei {@code wo}, im Massstab {@code f}; gibt ihren Kasten zurück. */
+    private static int[] zeile(GuiGraphicsExtractor g, Font font, int[] wo, Component text, float f, int breite, int zeile, int farbe) {
+        g.pose().pushMatrix();
+        g.pose().translate(wo[0], wo[1]);
+        g.pose().scale(f);
+        g.text(font, text, 0, 0, farbe, true);
+        g.pose().popMatrix();
+        return new int[] {wo[0], wo[1], breite, zeile};
+    }
+
+    /** Der Kasten um zwei Kästen {x, y, Breite, Höhe}; einer darf null sein. */
+    static int[] vereint(int[] a, int[] b) {
+        if (a == null || b == null) {
+            return a == null ? b : a;
+        }
+        int x = Math.min(a[0], b[0]), y = Math.min(a[1], b[1]);
+        return new int[] {x, y, Math.max(a[0] + a[2], b[0] + b[2]) - x, Math.max(a[1] + a[3], b[1] + b[3]) - y};
     }
 
     /**
@@ -1308,7 +1421,7 @@ public final class Minimap {
         long jetzt = Util.getMillis();
         if (kacheln == null || jetzt - satzGesucht >= SATZ_MS) {
             satzGesucht = jetzt;
-            Satz neu = Satz.fuer(Downloads.weltOrdner(), dimension);
+            Satz neu = Satz.fuer(Downloads.weltOrdner(), dimension, Downloads.INSTANZ.wer());
             if (neu == null || satz == null || !neu.ordner().equals(satz.ordner())) {
                 gibKachelnFrei();
                 satz = neu;

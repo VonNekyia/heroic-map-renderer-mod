@@ -1810,7 +1810,7 @@ public final class Bilder implements FabricClientGameTest {
         if (!Files.isDirectory(ordner.resolve("7")) || Files.exists(ordner.resolve("8"))) {
             throw new AssertionError("Kacheln mit 2 px nicht bis Stufe 7 unter " + ordner);
         }
-        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(welt, "minecraft:overworld"))));
+        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(welt, "minecraft:overworld", Zeigt.OHNE))));
         context.waitTicks(40);
         Path bild = context.takeScreenshot(TestScreenshotOptions.of("selbst").disableCounterPrefix());
         // Dieselbe Karte mit Chunklinien, dann die Minimap im HUD mit ihnen. Siehe docs/minimap.md, „Chunklinien“.

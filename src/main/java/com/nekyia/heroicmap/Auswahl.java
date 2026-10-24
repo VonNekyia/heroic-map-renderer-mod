@@ -47,7 +47,18 @@ final class Auswahl extends Screen {
         selbstAn = Selbst.INSTANZ.an(minecraft);
         dimension = minecraft.level == null ? "" : minecraft.level.dimension().identifier().toString();
         int y = 34;
-        if (selbst && selbstAn) {
+        if (selbst && !selbstAn && Selbst.INSTANZ.vorhanden(minecraft)) {
+            // Die eigene Karte ruht: ein Klick zeigt sie wieder, der Download ruht dann. Siehe docs/selbst.md, „Wahl“.
+            addRenderableWidget(Button.builder(Component.translatable("heroicmap.selbst.ruht", Selbst.INSTANZ.massstab(minecraft)), b -> {
+                hinweis = Selbst.INSTANZ.wiederAn(minecraft);
+                if (hinweis == null) {
+                    gewaehlt = true;
+                    hinweis = Component.translatable("heroicmap.selbst.wieder_an");
+                }
+                rebuildWidgets();
+            }).bounds(width / 2 - 60, y + 12, 120, 20).build());
+            y += ZEILE;
+        } else if (selbst && selbstAn) {
             Button knopf = Button.builder(Component.translatable("heroicmap.selbst.an", Selbst.INSTANZ.massstab(minecraft)), b -> {
             }).bounds(width / 2 - 60, y + 12, 120, 20).build();
             knopf.active = false;
@@ -72,7 +83,12 @@ final class Auswahl extends Screen {
             for (Map.Entry<Integer, Long> massstab : baum.bytes().entrySet()) {
                 int m = massstab.getKey();
                 Button knopf;
-                if (m == hat) {
+                if (m == hat && Downloads.INSTANZ.ruht(baum.id())) {
+                    // Eine ruhende Karte bekommt keinen Abgleich. Siehe docs/download.md, „Ablage“.
+                    knopf = Button.builder(Component.translatable("heroicmap.auswahl.ruht", m), b -> {
+                    }).bounds(x, y + 12, breite, 20).tooltip(Tooltip.create(Component.translatable("heroicmap.auswahl.ruht.beschreibung"))).build();
+                    knopf.active = false;
+                } else if (m == hat) {
                     // Den Massstab hat der Spieler schon ganz: Abgleich statt vollem Download.
                     long ab = Downloads.INSTANZ.abgleichAb(baum.id());
                     knopf = Button.builder(ab == 0 ? Component.translatable("heroicmap.auswahl.abgleich", m)
@@ -116,18 +132,32 @@ final class Auswahl extends Screen {
         super.extractRenderState(g, mausX, mausY, delta);
     }
 
-    /** „Selbst“ erst nach Rückfrage: Ab dann zeigt die Vollbildkarte nur noch die eigene Karte. */
+    /**
+     * „Selbst“ erst nach Rückfrage: Ab dann zeigt die Vollbildkarte auf diesem Server die eigene Karte. Zeigt er schon
+     * einen Download der Dimension, fragt der Mod, was mit ihm geschieht. Siehe docs/selbst.md, „Wahl“.
+     */
     private void frageSelbst() {
+        Satz gezeigt = Satz.fuer(Selbst.INSTANZ.weltOrdner(), dimension, Downloads.INSTANZ.wer());
+        if (gezeigt != null && !Selbst.selbst(gezeigt.ordner().getParent())) {
+            minecraft.gui.setScreen(new AlteKarte(this, gezeigt, Downloads.INSTANZ.geteiltMit(),
+                    Component.translatable("heroicmap.alte.danach_selbst", massstab), w -> waehleSelbst()));
+            return;
+        }
         minecraft.gui.setScreen(new ConfirmScreen(ja -> {
-            if (ja) {
-                hinweis = Selbst.INSTANZ.waehle(minecraft, massstab);
-                if (hinweis == null) {
-                    gewaehlt = true;
-                    hinweis = Component.translatable("heroicmap.selbst.gewaehlt");
-                }
-            }
             minecraft.gui.setScreen(this);
+            if (ja) {
+                waehleSelbst();
+            }
         }, Component.translatable("heroicmap.selbst.titel"), Component.translatable("heroicmap.selbst.frage", massstab)));
+    }
+
+    private void waehleSelbst() {
+        hinweis = Selbst.INSTANZ.waehle(minecraft, massstab);
+        if (hinweis == null) {
+            gewaehlt = true;
+            hinweis = Component.translatable("heroicmap.selbst.gewaehlt");
+        }
+        rebuildWidgets();
     }
 
     /** Zurück; kam die Liste von der Karte und wurde „Selbst“ gewählt, öffnet die Karte neu mit der eigenen. */
@@ -135,7 +165,7 @@ final class Auswahl extends Screen {
     public void onClose() {
         if (gewaehlt && zurueck instanceof Karte karte && minecraft.level != null) {
             karte.onClose();
-            minecraft.gui.setScreen(new Karte(Satz.fuer(Selbst.INSTANZ.weltOrdner(), dimension)));
+            minecraft.gui.setScreen(new Karte(Satz.fuer(Selbst.INSTANZ.weltOrdner(), dimension, Downloads.INSTANZ.wer())));
             return;
         }
         minecraft.gui.setScreen(zurueck);
