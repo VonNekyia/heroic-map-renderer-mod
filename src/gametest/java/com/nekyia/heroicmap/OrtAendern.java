@@ -90,6 +90,7 @@ public final class OrtAendern implements FabricClientGameTest {
 
             pfade(context, build.resolve("probe"));
             ausweis(context, spiel, hier);
+            ruhen(context, spiel, hier);
 
             // Nur diese Karte, von main nach build: Dort liegt probe schon, „Umziehen“ grau; nach build2 nicht. Esc bricht ab.
             liste(context);
@@ -372,6 +373,29 @@ public final class OrtAendern implements FabricClientGameTest {
         if (oben == null || nether == null || oben.tage() != 1 || oben.alterMax() <= 0 || nether.alterMax() <= 0
                 || oben.alterZuletzt() < oben.alterErstes()) {
             throw new AssertionError("Ausweis ohne beide Welten, Besuch oder Spielzeit: " + a);
+        }
+    }
+
+    /**
+     * Ein unsicherer Reset im Einzelspieler, ohne UID: Im Nether bekommt der Ausweis für die Oberwelt eine Spielzeit von 10⁸,
+     * dann zurück. Nach dem Warten ohne UID ruht der Download der Oberwelt unter {@code …-bis-<tag>} mit Marke, und die Welt
+     * zeigt ihn nicht mehr. Siehe docs/download.md, „Reset“.
+     */
+    private static void ruhen(ClientGameTestContext context, TestSingleplayerContext spiel, Path hier) {
+        String stelle = context.computeOnClient(mc -> mc.player.getX() + " " + mc.player.getY() + " " + mc.player.getZ());
+        spiel.getServer().runCommand("execute in minecraft:the_nether run tp @a 0 100 0");
+        context.waitFor(mc -> mc.level != null && mc.level.dimension().identifier().toString().equals("minecraft:the_nether"), 600);
+        context.runOnClient(mc -> Ausweise.INSTANZ.fuerTest(a -> a.alter("minecraft:overworld", 100_000_000L)));
+        spiel.getServer().runCommand("execute in minecraft:overworld run tp @a " + stelle);
+        context.waitFor(mc -> mc.level != null && mc.level.dimension().identifier().toString().equals("minecraft:overworld"), 600);
+        // Zehn Sekunden Warten auf eine UID, dazu Luft für den Worker.
+        context.waitTicks(300);
+        String ruht = "probe-hier-bis-" + java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+        if (Files.exists(hier.resolve("probe-hier")) || !Files.exists(hier.resolve(ruht).resolve(Reset.RUHT))) {
+            throw new AssertionError("Nach dem Reset ruht der Download nicht unter " + ruht);
+        }
+        if (context.computeOnClient(mc -> Satz.fuer(hier, "minecraft:overworld", Zeigt.OHNE)) != null) {
+            throw new AssertionError("Die Welt zeigt den ruhenden Baum noch");
         }
     }
 

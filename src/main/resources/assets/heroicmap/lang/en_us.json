@@ -204,6 +204,8 @@
   "heroicmap.liste.kopie.frage_titel": "Copy the map?",
   "heroicmap.liste.kopie.frage": "This drive can't do hard links. The copy needs %s more on disk.",
   "heroicmap.liste.kopie.fehler": "The copy failed; see the log for details.",
+  "heroicmap.reset.sicher": "Heroic Map: This world was reset; the old map is deleted. Your waypoints stay, they may no longer be right.",
+  "heroicmap.reset.unsicher": "Heroic Map: This world was probably reset; the old map rests in the map list, where you can delete it.",
   "heroicmap.liste.ort": "Move …",
   "heroicmap.liste.ort.nicht": "Maps of the storage before the hash don't move; without a hash there is no place.",
   "heroicmap.ort.titel": "Change location",

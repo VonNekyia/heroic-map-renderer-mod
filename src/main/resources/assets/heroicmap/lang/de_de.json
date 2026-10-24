@@ -204,6 +204,8 @@
   "heroicmap.liste.kopie.frage_titel": "Karte kopieren?",
   "heroicmap.liste.kopie.frage": "Dieses Laufwerk kann keine Hardlinks. Die Kopie braucht %s mehr auf der Platte.",
   "heroicmap.liste.kopie.fehler": "Kopie gescheitert; Einzelheiten im Log.",
+  "heroicmap.reset.sicher": "Heroic Map: Diese Welt wurde zurückgesetzt; die alte Karte ist gelöscht. Deine Wegpunkte bleiben, sie stimmen vielleicht nicht mehr.",
+  "heroicmap.reset.unsicher": "Heroic Map: Diese Welt wurde wohl zurückgesetzt; die alte Karte ruht in der Kartenliste, dort kannst du sie löschen.",
   "heroicmap.liste.ort": "Ort …",
   "heroicmap.liste.ort.nicht": "Karten der Ablage vor dem Hash ziehen nicht um; ohne Hash gibt es keinen Ort.",
   "heroicmap.ort.titel": "Ort ändern",
