@@ -963,6 +963,9 @@ Feldfrüchte und Gras; entschieden in
 - **Gekippt** werden die Flächen, wie das Paket sie baut: Eine schon
   gekippte Fläche kippt um 45° weiter, eine zwei Blöcke hohe wird beim
   Einpassen auf einen gestaucht.
+- **Hat das Modell des Pakets eine liegende Fläche,** bleibt es, wie es
+  ist, auch wenn es daneben stehende Flächen hat; diese fallen dann weg,
+  wie bei einem Blütenteppich.
 - **Geprüft** mit einem eigenen Testpaket, das die Eigenschaften
   nachbildet, ohne fremden Inhalt, siehe [Entwicklung](entwicklung.md),
   „Tests“, `Bilder.pflanzenAusPaketen`.

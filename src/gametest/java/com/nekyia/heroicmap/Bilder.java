@@ -1730,9 +1730,11 @@ public final class Bilder implements FabricClientGameTest {
         "pack.mcmeta",
         "assets/minecraft/blockstates/short_grass.json",
         "assets/minecraft/blockstates/wheat.json",
+        "assets/minecraft/blockstates/dandelion.json",
         "assets/minecraft/models/block/crop.json",
         "assets/minecraft/models/block/heroicmap_test_gras.json",
         "assets/minecraft/models/block/heroicmap_test_hohes_getreide.json",
+        "assets/minecraft/models/block/heroicmap_test_liegend.json",
         "assets/minecraft/models/block/heroicmap_test_schraeges_kreuz.json",
         "assets/minecraft/models/block/heroicmap_test_weizen_reif.json",
         "assets/minecraft/models/block/potatoes_stage3.json",
@@ -1748,13 +1750,13 @@ public final class Bilder implements FabricClientGameTest {
         "setblock -60 -60 40 wheat[age=0]", "setblock -59 -60 40 wheat[age=2]", "setblock -58 -60 40 wheat[age=4]",
         "setblock -57 -60 40 wheat[age=6]", "fill -56 -60 40 -53 -60 40 wheat[age=7]",
         "fill -60 -60 42 -57 -60 42 carrots[age=7]", "fill -56 -60 42 -53 -60 42 potatoes[age=7]",
-        "fill -60 -60 44 -53 -60 44 short_grass", "fill -60 -60 46 -57 -60 46 fern",
+        "fill -60 -60 44 -53 -60 44 short_grass", "fill -60 -60 46 -57 -60 46 fern", "setblock -54 -60 46 dandelion",
     };
 
     /**
      * Pflanzen aus Paketen: das Feld bei 4 px und 1 px, Zoom 4, ohne und mit dem Testpaket. Mit dem Paket kippen Karotten und
      * Gras ähnlich wie ohne, im Mittel höchstens 45 % anders, und reifer Weizen und Kartoffeln decken das Ackerland,
-     * statt wegzufallen; verglichen mit einem Bild derselben Stelle ohne sie, denn Ackerland in verschiedenen Reihen ist
+     * statt wegzufallen; der Löwenzahn des Pakets mit liegender Fläche bleibt, wie er ist; verglichen mit einem Bild derselben Stelle ohne sie, denn Ackerland in verschiedenen Reihen ist
      * verschieden hell. Die Kartoffeln tragen im Testpaket die Textur des reifen Weizens, denn die linke Hälfte ihrer eigenen
      * deckt nur ein Drittel des Blocks. Erst alle Bilder, dann die Prüfung. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
      */
@@ -1781,10 +1783,12 @@ public final class Bilder implements FabricClientGameTest {
         });
         server.runCommand("fill -56 -60 40 -53 -60 40 air");
         server.runCommand("fill -56 -60 42 -53 -60 42 air");
+        server.runCommand("setblock -54 -60 46 air");
         context.waitTicks(10);
         BufferedImage boden = minimapBei(context, server, -56.5, 43.5, "pakete-4px-boden");
         server.runCommand("fill -56 -60 40 -53 -60 40 wheat[age=7]");
         server.runCommand("fill -56 -60 42 -53 -60 42 potatoes[age=7]");
+        server.runCommand("setblock -54 -60 46 dandelion");
         context.waitTicks(10);
         List<BufferedImage> bilder = new ArrayList<>();
         try {
@@ -1831,9 +1835,35 @@ public final class Bilder implements FabricClientGameTest {
                 fehler.add("(" + b[0] + ", " + b[1] + ") zu " + Math.round(100 * wieBoden) + " % wie das Ackerland ohne Pflanze");
             }
         }
+        // Ein Modell mit liegender Fläche bleibt, wie es ist: der Löwenzahn des Pakets mit einem flachen Blatt im Westen und einer
+        // stehenden Fläche über den ganzen Block. Im Westen das Blatt, im Osten der Boden; kippte die stehende Fläche, deckte sie ihn.
+        double west = anteilAndersHaelfte(mit, boden, -54, 46, block, false), ost = anteilAndersHaelfte(mit, boden, -54, 46, block, true);
+        LOGGER.info("Pflanzen aus Paketen, Löwenzahn mit liegender Fläche: Westen anders {}, Osten anders {}", west, ost);
+        if (west < 0.5 || ost > 0.1) {
+            fehler.add("Löwenzahn mit liegender Fläche im Westen zu " + Math.round(100 * west) + " % anders als der Boden (mindestens 50 %), im Osten zu "
+                    + Math.round(100 * ost) + " % (höchstens 10 %)");
+        }
         if (!fehler.isEmpty()) {
             throw new AssertionError("Pflanzen aus Paketen bei 4 px: " + String.join("; ", fehler));
         }
+    }
+
+    /** Wie {@link #anteilAnders}, nur in der West- oder Osthälfte des Blocks (x, z), gegen dieselbe Stelle in {@code b}. */
+    private static double anteilAndersHaelfte(BufferedImage a, BufferedImage b, int x, int z, int block, boolean ost) {
+        int ax = a.getWidth() / 2 + Math.round((x + 56.5f) * block), az = a.getHeight() / 2 + Math.round((z - 43.5f) * block);
+        int anders = 0, alle = 0;
+        for (int dy = 1; dy < block - 1; dy++) {
+            for (int dx = ost ? block / 2 : 1; dx < (ost ? block - 1 : block / 2); dx++) {
+                int p = a.getRGB(ax + dx, az + dy), q = b.getRGB(ax + dx, az + dy);
+                boolean gleich = true;
+                for (int s = 0; s <= 16; s += 8) {
+                    gleich &= Math.abs((p >> s & 0xFF) - (q >> s & 0xFF)) <= 4;
+                }
+                anders += gleich ? 0 : 1;
+                alle++;
+            }
+        }
+        return anders / (double) alle;
     }
 
     /**
