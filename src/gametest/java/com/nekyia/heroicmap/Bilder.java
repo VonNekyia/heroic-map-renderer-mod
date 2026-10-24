@@ -262,6 +262,31 @@ public final class Bilder implements FabricClientGameTest {
                 }
             }
         }
+        // Redstone südlich vom Kelp, mit echten Quellen, sonst fiele die Stärke beim nächsten Update auf 0:
+        // z 1 ein Block und 15 Draht nach Osten (15 bis 1), z 3 Draht ohne Quelle (0), z 7 zwei Kreuzungen, die rechte mit einem
+        // Block am nördlichen Arm (15, Mitte 14). z 11 und 13 Kürbis- und Melonenstiele auf Ackerland, Wasser in z 12.
+        x0 = KX + 34;
+        z0 = KZ + 6;
+        b.add("fill " + x0 + " -60 " + z0 + " " + (x0 + 15) + " -50 " + (z0 + 15) + " air");
+        b.add("fill " + x0 + " -61 " + z0 + " " + (x0 + 15) + " -61 " + (z0 + 15) + " grass_block");
+        b.add("fill " + (x0 + 1) + " -60 " + (z0 + 1) + " " + (x0 + 15) + " -60 " + (z0 + 1) + " redstone_wire");
+        b.add("fill " + (x0 + 1) + " -60 " + (z0 + 3) + " " + (x0 + 15) + " -60 " + (z0 + 3) + " redstone_wire");
+        for (int cx : new int[] {x0 + 3, x0 + 9}) {
+            b.add("fill " + (cx - 1) + " -60 " + (z0 + 7) + " " + (cx + 1) + " -60 " + (z0 + 7) + " redstone_wire");
+            b.add("fill " + cx + " -60 " + (z0 + 6) + " " + cx + " -60 " + (z0 + 8) + " redstone_wire");
+        }
+        b.add("setblock " + x0 + " -60 " + (z0 + 1) + " redstone_block");
+        b.add("setblock " + (x0 + 9) + " -60 " + (z0 + 5) + " redstone_block");
+        b.add("fill " + x0 + " -61 " + (z0 + 11) + " " + (x0 + 15) + " -61 " + (z0 + 13) + " farmland[moisture=7]");
+        b.add("fill " + x0 + " -61 " + (z0 + 12) + " " + (x0 + 15) + " -61 " + (z0 + 12) + " water");
+        for (int r = 0; r < 2; r++) {
+            int z = z0 + 11 + 2 * r;
+            for (int i = 0; i < 8; i++) {
+                b.add("setblock " + (x0 + i) + " -60 " + z + " " + kuerbisse[r][0] + "[age=" + i + "]");
+            }
+            b.add("setblock " + (x0 + 10) + " -60 " + z + " " + kuerbisse[r][2]);
+            b.add("setblock " + (x0 + 9) + " -60 " + z + " " + kuerbisse[r][1] + "[facing=east]");
+        }
         // Bambus im Südosten: Stangen 1 bis 6 hoch, oben Blätter wie gewachsen.
         x0 = KX + 6;
         for (int gz = 0; gz < 8; gz++) {
@@ -299,12 +324,13 @@ public final class Bilder implements FabricClientGameTest {
         Minimap.ohneMarke = true;
         // Nah: Zoom 8, 16 Pixel des Schirms je Block bei GUI-Massstab 2; die Auflösung 16, 8 und 4. Je Szene ein Bild um ihre Mitte.
         // Die anderen vier Szenen liegen schon vor (Lauf 40092909926); dieser Lauf nur Kelp.
-        String[] szenen = {"kelp"};
-        int[][] mitten = {{KX + 42, KZ - 14}};
+        String[] szenen = {"kelp", "redstone"};
+        int[][] mitten = {{KX + 42, KZ - 14}, {KX + 42, KZ + 14}};
         for (int s = 0; s < szenen.length; s++) {
-            for (int v : new int[] {0, 1, 4, 5, 6}) {
+            boolean redstone = szenen[s].equals("redstone");
+            for (int v : redstone ? new int[] {0} : new int[] {0, 1, 4, 5, 6}) {
                 ChunkMaler.kippen = v;
-                for (int scale : new int[] {16, 8, 4}) {
+                for (int scale : redstone ? new int[] {16, 4} : new int[] {16, 8, 4}) {
                     context.runOnClient(mc -> {
                         Minimap.INSTANZ.leeren();
                         Minimap.INSTANZ.setzeScale(scale);
