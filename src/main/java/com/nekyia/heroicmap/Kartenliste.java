@@ -359,7 +359,7 @@ final class Kartenliste extends Screen {
             if (bestand.karten().isEmpty()) {
                 g.centeredText(font, Component.translatable("heroicmap.liste.keine"), width / 2, height / 2, TEXT);
             }
-            int platz = width - KNOPF - ZUSTAND - ORT - 32;
+            int platz = platz();
             for (int i = erste; i < Math.min(bestand.karten().size(), erste + zeilen()); i++) {
                 Laden.AufPlatte e = bestand.karten().get(i);
                 int y = OBEN + (i - erste) * ZEILE;
@@ -367,7 +367,11 @@ final class Kartenliste extends Screen {
                 String was = e.satz() == null ? Component.translatable("heroicmap.liste.unvollstaendig").getString()
                         : e.satz().name() + (Zeigt.OHNE.equals(besitzer) ? "" : " (" + besitzer + ")") + ", "
                                 + e.satz().dimension() + ", " + e.satz().massstab() + " px";
-                g.text(font, font.plainSubstrByWidth(e.pfad(), platz), 8, y + 1, TEXT);
+                String pfad = pfad(e);
+                g.text(font, pfad, 8, y + 1, TEXT);
+                if (!pfad.equals(e.pfad()) && mausX >= 8 && mausX < 8 + platz && mausY >= y && mausY < y + 10) {
+                    g.setTooltipForNextFrame(font.split(Component.literal(e.pfad()), width - 16), mausX, mausY);
+                }
                 g.text(font, font.plainSubstrByWidth(was + " · " + Downloads.groesse(e.bytes()), platz), 8, y + 11, 0xFFB0B0B0);
             }
         }
@@ -378,6 +382,16 @@ final class Kartenliste extends Screen {
             g.centeredText(font, hinweis, width / 2, height - 42 - (zeigerZeile ? ZEIGER : 0), TEXT);
         }
         super.extractRenderState(g, mausX, mausY, delta);
+    }
+
+    /** Die Breite der Zeilen links der Knöpfe. */
+    private int platz() {
+        return width - KNOPF - ZUSTAND - ORT - 32;
+    }
+
+    /** Der Pfad, wie seine Zeile ihn zeigt, in der Mitte gekürzt, wenn er nicht passt ({@link Ort#kurz}); paketweit für den Gametest. */
+    String pfad(Laden.AufPlatte e) {
+        return Ort.kurz(e.pfad(), platz(), font::width);
     }
 
     @Override

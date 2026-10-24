@@ -1,12 +1,14 @@
 package com.nekyia.heroicmap;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import javax.imageio.ImageIO;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
@@ -72,6 +74,8 @@ public final class OrtAendern implements FabricClientGameTest {
             if (!Selbst.gehoert(eigeneNeu, "build") || !eigeneNeu.getFileName().toString().equals(Zeigt.baum(build, "build", OBEN))) {
                 throw new AssertionError("Die eigene Karte gehört nicht build, oder zeigt.txt sagt es nicht");
             }
+
+            pfade(context, build.resolve("probe"));
 
             // Nur diese Karte, von main nach build: Dort liegt probe schon, „Umziehen“ grau; nach build2 nicht. Esc bricht ab.
             liste(context);
@@ -169,6 +173,76 @@ public final class OrtAendern implements FabricClientGameTest {
         }
         if (!fehler.isEmpty()) {
             throw new AssertionError(String.join("; ", fehler));
+        }
+    }
+
+    /**
+     * Der Pfad des Baums in der Kartenliste bei 854 × 480 mit GS 2 und 1280 × 960 mit GS 4: in der Mitte gekürzt, vorn die
+     * Adresse, soweit Platz ist, hinten der Baum, und schmal genug für die Zeile. Mit der Maus über dem Pfad zeigt ein Tooltip
+     * ihn ganz, gesehen im Bildschirmfoto. Danach das Fenster wie vorher. Siehe docs/download.md, „Kartenliste“.
+     */
+    private static void pfade(ClientGameTestContext context, Path baum) throws IOException {
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        Laden.AufPlatte e = Laden.bestand(Downloads.wurzel(), () -> false).karten().stream().filter(k -> k.ordner().equals(baum)).findFirst()
+                .orElseThrow(() -> new AssertionError("Nicht in der Kartenliste: " + baum));
+        try {
+            for (int[] f : new int[][] {{854, 480, 2}, {1280, 960, 4}}) {
+                context.getInput().resizeWindow(f[0], f[1]);
+                context.runOnClient(mc -> {
+                    mc.options.guiScale().set(f[2]);
+                    mc.resizeGui();
+                });
+                liste(context);
+                Button knopf = ort(context, baum);
+                String fall = "GS " + f[2];
+                // Die Zeile reicht bis 16 Einheiten vor „Ort …“.
+                String[] text = context.computeOnClient(mc -> new String[] {((Kartenliste) mc.gui.screen()).pfad(e),
+                        String.valueOf(knopf.getX() - 16 - mc.font.width(((Kartenliste) mc.gui.screen()).pfad(e)))});
+                if (text[0].equals(e.pfad()) || !text[0].contains("…") || !text[0].endsWith("/probe") || Integer.parseInt(text[1]) < 0) {
+                    throw new AssertionError(fall + ": Pfad „" + text[0] + "“ nicht in der Mitte gekürzt, ohne Baum oder zu breit");
+                }
+                if (f[2] == 2 && !text[0].startsWith("ort-probe")) {
+                    throw new AssertionError(fall + ": Pfad „" + text[0] + "“ ohne Adresse vorn");
+                }
+                int k = f[2], y = context.computeOnClient(mc -> knopf.getY());
+                context.getInput().setCursorPos(1, 1);
+                context.waitTicks(2);
+                Path ohne = context.takeScreenshot(TestScreenshotOptions.of("pfad-gs" + k + "-ohne").disableCounterPrefix());
+                context.getInput().setCursorPos(12 * k, (y + 5) * k);
+                context.waitTicks(2);
+                Path mit = context.takeScreenshot(TestScreenshotOptions.of("pfad-gs" + k).disableCounterPrefix());
+                int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+                double tooltip = unterschied(ohne, mit, k, new int[] {0, Math.max(0, y - 24), breite, y + 48});
+                if (tooltip < 100) {
+                    throw new AssertionError(fall + ": kein Tooltip mit dem ganzen Pfad, " + tooltip + " Einheiten anders");
+                }
+            }
+        } finally {
+            context.getInput().resizeWindow(vorher[0], vorher[1]);
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(vorher[2]);
+                mc.resizeGui();
+            });
+            context.waitTicks(2);
+        }
+    }
+
+    /** Wie breit in Einheiten der Bereich ist, in dem sich zwei Bildschirmfotos im Kasten {x0, y0, x1, y1} unterscheiden. */
+    private static double unterschied(Path a, Path b, int k, int[] kasten) {
+        try {
+            BufferedImage x = ImageIO.read(a.toFile()), y = ImageIO.read(b.toFile());
+            int links = Integer.MAX_VALUE, rechts = Integer.MIN_VALUE;
+            for (int py = kasten[1] * k; py < Math.min(kasten[3] * k, x.getHeight()); py++) {
+                for (int px = kasten[0] * k; px < Math.min(kasten[2] * k, x.getWidth()); px++) {
+                    if ((x.getRGB(px, py) & 0xFFFFFF) != (y.getRGB(px, py) & 0xFFFFFF)) {
+                        links = Math.min(links, px);
+                        rechts = Math.max(rechts, px);
+                    }
+                }
+            }
+            return rechts < links ? 0 : (rechts - links + 1) / (double) k;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
