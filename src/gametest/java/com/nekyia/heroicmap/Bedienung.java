@@ -4606,8 +4606,8 @@ public final class Bedienung implements FabricClientGameTest {
         });
         BufferedImage ohneN = foto(context, "waehler-n-weg");
         context.runOnClient(mc -> Minimap.INSTANZ.schalteVerzierung(0));
-        double oben = vorschau[1] - Waehler.SEITE / 2.0;
-        int nWeg = anders(mitN, ohneN, vorschau[0] - 3, oben, vorschau[0] + 3, oben + 4, k);
+        double vorschauOben = vorschau[1] - Waehler.SEITE / 2.0;
+        int nWeg = anders(mitN, ohneN, vorschau[0] - 3, vorschauOben, vorschau[0] + 3, vorschauOben + 4, k);
         if (nWeg < 6 * k * k) {
             throw new AssertionError("Wähler mit N durchsichtig: in der Vorschau „schild“ nur " + nWeg + " Pixel bei N anders");
         }
