@@ -29,10 +29,10 @@ record Ausweis(String netz, String server, String hash, Map<String, Welt> welten
     private static final int VERSION = 1;
 
     /**
-     * Was der Mod von einer Welt im Ordner weiss: der erste und letzte Besuch, an wie vielen Tagen, und die Spielzeit des
-     * Servers in Ticks, die erste gesehene, die grösste und die letzte; -1, solange keine kam.
+     * Was der Mod von einer Welt im Ordner weiss: der erste und letzte Besuch, an wie vielen Tagen, die Spielzeit des Servers
+     * in Ticks, die erste gesehene, die grösste und die letzte, -1, solange keine kam, und die UID vom Plugin, null ohne.
      */
-    record Welt(Instant erste, Instant zuletzt, int tage, long alterErstes, long alterMax, long alterZuletzt) {
+    record Welt(Instant erste, Instant zuletzt, int tage, long alterErstes, long alterMax, long alterZuletzt, String uid) {
     }
 
     Ausweis {
@@ -53,9 +53,9 @@ record Ausweis(String netz, String server, String hash, Map<String, Welt> welten
     /** Ein Besuch der Welt {@code schluessel} um {@code jetzt}; ein neuer Tag in der Zone {@code zone} zählt einen Tag mehr. */
     Ausweis besucht(String schluessel, Instant jetzt, ZoneId zone) {
         Welt alt = welten.get(schluessel);
-        Welt neu = alt == null ? new Welt(jetzt, jetzt, 1, -1, -1, -1)
+        Welt neu = alt == null ? new Welt(jetzt, jetzt, 1, -1, -1, -1, null)
                 : new Welt(alt.erste(), jetzt, alt.tage() + (tag(alt.zuletzt(), zone).equals(tag(jetzt, zone)) ? 0 : 1),
-                        alt.alterErstes(), alt.alterMax(), alt.alterZuletzt());
+                        alt.alterErstes(), alt.alterMax(), alt.alterZuletzt(), alt.uid());
         return mitWelt(schluessel, neu);
     }
 
@@ -66,7 +66,23 @@ record Ausweis(String netz, String server, String hash, Map<String, Welt> welten
             return this;
         }
         return mitWelt(schluessel, new Welt(w.erste(), w.zuletzt(), w.tage(), w.alterErstes() < 0 ? alter : w.alterErstes(),
-                Math.max(w.alterMax(), alter), alter));
+                Math.max(w.alterMax(), alter), alter, w.uid()));
+    }
+
+    /**
+     * Eine neue Generation der Welt {@code schluessel} nach einem Reset: die Spielzeit von vorn mit {@code alter} (-1 ohne),
+     * die UID {@code uid}; Besuche bleiben. Ohne Besuch nichts. Siehe docs/download.md, „Reset“.
+     */
+    Ausweis neueGeneration(String schluessel, long alter, String uid) {
+        Welt w = welten.get(schluessel);
+        return w == null ? this : mitWelt(schluessel, new Welt(w.erste(), w.zuletzt(), w.tage(), alter, alter, alter, uid));
+    }
+
+    /** Die UID vom Plugin für die Welt {@code schluessel}; ohne Besuch nichts. */
+    Ausweis uid(String schluessel, String uid) {
+        Welt w = welten.get(schluessel);
+        return w == null ? this
+                : mitWelt(schluessel, new Welt(w.erste(), w.zuletzt(), w.tage(), w.alterErstes(), w.alterMax(), w.alterZuletzt(), uid));
     }
 
     private Ausweis mitWelt(String schluessel, Welt w) {
@@ -92,7 +108,7 @@ record Ausweis(String netz, String server, String hash, Map<String, Welt> welten
                 JsonObject w = e.getValue().getAsJsonObject();
                 welten.put(e.getKey(), new Welt(Instant.parse(w.get("erste").getAsString()), Instant.parse(w.get("zuletzt").getAsString()),
                         w.get("tage").getAsInt(), w.get("alter_erstes").getAsLong(), w.get("alter_max").getAsLong(),
-                        w.get("alter_zuletzt").getAsLong()));
+                        w.get("alter_zuletzt").getAsLong(), w.has("uid") ? w.get("uid").getAsString() : null));
             }
             return new Ausweis(j.get("netz").getAsString(), j.get("server").getAsString(), j.get("hash").getAsString(), welten);
         } catch (IOException | RuntimeException e) {
@@ -116,6 +132,9 @@ record Ausweis(String netz, String server, String hash, Map<String, Welt> welten
             o.addProperty("alter_erstes", w.alterErstes());
             o.addProperty("alter_max", w.alterMax());
             o.addProperty("alter_zuletzt", w.alterZuletzt());
+            if (w.uid() != null) {
+                o.addProperty("uid", w.uid());
+            }
             ws.add(schluessel, o);
         });
         j.add("welten", ws);

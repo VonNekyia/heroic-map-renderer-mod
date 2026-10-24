@@ -21,6 +21,8 @@ code:
   - src/main/java/com/nekyia/heroicmap/Ausweis.java
   - src/main/java/com/nekyia/heroicmap/Ausweise.java
   - src/test/java/com/nekyia/heroicmap/AusweisTest.java
+  - src/main/java/com/nekyia/heroicmap/Reset.java
+  - src/test/java/com/nekyia/heroicmap/ResetTest.java
   - src/main/java/com/nekyia/heroicmap/Ort.java
   - src/main/java/com/nekyia/heroicmap/OrtFenster.java
   - src/test/java/com/nekyia/heroicmap/OrtTest.java
@@ -688,8 +690,9 @@ damit nichts.
   - `hash`: wie im Namen des Ordners;
   - `welten`: je Weltschlüssel, etwa `minecraft:overworld`, der erste und
     letzte Besuch, die Zahl der Tage mit Besuch in der Zeitzone des
-    Rechners, und die Spielzeit vom Server in Ticks: die erste gesehene,
-    die grösste und die letzte, ohne Wert -1.
+    Rechners, die Spielzeit vom Server in Ticks: die erste gesehene,
+    die grösste und die letzte, ohne Wert -1, und die UID vom Plugin,
+    siehe „Reset“.
 - **Je Weltschlüssel,** denn Oberwelt, Nether und End mit demselben Seed
   liegen im selben `welt-<hash>`.
 - **Wann:** Beim Betreten jeder Dimension, nach Ablage, Name und Karte,
@@ -707,6 +710,59 @@ damit nichts.
 - **Spielzeit:** `ClientLevel.getGameTime()`. Ob sie bei jedem Wechsel
   kommt und in 26.x immer weiterläuft, ist noch zu prüfen; eine Zeile im
   Log nennt sie beim ersten Wert je Besuch.
+
+## Reset
+
+Wird eine Welt zurückgesetzt, löscht der Mod ihre alte Karte, wenn der
+Reset sicher ist; sonst ruht sie (`Reset`, `Ausweise`), siehe
+[0046](entscheidungen/0046-reset-erkennen.md). Die Wegpunkte bleiben
+immer.
+
+- **UID vom Plugin:** Ab Plugin 0.20.1 nennt die Antwort auf `show` je
+  Welt des Servers die UID, `"welten": {"minecraft:overworld": {"uid":
+  "…"}}`, höchstens 64 (`Downloads.uidsAus`). Nur klein mit Bindestrichen,
+  sonst übergeht der Mod sie mit einer Zeile im Log. Sie gilt für die
+  Sitzung; der Ausweis merkt sie je Welt.
+- **Wann:** beim Betreten einer Dimension und wenn die Antwort auf `show`
+  kommt, denn sie kommt nach dem Betreten; ohne UID 10 s nach dem ersten
+  Wert der Spielzeit. Je Besuch einmal.
+- **Nur unter derselben Adresse** (`Reset.pruefe` mit `netz`): UID und
+  Spielzeit vergleicht der Mod nur, wenn der Ausweis vor dem Besuch
+  dieselbe eingetippte Adresse nennt; sonst trägt er sie nur ein. Derselbe
+  Ordner kann unter zwei Adressen zwei Welten zeigen, etwa ein Spiegel als
+  Kopie mit gleichem Namen und Hash, aber eigener UID und Spielzeit. Sonst
+  löschte jeder Wechsel zwischen beiden die Karte. Ein Reset fällt darum
+  nur auf, wenn der Besuch davor unter derselben Adresse war.
+- **Sicher, UID** (`Reset.pruefe`): Der Ausweis kennt eine UID der Welt,
+  und das Plugin schickt eine andere. Die Bäume dieser Welt im Ordner
+  werden gelöscht, Download und eigene Karte; die eigene beginnt gleich
+  neu im selben Massstab. Kennt der Ausweis noch keine, trägt der Mod sie
+  nur ein.
+- **Sicher, neuer Seed** (`Reset.veraltet`): Unter
+  `<adresse>/karte-<server>/` liegt ein anderer Ordner derselben Welt mit
+  einem anderen Hash. Gelöscht werden die Bäume dieser Welt dort, aber nur
+  - mit derselben eingetippten Adresse (`netz`) und demselben Namen vom
+    Plugin im Ausweis; ein Spiegel mit gleichem Namen unter anderer
+    Adresse zählt nicht;
+  - und wenn der alte Ordner zuletzt besucht war, bevor der neue zum
+    ersten Mal; so löscht kein Hin und Her.
+- **Unsicher, ohne UID:** Fällt die Spielzeit unter ein Viertel der
+  zuletzt gesehenen und um mehr als eine Stunde, 72 000 Ticks
+  (`Reset.TEIL`, `Reset.STUNDE`), ruhen die Bäume dieser Welt. Viertel und
+  Stunde sind vorläufig. Mit UID prüft der Mod die Spielzeit nicht, denn
+  ein Rückgang ist dann etwa eine eingespielte Sicherung.
+- **Ruhen:** Der Baum heisst danach `<baum>-bis-<jjjjmmtt>`, höchstens 64
+  Zeichen, mit `-2`, `-3` …, wenn ein Ordner oder ein Baum aus dem Angebot
+  so heisst (`Reset.ruhename`). Er bekommt die Marke `ruht.txt` und zeigt
+  nie (`Satz.fuer`); die Kartenliste bietet „Löschen“. Eine eigene Karte
+  behält `selbst-`, das kein Baum vom Server haben kann.
+- **Nie bei laufendem Download:** Dann bleibt alles, und der nächste Besuch
+  versucht es wieder. Gelöscht und umbenannt wird im Worker von „Selbst
+  zeichnen“, nach allem, was er noch schreibt.
+- **Danach:** Der Ausweis bekommt die neue Generation, Spielzeit von vorn
+  und die neue UID; eine Zeile im Chat und im Log sagt, was geschah, bei
+  „sicher“ mit dem Satz, dass die Wegpunkte bleiben, aber vielleicht nicht
+  mehr stimmen.
 
 ## Kartenliste
 

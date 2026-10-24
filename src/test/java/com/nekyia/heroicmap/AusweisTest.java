@@ -25,10 +25,17 @@ class AusweisTest {
         Instant t1 = Instant.parse("2026-10-24T10:00:00Z");
         Ausweis a = Ausweis.neu(HASH).mit("play.example.net:25566", "build").besucht(OBEN, t1, ZONE);
         Ausweis.Welt o = a.welten().get(OBEN);
-        assertEquals(new Ausweis.Welt(t1, t1, 1, -1, -1, -1), o, "ohne Spielzeit -1");
+        assertEquals(new Ausweis.Welt(t1, t1, 1, -1, -1, -1, null), o, "ohne Spielzeit -1, ohne UID");
         // Die erste gesehene bleibt, die grösste wächst, die letzte darf fallen.
         a = a.alter(OBEN, 500).alter(OBEN, 900).alter(OBEN, 400);
-        assertEquals(new Ausweis.Welt(t1, t1, 1, 500, 900, 400), a.welten().get(OBEN));
+        assertEquals(new Ausweis.Welt(t1, t1, 1, 500, 900, 400, null), a.welten().get(OBEN));
+        // Die UID bleibt über Besuche und Spielzeit; eine neue Generation beginnt die Spielzeit von vorn.
+        String uid = "0d9c1a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b";
+        a = a.uid(OBEN, uid);
+        assertEquals(uid, a.alter(OBEN, 950).welten().get(OBEN).uid());
+        assertEquals(new Ausweis.Welt(t1, t1, 1, 30, 30, 30, "neu"), a.neueGeneration(OBEN, 30, "neu").welten().get(OBEN));
+        assertSame(a, a.neueGeneration("minecraft:farm", 1, null));
+        a = a.neueGeneration(OBEN, 400, null).alter(OBEN, 900).alter(OBEN, 400);
         // Am selben Tag kein Tag mehr, am nächsten einer; der Tag zählt in der Zone, nicht in UTC.
         Instant spaeter = t1.plusSeconds(3600), mitternacht = Instant.parse("2026-10-24T22:30:00Z");
         a = a.besucht(OBEN, spaeter, ZONE);
@@ -50,7 +57,8 @@ class AusweisTest {
     @Test
     void schreibenUndLesen(@TempDir Path w) throws IOException {
         Instant t = Instant.parse("2026-10-24T10:00:00Z");
-        Ausweis a = Ausweis.neu(HASH).mit("0", "main").besucht(OBEN, t, ZONE).alter(OBEN, 1234).besucht(NETHER, t, ZONE);
+        Ausweis a = Ausweis.neu(HASH).mit("0", "main").besucht(OBEN, t, ZONE).alter(OBEN, 1234).besucht(NETHER, t, ZONE)
+                .uid(OBEN, "0d9c1a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b");
         a.schreibe(w);
         assertEquals(a, Ausweis.lies(w));
         assertFalse(Files.exists(w.resolve(Ausweis.DATEI + ".tmp")), "keine Zwischendatei bleibt");

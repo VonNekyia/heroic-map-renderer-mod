@@ -120,6 +120,8 @@ final class Downloads {
                 // Wer der Server ist, entscheidet, welche Karte er zeigt und in welche „Selbst“ zeichnet. Siehe
                 // docs/selbst.md, „Wahl“.
                 boolean gewechselt = karte(json);
+                uids = uidsAus(json);
+                Ausweise.INSTANZ.uidsGekommen(Minecraft.getInstance());
                 if (uebergang() || !gewechselt && mitNamen) {
                     Minimap.INSTANZ.leeren();
                     Selbst.INSTANZ.leeren();
@@ -149,6 +151,7 @@ final class Downloads {
      */
     void neueSitzung() {
         sitzung++;
+        uids = Map.of();
         angebot = null;
         neuGefragt = false;
         bestaetigt.clear();
@@ -322,6 +325,39 @@ final class Downloads {
             return true;
         }
         return Servername.gilt(alt, neu, belegt.test(alt.toString()));
+    }
+
+    /** Die UIDs der Welten vom Plugin, aus der Antwort auf show, je Weltschlüssel; leer ohne. Für die Sitzung. */
+    private static volatile Map<String, String> uids = Map.of();
+
+    static Map<String, String> uids() {
+        return uids;
+    }
+
+    /**
+     * {@code welten} aus der Antwort auf show: je Weltschlüssel ein Objekt mit {@code uid}, höchstens 64. Eine UID, die nicht
+     * klein mit Bindestrichen ist, übergeht der Mod mit einer Zeile im Log. Ohne das Feld, etwa bei einem älteren Plugin,
+     * leer. Siehe docs/download.md, „Reset“.
+     */
+    static Map<String, String> uidsAus(JsonObject json) {
+        if (!json.has("welten") || !json.get("welten").isJsonObject()) {
+            return Map.of();
+        }
+        Map<String, String> aus = new HashMap<>();
+        for (Map.Entry<String, JsonElement> e : json.getAsJsonObject("welten").entrySet()) {
+            JsonElement w = e.getValue();
+            String uid = w.isJsonObject() && w.getAsJsonObject().has("uid") && w.getAsJsonObject().get("uid").isJsonPrimitive()
+                    ? w.getAsJsonObject().get("uid").getAsString() : null;
+            if (aus.size() >= 64) {
+                break;
+            }
+            if (Reset.uid(uid)) {
+                aus.put(e.getKey(), uid);
+            } else {
+                LOGGER.warn("Heroic Map: UID der Welt {} ungültig, übergangen", e.getKey());
+            }
+        }
+        return Map.copyOf(aus);
     }
 
     /** Zählt jeden Login mit; ein Download merkt sich die Sitzung, aus der er stammt. */
