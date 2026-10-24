@@ -152,6 +152,29 @@ public final class Minimap {
     /** Koordinaten unter der Minimap. Siehe docs/minimap.md, „Koordinaten“. */
     enum Koordinaten { AUS, XZ, XYZ }
 
+    /**
+     * Die Zeit unter einem Todespunkt auf der Vollbildkarte: Datum und Uhrzeit, nur Datum, nur Uhrzeit oder keine; je Stil der
+     * Schlüssel des Musters in der Sprache und ein festes Muster, wenn das der Sprache nicht taugt. Ein Klick im Untermenü geht
+     * reihum. Siehe docs/wegpunkte.md, „Todespunkt“.
+     */
+    enum TodZeit {
+        DATUM_UHRZEIT("heroicmap.karte.tod_zeit", "dd.MM. HH:mm"), DATUM("heroicmap.karte.tod_datum", "dd.MM."),
+        UHRZEIT("heroicmap.karte.tod_uhrzeit", "HH:mm"), AUS(null, null);
+
+        final String schluessel, fest;
+
+        TodZeit(String schluessel, String fest) {
+            this.schluessel = schluessel;
+            this.fest = fest;
+        }
+
+        TodZeit naechste() {
+            return values()[(ordinal() + 1) % values().length];
+        }
+    }
+
+    private TodZeit todZeit = TodZeit.DATUM_UHRZEIT;
+
     private Koordinaten koordinaten = Koordinaten.XZ;
     /** Was die Minimap tut, solange der Debug-Bildschirm offen ist. Siehe docs/minimap.md, „Bei F3“. */
     enum BeiF3 { BLEIBT, AUS, MITTE }
@@ -406,6 +429,14 @@ public final class Minimap {
         return koordinaten;
     }
 
+    TodZeit todZeit() {
+        return todZeit;
+    }
+
+    void setzeTodZeit(TodZeit todZeit) {
+        this.todZeit = todZeit;
+    }
+
     BeiF3 beiF3() {
         return beiF3;
     }
@@ -656,6 +687,12 @@ public final class Minimap {
         // Bis 0.2.57 ein Schalter todespunkt: aus heisst keiner, an einer.
         todespunkte = Math.clamp(zahl(p.getProperty("todespunkte"), "false".equals(p.getProperty("todespunkt")) ? 0 : 1), 0, MAX_TODESPUNKTE);
         neueVersion = !"false".equals(p.getProperty("neue_version"));
+        todZeit = switch (String.valueOf(p.getProperty("tod_zeit")).trim()) {
+            case "datum" -> TodZeit.DATUM;
+            case "uhrzeit" -> TodZeit.UHRZEIT;
+            case "aus" -> TodZeit.AUS;
+            default -> TodZeit.DATUM_UHRZEIT;
+        };
         koordinaten = switch (String.valueOf(p.getProperty("koordinaten")).trim()) {
             case "aus" -> Koordinaten.AUS;
             case "xyz" -> Koordinaten.XYZ;
@@ -709,6 +746,7 @@ public final class Minimap {
         p.setProperty("effekte", Boolean.toString(effekte));
         p.setProperty("schleier", Integer.toString(schleier));
         p.setProperty("todespunkte", Integer.toString(todespunkte));
+        p.setProperty("tod_zeit", todZeit.name().toLowerCase(Locale.ROOT));
         p.setProperty("neue_version", Boolean.toString(neueVersion));
         p.setProperty("koordinaten", koordinaten.name().toLowerCase(Locale.ROOT));
         p.setProperty("bei_f3", beiF3.name().toLowerCase(Locale.ROOT));
@@ -1742,6 +1780,11 @@ public final class Minimap {
 
     static void wegpunkt(GuiGraphicsExtractor g, float x, float y, float groesse, int farbe, int hervor) {
         wegpunkt(g, x, y, groesse, farbe, hervor, false);
+    }
+
+    /** Ein Todespunkt ohne Wegpunkt dahinter, etwa im Untermenü. */
+    static void todespunkt(GuiGraphicsExtractor g, float x, float y, float groesse) {
+        wegpunkt(g, x, y, groesse, TOD, 0, true);
     }
 
     private static void wegpunkt(GuiGraphicsExtractor g, float x, float y, float groesse, int farbe, int hervor, boolean kreuz) {

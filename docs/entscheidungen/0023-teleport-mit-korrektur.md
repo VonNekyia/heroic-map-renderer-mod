@@ -1,7 +1,7 @@
 ---
 title: "0023: Teleport mit Korrektur"
 description: Warum „Hierher teleportieren“ immer im Menü steht, ohne Höhe zuerst den Server suchen lässt und dann die Höhe des Spielers nimmt, und warum der Mod nach dem Landen einmal korrigiert; löst 0019 in Punkt 3 ab.
-status: gilt
+status: abgelöst durch 0028
 date: 2026-10-18
 issues: [131]
 code:
