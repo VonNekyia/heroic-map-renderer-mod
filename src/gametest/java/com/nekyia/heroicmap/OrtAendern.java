@@ -351,8 +351,12 @@ public final class OrtAendern implements FabricClientGameTest {
      * Spielzeit, die gekommen ist und nicht fällt. Siehe docs/download.md, „Ausweis“.
      */
     private static void ausweis(ClientGameTestContext context, TestSingleplayerContext spiel, Path hier) {
-        for (String dimension : new String[] {"minecraft:the_nether", "minecraft:overworld"}) {
-            spiel.getServer().runCommand("execute in " + dimension + " run tp @a 0 100 0");
+        // Kreativ und zurück an dieselbe Stelle: Sonst stürbe der Spieler am Fall oder in der Wand, und der Tod verdeckte die Fenster danach.
+        spiel.getServer().runCommand("gamemode creative @a");
+        String stelle = context.computeOnClient(mc -> mc.player.getX() + " " + mc.player.getY() + " " + mc.player.getZ());
+        for (String[] ziel : new String[][] {{"minecraft:the_nether", "0 100 0"}, {"minecraft:overworld", stelle}}) {
+            String dimension = ziel[0];
+            spiel.getServer().runCommand("execute in " + dimension + " run tp @a " + ziel[1]);
             context.waitFor(mc -> mc.level != null && mc.level.dimension().identifier().toString().equals(dimension), 600);
             context.waitFor(mc -> mc.level.getGameTime() > 0, 600);
             context.waitTicks(5);
