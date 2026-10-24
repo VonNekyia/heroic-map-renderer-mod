@@ -106,6 +106,7 @@ public final class KarteJeServer implements FabricClientGameTest {
             }
             pruefe(welt, eigene, "nach „lösen“");
 
+            netz(context, welt, eigene);
             kopie(context, welt, eigene);
             context.runOnClient(mc -> mc.gui.setScreen(null));
         } catch (IOException e) {
@@ -171,20 +172,51 @@ public final class KarteJeServer implements FabricClientGameTest {
         }
     }
 
-    /** Der Knopf mit diesem Schlüssel auf dem Schirm, sonst null. */
-    private static Button knopf(Minecraft mc, String schluessel) {
+    /**
+     * Dieselbe Welt unter einer anderen Adresse: Unten in der Kartenliste steht neben „Karte von main nutzen“ auch „Karte von
+     * play.example.net nutzen“. Ein Klick setzt den Zeiger, dann den Download dort an, dann „lösen“. Siehe docs/download.md,
+     * „Kartenliste“.
+     */
+    private static void netz(ClientGameTestContext context, Path welt, String eigene) throws IOException {
+        Path dort = welt.getParent().getParent().resolve("play.example.net").resolve(welt.getFileName().toString());
+        Laden.loesche(dort);
+        download(dort, "probe-netz");
+        context.runOnClient(mc -> mc.gui.setScreen(new Kartenliste(null)));
+        context.waitFor(mc -> knopf(mc, "heroicmap.liste.zeiger_setzen", "play.example.net") != null, 600);
+        klicke(context, "heroicmap.liste.zeiger_setzen", "play.example.net");
+        context.waitTicks(2);
+        if (!"@play.example.net".equals(Zeiger.name(welt))) {
+            throw new AssertionError("Kein Zeiger auf play.example.net: " + Zeiger.name(welt));
+        }
+        pruefe(welt, eigene, "mit Zeiger über Adressen, ohne Namen erst die eigene");
+        context.waitFor(mc -> knopf(mc, "heroicmap.liste.ruht") != null, 100);
+        context.clickScreenButton("heroicmap.liste.ruht");
+        context.waitTicks(2);
+        pruefe(welt, "probe-netz", "nach „ruht“ beim Download unter der anderen Adresse");
+        context.clickScreenButton("heroicmap.liste.zeiger_loesen");
+        context.waitTicks(2);
+        if (Zeiger.name(welt) != null) {
+            throw new AssertionError("Der Zeiger über Adressen ist nach „lösen“ noch da");
+        }
+        pruefe(welt, eigene, "nach „lösen“ über Adressen");
+        Laden.loesche(dort);
+    }
+
+    /** Der Knopf mit diesem Schlüssel auf dem Schirm, mit {@code args} unter seinen Argumenten, sonst null. */
+    private static Button knopf(Minecraft mc, String schluessel, Object... args) {
         return mc.gui.screen() == null ? null : mc.gui.screen().children().stream()
-                .filter(w -> w instanceof Button b && b.getMessage().getContents() instanceof TranslatableContents t && t.getKey().equals(schluessel))
+                .filter(w -> w instanceof Button b && b.getMessage().getContents() instanceof TranslatableContents t && t.getKey().equals(schluessel)
+                        && java.util.Arrays.asList(t.getArgs()).containsAll(java.util.List.of(args)))
                 .map(w -> (Button) w).findFirst().orElse(null);
     }
 
     /**
-     * Klickt mit der Maus auf den Knopf mit diesem Schlüssel. clickScreenButton vergleicht den Text ohne Argumente und
-     * findet einen Knopf wie „Selbst · ruht · 4 px“ nicht.
+     * Klickt mit der Maus auf den Knopf mit diesem Schlüssel und {@code args}. clickScreenButton vergleicht den Text ohne
+     * Argumente und findet einen Knopf wie „Selbst · ruht · 4 px“ nicht.
      */
-    private static void klicke(ClientGameTestContext context, String schluessel) {
+    private static void klicke(ClientGameTestContext context, String schluessel, Object... args) {
         double[] mitte = context.computeOnClient(mc -> {
-            Button b = knopf(mc, schluessel);
+            Button b = knopf(mc, schluessel, args);
             if (b == null) {
                 throw new AssertionError("Kein Knopf " + schluessel);
             }
