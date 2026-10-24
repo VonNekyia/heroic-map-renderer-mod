@@ -1,5 +1,5 @@
 ---
-title: "0033: Das Band nach der Formel, in Pixeln des Schirms"
+title: "0034: Das Band nach der Formel, in Pixeln des Schirms"
 description: Warum der Mod die Bänder der Rahmen nach der Formel des Designers in Pixeln des Schirms rechnet, eckig aus einer kleinen Textur der Ecken und rund als Ring, und nur die Texturen behält, die zu sehen sind; ergänzt 0032.
 status: gilt
 date: 2026-10-24
@@ -10,7 +10,7 @@ code:
   - src/main/java/com/nekyia/heroicmap/Waehler.java
 ---
 
-# 0033: Das Band nach der Formel, in Pixeln des Schirms
+# 0034: Das Band nach der Formel, in Pixeln des Schirms
 
 ## Anlass
 

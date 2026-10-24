@@ -224,7 +224,7 @@ F3+T und Ressourcenpakete laden ihn neu. Bei „biom“ je Kategorie
 Die Bänder rechnet der Mod aus `palette.txt` nach der Formel des
 Designers, mit weichem Übergang, Fase und Schatten; Bilder gibt es dafür
 nicht. Warum so:
-[0033](entscheidungen/0033-band-nach-der-formel.md).
+[0034](entscheidungen/0034-band-nach-der-formel.md).
 
 - **Masse:** Die Formel rechnet in Texeln, 4 je Einheit des GUI
   (`Skin.D`). Ein Band ist 4 Texel breit, n Bänder sind B = 4n. Gezeichnet
