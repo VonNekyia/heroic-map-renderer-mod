@@ -314,8 +314,9 @@ class SymboleTest {
     void kopfEinmalJeNamenGenau8Mal8Hoechstens16KiB() throws Exception {
         String gut = "1".repeat(64), genau = "2".repeat(64), gross = "3".repeat(64), breit = "4".repeat(64), fehlt = "5".repeat(64);
         dateien.put("/tiles/koepfe/" + gut + ".png", png(8));
-        dateien.put("/tiles/koepfe/" + genau + ".png", aufgefuellt(png(8), Symbole.MAX_KOPF));
-        dateien.put("/tiles/koepfe/" + gross + ".png", aufgefuellt(png(8), Symbole.MAX_KOPF + 1));
+        // 16 KiB wie die Webkarte, als Zahl: so prüft der Test die Grenze, nicht die Konstante.
+        dateien.put("/tiles/koepfe/" + genau + ".png", aufgefuellt(png(8), 16 << 10));
+        dateien.put("/tiles/koepfe/" + gross + ".png", aufgefuellt(png(8), (16 << 10) + 1));
         dateien.put("/tiles/koepfe/" + breit + ".png", png(9, 8));
         Aufbau a = aufbau();
         Symbole s = a.symbole();
@@ -388,12 +389,12 @@ class SymboleTest {
         Identifier id = s.kopf(erster);
         assertNotNull(id);
         // 1023 weitere passen noch; der nächste verdrängt den am längsten nicht gezeigten, den ersten, und gibt ihn frei.
-        for (int i = 0; i < Symbole.MAX_KOEPFE - 1; i++) {
+        for (int i = 0; i < 1024 - 1; i++) {
             s.kopf(String.format(Locale.ROOT, "%064x", i));
         }
         s.warte();
         assertEquals(List.of(), a.frei());
-        s.kopf(String.format(Locale.ROOT, "%064x", Symbole.MAX_KOEPFE));
+        s.kopf(String.format(Locale.ROOT, "%064x", 1024));
         s.warte();
         assertEquals(List.of(id), a.frei());
         assertNull(s.kopf(erster));
