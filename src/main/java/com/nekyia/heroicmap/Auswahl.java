@@ -187,6 +187,8 @@ final class Auswahl extends Screen {
     private void waehleSelbst() {
         hinweis = Selbst.INSTANZ.waehle(minecraft, massstab);
         if (hinweis == null) {
+            // Auf einem Server gilt die Wahl auch für neue Welten und Runden desselben Servers. Siehe docs/selbst.md, „Neue Welten“.
+            Selbst.INSTANZ.weiterAn(Ausweise.netz(), massstab);
             gewaehlt = true;
             hinweis = Component.translatable("heroicmap.selbst.gewaehlt");
         }

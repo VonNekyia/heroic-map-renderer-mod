@@ -252,7 +252,7 @@
   "heroicmap.selbst.massstab.beschreibung": "Pixels per block. More pixels show finer detail but take more disk space: 1, 2 and 4 px roughly as 1 : 4 : 16. Fixed until you delete the map in the map list.",
   "heroicmap.selbst.an": "Myself · on · %s px",
   "heroicmap.selbst.titel": "Draw the map yourself?",
-  "heroicmap.selbst.frage": "From now on the mod draws every chunk you load in this dimension at %s pixels per block into a map of its own for this world. The full map then shows only that map, not the server's. The scale stays until you delete the map in the map list; that is also how you stop it.",
+  "heroicmap.selbst.frage": "From now on the mod draws every chunk you load in this dimension at %s pixels per block into a map of its own for this world. The full map then shows only that map, not the server's. The scale stays until you delete the map in the map list; that is also how you stop it. On a server, the mod then also draws new worlds and rounds of that server.",
   "heroicmap.selbst.gewaehlt": "The mod now draws the map itself.",
   "heroicmap.selbst.geht_nicht": "Drawing it yourself only works in a world and not under a ceiling.",
   "heroicmap.selbst.fehler": "The map to draw yourself could not be created; see the log for details.",

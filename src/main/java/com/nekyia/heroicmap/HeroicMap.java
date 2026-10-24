@@ -81,6 +81,9 @@ public final class HeroicMap implements ClientModInitializer {
                 .getEntrypoints(ID, HeroicMapClientApi.Listener.class).forEach(HeroicMapClientApi.Listener::ready));
         // Einmal je Start im Hintergrund, nach den Einstellungen. Siehe docs/vollbildkarte.md, „Neue Version“.
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> NeueVersion.frage());
+        // Einmal je Start im Hintergrund: alte Wegwerf- und Rundenkarten weg. Siehe docs/selbst.md, „Wegwerfkarten“.
+        ClientLifecycleEvents.CLIENT_STARTED.register(client -> Thread.ofPlatform().daemon().priority(Thread.MIN_PRIORITY)
+                .name("Heroic Map Wegwerf").start(Wegwerf::raeume));
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             Teleport.tick(client);
             boolean geaendert = false;
