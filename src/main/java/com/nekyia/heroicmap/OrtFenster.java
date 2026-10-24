@@ -6,7 +6,9 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import net.minecraft.ChatFormatting;
@@ -29,7 +31,7 @@ final class OrtFenster extends Screen {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final int TEXT = 0xFFFFFFFF, GRAU = 0xFFB0B0B0, GRUEN = 0xFF55FF55, ROT = 0xFFFF5555;
     /** Feld höchstens, Platz für die Namen links und die Hinweise rechts, die Zeilen der Felder, in Einheiten des GUI. */
-    private static final int FELD = 220, NAMEN = 90, HINWEISE = 86, OBEN = 78, ZEILE = 22;
+    private static final int FELD = 220, NAMEN = 90, HINWEISE = 86, OBEN = 94, ZEILE = 22;
 
     private final Kartenliste zurueck;
     private final Laden.AufPlatte karte;
@@ -39,12 +41,20 @@ final class OrtFenster extends Screen {
     private final List<Path> baeume;
     /** Gehört ein Baum im Ordner dem Server des Ordners als eigene Karte? Dann bekommt sie mit ihm einen neuen Server. */
     private final boolean eigene;
+    /** Die Speicherstände in {@code saves/}: Ordner unter {@code heroicmap/} → Name in {@code saves/}; beim Öffnen gelesen. */
+    private final Map<String, String> spielstaende = new HashMap<>();
     private boolean ganz = true, laeuft;
-    private String adresse, server, hash;
+    /** Liegt der neue Ort im Einzelspieler? Dann statt Adresse und Server der Speicherstand. */
+    private boolean einzel;
+    private String adresse, server, hash, speicherstand;
     private Button umziehen, abbrechen;
-    /** Nach {@link #pruefe}: der neue Ort, oder null; der Grund dagegen, oder null; ein Hinweis, was mitzieht. */
+    /**
+     * Nach {@link #pruefe}: der neue Ort, oder null; der Schlüssel des Grunds dagegen, oder null; was mitzieht; im Einzelspieler,
+     * ob es den Speicherstand gibt.
+     */
     private Ort.Teile neu;
-    private Component grund, mit;
+    private String grund;
+    private Component mit, fund;
     private Path ziel;
     /** Der Baum, den Minimap und Vollbildkarte zeigen, oder null; gelesen beim Aufbau und vor dem Umzug. */
     private Path gezeigt;
@@ -55,9 +65,16 @@ final class OrtFenster extends Screen {
         this.karte = karte;
         this.welt = karte.ordner().getParent();
         this.jetzt = jetzt;
-        adresse = jetzt.adresse();
+        einzel = jetzt.einzelspieler();
+        adresse = einzel ? "" : jetzt.adresse();
         server = jetzt.server();
         hash = jetzt.hash();
+        speicherstand = jetzt.speicherstand();
+        try (Stream<Path> alle = Files.list(Minecraft.getInstance().getLevelSource().getBaseDir())) {
+            alle.filter(Files::isDirectory).forEach(p -> spielstaende.put(Ort.speicherordner(p.getFileName().toString()), p.getFileName().toString()));
+        } catch (IOException e) {
+            // Ohne saves/ findet der Hinweis nichts; umziehen geht trotzdem.
+        }
         List<Path> b = List.of();
         try (Stream<Path> alle = Files.list(welt)) {
             b = alle.filter(p -> Files.isDirectory(p, LinkOption.NOFOLLOW_LINKS)).toList();
@@ -71,23 +88,34 @@ final class OrtFenster extends Screen {
     @Override
     protected void init() {
         int mitte = width / 2;
-        Button ganzKnopf = Button.builder(Component.translatable("heroicmap.ort.ganz").withStyle(ganz ? ChatFormatting.GREEN : ChatFormatting.WHITE),
-                b -> art(true)).bounds(mitte - 154, 52, 150, 20).build();
-        Button karteKnopf = Button.builder(Component.translatable("heroicmap.ort.karte").withStyle(ganz ? ChatFormatting.WHITE : ChatFormatting.GREEN),
-                b -> art(false)).bounds(mitte + 4, 52, 150, 20).build();
-        ganzKnopf.active = !ganz;
-        karteKnopf.active = ganz;
-        addRenderableWidget(ganzKnopf);
-        addRenderableWidget(karteKnopf);
-        feld(0, "heroicmap.ort.adresse", adresse, 253, t -> adresse = t);
-        feld(1, "heroicmap.ort.server", server, 64, t -> server = t);
-        feld(2, "heroicmap.ort.hash", hash, 16, t -> hash = t);
+        wahl("heroicmap.ort.ganz", ganz, mitte - 154, 48, () -> ganz = true);
+        wahl("heroicmap.ort.karte", !ganz, mitte + 4, 48, () -> ganz = false);
+        wahl("heroicmap.ort.ziel.server", !einzel, mitte - 154, 70, () -> einzel = false);
+        wahl("heroicmap.ort.ziel.einzelspieler", einzel, mitte + 4, 70, () -> einzel = true);
+        if (einzel) {
+            feld(0, "heroicmap.ort.speicherstand", speicherstand, 255, t -> speicherstand = t);
+            feld(1, "heroicmap.ort.hash", hash, 16, t -> hash = t);
+        } else {
+            feld(0, "heroicmap.ort.adresse", adresse, 253, t -> adresse = t);
+            feld(1, "heroicmap.ort.server", server, 64, t -> server = t);
+            feld(2, "heroicmap.ort.hash", hash, 16, t -> hash = t);
+        }
         umziehen = addRenderableWidget(Button.builder(Component.translatable("heroicmap.ort.umziehen"), b -> umziehe())
                 .bounds(mitte - 104, height - 28, 100, 20).build());
         gezeigt = gezeigt();
         abbrechen = addRenderableWidget(Button.builder(Component.translatable("gui.cancel"), b -> onClose())
                 .bounds(mitte + 4, height - 28, 100, 20).build());
         pruefe();
+    }
+
+    /** Ein Knopf einer Wahl aus zwei: gewählt grün und grau, sonst ein Klick, der wählt und neu aufbaut. */
+    private void wahl(String name, boolean gewaehlt, int x, int y, Runnable waehle) {
+        Button b = Button.builder(Component.translatable(name).withStyle(gewaehlt ? ChatFormatting.GREEN : ChatFormatting.WHITE), k -> {
+            waehle.run();
+            rebuildWidgets();
+        }).bounds(x, y, 150, 20).build();
+        b.active = !gewaehlt;
+        addRenderableWidget(b);
     }
 
     private void feld(int i, String name, String wert, int laenge, Consumer<String> setze) {
@@ -118,41 +146,47 @@ final class OrtFenster extends Screen {
         return Math.min(FELD, width - links() - NAMEN - HINWEISE);
     }
 
-    private void art(boolean ganzerOrdner) {
-        ganz = ganzerOrdner;
-        rebuildWidgets();
-    }
-
     /** Der Name des Baums am neuen Ort: eine eigene Karte heisst nach ihrem neuen Server, sonst wie bisher. */
     private String baumName(Ort.Teile t) {
         Path baum = karte.ordner();
         return Selbst.selbst(baum) && karte.satz() != null ? Selbst.baum(karte.satz().dimension(), t.wer()) : baum.getFileName().toString();
     }
 
-    /** Liest die Felder und setzt {@link #neu}, {@link #ziel}, {@link #grund} und {@link #mit}; „Umziehen“ nur ohne Grund. */
+    /** Liest die Felder und setzt {@link #neu}, {@link #ziel}, {@link #grund}, {@link #mit} und {@link #fund}; „Umziehen“ nur ohne Grund. */
     private void pruefe() {
         String[] fehler = new String[1];
-        neu = Ort.eingabe(adresse, server, hash, fehler);
+        neu = einzel ? Ort.einzelspieler(speicherstand, hash, fehler) : Ort.eingabe(adresse, server, hash, fehler);
         ziel = null;
         grund = null;
         mit = null;
+        fund = null;
         if (neu == null) {
-            grund = Component.translatable(fehler[0]);
+            grund = fehler[0];
         } else {
+            if (einzel) {
+                String name = spielstaende.get(neu.adresse());
+                fund = name == null ? Component.translatable("heroicmap.ort.nicht_gefunden")
+                        : Component.translatable("heroicmap.ort.gefunden", name).withStyle(ChatFormatting.GREEN);
+            }
             Path neuWelt = Ort.ordner(wurzel, neu);
             ziel = ganz ? neuWelt : neuWelt.resolve(baumName(neu));
-            String gegen = Ort.grund(welt, ganz ? welt : karte.ordner(), neuWelt, ziel, Downloads.weltOrdner(), Selbst.INSTANZ::zeichnetIn,
+            grund = Ort.grund(welt, ganz ? welt : karte.ordner(), neuWelt, ziel, Downloads.weltOrdner(), Selbst.INSTANZ::zeichnetIn,
                     gezeigt, halten().stream().anyMatch(Downloads.INSTANZ::belegt));
-            grund = gegen == null ? null : Component.translatable(gegen);
             boolean eigen = ganz ? eigene : Selbst.selbst(karte.ordner());
             Component wem = !eigen || neu.wer().equals(jetzt.wer()) ? Component.empty()
-                    : Component.literal(" ").append(Zeigt.OHNE.equals(neu.wer()) ? Component.translatable("heroicmap.ort.eigene.ohne")
+                    : Component.literal(" ").append(neu.einzelspieler() ? Component.translatable("heroicmap.ort.eigene.einzelspieler")
+                            : Zeigt.OHNE.equals(neu.wer()) ? Component.translatable("heroicmap.ort.eigene.ohne")
                             : Component.translatable("heroicmap.ort.eigene", neu.wer()));
             mit = Component.translatable(ganz ? "heroicmap.ort.mit" : "heroicmap.ort.bleiben", baeume.size()).append(wem);
         }
         if (umziehen != null) {
             umziehen.active = grund == null && !laeuft;
         }
+    }
+
+    /** Für den Gametest: der Schlüssel des Grunds gegen den Umzug, oder null. */
+    String grund() {
+        return grund;
     }
 
     /** Der Baum der Dimension des Spielers, den Minimap und Vollbildkarte zeigen, wie sie ihn suchen; sonst null. */
@@ -179,7 +213,7 @@ final class OrtFenster extends Screen {
         for (Path p : halten()) {
             if (!Downloads.INSTANZ.halte(p)) {
                 gehalten.forEach(Downloads.INSTANZ::gibFrei);
-                grund = Component.translatable("heroicmap.ort.belegt");
+                grund = "heroicmap.ort.belegt";
                 umziehen.active = false;
                 return;
             }
@@ -231,19 +265,24 @@ final class OrtFenster extends Screen {
         g.centeredText(font, font.plainSubstrByWidth(was + " · " + Downloads.groesse(karte.bytes()), width - 16), mitte, 24, GRAU);
         g.centeredText(font, font.plainSubstrByWidth(Component.translatable("heroicmap.ort.jetzt", zeige(ganz ? welt : karte.ordner())).getString(),
                 width - 16), mitte, 36, GRAU);
-        String[] namen = {"heroicmap.ort.adresse", "heroicmap.ort.server", "heroicmap.ort.hash"};
-        String[] hinweise = {null, "heroicmap.ort.server.hinweis", "heroicmap.ort.hash.hinweis"};
-        for (int i = 0; i < 3; i++) {
+        String[] namen = einzel ? new String[] {"heroicmap.ort.speicherstand", "heroicmap.ort.hash"}
+                : new String[] {"heroicmap.ort.adresse", "heroicmap.ort.server", "heroicmap.ort.hash"};
+        String[] hinweise = einzel ? new String[] {"heroicmap.ort.speicherstand.hinweis", "heroicmap.ort.hash.hinweis"}
+                : new String[] {null, "heroicmap.ort.server.hinweis", "heroicmap.ort.hash.hinweis"};
+        for (int i = 0; i < namen.length; i++) {
             int y = OBEN + i * ZEILE + 6;
             g.text(font, Component.translatable(namen[i]), links(), y, TEXT);
             if (hinweise[i] != null) {
                 g.text(font, Component.translatable(hinweise[i]), links() + NAMEN + feld() + 6, y, GRAU);
             }
         }
-        int y = OBEN + 3 * ZEILE + 4;
+        int y = OBEN + namen.length * ZEILE + 4;
+        if (fund != null) {
+            y = zeilen(g, fund, y, GRAU);
+        }
         if (grund != null) {
             // Der jetzige Ort ist kein Fehler, nur nichts zu tun.
-            zeilen(g, grund, y, neu != null && Ort.ordner(wurzel, neu).equals(welt) ? GRAU : ROT);
+            zeilen(g, Component.translatable(grund), y, neu != null && Ort.ordner(wurzel, neu).equals(welt) ? GRAU : ROT);
         } else if (ziel != null) {
             y = zeilen(g, Component.translatable("heroicmap.ort.neu", zeige(ziel)), y, GRUEN);
             zeilen(g, mit, y, GRAU);

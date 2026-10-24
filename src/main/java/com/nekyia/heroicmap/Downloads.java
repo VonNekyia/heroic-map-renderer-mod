@@ -881,12 +881,13 @@ final class Downloads {
      * Der Pfad einer Welt unter {@code heroicmap/}: {@code welt-<hash>}, davor der Host oder Host
      * und Port; meldet der Server einen {@code name}, steht er statt des Hosts. Mit einer {@code karte}
      * vom Plugin steht {@code karte-<karte>} vor {@code welt-<hash>}. {@code seed} ist der Hash des
-     * Seeds, den der Server dem Client schickt.
+     * Seeds, den der Server dem Client schickt. Ein Punkt am Ende des Hosts fällt weg.
      */
     static String weltOrdner(Ablage ablage, String adresse, String name, String karte, long seed) {
         String welt = (karte != null ? "karte-" + karte + "/" : "") + "welt-" + HexFormat.of().toHexDigits(seed);
         ServerAddress a = ServerAddress.parseString(adresse);
-        String host = name != null ? name : a.getHost();
+        // Windows nimmt einem Ordner den Punkt am Ende ohnehin; so liegt example.net. überall bei example.net, auch vor dem Port.
+        String host = (name != null ? name : a.getHost()).replaceAll("\\.+$", "");
         return switch (ablage) {
             case HASH -> welt;
             case IP -> name(host) + "/" + welt;

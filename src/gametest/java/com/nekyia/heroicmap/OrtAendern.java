@@ -23,8 +23,9 @@ import net.minecraft.network.chat.contents.TranslatableContents;
 /**
  * „Ort …“ in der Kartenliste wie ein Spieler, mit Maus und Tasten: Der ganze Ordner einer Welt ohne Server zieht nach
  * {@code karte-build}, Wegpunkte und eigene Karte mit. „Nur diese Karte“ auf einen Baum, der dort schon liegt, ist grau, auf
- * einen freien nicht; Esc bricht ab, und nichts zieht um. Dann zieht nur die Karte in den Ordner eines neuen Hashs. Eine Karte
- * aus dem Einzelspieler zieht nicht um. Siehe docs/download.md, „Ort ändern“.
+ * einen freien nicht; Esc bricht ab, und nichts zieht um. Dann zieht nur die Karte in den Ordner eines neuen Hashs, und der
+ * Ordner von build in den Einzelspieler und zurück. In der Welt des Spielers sind ganzer Ordner und gezeigter Download grau.
+ * Siehe docs/download.md, „Ort ändern“.
  */
 public final class OrtAendern implements FabricClientGameTest {
 
@@ -36,9 +37,11 @@ public final class OrtAendern implements FabricClientGameTest {
         try (TestSingleplayerContext spiel = context.worldBuilder().create(); var _ = Abschluss.langsamerTakt(context, spiel)) {
             spiel.getConnection().waitForChunksRender();
             Bilder.leereWelt(context);
-            Path adresse = Downloads.wurzel().resolve(ADRESSE);
-            if (Files.exists(adresse)) {
-                Laden.loesche(adresse);
+            Path adresse = Downloads.wurzel().resolve(ADRESSE), einzel = Downloads.wurzel().resolve("einzelspieler_ort_probe");
+            for (Path rest : new Path[] {adresse, einzel}) {
+                if (Files.exists(rest)) {
+                    Laden.loesche(rest);
+                }
             }
             // Zwei Ordner derselben Welt: ohne Server mit Download, eigener Karte und Wegpunkten, und der von main.
             Path ohne = adresse.resolve("welt-" + HASH), main = adresse.resolve("karte-main/welt-" + HASH);
@@ -52,12 +55,20 @@ public final class OrtAendern implements FabricClientGameTest {
             Path hier = context.computeOnClient(mc -> Downloads.weltOrdner());
             download(hier.resolve("probe-hier"));
 
-            // Aus dem Einzelspieler: „Ort …“ grau.
+            // Die Welt, in der der Spieler ist, aus dem Einzelspieler: Das Ziel ist vorgewählt. Als ganzer Ordner grau, weil der
+            // Spieler darin ist; nur der Download grau, weil Minimap und Vollbildkarte ihn zeigen.
             liste(context);
-            Button grau = ort(context, hier.resolve("probe-hier"));
-            if (context.computeOnClient(mc -> grau.active)) {
-                throw new AssertionError("„Ort …“ einer Karte aus dem Einzelspieler ist nicht grau");
+            fenster(context, hier.resolve("probe-hier"));
+            if (context.computeOnClient(mc -> knopf(context, "heroicmap.ort.ziel.einzelspieler").active)) {
+                throw new AssertionError("Bei einer Karte aus dem Einzelspieler ist das Ziel Einzelspieler nicht vorgewählt");
             }
+            tippe(context, 0, "anderer");
+            grund(context, "heroicmap.ort.hier", "ganzer Ordner der Welt, in der der Spieler ist");
+            klicke(context, knopf(context, "heroicmap.ort.karte"));
+            context.waitTicks(2);
+            grund(context, "heroicmap.ort.gezeigt", "der gezeigte Download");
+            context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+            context.waitFor(mc -> mc.gui.screen() instanceof Kartenliste, 100);
 
             // Ganzer Ordner, die Vorgabe: Am jetzigen Ort ist „Umziehen“ grau; Server build, „Umziehen“.
             liste(context);
@@ -108,6 +119,33 @@ public final class OrtAendern implements FabricClientGameTest {
             if (!Files.exists(main.resolve(Zeigt.DATEI))) {
                 throw new AssertionError("Der ganze Ordner zog um, nicht nur die Karte");
             }
+            // Ganzer Ordner von build in den Einzelspieler: Speicherstand statt Adresse und Server. Die eigene Karte gehört danach
+            // keinem Server. Dann zurück nach build.
+            liste(context);
+            fenster(context, build.resolve("probe"));
+            klicke(context, knopf(context, "heroicmap.ort.ziel.einzelspieler"));
+            context.waitTicks(2);
+            tippe(context, 0, "Ort Probe");
+            aktiv(context, true, "in den Einzelspieler");
+            klicke(context, knopf(context, "heroicmap.ort.umziehen"));
+            Path einzelWelt = einzel.resolve("welt-" + HASH);
+            context.waitFor(mc -> mc.gui.screen() instanceof Kartenliste && !Files.exists(build), 200);
+            if (!Files.exists(einzelWelt.resolve("wegpunkte.json")) || !Selbst.gehoert(einzelWelt.resolve(Selbst.baum(OBEN, Zeigt.OHNE)), Zeigt.OHNE)) {
+                throw new AssertionError("Im Einzelspieler fehlen die Wegpunkte, oder die eigene Karte gehört noch einem Server");
+            }
+            liste(context);
+            fenster(context, einzelWelt.resolve("probe"));
+            klicke(context, knopf(context, "heroicmap.ort.ziel.server"));
+            context.waitTicks(2);
+            tippe(context, 0, ADRESSE);
+            tippe(context, 1, "build");
+            aktiv(context, true, "zurück auf den Server");
+            klicke(context, knopf(context, "heroicmap.ort.umziehen"));
+            context.waitFor(mc -> mc.gui.screen() instanceof Kartenliste && !Files.exists(einzel), 200);
+            if (!Files.exists(build.resolve("probe/satz.json")) || !Selbst.gehoert(build.resolve(Selbst.baum(OBEN, "build")), "build")) {
+                throw new AssertionError("Zurück auf dem Server fehlt der Download, oder die eigene Karte gehört nicht build");
+            }
+
             groessen(context, build.resolve("probe"));
             Laden.loesche(adresse);
             context.runOnClient(mc -> mc.gui.setScreen(null));
@@ -289,6 +327,15 @@ public final class OrtAendern implements FabricClientGameTest {
     private static Button knopf(ClientGameTestContext context, String s) {
         return context.computeOnClient(mc -> mc.gui.screen().children().stream().filter(w -> w instanceof Button b && schluessel(b, s))
                 .map(w -> (Button) w).findFirst().orElseThrow(() -> new AssertionError("Kein Knopf " + s)));
+    }
+
+    /** „Umziehen“ ist grau, und das Fenster nennt genau diesen Grund. */
+    private static void grund(ClientGameTestContext context, String schluessel, String wann) {
+        aktiv(context, false, wann);
+        String grund = context.computeOnClient(mc -> mc.gui.screen() instanceof OrtFenster f ? f.grund() : "kein Fenster");
+        if (!schluessel.equals(grund)) {
+            throw new AssertionError(wann + ": Grund " + grund + " statt " + schluessel);
+        }
     }
 
     private static void aktiv(ClientGameTestContext context, boolean soll, String wann) {
