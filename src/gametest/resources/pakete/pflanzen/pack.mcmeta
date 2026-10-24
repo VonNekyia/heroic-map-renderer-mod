@@ -1,0 +1,9 @@
+{
+  "pack": {
+    "description": "Heroic Map Gametest: Pflanzen aus Paketen",
+    "pack_format": 15,
+    "min_format": 15,
+    "max_format": 1024,
+    "supported_formats": {"min_inclusive": 15, "max_inclusive": 1024}
+  }
+}

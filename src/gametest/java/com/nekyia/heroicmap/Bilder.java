@@ -147,6 +147,7 @@ public final class Bilder implements FabricClientGameTest {
             selbst(context);
             tueren(context, server);
             pflanzen(context, server);
+            pflanzenAusPaketen(context, server);
             weitHeraus(context, server);
             koordinatenAmRand(context, server);
         }
@@ -1656,6 +1657,95 @@ public final class Bilder implements FabricClientGameTest {
         "setblock -34 -60 20 pink_petals[facing=north,flower_amount=1]",
         "setblock -32 -60 21 stone", "setblock -32 -60 20 ladder[facing=north]",
     };
+
+    /**
+     * Das Testpaket unter /pakete/pflanzen, eigene Modelle nach dem Muster mancher Pakete: eine ersetzte Vorlage
+     * {@code block/crop} mit gekippten Flächen, reifer Weizen als zwei Blöcke hohes Modell ohne {@code parent}, und Gras, das
+     * neben dem Modell des Spiels ein schräges Kreuz ohne {@code parent} wählt. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
+     */
+    private static final String[] PAKET_PFLANZEN = {
+        "pack.mcmeta",
+        "assets/minecraft/blockstates/short_grass.json",
+        "assets/minecraft/blockstates/wheat.json",
+        "assets/minecraft/models/block/crop.json",
+        "assets/minecraft/models/block/heroicmap_test_gras.json",
+        "assets/minecraft/models/block/heroicmap_test_hohes_getreide.json",
+        "assets/minecraft/models/block/heroicmap_test_schraeges_kreuz.json",
+        "assets/minecraft/models/block/heroicmap_test_weizen_reif.json",
+    };
+
+    /** Ein Feld: Weizen jung bis reif, Karotten, Kartoffeln, Gras und Farn, um (-56, 43). */
+    private static final String[] FELD = {
+        "fill -62 -61 38 -48 -61 48 grass_block", "fill -62 -60 38 -48 -50 48 air",
+        "fill -60 -61 40 -53 -61 42 farmland[moisture=7]", "setblock -52 -61 41 water",
+        "setblock -60 -60 40 wheat[age=0]", "setblock -59 -60 40 wheat[age=2]", "setblock -58 -60 40 wheat[age=4]",
+        "setblock -57 -60 40 wheat[age=6]", "fill -56 -60 40 -53 -60 40 wheat[age=7]",
+        "fill -60 -60 42 -57 -60 42 carrots[age=7]", "fill -56 -60 42 -53 -60 42 potatoes[age=7]",
+        "fill -60 -60 44 -53 -60 44 short_grass", "fill -60 -60 46 -57 -60 46 fern",
+    };
+
+    /**
+     * Pflanzen aus Paketen: das Feld bei 4 px und 1 px, Zoom 4, ohne und mit dem Testpaket. Siehe docs/minimap.md, „Pflanzen
+     * aus Paketen“.
+     */
+    private static void pflanzenAusPaketen(ClientGameTestContext context, TestServerContext server) {
+        for (String befehl : FELD) {
+            server.runCommand(befehl);
+        }
+        Path ordner = FabricLoader.getInstance().getGameDir().resolve("resourcepacks").resolve("heroicmap-pflanzen-test");
+        try {
+            for (String datei : PAKET_PFLANZEN) {
+                Path ziel = ordner.resolve(datei);
+                Files.createDirectories(ziel.getParent());
+                try (InputStream rein = Bilder.class.getResourceAsStream("/pakete/pflanzen/" + datei)) {
+                    Files.copy(rein, ziel, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        List<BufferedImage> bilder = new ArrayList<>();
+        try {
+            for (boolean mitPaket : new boolean[] {false, true}) {
+                paket(context, "file/heroicmap-pflanzen-test", mitPaket);
+                for (int scale : new int[] {4, 1}) {
+                    context.runOnClient(mc -> {
+                        Minimap.INSTANZ.setzeScale(scale);
+                        Minimap.INSTANZ.setzeZoom(4);
+                    });
+                    context.waitTicks(10);
+                    bilder.add(minimapBei(context, server, -56.5, 43.5, "pakete-" + scale + "px-" + (mitPaket ? "mit" : "ohne")));
+                }
+            }
+        } finally {
+            paket(context, "file/heroicmap-pflanzen-test", false);
+        }
+        if (!AUSGABE.isEmpty()) {
+            try {
+                ImageIO.write(nebeneinander(0, bilder.toArray(BufferedImage[]::new)), "png", Path.of(AUSGABE, "pflanzen-pakete.png").toFile());
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        server.runCommand("tp @a 0.5 -30 0.5 0 90");
+    }
+
+    /** Schaltet das Paket {@code id} an oder aus und lädt die Ressourcen neu, wie das Menü der Pakete. */
+    private static void paket(ClientGameTestContext context, String id, boolean an) {
+        java.util.concurrent.CompletableFuture<Void> fertig = context.computeOnClient(mc -> {
+            net.minecraft.server.packs.repository.PackRepository r = mc.getResourcePackRepository();
+            r.reload();
+            List<String> gewaehlt = new ArrayList<>(r.getSelectedIds());
+            gewaehlt.remove(id);
+            if (an) {
+                gewaehlt.add(id);
+            }
+            r.setSelected(gewaehlt);
+            return mc.reloadResourcePacks();
+        });
+        context.waitFor(mc -> fertig.isDone(), 1200);
+        context.waitTicks(5);
+    }
 
     /** Was an ihrer Stelle steht, wenn die Pflanzen weg sind. */
     private static final String[] OHNE_PFLANZEN = {
