@@ -929,13 +929,12 @@ dieselbe Regel, siehe
   sonst nach ihrer Richtung (`BlockModelLighter.getDirectionalBrightness`,
   per javap am Client 26.3); der Mod teilt das heraus und schattiert nach
   oben (`CardinalLighting.up`, `ChunkMaler.schattenNachOben`).
-- **Abgetastet** über das gemittelte Raster des Sprites wie eine volle
-  Oberseite (`ChunkMaler.raster`): je Pixel die Zelle unter seiner Mitte,
-  eine Probe statt n × n. Ein Pixel deckt, wenn mehr als die Hälfte der
-  Texel seiner Zelle deckt, wie bei jeder ausgeschnittenen Fläche, siehe
-  „Flächen und Pixel“. Mit n × n Proben kostete eine gekippte Pflanze je
-  Chunk rund 0,5 ms mehr, siehe
+- **Abgetastet** wie jede ausgeschnittene Fläche, je Pixel n × n Proben im
+  Fussabdruck, siehe „Flächen und Pixel“. Das kostet je Chunk rund 0,5 ms
+  mehr als die flache Fläche, die das gemittelte Raster las, siehe
   [Pflanzen gekippt, Zeit je Chunk](messungen/2026-10-24-pflanzen-gekippt.md).
+  Mit 0.2.73 sollen gekippte Flächen das gemittelte Raster nehmen, eine
+  Probe je Pixel.
 - **Ohne Allokation je Block:** Die Flächen zum Kippen liegen in Puffern,
   die der Maler über alle Blöcke wiederverwendet (`ChunkMaler.merke`); neu
   angelegt wird nur je gezeichnete Fläche, wie bei jeder Oberseite.
@@ -1194,8 +1193,8 @@ der Platte nichts Neues.
 **Pflanzen gekippt:** Mit n × n Proben je Pixel kosteten sie im Worker je
 Chunk rund 0,5 ms mehr, bei 4 px +18 %, bei 1 px +36 %, bei 16 px +1 %
 (Reihe 1 in [Pflanzen gekippt, Zeit je Chunk](messungen/2026-10-24-pflanzen-gekippt.md)).
-Darum nehmen sie das gemittelte Raster, eine Probe je Pixel; die Messung
-dazu folgt in einem Fenster, das der Reviewer freigibt.
+Mit 0.2.73 sollen sie das gemittelte Raster nehmen, eine Probe je Pixel;
+gemessen wird das gegen main in einem Fenster, das der Reviewer freigibt.
 
 **Der Umriss rund ohne Rahmen** (`Minimap.umrissRing`), geschätzt, nicht
 gemessen:

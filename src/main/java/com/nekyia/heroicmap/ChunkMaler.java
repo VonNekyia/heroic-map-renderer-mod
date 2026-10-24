@@ -179,11 +179,10 @@ final class ChunkMaler {
 
     /**
      * Eine Fläche nach oben in x und z, mit UV, Sprite, Schicht und dem Faktor ihrer Ecken
-     * aus Licht, Schatten und Tönung; {@code hoehe} ordnet sie im Block. {@code gekippt}: die Fläche einer gekippten
-     * Pflanze, abgetastet über das gemittelte Raster.
+     * aus Licht, Schatten und Tönung; {@code hoehe} ordnet sie im Block.
      */
     private record Flaeche(float hoehe, float[] xz, float[] uv, TextureAtlasSprite sprite,
-            ChunkSectionLayer schicht, float[][] ecken, boolean gekippt) {
+            ChunkSectionLayer schicht, float[][] ecken) {
     }
 
     /** Zeichnet den Chunk; je Pixel ARGB, Zeile für Zeile, 16 · scale breit. */
@@ -241,7 +240,7 @@ final class ChunkMaler {
                 // Von oben nach unten; was aus dem Wasser ragt, liegt vor der Oberfläche.
                 flaechen.sort((f, g) -> Float.compare(g.hoehe(), f.hoehe()));
                 for (Flaeche f : flaechen) {
-                    schicht(f.xz(), f.uv(), f.sprite(), f.schicht(), f.ecken(), f.gekippt());
+                    schicht(f.xz(), f.uv(), f.sprite(), f.schicht(), f.ecken());
                 }
             }
             schreibe(pixel, seite, lx * scale, lz * scale);
@@ -291,7 +290,7 @@ final class ChunkMaler {
                 uv[2 * k + 1] = UVPair.unpackV(packed);
             }
             flaechen.add(new Flaeche(hoehe, xz, uv, quad.materialInfo().sprite(), quad.materialInfo().layer(),
-                    ecken(instanz, quad.materialInfo().lightEmission()), false));
+                    ecken(instanz, quad.materialInfo().lightEmission())));
         }, 0, 0, 0, welt, pos, state, model, state.getSeed(pos));
         // Ein Modell mit einer liegenden Fläche, etwa ein Blütenteppich, bleibt, wie es ist; Bambus kippt nur seine Blätter.
         if (kippAnzahl > 0 && (bambus || !oben)) {
@@ -372,7 +371,7 @@ final class ChunkMaler {
                 System.arraycopy(kippLicht, j, ecken[k], 0, 3);
             }
             flaechen.add(new Flaeche(Math.min(hoehe, hoechstens), xz, Arrays.copyOfRange(kippUv, 8 * i, 8 * i + 8), kippSprite[i],
-                    kippSchicht[i], ecken, true));
+                    kippSchicht[i], ecken));
         }
     }
 
@@ -462,7 +461,7 @@ final class ChunkMaler {
         }
         auftrag.licht().hell(LightCoordsUtil.getLightCoords(welt, pos.above()), hell);
         flaechen.add(new Flaeche((float) box.maxY, xz, uv, s, ChunkSectionLayer.SOLID,
-                new float[][] {hell.clone(), hell.clone(), hell.clone(), hell.clone()}, false));
+                new float[][] {hell.clone(), hell.clone(), hell.clone(), hell.clone()}));
     }
 
     /**
@@ -516,7 +515,7 @@ final class ChunkMaler {
             faktor[c] = hell[c] * schatten * ((tint >> (16 - 8 * c)) & 0xFF) / 255f;
         }
         flaechen.add(new Flaeche(fluid.getHeight(welt, pos), VOLL, voll(sprite), sprite, model.layer(),
-                new float[][] {faktor, faktor, faktor, faktor}, false));
+                new float[][] {faktor, faktor, faktor, faktor}));
     }
 
     private boolean ohneFlaechen(BlockStateModel model) {
@@ -589,7 +588,7 @@ final class ChunkMaler {
      * ihre Mitte liegt, so ist jede Fläche mindestens ein Pixel breit. Die Textur wird über den Pixel
      * in linearem Licht gemittelt, mit dem Test der Schicht. Siehe docs/minimap.md, „Flächen und Pixel“.
      */
-    private void schicht(float[] xz, float[] uv, TextureAtlasSprite sprite, ChunkSectionLayer schicht, float[][] ecken, boolean gekippt) {
+    private void schicht(float[] xz, float[] uv, TextureAtlasSprite sprite, ChunkSectionLayer schicht, float[][] ecken) {
         Texel textur = auftrag.texel().get(sprite);
         if (textur == null) {
             return;
@@ -600,10 +599,8 @@ final class ChunkMaler {
         float uMax = Math.max(Math.max(uv[0], uv[2]), Math.max(uv[4], uv[6]));
         float vMin = Math.min(Math.min(uv[1], uv[3]), Math.min(uv[5], uv[7]));
         float vMax = Math.max(Math.max(uv[1], uv[3]), Math.max(uv[5], uv[7]));
-        // Eine volle Oberseite mit dem ganzen Sprite: das gemittelte Raster, ohne abzutasten. Ebenso die Fläche einer gekippten
-        // Pflanze, je Pixel die Zelle unter seiner Mitte; sonst kostete sie n × n Proben je Pixel. Siehe docs/minimap.md,
-        // „Pflanzen von oben“.
-        float[] voll = gekippt || ganzeOberseite(xz, uv, sprite) ? raster(sprite, textur, schicht) : null;
+        // Eine volle Oberseite mit dem ganzen Sprite: das gemittelte Raster, ohne abzutasten.
+        float[] voll = ganzeOberseite(xz, uv, sprite) ? raster(sprite, textur, schicht) : null;
         int n = Math.max(1, 16 / scale);
         float[] reiheX = duenn(xz, 0, scale), reiheZ = duenn(xz, 1, scale);
         for (int pz = 0; pz < scale; pz++) {
