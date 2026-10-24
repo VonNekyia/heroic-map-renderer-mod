@@ -3419,6 +3419,16 @@ public final class Bedienung implements FabricClientGameTest {
             if (felder != 1) {
                 throw new AssertionError("Suche „Alpha“: " + felder + " Zeilen statt einer");
             }
+            // Ein Zug, der im Panel neben den Knöpfen beginnt, auf dem Zeichen der Art, schiebt die Karte nicht.
+            double[] vorZug = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blickMitte());
+            double zeileY = mitteDes(context, VerwaltungsPanel.NameFeld.class, w -> true, "Namensfeld")[1];
+            double artX = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).verwaltung().kasten[0] + Verwaltung.ART / 2.0);
+            ziehe(context, maus, LINKS, artX, zeileY, -40 * k, 30 * k);
+            context.waitTicks(2);
+            double[] nachZug = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blickMitte());
+            if (!Arrays.equals(vorZug, nachZug)) {
+                throw new AssertionError("Ein Zug aus dem Panel schob die Karte: " + Arrays.toString(vorZug) + " → " + Arrays.toString(nachZug));
+            }
             // Im Feld: Die Kartentaste schliesst nicht, Esc verwirft und schliesst nicht.
             double[] name = mitteDes(context, VerwaltungsPanel.NameFeld.class, w -> true, "Namensfeld");
             spielerKlick(context, maus, k, name[0], name[1]);
