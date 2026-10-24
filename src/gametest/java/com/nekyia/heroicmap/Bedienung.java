@@ -3485,6 +3485,19 @@ public final class Bedienung implements FabricClientGameTest {
             maus.pressKey(InputConstants.KEY_RETURN);
             context.waitTicks(3);
             alphaIst(context, dimension, alpha, p -> "AlphaX".equals(p.name()), "nach Enter „AlphaX“");
+            // Schliesst sich die Karte, während getippt wird, etwa beim Tod, ist der Name gespeichert.
+            name = mitteDes(context, VerwaltungsPanel.NameFeld.class, w -> true, "Namensfeld");
+            spielerKlick(context, maus, k, name[0], name[1]);
+            maus.pressKey(InputConstants.KEY_END);
+            maus.typeChars("Y");
+            context.runOnClient(mc -> mc.gui.setScreen(null));
+            alphaIst(context, dimension, alpha, p -> "AlphaXY".equals(p.name()), "Karte zu beim Tippen, „AlphaXY“");
+            context.runOnClient(mc -> {
+                Karte karte = new Karte(Satz.lies(baum)).mitVerwaltung();
+                karte.verwaltung().suche = "Alpha";
+                mc.gui.setScreen(karte);
+            });
+            context.waitTicks(3);
             // Farbe reihum, Schrift grösser, Schriftart Minecraft, Ebene weiter, angeheftet.
             int farbe = context.computeOnClient(mc -> Wegpunkte.INSTANZ.punktAuf(dimension, alpha[0], alpha[1]).farbe());
             klickeIm(context, maus, k, VerwaltungsPanel.Feld.class, w -> true, "Farbfeld");

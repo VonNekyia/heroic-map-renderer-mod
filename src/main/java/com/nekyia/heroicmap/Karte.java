@@ -2874,6 +2874,10 @@ final class Karte extends Screen {
     public void removed() {
         // Was beim Schliessen noch an der Maus hing, steht wieder an seinem Ort.
         Wegpunkte.INSTANZ.ziehe(List.of());
+        // Schliesst sich die Karte, während ein Name getippt wird, etwa beim Tod oder Trennen, ist er gespeichert wie beim Verlassen des Felds.
+        if (getFocused() instanceof VerwaltungsPanel.NameFeld) {
+            setFocused(null);
+        }
         if (blick != null && gestellt) {
             Kartenlage.schreibe(Downloads.weltOrdner(), satz,
                     new Kartenlage.Lage(blick.mx / satz.scale(), blick.mz / satz.scale(), blick.zoom, blick.lupe));
