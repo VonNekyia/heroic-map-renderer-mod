@@ -354,7 +354,7 @@ class MinimapTest {
         try (var rein = Files.newBufferedReader(datei)) {
             p.load(rein);
         }
-        assertEquals("koordinaten:xyz:unten", p.getProperty("widgets"));
+        assertEquals("koordinaten:xyz:0:unten", p.getProperty("widgets"));
         assertNull(p.getProperty("koordinaten"));
         // Mit widgets gilt koordinaten nicht mehr, auch leer: dann keine Koordinaten.
         Files.writeString(datei, "koordinaten=xyz\nwidgets=\n");
