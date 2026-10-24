@@ -1116,7 +1116,8 @@ public final class Minimap {
             Widgets.Widget w = widgets.get(i);
             Object[] werte = werte(w.version() == 0 ? Koordinaten.XZ : Koordinaten.XYZ, spieler.getX(), spieler.getY(), spieler.getZ());
             texte[i] = Component.translatable(werte.length == 3 ? "heroicmap.koordinaten_xyz" : "heroicmap.koordinaten", werte);
-            massstab[i] = Math.min(w.pixel(k) / (float) k, koordinatenMassstab(sw, abstand, mc.font.width(texte[i])));
+            // In ganzen Pixeln des Geräts je Pixel der Schrift; kleiner nur, wenn es nicht zwischen die Ränder passt.
+            massstab[i] = Math.min(w.pixel(k) / (float) k, (sw - 2f * abstand) / Math.max(1, mc.font.width(texte[i])));
             obenHoehe += w.anker() == Widgets.Anker.OBEN ? Mth.ceil(mc.font.lineHeight * massstab[i]) + 2 : 0;
         }
         // Passt der obere Stapel ganz über die Minimap, steht er dort, sonst neben dem Nordpfeil, bündig mit ihrer Oberkante.
