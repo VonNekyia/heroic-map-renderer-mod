@@ -5,14 +5,17 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
+import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 
 /**
@@ -101,10 +104,71 @@ public final class OrtAendern implements FabricClientGameTest {
             if (!Files.exists(main.resolve(Zeigt.DATEI))) {
                 throw new AssertionError("Der ganze Ordner zog um, nicht nur die Karte");
             }
+            groessen(context, build.resolve("probe"));
             Laden.loesche(adresse);
             context.runOnClient(mc -> mc.gui.setScreen(null));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * Das Fenster zu {@code baum} bei 1920 × 1080 mit GS 3 und 4, 1280 × 720 mit GS 3 und 1280 × 960 mit GS 4, also 320
+     * Einheiten breit: Knöpfe und Felder ganz auf dem Schirm, nichts übereinander, die Hinweise rechts der Felder auch.
+     * Je ein Bildschirmfoto. Danach das Fenster wie vorher.
+     */
+    private static void groessen(ClientGameTestContext context, Path baum) {
+        int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
+        List<String> fehler = new ArrayList<>();
+        try {
+            for (int[] f : new int[][] {{1920, 1080, 3}, {1920, 1080, 4}, {1280, 720, 3}, {1280, 960, 4}}) {
+                context.getInput().resizeWindow(f[0], f[1]);
+                context.runOnClient(mc -> {
+                    mc.options.guiScale().set(f[2]);
+                    mc.resizeGui();
+                    Laden.AufPlatte karte = new Laden.AufPlatte(baum, baum.toString(), Satz.lies(baum), 0);
+                    mc.gui.setScreen(new OrtFenster(new Kartenliste(null), karte, Ort.teile(Downloads.wurzel(), baum.getParent())));
+                });
+                context.waitTicks(3);
+                String fall = f[0] + " × " + f[1] + " GS " + f[2];
+                context.takeScreenshot(TestScreenshotOptions.of("ort-" + f[1] + "-gs" + f[2]).disableCounterPrefix());
+                fehler.addAll(context.computeOnClient(mc -> {
+                    int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+                    List<AbstractWidget> l = mc.gui.screen().children().stream().filter(c -> c instanceof AbstractWidget)
+                            .map(c -> (AbstractWidget) c).toList();
+                    List<String> fl = new ArrayList<>();
+                    if (mc.getWindow().getGuiScale() != f[2]) {
+                        fl.add(fall + ": GS " + mc.getWindow().getGuiScale());
+                    }
+                    int hinweis = Math.max(mc.font.width(Component.translatable("heroicmap.ort.server.hinweis")),
+                            mc.font.width(Component.translatable("heroicmap.ort.hash.hinweis")));
+                    for (int i = 0; i < l.size(); i++) {
+                        AbstractWidget w = l.get(i);
+                        int rechts = w.getX() + w.getWidth() + (w instanceof EditBox ? 6 + hinweis : 0);
+                        if (w.getX() < 0 || w.getY() < 0 || rechts > b || w.getY() + w.getHeight() > h) {
+                            fl.add(fall + ": " + w.getMessage().getString() + " nicht ganz auf dem Schirm");
+                        }
+                        for (int j = i + 1; j < l.size(); j++) {
+                            AbstractWidget v = l.get(j);
+                            if (w.getX() < v.getX() + v.getWidth() && v.getX() < w.getX() + w.getWidth() && w.getY() < v.getY() + v.getHeight()
+                                    && v.getY() < w.getY() + w.getHeight()) {
+                                fl.add(fall + ": " + w.getMessage().getString() + " über " + v.getMessage().getString());
+                            }
+                        }
+                    }
+                    return fl;
+                }));
+            }
+        } finally {
+            context.getInput().resizeWindow(vorher[0], vorher[1]);
+            context.runOnClient(mc -> {
+                mc.options.guiScale().set(vorher[2]);
+                mc.resizeGui();
+            });
+            context.waitTicks(2);
+        }
+        if (!fehler.isEmpty()) {
+            throw new AssertionError(String.join("; ", fehler));
         }
     }
 

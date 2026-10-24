@@ -16,6 +16,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import org.slf4j.Logger;
 
 /**
@@ -27,7 +28,8 @@ final class OrtFenster extends Screen {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final int TEXT = 0xFFFFFFFF, GRAU = 0xFFB0B0B0, GRUEN = 0xFF55FF55, ROT = 0xFFFF5555;
-    private static final int FELD = 220, OBEN = 80, ZEILE = 24;
+    /** Feld höchstens, Platz für die Namen links und die Hinweise rechts, die Zeilen der Felder, in Einheiten des GUI. */
+    private static final int FELD = 220, NAMEN = 90, HINWEISE = 86, OBEN = 78, ZEILE = 22;
 
     private final Kartenliste zurueck;
     private final Laden.AufPlatte karte;
@@ -79,14 +81,14 @@ final class OrtFenster extends Screen {
         feld(1, "heroicmap.ort.server", server, 64, t -> server = t);
         feld(2, "heroicmap.ort.hash", hash, 16, t -> hash = t);
         umziehen = addRenderableWidget(Button.builder(Component.translatable("heroicmap.ort.umziehen"), b -> umziehe())
-                .bounds(mitte - 104, OBEN + 3 * ZEILE + 34, 100, 20).build());
+                .bounds(mitte - 104, height - 28, 100, 20).build());
         abbrechen = addRenderableWidget(Button.builder(Component.translatable("gui.cancel"), b -> onClose())
-                .bounds(mitte + 4, OBEN + 3 * ZEILE + 34, 100, 20).build());
+                .bounds(mitte + 4, height - 28, 100, 20).build());
         pruefe();
     }
 
     private void feld(int i, String name, String wert, int laenge, Consumer<String> setze) {
-        EditBox f = addRenderableWidget(new EditBox(font, width / 2 - 80, OBEN + i * ZEILE, FELD, 20, Component.translatable(name)));
+        EditBox f = addRenderableWidget(new EditBox(font, links() + NAMEN, OBEN + i * ZEILE, feld(), 20, Component.translatable(name)));
         f.setMaxLength(laenge);
         f.setValue(wert);
         f.setResponder(t -> {
@@ -101,6 +103,16 @@ final class OrtFenster extends Screen {
         if (!laeuft) {
             pruefe();
         }
+    }
+
+    /** Wo die Namen der Felder beginnen; schmal rücken sie an den Rand. */
+    private int links() {
+        return Math.max(8, width / 2 - 200);
+    }
+
+    /** Die Breite der Felder; schmal werden sie schmaler, damit die Hinweise rechts auf den Schirm passen. */
+    private int feld() {
+        return Math.min(FELD, width - links() - NAMEN - HINWEISE);
     }
 
     private void art(boolean ganzerOrdner) {
@@ -204,26 +216,36 @@ final class OrtFenster extends Screen {
         Satz s = karte.satz();
         String was = s == null ? Component.translatable("heroicmap.liste.unvollstaendig").getString()
                 : s.name() + " · " + s.dimension() + " · " + s.massstab() + " px";
-        g.centeredText(font, was + " · " + Downloads.groesse(karte.bytes()), mitte, 24, GRAU);
-        g.centeredText(font, Component.translatable("heroicmap.ort.jetzt", zeige(ganz ? welt : karte.ordner())), mitte, 36, GRAU);
+        g.centeredText(font, font.plainSubstrByWidth(was + " · " + Downloads.groesse(karte.bytes()), width - 16), mitte, 24, GRAU);
+        g.centeredText(font, font.plainSubstrByWidth(Component.translatable("heroicmap.ort.jetzt", zeige(ganz ? welt : karte.ordner())).getString(),
+                width - 16), mitte, 36, GRAU);
         String[] namen = {"heroicmap.ort.adresse", "heroicmap.ort.server", "heroicmap.ort.hash"};
         String[] hinweise = {null, "heroicmap.ort.server.hinweis", "heroicmap.ort.hash.hinweis"};
         for (int i = 0; i < 3; i++) {
             int y = OBEN + i * ZEILE + 6;
-            g.text(font, Component.translatable(namen[i]), mitte - 180, y, TEXT);
+            g.text(font, Component.translatable(namen[i]), links(), y, TEXT);
             if (hinweise[i] != null) {
-                g.text(font, Component.translatable(hinweise[i]), mitte - 80 + FELD + 6, y, GRAU);
+                g.text(font, Component.translatable(hinweise[i]), links() + NAMEN + feld() + 6, y, GRAU);
             }
         }
         int y = OBEN + 3 * ZEILE + 4;
         if (grund != null) {
             // Der jetzige Ort ist kein Fehler, nur nichts zu tun.
-            g.centeredText(font, grund, mitte, y, neu != null && Ort.ordner(wurzel, neu).equals(welt) ? GRAU : ROT);
+            zeilen(g, grund, y, neu != null && Ort.ordner(wurzel, neu).equals(welt) ? GRAU : ROT);
         } else if (ziel != null) {
-            g.centeredText(font, Component.translatable("heroicmap.ort.neu", zeige(ziel)), mitte, y, GRUEN);
-            g.centeredText(font, mit, mitte, y + 12, GRAU);
+            y = zeilen(g, Component.translatable("heroicmap.ort.neu", zeige(ziel)), y, GRUEN);
+            zeilen(g, mit, y, GRAU);
         }
         super.extractRenderState(g, mausX, mausY, delta);
+    }
+
+    /** Mittig, umbrochen auf die Breite des Schirms; gibt die Höhe unter der letzten Zeile zurück. */
+    private int zeilen(GuiGraphicsExtractor g, Component text, int y, int farbe) {
+        for (FormattedCharSequence zeile : font.split(text, width - 16)) {
+            g.centeredText(font, zeile, width / 2, y, farbe);
+            y += font.lineHeight + 2;
+        }
+        return y;
     }
 
     @Override
