@@ -65,6 +65,9 @@ Der Versuch steht auf dem Tag `versuch/pflanzen-kippen`.
 
 - Ein volles Kreuz verliert beim Stauchen seinen Versatz entlang der
   Kipprichtung; der quer dazu bleibt.
-- Je Pflanze werden statt einer Fläche zwei bis vier abgetastet; die Zeit
-  je Chunk misst der Mod in einem freigegebenen Fenster.
+- Je Pflanze werden statt einer Fläche zwei bis vier abgetastet. Mit n × n
+  Proben je Pixel kostete das im Worker je Chunk rund 0,5 ms mehr, bei 4 px
+  +18 %; darum nehmen gekippte Flächen das gemittelte Raster, eine Probe je
+  Pixel, entschieden vom Reviewer am 24.10. Siehe
+  [Pflanzen gekippt, Zeit je Chunk](../messungen/2026-10-24-pflanzen-gekippt.md).
 - Die eigene Karte zeichnet mit demselben Maler und kippt also mit.
