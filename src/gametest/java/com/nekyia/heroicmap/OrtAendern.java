@@ -98,6 +98,9 @@ public final class OrtAendern implements FabricClientGameTest {
             if (Files.exists(main.resolve("probe")) || Zeigt.baum(main, "main", OBEN) != null) {
                 throw new AssertionError("Die Karte liegt noch am alten Ort, oder zeigt.txt nennt sie dort noch");
             }
+            if (!Files.exists(main.resolve(Zeigt.DATEI))) {
+                throw new AssertionError("Der ganze Ordner zog um, nicht nur die Karte");
+            }
             Laden.loesche(adresse);
             context.runOnClient(mc -> mc.gui.setScreen(null));
         } catch (IOException e) {
