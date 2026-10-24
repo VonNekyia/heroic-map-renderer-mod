@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
@@ -46,6 +47,8 @@ public final class Ebenen {
     static final Ebenen INSTANZ = new Ebenen();
     /** Grenzen aus dem Format, siehe docs/ebenen.md, „Grenzen“. */
     static final int MAX_EBENEN = 64, MAX_NADELN = 1000;
+    /** Die höchste Zoomgrenze einer Ebene in Blöcken je Pixel, wie im Plugin. */
+    static final double MAX_BLOECKE_JE_PIXEL = 1024;
     /** Eine eigene Grenze des Mods: Für eine Datei von 4 MiB braucht ein ehrliches Plugin rund 130 Teile. */
     static final int MAX_TEILE = 256;
     /** So lang ist höchstens ein Name, eine Kennung oder eine Dimension; länger übergeht der Mod. */
@@ -125,8 +128,8 @@ public final class Ebenen {
     record Zeichen(Component[] zeichen, double[] breiten) {
     }
 
-    /** Ein Eintrag der Liste; {@code order} höher liegt oben. */
-    record Eintrag(String id, String nameDe, String nameEn, boolean sichtbar, int order, String version) {
+    /** Ein Eintrag der Liste; {@code order} höher liegt oben; {@code maxBlocksPerPixel} 0 ohne Zoomgrenze. */
+    record Eintrag(String id, String nameDe, String nameEn, boolean sichtbar, int order, String version, double maxBlocksPerPixel) {
 
         /** Der Name in der Sprache des Spiels, sonst in der anderen. */
         String name(boolean deutsch) {
@@ -339,7 +342,22 @@ public final class Ebenen {
     private static Eintrag eintrag(JsonObject o, String id, String version) {
         JsonObject name = o.has("name") ? o.getAsJsonObject("name") : new JsonObject();
         return new Eintrag(id, text(name, "de", MAX_TEXT), text(name, "en", MAX_TEXT),
-                !o.has("visible") || o.get("visible").getAsBoolean(), o.has("order") ? o.get("order").getAsInt() : 0, version);
+                !o.has("visible") || o.get("visible").getAsBoolean(), o.has("order") ? o.get("order").getAsInt() : 0, version, grenze(o));
+    }
+
+    /** Die Zoomgrenze eines Eintrags: eine Zahl über 0 bis {@link #MAX_BLOECKE_JE_PIXEL}, sonst 0, keine Grenze. */
+    static double grenze(JsonObject o) {
+        double g = o.get("maxBlocksPerPixel") instanceof JsonPrimitive p && p.isNumber() ? p.getAsDouble() : 0;
+        return g > 0 && g <= MAX_BLOECKE_JE_PIXEL ? g : 0;
+    }
+
+    /**
+     * Liegt eine Ebene mit der Zoomgrenze {@code grenze} auf einer Karte mit {@code block} Einheiten des GUI je Block diesseits
+     * der Grenze? Blöcke je Pixel der Webkarte sind {@link #NAME_GROESSE} / 16 / {@code block}, wie bei den Namen; genau auf der
+     * Grenze ja, ohne Grenze immer. Siehe docs/ebenen.md, „Zoomgrenze“.
+     */
+    static boolean imZoom(double grenze, double block) {
+        return grenze <= 0 || NAME_GROESSE / 16 / block <= grenze;
     }
 
     /**
@@ -864,6 +882,21 @@ public final class Ebenen {
     /** Die Ebenen, die gezeichnet werden, unten zuerst. */
     List<Eintrag> sichtbar() {
         return liste.stream().filter(this::an).toList();
+    }
+
+    /** Ebenso auf einer Karte mit {@code block} Einheiten je Block, ohne die jenseits ihrer Zoomgrenze. */
+    List<Eintrag> sichtbar(double block) {
+        return liste.stream().filter(e -> an(e) && imZoom(e.maxBlocksPerPixel(), block)).toList();
+    }
+
+    /** Liegt die Ebene {@code id} auf einer Karte mit {@code block} Einheiten je Block diesseits ihrer Zoomgrenze? Eine unbekannte ja. */
+    boolean imZoom(String id, double block) {
+        for (Eintrag e : liste) {
+            if (e.id().equals(id)) {
+                return imZoom(e.maxBlocksPerPixel(), block);
+            }
+        }
+        return true;
     }
 
     /** Ist die Ebene geheim, mit {@code "secret": true} in der Liste? Ihre Banner holt der Mod über den Kanal, siehe docs/ebenen.md, „Geheime Banner“. */

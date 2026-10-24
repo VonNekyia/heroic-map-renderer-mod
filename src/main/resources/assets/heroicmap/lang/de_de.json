@@ -84,6 +84,7 @@
   "heroicmap.verwaltung.tod": "Tod%s",
   "heroicmap.karte.reihe_server": "Reihe des Servers",
   "heroicmap.karte.reihe_hoch": "Eine Stelle höher: darüber gezeichnet",
+  "heroicmap.karte.ebene_weit": "Erst beim Hineinzoomen zu sehen",
   "heroicmap.karte.reihe_runter": "Eine Stelle tiefer: darunter gezeichnet",
   "heroicmap.karte.ebene_voll": "%s nicht angeheftet: höchstens %s Regionen und %s Nadeln und Banner",
   "heroicmap.karte.zum_spieler": "Zum Spieler",

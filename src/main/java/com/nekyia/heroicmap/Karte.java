@@ -53,6 +53,8 @@ final class Karte extends Screen {
     private static final int TEXT = 0xFFFFFFFF;
     /** Die zweite Zeile im Kasten des Downloads. */
     private static final int GRAU = 0xFFC0C0C0;
+    /** Der Name einer Ebene jenseits ihrer Zoomgrenze in der Liste. */
+    private static final int GRAU_WEIT = 0xFF808080;
     /** Der Rand des Hinweises auf eine neue Version pulsiert in dieser Zeit einmal von Gold nach Weiss und zurück. */
     static final int GOLD = 0xFFFFAA00, PULS_MS = 2000;
     /** Breite der Knöpfe in Einheiten des GUI. */
@@ -569,8 +571,9 @@ final class Karte extends Screen {
     /**
      * Die Überschriften der Liste, rechtsbündig vor ihrem Knopf; ein langer Name ragt nach links über die Karte.
      * Vor einer Ebene, die ganz angeheftet ist, ein bunter Punkt; neu gerechnet, wenn sich Ebenen oder Wegpunkte ändern.
+     * Eine Ebene jenseits ihrer Zoomgrenze grau, mit Tooltip. Siehe docs/ebenen.md, „Zoomgrenze“.
      */
-    private void ueberschriften(GuiGraphicsExtractor g) {
+    private void ueberschriften(GuiGraphicsExtractor g, int mausX, int mausY) {
         if (schalter.isEmpty()) {
             return;
         }
@@ -583,10 +586,15 @@ final class Karte extends Screen {
             }
         }
         int bunt = Mth.hsvToArgb((System.currentTimeMillis() % BUNT_MS) / (float) BUNT_MS, 1f, 1f, 255);
+        double block = blockBreite();
         for (int i = 0; i < ganz.length; i++) {
             Schalter s = schalter.get(i);
             int[] r = ueberschrift(s);
-            g.text(font, s.name(), r[0] + 6, r[1] + 6, TEXT, true);
+            boolean nah = s.ebene() == null || Ebenen.INSTANZ.imZoom(s.ebene(), block);
+            g.text(font, s.name(), r[0] + 6, r[1] + 6, nah ? TEXT : GRAU_WEIT, true);
+            if (!nah && drin(r, mausX, mausY)) {
+                g.setTooltipForNextFrame(Component.translatable("heroicmap.karte.ebene_weit"), mausX, mausY);
+            }
             if (ganz[i]) {
                 g.fill(r[0], r[1] + 8, r[0] + 4, r[1] + 12, bunt);
             }
@@ -736,7 +744,7 @@ final class Karte extends Screen {
         super.extractRenderState(g, mausX, mausY, delta);
         VerwaltungsPanel.zeichne(verwaltung, g, font);
         leuchte(g);
-        ueberschriften(g);
+        ueberschriften(g, mausX, mausY);
         if (laeuft != null) {
             fortschritt(g, laeuft);
         }
@@ -771,7 +779,7 @@ final class Karte extends Screen {
                 new double[] {blick.basisRasterX(0, width) / scale, blick.basisRasterZ(0, height) / scale,
                         blick.basisRasterX(width, width) / scale, blick.basisRasterZ(height, height) / scale},
                 pose, new ScreenRectangle(0, 0, width, height).transformMaxBounds(pose), Double.POSITIVE_INFINITY);
-        Formen.zeichne(g, a, dimension, Wegpunkte.INSTANZ.karte(Ebenen.INSTANZ), formenSpeicher, font, true);
+        Formen.zeichne(g, a, dimension, Wegpunkte.INSTANZ.karte(Ebenen.INSTANZ, blockBreite()), formenSpeicher, font, true);
         // Die gezogenen Formen folgen der Maus in jedem Frame; ihr Speicher gilt nur bis zur nächsten Bewegung.
         List<List<Ebenen.Form>> gezogen = gezogeneFormen().stream()
                 .filter(f -> f.dimension().equals(dimension) && Wegpunkte.INSTANZ.an(f.ebene()))
@@ -1103,12 +1111,14 @@ final class Karte extends Screen {
         int[] namen = {Ebenen.MAX_NAMEN};
         double block = blockBreite();
         for (Ebenen.Eintrag e : Ebenen.INSTANZ.sichtbar()) {
+            // Jenseits der Zoomgrenze nur, was angeheftet ist. Siehe docs/ebenen.md, „Zoomgrenze“.
+            boolean nah = Ebenen.imZoom(e.maxBlocksPerPixel(), block);
             for (Ebenen.Ort n : Ebenen.INSTANZ.nadeln(e.id())) {
                 double x = blick.rasterX(Projektion.zuPixel(n.x(), satz.scale()), width);
                 double y = blick.rasterY(Projektion.zuPixel(n.z(), satz.scale()), height);
                 // Erst grob die Höhe: Unter dem Fuss reicht kein Name weiter als UNTEN_HOECHSTENS. Dann der Kasten ohne Holen,
                 // samt einem Namen im Bogen, der auch über den Fuss steigt; er misst den Namen, holt aber kein Bild.
-                if (!n.dimension().equals(dimension) || y <= -Ebenen.UNTEN_HOECHSTENS) {
+                if (!n.dimension().equals(dimension) || y <= -Ebenen.UNTEN_HOECHSTENS || !nah && !Wegpunkte.INSTANZ.angeheftet(Ebenen.INSTANZ, n)) {
                     continue;
                 }
                 float[] r = Ebenen.kastenOhneHolen(font, n);
@@ -1767,7 +1777,7 @@ final class Karte extends Screen {
         // Ein Klick in die Tafel wirkt nicht auf die Karte; links auf einen Knopf drückt ihn, solange die Tafel gilt.
         if (drin(tafelKasten, e.x(), e.y())) {
             Tafel.Knopfstueck k = taste ? knopfUnter(e.x(), e.y()) : null;
-            if (k != null && Tafeln.gilt(Ebenen.INSTANZ, tafelOffen)) {
+            if (k != null && Tafeln.gilt(Ebenen.INSTANZ, Wegpunkte.INSTANZ, tafelOffen, blockBreite())) {
                 Tafeln.INSTANZ.druecke(tafelOffen, k.knopf(), Util.getMillis());
             }
             klickVerbraucht = true;
@@ -1965,7 +1975,7 @@ final class Karte extends Screen {
                 && !(taste && gezogen > ZUG)
                 && getChildAt(mausX, mausY).isEmpty();
         zeigen.zeiger(frei ? zielUnter(mausX, mausY) : null, ueber, ms);
-        if (zeigen.offen() != null && !Tafeln.gilt(Ebenen.INSTANZ, zeigen.offen())) {
+        if (zeigen.offen() != null && !Tafeln.gilt(Ebenen.INSTANZ, Wegpunkte.INSTANZ, zeigen.offen(), blockBreite())) {
             zeigen.zu();
         }
         Optional<Tafel> t = zeigen.offen() == null ? null : Tafeln.INSTANZ.tafel(zeigen.offen(), ms);
@@ -2100,13 +2110,13 @@ final class Karte extends Screen {
         return tafelSatz;
     }
 
-    /** Das Ziel unter dem Zeiger, neu gesucht nur, wenn sich Zeiger, Ansicht, Ebenen, Bilder oder Schrift ändern. */
+    /** Das Ziel unter dem Zeiger, neu gesucht nur, wenn sich Zeiger, Ansicht, Ebenen, Angeheftetes, Bilder oder Schrift ändern. */
     private Tafeln.Ziel zielUnter(double mx, double my) {
         if (blick == null) {
             return null;
         }
         double[] jetzt = {mx, my, blick.mx, blick.mz, blick.zoom, blick.lupe, width, height, minecraft.getWindow().getGuiScale(),
-            Ebenen.INSTANZ.stand(), Symbole.INSTANZ.stand(), Geheimbanner.INSTANZ.stand(), Formen.generation};
+            Ebenen.INSTANZ.stand(), Wegpunkte.INSTANZ.stand(), Symbole.INSTANZ.stand(), Geheimbanner.INSTANZ.stand(), Formen.generation};
         if (!Arrays.equals(jetzt, suche)) {
             suche = jetzt;
             gefunden = tafelUnter(mx, my);
@@ -2128,9 +2138,11 @@ final class Karte extends Screen {
         String dimension = minecraft.player.level().dimension().identifier().toString();
         int scale = satz.scale(), gs = minecraft.getWindow().getGuiScale();
         Tafeln.Ziel treffer = null;
+        double block = blockBreite();
         for (Ebenen.Eintrag e : Ebenen.INSTANZ.sichtbar()) {
+            boolean nah = Ebenen.imZoom(e.maxBlocksPerPixel(), block);
             for (Ebenen.Ort o : Ebenen.INSTANZ.nadeln(e.id())) {
-                if (o.id() == null || !o.dimension().equals(dimension)) {
+                if (o.id() == null || !o.dimension().equals(dimension) || !nah && !Wegpunkte.INSTANZ.angeheftet(Ebenen.INSTANZ, o)) {
                     continue;
                 }
                 // Der Fuss wie gezeichnet; erst der Kasten ohne Holen, dann der genaue, denn der holt das Bild eines Banners.
@@ -2139,7 +2151,7 @@ final class Karte extends Screen {
                 if (!drin(Ebenen.kastenOhneHolen(font, o), x, y, mx, my)) {
                     continue;
                 }
-                float[] m = Ebenen.kasten(font, o, gs, blockBreite());
+                float[] m = Ebenen.kasten(font, o, gs, block);
                 if (m != null && drin(m, x, y, mx, my)) {
                     // Die version der gezeichneten Daten, nicht die der Liste; die kann schon neuer sein.
                     treffer = Tafeln.ziel(e.id(), o);
@@ -2160,10 +2172,12 @@ final class Karte extends Screen {
         List<Ebenen.Eintrag> ebenen = Ebenen.INSTANZ.sichtbar();
         for (int i = ebenen.size() - 1; i >= 0; i--) {
             List<Ebenen.Form> formen = Ebenen.INSTANZ.formen(ebenen.get(i).id());
+            boolean nah = Ebenen.imZoom(ebenen.get(i).maxBlocksPerPixel(), blockBreite());
             for (int j = formen.size() - 1; j >= 0; j--) {
                 Ebenen.Form f = formen.get(j);
                 String id = Ebenen.id(f);
-                if (id != null && f.dimension().equals(dimension) && Tafeln.trifft(f, wx, wz)) {
+                if (id != null && f.dimension().equals(dimension) && (nah || Wegpunkte.INSTANZ.angeheftet(ebenen.get(i).id(), id))
+                        && Tafeln.trifft(f, wx, wz)) {
                     return Tafeln.ziel(Ebenen.INSTANZ, ebenen.get(i).id(), id);
                 }
             }

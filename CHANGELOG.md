@@ -13,6 +13,7 @@ The release notes on GitHub and Modrinth come from here
 - **A server address with a dot at the end** now uses the same map folder as without it, on every system.
 - **Long paths in the map list are shortened in the middle.** The address stays in front, the world folder and the map name at the end. Hover a shortened path to see it in full.
 - **"Server without a name" explains itself.** Hover it in "Maps of this server" to see what it means and what helps.
+- **Layers can hide when you zoom out.** A server can now give a layer a zoom limit (plugin 0.20.0); beyond it the layer's pins, banners, areas and map text disappear from the full map and the minimap, and its name in the layer list turns grey. Pinned objects stay.
 
 ## 0.2.69
 

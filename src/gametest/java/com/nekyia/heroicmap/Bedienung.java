@@ -112,6 +112,7 @@ public final class Bedienung implements FabricClientGameTest {
 
             karte(context, maus, k);
             namenWeitDraussen(context, maus, k);
+            zoomgrenze(context, maus, k);
             verwaltung(context, maus, k);
             // Vor tod: Der lässt den Spieler am Ende fallen, und ein toter Spieler hat statt der Karte den Todesschirm.
             knoepfeGross(context, maus);
@@ -1577,6 +1578,191 @@ public final class Bedienung implements FabricClientGameTest {
                     }
                 }
                 Ebenen.INSTANZ.leeren();
+                Minimap.INSTANZ.lies(sicherung);
+                mc.gui.setScreen(null);
+            });
+            context.waitTicks(2);
+        }
+    }
+
+    /**
+     * Zoomgrenze je Ebene: eine Ebene mit {@code maxBlocksPerPixel} 1, eine Nadel in der Mitte, ein Kreis 40 Blöcke östlich und
+     * Kartenschrift 15 Blöcke nördlich des Spielers, auf dem Satz bis Stufe 11. Auf Stufe 9 (1 Einheit je Block, 0,625 Blöcke je
+     * Pixel) ist die Ebene zu sehen, auf Stufe 8 (1,25) nicht; je ein Bildschirmfoto mit und ohne sie. Die Tafel der Nadel geht
+     * auf Stufe 9 auf und mit dem Mausrad in ihr zu, sobald die Grenze überschritten ist; dann sind Nadel und Kreis kein Ziel. In der Liste steht die Ebene auf Stufe 8
+     * grau, mit Tooltip, auf Stufe 9 weiss, ohne. Angeheftet bleibt die Nadel auf Stufe 8, der Kreis nicht. Zuletzt die
+     * Kartenschrift auf der Minimap bei Zoom 2 da, bei Zoom 0,5 nicht. Siehe docs/ebenen.md, „Zoomgrenze“.
+     */
+    private static void zoomgrenze(ClientGameTestContext context, TestInput maus, int k) {
+        Path baum = fernSatz();
+        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(baum))));
+        context.waitTicks(5);
+        int breite = context.computeOnClient(mc -> mc.getWindow().getGuiScaledWidth());
+        int hoehe = context.computeOnClient(mc -> mc.getWindow().getGuiScaledHeight());
+        double mx = breite / 2.0, my = hoehe / 2.0;
+        int[] mitte = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).blockUnter(mx, my));
+        double[] spieler = context.computeOnClient(mc -> new double[] {mc.player.getX(), mc.player.getZ()});
+        Path sicherung = FabricLoader.getInstance().getGameDir().resolve("heroicmap-zoomgrenze-test.properties");
+        context.runOnClient(mc -> Minimap.INSTANZ.schreibe(sicherung));
+        List<Tafeln.Ziel> fragen = new CopyOnWriteArrayList<>();
+        Tafeln.fragen = fragen::add;
+        // Wo die Maus nichts trifft und keine Tafel aufgeht.
+        double[] frei = {mx - 100, my + 80};
+        try {
+            context.runOnClient(mc -> {
+                Ebenen.INSTANZ.empfange(JsonParser.parseString("""
+                        {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:nah","name":{"de":"Nah","en":"Near"},"visible":true,
+                          "order":1,"version":"1","maxBlocksPerPixel":1}]}""").getAsJsonObject());
+                Ebenen.INSTANZ.teil(Ebenen.Teil.lies("""
+                        {"v":1,"typ":"ebene","jetzt":1,"id":"test:nah","version":"1","teil":1,"teile":1,"objects":[
+                          {"type":"pin","id":"stadt","at":[%s,%s],"size":"small","name":"Stadt"},
+                          {"type":"circle","id":"see","center":[%s,%s],"radius":10,"fill":"#FF00FFFF"},
+                          {"type":"label","text":"Nahe","path":[[%s,%s],[%s,%s]],"size":4}]}"""
+                        .formatted(mitte[0] + 0.5, mitte[1] + 0.5, mitte[0] + 40.5, mitte[1] + 0.5,
+                                spieler[0] - 10, spieler[1] - 15, spieler[0] + 10, spieler[1] - 15)));
+            });
+            context.waitTicks(3);
+            // Die Nadel samt Schild und Name, die Kartenschrift darüber und der Kreis rechts; die Mitte des Kreises auf Stufe 9.
+            double[] alles = {mx - 30, my - 45, mx + 60, my + 20}, kreis9 = {mx + 34, my - 6, mx + 46, my + 6};
+            int magenta = 0xFFFF00FF;
+            double[] unterschied = new double[2];
+            int kreisPixel = 0;
+            int[] stufen = {9, 8};
+            for (int i = 0; i < 2; i++) {
+                // Gezoomt abseits der Nadel, dann die Nadel wieder in die Mitte: So geht keine Tafel auf.
+                zoomeAuf(context, maus, k, frei[0], frei[1], stufen[i]);
+                context.runOnClient(mc -> ((Karte) mc.gui.screen()).zeige(mitte[0], mitte[1]));
+                context.waitTicks(3);
+                Path mit = context.takeScreenshot(TestScreenshotOptions.of("zoomgrenze-stufe-" + stufen[i]).disableCounterPrefix());
+                context.runOnClient(mc -> Ebenen.INSTANZ.setze("test:nah", false));
+                context.waitTicks(2);
+                Path ohne = context.takeScreenshot(TestScreenshotOptions.of("zoomgrenze-stufe-" + stufen[i] + "-ohne").disableCounterPrefix());
+                context.runOnClient(mc -> Ebenen.INSTANZ.setze("test:nah", true));
+                context.waitTicks(2);
+                unterschied[i] = breiteDesUnterschieds(mit, ohne, k, alles);
+                if (i == 0) {
+                    kreisPixel = farbig(mit, k, kreis9, magenta);
+                }
+            }
+            if (unterschied[0] < 20 || kreisPixel < 72 * k * k || unterschied[1] != 0) {
+                throw new AssertionError("Ebene mit Grenze 1 auf Stufe 9 und 8: Unterschied mit und ohne " + Arrays.toString(unterschied)
+                        + " Einheiten breit, Kreis " + kreisPixel + " Pixel; auf 9 zu sehen, auf 8 nicht erwartet");
+            }
+
+            // Die Tafel der Nadel auf Stufe 9; die Maus in ihr, ein Schritt mit dem Mausrad hinaus schliesst sie.
+            zoomeAuf(context, maus, k, frei[0], frei[1], 9);
+            context.runOnClient(mc -> ((Karte) mc.gui.screen()).zeige(mitte[0], mitte[1]));
+            fahre(context, maus, k, mx, my - 6);
+            antworte(context, """
+                    {"v":1,"typ":"tafel","jetzt":1,"ebene":"test:nah","version":"1","id":"stadt","panel":{"blocks":[
+                      {"type":"title","text":"Stadt"}]}}""");
+            context.waitFor(mc -> ((Karte) mc.gui.screen()).tafelOffen(), 100);
+            rein(context, maus, k);
+            maus.scroll(-1);
+            context.waitTicks(3);
+            int[] stufe = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).stufe());
+            if (stufe[0] != 8 || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelOffen())) {
+                throw new AssertionError("Tafel nach einem Schritt hinaus auf Stufe " + stufe[0] + ": noch offen "
+                        + context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelOffen()));
+            }
+            // Jenseits der Grenze sind Nadel und Kreis kein Ziel: Über dem Fuss geht keine Tafel auf, auch mit gemerkter Antwort.
+            context.runOnClient(mc -> ((Karte) mc.gui.screen()).zeige(mitte[0], mitte[1]));
+            fahre(context, maus, k, mx, my - 6);
+            context.waitTicks(10);
+            Tafeln.Ziel aufNadel = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zielBei(mx, my - 6));
+            Tafeln.Ziel aufKreis = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zielBei(mx + 20, my));
+            if (aufNadel != null || aufKreis != null || context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelOffen())) {
+                throw new AssertionError("Jenseits der Grenze auf Stufe 8: Ziel an der Nadel " + aufNadel + ", am Kreis " + aufKreis
+                        + ", Tafel offen " + context.computeOnClient(mc -> ((Karte) mc.gui.screen()).tafelOffen()));
+            }
+
+            // Die Liste: auf Stufe 8 grau mit Tooltip, auf Stufe 9 weiss ohne.
+            maus.setCursorPos(frei[0] * k, frei[1] * k);
+            context.waitTick();
+            if (!context.computeOnClient(mc -> Kartenlage.ebenenOffen(Downloads.weltOrdner()))) {
+                klicke(context, maus, k, knopf(context, "heroicmap.karte.ebenen"), false);
+            }
+            int[] grau = new int[2], weiss = new int[2];
+            double[] tooltip = new double[2];
+            for (int i = 0; i < 2; i++) {
+                int s = stufen[1 - i];
+                zoomeAuf(context, maus, k, frei[0], frei[1], s);
+                double[] zeile = context.computeOnClient(mc -> ((Karte) mc.gui.screen()).zeile("test:nah"));
+                double[] name = {zeile[2] - 20, zeile[3] - 5, zeile[2] + 20, zeile[3] + 5};
+                Path ohneMaus = context.takeScreenshot(TestScreenshotOptions.of("zoomgrenze-liste-" + s).disableCounterPrefix());
+                maus.setCursorPos(zeile[2] * k, zeile[3] * k);
+                context.waitTicks(3);
+                Path mitMaus = context.takeScreenshot(TestScreenshotOptions.of("zoomgrenze-liste-" + s + "-maus").disableCounterPrefix());
+                maus.setCursorPos(frei[0] * k, frei[1] * k);
+                context.waitTicks(2);
+                grau[i] = farbig(ohneMaus, k, name, 0xFF808080);
+                weiss[i] = farbig(ohneMaus, k, name, 0xFFFFFFFF);
+                double[] umher = {Math.max(0, zeile[2] - 160), Math.max(0, zeile[3] - 30), Math.min(breite, zeile[2] + 160),
+                    Math.min(hoehe, zeile[3] + 40)};
+                tooltip[i] = breiteDesUnterschieds(mitMaus, ohneMaus, k, umher);
+            }
+            // i = 0 ist Stufe 8, jenseits der Grenze; i = 1 Stufe 9.
+            if (grau[0] < weiss[0] || weiss[1] < grau[1] || weiss[1] < 20 || tooltip[0] < 60 || tooltip[1] > 20) {
+                throw new AssertionError("Name in der Liste auf Stufe 8 und 9: grau " + Arrays.toString(grau) + ", weiss "
+                        + Arrays.toString(weiss) + " Pixel, Tooltip " + Arrays.toString(tooltip) + " Einheiten breit");
+            }
+            klicke(context, maus, k, knopf(context, "heroicmap.karte.ebenen_zu"), false);
+
+            // Angeheftet bleibt die Nadel jenseits der Grenze, der Kreis nicht.
+            zoomeAuf(context, maus, k, frei[0], frei[1], 8);
+            context.runOnClient(mc -> {
+                ((Karte) mc.gui.screen()).zeige(mitte[0], mitte[1]);
+                Wegpunkte.INSTANZ.umschaltenNadel("test:nah", "stadt");
+            });
+            context.waitTicks(3);
+            Path an = context.takeScreenshot(TestScreenshotOptions.of("zoomgrenze-angeheftet").disableCounterPrefix());
+            context.runOnClient(mc -> Ebenen.INSTANZ.setze("test:nah", false));
+            context.waitTicks(2);
+            Path aus = context.takeScreenshot(TestScreenshotOptions.of("zoomgrenze-angeheftet-ohne").disableCounterPrefix());
+            context.runOnClient(mc -> Ebenen.INSTANZ.setze("test:nah", true));
+            double nadel = breiteDesUnterschieds(an, aus, k, new double[] {mx - 15, my - 30, mx + 15, my + 16});
+            int kreis8 = farbig(an, k, new double[] {mx + 17, my - 3, mx + 23, my + 3}, magenta);
+            if (nadel < 5 || kreis8 > 2) {
+                throw new AssertionError("Angeheftet auf Stufe 8: Nadel " + nadel + " Einheiten breit, Kreis " + kreis8 + " Pixel");
+            }
+
+            // Die Kartenschrift auf der Minimap, genordet: bei Zoom 2 (0,3125 Blöcke je Pixel) da, bei 0,5 (1,25) nicht.
+            context.runOnClient(mc -> {
+                Wegpunkte.INSTANZ.umschaltenNadel("test:nah", "stadt");
+                Minimap.INSTANZ.setzeDrehen(false);
+                mc.gui.setScreen(null);
+            });
+            double[] schrift = new double[2];
+            double[] zooms = {2, 0.5};
+            for (int i = 0; i < 2; i++) {
+                double zoom = zooms[i];
+                context.runOnClient(mc -> Minimap.INSTANZ.setzeZoom(zoom));
+                context.waitFor(mc -> Minimap.INSTANZ.fertig(), 600);
+                context.waitTicks(3);
+                double[] ort = context.computeOnClient(mc -> {
+                    Minimap.Rahmen r = Minimap.INSTANZ.rahmen(mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+                    return new double[] {r.x() + r.seite() / 2.0, r.y() + r.seite() / 2.0 - 15 * zoom};
+                });
+                Path mit = context.takeScreenshot(TestScreenshotOptions.of("zoomgrenze-minimap-" + zoom).disableCounterPrefix());
+                context.runOnClient(mc -> Ebenen.INSTANZ.setze("test:nah", false));
+                context.waitTicks(2);
+                Path ohne = context.takeScreenshot(TestScreenshotOptions.of("zoomgrenze-minimap-" + zoom + "-ohne").disableCounterPrefix());
+                context.runOnClient(mc -> Ebenen.INSTANZ.setze("test:nah", true));
+                context.waitTicks(2);
+                schrift[i] = breiteDesUnterschieds(mit, ohne, k, new double[] {ort[0] - 30, ort[1] - 12, ort[0] + 30, ort[1] + 12});
+            }
+            if (schrift[0] < 10 || schrift[1] != 0) {
+                throw new AssertionError("Kartenschrift auf der Minimap bei Zoom 2 und 0,5: " + Arrays.toString(schrift)
+                        + " Einheiten breit; da und weg erwartet");
+            }
+        } finally {
+            Tafeln.fragen = Kanal::frageTafel;
+            context.runOnClient(mc -> {
+                if (Wegpunkte.INSTANZ.nadelAngeheftet("test:nah", "stadt")) {
+                    Wegpunkte.INSTANZ.umschaltenNadel("test:nah", "stadt");
+                }
+                Ebenen.INSTANZ.leeren();
+                Tafeln.INSTANZ.leeren();
                 Minimap.INSTANZ.lies(sicherung);
                 mc.gui.setScreen(null);
             });

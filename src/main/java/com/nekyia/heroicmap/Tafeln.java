@@ -49,6 +49,14 @@ final class Tafeln {
         return z.version().equals(e.version(z.ebene())) && e.sichtbar().stream().anyMatch(x -> x.id().equals(z.ebene()));
     }
 
+    /**
+     * Ebenso, und liegt das Objekt auf einer Karte mit {@code block} Einheiten je Block diesseits der Zoomgrenze seiner Ebene oder
+     * ist es in {@code w} angeheftet? Siehe docs/ebenen.md, „Zoomgrenze“.
+     */
+    static boolean gilt(Ebenen e, Wegpunkte w, Ziel z, double block) {
+        return gilt(e, z) && (e.imZoom(z.ebene(), block) || w.angeheftet(z.ebene(), z.id()) || w.nadelAngeheftet(z.ebene(), z.id()));
+    }
+
     /** Ein Objekt einer Ebene in einer {@code version}. */
     record Ziel(String ebene, String version, String id) {
     }

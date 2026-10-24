@@ -251,6 +251,9 @@ final class Wegpunkte {
     /** Der Stand der {@link Ebenenreihe}, nach dem zuletzt gebaut wurde. */
     private int gebautReihe = -1;
     private List<List<Ebenen.Form>> fuerKarte = List.of(), fuerMinimap = List.of();
+    /** Je Liste in {@link #fuerKarte} die Zoomgrenze ihrer Ebene, 0 für eigene, und was davon angeheftet ist. */
+    private double[] karteGrenzen = {};
+    private List<List<Ebenen.Form>> karteAngeheftet = List.of();
     /** Das Gewicht je eigener Form auf der Minimap, nach Identität; für den Schleier. */
     private Map<Ebenen.Form, Integer> gewichte = new IdentityHashMap<>();
     private List<Ebenen.Ort> fuerNadeln = List.of();
@@ -1801,6 +1804,25 @@ final class Wegpunkte {
     }
 
     /**
+     * Ebenso auf einer Karte mit {@code block} Einheiten je Block: von einer Ebene jenseits ihrer Zoomgrenze nur das Angeheftete.
+     * Ohne solche Ebene dieselbe Liste wie oben; sonst eine neue aus denselben Listen. Siehe docs/ebenen.md, „Zoomgrenze“.
+     */
+    List<List<Ebenen.Form>> karte(Ebenen e, double block) {
+        baue(e);
+        List<List<Ebenen.Form>> nah = null;
+        for (int i = 0; i < fuerKarte.size(); i++) {
+            boolean drin = Ebenen.imZoom(karteGrenzen[i], block);
+            if (!drin && nah == null) {
+                nah = new ArrayList<>(fuerKarte.subList(0, i));
+            }
+            if (nah != null && (drin || !karteAngeheftet.get(i).isEmpty())) {
+                nah.add(drin ? fuerKarte.get(i) : karteAngeheftet.get(i));
+            }
+        }
+        return nah == null ? fuerKarte : nah;
+    }
+
+    /**
      * Für die Minimap nur Angeheftetes: je sichtbare Ebene ihre angehefteten Flächen und Kreise,
      * zuletzt die angehefteten eigenen Regionen. Dieselben Listen wie oben.
      */
@@ -1848,21 +1870,25 @@ final class Wegpunkte {
         Map<String, Set<String>> je = new HashMap<>();
         formen.forEach(a -> je.computeIfAbsent(a.ebene(), k -> new HashSet<>()).add(a.id()));
         // Je sichtbare Ebene vom Server ihre Liste, angeheftete Formen und Nadeln, von unten nach oben.
-        Map<String, List<Ebenen.Form>> karteServer = new LinkedHashMap<>(), minimapServer = new LinkedHashMap<>();
+        Map<String, List<Ebenen.Form>> karteServer = new LinkedHashMap<>(), minimapServer = new LinkedHashMap<>(), karteAn = new HashMap<>();
+        Map<String, Double> grenzen = new HashMap<>();
         Map<String, List<Ebenen.Ort>> orteServer = new LinkedHashMap<>();
         for (Ebenen.Eintrag eintrag : e.sichtbar()) {
             List<Ebenen.Form> alle = e.formen(eintrag.id());
             Set<String> ids = je.getOrDefault(eintrag.id(), Set.of());
-            List<Ebenen.Form> breit = null, an = new ArrayList<>();
+            List<Ebenen.Form> breit = null, an = new ArrayList<>(), anBreit = new ArrayList<>();
             for (int i = 0; i < alle.size() && !ids.isEmpty(); i++) {
                 Ebenen.Form f = alle.get(i);
                 if (ids.contains(Ebenen.id(f))) {
                     breit = breit == null ? new ArrayList<>(alle) : breit;
                     breit.set(i, breiter(f));
                     an.add(f);
+                    anBreit.add(breit.get(i));
                 }
             }
             karteServer.put(eintrag.id(), breit == null ? alle : List.copyOf(breit));
+            karteAn.put(eintrag.id(), List.copyOf(anBreit));
+            grenzen.put(eintrag.id(), eintrag.maxBlocksPerPixel());
             if (!an.isEmpty()) {
                 minimapServer.put(eintrag.id(), List.copyOf(an));
             }
@@ -1916,13 +1942,16 @@ final class Wegpunkte {
             karteServer.keySet().forEach(id -> schichten.add(Ebenenreihe.Schicht.vomServer(id)));
             schichten.add(Ebenenreihe.Schicht.eigene(BASE));
         }
-        List<List<Ebenen.Form>> karte = new ArrayList<>(), minimap = new ArrayList<>();
+        List<List<Ebenen.Form>> karte = new ArrayList<>(), minimap = new ArrayList<>(), karteNurAn = new ArrayList<>();
+        List<Double> karteGrenze = new ArrayList<>();
         List<Ebenen.Ort> orte = new ArrayList<>();
         eigeneAufMinimap = Collections.newSetFromMap(new IdentityHashMap<>());
         for (Ebenenreihe.Schicht s : schichten) {
             if (s.server() != null) {
                 if (karteServer.containsKey(s.server())) {
                     karte.add(karteServer.get(s.server()));
+                    karteNurAn.add(karteAn.get(s.server()));
+                    karteGrenze.add(grenzen.get(s.server()));
                     orte.addAll(orteServer.get(s.server()));
                 }
                 if (minimapServer.containsKey(s.server())) {
@@ -1932,6 +1961,8 @@ final class Wegpunkte {
             }
             for (List<Ebenen.Form> l : karteEigen.getOrDefault(s.eigen(), new TreeMap<>()).values()) {
                 karte.add(List.copyOf(l));
+                karteNurAn.add(List.of());
+                karteGrenze.add(0.0);
             }
             for (List<Ebenen.Form> l : minimapEigen.getOrDefault(s.eigen(), new TreeMap<>()).values()) {
                 minimap.add(List.copyOf(l));
@@ -1943,6 +1974,8 @@ final class Wegpunkte {
         angeheftetOrte.addAll(orte);
         gewichte = gewichtJe;
         fuerKarte = List.copyOf(karte);
+        karteAngeheftet = List.copyOf(karteNurAn);
+        karteGrenzen = karteGrenze.stream().mapToDouble(Double::doubleValue).toArray();
         fuerMinimap = List.copyOf(minimap);
     }
 

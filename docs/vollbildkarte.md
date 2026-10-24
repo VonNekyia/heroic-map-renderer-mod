@@ -127,7 +127,9 @@ auf den Namen heftet die ganze Ebene an (mod#103).
   dieselbe Wahl. Rechts der Knopf „An“ oder „Aus“, 30 Einheiten breit
   (`Karte.AN_AUS`), davor „▲“ und „▼“, links davor der Name in der Sprache des Spiels als Überschrift, weiss
   mit Schatten, rechtsbündig. Ein langer Name ragt nach links über die
-  Karte, statt abgeschnitten zu werden. Die Liste
+  Karte, statt abgeschnitten zu werden. Jenseits der Zoomgrenze einer
+  Ebene steht ihr Name grau, mit dem Tooltip „Erst beim Hineinzoomen zu
+  sehen“, siehe [Ebenen](ebenen.md), „Zoomgrenze“. Die Liste
   reicht bis über „Optionen …“; passen nicht alle, führt der letzte Knopf
   „Weitere …“ zum Untermenü. Kommen andere Ebenen, während die Karte offen
   ist, baut sie die Liste neu (`Karte.tick`).
