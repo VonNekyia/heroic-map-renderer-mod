@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -130,10 +131,41 @@ class EbenenTest {
                 + "]").getAsJsonArray();
         List<Ebenen.Ort> n = Ebenen.nadeln("b:staedte", "v1", objekte);
         assertEquals(3, n.size());
-        assertEquals(new Ebenen.Nadel(120.5, -340.5, Ebenen.UEBERWELT, null, 1, Ebenen.FARBE, "b:staedte", "v1", null, null, "a"), n.get(0));
+        assertEquals(new Ebenen.Nadel(120.5, -340.5, Ebenen.UEBERWELT, null, 1, Ebenen.FARBE, "b:staedte", "v1", null, null, "a", null), n.get(0));
         // Das Alpha wirkt am Schild nicht; unbekannte Felder übergeht der Mod.
-        assertEquals(new Ebenen.Nadel(1, 2, "minecraft:the_nether", null, 0, 0xFF40E53F, "b:staedte", "v1", "images/burg_16.png", null, "c"), n.get(1));
-        assertEquals(new Ebenen.Nadel(3, 4, Ebenen.UEBERWELT, null, 2, Ebenen.FARBE, "b:staedte", "v1", null, null, "e"), n.get(2));
+        assertEquals(new Ebenen.Nadel(1, 2, "minecraft:the_nether", null, 0, 0xFF40E53F, "b:staedte", "v1", "images/burg_16.png", null, "c", null), n.get(1));
+        assertEquals(new Ebenen.Nadel(3, 4, Ebenen.UEBERWELT, null, 2, Ebenen.FARBE, "b:staedte", "v1", null, null, "e", null), n.get(2));
+    }
+
+    @Test
+    void kopfNurMit64Hex() {
+        // Jeder andere Wert als 64 Zeichen 0–9 a–f gilt wie ohne head. Siehe docs/ebenen.md, „Köpfe“.
+        String hex = "0123456789abcdef".repeat(4);
+        JsonArray objekte = JsonParser.parseString("["
+                + "{\"type\":\"pin\",\"at\":[1,2],\"head\":\"" + hex + "\"},"
+                + "{\"type\":\"pin\",\"at\":[1,2],\"head\":\"" + hex.toUpperCase(Locale.ROOT) + "\"},"
+                + "{\"type\":\"pin\",\"at\":[1,2],\"head\":\"" + hex.substring(1) + "\"},"
+                + "{\"type\":\"pin\",\"at\":[1,2],\"head\":\"" + hex + "0\"},"
+                + "{\"type\":\"pin\",\"at\":[1,2],\"head\":12},"
+                + "{\"type\":\"pin\",\"at\":[1,2],\"head\":null},"
+                + "{\"type\":\"pin\",\"at\":[1,2],\"head\":{\"x\":1}}"
+                + "]").getAsJsonArray();
+        List<Ebenen.Ort> n = Ebenen.nadeln("b:npc", "v1", objekte);
+        assertEquals(7, n.size());
+        assertEquals(hex, ((Ebenen.Nadel) n.get(0)).kopf());
+        for (int i = 1; i < n.size(); i++) {
+            assertNull(((Ebenen.Nadel) n.get(i)).kopf(), "Nadel " + i);
+        }
+    }
+
+    @Test
+    void kastenDesKopfs() {
+        // Das Gesicht samt Rand um den Fuss, 5 Einheiten zu jeder Seite; der Name darunter, 5 tiefer als an der Nadel.
+        assertArrayEquals(new float[] {-5, -5, 5, 5}, Ebenen.kopfKasten(0), 0);
+        assertArrayEquals(new float[] {-15, -5, 15, Ebenen.NAME_UNTEN + 5}, Ebenen.kopfKasten(30), 0);
+        assertArrayEquals(new float[] {-5, -5, 5, Ebenen.NAME_UNTEN + 5}, Ebenen.kopfKasten(4), 0);
+        // Auch der längste Name reicht nicht weiter unter den Fuss, als die Vollbildkarte vorab prüft.
+        assertTrue(Ebenen.NAME_UNTEN + Ebenen.KOPF_HALB <= Ebenen.UNTEN_HOECHSTENS);
     }
 
     @Test

@@ -1025,9 +1025,9 @@ final class Karte extends Screen {
                     float px = aufPixel(x, k), py = aufPixel(y, k);
                     Ebenen.zeichne(g, font, px, py, n, namen, k, 1);
                     if (Wegpunkte.INSTANZ.angeheftet(Ebenen.INSTANZ, n)) {
-                        // Zwischen Fuss und Name, der erst NAME_OBEN darunter beginnt.
+                        // Zwischen Fuss und Name, der erst NAME_OBEN darunter beginnt; unter einem Kopf zwischen Gesicht und Name.
                         g.pose().pushMatrix();
-                        g.pose().translate(px, py);
+                        g.pose().translate(px, py + Ebenen.nameVersatz(n));
                         g.fill(-PUNKT, 0, PUNKT, (int) Ebenen.NAME_OBEN, bunt);
                         g.pose().popMatrix();
                     }

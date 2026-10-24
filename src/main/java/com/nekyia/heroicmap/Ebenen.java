@@ -94,6 +94,8 @@ public final class Ebenen {
             BOGEN_HALB = 0.55 * NAME_GROESSE;
     /** So weit reicht der gerade Name unter den Fuss: Oberkante, ein Geviert der Schrift, die Kontur. */
     static final int NAME_UNTEN = (int) Math.ceil(NAME_OBEN + NAME_GROESSE + NAME_KONTUR);
+    /** Das halbe Gesicht eines Kopfs samt Rand, in Einheiten des GUI: 8 Pixel, je einer eine Einheit, und eine Einheit Rand. */
+    static final int KOPF_HALB = 5;
     /** So weit reicht kein Name unter den Fuss, auch keiner im Bogen; zum Vorfiltern vor dem Kasten. */
     static final int UNTEN_HOECHSTENS = 32;
     /**
@@ -147,10 +149,11 @@ public final class Ebenen {
 
     /**
      * Eine Nadel mit dem Fuss bei (x, z); {@code groesse} 0 ist {@code large}, 1 {@code medium}, 2
-     * {@code small}. Dazu ihre Ebene und deren {@code version} und die Felder ihrer Symbole oder null.
+     * {@code small}. Dazu ihre Ebene und deren {@code version}, die Felder ihrer Symbole oder null und der Name
+     * ihres Kopfs oder null; mit Kopf zeigt sie statt des Schilds das Gesicht, siehe docs/ebenen.md, „Köpfe“.
      */
     record Nadel(double x, double z, String dimension, String name, int groesse, int farbe, String ebene, String version,
-            String symbolGross, String symbolMittel, String id) implements Ort {
+            String symbolGross, String symbolMittel, String id, String kopf) implements Ort {
     }
 
     /**
@@ -551,9 +554,12 @@ public final class Ebenen {
             default -> 1;
         };
         String dimension = o.has("dimension") ? text(o, "dimension", MAX_KENNUNG) : UEBERWELT;
+        // Jeder andere Wert als 64 Zeichen 0–9 a–f gilt wie ohne head.
+        String kopf = o.has("head") && o.get("head").isJsonPrimitive() ? o.get("head").getAsString() : null;
         return dimension == null ? null : new Nadel(at.get(0).getAsDouble(), at.get(1).getAsDouble(), dimension,
                 text(o, "name", MAX_TEXT), groesse, o.has("color") ? farbe(o.get("color").getAsString()) : FARBE, ebene, version,
-                feld(symbol, "large"), feld(symbol, "medium"), text(o, "id", MAX_TEXT));
+                feld(symbol, "large"), feld(symbol, "medium"), text(o, "id", MAX_TEXT),
+                kopf != null && Symbole.KOPF.matcher(kopf).matches() ? kopf : null);
     }
 
     /**
@@ -957,8 +963,17 @@ public final class Ebenen {
         pose.pushMatrix();
         pose.translate(x, y);
         double hoehe = 0;
+        float unten = 0;
         switch (o) {
-            case Nadel n -> nadel(g, n);
+            case Nadel n -> {
+                Identifier kopf = kopf(n);
+                if (kopf != null) {
+                    kopf(g, kopf);
+                    unten = KOPF_HALB;
+                } else {
+                    nadel(g, n);
+                }
+            }
             case Banner b -> {
                 // Mit Entwurf das Sprite um seinen Fuss; solange es fehlt, das Bild, wie das Format sagt.
                 Symbole.Sprite sp = sprite(b);
@@ -978,6 +993,8 @@ public final class Ebenen {
         if (o.name() != null && namen[0] >= kosten) {
             namen[0] -= kosten;
             if (z == null) {
+                // Unter einem Kopf beginnt der Name erst unter dem Gesicht.
+                pose.translate(0, unten);
                 name(g, font, o.name());
             } else {
                 bogenName(g, font, z, hoehe);
@@ -996,7 +1013,8 @@ public final class Ebenen {
      */
     static float[] kasten(Font font, Ort o, int gs) {
         return switch (o) {
-            case Nadel n -> kasten(SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe(), o.name() == null ? 0 : nameBreite(font, o.name()));
+            case Nadel n -> kopf(n) != null ? kopfKasten(o.name() == null ? 0 : nameBreite(font, o.name()))
+                    : kasten(SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe(), o.name() == null ? 0 : nameBreite(font, o.name()));
             case Banner b -> {
                 Symbole.Sprite sp = sprite(b);
                 if (sp != null) {
@@ -1072,7 +1090,12 @@ public final class Ebenen {
      */
     static float[] kastenOhneHolen(Font font, Ort o) {
         return switch (o) {
-            case Nadel n -> kasten(SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe(), o.name() == null ? 0 : nameBreite(font, o.name()));
+            case Nadel n -> {
+                float name = o.name() == null ? 0 : nameBreite(font, o.name());
+                float[] schild = kasten(SCHILDE[n.groesse()].breite(), SCHILDE[n.groesse()].hoehe(), name);
+                // Mit Kopf: Gesicht oder Schild, je nachdem, ob er schon da ist; beide liegen darin.
+                yield n.kopf() == null ? schild : vereint(schild, kopfKasten(name));
+            }
             case Banner b -> grob(breiten(font, o), b.design() != null);
         };
     }
@@ -1267,6 +1290,33 @@ public final class Ebenen {
                 pose.popMatrix();
             }
         }
+    }
+
+    /** Der Kopf der Nadel, wenn sie einen nennt und er geladen ist; sonst null, dann zeichnet die Ansicht das Schild. */
+    private static Identifier kopf(Nadel n) {
+        return n.kopf() == null ? null : Symbole.INSTANZ.kopf(n.kopf());
+    }
+
+    /** Wie weit der Name eines Orts unter seinem Fuss beginnt, über {@link #NAME_OBEN} hinaus: unter einem Kopf das halbe Gesicht samt Rand. */
+    static float nameVersatz(Ort o) {
+        return o instanceof Nadel n && kopf(n) != null ? KOPF_HALB : 0;
+    }
+
+    /**
+     * Das Gesicht mit der Mitte auf dem Fuss, ein Pixel je Einheit, so auf ganzen Pixeln des Schirms, mit schwarzem Rand von einer
+     * Einheit wie bei den Mitspielern. Siehe docs/ebenen.md, „Köpfe“.
+     */
+    private static void kopf(GuiGraphicsExtractor g, Identifier kopf) {
+        int s = Symbole.KOPF_SEITE;
+        g.fill(-KOPF_HALB, -KOPF_HALB, KOPF_HALB, KOPF_HALB, 0xFF000000);
+        g.blit(RenderPipelines.GUI_TEXTURED, kopf, -s / 2, -s / 2, 0, 0, s, s, s, s);
+    }
+
+    /** Der Kasten eines Kopfs wie gezeichnet, in Einheiten des GUI: das Gesicht samt Rand um den Fuss, darunter der Name. */
+    static float[] kopfKasten(float name) {
+        float[] k = kasten(-KOPF_HALB, 2 * KOPF_HALB, KOPF_HALB, name);
+        k[3] += KOPF_HALB;
+        return k;
     }
 
     /** Feld, Symbol und Rahmen der Nadel in ihrer Grösse, der Fuss im Ursprung. */
