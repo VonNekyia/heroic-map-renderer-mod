@@ -1,5 +1,6 @@
 package com.nekyia.heroicmap;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import java.util.ArrayList;
 import java.util.List;
 import java.time.ZoneId;
@@ -15,6 +16,7 @@ import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.input.InputWithModifiers;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
@@ -33,7 +35,14 @@ final class Anzeige extends Screen {
     private static final int UEBERSCHRIFT = 0xFFFFFFA0;
 
     private final Screen zurueck;
-    private final MinimapKlick klick = new MinimapKlick();
+    /** Der Wähler der Rahmen über dem Untermenü, wie im Menü. Siehe docs/rahmen.md, „Wähler“. */
+    private final Waehler waehler = new Waehler();
+    private final MinimapKlick klick = new MinimapKlick(waehler);
+
+    /** Für die Gametests. */
+    Waehler waehler() {
+        return waehler;
+    }
     /** Höhe einer Überschrift über ihrer Gruppe. */
     private static final int GRUPPE = 12;
     /** Eine Überschrift und wo sie steht. */
@@ -250,6 +259,12 @@ final class Anzeige extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mausX, int mausY, float delta) {
+        // Ist der Wähler offen, gilt die Maus nur ihm: das Menü darunter ohne Hover und Tooltip.
+        int echtX = mausX, echtY = mausY;
+        if (waehler.offen()) {
+            mausX = -1;
+            mausY = -1;
+        }
         super.extractRenderState(g, mausX, mausY, delta);
         int[] s = Einstellungen.spalte(width, height);
         g.centeredText(font, title, s[0] + s[1] / 2, oben() - 14, TEXT);
@@ -258,16 +273,35 @@ final class Anzeige extends Screen {
         }
         schleierBild(g, region[0], region[1], Minimap.INSTANZ.schleier());
         klick.zeichne(g, font, mausX, mausY, true);
+        if (waehler.offen()) {
+            waehler.zeichne(g, font, echtX, echtY, width, height);
+        }
+    }
+
+    @Override
+    public boolean keyPressed(KeyEvent ereignis) {
+        // Offen nimmt der Wähler jede Taste; Esc schliesst nur ihn, nicht das Menü.
+        if (waehler.offen()) {
+            if (ereignis.key() == InputConstants.KEY_ESCAPE) {
+                waehler.schliesse();
+            }
+            return true;
+        }
+        return super.keyPressed(ereignis);
     }
 
     @Override
     public boolean mouseClicked(MouseButtonEvent e, boolean doppelt) {
+        if (waehler.offen()) {
+            waehler.klick(e.x(), e.y(), width, height);
+            return true;
+        }
         return super.mouseClicked(e, doppelt) || Minimap.INSTANZ.sichtbar() && klick.druecke(e);
     }
 
     @Override
     public boolean mouseReleased(MouseButtonEvent e) {
-        return klick.lasse(e) || super.mouseReleased(e);
+        return klick.lasse(e) || waehler.offen() || super.mouseReleased(e);
     }
 
     @Override

@@ -13,6 +13,11 @@ The release notes on GitHub and Modrinth come from here
 - **Teleporting from the map uses the plain `tp` command.** The server no longer needs to allow `execute`, only `tp`. Without a known height you first go up into the air and land on the ground as soon as your game has the destination; this costs no hearts any more. If the server doesn't send the destination within 5 seconds, or there's no place to stand, you go back where you were. If the server doesn't allow you `/tp`, the map says so and sends nothing.
 - **A progress bar under the minimap.** While the map downloads or syncs, a thin bar with the percentage sits under the minimap, so you see it without opening the full map. The coordinates move one line down meanwhile. If a sync finds nothing missing, there's no bar.
 
+- **Choose your frame from a preview.** Click a mark N, E, S or W on the minimap in the menu to open the frame chooser: a small minimap for each frame, with a colour swatch per variant below it. Click a swatch to recolour the preview, click the preview to use it; Esc or a click beside it keeps your frame. Clicking a mark no longer steps to the next frame.
+- **Frames come in families with colours.** "Shield" (grey, gold, paper) and "Rose" (silver, gold, parchment) replace grey, wood, paper, compass, clock and cartographer; your choice moves over by itself. Every biome of the "biome" frame has its own colours too, and you can set each one in the chooser.
+- **New frame "Letters"** with upright letters N, E, S, W, inside or outside the minimap, in four colours.
+- **Make a mark see-through with the middle mouse button.** The right click now opens the frame chooser.
+
 ## 0.2.68
 
 - **The full map zooms toward the mouse.** The spot under the mouse pointer stays under it while you zoom with the mouse wheel, in and out, like on the web map. At the closest and farthest zoom the map doesn't move.

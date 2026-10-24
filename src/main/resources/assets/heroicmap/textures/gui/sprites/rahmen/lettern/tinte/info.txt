@@ -1,0 +1,3 @@
+schatten=ja
+drehung=aufrecht
+lage=innen

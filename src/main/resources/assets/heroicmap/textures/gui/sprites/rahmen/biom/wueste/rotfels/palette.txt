@@ -1,0 +1,4 @@
+// heroicmap Rahmen 'biom/wueste', Variante 'rotfels' (Rotfels): Linie aussen -> innen, eine Zeile je Band.
+// Zwei Werte = Licht (oben/links) Schatten (unten/rechts).
+#1C1615
+#DFA082
