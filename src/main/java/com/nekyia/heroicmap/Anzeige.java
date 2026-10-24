@@ -2,13 +2,19 @@ package com.nekyia.heroicmap;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.time.ZoneId;
 import java.util.Locale;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.input.InputWithModifiers;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
@@ -35,6 +41,14 @@ final class Anzeige extends Screen {
     }
 
     private final List<Gruppe> gruppen = new ArrayList<>();
+    /** Breite des Bilds vor einem Regler, Höhe seiner Zeile, in Einheiten des GUI. */
+    static final int BILD = 56, ZEILE = 30;
+    /** So hoch ist das Untermenü mit offener Technik, von der ersten Überschrift bis unter „Fertig“. */
+    private static final int HOEHE = 2 * (GRUPPE + ZEILE) + 24 + 3 * 24 + 4 + 20;
+    /** Der dunkle, halb durchsichtige Grund hinter den Bildern. */
+    private static final int GRUND = 0x80000000;
+    /** Wo die Region mit dem Schleier steht, links oben. */
+    private int[] region;
 
     Anzeige(Screen zurueck) {
         super(Component.translatable("heroicmap.anzeige.titel"));
@@ -46,22 +60,25 @@ final class Anzeige extends Screen {
         Minimap m = Minimap.INSTANZ;
         int[] s = Einstellungen.spalte(width, height);
         int x = s[0], breite = s[1], y = oben();
-        // Je zwei Schalter teilen sich eine Zeile, so passt das Untermenü auch bei 240 Einheiten Höhe.
         int halb = (breite - 4) / 2;
-        // In Gruppen mit Überschrift; was die Minimap selbst angeht, stellt das Hauptmenü an ihr ein (mod#173, mod#175).
-        // „Technik“ ist ein Knopf zum Auf- und Zuklappen, gemerkt in heroicmap.properties. Siehe docs/minimap.md, „Bedienung“.
+        // In Gruppen mit Überschrift; was die Minimap selbst angeht, stellt das Hauptmenü an ihr ein (mod#173, mod#175). Todespunkt
+        // und Region stehen als Bild da, ihre Regler daneben. „Technik“ ist ein Knopf zum Auf- und Zuklappen, gemerkt in
+        // heroicmap.properties. Siehe docs/minimap.md, „Bedienung“.
         gruppen.clear();
         gruppen.add(new Gruppe(Component.translatable("heroicmap.anzeige.gruppe.wegpunkte"), y));
         y += GRUPPE;
-        addRenderableWidget(new TodRegler(x, y, breite));
-        y += 24;
+        addRenderableWidget(new TodBild(x, y));
+        addRenderableWidget(new TodRegler(x + BILD + 4, y + 4, breite - BILD - 4));
+        y += ZEILE;
         gruppen.add(new Gruppe(Component.translatable("heroicmap.anzeige.gruppe.welt"), y));
         y += GRUPPE;
-        addRenderableWidget(CycleButton.onOffBuilder(m.effekte())
-                .withTooltip(an -> Tooltip.create(Component.translatable("heroicmap.menue.effekte.beschreibung")))
-                .create(x, y, halb, 20, Component.translatable("heroicmap.menue.effekte"), (b, an) -> m.setzeEffekte(an)));
-        addRenderableWidget(new SchleierRegler(x + breite - halb, y, halb));
-        y += 24;
+        region = new int[] {x, y};
+        Einstellungen.Symbol effekte = new Einstellungen.Symbol(Einstellungen.Symbol.EFFEKTE);
+        effekte.setPosition(x + BILD + 4, y + 4);
+        addRenderableWidget(effekte);
+        int regler = BILD + 8 + Einstellungen.SYMBOL;
+        addRenderableWidget(new SchleierRegler(x + regler, y + 4, breite - regler));
+        y += ZEILE;
         addRenderableWidget(Button.builder(Component.translatable(m.technikOffen() ? "heroicmap.anzeige.gruppe.technik.auf"
                 : "heroicmap.anzeige.gruppe.technik.zu"), b -> {
             m.setzeTechnikOffen(!m.technikOffen());
@@ -139,9 +156,91 @@ final class Anzeige extends Screen {
         }
     }
 
-    /** Oben so weit, dass alles mittig steht, aber Platz für den Titel bleibt; bei 240 Einheiten Höhe reicht „Fertig“ bis 238. */
+    /**
+     * Oben so weit, dass alles mittig steht, aber Platz für den Titel bleibt, und auch mit offener Technik alles auf den Schirm
+     * passt; bei 240 Einheiten Höhe reicht „Fertig“ dann bis 234. Die Technik verschiebt das Menü nicht.
+     */
     private int oben() {
-        return Math.max(30, height / 2 - 74);
+        return Math.max(30, Math.min(height / 2 - 74, height - HOEHE - 6));
+    }
+
+    /**
+     * Der Todespunkt wie auf der Karte, darunter die Zeit im gewählten Stil, mit der Zeit von jetzt als Beispiel; bei keiner grau
+     * „Zeit aus“. Ein Klick wechselt reihum Datum und Uhrzeit, Datum, Uhrzeit, keine. Siehe docs/wegpunkte.md, „Todespunkt“.
+     */
+    static final class TodBild extends AbstractButton {
+
+        TodBild(int x, int y) {
+            super(x, y, BILD, ZEILE - 2, Component.translatable("heroicmap.menue.tod_zeit"));
+            tooltip();
+        }
+
+        private void tooltip() {
+            Minimap.TodZeit stil = Minimap.INSTANZ.todZeit();
+            setTooltip(Tooltip.create(Component.translatable("heroicmap.menue.symbol.klick", getMessage(), name(stil), name(stil.naechste()))));
+        }
+
+        private static Component name(Minimap.TodZeit stil) {
+            return Component.translatable("heroicmap.menue.tod_zeit." + stil.name().toLowerCase(Locale.ROOT));
+        }
+
+        @Override
+        public void onPress(InputWithModifiers e) {
+            Minimap.INSTANZ.setzeTodZeit(Minimap.INSTANZ.todZeit().naechste());
+            tooltip();
+        }
+
+        @Override
+        protected void extractContents(GuiGraphicsExtractor g, int mausX, int mausY, float delta) {
+            int x = getX(), y = getY();
+            g.fill(x, y, x + width, y + height, isHoveredOrFocused() ? 0xA0303030 : GRUND);
+            float mx = x + width / 2f, my = y + 9, groesse = 14;
+            Minimap.todespunkt(g, mx, my, groesse);
+            // Unter der unteren Spitze der Raute, wie auf der Karte.
+            float fuss = (float) (6 * Math.sqrt(2) * groesse / 16);
+            Minimap.TodZeit stil = Minimap.INSTANZ.todZeit();
+            Font font = Minecraft.getInstance().font;
+            if (stil == Minimap.TodZeit.AUS) {
+                g.centeredText(font, Component.translatable("heroicmap.menue.tod_zeit_aus"), (int) mx, (int) (my + fuss + 2), 0xFF8A8A8A);
+                return;
+            }
+            g.pose().pushMatrix();
+            g.pose().translate(mx, my + fuss);
+            Ebenen.name(g, font, Wegpunkte.todZeit(System.currentTimeMillis(), ZoneId.systemDefault(),
+                    Component.translatable(stil.schluessel).getString(), stil.fest));
+            g.pose().popMatrix();
+        }
+
+        @Override
+        protected void updateWidgetNarration(NarrationElementOutput ausgabe) {
+            defaultButtonNarrationText(ausgabe);
+        }
+    }
+
+    /**
+     * Eine Region mit Schleier, wie in der Welt, als Bild in (x, y, {@link #BILD} × {@link #ZEILE} − 2): ein Stück Boden schräg
+     * von oben in der Farbe einer eigenen Region, an seinen Kanten der Schleier, {@code hoehe} Blöcke als Einheiten hoch, unten so
+     * deckend wie in der Welt ({@link Schleier#deckung}), oben durchsichtig. Siehe docs/wegpunkte.md, „Schleier“.
+     */
+    static void schleierBild(GuiGraphicsExtractor g, int x, int y, int hoehe) {
+        g.fill(x, y, x + BILD, y + ZEILE - 2, GRUND);
+        int farbe = Wegpunkte.FARBEN[1] & 0xFFFFFF, unten = Math.round(Schleier.deckung(hoehe) * 255) << 24 | farbe;
+        // Hinten von x0 + tiefe bis x1 + tiefe auf yb, vorn von x0 bis x1 auf yf; je Zeile eine Einheit nach links.
+        int tiefe = 8, x0 = x + 6, x1 = x + BILD - 6 - tiefe, yf = y + ZEILE - 5, yb = yf - tiefe;
+        // Hinten und die Seiten zuerst, dann der Boden, vorn zuletzt.
+        g.fillGradient(x0 + tiefe, yb - hoehe, x1 + tiefe, yb, farbe, unten);
+        for (int c = 0; c < tiefe; c++) {
+            g.fillGradient(x0 + c, yf - c - hoehe, x0 + c + 1, yf - c, farbe, unten);
+            g.fillGradient(x1 + c, yf - c - hoehe, x1 + c + 1, yf - c, farbe, unten);
+        }
+        for (int r = 0; r <= tiefe; r++) {
+            g.fill(x0 + tiefe - r, yb + r, x1 + tiefe - r, yb + r + 1, 0x50000000 | farbe);
+            g.fill(x0 + tiefe - r, yb + r, x0 + tiefe - r + 1, yb + r + 1, 0xFF000000 | farbe);
+            g.fill(x1 + tiefe - r - 1, yb + r, x1 + tiefe - r, yb + r + 1, 0xFF000000 | farbe);
+        }
+        g.fill(x0 + tiefe, yb, x1 + tiefe, yb + 1, 0xFF000000 | farbe);
+        g.fill(x0, yf, x1, yf + 1, 0xFF000000 | farbe);
+        g.fillGradient(x0, yf - hoehe, x1, yf, farbe, unten);
     }
 
     /** Ohne Unschärfe und Abdunkeln, damit die Minimap im HUD zu sehen ist. */
@@ -157,6 +256,7 @@ final class Anzeige extends Screen {
         for (Gruppe gruppe : gruppen) {
             g.text(font, gruppe.text(), s[0], gruppe.y() + 1, UEBERSCHRIFT, true);
         }
+        schleierBild(g, region[0], region[1], Minimap.INSTANZ.schleier());
         klick.zeichne(g, font, mausX, mausY, true);
     }
 
