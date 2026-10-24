@@ -1689,7 +1689,8 @@ public final class Bilder implements FabricClientGameTest {
     /**
      * Pflanzen aus Paketen: das Feld bei 4 px und 1 px, Zoom 4, ohne und mit dem Testpaket. Mit dem Paket liegen Karotten und
      * Gras bei 4 px wie ohne, denn ihre erste Fläche ist dieselbe, und reifer Weizen und Kartoffeln decken das Ackerland,
-     * statt wegzufallen. Erst alle Bilder, dann die Prüfung. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
+     * statt wegzufallen; verglichen mit einem Bild derselben Stelle ohne sie, denn Ackerland in verschiedenen Reihen ist
+     * verschieden hell. Erst alle Bilder, dann die Prüfung. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
      */
     private static void pflanzenAusPaketen(ClientGameTestContext context, TestServerContext server) {
         for (String befehl : FELD) {
@@ -1707,6 +1708,18 @@ public final class Bilder implements FabricClientGameTest {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+        // Zuerst das Ackerland ohne reifen Weizen und Kartoffeln, an derselben Stelle: Damit vergleicht die Prüfung, ob sie decken.
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeScale(4);
+            Minimap.INSTANZ.setzeZoom(4);
+        });
+        server.runCommand("fill -56 -60 40 -53 -60 40 air");
+        server.runCommand("fill -56 -60 42 -53 -60 42 air");
+        context.waitTicks(10);
+        BufferedImage boden = minimapBei(context, server, -56.5, 43.5, "pakete-4px-boden");
+        server.runCommand("fill -56 -60 40 -53 -60 40 wheat[age=7]");
+        server.runCommand("fill -56 -60 42 -53 -60 42 potatoes[age=7]");
+        context.waitTicks(10);
         List<BufferedImage> bilder = new ArrayList<>();
         try {
             for (boolean mitPaket : new boolean[] {false, true}) {
@@ -1741,11 +1754,11 @@ public final class Bilder implements FabricClientGameTest {
                 fehler.add("(" + b[0] + ", " + b[1] + ") zu " + Math.round(100 * anders) + " % anders als ohne Paket");
             }
         }
-        // Deckt das Ackerland: reifer Weizen (z 40) und Kartoffeln (z 42), verglichen mit dem leeren Ackerland in z 41.
+        // Deckt das Ackerland: reifer Weizen (z 40) und Kartoffeln (z 42), verglichen mit derselben Stelle ohne sie.
         for (int[] b : new int[][] {{-56, 40}, {-55, 40}, {-54, 40}, {-53, 40}, {-56, 42}, {-55, 42}, {-54, 42}, {-53, 42}}) {
-            double boden = 1 - anteilAnders(mit, b[0], b[1], mit, b[0], 41, block);
-            if (boden > 0.5) {
-                fehler.add("(" + b[0] + ", " + b[1] + ") zu " + Math.round(100 * boden) + " % wie leeres Ackerland");
+            double wieBoden = 1 - anteilAnders(mit, b[0], b[1], boden, b[0], b[1], block);
+            if (wieBoden > 0.5) {
+                fehler.add("(" + b[0] + ", " + b[1] + ") zu " + Math.round(100 * wieBoden) + " % wie das Ackerland ohne Pflanze");
             }
         }
         if (!fehler.isEmpty()) {
