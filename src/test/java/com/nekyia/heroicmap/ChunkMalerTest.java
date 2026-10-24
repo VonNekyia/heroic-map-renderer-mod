@@ -2,7 +2,9 @@ package com.nekyia.heroicmap;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.CardinalLighting;
@@ -17,6 +19,25 @@ class ChunkMalerTest {
 
     private static float[] rechteck(float x0, float z0, float x1, float z1) {
         return new float[] {x0, z0, x0, z1, x1, z1, x1, z0};
+    }
+
+    /** Bei Pflanzen zählt eine Fläche erst als oben, wenn sie eher liegt als steht. Siehe docs/minimap.md, „Pflanzen aus Paketen“. */
+    @Test
+    void liegendGegenGekippt() {
+        double w = Math.toRadians(22.5);
+        // Eine Oberseite liegt; die Ecken gegen den Uhrzeigersinn von oben gesehen, wie im Spiel: nach Osten, dann nach Nordosten.
+        float oben = ChunkMaler.obenAnteil(1, 0, 0, 1, 0, -1);
+        assertEquals(1, oben, 1e-6);
+        // Eine senkrechte Fläche, um 22,5° gekippt wie in manchen Paketen: Ihre Normale steht 67,5° von oben, n_y = 0,38.
+        float gekippt = ChunkMaler.obenAnteil(1, 0, 0, 0, (float) Math.cos(w), (float) -Math.sin(w));
+        assertEquals(0.3827, gekippt, 1e-3);
+        assertTrue(ChunkMaler.liegt(oben));
+        assertFalse(ChunkMaler.liegt(gekippt));
+        // Genau 45° liegt noch, 46° nicht mehr.
+        assertTrue(ChunkMaler.liegt((float) Math.cos(Math.toRadians(45))));
+        assertFalse(ChunkMaler.liegt((float) Math.cos(Math.toRadians(46))));
+        // Ohne Fläche nichts.
+        assertEquals(0, ChunkMaler.obenAnteil(1, 0, 0, 2, 0, 0));
     }
 
     @Test

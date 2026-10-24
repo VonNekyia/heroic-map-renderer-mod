@@ -257,7 +257,9 @@ final class ChunkMaler {
         flach = null;
         oben = false;
         tesselator.tesselateBlock((x, y, z, quad, instanz) -> {
-            if (!nachOben(quad)) {
+            // Bei einer Pflanze zählt nur eine liegende Fläche; eine gekippte aus einem Paket legt sie flach. Siehe docs/minimap.md,
+            // „Pflanzen aus Paketen“.
+            if (pflanze ? !liegt(quad) : !nachOben(quad)) {
                 if (pflanze && flach == null) {
                     flach = flach(quad, instanz);
                 }
@@ -448,13 +450,31 @@ final class ChunkMaler {
         return true;
     }
 
+    /** Liegt die Fläche eher, als sie steht: ihre Normale höchstens 45° von oben, n_y ≥ cos 45° · |n|? */
+    static boolean liegt(BakedQuad q) {
+        return liegt(obenAnteil(q));
+    }
+
+    static boolean liegt(float obenAnteil) {
+        // Etwas Spiel unter cos 45°, so liegt eine Fläche, die genau 45° geneigt ist, trotz der Rundung von float.
+        return obenAnteil >= (float) Math.sqrt(0.5) - 1e-6f;
+    }
+
     /** Zeigt die Fläche nach oben? Die Ecken liegen gegen den Uhrzeigersinn, von vorn gesehen. */
     static boolean nachOben(BakedQuad q) {
+        return obenAnteil(q) > 1e-4f;
+    }
+
+    static float obenAnteil(BakedQuad q) {
         Vector3fc p0 = q.position(0), p1 = q.position(1), p2 = q.position(2);
-        float ax = p1.x() - p0.x(), ay = p1.y() - p0.y(), az = p1.z() - p0.z();
-        float bx = p2.x() - p0.x(), by = p2.y() - p0.y(), bz = p2.z() - p0.z();
+        return obenAnteil(p1.x() - p0.x(), p1.y() - p0.y(), p1.z() - p0.z(), p2.x() - p0.x(), p2.y() - p0.y(), p2.z() - p0.z());
+    }
+
+    /** Wie weit eine Fläche nach oben zeigt: n_y / |n| ihrer Normale a × b, von −1 bis 1, 0 ohne Fläche. */
+    static float obenAnteil(float ax, float ay, float az, float bx, float by, float bz) {
         float nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
-        return ny > 1e-4f * (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+        float laenge = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+        return laenge == 0 ? 0 : ny / laenge;
     }
 
     /** Je Ecke Licht, mit dem Leuchten der Fläche, mal Farbe, die Schatten und Tönung trägt. */
