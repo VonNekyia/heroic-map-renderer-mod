@@ -23,6 +23,8 @@ code:
   - src/test/java/com/nekyia/heroicmap/AusweisTest.java
   - src/main/java/com/nekyia/heroicmap/Reset.java
   - src/test/java/com/nekyia/heroicmap/ResetTest.java
+  - src/main/java/com/nekyia/heroicmap/Zeiger.java
+  - src/test/java/com/nekyia/heroicmap/ZeigerTest.java
   - src/main/java/com/nekyia/heroicmap/Ort.java
   - src/main/java/com/nekyia/heroicmap/OrtFenster.java
   - src/test/java/com/nekyia/heroicmap/OrtTest.java
@@ -620,15 +622,23 @@ eines Proxys von einem des Netzes (`Laden.Fehler.status`).
     zeigt (`Downloads.fragtNachSelbst`). „Behalten, ruht“ merkt den neuen
     Baum in `zeigt.txt`; bis er ganz daliegt, bleibt die eigene Karte an.
 - **Zeiger** (`Zeiger`): Ein Server nutzt die Karte eines anderen mit
-  derselben Welt unter derselben Adresse, ohne Kopie. Warum so:
-  [0031](entscheidungen/0031-ein-zeiger-statt-geteilter-ordner.md).
+  derselben Welt, ohne Kopie, meist unter derselben Adresse. Warum so:
+  [0031](entscheidungen/0031-ein-zeiger-statt-geteilter-ordner.md), über
+  Adressen [0047](entscheidungen/0047-zeiger-ueber-adressen.md).
   - **Wo:** `zeiger.txt` im eigenen Ordner der Welt, eine Zeile mit dem
     Namen der Karte des Ziels, `-` für den Ordner ohne Karte. Das Ziel ist
     so immer der Nachbar mit demselben Hash, etwa
-    `<host>/karte-main/welt-<hash>` für `<host>/karte-build/welt-<hash>`,
-    nie ein Pfad oder eine Adresse. Ein Name, der nicht wie eine Karte
-    aussieht, gilt nicht; einem Link oder einer Junction folgt der Mod
-    nicht.
+    `<host>/karte-main/welt-<hash>` für `<host>/karte-build/welt-<hash>`.
+  - **Unter einer anderen Adresse** steht `@<adresse>` oder
+    `@<adresse>/karte-<name>` darin (`Zeiger.fremd`), etwa
+    `@play.example.net_25566/karte-main`; der Hash ist auch dann der
+    eigene. `<adresse>` ist ein Ordner direkt unter `heroicmap/`, so
+    geschrieben, wie der Mod Adressen ablegt, nicht `einzelspieler_…` und
+    nicht derselbe Host, auch nicht mit `_25565`. Das gilt nur, wenn der
+    eigene Ordner selbst unter einer Adresse liegt, also nicht mit der
+    Ablage Hash.
+  - Ein Name, der nicht so aussieht, gilt nicht; einem Link oder einer
+    Junction folgt der Mod nicht.
   - **Wirkung:** Die Downloads im Ziel zählen hier wie eigene, nur zum
     Lesen, nach den eigenen Downloads und vor der eigenen Karte
     (`Satz.fuer`). In `zeigt.txt` steht ein Baum im Ziel mit `@` davor. Die
@@ -636,6 +646,13 @@ eines Proxys von einem des Netzes (`Laden.Fehler.status`).
     hinein: Der Worker zeichnet nur in einen Baum im eigenen Ordner.
   - **Fehlt das Ziel,** gilt die Regel ohne Zeiger. Der Zeiger bleibt, bis
     der Spieler ihn löst; die Karte des Ziels kann wiederkommen.
+  - **Unter einer anderen Adresse** gilt das Ziel nur, solange die
+    Ausweise für die Welt keine verschiedene UID kennen
+    (`Zeiger.ziel` mit der Welt, `Zeiger.gleicheWelt`, dieselbe Regel wie
+    beim Vorschlag). Sonst gilt die Regel ohne Zeiger; er bleibt und steht
+    mit „(andere Welt)“ in der Kartenliste. Ein Zeiger unter derselben
+    Adresse zählt die UID nicht, build zeigt mit Absicht die Karte von
+    main.
   - **Übergang von `karte.von`** (`Uebergang`): Meldet ein Server die Karte
     eines anderen, also `karte` ungleich `backend`, merkt der Mod das in
     `heroicmap/server.txt`, je Adresse, Hash und Server. Meldet derselbe
@@ -763,6 +780,10 @@ immer.
   und die neue UID; eine Zeile im Chat und im Log sagt, was geschah, bei
   „sicher“ mit dem Satz, dass die Wegpunkte bleiben, aber vielleicht nicht
   mehr stimmen.
+- **Zeiger:** Ein Reset, sicher oder ruhend, löst einen Zeiger unter eine
+  andere Adresse (`Zeiger.loeseNachReset`), denn dort liegt die alte Welt;
+  sonst nähme `Satz.fuer` deren Karte über der neuen. Ein Zeiger unter
+  derselben Adresse bleibt.
 
 ## Kartenliste
 
@@ -814,12 +835,24 @@ Platte (`Kartenliste`), auch die anderer Server und Welten:
   - Ein Baum im Ziel des Zeigers zählt wie einer im Ordner der Welt, eine
     eigene Karte dort zeigt grau „von main“.
 - **Zeiger,** unauffällig unten über „Zurück“, nur im Ordner einer Welt
-  (`Kartenliste.zeiger`): Ohne Zeiger, und nur, wenn unter derselben
-  Adresse ein anderer Ordner mit demselben Hash liegt, „Gleiche Welt auf
-  main“ und je Ordner „Karte von main nutzen“. Mit Zeiger „build zeigt auf:
-  `<pfad>`“, „(fehlt)“, wenn das Ziel nicht daliegt, und „lösen“. Kein
-  Dialog und kein Hinweis beim Betreten, so will es der User. Daneben je
-  „Kopie“, siehe [Selbst gezeichnete Karte](selbst.md), „Kopie“.
+  (`Kartenliste.zeiger`): Ohne Zeiger, und nur, wenn ein anderer Ordner
+  mit demselben Hash liegt, „Gleiche Welt auf main“ und je Ordner „Karte
+  von main nutzen“, so viele, wie in die Zeile passen. Mit Zeiger „build
+  zeigt auf: `<pfad>`“, „(fehlt)“, wenn das Ziel nicht daliegt, „(andere
+  Welt)“, wenn es unter einer anderen Adresse eine andere UID hat, und
+  „lösen“. Kein Dialog und kein Hinweis beim Betreten, so will es der
+  User. Daneben je „Kopie“, siehe
+  [Selbst gezeichnete Karte](selbst.md), „Kopie“.
+  - **Erst unter derselben Adresse,** dann unter anderen (`Zeiger.fremde`),
+    dort etwa als „main (play.example.net_25566)“ und ohne „Kopie“.
+  - **Unter einer anderen Adresse** nur ein Ordner mit einem Download
+    dieser Welt, der nicht ruht. Nicht, wenn sein Ausweis dieselbe
+    eingetippte Adresse nennt wie der eigene, denn dann ist es derselbe
+    Server in einem anderen Ordner, siehe „Ort ändern“; nicht, wenn beide
+    Ausweise eine UID kennen und sie sich unterscheiden. Derselbe Seed
+    kann eine andere Welt sein; darum nur ein Vorschlag, siehe
+    [0047](entscheidungen/0047-zeiger-ueber-adressen.md).
+  - **Im Einzelspieler** auch; ein Einzelspielerordner ist nie Ziel.
 - **Ort …:** je Baum links von an/ruht, siehe „Ort ändern“; grau mit
   Tooltip bei Karten aus der Ablage vor dem Hash und solange ein Download
   in den Baum läuft (`Kartenliste.ort`).
