@@ -64,7 +64,7 @@ Objekte aus Ebenen vom Server nicht.
 | Spalte | Breite | tut |
 |---|---|---|
 | Farbe | 12 | Wegpunkt und Rechteck: reihum die 8 Farben (`Wegpunkte.faerbe`). Form: öffnet das Feld „Farbe…“ mit „Gewicht“ darunter, wie im Menü der Form, siehe [Wegpunkte](wegpunkte.md), „Farbe“ |
-| Name | 88 | direkt bearbeitbar; ohne Namen grau der Ort „x …, z …“. Enter, ein Klick daneben oder in eine andere Zeile speichert, ebenso das Schliessen der Karte, etwa beim Tod oder Trennen (`Karte.removed`); `Esc` verwirft, was getippt ist; leer nimmt den Namen weg |
+| Name | 88 | direkt bearbeitbar; ohne Namen grau der Ort „x …, z …“. Enter, ein Klick daneben oder in eine andere Zeile speichert, ebenso das Schliessen der Karte, etwa beim Tod oder Trennen: Das Spiel nimmt dem Feld dabei den Fokus (`Minecraft.setScreen` ruft `Screen.clearFocus` vor `removed`, 26.3, per javap); `Esc` verwirft, was getippt ist; leer nimmt den Namen weg |
 | Schrift | 32 | `−` und `+` durch die Stufen ¼ bis 4; grau ohne Namen |
 | Biegung | 40 | `−` und `+` in 15° bis ±180°, nur Regionen; grau ohne Namen |
 | Schriftart | 24 | K für die Karte, MC für Minecraft; grau ohne Namen |
