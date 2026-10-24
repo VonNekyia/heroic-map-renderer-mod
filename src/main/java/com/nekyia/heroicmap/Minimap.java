@@ -185,6 +185,8 @@ public final class Minimap {
     private Rahmen zuletzt;
     /** Wo die Zeile der Koordinaten im letzten Frame stand: x, y, Breite, Höhe; null ohne Zeile. Für die Gametests. */
     private int[] koordinatenKasten;
+    /** Wo der Balken des Fortschritts zuletzt stand: x, y, Breite, Höhe der Zeile, Länge des Balkens; null ohne. Für Gametests. */
+    private int[] balkenKasten;
     /** Im Menü liegt die Maus auf der Zeile der Koordinaten; dann steht sie gelb. */
     private boolean koordinatenHell;
     /** Wie der eigene Spieler aussieht, auf Minimap und Vollbildkarte. Siehe docs/minimap.md, „Spieler“. */
@@ -446,6 +448,10 @@ public final class Minimap {
 
     int[] koordinatenKasten() {
         return koordinatenKasten;
+    }
+
+    int[] balkenKasten() {
+        return balkenKasten;
     }
 
     void koordinatenHell(boolean an) {
@@ -1036,6 +1042,17 @@ public final class Minimap {
                         rahmen != null ? rahmen.baender() : 1, rund, menueSkin.marken, lage, k, 0, -1, false, KEIN_ZIEL);
             }
         }
+        // Solange ein Download oder Abgleich läuft, steht der Balken in der ersten Zeile unter der Minimap, die Koordinaten eine
+        // Zeile weiter. Siehe docs/minimap.md, „Fortschritt“.
+        int abstand = rand(), ueberstand = rahmen == null ? 1 : abstand;
+        Laden.Fortschritt laeuft = Downloads.INSTANZ.fortschritt();
+        balkenKasten = null;
+        if (laeuft != null && laeuft.zeigen()) {
+            int zeile = mc.font.lineHeight;
+            int[] wo = koordinatenLage(r, ueberstand, abstand, g.guiWidth(), g.guiHeight(), r.seite(), zeile);
+            balkenKasten = balken(g, mc.font, wo[0], wo[1], r.seite(), zeile, laeuft);
+            ueberstand += zeile + 2;
+        }
         Object[] werte = werte(koordinaten, spieler.getX(), spieler.getY(), spieler.getZ());
         koordinatenKasten = null;
         // Im Menü steht die Zeile auch bei „aus“, grau; ein Klick darauf holt sie zurück. Siehe docs/minimap.md, „Koordinaten“.
@@ -1044,11 +1061,10 @@ public final class Minimap {
             Component text = werte == null ? Component.translatable("heroicmap.koordinaten_aus")
                     : Component.translatable(werte.length == 3 ? "heroicmap.koordinaten_xyz" : "heroicmap.koordinaten", werte);
             int farbe = klickbar && koordinatenHell ? KOORDINATEN_HELL : werte == null ? KOORDINATEN_AUS : TEXT;
-            int abstand = rand();
             float f = koordinatenMassstab(g.guiWidth(), abstand, mc.font.width(text));
             int breite = Mth.ceil(mc.font.width(text) * f), zeile = Mth.ceil(mc.font.lineHeight * f);
             // Unter dem Ring oder den Ornamenten des Rahmens, die halb über die Ecken ragen.
-            int[] wo = koordinatenLage(r, rahmen == null ? 1 : abstand, abstand, g.guiWidth(), g.guiHeight(), breite, zeile);
+            int[] wo = koordinatenLage(r, ueberstand, abstand, g.guiWidth(), g.guiHeight(), breite, zeile);
             g.pose().pushMatrix();
             g.pose().translate(wo[0], wo[1]);
             g.pose().scale(f);
@@ -1097,6 +1113,20 @@ public final class Minimap {
             case XZ -> new Object[] {Mth.floor(x), Mth.floor(z)};
             case XYZ -> new Object[] {Mth.floor(x), Mth.floor(y), Mth.floor(z)};
         };
+    }
+
+    /**
+     * Der Balken des Fortschritts in einer Zeile ab (x, y), {@code breite} Einheiten: 2 Einheiten hoch auf dunklem Grund, weiss
+     * gefüllt nach dem Anteil, rechts die Prozent. Gibt x, y, Breite, Höhe und die Länge des Balkens zurück. Siehe
+     * docs/minimap.md, „Fortschritt“.
+     */
+    private static int[] balken(GuiGraphicsExtractor g, Font font, int x, int y, int breite, int zeile, Laden.Fortschritt f) {
+        Component prozent = Component.literal(f.prozent());
+        int text = font.width(prozent), lang = Math.max(0, breite - text - 3);
+        g.fill(x, y + 3, x + lang, y + 5, HALB_SCHWARZ);
+        g.fill(x, y + 3, x + (int) Math.round(lang * f.anteil()), y + 5, TEXT);
+        g.text(font, prozent, x + breite - text, y, TEXT, true);
+        return new int[] {x, y, breite, zeile, lang};
     }
 
     /**
