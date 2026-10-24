@@ -1690,7 +1690,8 @@ public final class Bilder implements FabricClientGameTest {
      * Pflanzen aus Paketen: das Feld bei 4 px und 1 px, Zoom 4, ohne und mit dem Testpaket. Mit dem Paket liegen Karotten und
      * Gras bei 4 px wie ohne, denn ihre erste Fläche ist dieselbe, und reifer Weizen und Kartoffeln decken das Ackerland,
      * statt wegzufallen; verglichen mit einem Bild derselben Stelle ohne sie, denn Ackerland in verschiedenen Reihen ist
-     * verschieden hell. Erst alle Bilder, dann die Prüfung. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
+     * verschieden hell. Die Kartoffeln tragen im Testpaket die Textur des reifen Weizens, denn die linke Hälfte ihrer eigenen
+     * deckt nur ein Drittel des Blocks. Erst alle Bilder, dann die Prüfung. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
      */
     private static void pflanzenAusPaketen(ClientGameTestContext context, TestServerContext server) {
         for (String befehl : FELD) {
