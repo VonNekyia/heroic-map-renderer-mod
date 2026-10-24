@@ -89,6 +89,13 @@ class ZeigerTest {
         Zeiger.setze(build, "link");
         assertNull(Zeiger.ziel(build), "keinem Link folgen");
         assertFalse(Zeiger.kandidaten(build).contains("link"));
+
+        // Ein Link weiter oben: Der Ordner selbst ist keiner, liegt aber woanders, wie hinter einer Junction unter Windows.
+        Path oben = Files.createDirectories(wurzel.resolve("anderswo/karte-oben/" + HASH)).getParent();
+        Files.createSymbolicLink(wurzel.resolve("play.example.net/karte-oben"), oben);
+        Zeiger.setze(build, "oben");
+        assertNull(Zeiger.ziel(build), "keinem Link weiter oben folgen");
+        assertFalse(Zeiger.kandidaten(build).contains("oben"));
     }
 
     @Test
