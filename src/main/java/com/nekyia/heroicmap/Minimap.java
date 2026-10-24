@@ -191,7 +191,10 @@ public final class Minimap {
     /** Der Kasten um den ganzen Stapel unter der Minimap, Balken und Widgets, {x, y, Breite, Höhe}; null ohne. Daran hängt das L. */
     private int[] stapelKasten;
     /** Im Menü liegt die Maus auf der Zeile der Koordinaten; dann steht sie gelb. */
-    private boolean koordinatenHell;
+    /** Das Widget unter der Maus im Menü, gelb; die Zahl der Widgets für die graue Zeile ohne Koordinaten, -1 für keins. */
+    private int hell = -1;
+    /** Wo jedes Widget zuletzt stand, {x, y, Breite, Höhe}, in der Reihe der Liste; null, solange nicht gezeichnet. */
+    private int[][] widgetKaesten = new int[0][];
     /** Wie der eigene Spieler aussieht, auf Minimap und Vollbildkarte. Siehe docs/minimap.md, „Spieler“. */
     enum Darstellung { KOPF, PFEIL, DURCHSICHTIG }
 
@@ -447,6 +450,23 @@ public final class Minimap {
         return List.copyOf(widgets);
     }
 
+    /** Ersetzt die Widgets, etwa beim Ziehen im Menü; höchstens {@link Widgets#MAX}. */
+    void widgets(List<Widgets.Widget> neu) {
+        widgets = new ArrayList<>(neu.subList(0, Math.min(neu.size(), Widgets.MAX)));
+    }
+
+    void setzeWidget(int i, Widgets.Widget w) {
+        widgets.set(i, w);
+    }
+
+    void loescheWidget(int i) {
+        widgets.remove(i);
+    }
+
+    int[][] widgetKaesten() {
+        return widgetKaesten;
+    }
+
     TodZeit todZeit() {
         return todZeit;
     }
@@ -471,8 +491,8 @@ public final class Minimap {
         return stapelKasten;
     }
 
-    void koordinatenHell(boolean an) {
-        koordinatenHell = an;
+    void hell(int widget) {
+        hell = widget;
     }
 
     Rahmen zuletzt() {
@@ -1083,42 +1103,78 @@ public final class Minimap {
             balkenKasten = balken(g, mc.font, wo[0], wo[1], r.seite(), zeile, laeuft);
             ueberstand += zeile + 2;
         }
-        // Darunter die Widgets, je eine Zeile im Stapel. Siehe docs/widgets.md.
+        // Die Widgets: unten im Stapel nach dem Balken, oben über der Minimap oder neben dem Nordpfeil, frei, wo sie liegen.
+        // Siehe docs/widgets.md.
         koordinatenKasten = null;
         stapelKasten = balkenKasten;
         boolean klickbar = mc.gui.screen() instanceof Einstellungen;
-        for (Widgets.Widget w : widgets) {
+        int sw = g.guiWidth(), sh = g.guiHeight(), gs = mc.getWindow().getGuiScale(), n = widgets.size();
+        Component[] texte = new Component[n];
+        float[] massstab = new float[n];
+        int obenHoehe = 0;
+        for (int i = 0; i < n; i++) {
+            Widgets.Widget w = widgets.get(i);
             Object[] werte = werte(w.version() == 0 ? Koordinaten.XZ : Koordinaten.XYZ, spieler.getX(), spieler.getY(), spieler.getZ());
-            boolean hell = klickbar && koordinatenHell && koordinatenKasten == null;
-            int[] kasten = zeile(g, mc.font, r, ueberstand, abstand, Component.translatable(werte.length == 3 ? "heroicmap.koordinaten_xyz"
-                    : "heroicmap.koordinaten", werte), hell ? KOORDINATEN_HELL : TEXT);
-            koordinatenKasten = koordinatenKasten == null ? kasten : koordinatenKasten;
-            ueberstand += kasten[3] + 2;
+            texte[i] = Component.translatable(werte.length == 3 ? "heroicmap.koordinaten_xyz" : "heroicmap.koordinaten", werte);
+            massstab[i] = Math.min(w.pixel(gs) / (float) gs, koordinatenMassstab(sw, abstand, mc.font.width(texte[i])));
+            obenHoehe += w.anker() == Widgets.Anker.OBEN ? Mth.ceil(mc.font.lineHeight * massstab[i]) + 2 : 0;
         }
-        // Ohne Koordinaten steht im Menü die Zeile grau, „aus“; ein Klick darauf holt sie zurück. Siehe docs/minimap.md, „Koordinaten“.
+        // Passt der obere Stapel ganz über die Minimap, steht er dort, sonst neben dem Nordpfeil, bündig mit ihrer Oberkante.
+        int obenWeg = rahmen == null ? 1 : abstand, nebenY = r.y();
+        boolean darueber = r.y() - obenWeg - obenHoehe >= 0;
+        int zoomX = Einstellungen.zoomLage(r, abstand, sw)[0];
+        widgetKaesten = new int[n][];
+        for (int i = 0; i < n; i++) {
+            Widgets.Widget w = widgets.get(i);
+            int breite = Mth.ceil(mc.font.width(texte[i]) * massstab[i]), zeile = Mth.ceil(mc.font.lineHeight * massstab[i]);
+            int[] wo = switch (w.anker()) {
+                case UNTEN -> {
+                    int[] p = koordinatenLage(r, ueberstand, abstand, sw, sh, breite, zeile);
+                    ueberstand += zeile + 2;
+                    yield p;
+                }
+                case OBEN -> {
+                    int[] p = darueber ? new int[] {waagrecht(r.x() + (r.seite() - breite) / 2, abstand, sw, breite), r.y() - obenWeg - 2 - zeile}
+                            : new int[] {waagrecht(zoomX < r.x() ? zoomX - 2 - breite : zoomX + Einstellungen.ZOOM_BREITE + 2, abstand, sw, breite), nebenY};
+                    obenWeg += darueber ? zeile + 2 : 0;
+                    nebenY += darueber ? 0 : zeile + 2;
+                    yield p;
+                }
+                case FREI -> new int[] {abstand + Math.round(w.x() * Math.max(0, sw - breite - 2 * abstand)),
+                        abstand + Math.round(w.y() * Math.max(0, sh - zeile - 2 * abstand))};
+            };
+            int[] kasten = zeile(g, mc.font, wo, texte[i], massstab[i], breite, zeile, klickbar && hell == i ? KOORDINATEN_HELL : TEXT);
+            widgetKaesten[i] = kasten;
+            if (w.anker() == Widgets.Anker.UNTEN) {
+                stapelKasten = vereint(stapelKasten, kasten);
+            }
+            koordinatenKasten = koordinatenKasten == null && w.art() == Widgets.Art.KOORDINATEN ? kasten : koordinatenKasten;
+        }
+        // Ohne Koordinaten steht im Menü hinter dem Stapel grau „Koordinaten aus“; ein Klick darauf holt sie zurück. Siehe
+        // docs/widgets.md, „Bedienung“.
         if (klickbar && koordinatenKasten == null) {
-            koordinatenKasten = zeile(g, mc.font, r, ueberstand, abstand, Component.translatable("heroicmap.koordinaten_aus"),
-                    koordinatenHell ? KOORDINATEN_HELL : KOORDINATEN_AUS);
+            Component aus = Component.translatable("heroicmap.koordinaten_aus");
+            float f = koordinatenMassstab(sw, abstand, mc.font.width(aus));
+            int breite = Mth.ceil(mc.font.width(aus) * f), zeile = Mth.ceil(mc.font.lineHeight * f);
+            koordinatenKasten = zeile(g, mc.font, koordinatenLage(r, ueberstand, abstand, sw, sh, breite, zeile), aus, f, breite, zeile,
+                    hell == n ? KOORDINATEN_HELL : KOORDINATEN_AUS);
+            stapelKasten = vereint(stapelKasten, koordinatenKasten);
         }
     }
 
-    /**
-     * Eine Zeile des Stapels unter der Minimap, {@code ueberstand} Einheiten unter ihrem Rand ({@link #koordinatenLage}), kleiner
-     * nur, wenn sie nicht zwischen die Ränder passt. Gibt ihren Kasten zurück und nimmt ihn in den Kasten des Stapels.
-     */
-    private int[] zeile(GuiGraphicsExtractor g, Font font, Rahmen r, int ueberstand, int abstand, Component text, int farbe) {
-        float f = koordinatenMassstab(g.guiWidth(), abstand, font.width(text));
-        int breite = Mth.ceil(font.width(text) * f), zeile = Mth.ceil(font.lineHeight * f);
-        // Unter dem Ring oder den Ornamenten des Rahmens, die halb über die Ecken ragen.
-        int[] wo = koordinatenLage(r, ueberstand, abstand, g.guiWidth(), g.guiHeight(), breite, zeile);
+    /** Links bei {@code x}, ganz auf dem Schirm im Abstand {@code abstand} vom Rand. */
+    private static int waagrecht(int x, int abstand, int schirmBreite, int breite) {
+        return Math.clamp(x, abstand, Math.max(abstand, schirmBreite - abstand - breite));
+    }
+
+    /** Eine Zeile Text bei {@code wo}, im Massstab {@code f}; gibt ihren Kasten zurück. */
+    private static int[] zeile(GuiGraphicsExtractor g, Font font, int[] wo, Component text, float f, int breite, int zeile, int farbe) {
         g.pose().pushMatrix();
         g.pose().translate(wo[0], wo[1]);
         g.pose().scale(f);
         g.text(font, text, 0, 0, farbe, true);
         g.pose().popMatrix();
-        int[] kasten = {wo[0], wo[1], breite, zeile};
-        stapelKasten = vereint(stapelKasten, kasten);
-        return kasten;
+        return new int[] {wo[0], wo[1], breite, zeile};
     }
 
     /** Der Kasten um zwei Kästen {x, y, Breite, Höhe}; einer darf null sein. */

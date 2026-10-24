@@ -96,6 +96,7 @@ public final class Bedienung implements FabricClientGameTest {
             aussehen(context, maus, k);
             zoomNebenMinimap(context, maus, k);
             aufloesungUndKoordinaten(context, maus, k);
+            widgetsZiehen(context, maus, k);
             symbole(context, maus, k);
             biomMarken(context, maus, k);
             knoepfeUeberDemL(context, maus);
@@ -4821,11 +4822,163 @@ public final class Bedienung implements FabricClientGameTest {
     /**
      * Der Regler „Auflösung“ unter der Minimap und der Klick auf ihre Koordinaten im Menü (mod#173), mit Maus und Mausrad wie
      * von Hand. Der Regler steht 2 Einheiten unter der Zeile der Koordinaten, so breit wie die Minimap; ein Klick auf jede
-     * Raste stellt ihre Auflösung, das Mausrad je eine. Die Zeile steht unter der Maus gelb; ein Klick geht reihum xz, xyz,
-     * aus und zurück; bei „aus“ steht sie im Menü grau und lässt sich anklicken, im Spiel fehlt sie. Bei GS 3 und 4 in jeder
+     * Raste stellt ihre Auflösung, das Mausrad je eine. Die Zeile steht unter der Maus gelb; ein Klick links oder rechts geht
+     * reihum xz und xyz; das × beim Darüberfahren nimmt sie weg, dann steht sie im Menü grau und lässt sich anklicken, im Spiel
+     * fehlt sie. Bei GS 3 und 4 in jeder
      * Ecke, klein und gross: der Regler ganz auf dem Schirm, nicht auf der Zeile und nicht auf dem Regler „Zoom“. Siehe
      * docs/minimap.md, „Bedienung“ und „Koordinaten“.
      */
+    /**
+     * Widgets im Menü mit Maus und Tasten wie von Hand. Siehe docs/widgets.md, „Bedienung“.
+     * Siehe docs/widgets.md, „Ziehen“.
+     * Die Minimap steht oben
+     * rechts am Schirm, darüber ist kein Platz: Die Koordinaten, an die Oberkante gezogen, rasten neben dem Nordpfeil ein,
+     * bündig mit ihr; in die Mitte gezogen liegen sie frei, wo die Maus sie liess; Esc beim Ziehen legt sie zurück; unter die
+     * Minimap gezogen rasten sie unten ein. Das Mausrad macht sie je Raste ein Pixel des Geräts grösser und kleiner. Entf löscht
+     * das Widget unter der Maus. Das ×, auch über einem Knopf, löscht und lässt den Knopf in Ruhe.
+     */
+    private static void widgetsZiehen(ClientGameTestContext context, TestInput maus, int k) {
+        Path sicherung = FabricLoader.getInstance().getGameDir().resolve("heroicmap-widgets-test.properties");
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.schreibe(sicherung);
+            Minimap.INSTANZ.widgets(List.of(new Widgets.Widget(Widgets.Art.KOORDINATEN, 0, Widgets.Anker.UNTEN)));
+            int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+            Minimap.INSTANZ.stelle(b, 0, Minimap.GROESSE, b, h);
+            mc.gui.setScreen(new Einstellungen());
+        });
+        context.waitTicks(3);
+        try {
+            Minimap.Rahmen r = rahmen(context);
+            // An die Oberkante: neben dem Nordpfeil, bündig mit der Oberkante, links vom Regler „Zoom“.
+            int[] z = widgetKasten(context, 0);
+            ziehe(context, maus, k, z[0] + z[2] / 2.0, z[1] + z[3] / 2.0, r.x() + r.seite() / 2.0, r.y() + 2);
+            Widgets.Widget w = context.computeOnClient(mc -> Minimap.INSTANZ.widgets().getFirst());
+            int[] oben = widgetKasten(context, 0);
+            int zoomX = context.computeOnClient(mc -> zoomReglerWidget(mc).getX());
+            if (w.anker() != Widgets.Anker.OBEN || oben[1] != r.y() || oben[0] + oben[2] > zoomX) {
+                throw new AssertionError("An die Oberkante gezogen: " + w + " bei " + Arrays.toString(oben) + ", Regler „Zoom“ bei " + zoomX
+                        + ", Minimap " + r);
+            }
+            // In die Mitte des Schirms: frei, die Mitte des Widgets bei der Maus.
+            int[] schirm = context.computeOnClient(mc -> new int[] {mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight()});
+            ziehe(context, maus, k, oben[0] + oben[2] / 2.0, oben[1] + oben[3] / 2.0, schirm[0] / 2.0, schirm[1] / 2.0);
+            int[] frei = widgetKasten(context, 0);
+            w = context.computeOnClient(mc -> Minimap.INSTANZ.widgets().getFirst());
+            if (w.anker() != Widgets.Anker.FREI || Math.abs(frei[0] + frei[2] / 2.0 - schirm[0] / 2.0) > 2
+                    || Math.abs(frei[1] + frei[3] / 2.0 - schirm[1] / 2.0) > 2) {
+                throw new AssertionError("In die Mitte gezogen: " + w + " bei " + Arrays.toString(frei));
+            }
+            // Esc beim Ziehen legt es zurück.
+            fahre(context, maus, k, frei[0] + frei[2] / 2.0, frei[1] + frei[3] / 2.0);
+            maus.holdMouse(LINKS);
+            for (int i = 0; i < 5; i++) {
+                maus.moveCursor(-10 * k, 8 * k);
+                context.waitTick();
+            }
+            maus.pressKey(InputConstants.KEY_ESCAPE);
+            context.waitTick();
+            maus.releaseMouse(LINKS);
+            context.waitTicks(2);
+            int[] zurueck = widgetKasten(context, 0);
+            if (!Arrays.equals(zurueck, frei) || !(context.computeOnClient(mc -> mc.gui.screen()) instanceof Einstellungen)) {
+                throw new AssertionError("Esc beim Ziehen: " + Arrays.toString(zurueck) + " statt " + Arrays.toString(frei));
+            }
+            // Unter die Minimap: unten eingerastet.
+            ziehe(context, maus, k, frei[0] + frei[2] / 2.0, frei[1] + frei[3] / 2.0, r.x() + r.seite() / 2.0, r.y() + r.seite() + 6);
+            w = context.computeOnClient(mc -> Minimap.INSTANZ.widgets().getFirst());
+            if (w.anker() != Widgets.Anker.UNTEN) {
+                throw new AssertionError("Unter die Minimap gezogen: " + w);
+            }
+            // Das Mausrad: eine Raste grösser, eine zurück, in Pixeln des Geräts je Pixel der Schrift.
+            int[] unten = widgetKasten(context, 0);
+            maus.setCursorPos((unten[0] + unten[2] / 2.0) * k, (unten[1] + unten[3] / 2.0) * k);
+            context.waitTick();
+            maus.scroll(1);
+            context.waitTicks(2);
+            int groesser = context.computeOnClient(mc -> Minimap.INSTANZ.widgets().getFirst().groesse());
+            int[] gross = widgetKasten(context, 0);
+            maus.scroll(-1);
+            context.waitTicks(2);
+            int zurueckGross = context.computeOnClient(mc -> Minimap.INSTANZ.widgets().getFirst().groesse());
+            if (groesser != k + 1 || zurueckGross != k || gross[3] <= unten[3]) {
+                throw new AssertionError("Mausrad über dem Widget: " + groesser + " und " + zurueckGross + " statt " + (k + 1) + " und " + k
+                        + ", Höhe " + unten[3] + " → " + gross[3]);
+            }
+            // Entf löscht das Widget unter der Maus.
+            maus.setCursorPos((unten[0] + unten[2] / 2.0) * k, (unten[1] + unten[3] / 2.0) * k);
+            context.waitTicks(2);
+            maus.pressKey(InputConstants.KEY_DELETE);
+            context.waitTicks(2);
+            if (!context.computeOnClient(mc -> Minimap.INSTANZ.widgets().isEmpty())) {
+                throw new AssertionError("Entf löschte das Widget nicht: " + context.computeOnClient(mc -> Minimap.INSTANZ.widgets()));
+            }
+            // Das × über dem Knopf „Fertig“: Es nimmt den Klick, das Menü bleibt offen.
+            int[] knopf = context.computeOnClient(mc -> {
+                String text = CommonComponents.GUI_DONE.getString();
+                for (Object kind : mc.gui.screen().children()) {
+                    if (kind instanceof AbstractWidget f && f.getMessage().getString().equals(text)) {
+                        return new int[] {f.getX(), f.getY(), f.getWidth(), f.getHeight()};
+                    }
+                }
+                throw new AssertionError("Kein Knopf „Fertig“ im Menü");
+            });
+            context.runOnClient(mc -> {
+                int b = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight(), rand = Minimap.INSTANZ.rand();
+                // Die rechte obere Ecke des Widgets mitten auf dem Knopf, das × darüber.
+                int breite = mc.font.width(Component.translatable("heroicmap.koordinaten", 0, 0)), zeile = mc.font.lineHeight;
+                float fx = (knopf[0] + knopf[2] / 2f - breite - rand) / (b - breite - 2f * rand);
+                float fy = (knopf[1] + knopf[3] / 2f - rand) / (h - zeile - 2f * rand);
+                Minimap.INSTANZ.widgets(List.of(new Widgets.Widget(Widgets.Art.KOORDINATEN, 0, 0, Widgets.Anker.FREI, fx, fy)));
+            });
+            context.waitTicks(2);
+            int[] ueber = widgetKasten(context, 0);
+            int[] x = Widgets.kreuz(ueber);
+            fahre(context, maus, k, ueber[0] + 2, ueber[1] + ueber[3] / 2.0);
+            context.waitTicks(2);
+            boolean aufKnopf = x[0] + x[2] / 2.0 >= knopf[0] && x[0] + x[2] / 2.0 < knopf[0] + knopf[2] && x[1] + x[3] / 2.0 >= knopf[1]
+                    && x[1] + x[3] / 2.0 < knopf[1] + knopf[3];
+            spielerKlick(context, maus, k, x[0] + x[2] / 2.0, x[1] + x[3] / 2.0);
+            if (!aufKnopf || !context.computeOnClient(mc -> Minimap.INSTANZ.widgets().isEmpty())
+                    || !(context.computeOnClient(mc -> mc.gui.screen()) instanceof Einstellungen)) {
+                throw new AssertionError("Das × über „Fertig“ " + Arrays.toString(knopf) + ": × bei " + Arrays.toString(x) + ", auf dem Knopf "
+                        + aufKnopf + ", Widgets " + context.computeOnClient(mc -> Minimap.INSTANZ.widgets()) + ", Menü offen "
+                        + (context.computeOnClient(mc -> mc.gui.screen()) instanceof Einstellungen));
+            }
+        } finally {
+            context.runOnClient(mc -> {
+                mc.gui.setScreen(null);
+                Minimap.INSTANZ.lies(sicherung);
+            });
+            context.waitTicks(2);
+        }
+    }
+
+    /** Der Kasten des Widgets an Stelle {@code i}, wie die Minimap ihn zuletzt zeichnete. */
+    private static int[] widgetKasten(ClientGameTestContext context, int i) {
+        int[] k = context.computeOnClient(mc -> {
+            int[][] alle = Minimap.INSTANZ.widgetKaesten();
+            return i < alle.length && alle[i] != null ? alle[i].clone() : null;
+        });
+        if (k == null) {
+            throw new AssertionError("Kein Widget an Stelle " + i);
+        }
+        return k;
+    }
+
+    /** Zieht mit der linken Taste von (vx, vy) nach (nx, ny), in Einheiten des GUI, in zehn Schritten, wie von Hand. */
+    private static void ziehe(ClientGameTestContext context, TestInput maus, int k, double vx, double vy, double nx, double ny) {
+        warte250();
+        fahre(context, maus, k, vx, vy);
+        maus.holdMouse(LINKS);
+        context.waitTick();
+        for (int i = 1; i <= 10; i++) {
+            maus.setCursorPos((vx + (nx - vx) * i / 10) * k, (vy + (ny - vy) * i / 10) * k);
+            context.waitTick();
+        }
+        maus.releaseMouse(LINKS);
+        context.waitTicks(3);
+    }
+
     private static void aufloesungUndKoordinaten(ClientGameTestContext context, TestInput maus, int k) {
         Path sicherung = FabricLoader.getInstance().getGameDir().resolve("heroicmap-aufloesung-test.properties");
         int[] vorher = context.computeOnClient(mc -> new int[] {mc.getWindow().getWidth(), mc.getWindow().getHeight(), mc.options.guiScale().get()});
@@ -4886,17 +5039,34 @@ public final class Bedienung implements FabricClientGameTest {
             if (hell < 20 || dunkel > 0) {
                 throw new AssertionError("Koordinaten unter der Maus: " + hell + " gelbe Pixel, daneben " + dunkel);
             }
-            // Ein Klick nach dem anderen: xyz, aus, xz. Bei „aus“ steht die Zeile grau und bleibt anklickbar.
-            for (Minimap.Koordinaten soll : new Minimap.Koordinaten[] {Minimap.Koordinaten.XYZ, Minimap.Koordinaten.AUS, Minimap.Koordinaten.XZ}) {
+            // Links, links, rechts, rechts: xyz, xz, xyz, xz; dann das × beim Darüberfahren: aus. Bei „aus“ steht die Zeile grau
+            // und bleibt anklickbar. Siehe docs/widgets.md, „Bedienung“.
+            Minimap.Koordinaten[] folge = {Minimap.Koordinaten.XYZ, Minimap.Koordinaten.XZ, Minimap.Koordinaten.XYZ, Minimap.Koordinaten.XZ,
+                Minimap.Koordinaten.AUS, Minimap.Koordinaten.XZ};
+            for (int schritt = 0; schritt < folge.length; schritt++) {
+                Minimap.Koordinaten soll = folge[schritt];
                 int[] z = context.computeOnClient(mc -> Minimap.INSTANZ.koordinatenKasten());
                 if (z == null) {
                     throw new AssertionError("Im Menü fehlt die Zeile der Koordinaten vor " + soll);
                 }
-                spielerKlick(context, maus, k, z[0] + z[2] / 2.0, z[1] + z[3] / 2.0);
+                if (schritt == 2 || schritt == 3) {
+                    warte250();
+                    fahre(context, maus, k, z[0] + z[2] / 2.0, z[1] + z[3] / 2.0);
+                    maus.pressMouse(RECHTS);
+                    context.waitTicks(2);
+                } else if (schritt == 4) {
+                    // Erst darüber, dann auf das × rechts oben, halb über der Ecke.
+                    fahre(context, maus, k, z[0] + z[2] / 2.0, z[1] + z[3] / 2.0);
+                    context.waitTicks(2);
+                    int[] x = Widgets.kreuz(z);
+                    spielerKlick(context, maus, k, x[0] + x[2] / 2.0, x[1] + x[3] / 2.0);
+                } else {
+                    spielerKlick(context, maus, k, z[0] + z[2] / 2.0, z[1] + z[3] / 2.0);
+                }
                 context.waitTicks(2);
                 Minimap.Koordinaten ist = context.computeOnClient(mc -> Minimap.INSTANZ.koordinaten());
                 if (ist != soll) {
-                    throw new AssertionError("Klick auf die Koordinaten: " + ist + " statt " + soll);
+                    throw new AssertionError("Klick auf die Koordinaten, Schritt " + schritt + ": " + ist + " statt " + soll);
                 }
                 if (soll == Minimap.Koordinaten.AUS) {
                     maus.setCursorPos(2 * k, 2 * k);
