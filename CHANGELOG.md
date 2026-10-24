@@ -11,6 +11,7 @@ The release notes on GitHub and Modrinth come from here
 - **Death points and the veil, right in the settings.** The settings submenu now shows a death point with its time and a pinned region with its veil, each with its slider next to it; the veil in the picture grows with its slider. The world effects switch is a symbol next to the region. The separate slider rows are gone.
 - **Choose the time under death points.** Click the death point in the settings to switch between date and time, date, time or none. Date and time now always shows both, also on the day you died.
 - **Teleporting from the map uses the plain `tp` command.** The server no longer needs to allow `execute`, only `tp`. Without a known height you first go up into the air and land on the ground as soon as your game has the destination; this costs no hearts any more. If the server doesn't send the destination within 5 seconds, or there's no place to stand, you go back where you were. If the server doesn't allow you `/tp`, the map says so and sends nothing.
+- **A progress bar under the minimap.** While the map downloads or syncs, a thin bar with the percentage sits under the minimap, so you see it without opening the full map. The coordinates move one line down meanwhile. If a sync finds nothing missing, there's no bar.
 - **Heads on map pins.** If a server's layer gives a pin a head, for example an NPC, the map shows that face instead of the pin, with the name below, on the full map and pinned on the minimap. Until the head has loaded, you see the pin.
 
 ## 0.2.68

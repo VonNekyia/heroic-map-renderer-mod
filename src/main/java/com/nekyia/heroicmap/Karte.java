@@ -522,7 +522,7 @@ final class Karte extends Screen {
                 TEXT);
         // Bis gesamt feststeht, beim Abgleich vor dem Vergleich des Manifests, „…“ statt Prozent und Bytes.
         boolean bekannt = f.bekannt();
-        Component prozent = Component.literal(bekannt ? (int) (anteil * 100) + " %" : "…");
+        Component prozent = Component.literal(f.prozent());
         g.text(font, prozent, x + b - 4 - font.width(prozent), y + 5, TEXT);
         // Wie der Ladebalken des Spiels: weisser Rand, weiss gefüllt.
         g.outline(x + 5, y + 16, b - 10, 7, TEXT);
