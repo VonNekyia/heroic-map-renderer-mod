@@ -28,7 +28,7 @@ wechselt. „Ohne“ ist der dünne Umriss wie bisher. Die Vollbildkarte
 bekommt keinen Rahmen. Warum so:
 [0005](entscheidungen/0005-rahmen-als-skins.md),
 [0008](entscheidungen/0008-biom-rahmen-als-vorgabe.md) und
-[0030](entscheidungen/0030-rahmen-familien-und-waehler.md).
+[0032](entscheidungen/0032-rahmen-familien-und-waehler.md).
 
 ## Wahl
 
@@ -345,7 +345,7 @@ Wo eine Marke liegt, sagt `lage`, für N `lage_norden` (`Skin.Lage`,
   Bilds: eckig an beiden Seiten, die es erreichen kann, rund jede Ecke. Nach
   innen reicht die Marke über die Bänder in die Karte. Die Lage hiess beim
   Designer zuerst `innen`; so hat es der Reviewer am 24.10. getrennt, siehe
-  [0030](entscheidungen/0030-rahmen-familien-und-waehler.md).
+  [0032](entscheidungen/0032-rahmen-familien-und-waehler.md).
 - **`innen`** (`Skin.innen`): Das aufrechte Bild berührt von innen die Linie
   eine Einheit innerhalb der Bänder, eckig das Quadrat, rund mit seiner
   weitesten Ecke den Kreis; genordet die Formel des Designers, Mitte bei
@@ -368,7 +368,7 @@ nicht mehr.
   nur sie durchsichtig; ein zweites Mal holt sie zurück
   (`Minimap.schalteVerzierung`). Bis 0.2.68 war es der Rechtsklick; den
   braucht jetzt der Wähler, siehe
-  [0030](entscheidungen/0030-rahmen-familien-und-waehler.md). Ziehen heisst
+  [0032](entscheidungen/0032-rahmen-familien-und-waehler.md). Ziehen heisst
   wie beim Linksklick: Die Maus wandert mehr als 3 Einheiten
   (`MinimapKlick.WEG`).
 - **Links- und Rechtsklick** auf eine Marke öffnen den Wähler, siehe
@@ -412,7 +412,7 @@ Ein Klick auf eine Marke öffnet den Wähler, siehe „Wähler“ und
 Ein Klick mit der linken oder rechten Taste auf eine Marke öffnet über dem
 Menü oder Untermenü eine Tafel mit einer Vorschau je Familie (`Waehler`).
 So hat es der User am 23.10. gewünscht, statt durch die Rahmen zu
-schalten, siehe [0030](entscheidungen/0030-rahmen-familien-und-waehler.md).
+schalten, siehe [0032](entscheidungen/0032-rahmen-familien-und-waehler.md).
 
 - **Vorschau:** je Familie eine Minimap von 56 Einheiten mit ihrem Rahmen,
   gezeichnet mit denselben Routinen wie die Minimap, Bänder oder Ring und
