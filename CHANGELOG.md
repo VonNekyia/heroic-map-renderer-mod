@@ -17,6 +17,7 @@ The release notes on GitHub and Modrinth come from here
 - **Frames come in families with colours.** "Shield" (grey, gold, paper) and "Rose" (silver, gold, parchment) replace grey, wood, paper, compass, clock and cartographer; your choice moves over by itself. Every biome of the "biome" frame has its own colours too, and you can set each one in the chooser.
 - **New frame "Letters"** with upright letters N, E, S, W, inside or outside the minimap, in four colours.
 - **Make a mark see-through with the middle mouse button.** The right click now opens the frame chooser.
+- **HD marks.** Every mark of a frame can show a finer HD picture: the middle mouse button on a mark in the menu now steps through pixel, HD and see-through. HD looks smooth from GUI scale 2 up; at GUI scale 1 the mark stays in pixels. The handle turns HD as soon as a mark does.
 - **Softer frames.** The bands of every frame blend softly into each other, have a fine bevel and cast a light shadow onto the map; round frames get smooth edges. They're drawn in screen pixels, so they look even at every GUI scale.
 
 ## 0.2.68

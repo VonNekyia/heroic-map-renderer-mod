@@ -216,8 +216,12 @@ F3+T und Ressourcenpakete laden ihn neu. Bei „biom“ je Kategorie
 - **Geladen** einmal je Variante, auch ein Fehlschlag bleibt gemerkt, bis
   der Atlas neu lädt (`Skin.von`); sonst stünde je Frame eine Warnung im
   Log. Ebenso `varianten.txt` je Familie.
+- **HD-Bilder** `<bild>_hd.png` und `<bild>_hd_aktiv.png` je Bild der
+  Marken und des Griffs, 4 Texel je Einheit, ausserhalb des Atlas unter
+  `assets/heroicmap/textures/rahmen/<familie>/<ordner>/`, siehe „HD“.
 - **Quellen** unter `docs/bilder/quellen/rahmen/<familie>/<variante>.aseprite`,
-  eine Ebene je Bild, vom Designer; dazu `tafel.aseprite`.
+  die HD-Bilder in `<variante>_hd.aseprite`, eine Ebene je Bild, vom
+  Designer; dazu `tafel.aseprite`.
 
 ## Bänder
 
@@ -399,14 +403,16 @@ Wo eine Marke liegt, sagt `lage`, für N `lage_norden` (`Skin.Lage`,
 
 ## Verzierungen
 
-Jede Marke N, O, S, W steht für sich an oder durchsichtig, so hat es der
-User am 20.10. gewählt (mod#175). Einen Schalter im Untermenü gibt es dafür
-nicht mehr.
+Jede Marke N, O, S, W steht für sich in Pixeln, in HD oder durchsichtig.
+Für sich an oder durchsichtig hat es der User am 20.10. gewählt (mod#175),
+HD kam mit dem Satz des Designers dazu, siehe „HD“. Einen Schalter im
+Untermenü gibt es dafür nicht mehr.
 
-- **Die mittlere Maustaste** im Menü auf eine Marke, ohne zu ziehen, macht
-  nur sie durchsichtig; ein zweites Mal holt sie zurück
-  (`Minimap.schalteVerzierung`). Bis 0.2.68 war es der Rechtsklick; den
-  braucht jetzt der Wähler, siehe
+- **Die mittlere Maustaste** im Menü auf eine Marke, ohne zu ziehen,
+  schaltet nur sie reihum: Pixel, HD, durchsichtig, wieder Pixel
+  (`Minimap.schalteVerzierung`). Der Tooltip nennt, was gerade gilt. Bis
+  0.2.68 machte der Rechtsklick sie durchsichtig und zurück; den braucht
+  jetzt der Wähler, siehe
   [0032](entscheidungen/0032-rahmen-familien-und-waehler.md). Ziehen heisst
   wie beim Linksklick: Die Maus wandert mehr als 3 Einheiten
   (`MinimapKlick.WEG`).
@@ -418,9 +424,41 @@ nicht mehr.
 - **Gespeichert** als `verzierungen_aus` in `heroicmap.properties`, die
   Buchstaben der durchsichtigen Marken, etwa `N,S`; leer heisst alle an,
   die Vorgabe. Eine Datei von vorher hat `verzierungen=false`; das heisst
-  alle vier durchsichtig, so springt nichts (`Minimap.marken`).
+  alle vier durchsichtig, so springt nichts (`Minimap.marken`). Die
+  Marken in HD stehen ebenso in `verzierungen_hd`; eine durchsichtige ist
+  nie zugleich HD.
 - Nur die vier Marken, nicht die Ecken, so hat es der Reviewer entschieden;
   in den Ecken zeichnet der Rahmen ohnehin nichts ausser dem Griff.
+
+## HD
+
+Jede Marke kann statt der Pixelfassung eine feinere zeigen, mit 4 Texeln je
+Einheit (`Skin.D`), vom Designer gezeichnet. Warum so:
+[0035](entscheidungen/0035-hd-marken-ausserhalb-des-atlas.md).
+
+- **Wahl** je Marke mit der mittleren Taste, siehe „Verzierungen“. Der
+  Griff im Menü steht in HD, sobald eine Marke HD zeigt; eine eigene Wahl
+  hat er nicht.
+- **Gezeichnet** ab GUI-Massstab 2 aus einer eigenen kleinen Textur mit k
+  Pixeln je Einheit: das HD-Bild nach Fläche gemittelt, mit
+  vormultipliziertem Alpha, so bleibt am Rand kein dunkler Saum
+  (`Skin.verkleinere`). Bei 2 sind es je 2 × 2 Texel, bei 3 nach Fläche
+  4 : 3, bei 4 das Bild unverändert, darüber vergrössert. Bei
+  GUI-Massstab 1 zeichnet der Mod die Pixelfassung; HD wäre dort Brei.
+- **Geladen** beim ersten Zeichnen, nur für die gezeigte Variante und den
+  Massstab, in der Liste der Texturen der Bänder: Was 2 s nicht gezeichnet
+  wurde, fällt mit der nächsten neuen (`Skin.hd`, `Skin.textur`). Fehlt ein
+  HD-Bild oder hat es nicht genau die 4-fache Grösse der Pixelfassung,
+  zeichnet der Teil seine Pixelfassung, bis der Atlas neu lädt.
+- **Nicht im Atlas des GUI:** Die HD-Bilder liegen unter
+  `textures/rahmen/`, nicht unter `textures/gui/sprites/`, siehe „Dateien“.
+  Im Atlas brauchten sie dauerhaft 1,35 MiB.
+- **Schatten** wie bei der Pixelfassung: das Bild schwarz zu 50 % um
+  (+1, +1) Einheiten.
+- **Im Wähler** zeigen die Vorschauen die Marken so, wie sie je Marke
+  gestellt sind: durchsichtige fehlen, die in HD stehen in HD.
+
+![„rose“ in „silber“ mit allen Marken in HD, eckig und rund, bei GUI-Massstab 2](bilder/rahmen-rose-hd.png)
 
 ## Im Menü
 
@@ -531,6 +569,9 @@ Geschätzt, nicht gemessen:
   Familie, bei `biom` über alle Kategorien und ihre Varianten, rund 20
   Nachschlagen in Tabellen; den Abstand je Variante rechnet der Mod einmal
   beim Laden, bei `lage=aussen` über 360 Drehungen eckig und rund.
+- **HD:** je Teil und GUI-Massstab eine Textur, nur für die gezeigte
+  Variante, bei GUI-Massstab 4 für den Griff 28 × 28 Pixel, 3 KiB; die
+  Mittelung einmal beim Laden. Im Jar 224 HD-Bilder, 569 KiB.
 - **Wähler:** offen je Frame 4 Vorschauen mit Bändern oder Ring und je 4
   Marken, dazu die Farbfelder; geschlossen nichts.
 
@@ -538,7 +579,8 @@ Geschätzt, nicht gemessen:
 
 Der Gametest `Bilder` nimmt jede Familie in ihrer ersten Variante eckig und
 rund bei 4 px auf, `rahmen-<familie>.png`, dazu `lettern` aussen
-(`rahmen-lettern-aussen.png`), das Menü mit `rose` in `gold`, mit
+(`rahmen-lettern-aussen.png`), `rose` mit allen Marken in HD
+(`rahmen-rose-hd.png`), das Menü mit `rose` in `gold`, mit
 Verzierungen aus und der Maus auf N (`rahmen-menue-halb.png`) und mit dem
 offenen Wähler (`rahmen-waehler.png`), siehe [Minimap](minimap.md),
 „Bilder“. Diese Bilder stammen aus einem Lauf des Gametests in der CI mit

@@ -1155,13 +1155,15 @@ public final class Bilder implements FabricClientGameTest {
     }
 
     /**
-     * Jede Familie in ihrer ersten Variante eckig und rund nebeneinander, „lettern“ auch aussen, bei 4 px und Zoom 4; dazu das
-     * Menü mit dem offenen Wähler. Siehe docs/rahmen.md.
+     * Jede Familie in ihrer ersten Variante eckig und rund nebeneinander, „lettern“ auch aussen, „rose“ auch mit allen Marken
+     * in HD, bei 4 px und Zoom 4; dazu das Menü mit dem offenen Wähler. Siehe docs/rahmen.md.
      */
     private static void rahmen(ClientGameTestContext context) {
-        String[][] bilder = {{"biom", null}, {"schild", null}, {"rose", null}, {"lettern", null}, {"lettern", "tinte_aussen"}};
+        String[][] bilder = {{"biom", null}, {"schild", null}, {"rose", null}, {"rose", null, "hd"}, {"lettern", null},
+            {"lettern", "tinte_aussen"}};
         for (String[] wahl : bilder) {
-            String skin = wahl[0] + (wahl[1] == null ? "" : "-aussen");
+            boolean hd = wahl.length > 2;
+            String skin = wahl[0] + (wahl[1] == null ? "" : "-aussen") + (hd ? "-hd" : "");
             BufferedImage[] teile = new BufferedImage[2];
             for (int i = 0; i < teile.length; i++) {
                 boolean rund = i == 1;
@@ -1170,6 +1172,11 @@ public final class Bilder implements FabricClientGameTest {
                     // Ohne Angabe die erste Variante; „biom“ hat sie je Kategorie.
                     Minimap.INSTANZ.setzeVariante(wahl[0], wahl[1]);
                     Minimap.INSTANZ.setzeRund(rund);
+                    for (int m = 0; m < 4 && hd; m++) {
+                        if (!Minimap.INSTANZ.hd(m)) {
+                            Minimap.INSTANZ.schalteVerzierung(m);
+                        }
+                    }
                 });
                 context.waitTicks(2);
                 teile[i] = mitRand(context, context.takeScreenshot(TestScreenshotOptions.of("rahmen-" + skin + "-" + i).disableCounterPrefix()));
@@ -1184,6 +1191,14 @@ public final class Bilder implements FabricClientGameTest {
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
+            }
+            // Aus HD über durchsichtig zurück zu Pixel.
+            for (int m = 0; m < 4 && hd; m++) {
+                int marke = m;
+                context.runOnClient(mc -> {
+                    Minimap.INSTANZ.schalteVerzierung(marke);
+                    Minimap.INSTANZ.schalteVerzierung(marke);
+                });
             }
         }
         // Das Menü mit rose/gold: an der Ecke zur Mitte der Griff, ohne den weissen Umriss.

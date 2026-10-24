@@ -202,6 +202,8 @@ public final class Minimap {
     private final Map<String, String> varianten = new HashMap<>();
     /** Die Marken N, O, S, W des Rahmens, die durchsichtig sind: Bit i für Richtung i, 0 N bis 3 W. Siehe docs/rahmen.md, „Verzierungen“. */
     private int verzierungenAus;
+    /** Die Marken, die in HD stehen, Bits wie {@link #verzierungenAus}; eine Marke ist nie beides. Siehe docs/rahmen.md, „HD“. */
+    private int hd;
     /** Alle vier Marken. */
     static final int ALLE_MARKEN = 0b1111;
     /** Die Gruppe „Technik“ im Untermenü ist aufgeklappt. Siehe docs/minimap.md, „Bedienung“. */
@@ -514,9 +516,10 @@ public final class Minimap {
         return verzierungenAus == 0;
     }
 
-    /** Alle vier Marken an oder durchsichtig. */
+    /** Alle vier Marken an oder durchsichtig; durchsichtig ist keine mehr HD. */
     void setzeVerzierungen(boolean an) {
         verzierungenAus = an ? 0 : ALLE_MARKEN;
+        hd = an ? hd : 0;
     }
 
     /** Ist die Marke in Richtung {@code marke} (0 N bis 3 W) durchsichtig? */
@@ -524,9 +527,31 @@ public final class Minimap {
         return (verzierungenAus & 1 << marke) != 0;
     }
 
-    /** Ein Rechtsklick im Menü: die Marke durchsichtig oder zurück. Siehe docs/rahmen.md, „Verzierungen“. */
+    /** Steht die Marke in Richtung {@code marke} in HD? */
+    boolean hd(int marke) {
+        return (hd & 1 << marke) != 0;
+    }
+
+    /** Die durchsichtigen Marken und die in HD, Bit i für Richtung i. */
+    int ausMarken() {
+        return verzierungenAus;
+    }
+
+    int hdMarken() {
+        return hd;
+    }
+
+    /** Die mittlere Taste im Menü: die Marke von Pixel zu HD, zu durchsichtig, zurück zu Pixel. Siehe docs/rahmen.md, „Verzierungen“. */
     void schalteVerzierung(int marke) {
-        verzierungenAus ^= 1 << marke;
+        int bit = 1 << marke;
+        if ((verzierungenAus & bit) != 0) {
+            verzierungenAus &= ~bit;
+        } else if ((hd & bit) != 0) {
+            hd &= ~bit;
+            verzierungenAus |= bit;
+        } else {
+            hd |= bit;
+        }
     }
 
     boolean technikOffen() {
@@ -586,7 +611,7 @@ public final class Minimap {
             }
             Ornament o = menueMarken.get(j);
             boolean an = MARKEN[j] == hervor;
-            menueSkin.ornament(g, o.teil() + (an ? 1 : 0), o.ecke(), o.x(), o.y(), an ? 1 : 0.5f, o.winkel());
+            menueSkin.ornament(g, o.teil() + (an ? 1 : 0), o.ecke(), o.x(), o.y(), an ? 1 : 0.5f, o.winkel(), hd(MARKEN[j]));
         }
     }
 
@@ -763,6 +788,7 @@ public final class Minimap {
         // Vor mod#175 galt ein Schalter für alle vier; aus heisst alle vier durchsichtig, so springt nichts.
         String aus = p.getProperty("verzierungen_aus");
         verzierungenAus = aus != null ? marken(aus) : "false".equals(p.getProperty("verzierungen")) ? ALLE_MARKEN : 0;
+        hd = marken(p.getProperty("verzierungen_hd", "")) & ~verzierungenAus;
         technikOffen = "auf".equals(p.getProperty("technik"));
         ablage = switch (String.valueOf(p.getProperty("ablage")).trim()) {
             case "hash" -> Downloads.Ablage.HASH;
@@ -802,6 +828,7 @@ public final class Minimap {
         }
         varianten.forEach((familie, v) -> p.setProperty("rahmen_variante." + familie, v));
         p.setProperty("verzierungen_aus", marken(verzierungenAus));
+        p.setProperty("verzierungen_hd", marken(hd));
         p.setProperty("technik", technikOffen ? "auf" : "zu");
         p.setProperty("ablage", ablage.name().toLowerCase(Locale.ROOT));
         if (Float.isNaN(anteil)) {
@@ -1549,12 +1576,17 @@ public final class Minimap {
     private void zeichneRahmen(GuiGraphicsExtractor g, Skin skin, Rahmen r, Drehung.Lage lage, int k, float baender, float deckung) {
         skin.baender(g, r.x(), r.y(), r.seite(), k, rund, baender);
         for (Ornament o : ornamente(r, skin.baender(), rund, skin.marken, lage, k, verzierungenAus, griffEcke, griffAktiv, hervor)) {
-            skin.ornament(g, o.teil(), o.ecke(), o.x(), o.y(), deckung, o.winkel());
+            skin.ornament(g, o.teil(), o.ecke(), o.x(), o.y(), deckung, o.winkel(), hd(o, hd));
         }
     }
 
-    /** Ein Bild über den Bändern: Teil aus {@link Skin}, Ecke zum Spiegeln, Mitte in Einheiten des GUI, Winkel. */
-    record Ornament(int teil, int ecke, double x, double y, double winkel) {
+    /** Ein Bild über den Bändern: Teil aus {@link Skin}, Ecke zum Spiegeln, Mitte in Einheiten des GUI, Winkel, Richtung 0 N bis 3 W, beim Griff −1. */
+    record Ornament(int teil, int ecke, double x, double y, double winkel, int richtung) {
+    }
+
+    /** Ob das Ornament in HD steht: eine Marke nach ihrer Wahl in {@code hd}, der Griff, sobald eine Marke HD zeigt. */
+    static boolean hd(Ornament o, int hd) {
+        return o.richtung() >= 0 ? (hd & 1 << o.richtung()) != 0 : hd != 0;
     }
 
     /**
@@ -1582,12 +1614,12 @@ public final class Minimap {
                     case AUSSEN -> winkel + i * Math.PI / 2;
                     case AUFRECHT -> 0;
                 };
-                aus.add(new Ornament(teil + (i == hervor ? 1 : 0), 0, p[0], p[1], w));
+                aus.add(new Ornament(teil + (i == hervor ? 1 : 0), 0, p[0], p[1], w, i));
             }
         }
         if (griffEcke >= 0) {
             double[] p = Skin.ecken(r.x(), r.y(), r.seite(), r.seite(), baender, rund)[griffEcke];
-            aus.add(new Ornament(Skin.GRIFF + (griffAktiv ? 1 : 0), griffEcke, p[0], p[1], 0));
+            aus.add(new Ornament(Skin.GRIFF + (griffAktiv ? 1 : 0), griffEcke, p[0], p[1], 0, -1));
         }
         return aus;
     }
