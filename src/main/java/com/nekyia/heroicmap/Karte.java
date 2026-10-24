@@ -1728,11 +1728,19 @@ final class Karte extends Screen {
         // Ein Klick neben das Eingabefeld und seine Regler bricht die Eingabe ab und tut sonst nichts; einer darauf setzt den Cursor
         // oder schiebt den Regler.
         if (eingabe != null) {
-            if (eingabe.isMouseOver(e.x(), e.y()) || auf(schriftRegler, e.x(), e.y()) || auf(biegungRegler, e.x(), e.y())
-                    || auf(gewichtRegler, e.x(), e.y()) || auf(schriftartKnopf, e.x(), e.y())) {
-                super.mouseClicked(e, doppelt);
-            } else {
+            // Nur an das Feld und seine Regler, nie an einen Knopf darunter: Rechts reichen sie bis an die Spalte, und das Spiel gäbe
+            // den Klick dem Knopf, der früher angelegt ist.
+            AbstractWidget getroffen = null;
+            for (AbstractWidget w : new AbstractWidget[] {eingabe, schriftRegler, biegungRegler, gewichtRegler, schriftartKnopf}) {
+                if (getroffen == null && auf(w, e.x(), e.y())) {
+                    getroffen = w;
+                }
+            }
+            if (getroffen == null) {
                 schliesseEingabe();
+            } else if (getroffen.mouseClicked(e, doppelt)) {
+                setFocused(getroffen);
+                setDragging(e.button() == InputConstants.MOUSE_BUTTON_LEFT);
             }
             klickVerbraucht = true;
             return true;
