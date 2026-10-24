@@ -262,6 +262,20 @@ class OrtTest {
     }
 
     @Test
+    void ausweisNachUmzug(@TempDir Path w) throws IOException {
+        Path welt = w.resolve("play.example.net/karte-build/welt-" + HASH);
+        Files.createDirectories(welt);
+        // Ohne Ausweis legt der Umzug keinen an.
+        Ort.ausweisNachUmzug(welt, new Ort.Teile("play.example.net", "build", HASH));
+        assertFalse(Files.exists(welt.resolve(Ausweis.DATEI)));
+        // Mit Ausweis: der neue Server, das Netz unbekannt bis zum nächsten Besuch; die Welten bleiben.
+        Ausweis a = Ausweis.neu(HASH).mit("0", "main").besucht(DIM, java.time.Instant.parse("2026-10-24T10:00:00Z"), java.time.ZoneOffset.UTC);
+        a.schreibe(welt);
+        Ort.ausweisNachUmzug(welt, new Ort.Teile("play.example.net", "build", HASH));
+        assertEquals(a.mit("", "build"), Ausweis.lies(welt));
+    }
+
+    @Test
     void ganzOderGarNicht(@TempDir Path w) throws IOException {
         Path alt = welt(w), neu = w.resolve("play.example.net/karte-build/welt-" + HASH);
         // zeigt.txt lässt sich nicht lesen: Der Umzug scheitert nach dem Verschieben und nach dem Umbenennen der eigenen Karte.
