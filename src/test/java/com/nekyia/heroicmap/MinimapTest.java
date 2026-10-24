@@ -344,8 +344,7 @@ class MinimapTest {
         // Eine Datei von vor den Widgets: koordinaten=xyz wird das Widget der Koordinaten mit y; geschrieben wird nur noch
         // widgets. Siehe docs/widgets.md, „Gespeichert“.
         Path datei = ordner.resolve("heroicmap.properties");
-        Files.writeString(datei, "koordinaten=xyz
-");
+        Files.writeString(datei, "koordinaten=xyz\n");
         Minimap m = new Minimap();
         m.lies(datei);
         assertEquals(List.of(new Widgets.Widget(Widgets.Art.KOORDINATEN, 1, Widgets.Anker.UNTEN)), m.widgets());
@@ -357,9 +356,7 @@ class MinimapTest {
         assertEquals("koordinaten:xyz:unten", p.getProperty("widgets"));
         assertNull(p.getProperty("koordinaten"));
         // Mit widgets gilt koordinaten nicht mehr, auch leer: dann keine Koordinaten.
-        Files.writeString(datei, "koordinaten=xyz
-widgets=
-");
+        Files.writeString(datei, "koordinaten=xyz\nwidgets=\n");
         m.lies(datei);
         assertEquals(List.of(), m.widgets());
         assertEquals(Minimap.Koordinaten.AUS, m.koordinaten());
