@@ -28,7 +28,7 @@ final class Kartenliste extends Screen {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final int TEXT = 0xFFFFFFFF;
-    private static final int ZEILE = 24, OBEN = 44, KNOPF = 60, ZUSTAND = 72, ZEIGER = 36;
+    private static final int ZEILE = 24, OBEN = 44, KNOPF = 60, ZUSTAND = 72, ORT = 44, ZEIGER = 36;
 
     private final Screen zurueck;
     /** Null, solange gezählt wird. */
@@ -104,6 +104,7 @@ final class Kartenliste extends Screen {
             for (int i = erste; i < Math.min(bestand.karten().size(), erste + zeilen()); i++) {
                 Laden.AufPlatte e = bestand.karten().get(i);
                 int y = OBEN + (i - erste) * ZEILE;
+                addRenderableWidget(ort(e, width - KNOPF - ZUSTAND - ORT - 16, y));
                 addRenderableWidget(zustand(e, welt, ziel, wer, width - KNOPF - ZUSTAND - 12, y));
                 addRenderableWidget(Button.builder(Component.translatable("heroicmap.liste.loeschen"), b -> frage(e))
                         .bounds(width - KNOPF - 8, y, KNOPF, 20).build());
@@ -151,6 +152,28 @@ final class Kartenliste extends Screen {
                 .withStyle(an ? ChatFormatting.GREEN : ChatFormatting.YELLOW), b -> zeige(e, welt, wer, dort)).bounds(x, y, ZUSTAND, 20).build();
         knopf.active = !an;
         return knopf;
+    }
+
+    /**
+     * Der Knopf „Ort …“: Adresse, Server und Hash des Ordners der Welt oder nur dieses Baums ändern. Grau mit Grund für
+     * Karten ohne Adresse und Hash, etwa aus dem Einzelspieler, und solange ein Download in den Baum läuft. Siehe
+     * docs/download.md, „Ort ändern“.
+     */
+    private Button ort(Laden.AufPlatte e, int x, int y) {
+        Ort.Teile teile = Ort.teile(Downloads.wurzel(), e.ordner().getParent());
+        Button knopf = Button.builder(Component.translatable("heroicmap.liste.ort"), b -> minecraft.gui.setScreen(new OrtFenster(this, e, teile)))
+                .bounds(x, y, ORT, 20).build();
+        if (teile == null || Downloads.INSTANZ.belegt(e.ordner())) {
+            knopf.active = false;
+            knopf.setTooltip(Tooltip.create(Component.translatable(teile == null ? "heroicmap.liste.ort.nicht" : "heroicmap.liste.belegt")));
+        }
+        return knopf;
+    }
+
+    /** Nach „Ort ändern“, bevor die Liste wieder aufgeht: Sie zählt neu und nennt einen Fehler. */
+    void umgezogen(boolean ok) {
+        bestand = null;
+        hinweis = ok ? null : Component.translatable("heroicmap.ort.fehler");
     }
 
     /** Dieser Server zeigt ab jetzt diesen Baum für seine Dimension, {@code dort} im Ziel des Zeigers; der bisherige ruht. */
@@ -336,7 +359,7 @@ final class Kartenliste extends Screen {
             if (bestand.karten().isEmpty()) {
                 g.centeredText(font, Component.translatable("heroicmap.liste.keine"), width / 2, height / 2, TEXT);
             }
-            int platz = width - KNOPF - ZUSTAND - 28;
+            int platz = width - KNOPF - ZUSTAND - ORT - 32;
             for (int i = erste; i < Math.min(bestand.karten().size(), erste + zeilen()); i++) {
                 Laden.AufPlatte e = bestand.karten().get(i);
                 int y = OBEN + (i - erste) * ZEILE;

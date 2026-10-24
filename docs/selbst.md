@@ -104,7 +104,10 @@ Server, [0029](entscheidungen/0029-was-ein-server-zeigt-gilt-je-server.md).
 - **Die Zeile „Server“** im Fenster „Karten dieses Servers“ unter dem Titel:
   grün „Server: build · erkannt“ mit Namen, gelb „wartet auf Antwort“, grau
   „Server ohne Namen“ bei einem Plugin ohne `backend` oder „Server ohne
-  Heroic Map“; im Einzelspieler keine (`Auswahl.server`).
+  Heroic Map“; im Einzelspieler keine (`Auswahl.server`). Der Tooltip bei
+  „Server ohne Namen“ sagt, was das heisst und was hilft: „Ort …“ in der
+  Kartenliste, siehe [Download](download.md), „Ort ändern“, und für
+  Admins `karte.name` im Plugin.
 - **Ruht die eigene Karte,** heisst der Knopf „Selbst · ruht · `<n>` px“;
   ein Klick zeigt sie wieder, der Download ruht dann (`Selbst.wiederAn`).
 - **Alte eigene Karten** ohne `server` gehören einem Server ohne Namen. Ein

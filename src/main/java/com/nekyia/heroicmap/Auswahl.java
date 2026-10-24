@@ -10,6 +10,7 @@ import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 
 /**
  * Die Karten, die der Server anbietet, je Baum ein Knopf je Massstab mit seiner Grösse. Ein Knopf
@@ -119,6 +120,12 @@ final class Auswahl extends Screen {
         Component server = server();
         if (server != null) {
             g.centeredText(font, server, width / 2, 27, TEXT);
+            // Ohne Namen: was das heisst und was hilft. Siehe docs/selbst.md, „Wahl“.
+            if (server.getContents() instanceof TranslatableContents k && k.getKey().equals("heroicmap.auswahl.server.ohne_namen")
+                    && Math.abs(mausX - width / 2) <= font.width(server) / 2 && mausY >= 26 && mausY < 36) {
+                g.setTooltipForNextFrame(font.split(Component.translatable("heroicmap.auswahl.server.ohne_namen.beschreibung"), 250),
+                        mausX, mausY);
+            }
         }
         if (baeume.isEmpty()) {
             g.centeredText(font, Component.translatable("heroicmap.angebot.keins"), width / 2, height / 2, TEXT);

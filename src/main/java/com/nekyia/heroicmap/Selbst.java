@@ -277,6 +277,16 @@ public final class Selbst {
         });
     }
 
+    /** Zeichnet „Selbst“ gerade in einen Baum im Ordner der Welt {@code welt}? Siehe docs/download.md, „Ort ändern“. */
+    boolean zeichnetIn(Path welt) {
+        return satz != null && satz.ordner().getParent().getParent().equals(welt);
+    }
+
+    /** Führt {@code arbeit} im Worker aus, nach allem, was er noch schreibt; so zieht kein Baum um, in den er noch schreibt. */
+    void nachArbeit(Runnable arbeit) {
+        worker.execute(arbeit);
+    }
+
     /**
      * Löscht einen selbst gezeichneten Baum im Worker, nach allem, was dort noch wartet, und ruft
      * dann {@code danach} auf dem Render-Thread, mit wahr, wenn alles weg ist. Wird gerade in ihn
