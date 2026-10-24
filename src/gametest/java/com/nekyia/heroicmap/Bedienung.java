@@ -4596,6 +4596,26 @@ public final class Bedienung implements FabricClientGameTest {
         Minimap.Rahmen o = rahmen(context);
         spielerKlick(context, maus, k, o.x() + o.seite() + 1.5, o.y() + o.seite() / 2.0);
         waehlerOffen(context, true, "Klick auf die halbe Marke O, ohne Rahmen");
+        // Die Vorschauen zeigen die Marken so, wie sie gestellt sind: Durchsichtig fehlt N oben auf der Vorschau „schild“. Gezählt
+        // nur in der deckenden Karte der Vorschau; hinter der Tafel läuft die Welt weiter.
+        double[] vorschau = context.computeOnClient(mc -> waehler(mc).vorschauMitte(Skin.FAMILIEN.indexOf("schild"),
+                mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight()));
+        // Hier sind alle Marken durchsichtig; für den Vergleich erst alle in Pixeln, dann N durchsichtig, danach wieder alle.
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeVerzierungen(true));
+        zierIst(context, 0, 0, "Wähler, alle Marken in Pixeln");
+        BufferedImage mitN = foto(context, "waehler-n-da");
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.schalteVerzierung(0);
+            Minimap.INSTANZ.schalteVerzierung(0);
+        });
+        zierIst(context, 0, 0b0001, "Wähler, N durchsichtig");
+        BufferedImage ohneN = foto(context, "waehler-n-weg");
+        context.runOnClient(mc -> Minimap.INSTANZ.setzeVerzierungen(false));
+        double vorschauOben = vorschau[1] - Waehler.SEITE / 2.0;
+        int nWeg = anders(mitN, ohneN, vorschau[0] - 3, vorschauOben, vorschau[0] + 3, vorschauOben + 4, k);
+        if (nWeg < 6 * k * k) {
+            throw new AssertionError("Wähler mit N durchsichtig: in der Vorschau „schild“ nur " + nWeg + " Pixel bei N anders");
+        }
         // Das zweite Farbfeld unter „schild“ färbt nur die Vorschau; erst die Vorschau übernimmt Familie und Farbe.
         klickImWaehler(context, maus, k, "feld", Skin.FAMILIEN.indexOf("schild"), 1);
         waehlerOffen(context, true, "Klick auf ein Farbfeld unter „schild“");
@@ -4663,15 +4683,13 @@ public final class Bedienung implements FabricClientGameTest {
         maus.pressKey(InputConstants.KEY_ESCAPE);
         context.waitTicks(2);
         waehlerOffen(context, false, "Untermenü, Esc im Wähler");
-        // Die mittlere Taste auf S: nur S durchsichtig, ein zweites Mal zurück.
+        // Die mittlere Taste auf S reihum: HD, durchsichtig, Pixel, nur S.
         mitteZitternd(context, maus, k, sx, sy);
-        if (!context.computeOnClient(mc -> Minimap.INSTANZ.verzierungAus(2) && !Minimap.INSTANZ.verzierungAus(0))) {
-            throw new AssertionError("Untermenü, mittlere Taste auf S: S nicht allein durchsichtig");
-        }
+        zierIst(context, 0b0100, 0, "Untermenü, mittlere Taste auf S");
         mitteZitternd(context, maus, k, sx, sy);
-        if (!context.computeOnClient(mc -> Minimap.INSTANZ.verzierungen())) {
-            throw new AssertionError("Untermenü, zweite mittlere Taste auf S holte sie nicht zurück");
-        }
+        zierIst(context, 0, 0b0100, "Untermenü, zweite mittlere Taste auf S");
+        mitteZitternd(context, maus, k, sx, sy);
+        zierIst(context, 0, 0, "Untermenü, dritte mittlere Taste auf S");
         aussehenIst(context, Minimap.Darstellung.DURCHSICHTIG, Skin.BIOM, "Untermenü, nach S");
         warte250();
     }
@@ -5172,7 +5190,11 @@ public final class Bedienung implements FabricClientGameTest {
                 // O, S und W: je ein Kasten um die Marke, 10 Einheiten zu beiden Seiten, von 14 innen bis 6 aussen.
                 for (int i = 1; i <= 3; i++) {
                     int marke = i;
-                    context.runOnClient(mc -> Minimap.INSTANZ.schalteVerzierung(marke));
+                    // Zweimal: über HD nach durchsichtig; ein drittes Mal zurück zu Pixel.
+                    context.runOnClient(mc -> {
+                        Minimap.INSTANZ.schalteVerzierung(marke);
+                        Minimap.INSTANZ.schalteVerzierung(marke);
+                    });
                     BufferedImage ohne = imSpiel(context, "biom-marken-" + rund + "-" + i);
                     context.runOnClient(mc -> Minimap.INSTANZ.schalteVerzierung(marke));
                     double ux = i == 1 ? 1 : i == 3 ? -1 : 0, uy = i == 2 ? 1 : 0;
@@ -5205,14 +5227,13 @@ public final class Bedienung implements FabricClientGameTest {
                     Minimap.Ornament o = Minimap.ornamente(r, skin.baender(), rund, skin.marken, null, k, 0, -1, false, -1).get(1);
                     return new double[] {o.x(), o.y() - 6};
                 });
+                String wo = "Mittlere Taste auf S" + (rund ? " rund" : " eckig") + " bei „biom“, 6 Einheiten innen von seiner Mitte";
                 mitteZitternd(context, maus, k, s[0], s[1]);
-                boolean[] aus = context.computeOnClient(mc -> new boolean[] {Minimap.INSTANZ.verzierungAus(0), Minimap.INSTANZ.verzierungAus(1),
-                        Minimap.INSTANZ.verzierungAus(2), Minimap.INSTANZ.verzierungAus(3)});
-                if (aus[0] || aus[1] || !aus[2] || aus[3]) {
-                    throw new AssertionError("Mittlere Taste auf S" + (rund ? " rund" : " eckig") + " bei „biom“, 6 Einheiten innen von seiner Mitte: "
-                            + "durchsichtig " + Arrays.toString(aus) + " statt nur S");
-                }
+                zierIst(context, 0b0100, 0, wo);
                 mitteZitternd(context, maus, k, s[0], s[1]);
+                zierIst(context, 0, 0b0100, wo + ", zweimal");
+                mitteZitternd(context, maus, k, s[0], s[1]);
+                zierIst(context, 0, 0, wo + ", dreimal");
             }
         } finally {
             context.runOnClient(mc -> {
@@ -5274,31 +5295,24 @@ public final class Bedienung implements FabricClientGameTest {
                 }
             }
 
-            // Die mittlere Taste auf N: nur N durchsichtig; im Spiel fehlt sie.
+            // Die mittlere Taste auf N reihum: HD, durchsichtig, Pixel, nur N. Im Spiel sieht N in HD anders aus, ab GUI-Massstab 2,
+            // und fehlt durchsichtig.
             Minimap.Rahmen r = rahmen(context);
             double nx = r.x() + r.seite() / 2.0, ny = r.y() + baender(context) / 2.0;
             BufferedImage da = imSpiel(context, "symbole-n-da");
             mitteZitternd(context, maus, k, nx, ny);
-            boolean[] aus = context.computeOnClient(mc -> new boolean[] {Minimap.INSTANZ.verzierungAus(0), Minimap.INSTANZ.verzierungAus(1),
-                    Minimap.INSTANZ.verzierungAus(2), Minimap.INSTANZ.verzierungAus(3)});
-            if (!aus[0] || aus[1] || aus[2] || aus[3]) {
-                throw new AssertionError("Mittlere Taste auf N: durchsichtig " + Arrays.toString(aus) + " statt nur N");
-            }
+            zierIst(context, 0b0001, 0, "Mittlere Taste auf N");
+            BufferedImage hd = imSpiel(context, "symbole-n-hd");
+            mitteZitternd(context, maus, k, nx, ny);
+            zierIst(context, 0, 0b0001, "Zweite mittlere Taste auf N");
             BufferedImage weg = imSpiel(context, "symbole-n-weg");
-            int anders = 0;
-            // 16 × 16 Einheiten um N, soweit im Bild: Die Minimap steht oben am Schirm.
-            for (int y = Math.max(0, (int) ((ny - 8) * k)); y < Math.min(da.getHeight(), (ny + 8) * k); y++) {
-                for (int x = Math.max(0, (int) ((nx - 8) * k)); x < Math.min(da.getWidth(), (nx + 8) * k); x++) {
-                    anders += da.getRGB(x, y) != weg.getRGB(x, y) ? 1 : 0;
-                }
-            }
-            if (anders < 20) {
-                throw new AssertionError("Mittlere Taste auf N: im Spiel nur " + anders + " Pixel bei N anders");
+            int inHd = anders(da, hd, nx, ny, k), ohne = anders(da, weg, nx, ny, k);
+            if (k >= 2 && inHd < 20 || ohne < 20) {
+                throw new AssertionError("Mittlere Taste auf N bei GUI-Massstab " + k + ": im Spiel in HD " + inHd + ", durchsichtig " + ohne
+                        + " Pixel bei N anders");
             }
             mitteZitternd(context, maus, k, nx, ny);
-            if (!context.computeOnClient(mc -> Minimap.INSTANZ.verzierungen())) {
-                throw new AssertionError("Zweite mittlere Taste auf N holte sie nicht zurück");
-            }
+            zierIst(context, 0, 0, "Dritte mittlere Taste auf N");
             // Rechts von N gezogen: verschiebt nur.
             ziehe(context, maus, RECHTS, nx, ny, -2 * k, 0);
             Minimap.Rahmen gezogen = rahmen(context);
@@ -5537,6 +5551,41 @@ public final class Bedienung implements FabricClientGameTest {
             case Anzeige a -> a.waehler();
             case null, default -> throw new AssertionError("Kein Menü offen, sondern " + mc.gui.screen());
         };
+    }
+
+    /** Prüft, welche Marken in HD und welche durchsichtig stehen, Bit i für Richtung i, 0 N bis 3 W. */
+    private static void zierIst(ClientGameTestContext context, int hd, int aus, String was) {
+        int[] ist = context.computeOnClient(mc -> new int[] {Minimap.INSTANZ.hdMarken(), Minimap.INSTANZ.ausMarken()});
+        if (ist[0] != hd || ist[1] != aus) {
+            throw new AssertionError(was + ": HD " + Minimap.marken(ist[0]) + ", durchsichtig " + Minimap.marken(ist[1]) + " statt HD "
+                    + Minimap.marken(hd) + ", durchsichtig " + Minimap.marken(aus));
+        }
+    }
+
+    /** Ein Bildschirmfoto, wie es ist, ohne das Menü zu schliessen. */
+    private static BufferedImage foto(ClientGameTestContext context, String name) {
+        context.waitTicks(2);
+        try {
+            return ImageIO.read(context.takeScreenshot(TestScreenshotOptions.of(name).disableCounterPrefix()).toFile());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** Wie viele Pixel zweier Bildschirmfotos in 16 × 16 Einheiten um (x, y) anders sind, soweit im Bild. */
+    private static int anders(BufferedImage a, BufferedImage b, double x, double y, int k) {
+        return anders(a, b, x - 8, y - 8, x + 8, y + 8, k);
+    }
+
+    /** Wie viele Pixel zweier Bildschirmfotos im Rechteck (x0, y0) bis (x1, y1) in Einheiten anders sind, soweit im Bild. */
+    private static int anders(BufferedImage a, BufferedImage b, double x0, double y0, double x1, double y1, int k) {
+        int n = 0;
+        for (int py = Math.max(0, (int) (y0 * k)); py < Math.min(a.getHeight(), y1 * k); py++) {
+            for (int px = Math.max(0, (int) (x0 * k)); px < Math.min(a.getWidth(), x1 * k); px++) {
+                n += a.getRGB(px, py) != b.getRGB(px, py) ? 1 : 0;
+            }
+        }
+        return n;
     }
 
     private static void waehlerOffen(ClientGameTestContext context, boolean soll, String was) {

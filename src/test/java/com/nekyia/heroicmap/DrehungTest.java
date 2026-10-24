@@ -272,8 +272,8 @@ class DrehungTest {
         Minimap.Rahmen r = new Minimap.Rahmen(10, 20, 128);
         // Ungedreht: vier Marken fest rechts, unten, links und oben auf der Mitte der Bänder, N zuletzt; sonst nichts, keine zier.
         for (boolean rund : new boolean[] {false, true}) {
-            assertEquals(List.of(new Minimap.Ornament(Skin.MARKE_QUER, 0, 137, 84, 0), new Minimap.Ornament(Skin.MARKE, 0, 74, 147, 0),
-                    new Minimap.Ornament(Skin.MARKE_QUER, 0, 11, 84, 0), new Minimap.Ornament(Skin.NORDEN, 0, 74, 21, 0)),
+            assertEquals(List.of(new Minimap.Ornament(Skin.MARKE_QUER, 0, 137, 84, 0, 1), new Minimap.Ornament(Skin.MARKE, 0, 74, 147, 0, 2),
+                    new Minimap.Ornament(Skin.MARKE_QUER, 0, 11, 84, 0, 3), new Minimap.Ornament(Skin.NORDEN, 0, 74, 21, 0, 0)),
                     Minimap.ornamente(r, 2, rund, Skin.Marken.STARR, null, 2, 0, -1, false, -1), "rund " + rund);
         }
         // Um 30° gedreht: dieselben vier, starr mit der Karte, das Bild um denselben Winkel, die Mitte auf ganzen Pixeln.
@@ -295,11 +295,11 @@ class DrehungTest {
         // Aus: nichts. Im Menü steht der Griff zuletzt an seiner Ecke, aktiv, nie gedreht; nur die Marke unter der Maus als _aktiv, hier N.
         assertEquals(List.of(), Minimap.ornamente(r, 2, false, Skin.Marken.STARR, null, 2, Minimap.ALLE_MARKEN, -1, false, -1));
         double[] ecke = Skin.ecken(10, 20, 128, 128, 2, false)[3];
-        assertEquals(List.of(new Minimap.Ornament(Skin.GRIFF + 1, 3, ecke[0], ecke[1], 0)), Minimap.ornamente(r, 2, false, Skin.Marken.STARR, lage, 2, Minimap.ALLE_MARKEN, 3, true, -1));
+        assertEquals(List.of(new Minimap.Ornament(Skin.GRIFF + 1, 3, ecke[0], ecke[1], 0, -1)), Minimap.ornamente(r, 2, false, Skin.Marken.STARR, lage, 2, Minimap.ALLE_MARKEN, 3, true, -1));
         List<Minimap.Ornament> menue = Minimap.ornamente(r, 2, false, Skin.Marken.STARR, null, 2, 0, 3, false, 0);
         assertEquals(5, menue.size());
         assertEquals(List.of(Skin.MARKE_QUER, Skin.MARKE, Skin.MARKE_QUER, Skin.NORDEN + 1), menue.subList(0, 4).stream().map(Minimap.Ornament::teil).toList());
-        assertEquals(new Minimap.Ornament(Skin.GRIFF, 3, ecke[0], ecke[1], 0), menue.get(4));
+        assertEquals(new Minimap.Ornament(Skin.GRIFF, 3, ecke[0], ecke[1], 0, -1), menue.get(4));
     }
 
     @Test
