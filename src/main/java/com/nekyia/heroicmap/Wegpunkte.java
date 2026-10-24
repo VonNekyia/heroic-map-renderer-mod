@@ -1625,6 +1625,41 @@ final class Wegpunkte {
         return true;
     }
 
+    /**
+     * Gibt dem Wegpunkt die Farbe {@code farbe} aus {@link #FARBEN} und speichert; ein Todespunkt bleibt. Gibt den Wegpunkt zurück,
+     * wie er danach ist, ohne Fund {@code p}. Siehe docs/verwaltung.md, „Spalten“.
+     */
+    Punkt faerbe(Punkt p, int farbe) {
+        int i = punkte.indexOf(p);
+        if (i < 0 || p.tod()) {
+            return p;
+        }
+        Punkt neu = new Punkt(p.id(), p.dimension(), p.x(), p.z(), Math.floorMod(farbe, FARBEN.length), p.angeheftet(), p.tod(), p.ebene(),
+                p.bund(), p.zeit()).stil(p.name(), p.schrift(), p.minecraft());
+        punkte.set(i, neu);
+        schreibe();
+        return neu;
+    }
+
+    /** Ebenso für ein altes Rechteck. */
+    Region faerbe(Region r, int farbe) {
+        int i = finde(r);
+        if (i < 0) {
+            return r;
+        }
+        Region alt = regionen.get(i);
+        Region neu = new Region(alt.dimension(), alt.x0(), alt.z0(), alt.x1(), alt.z1(), Math.floorMod(farbe, FARBEN.length), alt.angeheftet(),
+                alt.ebene());
+        regionen.set(i, neu);
+        schreibe();
+        return neu;
+    }
+
+    /** Schreibt, was {@code stil} nur im Speicher geändert hat; die Schnellverwaltung speichert so jeden Klick. */
+    void speichere() {
+        schreibe();
+    }
+
     /** Wie oben für die Fläche oder den Kreis {@code id} der Ebene {@code ebene} vom Server. */
     boolean umschalten(String ebene, String id) {
         Anheftung a = new Anheftung(ebene, id);

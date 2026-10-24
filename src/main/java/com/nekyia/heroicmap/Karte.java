@@ -161,7 +161,7 @@ final class Karte extends Screen {
     /** Ein Regler unter dem Namensfeld samt Abstand, in Einheiten des GUI. */
     static final int REGLER_ZEILE = 22;
     /** Die Rasten von {@link Wegpunkte#SCHRIFTEN} als Text. */
-    private static final String[] SCHRIFT_TEXTE = {"¼", "⅓", "½", "⅔", "1", "1½", "2", "3", "4"};
+    static final String[] SCHRIFT_TEXTE = {"¼", "⅓", "½", "⅔", "1", "1½", "2", "3", "4"};
     /** Die Schrift im Eingabefeld, wenn Enter den Text nicht nimmt. */
     private static final int UNGUELTIG = 0xFFFF5555;
     /** Was die Maus gerade hervorhebt, höchstens eins davon; siehe {@link #schwebe}. */
@@ -280,6 +280,20 @@ final class Karte extends Screen {
         return this;
     }
 
+    /** Die Schnellverwaltung, solange die Karte offen ist. Siehe docs/verwaltung.md. */
+    private final VerwaltungsPanel.Stand verwaltung = new VerwaltungsPanel.Stand();
+
+    /** Für den Gametest: der Stand der Schnellverwaltung. */
+    VerwaltungsPanel.Stand verwaltung() {
+        return verwaltung;
+    }
+
+    /** Die Karte mit offener Schnellverwaltung, für ihre Taste. */
+    Karte mitVerwaltung() {
+        verwaltung.offen = true;
+        return this;
+    }
+
     /** {@code satz} ist null, wenn für diese Dimension nichts geladen ist. */
     Karte(Satz satz) {
         super(Component.translatable("heroicmap.karte.titel"));
@@ -334,6 +348,19 @@ final class Karte extends Screen {
             }).bounds(x, unterster.getY() + 24, KNOPF, 20).build());
         }
         unterster = ebenen(x, unterster);
+        // Darunter „Verwalten“, links daneben dann das Panel mit allen eigenen Objekten. Siehe docs/verwaltung.md.
+        verwaltung.kasten = null;
+        if (blick != null) {
+            unterster = addRenderableWidget(Button.builder(Component.translatable(verwaltung.offen ? "heroicmap.karte.verwalten_zu"
+                    : "heroicmap.karte.verwalten"), b -> schalteVerwaltung()).bounds(x, unterster.getY() + 24, KNOPF, 20).build());
+            if (verwaltung.offen && minecraft.level != null) {
+                LocalPlayer p = minecraft.player;
+                // Unter dem Hinweis auf eine neue Version oben links, sonst läge es bei schmalem Fenster auf ihm.
+                int oben = NeueVersion.neu != null && Minimap.INSTANZ.neueVersion() ? 28 : 4;
+                VerwaltungsPanel.baue(verwaltung, gastgeber(), font, x - 4, oben, height, minecraft.level.dimension().identifier().toString(),
+                        p == null ? new double[] {0, 0} : new double[] {p.getX(), p.getZ()});
+            }
+        }
         knopfX = x;
         knopfUnten = unterster.getY() + unterster.getHeight();
         // Darüber die Webkarte im Browser, nur mit dem Kanal zum Plugin. Siehe docs/vollbildkarte.md, „Im Browser öffnen“.
@@ -398,7 +425,7 @@ final class Karte extends Screen {
         Set<Ebenenreihe.Schicht> gezeigt = Set.copyOf(zeilen);
         boolean umgestellt = Ebenenreihe.INSTANZ.umgestellt();
         // Platz bis über „Optionen …“ unten rechts, mit dem Kanal bis über „Im Browser öffnen“, je Schalter 22 Einheiten.
-        int platz = Math.max(1, (height - (Webkarte.kanal.getAsBoolean() ? 52 : 28) - (unterster.getY() + unterster.getHeight())) / 22);
+        int platz = Math.max(1, (height - (Webkarte.kanal.getAsBoolean() ? 52 : 28) - 24 - (unterster.getY() + unterster.getHeight())) / 22);
         int zurueck = umgestellt ? 1 : 0, gesamt = zeilen.size(), n = gesamt + zurueck <= platz ? gesamt : Math.max(0, platz - 1 - zurueck);
         for (int i = 0; i < n; i++) {
             Ebenenreihe.Schicht s = zeilen.get(i);
@@ -482,6 +509,61 @@ final class Karte extends Screen {
         if (Wegpunkte.INSTANZ.ebenenStand() != eigeneStand && eingabe == null) {
             rebuildWidgets();
         }
+        // Die Schnellverwaltung neu, wenn sich an ihr oder an den Wegpunkten etwas änderte; nicht über einem Feld der Karte und nicht,
+        // solange ein Name getippt wird. Nie mitten in einem Klick, darum hier.
+        if (verwaltung.offen && eingabe == null && !(getFocused() instanceof VerwaltungsPanel.NameFeld)
+                && (verwaltung.neuBauen || Wegpunkte.INSTANZ.stand() != verwaltung.wegpunkte)) {
+            verwaltung.neuBauen = false;
+            rebuildWidgets();
+        }
+    }
+
+    /** Öffnet oder schliesst die Schnellverwaltung. */
+    private void schalteVerwaltung() {
+        verwaltung.offen = !verwaltung.offen;
+        verwaltung.sucheFokus = false;
+        verwaltung.loeschen = null;
+        rebuildWidgets();
+    }
+
+    /** Was die Schnellverwaltung von der Karte braucht. */
+    private VerwaltungsPanel.Gastgeber gastgeber() {
+        return new VerwaltungsPanel.Gastgeber() {
+            @Override
+            public <T extends AbstractWidget> T dazu(T w) {
+                return addRenderableWidget(w);
+            }
+
+            @Override
+            public void fokus(AbstractWidget w) {
+                setFocused(w);
+            }
+
+            @Override
+            public void zentriere(double x, double z) {
+                Karte.this.zentriere(x, z);
+            }
+
+            @Override
+            public void faerben(Wegpunkte.EigeneForm f, int x, int y) {
+                menueX = x;
+                menueY = y;
+                Karte.this.faerben(f);
+            }
+
+            @Override
+            public void angeheftet(boolean geschehen) {
+                anheften(geschehen, "heroicmap.karte.angeheftet_voll", Wegpunkte.MAX_ANGEHEFTET);
+            }
+
+            @Override
+            public Component tod(Wegpunkte.Punkt p) {
+                Minimap.TodZeit stil = Minimap.INSTANZ.todZeit();
+                String zeit = stil == Minimap.TodZeit.AUS || p.zeit() == 0 ? ""
+                        : " " + Wegpunkte.todZeit(p.zeit(), ZoneId.systemDefault(), Component.translatable(stil.schluessel).getString(), stil.fest);
+                return Component.translatable("heroicmap.verwaltung.tod", zeit);
+            }
+        };
     }
 
     /**
@@ -652,6 +734,7 @@ final class Karte extends Screen {
                     : Component.translatable("heroicmap.karte.abgleich_ab", Downloads.uhr(ab)));
         }
         super.extractRenderState(g, mausX, mausY, delta);
+        VerwaltungsPanel.zeichne(verwaltung, g, font);
         leuchte(g);
         ueberschriften(g);
         if (laeuft != null) {
@@ -705,7 +788,7 @@ final class Karte extends Screen {
      */
     private void schwebe(int mausX, int mausY) {
         boolean frei = ziel == null && eingabe == null && gezogeneForm() == null && haengt == null && !(taste && gezogen > ZUG)
-                && getChildAt(mausX, mausY).isEmpty() && !drin(tafelKasten, mausX, mausY);
+                && getChildAt(mausX, mausY).isEmpty() && !drin(tafelKasten, mausX, mausY) && !verwaltung.drin(mausX, mausY);
         Marke m = frei ? treffer(mausX, mausY) : null;
         ueberMarke = m != null && (m.punkt() != null || m.region() != null) ? m : null;
         ueberEcke = frei && m == null ? eckeUnter(mausX, mausY) : null;
@@ -1615,6 +1698,13 @@ final class Karte extends Screen {
     public boolean mouseClicked(MouseButtonEvent e, boolean doppeltNachZeit) {
         // Der nächste Klick nimmt den Hinweis weg; was er selbst meldet, kommt danach.
         hinweis = null;
+        // Das × der Schnellverwaltung löscht nur beim zweiten Klick in Folge auf dasselbe; ein Klick daneben vergisst den ersten. Ein
+        // Klick ausserhalb des Panels nimmt einem Feld den Fokus, und der Name ist gespeichert.
+        verwaltung.loeschenVorher = verwaltung.loeschen;
+        verwaltung.loeschen = null;
+        if (getFocused() instanceof VerwaltungsPanel.Eingabe && !verwaltung.drin(e.x(), e.y())) {
+            setFocused(null);
+        }
         // Das Spiel meldet einen Doppelklick nach Zeit und Taste, nicht nach dem Ort; er zählt nur nah am vorigen Druckpunkt.
         // Siehe docs/wegpunkte.md, „Bedienung“.
         boolean doppelt = doppeltNachZeit && Math.hypot(e.x() - druckX, e.y() - druckY) <= ZUG;
@@ -1638,11 +1728,19 @@ final class Karte extends Screen {
         // Ein Klick neben das Eingabefeld und seine Regler bricht die Eingabe ab und tut sonst nichts; einer darauf setzt den Cursor
         // oder schiebt den Regler.
         if (eingabe != null) {
-            if (eingabe.isMouseOver(e.x(), e.y()) || auf(schriftRegler, e.x(), e.y()) || auf(biegungRegler, e.x(), e.y())
-                    || auf(gewichtRegler, e.x(), e.y()) || auf(schriftartKnopf, e.x(), e.y())) {
-                super.mouseClicked(e, doppelt);
-            } else {
+            // Nur an das Feld und seine Regler, nie an einen Knopf darunter: Rechts reichen sie bis an die Spalte, und das Spiel gäbe
+            // den Klick dem Knopf, der früher angelegt ist.
+            AbstractWidget getroffen = null;
+            for (AbstractWidget w : new AbstractWidget[] {eingabe, schriftRegler, biegungRegler, gewichtRegler, schriftartKnopf}) {
+                if (getroffen == null && auf(w, e.x(), e.y())) {
+                    getroffen = w;
+                }
+            }
+            if (getroffen == null) {
                 schliesseEingabe();
+            } else if (getroffen.mouseClicked(e, doppelt)) {
+                setFocused(getroffen);
+                setDragging(e.button() == InputConstants.MOUSE_BUTTON_LEFT);
             }
             klickVerbraucht = true;
             return true;
@@ -1657,6 +1755,12 @@ final class Karte extends Screen {
                 offen.get(zeile).tut().run();
             }
             // Der Klick, der das Menü schliesst, tut sonst nichts, hält also auch keine Tafel.
+            klickVerbraucht = true;
+            return true;
+        }
+        // Ein Klick ins Panel der Schnellverwaltung wirkt nur auf seine Knöpfe, nie auf die Karte. Siehe docs/verwaltung.md.
+        if (verwaltung.drin(e.x(), e.y())) {
+            super.mouseClicked(e, doppelt);
             klickVerbraucht = true;
             return true;
         }
@@ -2671,6 +2775,11 @@ final class Karte extends Screen {
 
     @Override
     public boolean mouseScrolled(double x, double y, double weitX, double weitY) {
+        if (verwaltung.drin(x, y)) {
+            verwaltung.seite += weitY < 0 ? 1 : weitY > 0 ? -1 : 0;
+            verwaltung.neuBauen = true;
+            return true;
+        }
         if (drin(tafelKasten, x, y) && tafelZuHoch) {
             tafelScroll -= (int) Math.round(weitY * 10);
             return true;
@@ -2700,6 +2809,24 @@ final class Karte extends Screen {
             } else {
                 eingabe.keyPressed(ereignis);
             }
+            return true;
+        }
+        // Ebenso ein Feld der Schnellverwaltung: Enter speichert, Escape verwirft nur, was getippt ist; die Taste der Karte und Entf
+        // gehören dem Feld. Siehe docs/verwaltung.md.
+        if (getFocused() instanceof VerwaltungsPanel.Eingabe feld && getFocused() instanceof EditBox box) {
+            int k = ereignis.key();
+            if (k == InputConstants.KEY_ESCAPE) {
+                feld.verwerfen();
+                setFocused(null);
+            } else if (k == InputConstants.KEY_RETURN || k == InputConstants.KEY_NUMPADENTER) {
+                setFocused(null);
+            } else {
+                box.keyPressed(ereignis);
+            }
+            return true;
+        }
+        if (HeroicMap.verwaltung != null && HeroicMap.verwaltung.matches(ereignis)) {
+            schalteVerwaltung();
             return true;
         }
         // Escape lässt zuerst einen Wegpunkt an der Maus, wo er war; das Loslassen danach tut nichts.

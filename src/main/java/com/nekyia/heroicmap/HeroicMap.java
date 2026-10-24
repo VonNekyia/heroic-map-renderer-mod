@@ -40,6 +40,8 @@ public final class HeroicMap implements ClientModInitializer {
     /** War der Spieler im letzten Tick schon am Sterben? So setzt ein Tod den Todespunkt nur einmal. */
     private static boolean warTot;
     static KeyMapping karte;
+    /** Öffnet die Vollbildkarte mit der Schnellverwaltung, auf ihr schaltet sie sie. Siehe docs/verwaltung.md. */
+    static KeyMapping verwaltung;
 
     /** Für {@code FontManagerMixin}: Die Optionen der Schrift wechselten ohne Neuladen der Ressourcen. */
     public static void schriftenGewechselt() {
@@ -56,6 +58,8 @@ public final class HeroicMap implements ClientModInitializer {
                 new KeyMapping("key.heroicmap.zoom", InputConstants.UNKNOWN.getValue(), kategorie));
         karte = KeyMappingHelper.registerKeyMapping(
                 new KeyMapping("key.heroicmap.karte", InputConstants.KEY_PERIOD, kategorie));
+        verwaltung = KeyMappingHelper.registerKeyMapping(
+                new KeyMapping("key.heroicmap.verwaltung", InputConstants.UNKNOWN.getValue(), kategorie));
         Minimap.INSTANZ.lies(einstellungen());
         // Nach den Schriften: Die gespeicherte Kartenschrift hält Glyphen, die ein Neuladen verwirft.
         Identifier formen = Identifier.fromNamespaceAndPath(ID, "formen");
@@ -102,6 +106,12 @@ public final class HeroicMap implements ClientModInitializer {
                 if (client.gui.screen() == null && client.level != null) {
                     String dimension = client.level.dimension().identifier().toString();
                     client.gui.setScreen(new Karte(Satz.fuer(Downloads.weltOrdner(), dimension, Downloads.INSTANZ.wer())));
+                }
+            }
+            while (verwaltung.consumeClick()) {
+                if (client.gui.screen() == null && client.level != null) {
+                    String dimension = client.level.dimension().identifier().toString();
+                    client.gui.setScreen(new Karte(Satz.fuer(Downloads.weltOrdner(), dimension, Downloads.INSTANZ.wer())).mitVerwaltung());
                 }
             }
         });
