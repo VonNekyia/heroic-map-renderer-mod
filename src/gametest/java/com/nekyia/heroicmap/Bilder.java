@@ -15,11 +15,14 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.NoSuchAlgorithmException;
+import java.security.MessageDigest;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.HexFormat;
 import javax.imageio.ImageIO;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -291,7 +294,7 @@ public final class Bilder implements FabricClientGameTest {
      */
     private static void orte(ClientGameTestContext context, TestServerContext server) {
         HttpServer bilder = bilderServer(Map.of("anker.png", bild(16, 16, ANKER), "anker-m.png", bild(9, 9, ANKER), "banner.png",
-                bild(21, 40, BANNER)), Map.of("orte/oben/satz.json", SATZ.getBytes(StandardCharsets.UTF_8),
+                bild(21, 40, BANNER), "koepfe/" + KOPF + ".png", KOPF_PNG), Map.of("orte/oben/satz.json", SATZ.getBytes(StandardCharsets.UTF_8),
                 "orte/oben/suedreich.png", bild(SPRITE_BREITE, SPRITE_HOEHE, OHNE_KRONE),
                 "orte/oben/krone/suedreich.png", bild(SPRITE_BREITE, SPRITE_HOEHE, MIT_KRONE)));
         // Der Server im Test hört den Kanal nicht: Der Test lässt die Frage nach dem geheimen Banner als gesendet gelten.
@@ -302,7 +305,8 @@ public final class Bilder implements FabricClientGameTest {
                 Ebenen.INSTANZ.empfange(JsonParser.parseString("""
                         {"v":1,"typ":"ebenen","jetzt":1,"ebenen":[{"id":"test:orte","name":{"de":"Orte","en":"Places"},
                           "visible":true,"order":1,"version":"1"},{"id":"test:geheim","name":{"de":"Geheim","en":"Secret"},
-                          "visible":true,"order":2,"version":"1","secret":true}]}""").getAsJsonObject());
+                          "visible":true,"order":2,"version":"1","secret":true},{"id":"test:koepfe","name":{"de":"Köpfe","en":"Heads"},
+                          "visible":true,"order":3,"version":"1"}]}""").getAsJsonObject());
                 Symbole.INSTANZ.basis(JsonParser.parseString("{\"url\":\"http://127.0.0.1:" + bilder.getAddress().getPort() + "/tiles\"}")
                         .getAsJsonObject(), InetAddress.getLoopbackAddress());
                 Ebenen.Teil t = Ebenen.Teil.lies(ORTE);
@@ -311,6 +315,7 @@ public final class Bilder implements FabricClientGameTest {
                 }
                 Ebenen.INSTANZ.teil(t);
                 Ebenen.INSTANZ.teil(Ebenen.Teil.lies(GEHEIM));
+                Ebenen.INSTANZ.teil(Ebenen.Teil.lies(KOEPFE));
                 // Ein altes Rechteck links unten, wie es bis 0.2.15 das Menü setzte (docs/wegpunkte.md, „Regionen“).
                 Wegpunkte.INSTANZ.setze(Ebenen.UEBERWELT, -14, 2, -5, 8);
                 Minimap.INSTANZ.setzeScale(4);
@@ -357,6 +362,7 @@ public final class Bilder implements FabricClientGameTest {
             context.waitTicks(10);
             tafel(context);
             BufferedImage groessen = groessen(context);
+            koepfe(context, server);
             if (!AUSGABE.isEmpty()) {
                 try {
                     ImageIO.write(minimap, "png", Path.of(AUSGABE, "orte.png").toFile());
@@ -812,6 +818,100 @@ public final class Bilder implements FabricClientGameTest {
         }
     }
 
+    /** Ein Kopf 8 × 8 wie vom Plugin, im Schachbrett aus Magenta und Cyan, die sonst nirgends auf der Karte stehen; sein Name ist sein SHA-256. */
+    private static final int KOPF_A = 0xFF00FF, KOPF_B = 0x00FFFF;
+    private static final byte[] KOPF_PNG = kopfPng();
+    private static final String KOPF = sha256(KOPF_PNG);
+
+    private static byte[] kopfPng() {
+        BufferedImage b = new BufferedImage(8, 8, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
+                b.setRGB(x, y, 0xFF000000 | ((x + y) % 2 == 0 ? KOPF_A : KOPF_B));
+            }
+        }
+        ByteArrayOutputStream aus = new ByteArrayOutputStream();
+        try {
+            ImageIO.write(b, "png", aus);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return aus.toByteArray();
+    }
+
+    private static String sha256(byte[] daten) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(daten));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** Zwei Nadeln weit weg von den Orten: eine mit Kopf, eine mit einem Kopf, den der Server nicht hat. */
+    private static final String KOEPFE = """
+            {"v":1,"typ":"ebene","id":"test:koepfe","version":"1","teil":1,"teile":1,"objects":[
+              {"type":"pin","id":"haendlerin","at":[200.5,200.5],"name":"Händlerin","head":"%s"},
+              {"type":"pin","id":"wache","at":[240.5,200.5],"name":"Wache","head":"%s"}
+            ]}""".formatted(KOPF, "f".repeat(64));
+
+    /**
+     * Köpfe an Nadeln: Mit geladenem Kopf steht auf der Vollbildkarte das Gesicht mittig auf dem Fuss, ein Pixel je Einheit,
+     * also je Farbe des Schachbretts 32 Einheiten im Quadrat; mit fehlendem bleibt die Nadel, und der Kasten folgt dem, was
+     * steht. Angeheftet steht das Gesicht auch auf der Minimap. Siehe docs/ebenen.md, „Köpfe“.
+     */
+    private static void koepfe(ClientGameTestContext context, TestServerContext server) {
+        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.lies(testsatz()))));
+        context.waitFor(mc -> Symbole.INSTANZ.kopf(KOPF) != null, 600);
+        context.runOnClient(mc -> ((Karte) mc.gui.screen()).zeige(200, 200));
+        context.waitTicks(20);
+        int[] f = context.computeOnClient(mc -> new int[] {mc.getWindow().getGuiScale(), mc.getWindow().getWidth(), mc.getWindow().getHeight()});
+        int gs = f[0];
+        Path bild = context.takeScreenshot(TestScreenshotOptions.of("koepfe-karte").disableCounterPrefix());
+        try {
+            BufferedImage b = ImageIO.read(bild.toFile());
+            int a = 0, c = 0;
+            // Um die Mitte, wo der Fuss der Händlerin steht, 12 Einheiten zu jeder Seite.
+            for (int y = f[2] / 2 - 12 * gs; y < f[2] / 2 + 12 * gs; y++) {
+                for (int x = f[1] / 2 - 12 * gs; x < f[1] / 2 + 12 * gs; x++) {
+                    int p = b.getRGB(x, y) & 0xFFFFFF;
+                    a += p == KOPF_A ? 1 : 0;
+                    c += p == KOPF_B ? 1 : 0;
+                }
+            }
+            if (a != 32 * gs * gs || c != 32 * gs * gs) {
+                throw new AssertionError("Kopf auf der Vollbildkarte: " + a + " und " + c + " Pixel je Farbe statt je " + 32 * gs * gs);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        // Der Kasten: mit Kopf das Gesicht samt Rand um den Fuss, ohne Kopf das Schild in medium, 23 hoch über dem Fuss.
+        float[][] kaesten = context.computeOnClient(mc -> Ebenen.INSTANZ.nadeln("test:koepfe").stream()
+                .map(o -> Ebenen.kasten(mc.font, o, gs)).toArray(float[][]::new));
+        if (kaesten.length != 2 || kaesten[0][1] != -Ebenen.KOPF_HALB || kaesten[1][1] != -23) {
+            throw new AssertionError("Kästen der Köpfe: " + Arrays.deepToString(kaesten));
+        }
+        context.runOnClient(mc -> {
+            mc.gui.setScreen(null);
+            Wegpunkte.INSTANZ.umschaltenNadel("test:koepfe", "haendlerin");
+        });
+        BufferedImage minimap = minimapBei(context, server, 200.5, 206.5, "koepfe-minimap");
+        int a = 0, c = 0;
+        for (int y = 0; y < minimap.getHeight(); y++) {
+            for (int x = 0; x < minimap.getWidth(); x++) {
+                int p = minimap.getRGB(x, y) & 0xFFFFFF;
+                a += p == KOPF_A ? 1 : 0;
+                c += p == KOPF_B ? 1 : 0;
+            }
+        }
+        if (a == 0 || c == 0) {
+            throw new AssertionError("Angehefteter Kopf nicht auf der Minimap: " + a + " und " + c + " Pixel");
+        }
+        context.runOnClient(mc -> Wegpunkte.INSTANZ.umschaltenNadel("test:koepfe", "haendlerin"));
+        // Zurück, wo die übrigen Szenen den Spieler erwarten.
+        server.runCommand("tp @a 0.5 -30 0.5 0 90");
+        context.waitFor(mc -> mc.player != null && Math.abs(mc.player.getX() - 0.5) < 0.1 && Minimap.INSTANZ.fertig(), 600);
+    }
+
     /** Ein Server auf 127.0.0.1, der die Bilder unter /tiles/layers/test/images/ ausliefert. */
     private static HttpServer bilderServer(Map<String, byte[]> dateien) {
         return bilderServer(dateien, Map.of());
@@ -823,6 +923,17 @@ public final class Bilder implements FabricClientGameTest {
             HttpServer s = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
             s.createContext("/tiles/layers/test/banner/", austausch -> {
                 byte[] inhalt = banner.get(austausch.getRequestURI().getPath().substring("/tiles/layers/test/banner/".length()));
+                if (inhalt == null) {
+                    austausch.sendResponseHeaders(404, -1);
+                } else {
+                    austausch.sendResponseHeaders(200, inhalt.length);
+                    austausch.getResponseBody().write(inhalt);
+                }
+                austausch.close();
+            });
+            // Köpfe unter koepfe/ in der Wurzel, je Name im selben Verzeichnis der Dateien.
+            s.createContext("/tiles/koepfe/", austausch -> {
+                byte[] inhalt = dateien.get(austausch.getRequestURI().getPath().substring("/tiles/".length()));
                 if (inhalt == null) {
                     austausch.sendResponseHeaders(404, -1);
                 } else {
