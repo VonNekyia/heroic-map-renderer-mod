@@ -1175,7 +1175,7 @@ public final class Minimap {
         long jetzt = Util.getMillis();
         if (kacheln == null || jetzt - satzGesucht >= SATZ_MS) {
             satzGesucht = jetzt;
-            Satz neu = Satz.fuer(Downloads.weltOrdner(), dimension);
+            Satz neu = Satz.fuer(Downloads.weltOrdner(), dimension, Downloads.INSTANZ.wer());
             if (neu == null || satz == null || !neu.ordner().equals(satz.ordner())) {
                 gibKachelnFrei();
                 satz = neu;

@@ -415,8 +415,9 @@ Reviewer in mod#155, Plan freigegeben am 19.10.; siehe
   [Download](download.md), „Strom“.
 - **Die Karte** nimmt unter dem Ordner der Welt den Baum, dessen
   Dimension die des Spielers ist (`Satz.fuer`), siehe
-  [Download](download.md), „Ablage“; einen selbst gezeichneten vor jedem
-  anderen, siehe [Selbst gezeichnete Karte](selbst.md), „Wahl“. Kachelgrösse, Stufen und
+  [Download](download.md), „Ablage“; welchen, wenn es mehrere gibt,
+  entscheidet der Server, auf dem der Spieler ist, siehe
+  [Selbst gezeichnete Karte](selbst.md), „Wahl“. Kachelgrösse, Stufen und
   `scale` liest sie aus `map.json` des Satzes.
 - **`map.json` kommt vom Server** und hat deshalb Grenzen (`Satz.lies`):
 
@@ -432,7 +433,8 @@ Reviewer in mod#155, Plan freigegeben am 19.10.; siehe
 - **Ein Baum ohne `satz.json`, `map.json` oder mit unlesbarer Datei oder
   verletzter Grenze** zählt nicht und verdeckt keinen anderen.
 - **Bietet ein Server zwei Bäume derselben Dimension an,** nimmt die Karte
-  den ersten nach dem Namen, Zeichen für Zeichen (`welt_alt` vor `weltneu`).
+  ohne Wahl in `zeigt.txt` den ersten nach dem Namen, Zeichen für Zeichen
+  (`welt_alt` vor `weltneu`).
 
 ## Fortschritt
 

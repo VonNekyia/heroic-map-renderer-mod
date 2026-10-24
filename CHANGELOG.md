@@ -6,6 +6,8 @@ The release notes on GitHub and Modrinth come from here
 
 ## 0.2.69
 
+- **Two servers, one world: each keeps its own map.** What the full map shows for a dimension now counts per server, and your own map ("Myself") belongs to the server you drew it on. Drawing your own map on build no longer hides the map you downloaded on main. Choosing "Myself" while a downloaded map is shown asks whether to delete the old map, keep it resting, or cancel; the map list switches each map on or to resting for the server you are on. A resting map gets no sync. The servers need plugin 0.17.2, which tells the mod their names.
+- **After the update:** if you drew your own map on build, main shows its downloaded map again right away. On build you see the download until you switch your old own map back on: map list, "take over".
 - **Thin chunk lines on the block edges.** Chunk lines now sit exactly on the border between two chunks, where `Ctrl` snaps, instead of on the first block of a chunk, and they are one screen pixel thin at every GUI scale, on the minimap and the full map. The line that lights up while you snap is just as thin.
 - **The marks of the biome frame sit on the frame.** The east, south and west marks of the "biome" frame no longer stick out past its narrow band: they rest on it, flush with the outer edge, shadow included, square and round, upright and rotating. North and the other frames stay as they were.
 

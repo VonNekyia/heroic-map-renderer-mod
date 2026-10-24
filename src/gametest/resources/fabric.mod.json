@@ -17,7 +17,8 @@
       "com.nekyia.heroicmap.Blockentities",
       "com.nekyia.heroicmap.Spieler",
       "com.nekyia.heroicmap.Zoomstufen",
-      "com.nekyia.heroicmap.SelbstZoom"
+      "com.nekyia.heroicmap.SelbstZoom",
+      "com.nekyia.heroicmap.KarteJeServer"
     ],
     "heroicmap": [
       "com.nekyia.heroicmap.ProbeEbene"

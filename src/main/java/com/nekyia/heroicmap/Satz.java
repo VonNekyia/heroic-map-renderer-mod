@@ -25,30 +25,55 @@ record Satz(Path ordner, String name, String dimension, int massstab, int kachel
     }
 
     /**
-     * Der Satz für {@code dimension} unter dem Ordner einer Welt, oder null. Ein selbst
-     * gezeichneter geht vor, siehe docs/selbst.md, „Wahl“.
+     * Der Satz, den {@code server} für {@code dimension} unter dem Ordner einer Welt zeigt, oder null: seine Wahl in
+     * {@link Zeigt}, sonst der erste Download nach dem Namen, dann seine eigene Karte. Ein Server ohne Namen nimmt wie
+     * bisher seine eigene vor dem Download. Die eigene Karte eines anderen Servers zeigt er nie. Siehe docs/selbst.md,
+     * „Wahl“.
      */
-    static Satz fuer(Path welt, String dimension) {
+    static Satz fuer(Path welt, String dimension, String server) {
         if (welt == null || !Files.isDirectory(welt)) {
             return null;
         }
-        Satz erster = null;
+        String gewaehlt = Zeigt.baum(welt, server, dimension);
+        if (gewaehlt != null) {
+            Path baum = welt.resolve(gewaehlt);
+            Satz satz = lies(baum);
+            if (satz != null && dimension.equals(satz.dimension()) && (!Selbst.selbst(baum) || Selbst.gehoert(baum, server))) {
+                return satz;
+            }
+        }
+        Satz download = null, eigene = null;
         // Nach dem Namen als Zeichenkette, nicht in der Folge des Dateisystems und nicht nach Path.compareTo,
         // das unter Windows Gross und Klein gleich nimmt: So ist das Ergebnis überall gleich.
         try (Stream<Path> baeume = Files.list(welt)) {
             for (Path baum : baeume.sorted(Comparator.comparing((Path p) -> p.getFileName().toString())).toList()) {
                 Satz satz = lies(baum);
-                if (satz != null && dimension.equals(satz.dimension())) {
-                    if (Selbst.selbst(baum)) {
-                        return satz;
-                    }
-                    erster = erster == null ? satz : erster;
+                if (satz == null || !dimension.equals(satz.dimension())) {
+                    continue;
+                }
+                if (!Selbst.selbst(baum)) {
+                    download = download == null ? satz : download;
+                } else if (eigene == null && Selbst.gehoert(baum, server)) {
+                    eigene = satz;
                 }
             }
         } catch (IOException e) {
             return null;
         }
-        return erster;
+        if (Zeigt.OHNE.equals(server)) {
+            return eigene != null ? eigene : download;
+        }
+        return download != null ? download : eigene;
+    }
+
+    /** Der Server, dem ein selbst gezeichneter Baum gehört, aus {@code satz.json}; {@link Zeigt#OHNE} ohne Angabe. */
+    static String besitzer(Path baum) {
+        try {
+            JsonObject satz = json(baum.resolve("satz.json"));
+            return satz.has("server") ? satz.get("server").getAsString() : Zeigt.OHNE;
+        } catch (IOException | RuntimeException e) {
+            return Zeigt.OHNE;
+        }
     }
 
     /**
@@ -80,10 +105,18 @@ record Satz(Path ordner, String name, String dimension, int massstab, int kachel
 
     /** Schreibt {@code satz.json} eines Baums: Name, Dimension und Massstab. */
     static void schreibe(Path baum, String name, String dimension, int massstab) throws IOException {
+        schreibe(baum, name, dimension, massstab, Zeigt.OHNE);
+    }
+
+    /** Wie oben, mit dem Server, dem eine eigene Karte gehört; ohne Namen ohne das Feld. */
+    static void schreibe(Path baum, String name, String dimension, int massstab, String server) throws IOException {
         JsonObject json = new JsonObject();
         json.addProperty("name", name);
         json.addProperty("dimension", dimension);
         json.addProperty("massstab", massstab);
+        if (!Zeigt.OHNE.equals(server)) {
+            json.addProperty("server", server);
+        }
         Files.createDirectories(baum);
         Files.writeString(baum.resolve("satz.json"), json.toString(), StandardCharsets.UTF_8);
     }

@@ -95,7 +95,7 @@ public final class Strom implements FabricClientGameTest {
             spiel.getConnection().waitForChunksRender();
             welt = context.computeOnClient(mc -> Downloads.weltOrdner());
             raeume(welt);
-            context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(Downloads.weltOrdner(), DIMENSION))));
+            context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(Downloads.weltOrdner(), DIMENSION, Downloads.INSTANZ.wer()))));
             context.waitTick();
             if (context.computeOnClient(mc -> !(mc.gui.screen() instanceof Karte k) || k.satz() != null)) {
                 throw new AssertionError("Die Vollbildkarte hat vor dem Download schon einen Satz");

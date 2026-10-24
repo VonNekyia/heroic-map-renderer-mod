@@ -114,7 +114,14 @@ final class Downloads {
             case "show" -> {
                 Mitspieler.INSTANZ.antwort(json);
                 Webkarte.INSTANZ.show(json);
-                karte(json);
+                boolean mitNamen = backend(json);
+                // Wer der Server ist, entscheidet, welche Karte er zeigt und in welche „Selbst“ zeichnet. Siehe
+                // docs/selbst.md, „Wahl“.
+                if (!karte(json) && mitNamen) {
+                    Minimap.INSTANZ.leeren();
+                    Selbst.INSTANZ.leeren();
+                    HeroicMap.weltOrdnerGewechselt();
+                }
             }
             case "web" -> Webkarte.INSTANZ.antwort(json, Symbole.INSTANZ.basis(), Symbole.INSTANZ.spielserver(), Util.getMillis());
             case "ebenen" -> {
@@ -150,6 +157,66 @@ final class Downloads {
         servername = null;
         nameGilt.clear();
         KARTE.neueSitzung();
+        backend = null;
+        beantwortet = false;
+        sitzungAb = System.currentTimeMillis();
+    }
+
+    /** Der Schlüssel dieses Servers für zeigt.txt und die eigene Karte: sein Name aus show, sonst {@link Zeigt#OHNE}. */
+    String wer() {
+        String b = backend;
+        return b == null ? Zeigt.OHNE : b;
+    }
+
+    /**
+     * Steht fest, welcher Server es ist? Im Einzelspieler immer; auf einem Server nach der ersten Antwort auf show,
+     * oder wenn der Kanal von Heroic Map {@link #OHNE_KANAL_MS} nach dem Login fehlt. Bis dahin zeichnet „Selbst“
+     * nicht. Siehe docs/selbst.md, „Wahl“.
+     */
+    boolean serverFest() {
+        return server() == null || beantwortet || !Kanal.offen() && System.currentTimeMillis() - sitzungAb >= OHNE_KANAL_MS;
+    }
+
+    /** Die erste Antwort auf show in der Sitzung setzt den Namen dieses Servers; true, wenn sie einen nennt. */
+    private boolean backend(JsonObject json) {
+        if (beantwortet) {
+            return false;
+        }
+        beantwortet = true;
+        backend = backendAus(json);
+        return backend != null;
+    }
+
+    /** {@code backend} aus der Antwort auf show, wenn es als Name taugt und nicht {@link Zeigt#OHNE} ist; sonst null. */
+    static String backendAus(JsonObject json) {
+        JsonElement feld = json.get("backend");
+        String name = feld != null && feld.isJsonPrimitive() && feld.getAsJsonPrimitive().isString()
+                ? Kartenname.gueltig(feld.getAsString()) : null;
+        return Zeigt.OHNE.equals(name) ? null : name;
+    }
+
+    /**
+     * Der Server, dessen Karte dieser zeigt, wenn es ein anderer ist, etwa main auf build mit {@code karte.von}; sonst
+     * null. Ein Download im Ordner gehört dann beiden.
+     */
+    String geteiltMit() {
+        String karte = KARTE.karte();
+        return karte != null && backend != null && !karte.equals(backend) ? karte : null;
+    }
+
+    /** Ruht der Baum für diesen Server, zeigt der also für seine Dimension einen anderen? Siehe docs/download.md, „Ablage“. */
+    boolean ruht(String baum) {
+        return ruht(ordner(baum), wer());
+    }
+
+    /** Ruht der Baum im Ordner {@code ordner} für {@code server}? Ein unvollständiger ruht nie. */
+    static boolean ruht(Path ordner, String server) {
+        Satz satz = ordner == null ? null : Satz.lies(ordner);
+        if (satz == null) {
+            return false;
+        }
+        Satz gezeigt = Satz.fuer(ordner.getParent(), satz.dimension(), server);
+        return gezeigt != null && !gezeigt.ordner().getParent().equals(ordner);
     }
 
     /**
@@ -157,15 +224,15 @@ final class Downloads {
      * für jede Welt, die der Spieler schon betrat, mit Umzug aus dem Ordner ohne Karte ({@link #karteGilt}); dann lesen
      * Minimap, eigene Karte, Wegpunkte und Ebenen neu. Gemerkt für den nächsten Login. Siehe docs/download.md, „Ablage“.
      */
-    private void karte(JsonObject json) {
+    private boolean karte(JsonObject json) {
         ServerData server = server();
         if (server == null || KARTE.bestaetigt()) {
-            return;
+            return false;
         }
         String karte = karteAus(json);
         if (json.has("karte") && karte == null) {
             LOGGER.warn("Heroic Map: Name der Karte ungültig, übergangen");
-            return;
+            return false;
         }
         List<Long> betreten = List.copyOf(nameGilt.keySet());
         boolean anders = KARTE.vomServer(karte, betreten, this::karteGilt);
@@ -176,6 +243,7 @@ final class Downloads {
             HeroicMap.weltOrdnerGewechselt();
             baeume().forEach(b -> zieheUm(b.id()));
         }
+        return anders;
     }
 
     /** {@link #karteGilt(Path, Ablage, String, String, String, long, Predicate)} für diesen Server. */
@@ -217,6 +285,14 @@ final class Downloads {
     private static final Map<Long, Boolean> nameGilt = new ConcurrentHashMap<>();
     /** Der Name der Karte vom Plugin, je Sitzung, und wo er gilt. */
     static final Kartenname KARTE = new Kartenname();
+    /** So lange nach dem Login wartet „Selbst“ auf den Kanal von Heroic Map; danach gilt der Server als einer ohne Namen. */
+    static final long OHNE_KANAL_MS = 3000;
+    /** Der Name dieses Servers aus der Antwort auf show, je Sitzung; null ohne. Siehe docs/selbst.md, „Wahl“. */
+    private volatile String backend;
+    /** Kam in dieser Sitzung schon eine Antwort auf show? */
+    private volatile boolean beantwortet;
+    /** Wann die Sitzung begann, in ms. */
+    private volatile long sitzungAb;
 
     /** Hält eine freigabe, bis der Hash ihrer Dimension bekannt ist. */
     void warte(String baum, JsonObject json) {
@@ -309,6 +385,9 @@ final class Downloads {
         if (belegt(baum)) {
             return Component.translatable("heroicmap.download.belegt", baum);
         }
+        if (fragtNachSelbst(baum, massstab, text(eintrag, "dimension"))) {
+            return null;
+        }
         int alt = aktiv(baum);
         String name = eintrag.has("name") ? eintrag.get("name").getAsString() : baum;
         Component frage = alt != 0 && alt != massstab
@@ -326,6 +405,42 @@ final class Downloads {
             Kanal.frage(baum, massstab, "voll", ordner == null || !Laden.hatStand(ordner.resolve(String.valueOf(massstab))));
         });
         return gezeigt ? null : Component.translatable("heroicmap.befehl.dialog");
+    }
+
+    /**
+     * Vor dem ersten vollen Download eines Baums: Zeigt dieser Server für seine Dimension die eigene Karte, fragt der
+     * Mod, was mit ihr geschieht, und danach erst nach dem Download. True, wenn er fragt. Siehe docs/download.md,
+     * „Ablage“.
+     */
+    private boolean fragtNachSelbst(String baum, int massstab, String dimension) {
+        Path ordner = ordner(baum);
+        if (ordner == null || dimension == null || Satz.lies(ordner) != null) {
+            return false;
+        }
+        Path welt = ordner.getParent();
+        String wer = wer();
+        Satz gezeigt = Satz.fuer(welt, dimension, wer);
+        if (gezeigt == null || !Selbst.gehoert(gezeigt.ordner().getParent(), wer) || baum.equals(Zeigt.baum(welt, wer, dimension))) {
+            return false;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        mc.gui.setScreen(new AlteKarte(mc.gui.screen(), gezeigt, null,
+                Component.translatable("heroicmap.alte.danach_download"), wahl -> {
+                    if (wahl == AlteKarte.Wahl.BEHALTEN) {
+                        try {
+                            Zeigt.setze(welt, wer, dimension, baum);
+                        } catch (IOException e) {
+                            LOGGER.warn("Heroic Map: Wahl der Karte nicht gespeichert", e);
+                            melde(Component.translatable("heroicmap.selbst.fehler"));
+                            return;
+                        }
+                    }
+                    Component fehler = frageVoll(baum, massstab);
+                    if (fehler != null) {
+                        melde(fehler);
+                    }
+                }));
+        return true;
     }
 
     private void freigabe(JsonObject json) {
@@ -349,6 +464,11 @@ final class Downloads {
         if (ordner(f.baum()) == null) {
             // Den Hash der Dimension kennt der Mod erst, wenn der Spieler sie betritt. Siehe docs/download.md, „Ablage“.
             warte(f.baum(), json);
+            return;
+        }
+        if (f.abgleich() && ruht(f.baum())) {
+            // Eine ruhende Karte bekommt hier keinen Abgleich, sonst wüchse sie unbemerkt. Siehe docs/download.md, „Ablage“.
+            LOGGER.info("Heroic Map: Abgleich von {} übergangen, die Karte ruht auf diesem Server", f.baum());
             return;
         }
         if (belegt(f.baum())) {
@@ -922,6 +1042,9 @@ final class Downloads {
         Component unbekannt = weltUnbekannt(baum);
         if (unbekannt != null) {
             return unbekannt;
+        }
+        if (ruht(baum)) {
+            return Component.translatable("heroicmap.download.ruht", baum);
         }
         int massstab = aktiv(baum);
         if (massstab == 0) {
