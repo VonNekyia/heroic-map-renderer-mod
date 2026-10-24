@@ -89,6 +89,7 @@ public final class OrtAendern implements FabricClientGameTest {
             }
 
             pfade(context, build.resolve("probe"));
+            ausweis(context, spiel, hier);
 
             // Nur diese Karte, von main nach build: Dort liegt probe schon, „Umziehen“ grau; nach build2 nicht. Esc bricht ab.
             liste(context);
@@ -341,6 +342,32 @@ public final class OrtAendern implements FabricClientGameTest {
         context.waitFor(mc -> !Files.exists(ungenutzt), 200);
         if (!Files.exists(genutzt.resolve("satz.json"))) {
             throw new AssertionError("Die genutzte Karte ist weg");
+        }
+    }
+
+    /**
+     * Der Ausweis der Einzelspielerwelt: Ihr Ordner gibt es, seit der Test dort einen Download anlegte. Nach einem Wechsel in den
+     * Nether und zurück steht er im Ordner, mit beiden Weltschlüsseln, ohne Netz und Server, mit dem Hash des Ordners und einer
+     * Spielzeit, die gekommen ist und nicht fällt. Siehe docs/download.md, „Ausweis“.
+     */
+    private static void ausweis(ClientGameTestContext context, TestSingleplayerContext spiel, Path hier) {
+        for (String dimension : new String[] {"minecraft:the_nether", "minecraft:overworld"}) {
+            spiel.getServer().runCommand("execute in " + dimension + " run tp @a 0 100 0");
+            context.waitFor(mc -> mc.level != null && mc.level.dimension().identifier().toString().equals(dimension), 600);
+            context.waitFor(mc -> mc.level.getGameTime() > 0, 600);
+            context.waitTicks(5);
+        }
+        Ausweis a = Ausweis.lies(hier);
+        if (a == null) {
+            throw new AssertionError("Kein Ausweis in " + hier);
+        }
+        Ausweis.Welt oben = a.welten().get("minecraft:overworld"), nether = a.welten().get("minecraft:the_nether");
+        if (!a.netz().isEmpty() || !a.server().isEmpty() || !hier.getFileName().toString().equals("welt-" + a.hash())) {
+            throw new AssertionError("Ausweis im Einzelspieler mit Netz, Server oder falschem Hash: " + a);
+        }
+        if (oben == null || nether == null || oben.tage() != 1 || oben.alterMax() <= 0 || nether.alterMax() <= 0
+                || oben.alterZuletzt() < oben.alterErstes()) {
+            throw new AssertionError("Ausweis ohne beide Welten, Besuch oder Spielzeit: " + a);
         }
     }
 

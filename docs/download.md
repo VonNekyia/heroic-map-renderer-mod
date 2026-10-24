@@ -18,6 +18,9 @@ code:
   - src/test/java/com/nekyia/heroicmap/ReiheTest.java
   - src/test/java/com/nekyia/heroicmap/AdresseTest.java
   - src/main/java/com/nekyia/heroicmap/Kartenliste.java
+  - src/main/java/com/nekyia/heroicmap/Ausweis.java
+  - src/main/java/com/nekyia/heroicmap/Ausweise.java
+  - src/test/java/com/nekyia/heroicmap/AusweisTest.java
   - src/main/java/com/nekyia/heroicmap/Ort.java
   - src/main/java/com/nekyia/heroicmap/OrtFenster.java
   - src/test/java/com/nekyia/heroicmap/OrtTest.java
@@ -667,6 +670,43 @@ eines Proxys von einem des Netzes (`Laden.Fehler.status`).
   der Spieler nicht ohne Karte dasteht; ein gekappter Download löscht nichts.
 - **Fortsetzen:** Was mit gleichem ETag schon da ist, lädt der Mod nicht.
   Ein Abgleich ist derselbe Weg mit weniger Kacheln.
+
+## Ausweis
+
+Jeder Ordner einer Welt bekommt einen Kartenausweis, `ausweis.json`
+(`Ausweis`, `Ausweise`), siehe
+[0044](entscheidungen/0044-kartenausweis-je-weltordner.md). Er ist der
+erste Baustein des Konzepts „Kartenausweis“ mit den Teilen Netz, Server,
+Welt, Seed-Hash, Generation und Inhalt. Der Pfad bleibt massgeblich; der
+Ausweis ergänzt, was der Pfad nicht weiss. Für den Spieler ändert sich
+damit nichts.
+
+- **Inhalt:**
+  - `netz`: die eingetippte Adresse wie in `namen.txt`, mit Port; leer im
+    Einzelspieler;
+  - `server`: der Name vom Server, leer ohne;
+  - `hash`: wie im Namen des Ordners;
+  - `welten`: je Weltschlüssel, etwa `minecraft:overworld`, der erste und
+    letzte Besuch, die Zahl der Tage mit Besuch in der Zeitzone des
+    Rechners, und die Spielzeit vom Server in Ticks: die erste gesehene,
+    die grösste und die letzte, ohne Wert -1.
+- **Je Weltschlüssel,** denn Oberwelt, Nether und End mit demselben Seed
+  liegen im selben `welt-<hash>`.
+- **Wann:** Beim Betreten jeder Dimension, nach Ablage, Name und Karte,
+  zählt ein Besuch im Speicher (`Ausweise.betreten`). Geschrieben wird
+  beim ersten Wert der Spielzeit und beim Verlassen, also beim Wechsel der
+  Welt oder der Dimension und beim Trennen; über eine Zwischendatei.
+- **Nur in Ordner, die es gibt:** Ein Besuch allein legt keinen an; das
+  tun erst eine Karte, Wegpunkte oder die Kartenlage. Bestehende Ordner
+  bekommen ihren Ausweis beim nächsten Besuch.
+- **Umzüge:** Der Ausweis liegt im Ordner und zieht mit. „Ort …“ mit dem
+  ganzen Ordner setzt `server` auf den neuen und leert `netz` bis zum
+  nächsten Besuch (`Ort.ausweisNachUmzug`). Zieht der Ordner mitten im
+  Besuch um, etwa zur Karte vom Server oder in eine andere Ablage,
+  schreibt der Mod in den neuen (`Ausweise.ordnerGewechselt`).
+- **Spielzeit:** `ClientLevel.getGameTime()`. Ob sie bei jedem Wechsel
+  kommt und in 26.x immer weiterläuft, ist noch zu prüfen; eine Zeile im
+  Log nennt sie beim ersten Wert je Besuch.
 
 ## Kartenliste
 

@@ -96,6 +96,7 @@ public final class HeroicMap implements ClientModInitializer {
                 Minimap.INSTANZ.schreibe(einstellungen());
             }
             Selbst.INSTANZ.arbeite(client);
+            Ausweise.INSTANZ.tick(client);
             // Beim Wechsel ins Sterben einmal der Todespunkt. Siehe docs/wegpunkte.md, „Todespunkt“.
             boolean tot = client.player != null && client.player.isDeadOrDying();
             if (tot && !warTot && client.level != null && Minimap.INSTANZ.todespunkte() > 0) {
@@ -118,11 +119,14 @@ public final class HeroicMap implements ClientModInitializer {
         // Fabric meldet den Wechsel der Welt nur zu einer neuen; das Trennen eigens, und das auf
         // einem Thread von Netty, deshalb auf den Render-Thread.
         ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> {
+            // Der Ausweis der alten Welt zuerst, solange er ihren Ordner kennt.
+            Ausweise.INSTANZ.verlassen();
             Minimap.INSTANZ.leeren();
             Selbst.INSTANZ.leeren();
             // Erst den Hash der Welt merken; Wegpunkte und Bäume liegen unter ihm. Siehe docs/download.md, „Ablage“.
             Downloads.INSTANZ.weltBetreten();
             weltOrdnerGewechselt();
+            Ausweise.INSTANZ.betreten(client);
         });
         // Auch ein Wechsel des Backends hinter einem Proxy ist ein neuer Login, ohne DISCONNECT.
         ClientPlayConnectionEvents.INIT.register((listener, client) -> client.execute(() -> {
@@ -133,6 +137,7 @@ public final class HeroicMap implements ClientModInitializer {
             Geheimbanner.INSTANZ.leeren();
         }));
         ClientPlayConnectionEvents.DISCONNECT.register((listener, client) -> client.execute(() -> {
+            Ausweise.INSTANZ.verlassen();
             Minimap.INSTANZ.leeren();
             Downloads.INSTANZ.leeren();
             Mitspieler.INSTANZ.leeren();
@@ -245,6 +250,7 @@ public final class HeroicMap implements ClientModInitializer {
      * Ordner liegt, liest neu. Auf dem Render-Thread. Siehe docs/download.md, „Ablage“.
      */
     static void weltOrdnerGewechselt() {
+        Ausweise.INSTANZ.ordnerGewechselt();
         Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());
         Ebenen.INSTANZ.wechsel(Downloads.weltOrdner());
         Ebenenreihe.INSTANZ.wechsel(Downloads.weltOrdner());

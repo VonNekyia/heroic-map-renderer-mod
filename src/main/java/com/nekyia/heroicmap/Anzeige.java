@@ -313,18 +313,13 @@ final class Anzeige extends Screen {
         // Erst hier, nicht beim Ziehen des Reglers: Von 8 auf 1 und zurück nimmt sonst sieben weg.
         Wegpunkte.INSTANZ.kappeTode(Minimap.INSTANZ.todespunkte());
         // Eine andere Ablage heisst ein anderer Ordner der Welt, auch für Wegpunkte und Ebenen; die Welt zieht erst um.
-        Runnable lies = () -> {
-            Wegpunkte.INSTANZ.wechsel(Downloads.weltOrdner());
-            Ebenen.INSTANZ.wechsel(Downloads.weltOrdner());
-            Ebenenreihe.INSTANZ.wechsel(Downloads.weltOrdner());
-        };
         if (Minimap.INSTANZ.ablage() == ablage) {
-            lies.run();
+            HeroicMap.weltOrdnerGewechselt();
             return;
         }
         ablage = Minimap.INSTANZ.ablage();
         Downloads.INSTANZ.ablageGewechselt(() -> {
-            lies.run();
+            HeroicMap.weltOrdnerGewechselt();
             Selbst.INSTANZ.neuGewaehlt(Minecraft.getInstance());
         });
     }

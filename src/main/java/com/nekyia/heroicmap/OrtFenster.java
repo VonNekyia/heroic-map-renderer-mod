@@ -225,11 +225,13 @@ final class OrtFenster extends Screen {
         boolean ganzerOrdner = ganz;
         Path baum = karte.ordner(), neuWelt = Ort.ordner(wurzel, neu);
         String werAlt = jetzt.wer(), werNeu = neu.wer();
+        Ort.Teile teile = neu;
         Selbst.INSTANZ.nachArbeit(() -> {
             boolean ok = true;
             try {
                 if (ganzerOrdner) {
                     Ort.zieheOrdner(wurzel, welt, neuWelt, werAlt, werNeu);
+                    Ort.ausweisNachUmzug(neuWelt, teile);
                 } else {
                     Ort.zieheBaum(baum, neuWelt, werNeu);
                 }
