@@ -97,7 +97,7 @@ public final class Bedienung implements FabricClientGameTest {
             zoomNebenMinimap(context, maus, k);
             aufloesungUndKoordinaten(context, maus, k);
             widgetsZiehen(context, maus, k);
-            widgetsHinzufuegen(context, spiel.getServer(), maus, k);
+            widgetsHinzufuegen(context, maus, k);
             symbole(context, maus, k);
             biomMarken(context, maus, k);
             knoepfeUeberDemL(context, maus);
@@ -4960,7 +4960,7 @@ public final class Bedienung implements FabricClientGameTest {
      * Rechtsklick schaltet reihum. Esc schliesst nur die Liste; bei 16 Widgets öffnet nichts sie. Siehe docs/widgets.md,
      * „Hinzufügen“ und „Arten“.
      */
-    private static void widgetsHinzufuegen(ClientGameTestContext context, TestServerContext server, TestInput maus, int k) {
+    private static void widgetsHinzufuegen(ClientGameTestContext context, TestInput maus, int k) {
         Path sicherung = FabricLoader.getInstance().getGameDir().resolve("heroicmap-widgets-neu-test.properties");
         context.runOnClient(mc -> {
             Minimap.INSTANZ.schreibe(sicherung);
@@ -4970,7 +4970,6 @@ public final class Bedienung implements FabricClientGameTest {
             Minimap.INSTANZ.stelle(b, 0, Minimap.GROESSE, b, h);
             mc.gui.setScreen(new Einstellungen());
         });
-        server.runCommand("time set 13500");
         context.waitTicks(3);
         try {
             Minimap.Rahmen r = rahmen(context);
@@ -4998,8 +4997,8 @@ public final class Bedienung implements FabricClientGameTest {
             if (widgetKasten(context, 1)[1] <= widgetKasten(context, 0)[1]) {
                 throw new AssertionError("Die Zeit steht nicht unter den Koordinaten: " + Arrays.toString(widgetKasten(context, 1)));
             }
-            // Die Uhr der Oberwelt: nach „time set 13500“ halb acht abends, bis die Klicks durch sind noch vor acht. Ein Rechtsklick
-            // schaltet reihum.
+            // Die Uhr der Oberwelt, verglichen im selben Frame; die Uhr bleibt, wie sie ist, so ändert kein Licht die Bilder danach.
+            // Ein Rechtsklick schaltet reihum.
             String[] versionen = {"24h", "12h", "tag", "echt", "24h"};
             for (int i = 0; i < versionen.length; i++) {
                 if (i > 0) {
@@ -5009,18 +5008,21 @@ public final class Bedienung implements FabricClientGameTest {
                     maus.pressMouse(RECHTS);
                     context.waitTicks(2);
                 }
-                String version = context.computeOnClient(mc -> Minimap.INSTANZ.widgets().get(1).versionName());
-                String text = widgetText(context, 1);
-                String tag = context.computeOnClient(mc -> Component.translatable("heroicmap.widget.tag",
-                        Widgets.tag(mc.level.getOverworldClockTime())).getString());
+                String[] ist = context.computeOnClient(mc -> {
+                    Widgets.Widget z = Minimap.INSTANZ.widgets().get(1);
+                    long t = mc.level.getOverworldClockTime();
+                    return new String[] {z.versionName(), Minimap.INSTANZ.text(z, mc.level, mc.player).getString(), Widgets.uhr(t, false),
+                        Widgets.uhr(t, true), Component.translatable("heroicmap.widget.tag", Widgets.tag(t)).getString()};
+                });
                 boolean passt = switch (versionen[i]) {
-                    case "24h" -> text.startsWith("19:");
-                    case "12h" -> text.startsWith("7:") && text.endsWith(" PM");
-                    case "tag" -> text.equals(tag);
-                    default -> text.matches("[0-9]{1,2}:[0-9]{2}");
+                    case "24h" -> ist[1].equals(ist[2]);
+                    case "12h" -> ist[1].equals(ist[3]) && ist[1].matches("[0-9]{1,2}:[0-9]{2} [AP]M");
+                    case "tag" -> ist[1].equals(ist[4]);
+                    default -> ist[1].matches("[0-9]{1,2}:[0-9]{2}");
                 };
-                if (!version.equals(versionen[i]) || !passt) {
-                    throw new AssertionError("Zeit, Schritt " + i + ": " + version + " „" + text + "“ statt " + versionen[i]);
+                if (!ist[0].equals(versionen[i]) || !passt) {
+                    throw new AssertionError("Zeit, Schritt " + i + ": " + ist[0] + " „" + ist[1] + "“ statt " + versionen[i] + ", erwartet "
+                            + String.join(" | ", ist[2], ist[3], ist[4]));
                 }
             }
 
@@ -5102,8 +5104,6 @@ public final class Bedienung implements FabricClientGameTest {
                 throw new AssertionError("Bei 16 Widgets: „+“ an " + plusAn + ", Liste offen " + listeOffen(context));
             }
         } finally {
-            // Mittag, wie in den anderen Bildtests: ruhiges Licht für die Bildschirmfotos danach, und nachts kämen Monster.
-            server.runCommand("time set noon");
             context.runOnClient(mc -> {
                 mc.gui.setScreen(null);
                 Minimap.INSTANZ.lies(sicherung);
@@ -6035,16 +6035,14 @@ public final class Bedienung implements FabricClientGameTest {
         }
         server.runCommand("execute in minecraft:the_nether run tp @p 0.5 60 0.5");
         context.waitFor(mc -> mc.level.dimension() == Level.NETHER && Math.abs(mc.player.getY() - 60) < 0.01 && mc.player.onGround(), 600);
-        // Das Widget der Zeit zeigt hier die Uhr der Oberwelt; der Nether hat keine eigene. Siehe docs/widgets.md, „Arten“.
-        server.runCommand("time set 13500");
-        context.waitTicks(3);
-        String zeit = context.computeOnClient(mc -> Minimap.INSTANZ.text(new Widgets.Widget(Widgets.Art.ZEIT, 0, Widgets.Anker.UNTEN), mc.level,
-                mc.player).getString());
-        if (!zeit.startsWith("19:")) {
-            throw new AssertionError("Nether: Die Zeit zeigt „" + zeit + "“ statt der Uhr der Oberwelt nach „time set 13500“");
+        // Das Widget der Zeit zeigt hier die Uhr der Oberwelt, nicht die fehlende des Nethers, die 6:00 hiesse; im selben Frame
+        // verglichen, die Uhr bleibt. Siehe docs/widgets.md, „Arten“.
+        String[] zeit = context.computeOnClient(mc -> new String[] {
+            Minimap.INSTANZ.text(new Widgets.Widget(Widgets.Art.ZEIT, 0, Widgets.Anker.UNTEN), mc.level, mc.player).getString(),
+            Widgets.uhr(mc.level.getOverworldClockTime(), false), Widgets.uhr(mc.level.getDefaultClockTime(), false)});
+        if (zeit[1].equals(zeit[2]) || !zeit[0].equals(zeit[1])) {
+            throw new AssertionError("Nether: Die Zeit zeigt „" + zeit[0] + "“; Uhr der Oberwelt „" + zeit[1] + "“, des Nethers „" + zeit[2] + "“");
         }
-        // Mittag, sonst kämen in der Oberwelt Monster.
-        server.runCommand("time set noon");
         if (context.computeOnClient(mc -> mc.level.getChunkSource().getChunk(ziel >> 4, ziel >> 4, ChunkStatus.FULL, false) != null)) {
             throw new AssertionError("Nether: Der Chunk des Ziels ist schon beim Client");
         }
