@@ -80,6 +80,31 @@ public final class KarteJeServer implements FabricClientGameTest {
             context.clickScreenButton("heroicmap.alte.loeschen");
             context.waitFor(mc -> !Files.exists(welt.resolve(DOWNLOAD)) && Files.exists(welt.resolve(eigene)), 600);
             pruefe(welt, eigene, "nach „Löschen“");
+
+            // Der Zeiger: Neben diesem Ordner liegt dieselbe Welt von main mit einem Download. Unten in der Kartenliste
+            // „Karte von main nutzen“, dann den Download dort an, dann „lösen“. Siehe docs/download.md, „Kartenliste“.
+            download(Zeiger.ordner(welt, "main"), "probe-main");
+            context.runOnClient(mc -> mc.gui.setScreen(new Kartenliste(null)));
+            context.waitFor(mc -> knopf(mc, "heroicmap.liste.zeiger_setzen") != null, 600);
+            klicke(context, "heroicmap.liste.zeiger_setzen");
+            context.waitTicks(2);
+            if (!"main".equals(Zeiger.name(welt))) {
+                throw new AssertionError("Kein Zeiger auf main: " + Zeiger.name(welt));
+            }
+            pruefe(welt, eigene, "mit Zeiger, ohne Namen erst die eigene");
+            context.waitFor(mc -> knopf(mc, "heroicmap.liste.ruht") != null, 100);
+            context.clickScreenButton("heroicmap.liste.ruht");
+            context.waitTicks(2);
+            pruefe(welt, "probe-main", "nach „ruht“ beim Download im Ziel");
+            if (!Files.exists(Zeiger.ordner(welt, "main").resolve("probe-main")) || Files.exists(Zeiger.ordner(welt, "main").resolve(eigene))) {
+                throw new AssertionError("Im Ziel fehlt der Download, oder die eigene Karte liegt dort");
+            }
+            context.clickScreenButton("heroicmap.liste.zeiger_loesen");
+            context.waitTicks(2);
+            if (Zeiger.name(welt) != null) {
+                throw new AssertionError("Der Zeiger ist nach „lösen“ noch da");
+            }
+            pruefe(welt, eigene, "nach „lösen“");
             context.runOnClient(mc -> mc.gui.setScreen(null));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -119,8 +144,12 @@ public final class KarteJeServer implements FabricClientGameTest {
     }
 
     private static void download(Path welt) throws IOException {
-        Satz.schreibe(welt.resolve(DOWNLOAD), "Probe", OBEN, 4);
-        Path ordner = Files.createDirectories(welt.resolve(DOWNLOAD).resolve("4"));
+        download(welt, DOWNLOAD);
+    }
+
+    private static void download(Path welt, String baum) throws IOException {
+        Satz.schreibe(welt.resolve(baum), "Probe", OBEN, 4);
+        Path ordner = Files.createDirectories(welt.resolve(baum).resolve("4"));
         Files.writeString(ordner.resolve("map.json"), "{\"tileSize\":256,\"scale\":4,\"minZoom\":0,\"maxZoom\":8}");
     }
 

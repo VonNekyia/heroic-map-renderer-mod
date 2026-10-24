@@ -2,6 +2,7 @@ package com.nekyia.heroicmap;
 
 import java.util.List;
 import java.util.Map;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
@@ -22,6 +23,8 @@ final class Auswahl extends Screen {
     private static final int TEXT = 0xFFFFFFFF;
     /** Höhe eines Baums: Name, darunter die Knöpfe. */
     private static final int ZEILE = 38;
+    /** Unter Titel und Zeile „Server“ beginnen die Zeilen. */
+    private static final int OBEN = 40;
 
     private final Screen zurueck;
     private List<Downloads.Baum> baeume = List.of();
@@ -46,7 +49,7 @@ final class Auswahl extends Screen {
         selbst = Selbst.INSTANZ.moeglich(minecraft);
         selbstAn = Selbst.INSTANZ.an(minecraft);
         dimension = minecraft.level == null ? "" : minecraft.level.dimension().identifier().toString();
-        int y = 34;
+        int y = OBEN;
         if (selbst && !selbstAn && Selbst.INSTANZ.vorhanden(minecraft)) {
             // Die eigene Karte ruht: ein Klick zeigt sie wieder, der Download ruht dann. Siehe docs/selbst.md, „Wahl“.
             addRenderableWidget(Button.builder(Component.translatable("heroicmap.selbst.ruht", Selbst.INSTANZ.massstab(minecraft)), b -> {
@@ -113,10 +116,14 @@ final class Auswahl extends Screen {
     public void extractRenderState(GuiGraphicsExtractor g, int mausX, int mausY, float delta) {
         g.fill(0, 0, width, height, 0xFF101010);
         g.centeredText(font, title, width / 2, 16, TEXT);
+        Component server = server();
+        if (server != null) {
+            g.centeredText(font, server, width / 2, 27, TEXT);
+        }
         if (baeume.isEmpty()) {
             g.centeredText(font, Component.translatable("heroicmap.angebot.keins"), width / 2, height / 2, TEXT);
         }
-        int y = 34;
+        int y = OBEN;
         if (selbst) {
             g.centeredText(font, Component.translatable("heroicmap.selbst.zeile", dimension),
                     width / 2, y, TEXT);
@@ -130,6 +137,25 @@ final class Auswahl extends Screen {
             g.centeredText(font, hinweis, width / 2, height - 44, TEXT);
         }
         super.extractRenderState(g, mausX, mausY, delta);
+    }
+
+    /**
+     * Die Zeile „Server“: erkannt mit Namen, wartet auf die Antwort, ohne Namen oder ohne Heroic Map; im Einzelspieler
+     * keine. Siehe docs/selbst.md, „Wahl“.
+     */
+    private static Component server() {
+        if (Downloads.server() == null) {
+            return null;
+        }
+        if (!Downloads.INSTANZ.serverFest()) {
+            return Component.translatable("heroicmap.auswahl.server.wartet").withStyle(ChatFormatting.YELLOW);
+        }
+        String wer = Downloads.INSTANZ.wer();
+        if (!Zeigt.OHNE.equals(wer)) {
+            return Component.translatable("heroicmap.auswahl.server.erkannt", wer).withStyle(ChatFormatting.GREEN);
+        }
+        return Component.translatable(Downloads.INSTANZ.beantwortet() ? "heroicmap.auswahl.server.ohne_namen"
+                : "heroicmap.auswahl.server.ohne").withStyle(ChatFormatting.GRAY);
     }
 
     /**
