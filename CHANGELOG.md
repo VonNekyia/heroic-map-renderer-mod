@@ -4,9 +4,12 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
-## 0.2.70
+## 0.2.71
 
 - **Copy another server's map and draw over it.** In the map list, next to "Use the map of …", "Copy" makes the other server's map of the same world your own map on this server, and "Draw it yourself" then draws what changes here. The copy costs hardly any space: until a tile is drawn anew, both maps share its file.
+
+## 0.2.70
+
 - **Plants from resource packs lie flat on the minimap.** Crops and grass from packs that build their own plant models, with tilted faces or their own templates, no longer turn into stripes or vanish on the minimap and your own map; they lie flat like the game's plants.
 - **Move a map to another place.** "Move …" in the map list changes the address, server and world hash of a map. "Whole folder", the default, moves the folder of the world with all its maps, waypoints and map view, for example to say which of two folders of the same world belongs to which server; your own map then belongs to the new server. "Only this map" moves just this map, for example into the folder of the new hash after a world reset. Nothing is ever merged: if something is already there, "Move" stays grey and says why. A move happens completely or not at all.
 - **No more duplicate maps after changing the storage.** Switching between "IP + Hash" and "IP:Port + Hash" now moves the map folder instead of downloading everything again, and the default port 25565 no longer counts as a difference. The map list marks a map that lies twice as "duplicate"; hover it to see both places and when each was last written, then delete the one you don't need.
