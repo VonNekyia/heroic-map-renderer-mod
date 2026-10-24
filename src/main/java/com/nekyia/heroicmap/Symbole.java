@@ -64,6 +64,12 @@ final class Symbole {
     static final int BANNER_BREITE = 32, BANNER_HOEHE = 64;
     /** Ein Feld wie {@code images/burg_16.png}: ohne Unterordner, ohne Punkt vorn, nur PNG und WebP. */
     static final Pattern FELD = Pattern.compile("images/[a-z0-9_-][a-z0-9_.-]{0,63}\\.(png|webp)");
+    /** Der Name eines Kopfs: der SHA-256 seiner Datei, 64 Zeichen 0–9 a–f. Siehe docs/ebenen.md, „Köpfe“. */
+    static final Pattern KOPF = Pattern.compile("[0-9a-f]{64}");
+    /** So gross ist die Datei eines Kopfs höchstens, wie auf der Webkarte; das Plugin legt ein PNG 8 × 8 ab. */
+    static final int MAX_KOPF = 16 << 10, KOPF_SEITE = 8;
+    /** So viele Köpfe hält der Mod, der zuletzt gezeigte hinten; einer hat 256 Byte. */
+    static final int MAX_KOEPFE = 1024;
     private static final Pattern MODNAME = Pattern.compile("[a-z0-9_-][a-z0-9_.-]{0,63}");
     /** Ein Teil einer Kennung, auch der Name eines Entwurfs: 1 bis 64 Zeichen, nicht mit Punkt vorn oder hinten, kein Gerät von Windows. */
     private static final Pattern TEIL = Pattern.compile("[a-z0-9_-]([a-z0-9_.-]{0,62}[a-z0-9_-])?");
@@ -143,6 +149,12 @@ final class Symbole {
 
     /** Die Bilder der Tafeln, das zuletzt gezeigte hinten; null, solange es lädt oder wenn es fehlt. */
     private final LinkedHashMap<Tafelbild, Textur> tafelbilder = new LinkedHashMap<>(16, 0.75f, true);
+    /**
+     * Die Köpfe je Name über alle Ebenen, denn der Name ist der Inhalt; der zuletzt gezeigte hinten, null, solange er lädt
+     * oder fehlt. Dazu je Name, der nicht kam, {wann zuletzt gescheitert, oder Long.MAX_VALUE, solange ein Versuch läuft; wie oft}.
+     */
+    private final LinkedHashMap<String, Identifier> koepfe = new LinkedHashMap<>(16, 0.75f, true);
+    private final Map<String, long[]> kopfVersuche = new HashMap<>();
     private long tafelbilderByte;
 
     Symbole(HttpClient client, ExecutorService holer, Executor renderThread, BiFunction<URI, Kacheln.Bild, Identifier> ablage,
@@ -419,6 +431,76 @@ final class Symbole {
         return stand;
     }
 
+    /** Wo der Kopf {@code name} liegt: {@code <basis>/koepfe/<name>.png}; null ohne Basis oder mit einem anderen Namen. */
+    static URI kopfUri(URI basis, String name) {
+        if (basis == null || name == null || !KOPF.matcher(name).matches()) {
+            return null;
+        }
+        String b = basis.toString();
+        return URI.create((b.endsWith("/") ? b : b + "/") + "koepfe/" + name + ".png");
+    }
+
+    /**
+     * Der Kopf {@code name}, ein Bild 8 × 8, oder null, solange er lädt, nach einem Fehler oder ohne Adresse. Holt ihn beim
+     * ersten Fragen, einmal je Name, mit den Neuversuchen der Bilder; höchstens {@link #MAX_KOEPFE}, der am längsten nicht
+     * gezeigte geht zuerst. Siehe docs/ebenen.md, „Köpfe“.
+     */
+    Identifier kopf(String name) {
+        if (koepfe.containsKey(name)) {
+            Identifier id = koepfe.get(name);
+            long[] v = kopfVersuche.get(name);
+            // Da, lädt zum ersten Mal, ein neuer Versuch läuft schon, oder noch nicht dran: so lassen.
+            if (id != null || v == null || v[0] == Long.MAX_VALUE || uhr.getAsLong() - v[0] < warten(v[1])) {
+                return id;
+            }
+            v[0] = Long.MAX_VALUE;
+            holeKopf(name, false);
+            return null;
+        }
+        if (kopfUri(basis, name) == null) {
+            return null;
+        }
+        koepfe.put(name, null);
+        while (koepfe.size() > MAX_KOEPFE) {
+            var aeltester = koepfe.entrySet().iterator().next();
+            if (aeltester.getValue() != null) {
+                freigabe.accept(aeltester.getValue());
+            }
+            kopfVersuche.remove(aeltester.getKey());
+            koepfe.remove(aeltester.getKey());
+        }
+        holeKopf(name, true);
+        return null;
+    }
+
+    /** Holt den Kopf im eigenen Thread wie ein Bild, höchstens {@link #MAX_KOPF} Byte, genau 8 × 8; ein Fehlschlag zählt mit seiner Zeit. */
+    private void holeKopf(String name, boolean warnen) {
+        URI uri = kopfUri(basis, name);
+        int r = runde.get();
+        InetAddress server = spielserver;
+        holer.execute(() -> {
+            if (r != runde.get()) {
+                return;
+            }
+            Kacheln.Bild bild = hole(client, uri, server, KOPF_SEITE, KOPF_SEITE, false, FRIST, warnen, MAX_KOPF);
+            renderThread.execute(() -> {
+                // Nach dem Trennen, oder schon wieder verdrängt, legt ein alter Auftrag nichts ab.
+                if (r != runde.get() || !koepfe.containsKey(name) || koepfe.get(name) != null) {
+                    return;
+                }
+                if (bild != null) {
+                    koepfe.put(name, ablage.apply(uri, bild));
+                    kopfVersuche.remove(name);
+                    stand++;
+                } else {
+                    long[] v = kopfVersuche.computeIfAbsent(name, k -> new long[2]);
+                    v[0] = uhr.getAsLong();
+                    v[1]++;
+                }
+            });
+        });
+    }
+
     /** Über dem Budget: die am längsten nicht gezeigten Bilder der Tafeln frei, das neueste bleibt. */
     private void raeume() {
         Iterator<Map.Entry<Tafelbild, Textur>> alt = tafelbilder.entrySet().iterator();
@@ -561,13 +643,19 @@ final class Symbole {
     /** Wie oben; ohne {@code warnen} steht ein Fehler nur als DEBUG im Log, für die neuen Versuche. */
     static Kacheln.Bild hole(HttpClient client, URI uri, InetAddress spielserver, int breite, int hoehe, boolean hoechstens, Duration frist,
             boolean warnen) {
+        return hole(client, uri, spielserver, breite, hoehe, hoechstens, frist, warnen, MAX);
+    }
+
+    /** Wie oben, höchstens {@code max} Byte. */
+    static Kacheln.Bild hole(HttpClient client, URI uri, InetAddress spielserver, int breite, int hoehe, boolean hoechstens, Duration frist,
+            boolean warnen, int max) {
         try {
             Adresse.Urteil urteil = Adresse.pruefe(uri, spielserver);
             if (urteil != Adresse.Urteil.GUT) {
                 throw new IOException(urteil.name());
             }
             HttpRequest anfrage = HttpRequest.newBuilder(uri).timeout(frist).GET().build();
-            HttpResponse<byte[]> antwort = Laden.sende(client, anfrage, MAX, Laden.Grund.NETZ, frist, uri.getPath());
+            HttpResponse<byte[]> antwort = Laden.sende(client, anfrage, max, Laden.Grund.NETZ, frist, uri.getPath());
             if (antwort.statusCode() != 200) {
                 throw new IOException("HTTP " + antwort.statusCode());
             }
@@ -620,6 +708,9 @@ final class Symbole {
         ebenen.clear();
         tafelbilder.values().forEach(this::gibBildFrei);
         tafelbilder.clear();
+        koepfe.values().stream().filter(Objects::nonNull).forEach(freigabe);
+        koepfe.clear();
+        kopfVersuche.clear();
     }
 
     /** Für Tests: wartet, bis der eigene Thread alles Eingereihte abgearbeitet hat. */

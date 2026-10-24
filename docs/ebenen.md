@@ -95,6 +95,9 @@ die Nachrichten das Plugin:
   Pixel, die linke obere Ecke bei (⌊(Breite − Seite) / 2⌋, 3) im Bild des
   Schilds: `symbol.large` 16 × 16 in `large`, `symbol.medium` 9 × 9 in
   `medium`, `small` ohne. Fehlt es, bleibt das Schild leer. Siehe „Symbole“.
+- **Kopf** (`head`): Nennt die Nadel einen Kopf und ist er geladen, zeigt
+  der Mod statt Schild und Nadel das Gesicht, darunter den Namen; siehe
+  „Köpfe“. Bis dahin, und wenn er nicht taugt, die Nadel.
 - **Farbe:** Die Grafikkarte multipliziert das Feld mit `color`, ohne
   `color` `#D9443A`; das Alpha wirkt nicht. Sie rundet dabei, statt
   abzuschneiden wie die Webkarte; ein Kanal weicht so um höchstens eine
@@ -346,6 +349,48 @@ Schritt 2b zu 0100 des Renderers, Format mit dem Backend abgestimmt, siehe
   bekommt oder aus der Liste fällt, und alle beim Trennen, bei einem neuen
   Login und mit einer neuen Adresse. Danach fragt ein Auftrag für sie, der
   noch wartet, nicht mehr.
+
+## Köpfe
+
+Eine Nadel mit `head` zeigt statt Schild und Nadel ein Gesicht, etwa eines
+NPC. Gewünscht vom User am 24.10.; das Format und warum steht im Renderer
+unter
+[Ebenen](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/ebenen.md),
+„Nadel“, und in
+[0118](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/entscheidungen/0118-koepfe-in-ebenen.md);
+für den Mod siehe [0029](entscheidungen/0029-koepfe-an-nadeln.md).
+
+- **Gelesen:** `head` gilt nur mit genau 64 Zeichen `0–9 a–f`, dem
+  SHA-256 der Datei (`Symbole.KOPF`); jeder andere Wert gilt wie ohne
+  (`Ebenen.nadel`). Auch in Ebenen anderer Client-Mods über die API; fehlt
+  die Datei beim Server, bleibt dort die Nadel.
+- **Adresse:** `<Adresse>/koepfe/<head>.png`, mit der Adresse der
+  Symbole (`Symbole.kopfUri`), ohne Token. Ein Kopf liegt nicht unter
+  `layers/`; darum zeigen ihn auch Ebenen mit `permission`.
+- **Geprüft** wie die Symbole, dazu wie die Webkarte: höchstens 16 KiB
+  (`Symbole.MAX_KOPF`), PNG genau 8 × 8, am Kopf der Datei vor dem
+  Dekodieren. Einen Hash über die Bytes rechnet der Mod nicht, die
+  Webkarte auch nicht. Das Plugin legt ein deckendes Gesicht ab, den Hut
+  darüber gemischt (`Koepfe` des Plugins, geprüft am 24.10.).
+- **Einmal je Name:** Der Name ist der Inhalt, darum hält der Mod Köpfe je
+  Name über alle Ebenen und jede `version`, nicht je Ebene
+  (`Symbole.kopf`). Höchstens 1024 (`Symbole.MAX_KOEPFE`), der am längsten
+  nicht gezeigte geht zuerst; einer hat 256 Byte. Geholt erst, wenn eine
+  Nadel ihn zeichnet oder trifft. Neu geholt wie ein Symbol nach 1, 5 und
+  dann alle 15 Minuten. Freigegeben beim Trennen und mit einer neuen
+  Adresse.
+- **Gezeichnet:** das Gesicht 8 × 8 Einheiten, ein Pixel des Bilds genau
+  eine Einheit, so auf ganzen Pixeln des Schirms; ein schwarzer Rand von
+  einer Einheit wie bei den Mitspielern (`Ebenen.kopf`). Die Mitte des
+  Gesichts liegt auf dem Fuss, wie auf der Webkarte. Fest wie die Nadel,
+  auf jeder Stufe gleich; so entschieden vom Reviewer am 24.10.
+- **Name** wie an der Nadel, aber erst 5 Einheiten tiefer, unter dem
+  Gesicht (`Ebenen.KOPF_HALB`, `Ebenen.nameVersatz`). Ebenso der Punkt
+  einer angehefteten Nadel, zwischen Gesicht und Name.
+- **Minimap, Zeigen, Tafel und Doppelklick** wie bei der Nadel. Der
+  Kasten zum Treffen folgt dem, was gezeichnet ist (`Ebenen.kopfKasten`);
+  kommt der Kopf an, sucht die Vollbildkarte ihr Ziel neu
+  (`Symbole.stand`). Der Kasten ohne Holen umfasst Schild und Gesicht.
 
 ## Flächen, Kreise und Linien
 

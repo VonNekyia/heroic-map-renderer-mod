@@ -10,6 +10,7 @@ The release notes on GitHub and Modrinth come from here
 - **The marks of the biome frame sit on the frame.** The east, south and west marks of the "biome" frame no longer stick out past its narrow band: they rest on it, flush with the outer edge, shadow included, square and round, upright and rotating. North and the other frames stay as they were.
 - **Death points and the veil, right in the settings.** The settings submenu now shows a death point with its time and a pinned region with its veil, each with its slider next to it; the veil in the picture grows with its slider. The world effects switch is a symbol next to the region. The separate slider rows are gone.
 - **Choose the time under death points.** Click the death point in the settings to switch between date and time, date, time or none. Date and time now always shows both, also on the day you died.
+- **Heads on map pins.** If a server's layer gives a pin a head, for example an NPC, the map shows that face instead of the pin, with the name below, on the full map and pinned on the minimap. Until the head has loaded, you see the pin.
 
 ## 0.2.68
 
