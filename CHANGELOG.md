@@ -7,6 +7,8 @@ The release notes on GitHub and Modrinth come from here
 ## 0.2.70
 
 - **Move a map to another place.** "Move …" in the map list changes the address, server and world hash of a map. "Whole folder", the default, moves the folder of the world with all its maps, waypoints and map view, for example to say which of two folders of the same world belongs to which server; your own map then belongs to the new server. "Only this map" moves just this map, for example into the folder of the new hash after a world reset. Nothing is ever merged: if something is already there, "Move" stays grey and says why. A move happens completely or not at all.
+- **Move maps between singleplayer and a server.** "Move …" now also takes a world folder or a map from singleplayer to a server and back: choose "Server" or "Singleplayer" and type the name of the save. A world with the same seed has the same hash in both places, so your map and waypoints fit right away.
+- **A server address with a dot at the end** now uses the same map folder as without it, on every system.
 - **Long paths in the map list are shortened in the middle.** The address stays in front, the world folder and the map name at the end. Hover a shortened path to see it in full.
 - **"Server without a name" explains itself.** Hover it in "Maps of this server" to see what it means and what helps.
 

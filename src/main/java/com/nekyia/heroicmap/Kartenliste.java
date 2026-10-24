@@ -155,8 +155,8 @@ final class Kartenliste extends Screen {
     }
 
     /**
-     * Der Knopf „Ort …“: Adresse, Server und Hash des Ordners der Welt oder nur dieses Baums ändern. Grau mit Grund für
-     * Karten ohne Adresse und Hash, etwa aus dem Einzelspieler, und solange ein Download in den Baum läuft. Siehe
+     * Der Knopf „Ort …“: Adresse, Server und Hash des Ordners der Welt oder nur dieses Baums ändern, auch zwischen Einzelspieler
+     * und Server. Grau mit Grund für Karten ohne Hash, aus der Ablage davor, und solange ein Download in den Baum läuft. Siehe
      * docs/download.md, „Ort ändern“.
      */
     private Button ort(Laden.AufPlatte e, int x, int y) {
