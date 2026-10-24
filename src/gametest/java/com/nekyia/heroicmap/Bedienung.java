@@ -1470,21 +1470,23 @@ public final class Bedienung implements FabricClientGameTest {
             }
             int farbe = Wegpunkte.FARBEN[p.farbe()];
             int[] wegpunkt = new int[3];
+            double[] wegpunktBreite = new double[3];
             for (int i = 0; i < 3; i++) {
                 zoomeAuf(context, maus, k, mx, my, stufen[i]);
-                int mit = farbig(context.takeScreenshot(TestScreenshotOptions.of("namen-weit-" + namen[i]).disableCounterPrefix()), k,
-                        unterRaute, farbe);
+                Path mit = context.takeScreenshot(TestScreenshotOptions.of("namen-weit-" + namen[i]).disableCounterPrefix());
                 context.runOnClient(mc -> Wegpunkte.INSTANZ.benenne(punktImSpiel(dimension, mitte), ""));
                 context.waitTicks(2);
-                int ohne = farbig(context.takeScreenshot(TestScreenshotOptions.of("namen-weit-" + namen[i] + "-ohne").disableCounterPrefix()), k,
-                        unterRaute, farbe);
+                Path ohne = context.takeScreenshot(TestScreenshotOptions.of("namen-weit-" + namen[i] + "-ohne").disableCounterPrefix());
                 context.runOnClient(mc -> Wegpunkte.INSTANZ.benenne(punktImSpiel(dimension, mitte), "Mine"));
                 context.waitTicks(2);
-                wegpunkt[i] = mit - ohne;
+                wegpunkt[i] = farbig(mit, k, unterRaute, farbe) - farbig(ohne, k, unterRaute, farbe);
+                wegpunktBreite[i] = breiteDesUnterschieds(mit, ohne, k, unterRaute);
             }
-            if (wegpunkt[0] < 40 || wegpunkt[1] < 10 || wegpunkt[1] >= wegpunkt[0] || wegpunkt[2] > 2) {
-                throw new AssertionError("Name des Wegpunkts auf Stufe 11, 4 und 2: " + Arrays.toString(wegpunkt)
-                        + " Pixel; voll, kleiner, weg erwartet");
+            // Kleiner heisst schmaler: auf Stufe 4 der Faktor 0,8; die Zahl der Pixel allein schwankt mit dem Hintergrund.
+            if (wegpunkt[0] < 40 || wegpunkt[1] < 10 || wegpunkt[2] > 2 || wegpunktBreite[0] < 15
+                    || wegpunktBreite[1] > 0.9 * wegpunktBreite[0] || wegpunktBreite[1] < 0.6 * wegpunktBreite[0]) {
+                throw new AssertionError("Name des Wegpunkts auf Stufe 11, 4 und 2: " + Arrays.toString(wegpunkt) + " Pixel, "
+                        + Arrays.toString(wegpunktBreite) + " Einheiten breit; voll, um 0,8 schmaler, weg erwartet");
             }
             // Mit „Schrift“ 2 auf Stufe 4 steht er grösser als mit 1; in einem Kasten, der beide fasst.
             zoomeAuf(context, maus, k, mx, my, 4);
@@ -1509,10 +1511,10 @@ public final class Bedienung implements FabricClientGameTest {
                         + "\"size\":\"small\",\"name\":\"Stadt\"}]}"));
             });
             int[] nadel = new int[3];
+            double[] nadelBreite = new double[3];
             for (int i = 0; i < 3; i++) {
                 zoomeAuf(context, maus, k, mx, my, stufen[i]);
-                int mit = farbig(context.takeScreenshot(TestScreenshotOptions.of("nadel-weit-" + namen[i]).disableCounterPrefix()), k,
-                        unterFuss, Ebenen.KONTURFARBE);
+                Path mit = context.takeScreenshot(TestScreenshotOptions.of("nadel-weit-" + namen[i]).disableCounterPrefix());
                 // Ausgeblendet ist der Name kein Ziel: Der Kasten endet am Fuss.
                 float unten = context.computeOnClient(mc -> {
                     Karte karte = (Karte) mc.gui.screen();
@@ -1523,14 +1525,16 @@ public final class Bedienung implements FabricClientGameTest {
                 }
                 context.runOnClient(mc -> Ebenen.INSTANZ.setze("test:fern", false));
                 context.waitTicks(2);
-                int ohne = farbig(context.takeScreenshot(TestScreenshotOptions.of("nadel-weit-" + namen[i] + "-ohne").disableCounterPrefix()), k,
-                        unterFuss, Ebenen.KONTURFARBE);
+                Path ohne = context.takeScreenshot(TestScreenshotOptions.of("nadel-weit-" + namen[i] + "-ohne").disableCounterPrefix());
                 context.runOnClient(mc -> Ebenen.INSTANZ.setze("test:fern", true));
                 context.waitTicks(2);
-                nadel[i] = mit - ohne;
+                nadel[i] = farbig(mit, k, unterFuss, Ebenen.KONTURFARBE) - farbig(ohne, k, unterFuss, Ebenen.KONTURFARBE);
+                nadelBreite[i] = breiteDesUnterschieds(mit, ohne, k, unterFuss);
             }
-            if (nadel[0] < 30 || nadel[1] < 5 || nadel[1] >= nadel[0] || nadel[2] > 2) {
-                throw new AssertionError("Name der Nadel auf Stufe 11, 4 und 2: " + Arrays.toString(nadel) + " Pixel; voll, kleiner, weg erwartet");
+            if (nadel[0] < 30 || nadel[1] < 5 || nadel[2] > 2 || nadelBreite[0] < 15 || nadelBreite[1] > 0.9 * nadelBreite[0]
+                    || nadelBreite[1] < 0.6 * nadelBreite[0]) {
+                throw new AssertionError("Name der Nadel auf Stufe 11, 4 und 2: " + Arrays.toString(nadel) + " Pixel, "
+                        + Arrays.toString(nadelBreite) + " Einheiten breit; voll, um 0,8 schmaler, weg erwartet");
             }
 
             // Angeheftet auf der Minimap, genordet bei Zoom 2: der Name unter der Raute, im Spiel.
@@ -1604,6 +1608,33 @@ public final class Bedienung implements FabricClientGameTest {
             throw new AssertionError("Kein Wegpunkt auf " + Arrays.toString(block));
         }
         return p;
+    }
+
+    /**
+     * Wie breit in Einheiten der Bereich ist, in dem sich zwei Bildschirmfotos im Kasten {x0, y0, x1, y1} unterscheiden, um mehr
+     * als 16 in einem Kanal; 0 ohne Unterschied.
+     */
+    private static double breiteDesUnterschieds(Path a, Path b, int k, double[] kasten) {
+        try {
+            BufferedImage x = ImageIO.read(a.toFile()), y = ImageIO.read(b.toFile());
+            int links = Integer.MAX_VALUE, rechts = Integer.MIN_VALUE;
+            for (int py = (int) (kasten[1] * k); py < kasten[3] * k; py++) {
+                for (int px = (int) (kasten[0] * k); px < kasten[2] * k; px++) {
+                    int p = x.getRGB(px, py), q = y.getRGB(px, py);
+                    boolean anders = false;
+                    for (int s = 0; s < 24; s += 8) {
+                        anders |= Math.abs((p >> s & 0xFF) - (q >> s & 0xFF)) > 16;
+                    }
+                    if (anders) {
+                        links = Math.min(links, px);
+                        rechts = Math.max(rechts, px);
+                    }
+                }
+            }
+            return rechts < links ? 0 : (rechts - links + 1) / (double) k;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /** Die Pixel nah an {@code farbe}, auf 24 je Kanal genau, im Kasten {x0, y0, x1, y1} in Einheiten. */
