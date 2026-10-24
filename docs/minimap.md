@@ -879,21 +879,24 @@ oben weg.
   Renderer. Dazu gehören auch Setzlinge, Pilze, Spinnennetz und die
   Amethystknospen.
   - **Die Blockstate-Datei** liest das Spiel selbst
-    (`BlockStateModelDispatcher.CODEC`, `instantiate`), aus allen Packs,
-    das oberste zuletzt, wie beim Laden; die Modelle eines Zustands nennt
+    (`BlockStateModelDispatcher.CODEC`, `instantiate`), aus der untersten
+    Quelle, dem Spiel oder dem Mod, der den Block bringt, siehe
+    „Pflanzen aus Paketen“; die Modelle eines Zustands nennt
     `resolveDependencies`. Belegt per javap am Client 26.3.
-  - **Die `parent`-Kette** liest der Mod aus den Modelldateien im obersten
-    Pack, höchstens 32 Glieder; eine längere gilt als Schleife.
+  - **Die `parent`-Kette** liest der Mod ebenso aus der untersten Quelle je
+    Modelldatei, höchstens 32 Glieder; eine längere gilt als Schleife.
   - **Je Block einmal:** die Blockstate-Datei beim ersten Treffen eines
     Blocks im Worker, mit dem Ergebnis für jeden seiner Zustände
     (`Pflanzen.eintragen`); fehlt die Datei oder ein Zustand darin, ist er
     keine Pflanze. Die Kette je Modell einmal. Ein Neuladen der Packs
     nimmt einen neuen Merker (`Pflanzen.neuGeladen`); was ein Worker
     danach noch in den alten schreibt, zählt nicht.
-- **Welche Modelle:** Hat das Modell eine Fläche nach oben, bleibt es, wie
-  es ist, etwa Blütenteppiche und Laub am Boden.
+- **Welche Modelle:** Hat das Modell eine liegende Fläche, deren Normale
+  höchstens 45° von oben steht (`ChunkMaler.liegt`), bleibt es, wie es ist,
+  mit allen Flächen nach oben, etwa Blütenteppiche und Laub am Boden.
 - **Was flach liegt** (`ChunkMaler.flach`): die erste Fläche aus dem
-  Tesselator, als Fläche über den ganzen Block, 1/16 über seinem Boden.
+  Tesselator, die nicht liegt, als Fläche über den ganzen Block, 1/16 über
+  seinem Boden.
   - **UV:** das Rechteck aus min und max über alle vier Ecken
     (`ChunkMaler.rechteck`), u0 und v0 im Nordwesten wie das Bild in der
     Datei. Drehung und Spiegelung zählen nicht.
@@ -913,6 +916,37 @@ oben weg.
   Seegras ein Viertel des Blocks, Weizen deckt fast ganz.
 - **Die eigene Karte** zeichnet mit demselben Maler, siehe
   [Selbst gezeichnete Karte](selbst.md).
+
+## Pflanzen aus Paketen
+
+Ressourcenpakete bauen Pflanzen oft anders als das Spiel: mit eigenen
+Vorlagen, mit gekippten Flächen, auch mit einer ersetzten Vorlage des
+Spiels. Bis 0.2.69 fielen solche Pflanzen aus der Regel oder standen als
+schräge Streifen da. Gemeldet vom User am 24.10. mit zwei Paketen für
+Feldfrüchte und Gras; entschieden in
+[0042](entscheidungen/0042-pflanzen-aus-paketen.md).
+
+- **Ob ein Block Pflanze ist,** entscheidet die unterste Quelle, also das
+  Spiel oder der Mod, der den Block bringt: ihre Blockstate-Datei und die
+  `parent`-Kette ihrer Modelle (`Pflanzen.lies`, `Pflanzen.eltern`). Ein
+  Paket darüber ändert daran nichts, auch wenn es eigene Modelle ohne
+  `parent` nennt oder eine Modelldatei des Spiels auf eine eigene Vorlage
+  zeigen lässt. So zählt dasselbe wie im Renderer, der nur die Dateien des
+  Spiels kennt.
+- **Gezeichnet** wird das Modell, das das Spiel lädt, also das des Pakets;
+  nur die Entscheidung kommt von unten.
+- **Eine gekippte Fläche** zählt bei einer Pflanze nicht als oben. Eine
+  Fläche liegt, wenn ihre Normale höchstens 45° von oben steht,
+  n_y ≥ cos 45° · |n| (`ChunkMaler.liegt`). Eine Fläche eines Kreuzes, die
+  ein Paket um 22,5° kippt, steht 67,5° von oben und liegt also nicht; die
+  Pflanze liegt flach wie ohne Paket. Für andere Blöcke bleibt die Grenze
+  aus „Flächen aus dem Tesselator“.
+- **Die flache Textur** ist die der ersten Fläche, die nicht liegt, wie
+  bei jeder Pflanze. Zeigt ein Paket auf seinen Flächen nur die halbe
+  Textur, liegt diese Hälfte über dem Block.
+- **Geprüft** mit einem eigenen Testpaket, das die Eigenschaften
+  nachbildet, ohne fremden Inhalt, siehe [Entwicklung](entwicklung.md),
+  „Tests“, `Bilder.pflanzenAusPaketen`.
 
 ## Flächen und Pixel
 

@@ -1660,8 +1660,9 @@ public final class Bilder implements FabricClientGameTest {
 
     /**
      * Das Testpaket unter /pakete/pflanzen, eigene Modelle nach dem Muster mancher Pakete: eine ersetzte Vorlage
-     * {@code block/crop} mit gekippten Flächen, reifer Weizen als zwei Blöcke hohes Modell ohne {@code parent}, und Gras, das
-     * neben dem Modell des Spiels ein schräges Kreuz ohne {@code parent} wählt. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
+     * {@code block/crop} mit gekippten Flächen, reifer Weizen als zwei Blöcke hohes Modell ohne {@code parent}, die Datei
+     * {@code potatoes_stage3} des Spiels mit diesem Modell als {@code parent}, und Gras, das neben dem Modell des Spiels ein
+     * schräges Kreuz ohne {@code parent} wählt. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
      */
     private static final String[] PAKET_PFLANZEN = {
         "pack.mcmeta",
@@ -1672,6 +1673,7 @@ public final class Bilder implements FabricClientGameTest {
         "assets/minecraft/models/block/heroicmap_test_hohes_getreide.json",
         "assets/minecraft/models/block/heroicmap_test_schraeges_kreuz.json",
         "assets/minecraft/models/block/heroicmap_test_weizen_reif.json",
+        "assets/minecraft/models/block/potatoes_stage3.json",
     };
 
     /** Ein Feld: Weizen jung bis reif, Karotten, Kartoffeln, Gras und Farn, um (-56, 43). */
@@ -1685,8 +1687,9 @@ public final class Bilder implements FabricClientGameTest {
     };
 
     /**
-     * Pflanzen aus Paketen: das Feld bei 4 px und 1 px, Zoom 4, ohne und mit dem Testpaket. Siehe docs/minimap.md, „Pflanzen
-     * aus Paketen“.
+     * Pflanzen aus Paketen: das Feld bei 4 px und 1 px, Zoom 4, ohne und mit dem Testpaket. Mit dem Paket liegen Karotten und
+     * Gras bei 4 px wie ohne, denn ihre erste Fläche ist dieselbe, und reifer Weizen und Kartoffeln decken das Ackerland,
+     * statt wegzufallen. Erst alle Bilder, dann die Prüfung. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
      */
     private static void pflanzenAusPaketen(ClientGameTestContext context, TestServerContext server) {
         for (String befehl : FELD) {
@@ -1728,6 +1731,48 @@ public final class Bilder implements FabricClientGameTest {
             }
         }
         server.runCommand("tp @a 0.5 -30 0.5 0 90");
+        BufferedImage ohne = bilder.get(0), mit = bilder.get(2);
+        int block = 4 * context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+        List<String> fehler = new ArrayList<>();
+        // Wie ohne Paket: Karotten (z 42) und Gras (z 44).
+        for (int[] b : new int[][] {{-60, 42}, {-59, 42}, {-58, 42}, {-57, 42}, {-60, 44}, {-58, 44}, {-56, 44}, {-54, 44}}) {
+            double anders = anteilAnders(mit, b[0], b[1], ohne, b[0], b[1], block);
+            if (anders > 0.15) {
+                fehler.add("(" + b[0] + ", " + b[1] + ") zu " + Math.round(100 * anders) + " % anders als ohne Paket");
+            }
+        }
+        // Deckt das Ackerland: reifer Weizen (z 40) und Kartoffeln (z 42), verglichen mit dem leeren Ackerland in z 41.
+        for (int[] b : new int[][] {{-56, 40}, {-55, 40}, {-54, 40}, {-53, 40}, {-56, 42}, {-55, 42}, {-54, 42}, {-53, 42}}) {
+            double boden = 1 - anteilAnders(mit, b[0], b[1], mit, b[0], 41, block);
+            if (boden > 0.5) {
+                fehler.add("(" + b[0] + ", " + b[1] + ") zu " + Math.round(100 * boden) + " % wie leeres Ackerland");
+            }
+        }
+        if (!fehler.isEmpty()) {
+            throw new AssertionError("Pflanzen aus Paketen bei 4 px: " + String.join("; ", fehler));
+        }
+    }
+
+    /**
+     * Welcher Anteil der Pixel im Inneren des Blocks (x, z) in {@code a} mehr als 4 in einem Kanal von denen des Blocks (x2, z2)
+     * in {@code b} abweicht; die Minimap steht mit dem Spieler bei (-56,5, 43,5) in der Mitte, {@code block} Pixel je Block.
+     */
+    private static double anteilAnders(BufferedImage a, int x, int z, BufferedImage b, int x2, int z2, int block) {
+        int ax = a.getWidth() / 2 + Math.round((x + 56.5f) * block), az = a.getHeight() / 2 + Math.round((z - 43.5f) * block);
+        int bx = b.getWidth() / 2 + Math.round((x2 + 56.5f) * block), bz = b.getHeight() / 2 + Math.round((z2 - 43.5f) * block);
+        int anders = 0, alle = 0;
+        for (int dy = 1; dy < block - 1; dy++) {
+            for (int dx = 1; dx < block - 1; dx++) {
+                int p = a.getRGB(ax + dx, az + dy), q = b.getRGB(bx + dx, bz + dy);
+                boolean gleich = true;
+                for (int s = 0; s <= 16; s += 8) {
+                    gleich &= Math.abs((p >> s & 0xFF) - (q >> s & 0xFF)) <= 4;
+                }
+                anders += gleich ? 0 : 1;
+                alle++;
+            }
+        }
+        return anders / (double) alle;
     }
 
     /** Schaltet das Paket {@code id} an oder aus und lädt die Ressourcen neu, wie das Menü der Pakete. */
@@ -1743,7 +1788,8 @@ public final class Bilder implements FabricClientGameTest {
             r.setSelected(gewaehlt);
             return mc.reloadResourcePacks();
         });
-        context.waitFor(mc -> fertig.isDone(), 1200);
+        // Fertig erst, wenn auch das Bild des Ladens ausgeblendet ist.
+        context.waitFor(mc -> fertig.isDone() && mc.gui.overlay() == null, 1200);
         context.waitTicks(5);
     }
 

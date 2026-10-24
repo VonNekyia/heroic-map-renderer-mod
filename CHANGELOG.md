@@ -6,6 +6,7 @@ The release notes on GitHub and Modrinth come from here
 
 ## 0.2.70
 
+- **Plants from resource packs lie flat on the minimap.** Crops and grass from packs that build their own plant models, with tilted faces or their own templates, no longer turn into stripes or vanish on the minimap and your own map; they lie flat like the game's plants.
 - **Move a map to another place.** "Move …" in the map list changes the address, server and world hash of a map. "Whole folder", the default, moves the folder of the world with all its maps, waypoints and map view, for example to say which of two folders of the same world belongs to which server; your own map then belongs to the new server. "Only this map" moves just this map, for example into the folder of the new hash after a world reset. Nothing is ever merged: if something is already there, "Move" stays grey and says why. A move happens completely or not at all.
 - **Move maps between singleplayer and a server.** "Move …" now also takes a world folder or a map from singleplayer to a server and back: choose "Server" or "Singleplayer" and type the name of the save. A world with the same seed has the same hash in both places, so your map and waypoints fit right away.
 - **A server address with a dot at the end** now uses the same map folder as without it, on every system.
