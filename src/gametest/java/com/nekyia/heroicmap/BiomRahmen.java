@@ -45,6 +45,11 @@ public final class BiomRahmen implements FabricClientGameTest {
             vorschau(context, Biom.KATEGORIEN.getFirst(), "nach einem Klick nach rechts");
             klicke(context, false, false);
             vorschau(context, null, "zurück nach links");
+            // Die Reihe läuft um: links von „Automatisch“ die letzte Kategorie, rechts von ihr wieder „Automatisch“.
+            klicke(context, false, false);
+            vorschau(context, Biom.KATEGORIEN.getLast(), "links von Automatisch");
+            klicke(context, false, true);
+            vorschau(context, null, "rechts von der letzten Kategorie");
             klicke(context, false, true);
             // Die Vorschau übernimmt „waelder“ fest; im Schnee bleibt der Rahmen dabei.
             klicke(context, true, false);
