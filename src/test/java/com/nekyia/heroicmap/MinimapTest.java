@@ -174,8 +174,6 @@ class MinimapTest {
     @Test
     void markiereNurImBereich() {
         Minimap minimap = new Minimap();
-        // Flach: ohne den Ring des Reliefs, nur der Chunk selbst.
-        minimap.setzeRelief(Relief.Art.OHNE);
         minimap.mitte = new ChunkPos(10, -20);
         int r = minimap.reichweite();
 
@@ -190,17 +188,30 @@ class MinimapTest {
     }
 
     @Test
-    void mitReliefDerRing() {
-        // Mit Relief dazu die Chunks, deren Codes an den Höhen hängen: Rand im Westen und Norden, Schatten bis 2 nach Südosten.
+    void ringNurWennSichDieHoehenAendern() {
         Minimap minimap = new Minimap();
         minimap.setzeRelief(Relief.Art.SHADOWS);
         minimap.mitte = new ChunkPos(0, 0);
-        minimap.markiere(0, 0);
-        java.util.Set<Long> soll = new java.util.HashSet<>();
-        for (int[] k : new int[][] {{0, 0}, {-1, 0}, {0, -1}, {1, 0}, {0, 1}, {1, 1}, {2, 1}, {1, 2}, {2, 2}}) {
-            soll.add(ChunkPos.pack(k[0], k[1]));
+        int[] hoehen = new int[256];
+        java.util.Arrays.fill(hoehen, 64);
+        // Das erste Abziehen gilt als Änderung: der Ring, Rand im Westen und Norden, Schatten bis 2 nach Südosten, 8 Chunks.
+        minimap.abgezogen(0, 0, hoehen.clone());
+        java.util.Set<Long> ring = new java.util.HashSet<>();
+        for (int[] k : new int[][] {{-1, 0}, {0, -1}, {1, 0}, {0, 1}, {1, 1}, {2, 1}, {1, 2}, {2, 2}}) {
+            ring.add(ChunkPos.pack(k[0], k[1]));
         }
-        assertEquals(soll, new java.util.HashSet<>(minimap.offen));
+        assertEquals(ring, new java.util.HashSet<>(minimap.offen));
+        // Eine Änderung unter der Oberfläche: markiert 1 Chunk, und nach dem Neumalen mit gleichen Höhen kein Ring.
+        minimap.offen.clear();
+        minimap.markiere(0, 0);
+        assertEquals(1, minimap.offen.size());
+        minimap.offen.clear();
+        minimap.abgezogen(0, 0, hoehen.clone());
+        assertEquals(0, minimap.offen.size());
+        // An der Oberfläche: eine Höhe anders, der Ring, 8 Chunks.
+        hoehen[17] = 65;
+        minimap.abgezogen(0, 0, hoehen.clone());
+        assertEquals(8, minimap.offen.size());
     }
 
     @Test

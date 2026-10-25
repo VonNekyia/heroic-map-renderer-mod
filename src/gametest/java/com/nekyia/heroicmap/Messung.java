@@ -46,6 +46,8 @@ public final class Messung implements FabricClientGameTest {
     private static final boolean NUR_EFFEKTE = Boolean.getBoolean("heroicmap.messung.effekte");
     /** Mit {@code -PmessungChunks=true} nur das Zeichnen je Chunk, wie in der ganzen Messung; so passen Läufe im Wechsel in ein Fenster. */
     private static final boolean NUR_CHUNKS = Boolean.getBoolean("heroicmap.messung.chunks");
+    /** Mit -PmessungUpdates=n nur Blockänderungen unter der Oberfläche, je Runde n in verschiedenen Chunks. */
+    private static final int UPDATES = Integer.getInteger("heroicmap.messung.updates", 0);
     /** Mit -PmessungRelief=slope oder shadows legt der Maler das Relief auf, wie die Minimap nah; Vorgabe ohne. */
     private static final Relief.Art RELIEF = Relief.Art.von(System.getProperty("heroicmap.messung.relief", "ohne"), Relief.Art.OHNE);
     /**
@@ -164,6 +166,11 @@ public final class Messung implements FabricClientGameTest {
             }
             if (NUR_ZOOM) {
                 zoom(context, server);
+                schreibe();
+                return;
+            }
+            if (UPDATES > 0) {
+                updates(context, server);
                 schreibe();
                 return;
             }
@@ -591,6 +598,34 @@ public final class Messung implements FabricClientGameTest {
 
     private static double ms(long ns) {
         return ns / 1e6;
+    }
+
+    /**
+     * Blockänderungen unter der Oberfläche, wie auf einer Farm: je Runde {@link #UPDATES} in verschiedenen Chunks um den
+     * Spieler, bei y −50 abwechselnd Glas und Diamantblock, also jedes Mal eine Änderung; gemessen die Zeit, bis die Minimap wieder fertig ist, und wie viele
+     * Chunks sie dafür malte, mit dem Relief aus -PmessungRelief. Siehe docs/minimap.md, „Relief“.
+     */
+    private void updates(ClientGameTestContext context, TestServerContext server) {
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeRelief(RELIEF);
+            Minimap.INSTANZ.setzeScale(4);
+            Minimap.INSTANZ.setzeZoom(4);
+        });
+        context.waitFor(mc -> Minimap.INSTANZ.fertig(), 6000);
+        for (int runde = 1; runde <= RUNDEN; runde++) {
+            String block = runde % 2 == 1 ? "glass" : "diamond_block";
+            int vorher = context.computeOnClient(mc -> Minimap.INSTANZ.gemalt());
+            long start = System.nanoTime();
+            for (int i = 0; i < UPDATES; i++) {
+                int x = (i % 9 - 4) * 16 + 8, z = (i / 9 % 9 - 4) * 16 + 8;
+                server.runCommand("setblock " + x + " -50 " + z + " " + block);
+            }
+            context.waitTicks(2);
+            context.waitFor(mc -> Minimap.INSTANZ.fertig(), 6000);
+            double ms = (System.nanoTime() - start) / 1e6;
+            int chunks = context.computeOnClient(mc -> Minimap.INSTANZ.gemalt()) - vorher;
+            zeile("updates relief=%s n=%d runde=%d ms=%.1f chunks=%d", RELIEF.name, UPDATES, runde, ms, chunks);
+        }
     }
 
     private void zeile(String format, Object... werte) {

@@ -173,6 +173,15 @@ final class Relief {
         return codes;
     }
 
+    /** Aus den Höhen um einen Chunk ({@link #SEITE} im Quadrat) seine eigenen 16 × 16, Zeile für Zeile nach z. */
+    static int[] eigene(int[] hoehen) {
+        int[] eigene = new int[256];
+        for (int z = 0; z < 16; z++) {
+            System.arraycopy(hoehen, (REICHWEITE + z) * SEITE + REICHWEITE, eigene, z * 16, 16);
+        }
+        return eigene;
+    }
+
     /**
      * Legt die Art {@code art} auf das Bild eines Chunks ohne Relief, je Block {@code scale} × {@code scale} Pixel mit dem Code
      * seiner Spalte: je Kanal gerundet und bei 255 gekappt, Alpha bleibt, wie der Renderer auf eine Kachel.

@@ -258,6 +258,10 @@ public final class Minimap {
     /** Die Lage im freien Platz des Schirms: 0 links oder oben, 1 rechts oder unten. */
     private float lageX = 1, lageY = 0;
     final LongLinkedOpenHashSet offen = new LongLinkedOpenHashSet();
+    /** Wie viele Chunks die Minimap seit dem Start gemalt hat; für die Messung. */
+    private int gemalt;
+    /** Mit Relief je gezeichnetem Chunk seine 16 × 16 Höhen beim letzten Abziehen; ändern sie sich, zieht der Ring nach. */
+    private final Long2ObjectOpenHashMap<int[]> hoehenGemalt = new Long2ObjectOpenHashMap<>();
     /** Chunks im Bereich, deren Bild in der Textur steht. */
     private final LongOpenHashSet gezeichnet = new LongOpenHashSet();
     /** Zahl der übernommenen Bilder, für die Messung. */
@@ -310,29 +314,32 @@ public final class Minimap {
         }
     }
 
-    /**
-     * Der Chunk (x, z) ist neu zu zeichnen, wenn er im Bereich liegt. Mit Relief dazu die, deren Codes an seinen Höhen hängen: im
-     * Westen und Norden der Rand, im Osten und Süden bis 2 Chunks der Schatten. Siehe docs/minimap.md, „Relief“.
-     */
+    /** Der Chunk (x, z) ist neu zu zeichnen, wenn er im Bereich liegt. */
     public void markiere(int x, int z) {
-        markiereEinen(x, z);
-        if (relief != Relief.Art.OHNE) {
-            // ponytail: jede Änderung malt bis zu 9 Chunks mehr; prüft man erst, ob sich die Höhen änderten, fällt das weg.
-            markiereEinen(x - 1, z);
-            markiereEinen(x, z - 1);
-            for (int dz = 0; dz <= 2; dz++) {
-                for (int dx = Math.max(0, dz - 1); dx <= Math.min(2, dz + 1); dx++) {
-                    if (dx != 0 || dz != 0) {
-                        markiereEinen(x + dx, z + dz);
-                    }
-                }
-            }
+        if (mitte == null || imBereich(x, z)) {
+            offen.add(ChunkPos.pack(x, z));
         }
     }
 
-    private void markiereEinen(int x, int z) {
-        if (mitte == null || imBereich(x, z)) {
-            offen.add(ChunkPos.pack(x, z));
+    /**
+     * Mit Relief, wenn der Chunk (x, z) mit den 16 × 16 Höhen {@code hoehen} (WORLD_SURFACE) abgezogen ist: Haben sie sich seit
+     * dem letzten Mal geändert, oder ist es das erste Mal, sind die Chunks neu zu zeichnen, deren Codes an ihnen hängen: im
+     * Westen und Norden der Rand, im Osten und Süden bis 2 Chunks der Schatten. Eine Änderung unter der Oberfläche malt so
+     * nur ihren Chunk. Siehe docs/minimap.md, „Relief“.
+     */
+    void abgezogen(int x, int z, int[] hoehen) {
+        int[] vorher = hoehenGemalt.put(ChunkPos.pack(x, z), hoehen);
+        if (vorher != null && Arrays.equals(vorher, hoehen)) {
+            return;
+        }
+        markiere(x - 1, z);
+        markiere(x, z - 1);
+        for (int dz = 0; dz <= 2; dz++) {
+            for (int dx = Math.max(0, dz - 1); dx <= Math.min(2, dz + 1); dx++) {
+                if (dx != 0 || dz != 0) {
+                    markiere(x + dx, z + dz);
+                }
+            }
         }
     }
 
@@ -995,6 +1002,10 @@ public final class Minimap {
     }
 
     /** Ist nichts mehr nachzuzeichnen? */
+    int gemalt() {
+        return gemalt;
+    }
+
     boolean fertig() {
         return kacheln != null ? kachelnLaden == 0 : mitte != null && offen.isEmpty() && laufend.isEmpty();
     }
@@ -1062,6 +1073,7 @@ public final class Minimap {
     /** Zeichnet den Bereich neu, ohne die Texturen zu leeren. */
     private void neuZeichnen() {
         gezeichnet.clear();
+        hoehenGemalt.clear();
         mitte = null;
     }
 
@@ -1938,6 +1950,9 @@ public final class Minimap {
                 continue;
             }
             ChunkMaler.Auftrag auftrag = ChunkMaler.abziehen(level, chunk, scale, decke, licht, texel, stand, relief);
+            if (auftrag.hoehen() != null) {
+                abgezogen(auftrag.cx(), auftrag.cz(), Relief.eigene(auftrag.hoehen()));
+            }
             laufend.add(CompletableFuture.supplyAsync(() -> {
                 if (maler == null) {
                     maler = new ChunkMaler();
@@ -1955,6 +1970,7 @@ public final class Minimap {
         int r = reichweite();
         offen.removeIf((long k) -> !imBereich(ChunkPos.getX(k), ChunkPos.getZ(k)));
         gezeichnet.removeIf((long k) -> !imBereich(ChunkPos.getX(k), ChunkPos.getZ(k)));
+        hoehenGemalt.keySet().removeIf((long k) -> !imBereich(ChunkPos.getX(k), ChunkPos.getZ(k)));
         regionen.long2ObjectEntrySet().removeIf(e -> {
             int rx = ChunkPos.getX(e.getLongKey()), rz = ChunkPos.getZ(e.getLongKey());
             boolean draussen = rx * CHUNKS_JE_REGION > mitte.x() + r || (rx + 1) * CHUNKS_JE_REGION - 1 < mitte.x() - r
@@ -2002,6 +2018,7 @@ public final class Minimap {
         if (bild.stand() != stand || bild.scale() != scale || mitte == null || !imBereich(bild.cx(), bild.cz())) {
             return;
         }
+        gemalt++;
         Region region = regionen.computeIfAbsent(ChunkPos.pack(bild.cx() >> 3, bild.cz() >> 3),
                 k -> new Region(ChunkPos.getX(k), ChunkPos.getZ(k), scale));
         int seite = 16 * scale, ox = (bild.cx() & 7) * seite, oy = (bild.cz() & 7) * seite;
