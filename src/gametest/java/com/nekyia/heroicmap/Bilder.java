@@ -1725,18 +1725,21 @@ public final class Bilder implements FabricClientGameTest {
      * {@code block/crop} mit gekippten Flächen, reifer Weizen als zwei Blöcke hohes Modell ohne {@code parent}, die Datei
      * {@code potatoes_stage3} des Spiels mit diesem Modell als {@code parent}, Gras, das neben dem Modell des Spiels ein
      * schräges Kreuz ohne {@code parent} wählt, ein kleiner roter Löwenzahn, eine Fläche halb so breit und hoch wie der
-     * Block, und ein Lauch aus zwei solchen Flächen hintereinander, im Modell zuerst die blaue hinten im Norden, dann die rote
-     * vorn. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
+     * Block, ein Lauch aus zwei solchen Flächen hintereinander, im Modell zuerst die blaue hinten im Norden, dann die rote
+     * vorn, und als Rübe ein hoher Weizen: Flächen 32 hoch, in der Textur 32 × 32 nur das Viertel links unten deckend, die
+     * obere Hälfte des Modells also durchsichtig. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
      */
     private static final String[] PAKET_PFLANZEN = {
         "pack.mcmeta",
         "assets/minecraft/blockstates/short_grass.json",
         "assets/minecraft/blockstates/wheat.json",
         "assets/minecraft/blockstates/allium.json",
+        "assets/minecraft/blockstates/beetroots.json",
         "assets/minecraft/blockstates/cobweb.json",
         "assets/minecraft/blockstates/dandelion.json",
         "assets/minecraft/models/block/crop.json",
         "assets/minecraft/models/block/heroicmap_test_gras.json",
+        "assets/minecraft/models/block/heroicmap_test_hoher_weizen.json",
         "assets/minecraft/models/block/heroicmap_test_hohes_getreide.json",
         "assets/minecraft/models/block/heroicmap_test_klein.json",
         "assets/minecraft/models/block/heroicmap_test_liegend.json",
@@ -1744,6 +1747,7 @@ public final class Bilder implements FabricClientGameTest {
         "assets/minecraft/models/block/heroicmap_test_vorn_hinten.json",
         "assets/minecraft/models/block/heroicmap_test_weizen_reif.json",
         "assets/minecraft/models/block/potatoes_stage3.json",
+        "assets/minecraft/textures/block/heroicmap_test_hoher_weizen.png",
     };
 
     /**
@@ -1757,7 +1761,7 @@ public final class Bilder implements FabricClientGameTest {
         "setblock -57 -60 40 wheat[age=6]", "fill -56 -60 40 -53 -60 40 wheat[age=7]",
         "fill -60 -60 42 -57 -60 42 carrots[age=7]", "fill -56 -60 42 -53 -60 42 potatoes[age=7]",
         "fill -60 -60 44 -53 -60 44 short_grass", "fill -60 -60 46 -57 -60 46 fern", "setblock -54 -60 46 cobweb",
-        "setblock -60 -60 45 allium",
+        "setblock -60 -60 45 allium", "setblock -58 -60 41 beetroots[age=3]",
     };
 
     /**
@@ -1889,6 +1893,8 @@ public final class Bilder implements FabricClientGameTest {
         if (!(blau <= 0.5)) {
             fehler.add("Lauch zu " + Math.round(100 * blau) + " % blau statt höchstens 50 %, rot " + farben[0] + ", blau " + farben[1]);
         }
+        double weizenNord = anteilGelb(bilder.get(4), -58, 41, 2 * block, false), weizenSued = anteilGelb(bilder.get(4), -58, 41, 2 * block, true);
+        LOGGER.info("Pflanzen aus Paketen, hoher Weizen bei 16 px gelb: Nordhälfte {}, Südhälfte {}", weizenNord, weizenSued);
         if (!fehler.isEmpty()) {
             throw new AssertionError("Pflanzen aus Paketen: " + String.join("; ", fehler));
         }
@@ -1906,6 +1912,20 @@ public final class Bilder implements FabricClientGameTest {
             }
         }
         return n;
+    }
+
+    /** Welcher Anteil der Pixel in der Nord- oder Südhälfte des Blocks (x, z) gelb ist; Mitte wie bei {@link #rotMitte}. */
+    private static double anteilGelb(BufferedImage bild, int x, int z, int block, boolean sued) {
+        int ax = bild.getWidth() / 2 + Math.round((x + 56.5f) * block), az = bild.getHeight() / 2 + Math.round((z - 43.5f) * block);
+        int gelb = 0, alle = 0;
+        for (int dy = sued ? block / 2 : 0; dy < (sued ? block : block / 2); dy++) {
+            for (int dx = 0; dx < block; dx++) {
+                int c = bild.getRGB(ax + dx, az + dy), r = c >> 16 & 0xFF, g = c >> 8 & 0xFF, b = c & 0xFF;
+                gelb += r > 150 && g > 120 && b < 90 && r - b > 100 ? 1 : 0;
+                alle++;
+            }
+        }
+        return gelb / (double) alle;
     }
 
     /** Der Versatz des Löwenzahns im Block (x, -60, z). */
