@@ -1724,13 +1724,15 @@ public final class Bilder implements FabricClientGameTest {
      * Das Testpaket unter /pakete/pflanzen, eigene Modelle nach dem Muster mancher Pakete: eine ersetzte Vorlage
      * {@code block/crop} mit gekippten Flächen, reifer Weizen als zwei Blöcke hohes Modell ohne {@code parent}, die Datei
      * {@code potatoes_stage3} des Spiels mit diesem Modell als {@code parent}, Gras, das neben dem Modell des Spiels ein
-     * schräges Kreuz ohne {@code parent} wählt, und ein kleiner roter Löwenzahn, eine Fläche halb so breit und hoch wie der
-     * Block. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
+     * schräges Kreuz ohne {@code parent} wählt, ein kleiner roter Löwenzahn, eine Fläche halb so breit und hoch wie der
+     * Block, und ein Lauch aus zwei solchen Flächen hintereinander, im Modell zuerst die blaue hinten im Norden, dann die rote
+     * vorn. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
      */
     private static final String[] PAKET_PFLANZEN = {
         "pack.mcmeta",
         "assets/minecraft/blockstates/short_grass.json",
         "assets/minecraft/blockstates/wheat.json",
+        "assets/minecraft/blockstates/allium.json",
         "assets/minecraft/blockstates/cobweb.json",
         "assets/minecraft/blockstates/dandelion.json",
         "assets/minecraft/models/block/crop.json",
@@ -1739,6 +1741,7 @@ public final class Bilder implements FabricClientGameTest {
         "assets/minecraft/models/block/heroicmap_test_klein.json",
         "assets/minecraft/models/block/heroicmap_test_liegend.json",
         "assets/minecraft/models/block/heroicmap_test_schraeges_kreuz.json",
+        "assets/minecraft/models/block/heroicmap_test_vorn_hinten.json",
         "assets/minecraft/models/block/heroicmap_test_weizen_reif.json",
         "assets/minecraft/models/block/potatoes_stage3.json",
     };
@@ -1754,6 +1757,7 @@ public final class Bilder implements FabricClientGameTest {
         "setblock -57 -60 40 wheat[age=6]", "fill -56 -60 40 -53 -60 40 wheat[age=7]",
         "fill -60 -60 42 -57 -60 42 carrots[age=7]", "fill -56 -60 42 -53 -60 42 potatoes[age=7]",
         "fill -60 -60 44 -53 -60 44 short_grass", "fill -60 -60 46 -57 -60 46 fern", "setblock -54 -60 46 cobweb",
+        "setblock -60 -60 45 allium",
     };
 
     /**
@@ -1877,9 +1881,31 @@ public final class Bilder implements FabricClientGameTest {
                         + " Block verschoben statt x " + erwartetX + ", z " + erwartetZ + " (± 0,1)");
             }
         }
+        // Der Lauch des Pakets bei 16 px: Die rote Fläche vorn liegt gekippt höher und deckt die blaue, wo beide liegen; blau
+        // bleibt nur der Streifen im Norden, rund ein Drittel. Andersherum wäre es rund zwei Drittel.
+        int[] farben = farbenImBlock(bilder.get(4), -60, 45, 2 * block);
+        double blau = farben[1] / (double) (farben[0] + farben[1]);
+        LOGGER.info("Pflanzen aus Paketen, Lauch vorn und hinten: rot {}, blau {}, Anteil blau {}", farben[0], farben[1], blau);
+        if (!(blau <= 0.5)) {
+            fehler.add("Lauch zu " + Math.round(100 * blau) + " % blau statt höchstens 50 %, rot " + farben[0] + ", blau " + farben[1]);
+        }
         if (!fehler.isEmpty()) {
             throw new AssertionError("Pflanzen aus Paketen: " + String.join("; ", fehler));
         }
+    }
+
+    /** Wie viele Pixel im Block (x, z) rot sind und wie viele blau, {rot, blau}; Mitte wie bei {@link #rotMitte}. */
+    private static int[] farbenImBlock(BufferedImage bild, int x, int z, int block) {
+        int ax = bild.getWidth() / 2 + Math.round((x + 56.5f) * block), az = bild.getHeight() / 2 + Math.round((z - 43.5f) * block);
+        int[] n = new int[2];
+        for (int dy = 0; dy < block; dy++) {
+            for (int dx = 0; dx < block; dx++) {
+                int c = bild.getRGB(ax + dx, az + dy), r = c >> 16 & 0xFF, g = c >> 8 & 0xFF, b = c & 0xFF;
+                n[0] += r > g + 60 ? 1 : 0;
+                n[1] += b > r + 60 && b > g + 60 ? 1 : 0;
+            }
+        }
+        return n;
     }
 
     /** Der Versatz des Löwenzahns im Block (x, -60, z). */

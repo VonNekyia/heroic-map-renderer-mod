@@ -1,0 +1,10 @@
+{
+  "ambientocclusion": false,
+  "textures": {"particle": "#vorn", "vorn": "minecraft:block/red_wool", "hinten": "minecraft:block/blue_wool"},
+  "elements": [
+    {"from": [4, 0, 4], "to": [12, 8, 4],
+      "faces": {"north": {"uv": [4, 8, 12, 16], "texture": "#hinten"}, "south": {"uv": [12, 8, 4, 16], "texture": "#hinten"}}},
+    {"from": [4, 0, 8], "to": [12, 8, 8],
+      "faces": {"north": {"uv": [4, 8, 12, 16], "texture": "#vorn"}, "south": {"uv": [12, 8, 4, 16], "texture": "#vorn"}}}
+  ]
+}
