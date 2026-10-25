@@ -1,0 +1,8 @@
+{
+  "ambientocclusion": false,
+  "textures": {"particle": "#blatt", "blatt": "minecraft:block/red_wool"},
+  "elements": [
+    {"from": [4, 0, 8], "to": [12, 8, 8],
+      "faces": {"north": {"uv": [4, 8, 12, 16], "texture": "#blatt"}, "south": {"uv": [12, 8, 4, 16], "texture": "#blatt"}}}
+  ]
+}

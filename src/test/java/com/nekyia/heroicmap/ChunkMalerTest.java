@@ -136,4 +136,32 @@ class ChunkMalerTest {
         assertEquals(licht.up() / licht.north(), ChunkMaler.schattenNachOben(licht, null, Direction.NORTH), 1e-6f);
         assertEquals(licht.up() / licht.east(), ChunkMaler.schattenNachOben(licht, Direction.EAST, Direction.NORTH), 1e-6f);
     }
+
+    @Test
+    void draufsichtWieFlaechenEinzeln() {
+        // Pixel 0: vorn halb durchsichtig, dahinter deckend; Pixel 1 ohne Fläche. Der Faktor 1,5 kappt bei 1.
+        float[] vorn = {0.2f, 0.4f, 0.6f}, hinten = {0.8f, 0.1f, 0.3f};
+        float[][] faktoren = {{0.9f, 0.8f, 0.7f}, {1.5f, 1, 0.5f}};
+        float[] zellen = new float[2 * 2 * 4], deckung = new float[2];
+        deckung[0] = ChunkMaler.stapel(zellen, 0, 0, 0.5f, vorn[0], vorn[1], vorn[2]);
+        assertEquals(0.5f, deckung[0], 1e-6f);
+        deckung[0] = ChunkMaler.stapel(zellen, 4, deckung[0], 1, hinten[0], hinten[1], hinten[2]);
+        assertEquals(1, deckung[0], 1e-6f);
+
+        // Die Spalte deckt Pixel 0 schon zu einem Viertel. Erwartet wie in schicht: Fläche für Fläche darunter.
+        float[] summe = {0.1f, 0.1f, 0.1f, 0.25f, 0, 0, 0, 0};
+        ChunkMaler.lege(summe, zellen, deckung, faktoren);
+        float[] erwartet = {0.1f, 0.1f, 0.1f, 1};
+        for (int c = 0; c < 3; c++) {
+            erwartet[c] += 0.75f * 0.5f * Math.min(1, ChunkMaler.srgb(vorn[c]) * faktoren[0][c]);
+            erwartet[c] += 0.375f * Math.min(1, ChunkMaler.srgb(hinten[c]) * faktoren[1][c]);
+        }
+        assertArrayEquals(erwartet, java.util.Arrays.copyOf(summe, 4), 1e-6f);
+        assertArrayEquals(new float[4], java.util.Arrays.copyOfRange(summe, 4, 8));
+
+        // Was schon deckt, bleibt.
+        float[] gedeckt = {0.3f, 0.3f, 0.3f, 1, 0, 0, 0, 0};
+        ChunkMaler.lege(gedeckt, zellen, deckung, faktoren);
+        assertArrayEquals(new float[] {0.3f, 0.3f, 0.3f, 1, 0, 0, 0, 0}, gedeckt);
+    }
 }

@@ -924,8 +924,12 @@ dieselbe Regel, siehe
   mit Wasser im Block. Gekippt und auf die alte Tiefe gesetzt, ragt eine
   Pflanze über 1 Block hoch, Seegras bis 1,24, und stünde im flachen Wasser
   ungetönt über der Oberfläche, die bei 0,89 liegt.
-- **Licht und Tönung** je Ecke wie im Spiel, Gras also in der Farbe des
-  Bioms. Das Spiel schattiert jede Fläche nach `shadeDirectionOverride`,
+- **Licht und Tönung** je Fläche im Mittel ihrer vier Ecken, Gras also in
+  der Farbe des Bioms. Flach beleuchtet gibt das Spiel allen Ecken einer
+  Fläche ein Licht und eine Farbe (`BlockModelLighter.prepareQuadFlat`,
+  per javap am Client 26.3); flach sind alle Vorlagen oben mit
+  `"ambientocclusion": false`, nur `template_seagrass` nicht. Das Spiel
+  schattiert jede Fläche nach `shadeDirectionOverride`,
   sonst nach ihrer Richtung (`BlockModelLighter.getDirectionalBrightness`,
   per javap am Client 26.3); der Mod teilt das heraus und schattiert nach
   oben (`CardinalLighting.up`, `ChunkMaler.schattenNachOben`).
@@ -936,11 +940,44 @@ dieselbe Regel, siehe
   „Flächen und Pixel“. Mit n × n Proben kostete eine gekippte Pflanze je
   Chunk rund 0,5 ms mehr, siehe
   [Pflanzen gekippt, Zeit je Chunk](messungen/2026-10-24-pflanzen-gekippt.md).
-- **Ohne Allokation je Block:** Die Flächen zum Kippen liegen in Puffern,
-  die der Maler über alle Blöcke wiederverwendet (`ChunkMaler.merke`); neu
-  angelegt wird nur je gezeichnete Fläche, wie bei jeder Oberseite.
+- **Vorgerechnet** je Modell und Versatz, siehe unten.
 - **Die eigene Karte** zeichnet mit demselben Maler, siehe
   [Selbst gezeichnete Karte](selbst.md).
+
+### Vorgerechnet je Modell und Versatz
+
+Wie eine Pflanze gekippt von oben aussieht, hängt nur von ihren Flächen und
+dem Versatz ihres Blocks ab. Darum rechnet der Maler ihre Draufsicht einmal
+vor (`ChunkMaler.baue`) und legt sie danach je Block nur noch in dessen
+Licht (`ChunkMaler.kippe`, `ChunkMaler.lege`). Entschieden in
+[0051](entscheidungen/0051-pflanzen-vorgerechnet.md).
+
+- **Was vorgerechnet ist** (`ChunkMaler.Draufsicht`): je Pixel und
+  gezeichneter Fläche, die höchste zuerst, ihr Anteil am Pixel und ihre
+  Farbe in sRGB, dazu je Pixel, wie weit alle zusammen decken. Je Block
+  kommt der Faktor aus Licht, Tönung und Schatten je Fläche dazu. Das
+  Ergebnis ist dasselbe, als kämen die Flächen einzeln
+  (`ChunkMalerTest.draufsichtWieFlaechenEinzeln`).
+- **Der Schlüssel** (`ChunkMaler.Schluessel`): die Flächen aus dem
+  Tesselator als dieselben Objekte und der Versatz des Blocks. Die
+  Flächen eines Modells legt das Spiel beim Laden einmal an. Baute ein
+  Modell je Block neue, träfe es nie; dann rechnet der Maler jedes Mal neu.
+- **Versatz in z:** Reicht eine Pflanze gekippt über mehr als 1 Block,
+  legt das Einpassen sie an den Nordrand, und ihr Versatz in z ändert
+  nichts. Dann gilt eine Draufsicht für alle 16 Versätze in z. Das trifft
+  auf alle Vorlagen des Spiels zu; eine kleinere Pflanze bekommt eine je
+  Versatz.
+- **Reihenfolge im Block:** nach der Höhe vor dem Einreihen unter das
+  Wasser, gleich hohe in der Reihenfolge des Modells.
+- **Wie viele** (`ChunkMaler.draufsichten`): je Maler höchstens 4096 und
+  höchstens 2¹⁸ / scale², bei 16 px also 1024, bei 2 Flächen rund 9 KB je
+  Stück; darüber fällt die am längsten nicht gebrauchte weg. Wie das Raster
+  verfällt der Vorrat, wenn sich scale oder die Texturen ändern.
+- **Kosten** siehe „Kosten“.
+- **Ohne Allokation beim Treffer:** Die Flächen zum Kippen liegen in
+  Puffern, die der Maler über alle Blöcke wiederverwendet
+  (`ChunkMaler.merke`), ebenso der Schlüssel zum Suchen; neu angelegt wird
+  je Block nur der Faktor je Fläche.
 
 ## Pflanzen aus Paketen
 
@@ -1194,10 +1231,11 @@ der Platte nichts Neues.
 **Pflanzen gekippt:** Mit n × n Proben je Pixel kosteten sie im Worker je
 Chunk rund 0,5 ms mehr, bei 4 px +18 %, bei 1 px +36 %, bei 16 px +1 %
 (Reihe 1 in [Pflanzen gekippt, Zeit je Chunk](messungen/2026-10-24-pflanzen-gekippt.md)).
-Darum nehmen sie das gemittelte Raster, eine Probe je Pixel, und das Licht
-rechnet der Maler nur für Flächen, die gezeichnet werden. Gegen main kosten
-sie damit je Chunk noch rund 0,2 bis 0,5 ms, bei 4 und 8 px +6 bis +9 %
-(Reihen 2 und 3 derselben Messung).
+Mit dem gemittelten Raster und Licht nur für gezeichnete Flächen waren es
+noch +6 bis +9 % bei 4 und 8 px (Reihen 2 und 3). Vorgerechnet je Modell
+und Versatz zeichnet der Worker einen Chunk schneller als mit den flachen
+Pflanzen bis 0.2.70: −1,9 % bei 1 px, −3,1 % bei 2 px, −2,8 % bei 4 px,
+−6,9 % bei 8 px, −7,1 % bei 16 px (Reihe 4).
 
 **Der Umriss rund ohne Rahmen** (`Minimap.umrissRing`), geschätzt, nicht
 gemessen:
