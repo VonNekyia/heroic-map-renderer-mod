@@ -4,6 +4,11 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.75
+
+- **Choose the relief of the map: Flat, Relief or Relief + Shadows.** The server draws its map with relief; the mod now computes the other two kinds from a layer the server sends with it. A button on the full-screen map switches between them, the default stays Relief. Flat and Relief + Shadows need a server with renderer 0.19.0 and plugin 0.21.0.
+- **The minimap now shows relief up close, and so does your own map.** Until now only the zoomed-out minimap had it; up close it now looks the same, for everyone. Pick Flat to keep the old look.
+
 ## 0.2.74
 
 - **Tall crops from resource packs fill their block on the map again.** Some packs build crops taller than a block and leave the top of the texture empty; tilted, the empty part used to squeeze the visible plant into half the block. Plants from the game look exactly as before.

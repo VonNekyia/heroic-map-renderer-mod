@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.NativeImage;
 import com.nekyia.heroicmap.webp.VP8LDecoder;
 import com.twelvemonkeys.imageio.plugins.webp.WebPImageReaderSpi;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -70,6 +71,8 @@ final class Kacheln implements AutoCloseable {
     /** Kacheln mit einer älteren Textur: Sie bleibt sichtbar, bis die neue da ist. */
     private final Set<String> veraltet = new HashSet<>();
     private final int max;
+    /** Die Art des Reliefs in den Kacheln und ob ihre Schicht daliegt; aus {@code map.json}. */
+    private final Relief.Satzrelief relief;
     private boolean geschlossen;
 
     /** Die Kacheln des Satzes; jede muss genau {@code tileSize} gross sein. Höchstens {@code max} Texturen bleiben. Auf dem Render-Thread. */
@@ -77,6 +80,7 @@ final class Kacheln implements AutoCloseable {
         this.ordner = satz.ordner();
         this.seite = satz.kachel();
         this.max = max;
+        this.relief = Relief.von(ordner);
         OFFEN.add(this);
     }
 
@@ -130,6 +134,7 @@ final class Kacheln implements AutoCloseable {
         laeuft.add(pfad);
         veraltet.remove(pfad);
         int gen = generation.getOrDefault(pfad, 0);
+        Relief.Art art = Minimap.INSTANZ.relief();
         Path spalte = ordner.resolve(String.valueOf(z)).resolve(String.valueOf(x));
         Path datei = spalte.resolve(y + ".webp"), png = spalte.resolve(y + ".png");
         dekoder.execute(() -> {
@@ -139,6 +144,9 @@ final class Kacheln implements AutoCloseable {
                 try {
                     if (Files.exists(datei)) {
                         argb = dekodiere(Files.readAllBytes(datei), seite).argb();
+                        if (relief.noetig(art)) {
+                            mitRelief(argb, z, x, y, art);
+                        }
                     } else if (Files.exists(png)) {
                         // Die selbst gezeichnete Karte schreibt PNG. Siehe docs/selbst.md, „Kacheln“.
                         argb = png(Files.readAllBytes(png), seite).argb();
@@ -157,6 +165,25 @@ final class Kacheln implements AutoCloseable {
             }
         });
         return id;
+    }
+
+    /**
+     * Legt die gewählte Art des Reliefs auf eine Kachel vom Server, aus ihrer Schicht und ihrem Rest unter {@code relief/}.
+     * Fehlt oder bricht die Schicht, gilt Code 4 und die Kachel bleibt; ohne Rest keiner. Siehe docs/vollbildkarte.md, „Relief“.
+     */
+    private void mitRelief(int[] argb, int z, int x, int y, Relief.Art art) {
+        Path schicht = ordner.resolve("relief").resolve(String.valueOf(z)).resolve(String.valueOf(x)).resolve(y + ".webp");
+        Path rest = ordner.resolve("relief").resolve("rest").resolve(String.valueOf(z)).resolve(String.valueOf(x)).resolve(y + ".webp");
+        // Den Rest gibt es nur an abgeschnittenen Pixeln, und dort steht in der Kachel 255; ohne solche bleibt er ungelesen.
+        Relief.rechne(argb, liesOderNull(schicht), Relief.abgeschnitten(argb) ? liesOderNull(rest) : null, relief.gebacken(), art);
+    }
+
+    private int[] liesOderNull(Path webp) {
+        try {
+            return Files.exists(webp) ? dekodiere(Files.readAllBytes(webp), seite).argb() : null;
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
     }
 
     private void zurueck(String pfad, int gen, NativeImage pixel) {
@@ -245,8 +272,26 @@ final class Kacheln implements AutoCloseable {
         return bild == null ? null : bild(bild);
     }
 
-    private static Bild bild(BufferedImage bild) {
+    static Bild bild(BufferedImage bild) {
         int b = bild.getWidth(), h = bild.getHeight();
+        // Die beiden Formate der Dekoder direkt aus den Bytes: getRGB rechnet je Pixel über das ColorModel und kostete
+        // bei einer Kachel 256² mit Alpha mehrere ms. Siehe docs/vollbildkarte.md, „Relief“.
+        int typ = bild.getType();
+        if ((typ == BufferedImage.TYPE_4BYTE_ABGR || typ == BufferedImage.TYPE_3BYTE_BGR)
+                && bild.getRaster().getDataBuffer() instanceof DataBufferByte puffer && puffer.getData().length == b * h * (typ == BufferedImage.TYPE_4BYTE_ABGR ? 4 : 3)) {
+            byte[] d = puffer.getData();
+            int[] argb = new int[b * h];
+            if (typ == BufferedImage.TYPE_4BYTE_ABGR) {
+                for (int i = 0, j = 0; i < argb.length; i++, j += 4) {
+                    argb[i] = (d[j] & 0xFF) << 24 | (d[j + 3] & 0xFF) << 16 | (d[j + 2] & 0xFF) << 8 | d[j + 1] & 0xFF;
+                }
+            } else {
+                for (int i = 0, j = 0; i < argb.length; i++, j += 3) {
+                    argb[i] = 0xFF000000 | (d[j + 2] & 0xFF) << 16 | (d[j + 1] & 0xFF) << 8 | d[j] & 0xFF;
+                }
+            }
+            return new Bild(b, h, argb);
+        }
         return new Bild(b, h, bild.getRGB(0, 0, b, h, null, 0, b));
     }
 
