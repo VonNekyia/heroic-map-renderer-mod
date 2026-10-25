@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.74
+
+- **Tall crops from resource packs fill their block on the map again.** Some packs build crops taller than a block and leave the top of the texture empty; tilted, the empty part used to squeeze the visible plant into half the block. Plants from the game look exactly as before.
+
 ## 0.2.73
 
 - **Plants lean to the north on the minimap and your own map.** Crops, grass, flowers, kelp and seagrass now tilt 45° so you see them from the side instead of a flat patch of texture. Each plant stays inside its block, plants in water stay under the surface, and bamboo leaves and pumpkin and melon stems show too.

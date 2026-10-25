@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "age=0": {"model": "minecraft:block/heroicmap_test_hoher_weizen"},
+    "age=1": {"model": "minecraft:block/heroicmap_test_hoher_weizen"},
+    "age=2": {"model": "minecraft:block/heroicmap_test_hoher_weizen"},
+    "age=3": {"model": "minecraft:block/heroicmap_test_hoher_weizen"}
+  }
+}
