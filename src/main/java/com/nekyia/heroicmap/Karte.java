@@ -506,7 +506,7 @@ final class Karte extends Screen {
             }
             rebuildWidgets();
         }).bounds(x, y, KNOPF, 20).build();
-        String grund = relief.selbst() ? null
+        String grund = relief.selbst() ? "heroicmap.karte.relief_ohne"
                 : relief.gebacken() == Relief.Art.OHNE ? "heroicmap.karte.relief_ohne"
                 : !relief.schicht() ? "heroicmap.karte.relief_alt" : null;
         knopf.active = grund == null;
