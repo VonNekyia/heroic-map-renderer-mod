@@ -505,7 +505,7 @@ public final class Selbst {
         // Die Kacheln bleiben ohne Relief; mit Relief kommt die Schicht dazu. Siehe docs/selbst.md, „Relief“.
         int[] hoehen = Minimap.INSTANZ.relief() == Relief.Art.OHNE ? null : ChunkMaler.hoehen(level, auftrag.cx(), auftrag.cz());
         if (hoehen != null) {
-            ring.abgezogen(auftrag.cx(), auftrag.cz(), Relief.eigene(hoehen), Relief.fehlende(hoehen), offen::add);
+            ;
         }
         inArbeit.incrementAndGet();
         worker.execute(() -> {
