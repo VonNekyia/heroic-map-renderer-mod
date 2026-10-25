@@ -51,7 +51,7 @@ public final class Strom implements FabricClientGameTest {
     private static final String DIMENSION = "minecraft:overworld";
 
     /** Eine Kachel des Testsatzes: ihr Name im Strom und im Ordner des Massstabs, und ihre Bytes. */
-    private record Kachel(String name, byte[] inhalt) {
+    record Kachel(String name, byte[] inhalt) {
         int z() {
             return Integer.parseInt(name.substring(0, name.indexOf('/')));
         }
@@ -491,7 +491,7 @@ public final class Strom implements FabricClientGameTest {
     }
 
     /** Ein Eintrag des Stroms wie vom Renderer: lokaler Kopf, ohne Kompression und ohne Data Descriptor. */
-    private static void eintrag(OutputStream aus, String name, byte[] inhalt) throws IOException {
+    static void eintrag(OutputStream aus, String name, byte[] inhalt) throws IOException {
         CRC32 crc = new CRC32();
         crc.update(inhalt);
         byte[] n = name.getBytes(StandardCharsets.US_ASCII);
@@ -521,7 +521,7 @@ public final class Strom implements FabricClientGameTest {
     }
 
     /** Die Kacheln des Testsatzes von grob nach fein, wie der Renderer sie schickt. */
-    private static List<Kachel> kacheln() {
+    static List<Kachel> kacheln() {
         List<Kachel> kacheln = new ArrayList<>();
         for (String name : new String(datei("liste.txt"), StandardCharsets.UTF_8).lines().filter(z -> z.endsWith(".webp")).toList()) {
             kacheln.add(new Kachel(name, datei("4/" + name)));
@@ -530,7 +530,7 @@ public final class Strom implements FabricClientGameTest {
         return kacheln;
     }
 
-    private static byte[] manifest(List<Kachel> kacheln) {
+    static byte[] manifest(List<Kachel> kacheln) {
         return manifest(kacheln, Set.of());
     }
 
@@ -551,7 +551,7 @@ public final class Strom implements FabricClientGameTest {
         return aus.toByteArray();
     }
 
-    private static byte[] datei(String name) {
+    static byte[] datei(String name) {
         try (InputStream rein = Strom.class.getResourceAsStream("/satz/" + name)) {
             return rein.readAllBytes();
         } catch (IOException e) {

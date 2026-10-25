@@ -376,7 +376,7 @@ im Plugin unter
 - **Bricht ein Teil ab,** bleibt der neue Baum, und die Meldung nennt den
   Grund; der nächste Abgleich versucht es wieder. Bis dahin können einzelne
   geänderte Kacheln mit einer alten Schicht stehen.
-- **Geprüft:** `FreigabeTest.reliefMitRest`, `LadenTest.teilDesReliefsOhneMapJson`.
+- **Geprüft:** `FreigabeTest.reliefMitRest`, `LadenTest.teilDesReliefsOhneMapJson` und der Gametest `ReliefLaden`, siehe [Entwicklung](entwicklung.md), „Tests“.
 
 ## Ablauf
 
