@@ -1896,6 +1896,12 @@ public final class Bilder implements FabricClientGameTest {
         }
         double weizenNord = anteilGelb(bilder.get(4), -58, 41, 2 * block, false), weizenSued = anteilGelb(bilder.get(4), -58, 41, 2 * block, true);
         LOGGER.info("Pflanzen aus Paketen, hoher Weizen bei 16 px gelb: Nordhälfte {}, Südhälfte {}", weizenNord, weizenSued);
+        // Der ganze Block ist Weizen, nicht nur der Süden: Zählte die leere obere Hälfte beim Einpassen mit, lag er gestaucht
+        // im Süden, Nordhälfte 0,125. Siehe docs/minimap.md, „Zuschneiden“.
+        if (!(weizenNord >= 0.3 && weizenSued >= 0.3)) {
+            fehler.add("hoher Weizen bei 16 px in der Nordhälfte zu " + Math.round(100 * weizenNord) + " %, in der Südhälfte zu "
+                    + Math.round(100 * weizenSued) + " % gelb statt je mindestens 30 %");
+        }
         if (!fehler.isEmpty()) {
             throw new AssertionError("Pflanzen aus Paketen: " + String.join("; ", fehler));
         }

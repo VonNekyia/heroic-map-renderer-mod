@@ -199,6 +199,14 @@ class ChunkMalerTest {
     }
 
     @Test
+    void deckendesUeberDemBlockBleibt() {
+        // Deckend bis 8 Texel unter dem oberen Rand: oben bei 31/16 − 0,5 = 1,4375 abgeschnitten, nicht bei 1.
+        float[] e = stehend(-1 / 16f, 31 / 16f), uv = uv(0.5f);
+        ChunkMaler.zuschneiden(e, 0, uv, 0, textur(32, (x, y) -> x < 16 && y >= 8), 0.5f, 0.25f, 0.25f, 0.25f);
+        assertArrayEquals(stehend(-1 / 16f, 1.4375f), e, 1e-5f);
+    }
+
+    @Test
     void cropUndKreuzBleiben() {
         // crop von −1/16 bis 15/16, die unterste Reihe deckt: bleibt, wie es ist.
         float[] e = stehend(-1 / 16f, 15 / 16f), uv = uv(1);
