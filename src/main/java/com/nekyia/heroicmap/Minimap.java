@@ -310,8 +310,27 @@ public final class Minimap {
         }
     }
 
-    /** Der Chunk (x, z) ist neu zu zeichnen, wenn er im Bereich liegt. */
+    /**
+     * Der Chunk (x, z) ist neu zu zeichnen, wenn er im Bereich liegt. Mit Relief dazu die, deren Codes an seinen Höhen hängen: im
+     * Westen und Norden der Rand, im Osten und Süden bis 2 Chunks der Schatten. Siehe docs/minimap.md, „Relief“.
+     */
     public void markiere(int x, int z) {
+        markiereEinen(x, z);
+        if (relief != Relief.Art.OHNE) {
+            // ponytail: jede Änderung malt bis zu 9 Chunks mehr; prüft man erst, ob sich die Höhen änderten, fällt das weg.
+            markiereEinen(x - 1, z);
+            markiereEinen(x, z - 1);
+            for (int dz = 0; dz <= 2; dz++) {
+                for (int dx = Math.max(0, dz - 1); dx <= Math.min(2, dz + 1); dx++) {
+                    if (dx != 0 || dz != 0) {
+                        markiereEinen(x + dx, z + dz);
+                    }
+                }
+            }
+        }
+    }
+
+    private void markiereEinen(int x, int z) {
         if (mitte == null || imBereich(x, z)) {
             offen.add(ChunkPos.pack(x, z));
         }
@@ -637,8 +656,12 @@ public final class Minimap {
         return relief;
     }
 
+    /** Eine andere Art zeichnet die Minimap neu, nah wie weit. Siehe docs/minimap.md, „Relief“. */
     void setzeRelief(Relief.Art relief) {
-        this.relief = relief;
+        if (relief != this.relief) {
+            this.relief = relief;
+            neuZeichnen();
+        }
     }
 
     boolean technikOffen() {
@@ -1914,7 +1937,7 @@ public final class Minimap {
             if (chunk == null) {
                 continue;
             }
-            ChunkMaler.Auftrag auftrag = ChunkMaler.abziehen(level, chunk, scale, decke, licht, texel, stand);
+            ChunkMaler.Auftrag auftrag = ChunkMaler.abziehen(level, chunk, scale, decke, licht, texel, stand, relief);
             laufend.add(CompletableFuture.supplyAsync(() -> {
                 if (maler == null) {
                     maler = new ChunkMaler();

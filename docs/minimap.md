@@ -1152,6 +1152,41 @@ Barrieren, zeichnen nichts.
   der Endertruhe Obsidian; eine Truhe sah aus wie ein Holzblock (mod#80).
 - **Alle übrigen** bekommen das Partikel-Sprite ihres Modells.
 
+## Relief
+
+Die Minimap nah malt das Relief selbst, in der Art, die der Knopf auf der
+Vollbildkarte wählt; so sieht sie nah aus wie weit, wo sie die Kacheln vom
+Server zeigt. Bis 0.2.74 hatte sie nah kein Relief. Wahl des Users, siehe
+[0053](entscheidungen/0053-wahl-des-reliefs.md); die Art steht in
+[Vollbildkarte](vollbildkarte.md), „Relief“.
+
+- **Die Codes je Spalte** wie die Schicht des Renderers (`Relief.code`), nach
+  [Relief von oben, „Die Schicht“](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/renderer/relief.md#die-schicht):
+  Gefälle aus den vier Nachbarn, Schatten bis 32 Blöcke diagonal nach
+  Nordwesten. Fehlt ein Nachbar, gilt er als gleich hoch; fehlt die Spalte,
+  bleibt sie.
+- **Die Höhen** aus WORLD_SURFACE der Chunks, die der Client hat
+  (`ChunkMaler.hoehen`), beim Abziehen auf dem Render-Thread: 49 × 49 Spalten
+  um den Chunk, 32 nach Norden und Westen, 1 nach Osten und Süden
+  (`Relief.SEITE`). Wo kein Chunk geladen ist, fehlen sie.
+- **Aufgelegt** nach dem Zeichnen im Worker (`ChunkMaler.male`,
+  `Relief.auf`): je Block der Faktor seines Codes auf Rot, Grün und Blau seiner
+  Pixel, gerundet und bei 255 gekappt, Alpha bleibt, wie der Renderer auf eine
+  Kachel. Gemalt ist ohne Relief, so trifft es genau.
+- **Nicht mit Decke:** In einer Dimension mit Decke, etwa im Nether, malt sie
+  kein Relief; Flach malt keins und liest auch keine Höhen.
+- **Neu gemalt** (`Minimap.markiere`): mit Relief dazu die Chunks, deren Codes
+  an den Höhen des geänderten hängen, im Westen und Norden der Rand, im Osten
+  und Süden bis 2 Chunks der Schatten. Lädt ein Chunk im Nordwesten später,
+  malt das die Chunks im Schatten so neu. Eine andere Wahl malt alles neu.
+- **Die eigene Karte** malt noch ohne Relief.
+- **Geprüft** in `ReliefTest`: Codes mit Zahlen, die Codes für zwei
+  Basiskacheln der Testwelt aus ihren Höhen (`src/test/resources/relief/hoehen.bin`,
+  geschrieben von `hoehen.py` aus den Regionen der Testwelt) genau wie die
+  Schicht von Renderer 0.19.0, 8192 von 8192, und der Faktor je Block.
+- **Kosten:** Messung (b) folgt im Fenster des Reviewers, Ziel höchstens +5 %
+  Zeit je Chunk bei 4 und 8 px.
+
 ## Neu zeichnen
 
 - **Wann:** Die Wege, auf denen der Client einen Abschnitt neu zeichnen

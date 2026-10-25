@@ -130,6 +130,87 @@ class ReliefTest {
     }
 
     @Test
+    void codeJeSpalte() {
+        // Eben: 4. Steigt nach Osten um 3 und nach Süden um 2: n = 5, begrenzt 4, Code 8. Fehlt ein Nachbar, gilt er gleich hoch.
+        java.util.Map<Long, Integer> h = new java.util.HashMap<>();
+        Relief.Hoehen hoehen = (x, z) -> h.getOrDefault((long) x << 32 | (z & 0xFFFFFFFFL), Relief.FEHLT);
+        java.util.function.BiConsumer<int[], Integer> setze = (p, v) -> h.put((long) p[0] << 32 | (p[1] & 0xFFFFFFFFL), v);
+        for (int x = -40; x <= 2; x++) {
+            for (int z = -40; z <= 2; z++) {
+                setze.accept(new int[] {x, z}, 64);
+            }
+        }
+        assertEquals(4, Relief.code(hoehen, 0, 0));
+        setze.accept(new int[] {1, 0}, 67);
+        setze.accept(new int[] {0, 1}, 66);
+        assertEquals(8, Relief.code(hoehen, 0, 0));
+        h.remove((long) 1 << 32);
+        assertEquals(6, Relief.code(hoehen, 0, 0));
+        // Schatten: 20 Blöcke nach Nordwesten eine Spalte 29 höher, mehr als 20 · √2 = 28,3: im Schatten, Code 6 + 9.
+        setze.accept(new int[] {-20, -20}, 64 + 29);
+        assertEquals(15, Relief.code(hoehen, 0, 0));
+        setze.accept(new int[] {-20, -20}, 64 + 28);
+        assertEquals(6, Relief.code(hoehen, 0, 0));
+        // Ohne die Spalte selbst: 4.
+        assertEquals(4, Relief.code(hoehen, 100, 100));
+    }
+
+    @Test
+    void codesUndFaktorJeChunk() {
+        // Die Höhen um einen Chunk ab 32 Blöcken nordwestlich: eben 64, seine Spalte (1, 0) 66. Westlich davon steigt es nach
+        // Osten, Code 6; sie selbst ist eben umgeben, 4; östlich davon fällt es, 2.
+        int[] hoehen = new int[Relief.SEITE * Relief.SEITE];
+        java.util.Arrays.fill(hoehen, 64);
+        hoehen[32 * Relief.SEITE + 33] = 66;
+        byte[] codes = Relief.codes(hoehen);
+        assertEquals(6, codes[0]);
+        assertEquals(4, codes[1]);
+        assertEquals(2, codes[2]);
+        // Bei 2 px je Block: Code 8 mit slope, 1,24: 100 wird 124, 255 bleibt 255; Alpha 0 bleibt; Code 4 bleibt.
+        codes[0] = 8;
+        int[] pixel = new int[32 * 32];
+        pixel[0] = grau(100);
+        pixel[1] = grau(255);
+        pixel[32] = 0x00646464;
+        pixel[2] = grau(100);
+        Relief.auf(pixel, 2, codes, Relief.Art.SLOPE);
+        assertEquals(grau(124), pixel[0]);
+        assertEquals(grau(255), pixel[1]);
+        assertEquals(0x00646464, pixel[32]);
+        assertEquals(grau(100), pixel[2]);
+    }
+
+    @Test
+    void codesWieDerRenderer() throws IOException {
+        // Die Höhen der Testwelt (hoehen.bin, siehe hoehen.py) ergeben genau die Schicht von Renderer 0.19.0 für dieselben zwei
+        // Basiskacheln, je Block ein Code, bei scale 4 je 4 × 4 Pixel.
+        java.nio.ByteBuffer roh;
+        try (java.io.InputStream rein = ReliefTest.class.getResourceAsStream("/relief/hoehen.bin")) {
+            roh = java.nio.ByteBuffer.wrap(rein.readAllBytes()).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        }
+        int x0 = roh.getInt(), z0 = roh.getInt(), breite = roh.getInt(), tiefe = roh.getInt();
+        short[] werte = new short[breite * tiefe];
+        roh.asShortBuffer().get(werte);
+        Relief.Hoehen hoehen = (x, z) -> {
+            int i = x - x0, j = z - z0;
+            return i < 0 || j < 0 || i >= breite || j >= tiefe || werte[j * breite + i] == Short.MIN_VALUE ? Relief.FEHLT : werte[j * breite + i];
+        };
+        int gleich = 0, alle = 0;
+        for (int[] k : new int[][] {{-44, -52}, {-45, -53}}) {
+            int[] schicht = kachel("slope/relief/8/" + k[0] + "/" + k[1] + ".webp");
+            for (int bz = 0; bz < 64; bz++) {
+                for (int bx = 0; bx < 64; bx++) {
+                    int soll = schicht[(bz * 4 + 1) * 256 + bx * 4 + 1] >> 16 & 0xFF;
+                    gleich += Relief.code(hoehen, k[0] * 64 + bx, k[1] * 64 + bz) == soll ? 1 : 0;
+                    alle++;
+                }
+            }
+        }
+        assertEquals(8192, alle);
+        assertEquals(alle, gleich, gleich + " von " + alle + " Codes wie der Renderer");
+    }
+
+    @Test
     void satzAusMapJson(@TempDir Path ordner) throws IOException {
         Path karte = ordner.resolve("map.json");
         Files.writeString(karte, "{\"relief\":\"slope\",\"reliefTiles\":\"relief/{z}/{x}/{y}.webp\"}", StandardCharsets.UTF_8);

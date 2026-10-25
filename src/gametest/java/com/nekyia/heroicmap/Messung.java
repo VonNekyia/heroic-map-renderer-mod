@@ -46,6 +46,8 @@ public final class Messung implements FabricClientGameTest {
     private static final boolean NUR_EFFEKTE = Boolean.getBoolean("heroicmap.messung.effekte");
     /** Mit {@code -PmessungChunks=true} nur das Zeichnen je Chunk, wie in der ganzen Messung; so passen Läufe im Wechsel in ein Fenster. */
     private static final boolean NUR_CHUNKS = Boolean.getBoolean("heroicmap.messung.chunks");
+    /** Mit -PmessungRelief=slope oder shadows legt der Maler das Relief auf, wie die Minimap nah; Vorgabe ohne. */
+    private static final Relief.Art RELIEF = Relief.Art.von(System.getProperty("heroicmap.messung.relief", "ohne"), Relief.Art.OHNE);
     /**
      * Mit {@code -PmessungZoom=true} nur die Läufe zum Zoom 0,5 gegen 2, mit einer Stufe wie {@code -PmessungZoom=0.03125} zu
      * ihr gegen 2; ab 1/4 mit einem Satz aus Rauschen. Siehe docs/minimap.md, „Kosten“.
@@ -533,7 +535,7 @@ public final class Messung implements FabricClientGameTest {
                         continue;
                     }
                     long t0 = System.nanoTime();
-                    ChunkMaler.Auftrag auftrag = ChunkMaler.abziehen(level, chunk, scale, Integer.MAX_VALUE, licht, texel, 0);
+                    ChunkMaler.Auftrag auftrag = ChunkMaler.abziehen(level, chunk, scale, Integer.MAX_VALUE, licht, texel, 0, RELIEF);
                     long t1 = System.nanoTime();
                     maler.male(auftrag);
                     abzug.add(t1 - t0);

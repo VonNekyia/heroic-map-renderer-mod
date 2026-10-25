@@ -2,3 +2,5 @@ Zwei Basiskacheln (Zoom 8) der Testwelt, gezeichnet von Renderer 0.19.0 (master 
 --center -2816 -3328 --size 512, je ohne Relief, mit --relief slope (dazu relief/ und relief/rest/) und mit --relief shadows.
 Gerendert von Backend am 25.10.2026 mit 2 Threads und --low-priority. ReliefTest.wieDerRenderer rechnet aus slope mit
 Schicht und Rest ohne und shadows und vergleicht sie mit den Kacheln des Renderers, je Kanal auf +-1.
+hoehen.bin: je Spalte das y aus WORLD_SURFACE der Testwelt für dieselbe Szene mit Rand, geschrieben von hoehen.py aus den
+Regionen der Testwelt; ReliefTest.codesWieDerRenderer rechnet daraus die Codes und vergleicht sie mit relief/8/... .
