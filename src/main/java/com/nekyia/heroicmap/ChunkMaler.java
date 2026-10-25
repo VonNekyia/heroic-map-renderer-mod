@@ -540,8 +540,7 @@ final class ChunkMaler {
         float neuUnten = Math.min(deckend == null ? Float.MAX_VALUE : deckend[0], Math.max(unten, 0));
         // Liegt sie ganz ausserhalb und ganz durchsichtig, bleibt keine Höhe; dann zeigt sie nicht mehr nach oben.
         neuOben = Math.max(neuOben, neuUnten);
-        // Etwas Spiel für die Rundung von float, damit eine deckende Kante wie die unterste Reihe von crop bleibt.
-        if (neuOben < oben - 1e-5f || neuUnten > unten + 1e-5f) {
+        if (neuOben < oben || neuUnten > unten) {
             schneide(e, b, uv, bu, neuUnten, neuOben);
         }
     }

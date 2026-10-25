@@ -975,8 +975,7 @@ deckend. Die Regel gab der Reviewer am 25.10. vor, entschieden in
 - **Mit den Assets des Spiels** ändert sich nichts: Kreuze liegen ganz im
   Block, `crop` und die Stiele beginnen bei −1/16 mit einer deckenden
   untersten Reihe. Geprüft über jede Fläche jeder Bodenpflanze im Gametest,
-  siehe [Entwicklung](entwicklung.md), „Tests“. Etwas Spiel von 10⁻⁵ hält die
-  Rundung von float von dieser Kante fern.
+  siehe [Entwicklung](entwicklung.md), „Tests“.
 - **Der Renderer** schneidet nach derselben Regel, abgestimmt mit Backend am
   25.10.
 
