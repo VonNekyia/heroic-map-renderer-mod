@@ -521,7 +521,7 @@ final class Karte extends Screen {
      */
     private boolean fehltSchicht(Relief.Satzrelief relief, Relief.Art art) {
         Path schicht = satz.ordner().resolve(Downloads.RELIEF);
-        return relief.noetig(art) && !relief.selbst() && !(liegt(schicht) && liegt(schicht.resolve("rest")));
+        return relief.noetig(art) && !(liegt(schicht) && liegt(schicht.resolve("rest")));
     }
 
     private static boolean liegt(Path teil) {
