@@ -262,6 +262,29 @@ class LadenTest {
     }
 
     @Test
+    void teilDesReliefsOhneMapJson() throws Exception {
+        // Schicht und Rest bringen keine map.json; die Stufen kommen aus der des Baums, und keine landet im Ordner.
+        byte[] desBaums = karte.getBytes(StandardCharsets.UTF_8);
+        karte = "kaputt";
+        URI url = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/baum");
+        Laden.Auftrag a = new Laden.Auftrag(url, TOKEN, Laden.sha256(manifest), summe(), 4, false, 1L << 30, kacheln.size(),
+                InetAddress.getLoopbackAddress(), desBaums);
+        assertEquals(5, new Laden().lade(a, ziel).geladen());
+        assertFalse(Files.exists(ziel.resolve("map.json")));
+        // Als Strom ebenso: das Manifest zuerst.
+        ByteArrayOutputStream aus = new ByteArrayOutputStream();
+        eintrag(aus, "manifest", manifest, 0);
+        for (String pfad : grobNachFein()) {
+            eintrag(aus, pfad + ".webp", kacheln.get(pfad), 0);
+        }
+        eintrag(aus, "ende", new byte[0], 0);
+        zip = aus.toByteArray();
+        Path strom = ziel.resolve("strom");
+        assertEquals(5, new Laden().strom(a, strom, new Laden.Fortschritt(summe()), z -> { }).geladen());
+        assertFalse(Files.exists(strom.resolve("map.json")));
+    }
+
+    @Test
     void geaenderteUndEntfernteKacheln() throws Exception {
         new Laden().lade(auftrag(4, summe()), ziel);
         setze("2/1/1", "neu".getBytes(StandardCharsets.UTF_8), "\"neu\"");

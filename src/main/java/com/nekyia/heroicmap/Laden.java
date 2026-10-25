@@ -105,10 +105,17 @@ final class Laden {
 
     /**
      * Was die {@code freigabe} nennt, dazu aus dem {@code angebot} Grösse und Zahl der Kacheln
-     * des Satzes, und die Adresse der Verbindung zum Spielserver oder null.
+     * des Satzes, und die Adresse der Verbindung zum Spielserver oder null. Für Schicht und Rest des Reliefs
+     * ist {@code url} die Basis mit {@code /relief} oder {@code /relief/rest} und {@code karte} die {@code map.json} des
+     * Baums, denn sie bringen keine eigene; sonst null. Siehe docs/download.md, „Relief“.
      */
     record Auftrag(URI url, String token, String manifestSha256, long bytes, int massstab, boolean abgleich,
-            long satzBytes, long kacheln, InetAddress spielserver) {
+            long satzBytes, long kacheln, InetAddress spielserver, byte[] karte) {
+
+        Auftrag(URI url, String token, String manifestSha256, long bytes, int massstab, boolean abgleich,
+                long satzBytes, long kacheln, InetAddress spielserver) {
+            this(url, token, manifestSha256, bytes, massstab, abgleich, satzBytes, kacheln, spielserver, null);
+        }
 
         /** Höchstens so viel lädt der Mod: beim Abgleich der Deckel des Tokens, sonst der Satz plus 10 %. */
         long grenze() {
@@ -288,7 +295,7 @@ final class Laden {
         // Was ein beendetes Spiel halb geschrieben hat.
         loesche(zwischen);
         Files.createDirectories(zwischen);
-        byte[] karte = hole(a, "map.json", KARTE_MAX, Grund.MANIFEST).body();
+        byte[] karte = a.karte() != null ? a.karte() : hole(a, "map.json", KARTE_MAX, Grund.MANIFEST).body();
         int[] zoom = zoom(karte, a.massstab());
         byte[] gz = hole(a, "manifest", MANIFEST_MAX, Grund.MANIFEST).body();
         Plan plan = plane(a, karte, zoom, gz, ziel, zwischen);
@@ -407,7 +414,9 @@ final class Laden {
             throw new Fehler(Grund.PRUEFSUMME, "manifest_sha256");
         }
         List<Eintrag> soll = lies(entpacke(gz), zoom[0], zoom[1], zoom[2], a.zeilen());
-        schreibe(zwischen, ziel.resolve("map.json"), karte);
+        if (a.karte() == null) {
+            schreibe(zwischen, ziel.resolve("map.json"), karte);
+        }
 
         Map<String, String> ist = new ConcurrentHashMap<>(liesIndex(ziel));
         Set<String> pfade = new HashSet<>();
@@ -537,14 +546,15 @@ final class Laden {
         boolean fertig = false;
         OutputStream protokoll = null;
         try {
-            byte[] karte = erster(zip, "map.json", KARTE_MAX);
+            // Schicht und Rest des Reliefs kommen ohne map.json; die Stufen nennt die des Baums.
+            byte[] karte = a.karte() != null ? a.karte() : erster(zip, "map.json", KARTE_MAX);
             int[] zoom = zoom(karte, a.massstab());
             byte[] gz = erster(zip, "manifest", MANIFEST_MAX);
             plan = plane(a, karte, zoom, gz, ziel, zwischen);
             summe.geloescht += plan.geloescht();
             Map<String, Eintrag> erwartet = new HashMap<>();
             plan.soll().forEach(e -> erwartet.put(e.pfad(), e));
-            long max = a.grenze() + (plan.soll().size() + 3) * KOPF_MAX + karte.length + gz.length;
+            long max = a.grenze() + (plan.soll().size() + 3) * KOPF_MAX + (a.karte() == null ? karte.length : 0) + gz.length;
             zaehler.fortschritt.gesamt = Math.min(zaehler.fortschritt.gesamt, schon + max);
             if (!Files.exists(marke)) {
                 Files.writeString(marke, "", StandardCharsets.UTF_8);
