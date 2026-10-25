@@ -51,6 +51,9 @@ final class Downloads {
     private static final Logger LOGGER = LogUtils.getLogger();
     /** Hier steht der Stand des Satzes, siehe {@link Freigabe.Stand}. */
     private static final String STAND = "massstab.txt";
+    /** Im Ordner des Massstabs: Schicht des Reliefs, darin {@code rest/} der Rest; je Teil sein Stand in {@code stand.txt}. */
+    static final String RELIEF = "relief";
+    private static final String STAND_TEIL = "stand.txt";
     private static final DateTimeFormatter UHR = DateTimeFormatter.ofPattern("dd.MM. HH:mm");
 
     private final Reihe reihe = new Reihe();
@@ -669,7 +672,8 @@ final class Downloads {
     /** Reiht den Download in den Ordner des Baums ein und meldet den Beginn. Auf dem Render-Thread; der Gametest ruft es direkt. */
     void reiheEin(Freigabe f, Laden.Auftrag auftrag, Path ordner, String name, String dimension) {
         int meine = sitzung;
-        if (!reihe.reihe(ordner.toString(), () -> lade(f, auftrag, ordner, name, dimension, meine))) {
+        Relief.Art art = Minimap.INSTANZ.relief();
+        if (!reihe.reihe(ordner.toString(), () -> lade(f, auftrag, ordner, name, dimension, meine, art))) {
             melde(Component.translatable("heroicmap.download.verfaellt_belegt", f.baum()));
             return;
         }
@@ -677,7 +681,7 @@ final class Downloads {
     }
 
     /** Im Thread der Reihe. Das Ergebnis geht in jedem Fall zurück, auch bei einem Error. */
-    private void lade(Freigabe f, Laden.Auftrag auftrag, Path ordner, String name, String dimension, int meine) {
+    private void lade(Freigabe f, Laden.Auftrag auftrag, Path ordner, String name, String dimension, int meine, Relief.Art art) {
         Laden.Ergebnis ergebnis = null;
         Exception fehler = null;
         try {
@@ -721,12 +725,74 @@ final class Downloads {
                     // Spätestens jetzt zeigt die Vollbildkarte den Satz, siehe docs/vollbildkarte.md, „Welcher Satz“.
                     Satz.schreibe(ordner, name, dimension, f.massstab());
                 }
+                ladeRelief(f, auftrag, ziel, art);
             }
         } catch (Exception e) {
             fehler = e;
         } finally {
             fortschritt = null;
             zurueck(f, auftrag, ergebnis, fehler, meine);
+        }
+    }
+
+    /**
+     * Nach dem Baum, mit demselben Token und einem nach dem anderen, Schicht und Rest des Reliefs: nur, wenn die gewählte Art
+     * nicht die der Kacheln ist und der Baum die Schicht hat. Sonst löscht es eine liegende Schicht samt Rest; so ist sie nie
+     * älter als ihr Baum. Ein Fehler hier lässt den Baum stehen und meldet sich selbst. Im Thread der Reihe. Siehe
+     * docs/download.md, „Relief“.
+     */
+    private void ladeRelief(Freigabe f, Laden.Auftrag baum, Path ziel, Relief.Art art) {
+        Path schicht = ziel.resolve(RELIEF);
+        try {
+            if (!Relief.von(ziel).noetig(art)) {
+                if (Files.exists(schicht)) {
+                    Laden.loesche(schicht);
+                }
+                return;
+            }
+            if (f.relief() == null) {
+                Minecraft.getInstance().execute(() -> melde(Component.translatable("heroicmap.download.relief_fehlt")));
+                return;
+            }
+            byte[] karte = Files.readAllBytes(ziel.resolve("map.json"));
+            String basis = f.url().toString().replaceAll("/+$", "");
+            Freigabe.Teil[] teile = {f.relief(), f.rest()};
+            Path[] ordner = {schicht, schicht.resolve("rest")};
+            String[] pfade = {RELIEF, RELIEF + "/rest"};
+            for (int i = 0; i < 2; i++) {
+                Freigabe.Teil t = teile[i];
+                // Mit Stand still bis 10 % darüber; ohne, gleich nach dem Wechsel, gilt die Wahl als Zustimmung.
+                Freigabe.Stand stand = Freigabe.Stand.lies(ordner[i].resolve(STAND_TEIL));
+                if (stand != null && t.bytes() > stand.bytes() + stand.bytes() / 10) {
+                    long vorher = stand.bytes();
+                    Minecraft.getInstance().execute(() -> melde(Component.translatable("heroicmap.download.relief_gross",
+                            groesse(t.bytes()), groesse(vorher))));
+                    return;
+                }
+                Files.createDirectories(ordner[i]);
+                new Freigabe.Stand(f.massstab(), t.bytes(), baum.kacheln()).schreibe(ordner[i].resolve(STAND_TEIL));
+                Laden.Auftrag a = new Laden.Auftrag(java.net.URI.create(basis + "/" + pfade[i]), baum.token(), t.manifestSha256(),
+                        t.bytes(), f.massstab(), f.abgleich(), t.bytes(), baum.kacheln(), baum.spielserver(), karte);
+                Laden.Ergebnis e = null;
+                if (!f.abgleich()) {
+                    fortschritt = new Laden.Fortschritt(t.bytes());
+                    e = laden.strom(a, ordner[i], fortschritt, z -> { });
+                    fortschritt = null;
+                }
+                if (e == null) {
+                    laden.lade(a, ordner[i], null);
+                }
+            }
+        } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            LOGGER.warn("Heroic Map: Relief nicht geladen", e);
+            String grund = e instanceof Laden.Fehler lf ? lf.grund.name().toLowerCase(Locale.ROOT) : "anderer";
+            Minecraft.getInstance().execute(() -> melde(Component.translatable("heroicmap.download.relief_abbruch",
+                    Component.translatable("heroicmap.download.grund." + grund))));
+        } finally {
+            fortschritt = null;
         }
     }
 

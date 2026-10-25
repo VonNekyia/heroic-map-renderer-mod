@@ -331,6 +331,53 @@ als Strom“; hier steht, was der Mod tut.
   echten Abriss im chunked-Körper; der Gametest `Strom`, siehe
   [Entwicklung](entwicklung.md), „Gametests“.
 
+## Relief
+
+Ab Plugin 0.21.0 nennt eine `freigabe` für einen Baum mit Relief auch seine
+Schicht und ihren Rest, je mit eigenem Manifest und Strom. Der Mod lädt sie
+nur, wenn er sie zum Rechnen braucht, siehe
+[Vollbildkarte](vollbildkarte.md), „Relief“, und
+[0053](entscheidungen/0053-wahl-des-reliefs.md). Was das Plugin schickt, steht
+im Plugin unter
+[„Relief“](https://github.com/VonNekyia/heroic-map-renderer-plugin/blob/main/docs/download.md#relief).
+
+- **Gelesen** (`Freigabe.lies`): das Objekt `relief` mit `manifest_sha256`,
+  `bytes` und `rest` darin, ebenso aufgebaut, als `Freigabe.relief` und
+  `Freigabe.rest`. Fehlt es, gibt es keine; fehlt `rest` oder sind Bytes
+  negativ, ist die `freigabe` unlesbar. `bytes` der `freigabe` bleibt der Baum.
+- **Wann** (`Downloads.ladeRelief`): nach dem Baum, wenn er fertig und nicht
+  gekappt ist, und nur, wenn die gewählte Art nicht die seiner Kacheln ist und
+  er die Schicht hat. Die Wahl gilt, wie sie beim Einreihen war.
+- **Mit demselben Token,** einer nach dem anderen, erst die Schicht, dann der
+  Rest. Die Basis ist die des Baums mit `/relief` oder `/relief/rest`; so
+  liegen Manifest, Kacheln und Strom genau, wo der Server sie hat
+  (`<basis>/relief.zip`, `<basis>/relief/manifest`, `<basis>/relief/<z>/<x>/<y>.webp`).
+  Ein voller Download lädt als Strom, ein Abgleich einzeln. Die Teile bringen
+  keine `map.json`; die Stufen kommen aus der des Baums (`Laden.Auftrag.karte`),
+  und im Ordner des Teils liegt keine.
+- **Ablage:** im Ordner des Massstabs `relief/` für die Schicht, darin
+  `rest/` für den Rest, je mit eigenem `etags.txt`, `strom.txt`, `tmp/` und
+  einem Stand `stand.txt`: Massstab, Bytes des Teils und Kacheln des Baums.
+  Das Löschen des Baums nach dem Manifest geht nur über die Pfade seines
+  Index und lässt `relief/` stehen; die Kartenliste zählt den Ordner mit.
+- **Grenzen:** je Teil bei `voll` seine Bytes plus 10 %, beim Abgleich seine
+  Bytes; das Plugin lässt ihn ganz zu.
+- **Still:** Mit einem Stand lädt der Mod einen Teil, solange er höchstens
+  10 % grösser ist als dort; ist er grösser, lädt er ihn nicht und meldet
+  es, „Karte laden …“ holt ihn nach der Rückfrage. Ohne Stand, gleich nach
+  dem Wechsel der Wahl, gilt die Wahl als Zustimmung.
+- **Nicht gebraucht,** etwa nach dem Wechsel zurück auf die Art der Kacheln,
+  löscht der nächste Download des Baums `relief/` samt Rest. Bis dahin bleiben
+  sie liegen; ein Fehlklick kostet so keinen Abgleich, und eine liegende
+  Schicht ist nie älter als ihr Baum.
+- **Fehlt `relief`** in der `freigabe`, obwohl der Mod es bräuchte, meldet er
+  „Der Server liefert die Schicht des Reliefs nicht aus“ und lädt nur den
+  Baum.
+- **Bricht ein Teil ab,** bleibt der neue Baum, und die Meldung nennt den
+  Grund; der nächste Abgleich versucht es wieder. Bis dahin können einzelne
+  geänderte Kacheln mit einer alten Schicht stehen.
+- **Geprüft:** `FreigabeTest.reliefMitRest`, `LadenTest.teilDesReliefsOhneMapJson` und der Gametest `ReliefLaden`, siehe [Entwicklung](entwicklung.md), „Tests“.
+
 ## Ablauf
 
 Ein Abgleich, und ein voller Download, wenn der Renderer den Strom nicht
