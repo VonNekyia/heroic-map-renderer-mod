@@ -15,12 +15,13 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContex
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.ChunkPos;
 
 /**
  * Der Knopf „Relief“ auf der Vollbildkarte, mit echten Klicks, auf zwei Basiskacheln der Testwelt von Renderer 0.19.0 mit
  * Schicht und Rest: von Relief reihum Relief + Schatten, Flach, Relief; Flach und Relief + Schatten sehen anders aus als die Kacheln,
  * zurück auf Relief wie vorher. Fehlt der Index der Schicht, trägt der Knopf „…“; ohne Schicht in {@code map.json} ist er grau.
- * Siehe docs/vollbildkarte.md, „Relief“.
+ * Dazu die eigene Karte ({@link #eigeneKarte}). Siehe docs/vollbildkarte.md, „Relief“.
  */
 public final class ReliefWahl implements FabricClientGameTest {
 
@@ -85,11 +86,107 @@ public final class ReliefWahl implements FabricClientGameTest {
             }
             context.runOnClient(mc -> mc.gui.setScreen(null));
             Laden.loesche(baum);
+            eigeneKarte(context, spiel);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         } finally {
             context.runOnClient(mc -> Minimap.INSTANZ.setzeRelief(vorher));
         }
+    }
+
+    /**
+     * Die eigene Karte: Mit Flach schreibt sie keine Schicht. Ein Klick auf Relief, und die geladenen Chunks bekommen sie, mit
+     * den Codes um eine Säule wie der Renderer; die Kacheln bleiben ohne Relief. Der Knopf ist nicht grau und trägt nie „…“,
+     * Relief sieht anders aus als Flach. Ein Turm im Nordwesten wirft danach seinen Schatten in die Schicht des Chunks
+     * südöstlich. Siehe docs/selbst.md, „Relief“.
+     */
+    private static void eigeneKarte(ClientGameTestContext context, TestSingleplayerContext spiel) throws IOException {
+        var server = spiel.getServer();
+        server.runCommand("gamemode spectator @a");
+        // Die Säule wie in Bilder.reliefNah, Oberfläche bei y −47 statt −60.
+        server.runCommand("fill 60 -60 60 62 -48 62 stone");
+        server.runCommand("tp @a 56.5 -30 56.5");
+        context.waitTicks(10);
+        spiel.getConnection().waitForChunksRender();
+        Path welt = context.computeOnClient(mc -> Downloads.weltOrdner());
+        Path ordner = welt.resolve(Selbst.baum("minecraft:overworld")).resolve("4");
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeRelief(Relief.Art.OHNE);
+            if (Selbst.INSTANZ.waehle(mc, 4) != null) {
+                throw new AssertionError("„Selbst“ geht nicht");
+            }
+        });
+        zeichne(context);
+        if (Files.exists(ordner.resolve("relief"))) {
+            throw new AssertionError("Mit Flach schreibt die eigene Karte eine Schicht");
+        }
+        int[] kachelFlach = png(ordner.resolve("8/0/0.png"));
+        // Die Säule im linken Teil des Bilds, den anders vergleicht.
+        oeffneEigene(context, welt);
+        if (!context.computeOnClient(mc -> knopf(mc.gui.screen()).active)) {
+            throw new AssertionError("Auf der eigenen Karte ist der Knopf „Relief“ grau");
+        }
+        BufferedImage flach = bild(context, "relief-selbst-ohne");
+        klicke(context);
+        context.runOnClient(mc -> mc.gui.setScreen(null));
+        zeichne(context);
+        oeffneEigene(context, welt);
+        pruefeText(context, "heroicmap.karte.relief", "slope");
+        BufferedImage relief = bild(context, "relief-selbst-slope");
+        context.runOnClient(mc -> mc.gui.setScreen(null));
+        int[] schicht = png(ordner.resolve("relief/8/0/0.png")), kachel = png(ordner.resolve("8/0/0.png"));
+        // Westrand der Säule steigt (8), Ostrand fällt (0), südöstlich daneben Schatten (13), weit weg eben (4).
+        int[] codes = {code(schicht, 60, 61), code(schicht, 62, 61), code(schicht, 63, 63), code(schicht, 40, 40)};
+        int kachelAnders = 0;
+        for (int i = 0; i < kachel.length; i++) {
+            kachelAnders += kachel[i] != kachelFlach[i] ? 1 : 0;
+        }
+        int bildAnders = anders(flach, relief);
+
+        // Der Turm in Chunk (2, 2): Sein Schatten fällt auf (48, 48) in Chunk (3, 3), den nur der Ring neu zeichnet.
+        int vorTurm = code(schicht, 48, 48);
+        server.runCommand("fill 44 -60 44 45 -41 45 stone");
+        zeichne(context);
+        int mitTurm = code(png(ordner.resolve("relief/8/0/0.png")), 48, 48);
+        context.runOnClient(mc -> Selbst.INSTANZ.leeren());
+        LOGGER.info("Relief der eigenen Karte: Codes {} {} {} {}, Kachel {} Pixel anders, Bild {} Pixel anders, Turm {} → {}",
+                codes[0], codes[1], codes[2], codes[3], kachelAnders, bildAnders, vorTurm, mitTurm);
+        if (codes[0] != 8 || codes[1] != 0 || codes[2] != 13 || codes[3] != 4) {
+            throw new AssertionError("Schicht der eigenen Karte: Codes " + java.util.Arrays.toString(codes) + " statt [8, 0, 13, 4]");
+        }
+        if (kachelAnders != 0) {
+            throw new AssertionError("Mit Relief ist die Kachel der eigenen Karte " + kachelAnders + " Pixel anders; sie bleibt ohne Relief");
+        }
+        if (bildAnders < 100) {
+            throw new AssertionError("Eigene Karte mit Relief nur " + bildAnders + " Pixel anders als Flach (mindestens 100)");
+        }
+        if (vorTurm != 4 || mitTurm != 13) {
+            throw new AssertionError("Schatten des Turms in der Schicht der eigenen Karte: " + vorTurm + " → " + mitTurm + " statt 4 → 13");
+        }
+    }
+
+    /** Bis „Selbst“ um Chunk (3, 3) alles gezeichnet und geschrieben hat. */
+    private static void zeichne(ClientGameTestContext context) {
+        context.waitTicks(5);
+        context.waitFor(mc -> Selbst.INSTANZ.fertig(new ChunkPos(3, 3), 3), 2400);
+        context.computeOnClient(mc -> Selbst.INSTANZ.schreibeJetzt()).join();
+    }
+
+    /** Die eigene Karte bei (90, 75), die Säule links oben im Bild, bis ihre Kacheln dekodiert sind. */
+    private static void oeffneEigene(ClientGameTestContext context, Path welt) {
+        context.runOnClient(mc -> mc.gui.setScreen(new Karte(Satz.fuer(welt, "minecraft:overworld", Zeigt.OHNE)).bei(90, 75)));
+        context.waitTicks(40);
+    }
+
+    /** Die Pixel einer PNG. */
+    private static int[] png(Path datei) throws IOException {
+        BufferedImage b = ImageIO.read(datei.toFile());
+        return b.getRGB(0, 0, b.getWidth(), b.getHeight(), null, 0, b.getWidth());
+    }
+
+    /** Der Code der Spalte (x, z) in der Schicht der Kachel (8, 0, 0) mit 4 px je Block. */
+    private static int code(int[] schicht, int x, int z) {
+        return schicht[z * 4 * 256 + x * 4] >> 16 & 0xFF;
     }
 
     /** Die Vollbildkarte auf der Kachel (−44, −52), bis ihre Kacheln dekodiert sind. */

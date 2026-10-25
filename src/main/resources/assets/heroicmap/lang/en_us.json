@@ -96,7 +96,6 @@
   "heroicmap.karte.relief_kommt.beschreibung": "Comes with the next sync; \"Sync\" gets it now.",
   "heroicmap.karte.relief_kommt": "Relief \"%s\" comes with the next sync. \"Sync\" gets it now.",
   "heroicmap.karte.relief_kommt_ab": "Relief \"%s\" comes with the next sync, at %s.",
-  "heroicmap.karte.relief_selbst": "Your own map has no relief.",
   "heroicmap.karte.relief_ohne": "This map has no relief.",
   "heroicmap.karte.relief_alt": "This map has no relief layer the mod can read; the server draws it with an older version.",
   "heroicmap.relief.ohne": "Flat",

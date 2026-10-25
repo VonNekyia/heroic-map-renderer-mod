@@ -37,8 +37,11 @@ final class Relief {
     /** Das einzige Muster der Schicht, das der Mod kennt; ein neues Format bekäme ein neues Feld in {@code map.json}. */
     static final String SCHICHT = "relief/{z}/{x}/{y}.webp";
 
-    /** Was ein Satz mitbringt: die Art in seinen Kacheln und ob seine Schicht im bekannten Format daliegt. */
-    record Satzrelief(Art gebacken, boolean schicht) {
+    /**
+     * Was ein Satz mitbringt: die Art in seinen Kacheln, ob seine Schicht im bekannten Format daliegt, und ob er die eigene Karte
+     * ist, deren Schicht der Mod selbst als PNG schreibt.
+     */
+    record Satzrelief(Art gebacken, boolean schicht, boolean selbst) {
 
         /** Muss der Mod rechnen, um {@code gewaehlt} zu zeigen? Nur mit der Schicht und einer anderen Art als gebacken. */
         boolean noetig(Art gewaehlt) {
@@ -54,15 +57,19 @@ final class Relief {
      * Relief. Siehe docs/vollbildkarte.md, „Relief“.
      */
     static Satzrelief von(Path ordner) {
+        if (Selbst.selbst(ordner.getParent())) {
+            // Kacheln ohne Relief, die Schicht daneben. Siehe docs/selbst.md, „Relief“.
+            return new Satzrelief(Art.OHNE, true, true);
+        }
         try {
             JsonObject karte = JsonParser.parseString(Files.readString(ordner.resolve("map.json"), StandardCharsets.UTF_8)).getAsJsonObject();
             Art gebacken = karte.has("relief") ? Art.von(karte.get("relief").getAsString(), null) : Art.OHNE;
             if (gebacken == null || gebacken == Art.OHNE) {
-                return new Satzrelief(Art.OHNE, false);
+                return new Satzrelief(Art.OHNE, false, false);
             }
-            return new Satzrelief(gebacken, karte.has("reliefTiles") && SCHICHT.equals(karte.get("reliefTiles").getAsString()));
+            return new Satzrelief(gebacken, karte.has("reliefTiles") && SCHICHT.equals(karte.get("reliefTiles").getAsString()), false);
         } catch (IOException | RuntimeException e) {
-            return new Satzrelief(Art.OHNE, false);
+            return new Satzrelief(Art.OHNE, false, false);
         }
     }
 
@@ -84,7 +91,7 @@ final class Relief {
      * Rechnet die Kachel {@code kachel} (ARGB, Art {@code gebacken}) in die Art {@code gewaehlt} um, an Ort und Stelle: je
      * Pixel mit Alpha über 0 die Farbe ohne Relief aus dem Rest, wo er Alpha 255 hat, sonst je Kanal round(k / f) mit dem
      * Faktor der Kachel; dann mal den Faktor der gewählten Art, gerundet und bei 255 gekappt. Alpha bleibt. Der Code steht
-     * in Rot der Schicht; ohne Schicht gilt 4, ohne Rest keiner.
+     * in Rot der Schicht; ohne Schicht und wo sie durchsichtig ist gilt 4, ohne Rest keiner.
      */
     static void rechne(int[] kachel, int[] schicht, int[] rest, Art gebacken, Art gewaehlt) {
         // Je Code einmal jeder Wert eines Kanals der Kachel, und jeder Wert ohne Relief für den Rest: dieselbe Rechnung, nur
@@ -102,7 +109,8 @@ final class Relief {
             if (argb >>> 24 == 0) {
                 continue;
             }
-            int code = schicht == null ? 4 : schicht[p] >> 16 & 0xFF;
+            // Durchsichtig nur in der Schicht der eigenen Karte, wo ein Chunk ohne Relief gezeichnet ist.
+            int code = schicht == null || schicht[p] >>> 24 == 0 ? 4 : schicht[p] >> 16 & 0xFF;
             code = code > 17 ? 4 : code;
             boolean mitRest = rest != null && rest[p] >>> 24 == 255;
             int[] tafel = mitRest ? ausRest[code] : ausKachel[code];
@@ -201,6 +209,19 @@ final class Relief {
     /** Fehlte in {@code maske} ({@link #fehlende}) der Chunk mit dem Abstand dx, dz? */
     static boolean fehlte(int maske, int dx, int dz) {
         return (maske >> (dz + 2) * 4 + dx + 2 & 1) != 0;
+    }
+
+    /**
+     * Die Schicht eines Chunks wie die des Renderers aus seinen 256 Codes: je Block {@code scale} × {@code scale} Pixel grau mit
+     * dem Code in Rot, Grün und Blau, Alpha 255.
+     */
+    static int[] schicht(byte[] codes, int scale) {
+        int seite = 16 * scale;
+        int[] pixel = new int[seite * seite];
+        for (int p = 0; p < pixel.length; p++) {
+            pixel[p] = 0xFF000000 | 0x010101 * codes[p / seite / scale * 16 + p % seite / scale];
+        }
+        return pixel;
     }
 
     /**

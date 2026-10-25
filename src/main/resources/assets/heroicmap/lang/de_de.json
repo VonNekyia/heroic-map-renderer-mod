@@ -96,7 +96,6 @@
   "heroicmap.karte.relief_kommt.beschreibung": "Kommt mit dem nächsten Abgleich; „Abgleich“ holt es jetzt.",
   "heroicmap.karte.relief_kommt": "Relief „%s“ kommt mit dem nächsten Abgleich. „Abgleich“ holt es jetzt.",
   "heroicmap.karte.relief_kommt_ab": "Relief „%s“ kommt mit dem nächsten Abgleich, ab %s.",
-  "heroicmap.karte.relief_selbst": "Die eigene Karte hat kein Relief.",
   "heroicmap.karte.relief_ohne": "Diese Karte hat kein Relief.",
   "heroicmap.karte.relief_alt": "Diese Karte hat keine Schicht des Reliefs, die der Mod lesen kann; der Server zeichnet sie mit einer älteren Version.",
   "heroicmap.relief.ohne": "Flach",

@@ -1175,9 +1175,9 @@ Server zeigt. Bis 0.2.74 hatte sie nah kein Relief. Wahl des Users, siehe
   Kachel. Gemalt ist ohne Relief, so trifft es genau.
 - **Nicht mit Decke:** In einer Dimension mit Decke, etwa im Nether, malt sie
   kein Relief; Flach malt keins und liest auch keine Höhen.
-- **Neu gemalt** (`Minimap.abgezogen`): Je gezeichnetem Chunk merkt sich die
-  Minimap seine 16 × 16 Höhen beim Abziehen und welche Chunks um ihn nicht
-  geladen waren (`Relief.fehlende`). Sind die Höhen beim nächsten Mal anders,
+- **Neu gemalt** (`Minimap.abgezogen`, `Ring`): Je gezeichnetem Chunk merkt
+  sich die Minimap einen Hash seiner 16 × 16 Höhen beim Abziehen, 64 Bit, und
+  welche Chunks um ihn nicht geladen waren (`Relief.fehlende`). Sind die Höhen beim nächsten Mal anders,
   malt sie dazu die Chunks, deren Codes an ihnen hängen: im Westen und Norden
   der Rand, im Osten und Süden bis 2 Chunks der Schatten, 8 Chunks. Eine
   Änderung unter der Oberfläche, etwa auf einer Farm, malt so nur ihren Chunk,
@@ -1186,7 +1186,9 @@ Server zeigt. Bis 0.2.74 hatte sie nah kein Relief. Wahl des Users, siehe
   das erste Füllen jeden Chunk einmal. Ändert sich ein Chunk, bevor er selbst
   gemalt ist, behalten die schon gemalten im Ring seine alten Höhen bis zu
   ihrem nächsten Neumalen. Eine andere Wahl malt alles neu.
-- **Die eigene Karte** malt noch ohne Relief.
+- **Die eigene Karte** schreibt mit Relief eine Schicht neben ihre Kacheln,
+  mit denselben Codes und demselben `Ring`, siehe [Selbst](selbst.md),
+  „Relief“.
 - **Geprüft** in `ReliefTest`: Codes mit Zahlen, die Codes für zwei
   Basiskacheln der Testwelt aus ihren Höhen (`src/test/resources/relief/hoehen.bin`,
   geschrieben von `hoehen.py` aus den Regionen der Testwelt) genau wie die

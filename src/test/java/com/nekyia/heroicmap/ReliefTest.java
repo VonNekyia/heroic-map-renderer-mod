@@ -235,19 +235,53 @@ class ReliefTest {
         Path karte = ordner.resolve("map.json");
         Files.writeString(karte, "{\"relief\":\"slope\",\"reliefTiles\":\"relief/{z}/{x}/{y}.webp\"}", StandardCharsets.UTF_8);
         Relief.Satzrelief s = Relief.von(ordner);
-        assertEquals(new Relief.Satzrelief(Relief.Art.SLOPE, true), s);
+        assertEquals(new Relief.Satzrelief(Relief.Art.SLOPE, true, false), s);
         assertFalse(s.noetig(Relief.Art.SLOPE));
         assertTrue(s.noetig(Relief.Art.OHNE));
         assertTrue(s.noetig(Relief.Art.SHADOWS));
         // Relief ohne Schicht (Renderer vor 0.19.0) oder in einem anderen Muster: nichts zu rechnen.
         Files.writeString(karte, "{\"relief\":\"shadows\"}", StandardCharsets.UTF_8);
-        assertEquals(new Relief.Satzrelief(Relief.Art.SHADOWS, false), Relief.von(ordner));
+        assertEquals(new Relief.Satzrelief(Relief.Art.SHADOWS, false, false), Relief.von(ordner));
         Files.writeString(karte, "{\"relief\":\"slope\",\"reliefTiles\":\"relief2/{z}/{x}/{y}.webp\"}", StandardCharsets.UTF_8);
         assertFalse(Relief.von(ordner).noetig(Relief.Art.OHNE));
         // Ohne Relief, mit unbekanntem oder ohne map.json: ohne.
         Files.writeString(karte, "{\"relief\":\"bergig\"}", StandardCharsets.UTF_8);
-        assertEquals(new Relief.Satzrelief(Relief.Art.OHNE, false), Relief.von(ordner));
+        assertEquals(new Relief.Satzrelief(Relief.Art.OHNE, false, false), Relief.von(ordner));
         Files.delete(karte);
         assertArrayEquals(new Object[] {Relief.Art.OHNE, false}, new Object[] {Relief.von(ordner).gebacken(), Relief.von(ordner).schicht()});
+    }
+
+    @Test
+    void satzDerEigenenKarte(@TempDir Path welt) throws IOException {
+        // Die eigene Karte: Kacheln ohne Relief, die Schicht als PNG; jede Art ausser Flach wird gerechnet.
+        Path baum = Selbst.anlegen(welt, "minecraft:overworld", 4);
+        Relief.Satzrelief s = Relief.von(baum.resolve("4"));
+        assertEquals(new Relief.Satzrelief(Relief.Art.OHNE, true, true), s);
+        assertFalse(s.noetig(Relief.Art.OHNE));
+        assertTrue(s.noetig(Relief.Art.SLOPE));
+    }
+
+    @Test
+    void schichtJeChunk() {
+        // Bei 2 px je Block: der Block (1, 0) mit Code 8 in den Pixeln x 2 bis 3, y 0 bis 1, grau, Alpha 255; die übrigen 4.
+        byte[] codes = new byte[256];
+        java.util.Arrays.fill(codes, (byte) 4);
+        codes[1] = 8;
+        int[] pixel = Relief.schicht(codes, 2);
+        assertEquals(32 * 32, pixel.length);
+        assertEquals(0xFF080808, pixel[2]);
+        assertEquals(0xFF080808, pixel[32 + 3]);
+        assertEquals(0xFF040404, pixel[1]);
+        assertEquals(0xFF040404, pixel[4]);
+        assertEquals(0xFF040404, pixel[2 * 32 + 2]);
+    }
+
+    @Test
+    void durchsichtigeSchichtGiltVier() {
+        // Die eigene Karte ohne Relief in den Kacheln: wo die Schicht durchsichtig ist, bleibt die Kachel, sonst mal den Faktor.
+        int[] kachel = {0xFF646464, 0xFF646464};
+        Relief.rechne(kachel, new int[] {0, 0xFF080808}, null, Relief.Art.OHNE, Relief.Art.SLOPE);
+        assertEquals(0xFF646464, kachel[0]);
+        assertEquals(0xFF7C7C7C, kachel[1]);
     }
 }

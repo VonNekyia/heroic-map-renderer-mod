@@ -144,12 +144,12 @@ final class Kacheln implements AutoCloseable {
                 try {
                     if (Files.exists(datei)) {
                         argb = dekodiere(Files.readAllBytes(datei), seite).argb();
-                        if (relief.noetig(art)) {
-                            mitRelief(argb, z, x, y, art);
-                        }
                     } else if (Files.exists(png)) {
                         // Die selbst gezeichnete Karte schreibt PNG. Siehe docs/selbst.md, „Kacheln“.
                         argb = png(Files.readAllBytes(png), seite).argb();
+                    }
+                    if (argb != null && relief.noetig(art)) {
+                        mitRelief(argb, z, x, y, art);
                     }
                 } catch (IOException e) {
                     argb = null;
@@ -172,15 +172,25 @@ final class Kacheln implements AutoCloseable {
      * Fehlt oder bricht die Schicht, gilt Code 4 und die Kachel bleibt; ohne Rest keiner. Siehe docs/vollbildkarte.md, „Relief“.
      */
     private void mitRelief(int[] argb, int z, int x, int y, Relief.Art art) {
-        Path schicht = ordner.resolve("relief").resolve(String.valueOf(z)).resolve(String.valueOf(x)).resolve(y + ".webp");
+        // Die eigene Karte schreibt ihre Schicht als PNG und hat keinen Rest; ihre Kacheln sind ohne Relief.
+        String endung = relief.selbst() ? ".png" : ".webp";
+        int[] schicht = liesOderNull(ordner.resolve("relief").resolve(String.valueOf(z)).resolve(String.valueOf(x)).resolve(y + endung));
+        if (schicht == null) {
+            // Ohne Schicht gilt überall Code 4, und der ändert keine Art.
+            return;
+        }
         Path rest = ordner.resolve("relief").resolve("rest").resolve(String.valueOf(z)).resolve(String.valueOf(x)).resolve(y + ".webp");
         // Den Rest gibt es nur an abgeschnittenen Pixeln, und dort steht in der Kachel 255; ohne solche bleibt er ungelesen.
-        Relief.rechne(argb, liesOderNull(schicht), Relief.abgeschnitten(argb) ? liesOderNull(rest) : null, relief.gebacken(), art);
+        Relief.rechne(argb, schicht, !relief.selbst() && Relief.abgeschnitten(argb) ? liesOderNull(rest) : null, relief.gebacken(), art);
     }
 
-    private int[] liesOderNull(Path webp) {
+    private int[] liesOderNull(Path datei) {
         try {
-            return Files.exists(webp) ? dekodiere(Files.readAllBytes(webp), seite).argb() : null;
+            if (!Files.exists(datei)) {
+                return null;
+            }
+            byte[] bytes = Files.readAllBytes(datei);
+            return (datei.getFileName().toString().endsWith(".png") ? png(bytes, seite) : dekodiere(bytes, seite)).argb();
         } catch (IOException | RuntimeException e) {
             return null;
         }
