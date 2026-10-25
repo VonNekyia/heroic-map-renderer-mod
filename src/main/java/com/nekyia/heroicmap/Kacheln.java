@@ -173,7 +173,7 @@ final class Kacheln implements AutoCloseable {
      */
     private void mitRelief(int[] argb, int z, int x, int y, Relief.Art art) {
         // Die eigene Karte schreibt ihre Schicht als PNG und hat keinen Rest; ihre Kacheln sind ohne Relief.
-        String endung = relief.selbst() ? ".png" : ".webp";
+        String endung = ".webp";
         int[] schicht = liesOderNull(ordner.resolve("relief").resolve(String.valueOf(z)).resolve(String.valueOf(x)).resolve(y + endung));
         if (schicht == null) {
             // Ohne Schicht gilt überall Code 4, und der ändert keine Art.
