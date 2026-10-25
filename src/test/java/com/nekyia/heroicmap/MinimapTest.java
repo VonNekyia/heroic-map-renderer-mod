@@ -174,6 +174,8 @@ class MinimapTest {
     @Test
     void markiereNurImBereich() {
         Minimap minimap = new Minimap();
+        // Flach: ohne den Ring des Reliefs, nur der Chunk selbst.
+        minimap.setzeRelief(Relief.Art.OHNE);
         minimap.mitte = new ChunkPos(10, -20);
         int r = minimap.reichweite();
 
@@ -185,6 +187,20 @@ class MinimapTest {
         assertFalse(minimap.offen.contains(ChunkPos.pack(10 + r + 1, -20)));
         assertFalse(minimap.offen.contains(ChunkPos.pack(10, -20 - r - 1)));
         assertEquals(1, minimap.offen.size());
+    }
+
+    @Test
+    void mitReliefDerRing() {
+        // Mit Relief dazu die Chunks, deren Codes an den Höhen hängen: Rand im Westen und Norden, Schatten bis 2 nach Südosten.
+        Minimap minimap = new Minimap();
+        minimap.setzeRelief(Relief.Art.SHADOWS);
+        minimap.mitte = new ChunkPos(0, 0);
+        minimap.markiere(0, 0);
+        java.util.Set<Long> soll = new java.util.HashSet<>();
+        for (int[] k : new int[][] {{0, 0}, {-1, 0}, {0, -1}, {1, 0}, {0, 1}, {1, 1}, {2, 1}, {1, 2}, {2, 2}}) {
+            soll.add(ChunkPos.pack(k[0], k[1]));
+        }
+        assertEquals(soll, new java.util.HashSet<>(minimap.offen));
     }
 
     @Test
