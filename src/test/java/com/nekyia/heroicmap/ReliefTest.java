@@ -85,6 +85,43 @@ class ReliefTest {
         assertEquals(grau(200), k[0]);
     }
 
+    private static int[] kachel(String pfad) throws IOException {
+        try (java.io.InputStream rein = ReliefTest.class.getResourceAsStream("/relief/" + pfad)) {
+            return rein == null ? null : Kacheln.dekodiere(rein.readAllBytes(), 256).argb();
+        }
+    }
+
+    @Test
+    void wieDerRenderer() throws IOException {
+        // Zwei Basiskacheln der Testwelt von Renderer 0.19.0, siehe src/test/resources/relief/LIESMICH.txt: aus slope mit
+        // Schicht und Rest gerechnet treffen ohne und shadows die Kacheln des Renderers je Kanal auf ±1, wie map.json verspricht.
+        int pixel = 0, eins = 0, rest = 0, schatten = 0;
+        for (String k : new String[] {"8/-44/-52.webp", "8/-45/-53.webp"}) {
+            int[] slope = kachel("slope/" + k), schicht = kachel("slope/relief/" + k), r = kachel("slope/relief/rest/" + k);
+            for (int p = 0; p < r.length; p++) {
+                rest += r[p] >>> 24 == 255 ? 1 : 0;
+                schatten += (schicht[p] >> 16 & 0xFF) >= 9 ? 1 : 0;
+            }
+            for (Relief.Art art : new Relief.Art[] {Relief.Art.OHNE, Relief.Art.SHADOWS}) {
+                int[] ist = slope.clone(), soll = kachel(art.name + "/" + k);
+                Relief.rechne(ist, schicht, r, Relief.Art.SLOPE, art);
+                for (int p = 0; p < ist.length; p++) {
+                    assertEquals(soll[p] >>> 24, ist[p] >>> 24, "Alpha " + art + " " + k + " " + p);
+                    int d = 0;
+                    for (int s = 0; s <= 16; s += 8) {
+                        d = Math.max(d, Math.abs((ist[p] >> s & 0xFF) - (soll[p] >> s & 0xFF)));
+                    }
+                    assertTrue(d <= 1, art + " " + k + " Pixel " + p + ": " + d);
+                    pixel++;
+                    eins += d;
+                }
+            }
+        }
+        // Die Kacheln haben abgeschnittene Pixel und Schatten, sonst prüfte das wenig; und nicht jeder Pixel liegt um 1 daneben.
+        assertTrue(rest > 1000 && schatten > 1000, "Rest " + rest + ", Schatten " + schatten);
+        assertTrue(eins < pixel / 4, eins + " von " + pixel + " um 1 daneben");
+    }
+
     @Test
     void satzAusMapJson(@TempDir Path ordner) throws IOException {
         Path karte = ordner.resolve("map.json");

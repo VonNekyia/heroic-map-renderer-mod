@@ -654,7 +654,13 @@ Arten. Entschieden in [0053](entscheidungen/0053-wahl-des-reliefs.md).
   - Pixel mit Alpha 0 bleiben ganz, Alpha bleibt.
 - **Geprüft** in `ReliefTest` mit Zahlen: die Faktoren je Code, Schnee 250
   bei 1,24 zurück auf 202, abgeschnittene Pixel nur mit dem Rest richtig
-  (230 statt 206), Alpha, Kacheln mit `shadows` gebacken.
+  (230 statt 206), Alpha, Kacheln mit `shadows` gebacken. Dazu gegen den
+  Renderer (`ReliefTest.wieDerRenderer`): zwei Basiskacheln der Testwelt von
+  Renderer 0.19.0, je ohne Relief, mit `slope` samt Schicht und Rest und mit
+  `shadows` (`src/test/resources/relief/`); aus `slope` gerechnet treffen
+  ohne und `shadows` die Kacheln des Renderers je Kanal auf ±1, Alpha genau.
+  Über alle Stufen der Szene, nachgerechnet mit einem Skript: kein Pixel
+  über ±1, um 1 daneben bei 8 px rund 11 % (ohne) und 4 % (`shadows`).
 
 ## Spieler und Koordinaten
 
