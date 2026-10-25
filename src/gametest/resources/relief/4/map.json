@@ -1,0 +1,40 @@
+{
+  "tileSize": 256,
+  "scale": 4,
+  "minZoom": 0,
+  "maxZoom": 8,
+  "tiles": "{z}/{x}/{y}.webp",
+  "bounds": [
+    -11520,
+    -13568,
+    -11008,
+    -13056
+  ],
+  "nativeLevels": 0,
+  "biomeBlend": 2,
+  "downscale": "nearest",
+  "world": "09aaf037661aa79f-f2f52e7f3fa8731f",
+  "heights": "../heights/{x}.{z}.bin",
+  "heightsCell": 4,
+  "minY": -64,
+  "maxY": 319,
+  "camera": "top-north",
+  "direction": "s",
+  "projection": {
+    "azimuth": "north",
+    "u": 4,
+    "v": 4,
+    "y": 0
+  },
+  "look": "map",
+  "relief": "slope",
+  "reliefTiles": "relief/{z}/{x}/{y}.webp",
+  "seaLevel": 63,
+  "area": [
+    -13072,
+    -10208,
+    11104,
+    10496
+  ],
+  "ambientOcclusion": "26.2"
+}
