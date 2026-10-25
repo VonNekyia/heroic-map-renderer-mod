@@ -96,6 +96,15 @@ public final class ReliefLaden implements FabricClientGameTest {
                 throw new AssertionError("Schicht und Rest: map.json da oder Stand fehlt");
             }
 
+            // Noch einmal mit ohne, gleich gross: Mit Stand lädt er still wieder. Doppelt so gross als der Stand: übergangen, die
+            // Schicht bleibt, wie sie ist.
+            lade(context, basis, ordner, manifest, bytes, kacheln.size(), Relief.Art.OHNE, teilSchicht, teilRest);
+            Freigabe.Teil gross = new Freigabe.Teil(teilSchicht.manifestSha256(), 2 * bytes);
+            lade(context, basis, ordner, manifest, bytes, kacheln.size(), Relief.Art.OHNE, gross, teilRest);
+            if (abrufe.getOrDefault("/download/" + BAUM + "/relief.zip", 0) != 2 || !Files.exists(schicht.resolve(kacheln.getFirst().name()))) {
+                throw new AssertionError("Mit Stand: gleich gross 2 Abrufe erwartet, doppelt so gross keiner mehr: " + abrufe);
+            }
+
             // Zurück auf slope: Schicht und Rest bleiben bis zum nächsten Download, der löscht sie.
             context.runOnClient(mc -> Minimap.INSTANZ.setzeRelief(Relief.Art.SLOPE));
             if (!Files.exists(schicht)) {
