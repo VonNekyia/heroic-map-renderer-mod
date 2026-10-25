@@ -46,6 +46,8 @@ public final class Messung implements FabricClientGameTest {
     private static final boolean NUR_EFFEKTE = Boolean.getBoolean("heroicmap.messung.effekte");
     /** Mit {@code -PmessungChunks=true} nur das Zeichnen je Chunk, wie in der ganzen Messung; so passen Läufe im Wechsel in ein Fenster. */
     private static final boolean NUR_CHUNKS = Boolean.getBoolean("heroicmap.messung.chunks");
+    /** Mit {@code -PmessungSelbst=true} dazu nach dem Zeichnen je Chunk „Selbst“ mit der Art aus -PmessungRelief, Messung (c). */
+    private static final boolean SELBST = Boolean.getBoolean("heroicmap.messung.selbst");
     /** Mit -PmessungUpdates=n nur Blockänderungen unter der Oberfläche, je Runde n in verschiedenen Chunks. */
     private static final int UPDATES = Integer.getInteger("heroicmap.messung.updates", 0);
     /** Mit -PmessungRelief=slope oder shadows legt der Maler das Relief auf, wie die Minimap nah; Vorgabe ohne. */
@@ -179,6 +181,9 @@ public final class Messung implements FabricClientGameTest {
                 for (int runde = 1; runde <= RUNDEN; runde++) {
                     chunks(context, scale, runde);
                 }
+            }
+            if (SELBST) {
+                selbst(context);
             }
             if (NUR_CHUNKS) {
                 schreibe();
@@ -625,6 +630,94 @@ public final class Messung implements FabricClientGameTest {
             double ms = (System.nanoTime() - start) / 1e6;
             int chunks = context.computeOnClient(mc -> Minimap.INSTANZ.gemalt()) - vorher;
             zeile("updates relief=%s n=%d runde=%d ms=%.1f chunks=%d", RELIEF.name, UPDATES, runde, ms, chunks);
+        }
+    }
+
+    /**
+     * Was „Selbst“ mit Relief je Chunk kostet, Messung (c): dieselben Chunks wie {@link #chunks}, je Massstab und Runde wie bei
+     * „Selbst“ abgezogen, gemalt und in die Kacheln gelegt, mit Relief dazu Höhen, Ring, Codes und Schicht; dann alle Stufen in
+     * einen leeren Ordner geschrieben. Zeit je Chunk wie auf dem Render-Thread (Abzug, Höhen, Ring) und wie im Worker (Malen,
+     * Codes, Legen), Zeit des Schreibens, Kacheln und Bytes von Kacheln und Schicht. Siehe docs/selbst.md, „Relief“.
+     */
+    private void selbst(ClientGameTestContext context) {
+        Path wurzel = context.computeOnClient(mc -> Downloads.weltOrdner()).resolve("messung-selbst");
+        boolean mitRelief = RELIEF != Relief.Art.OHNE;
+        for (int massstab : Selbst.MASSSTAEBE) {
+            for (int runde = 1; runde <= RUNDEN; runde++) {
+                Path ordner = wurzel.resolve(String.valueOf(massstab));
+                try {
+                    Laden.loesche(wurzel);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+                // Wie Satz.stufe: 4 px auf Stufe 8, 2 px auf 7, 1 px auf 6.
+                int stufe = Selbst.MAX_ZOOM - Integer.numberOfTrailingZeros(Selbst.SCALE / massstab);
+                Kachelwerk werk = new Kachelwerk(ordner, Selbst.KACHEL, 16 * massstab, Selbst.MIN_ZOOM, stufe);
+                Kachelwerk schicht = new Kachelwerk(ordner.resolve(Downloads.RELIEF), Selbst.KACHEL, 16 * massstab, Selbst.MIN_ZOOM, stufe);
+                long[][] zeiten = context.computeOnClient(mc -> {
+                    ClientLevel level = mc.level;
+                    ChunkPos mitte = mc.player.chunkPosition();
+                    ChunkMaler maler = new ChunkMaler();
+                    Ring ring = new Ring();
+                    Licht licht = Licht.von(level.dimensionType());
+                    Map<TextureAtlasSprite, ChunkMaler.Texel> texel = ChunkMaler.Texel.vomAtlas(
+                            mc.getAtlasManager().getAtlasOrThrow(AtlasIds.BLOCKS));
+                    LongArrayList abzug = new LongArrayList(), worker = new LongArrayList();
+                    for (int dz = -SICHTWEITE; dz <= SICHTWEITE; dz++) {
+                        for (int dx = -SICHTWEITE; dx <= SICHTWEITE; dx++) {
+                            LevelChunk chunk = level.getChunkSource().getChunk(mitte.x() + dx, mitte.z() + dz, ChunkStatus.FULL, false);
+                            if (chunk == null) {
+                                continue;
+                            }
+                            int cx = chunk.getPos().x(), cz = chunk.getPos().z();
+                            long t0 = System.nanoTime();
+                            ChunkMaler.Auftrag auftrag = ChunkMaler.abziehen(level, chunk, massstab, Integer.MAX_VALUE, licht, texel, 0, null);
+                            int[] hoehen = mitRelief ? ChunkMaler.hoehen(level, cx, cz) : null;
+                            if (hoehen != null) {
+                                ring.abgezogen(cx, cz, Relief.eigene(hoehen), Relief.fehlende(hoehen), k -> { });
+                            }
+                            long t1 = System.nanoTime();
+                            werk.lege(cx, cz, maler.male(auftrag));
+                            if (hoehen != null) {
+                                schicht.lege(cx, cz, Relief.schicht(Relief.codes(hoehen), massstab));
+                            }
+                            abzug.add(t1 - t0);
+                            worker.add(System.nanoTime() - t1);
+                        }
+                    }
+                    return new long[][] {abzug.toLongArray(), worker.toLongArray()};
+                });
+                long[] bytes = new long[4];
+                long ns;
+                try {
+                    long t = System.nanoTime();
+                    java.util.List<Kachelwerk.Kachel> fertig = new java.util.ArrayList<>();
+                    werk.schreibe(true, fertig);
+                    if (mitRelief) {
+                        schicht.schreibe(true, fertig);
+                    }
+                    ns = System.nanoTime() - t;
+                    Path ebene = ordner.resolve(Downloads.RELIEF);
+                    try (java.util.stream.Stream<Path> alle = Files.walk(ordner)) {
+                        for (Path p : alle.filter(d -> d.toString().endsWith(".png")).toList()) {
+                            int i = p.startsWith(ebene) ? 2 : 0;
+                            bytes[i]++;
+                            bytes[i + 1] += Files.size(p);
+                        }
+                    }
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+                for (int art = 0; art < 2; art++) {
+                    long[] z = zeiten[art];
+                    Arrays.sort(z);
+                    zeile("selbst %s relief=%s massstab=%d runde=%d n=%d median=%.3f ms p90=%.3f ms max=%.3f ms summe=%.1f ms",
+                            art == 0 ? "abzug" : "worker", RELIEF.name, massstab, runde, z.length, ms(quantil(z, 0.5)),
+                            ms(quantil(z, 0.9)), ms(z[z.length - 1]), ms(Arrays.stream(z).sum()));
+                }
+                zeile("selbst schreiben relief=%s massstab=%d runde=%d ms=%.1f kacheln=%d bytes_kacheln=%d schicht=%d bytes_schicht=%d",
+                        RELIEF.name, massstab, runde, ns / 1e6, bytes[0], bytes[1], bytes[2], bytes[3]);
+            }
         }
     }
 
