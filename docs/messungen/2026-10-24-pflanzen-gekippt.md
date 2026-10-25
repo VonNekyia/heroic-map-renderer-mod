@@ -1,8 +1,8 @@
 ---
 title: Pflanzen gekippt, Zeit je Chunk
-description: Was die gekippten Pflanzen (0049) im Worker je Chunk kosten, vorher gegen nachher im Wechsel, bei 1 bis 16 px; Reihe 1 mit n × n Proben, Reihe 2 mit dem gemittelten Raster.
+description: Was die gekippten Pflanzen (0049) im Worker je Chunk kosten, vorher gegen nachher im Wechsel, bei 1 bis 16 px; Reihe 1 mit n × n Proben, Reihe 2 mit dem gemittelten Raster, Reihe 3 dazu mit Licht nur für gezeichnete Flächen.
 date: 2026-10-24
-commits: [a834226, 4995213, d356b25, b6c0ae3]
+commits: [a834226, 4995213, d356b25, b6c0ae3, f4eb620]
 code:
   - src/main/java/com/nekyia/heroicmap/ChunkMaler.java
   - src/gametest/java/com/nekyia/heroicmap/Messung.java
@@ -16,7 +16,9 @@ bei 16 px +1 %. Der Grund: Die flache Fläche nahm das vorgemittelte Raster,
 die gekippten Flächen tasten je Pixel n × n Proben ab, je Fläche und Block
 256. Das liegt über dem Ziel von +5 %. Mit dem gemittelten Raster
 (Reihe 2) sind es noch +7,2 % bei 4 px, +6,0 % bei 8 px und +3,3 % bei
-16 px, rund 0,2 bis 0,5 ms je Chunk.
+16 px, rund 0,2 bis 0,5 ms je Chunk. Das Licht nur für gezeichnete Flächen
+zu rechnen (Reihe 3) bringt nichts Messbares: +8,8 % bei 4 px, +9,0 % bei
+8 px; die Streuung zwischen den Reihen liegt bei einigen Prozent.
 
 ## Aufbau
 
@@ -126,6 +128,50 @@ Median der drei Läufe je Stand, in Klammern die Spanne:
   die nicht liegt, beim `crop` acht Flächen mit je vier Ecken, auch für die
   Hälfte, die nach dem Kippen nach unten zeigt und nicht gezeichnet wird.
   Dazu zeichnet er statt einer Fläche zwei.
+
+## Reihe 3: Licht nur für gezeichnete Flächen
+
+Dazu rechnet der Maler das Licht einer gekippten Fläche erst, wenn sie nach
+dem Kippen nach oben zeigt.
+
+- **Stände:** A ist main `d356b25` mit dem Schalter, B mod#217 `f4eb620`,
+  also das Raster, das Licht nur für gezeichnete Flächen und main mit #218
+  wie A.
+- **Lauf:** 25.10., 02:04 bis 02:17 Winterzeit, nach der Zeitumstellung,
+  unter der Sperrdatei, vor jedem Lauf die Lastprüfung des Skills: 30 s
+  unter 10 %, gemessen 0 bis 8 %. Kein Spiel lief, keine andere Sitzung
+  arbeitete am Rechner.
+
+| Lauf | Stand | Zeit | 1 px | 2 px | 4 px | 8 px | 16 px |
+|---|---|---|---|---|---|---|---|
+| 1 | A | 02:04:49 bis 02:06:18 | 1,880 | 2,032 | 2,621 | 4,950 | 13,99 |
+| 2 | B | 02:07:04 bis 02:08:36 | 1,998 | 2,155 | 2,769 | 5,247 | 14,53 |
+| 3 | B | 02:09:10 bis 02:10:44 | 2,003 | 2,213 | 2,852 | 5,404 | 15,21 |
+| 4 | A | 02:11:17 bis 02:12:47 | 1,857 | 2,037 | 2,607 | 4,959 | 13,85 |
+| 5 | A | 02:13:20 bis 02:14:51 | 1,878 | 2,050 | 2,645 | 4,998 | 14,16 |
+| 6 | B | 02:15:24 bis 02:17:01 | 2,128 | 2,314 | 2,929 | 5,506 | 15,21 |
+
+Median der drei Läufe je Stand, in Klammern die Spanne:
+
+| Auflösung | A | B | B gegen A |
+|---|---|---|---|
+| 1 px | 1,88 ms (1,86–1,88) | 2,00 ms (2,00–2,13) | +0,13 ms, +6,7 % |
+| 2 px | 2,04 ms (2,03–2,05) | 2,21 ms (2,16–2,31) | +0,18 ms, +8,6 % |
+| 4 px | 2,62 ms (2,61–2,65) | 2,85 ms (2,77–2,93) | +0,23 ms, +8,8 % |
+| 8 px | 4,96 ms (4,95–5,00) | 5,40 ms (5,25–5,51) | +0,45 ms, +9,0 % |
+| 16 px | 13,99 ms (13,85–14,16) | 15,21 ms (14,53–15,21) | +1,22 ms, +8,7 % |
+
+- **B streut** hier um 6 % und steigt von Lauf zu Lauf (4 px: 2,77, 2,85,
+  2,93 ms), A bleibt auf 1,5 % genau. Bei 16 px ist das Raster texelgenau,
+  und das Licht ändert dort nichts am Abtasten; dass der Aufpreis dort von
+  +3,3 % in Reihe 2 auf +8,7 % steigt, zeigt die Streuung zwischen den
+  Reihen.
+- **Ergebnis:** Das Licht nur für gezeichnete Flächen bringt keinen
+  Unterschied, der grösser ist als diese Streuung. Bei 4 und 8 px liegen
+  beide Reihen über +5 %, bei 6 bis 9 %.
+- **Was bleibt:** Je Pflanze zeichnet der Maler statt einer Fläche zwei,
+  und jede prüft je Pixel, ob er in ihr liegt; die flache Fläche deckte den
+  Block ganz und brauchte diese Prüfung nicht.
 
 ## Schluss
 
