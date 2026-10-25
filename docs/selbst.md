@@ -382,7 +382,12 @@ rechnet daraus die gewählte Art. Entschieden in
   Pixel wie mit Flach, das Bild anders; ein Turm im Nordwesten wirft danach
   seinen Schatten in die Schicht des Chunks südöstlich (4 → 13).
 - **Kosten:** je Chunk die Höhen und Codes, je geänderter Kachel eine
-  zweite PNG. Nicht gemessen.
+  zweite PNG. Gemessen wird es als Messung (c) im Gametest `Messung` mit
+  `-PmessungChunks=true -PmessungSelbst=true` und `-PmessungRelief=ohne`
+  oder `slope` (`Messung.selbst`): dieselben Chunks wie beim Zeichnen je
+  Chunk, je 1, 2 und 4 px wie bei „Selbst“ abgezogen, gemalt, gelegt und
+  geschrieben; Zeit je Chunk, Zeit des Schreibens, Bytes von Kacheln und
+  Schicht. Ziel höchstens +5 % Zeit je Chunk. Die Zahlen folgen.
 
 ## Kosten
 
