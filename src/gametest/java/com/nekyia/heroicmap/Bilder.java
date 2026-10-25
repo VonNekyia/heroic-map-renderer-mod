@@ -1717,6 +1717,7 @@ public final class Bilder implements FabricClientGameTest {
         "setblock -36 -61 20 seagrass",
         "setblock -34 -60 20 pink_petals[facing=north,flower_amount=1]",
         "setblock -32 -60 21 stone", "setblock -32 -60 20 ladder[facing=north]",
+        "setblock -30 -60 20 bamboo[age=0,leaves=large]",
     };
 
     /**
@@ -1729,9 +1730,11 @@ public final class Bilder implements FabricClientGameTest {
         "pack.mcmeta",
         "assets/minecraft/blockstates/short_grass.json",
         "assets/minecraft/blockstates/wheat.json",
+        "assets/minecraft/blockstates/cobweb.json",
         "assets/minecraft/models/block/crop.json",
         "assets/minecraft/models/block/heroicmap_test_gras.json",
         "assets/minecraft/models/block/heroicmap_test_hohes_getreide.json",
+        "assets/minecraft/models/block/heroicmap_test_liegend.json",
         "assets/minecraft/models/block/heroicmap_test_schraeges_kreuz.json",
         "assets/minecraft/models/block/heroicmap_test_weizen_reif.json",
         "assets/minecraft/models/block/potatoes_stage3.json",
@@ -1747,13 +1750,13 @@ public final class Bilder implements FabricClientGameTest {
         "setblock -60 -60 40 wheat[age=0]", "setblock -59 -60 40 wheat[age=2]", "setblock -58 -60 40 wheat[age=4]",
         "setblock -57 -60 40 wheat[age=6]", "fill -56 -60 40 -53 -60 40 wheat[age=7]",
         "fill -60 -60 42 -57 -60 42 carrots[age=7]", "fill -56 -60 42 -53 -60 42 potatoes[age=7]",
-        "fill -60 -60 44 -53 -60 44 short_grass", "fill -60 -60 46 -57 -60 46 fern",
+        "fill -60 -60 44 -53 -60 44 short_grass", "fill -60 -60 46 -57 -60 46 fern", "setblock -54 -60 46 cobweb",
     };
 
     /**
-     * Pflanzen aus Paketen: das Feld bei 4 px und 1 px, Zoom 4, ohne und mit dem Testpaket. Mit dem Paket liegen Karotten und
-     * Gras bei 4 px wie ohne, denn ihre erste Fläche ist dieselbe, und reifer Weizen und Kartoffeln decken das Ackerland,
-     * statt wegzufallen; verglichen mit einem Bild derselben Stelle ohne sie, denn Ackerland in verschiedenen Reihen ist
+     * Pflanzen aus Paketen: das Feld bei 4 px und 1 px, Zoom 4, ohne und mit dem Testpaket. Mit dem Paket kippen Karotten und
+     * Gras ähnlich wie ohne, im Mittel höchstens 45 % anders, und reifer Weizen und Kartoffeln decken das Ackerland,
+     * statt wegzufallen; das Spinnennetz des Pakets mit liegender Fläche bleibt, wie es ist; verglichen mit einem Bild derselben Stelle ohne sie, denn Ackerland in verschiedenen Reihen ist
      * verschieden hell. Die Kartoffeln tragen im Testpaket die Textur des reifen Weizens, denn die linke Hälfte ihrer eigenen
      * deckt nur ein Drittel des Blocks. Erst alle Bilder, dann die Prüfung. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
      */
@@ -1780,10 +1783,12 @@ public final class Bilder implements FabricClientGameTest {
         });
         server.runCommand("fill -56 -60 40 -53 -60 40 air");
         server.runCommand("fill -56 -60 42 -53 -60 42 air");
+        server.runCommand("setblock -54 -60 46 air");
         context.waitTicks(10);
         BufferedImage boden = minimapBei(context, server, -56.5, 43.5, "pakete-4px-boden");
         server.runCommand("fill -56 -60 40 -53 -60 40 wheat[age=7]");
         server.runCommand("fill -56 -60 42 -53 -60 42 potatoes[age=7]");
+        server.runCommand("setblock -54 -60 46 cobweb");
         context.waitTicks(10);
         List<BufferedImage> bilder = new ArrayList<>();
         try {
@@ -1812,12 +1817,16 @@ public final class Bilder implements FabricClientGameTest {
         BufferedImage ohne = bilder.get(0), mit = bilder.get(2);
         int block = 4 * context.computeOnClient(mc -> mc.getWindow().getGuiScale());
         List<String> fehler = new ArrayList<>();
-        // Wie ohne Paket: Karotten (z 42) und Gras (z 44).
+        // Ähnlich wie ohne Paket, im Mittel: Karotten (z 42) und Gras (z 44) kippen, die schon gekippten Flächen des Pakets weiter.
+        // Zählten bei Pflanzen alle Flächen nach oben, stünden sie als Streifen da, im Mittel rund doppelt so anders.
+        double summe = 0;
         for (int[] b : new int[][] {{-60, 42}, {-59, 42}, {-58, 42}, {-57, 42}, {-60, 44}, {-58, 44}, {-56, 44}, {-54, 44}}) {
             double anders = anteilAnders(mit, b[0], b[1], ohne, b[0], b[1], block);
-            if (anders > 0.15) {
-                fehler.add("(" + b[0] + ", " + b[1] + ") zu " + Math.round(100 * anders) + " % anders als ohne Paket");
-            }
+            LOGGER.info("Pflanzen aus Paketen ({}, {}) anders als ohne Paket: {}", b[0], b[1], anders);
+            summe += anders;
+        }
+        if (summe / 8 > 0.45) {
+            fehler.add("Karotten und Gras im Mittel zu " + Math.round(100 * summe / 8) + " % anders als ohne Paket, statt höchstens 45 %");
         }
         // Deckt das Ackerland: reifer Weizen (z 40) und Kartoffeln (z 42), verglichen mit derselben Stelle ohne sie.
         for (int[] b : new int[][] {{-56, 40}, {-55, 40}, {-54, 40}, {-53, 40}, {-56, 42}, {-55, 42}, {-54, 42}, {-53, 42}}) {
@@ -1826,9 +1835,36 @@ public final class Bilder implements FabricClientGameTest {
                 fehler.add("(" + b[0] + ", " + b[1] + ") zu " + Math.round(100 * wieBoden) + " % wie das Ackerland ohne Pflanze");
             }
         }
+        // Ein Modell mit liegender Fläche bleibt, wie es ist: das Spinnennetz des Pakets, ohne Versatz des Blocks, mit einer flachen
+        // Fläche im Westen und einer stehenden über den ganzen Block. Im Westen die Fläche, im Osten der Boden; kippte die stehende
+        // Fläche, deckte sie ihn.
+        double west = anteilAndersHaelfte(mit, boden, -54, 46, block, false), ost = anteilAndersHaelfte(mit, boden, -54, 46, block, true);
+        LOGGER.info("Pflanzen aus Paketen, Spinnennetz mit liegender Fläche: Westen anders {}, Osten anders {}", west, ost);
+        if (west < 0.5 || ost > 0.1) {
+            fehler.add("Spinnennetz mit liegender Fläche im Westen zu " + Math.round(100 * west) + " % anders als der Boden (mindestens 50 %), im Osten zu "
+                    + Math.round(100 * ost) + " % (höchstens 10 %)");
+        }
         if (!fehler.isEmpty()) {
             throw new AssertionError("Pflanzen aus Paketen bei 4 px: " + String.join("; ", fehler));
         }
+    }
+
+    /** Wie {@link #anteilAnders}, nur in der West- oder Osthälfte des Blocks (x, z), gegen dieselbe Stelle in {@code b}. */
+    private static double anteilAndersHaelfte(BufferedImage a, BufferedImage b, int x, int z, int block, boolean ost) {
+        int ax = a.getWidth() / 2 + Math.round((x + 56.5f) * block), az = a.getHeight() / 2 + Math.round((z - 43.5f) * block);
+        int anders = 0, alle = 0;
+        for (int dy = 1; dy < block - 1; dy++) {
+            for (int dx = ost ? block / 2 : 1; dx < (ost ? block - 1 : block / 2); dx++) {
+                int p = a.getRGB(ax + dx, az + dy), q = b.getRGB(ax + dx, az + dy);
+                boolean gleich = true;
+                for (int s = 0; s <= 16; s += 8) {
+                    gleich &= Math.abs((p >> s & 0xFF) - (q >> s & 0xFF)) <= 4;
+                }
+                anders += gleich ? 0 : 1;
+                alle++;
+            }
+        }
+        return anders / (double) alle;
     }
 
     /**
@@ -1874,12 +1910,13 @@ public final class Bilder implements FabricClientGameTest {
     /** Was an ihrer Stelle steht, wenn die Pflanzen weg sind. */
     private static final String[] OHNE_PFLANZEN = {
         "setblock -40 -60 20 air", "setblock -38 -60 20 air", "setblock -36 -61 20 water", "setblock -34 -60 20 air",
-        "setblock -32 -60 20 air",
+        "setblock -32 -60 20 air", "setblock -30 -60 20 bamboo[age=0,leaves=none]",
     };
 
     /**
-     * Pflanzen von oben, bei 4 px und Zoom 4, verglichen mit derselben Stelle ohne sie: Mohn, Weizen und Seegras liegen
-     * flach; der Blütenteppich mit einer Blüte im Nordwesten hat eine Oberseite und bleibt, ausserhalb der Blüte Gras; die
+     * Pflanzen von oben, bei 4 px und Zoom 4 und nah bei 16 px und Zoom 8, verglichen mit derselben Stelle ohne sie: Mohn,
+     * Weizen und Seegras kippen 45° nach Norden, der Weizen eingepasst, das Seegras unter dem Wasser; Bambus kippt seine
+     * Blätter; der Blütenteppich mit einer Blüte im Nordwesten hat eine Oberseite und bleibt, ausserhalb der Blüte Gras; die
      * Leiter erbt von keiner Vorlage und fehlt wie bisher. Siehe docs/minimap.md, „Pflanzen von oben“.
      */
     private static void pflanzen(ClientGameTestContext context, TestServerContext server) {
@@ -1892,18 +1929,58 @@ public final class Bilder implements FabricClientGameTest {
         });
         context.waitTicks(10);
         BufferedImage mit = minimapBei(context, server, -35.5, 26.5, "pflanzen-mit");
+        // Dazu nah, 16 px je Block bei Zoom 8, mit und ohne: der Rand des reifen Weizens im Norden.
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeScale(16);
+            Minimap.INSTANZ.setzeZoom(8);
+        });
+        context.waitTicks(10);
+        BufferedImage mit16 = minimapBei(context, server, -35.5, 26.5, "pflanzen-16px");
         for (String befehl : OHNE_PFLANZEN) {
             server.runCommand(befehl);
         }
         context.waitTicks(10);
+        BufferedImage ohne16 = minimapBei(context, server, -35.5, 26.5, "pflanzen-16px-ohne");
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeScale(4);
+            Minimap.INSTANZ.setzeZoom(4);
+        });
+        context.waitTicks(10);
         BufferedImage ohne = minimapBei(context, server, -35.5, 26.5, "pflanzen-ohne");
+        int gs16 = context.computeOnClient(mc -> mc.getWindow().getGuiScale()), block16 = 8 * gs16;
+        int wx = mit16.getWidth() / 2 + Math.round((-38 + 35.5f) * block16), wz = mit16.getHeight() / 2 - Math.round(6.5f * block16);
+        // Der Mohn bei 16 px: seine rote Blüte.
+        int px = mit16.getWidth() / 2 + Math.round((-40 + 35.5f) * block16), rot16 = 0;
+        for (int y = wz; y < wz + block16; y++) {
+            for (int x = px; x < px + block16; x++) {
+                int a = mit16.getRGB(x, y);
+                rot16 += (a >> 16 & 0xFF) > (a >> 8 & 0xFF) + 60 ? 1 : 0;
+            }
+        }
+        double[] reihen = new double[16];
+        for (int r = 0; r < 16; r++) {
+            int anders16 = 0, alle16 = 0;
+            for (int y = wz + r * block16 / 16; y < wz + (r + 1) * block16 / 16; y++) {
+                for (int x = wx; x < wx + block16; x++) {
+                    int a = mit16.getRGB(x, y), b = ohne16.getRGB(x, y);
+                    boolean gleich = true;
+                    for (int sh = 0; sh <= 16; sh += 8) {
+                        gleich &= Math.abs((a >> sh & 0xFF) - (b >> sh & 0xFF)) <= 4;
+                    }
+                    anders16 += gleich ? 0 : 1;
+                    alle16++;
+                }
+            }
+            reihen[r] = Math.round(100.0 * anders16 / alle16) / 100.0;
+        }
+        LOGGER.info("Pflanzen 16 px, reifer Weizen je Texelreihe von Norden, Anteil anders: {}; Mohn rot {}", Arrays.toString(reihen), rot16);
         int gs = context.computeOnClient(mc -> mc.getWindow().getGuiScale()), block = 4 * gs;
         // Die Ecke des Blocks (x, 20) im Bild; der Spieler steht bei (-35,5, 26,5) in der Mitte, seine Marke deckt die Reihe nicht.
         java.util.function.IntUnaryOperator links = x -> mit.getWidth() / 2 + Math.round((x + 35.5f) * block);
         int oben = mit.getHeight() / 2 - Math.round(6.5f * block);
-        int[] anders = new int[5];
-        int rot = 0;
-        for (int i = 0; i < 5; i++) {
+        int[] anders = new int[6];
+        int rot = 0, gruen = 0;
+        for (int i = 0; i < 6; i++) {
             int x0 = links.applyAsInt(-40 + 2 * i);
             // Der Block ohne den Rand; beim Blütenteppich ohne das Viertel im Nordwesten, wo die Blüte liegt.
             for (int y = oben + 1; y < oben + block - 1; y++) {
@@ -1918,15 +1995,26 @@ public final class Bilder implements FabricClientGameTest {
                     }
                     anders[i] += gleich ? 0 : 1;
                     rot += i == 0 && (a >> 16 & 0xFF) > (a >> 8 & 0xFF) + 60 ? 1 : 0;
+                    // Seegras ohne die Tönung des Wassers: grüner als blau.
+                    gruen += i == 2 && (a >> 8 & 0xFF) > (a & 0xFF) + 20 ? 1 : 0;
                 }
             }
         }
+        LOGGER.info("Pflanzen 4 px, anders als ohne: Mohn {} (rot {}), Weizen {}, Seegras {} (grün {}), Blütenteppich {}, Leiter {}, Bambus {}",
+                anders[0], rot, anders[1], anders[2], gruen, anders[3], anders[4], anders[5]);
         // Bei 4 px deckt ein Pixel 4 × 4 Texel, ausgeschnitten: Mohn und Seegras sind spärlich, nur einzelne Pixel decken.
+        // Gekippt zeigt der Mohn bei 4 px kein Rot mehr; das prüft der Blick bei 16 px. Eingepasst endet der Weizen im Norden in
+        // seinen Ähren und reicht bis an den Süden; ohne Einpassen stünde im Norden eine gerade Linie und der Süden bliebe leer.
+        // Siehe docs/minimap.md, „Pflanzen von oben“.
         int innen = (block - 2) * (block - 2);
-        if (rot == 0 || anders[1] < innen / 2 || anders[2] < gs * gs || anders[3] != 0 || anders[4] != 0) {
-            throw new AssertionError("Pflanzen von oben: Pixel anders als ohne Pflanze, Mohn " + anders[0] + " (rot " + rot
-                    + "), Weizen " + anders[1] + ", Seegras " + anders[2] + " von " + innen + "; Blütenteppich ausser im Nordwesten "
-                    + anders[3] + " und Leiter " + anders[4] + " statt 0");
+        double sueden = Math.min(Math.min(reihen[12], reihen[13]), Math.min(reihen[14], reihen[15]));
+        if (rot16 == 0 || anders[1] < innen / 2 || anders[2] < gs * gs || gruen != 0 || anders[3] != 0 || anders[4] != 0 || anders[5] == 0
+                || reihen[0] > 0.3 || sueden < 0.3) {
+            throw new AssertionError("Pflanzen von oben: Pixel anders als ohne Pflanze, Mohn " + anders[0] + " (rot bei 16 px " + rot16
+                    + "), Weizen " + anders[1] + ", Seegras " + anders[2] + " von " + innen + " (grün ohne Wasser " + gruen
+                    + " statt 0); Blütenteppich ausser im Nordwesten " + anders[3] + " und Leiter " + anders[4] + " statt 0; Bambus "
+                    + anders[5] + " statt mehr als 0; Weizen bei 16 px im Norden " + reihen[0] + " statt höchstens 0,3, im Süden "
+                    + sueden + " statt mindestens 0,3");
         }
         if (!AUSGABE.isEmpty()) {
             try {

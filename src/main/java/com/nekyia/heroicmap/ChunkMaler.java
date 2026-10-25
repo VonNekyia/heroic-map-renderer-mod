@@ -35,6 +35,7 @@ import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.CardinalLighting;
 import net.minecraft.world.level.block.AbstractChestBlock;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.CopperChestBlock;
 import net.minecraft.world.level.block.EnderChestBlock;
@@ -162,18 +163,29 @@ final class ChunkMaler {
     private int scale;
     /** Der Abschnitt mit seinen Nachbarn, in dem der aktuelle Block liegt. */
     private RenderSectionRegion welt;
-    /** Die flache Fläche des aktuellen Blocks, wenn er eine Bodenpflanze ist, und ob er eine Fläche nach oben hat. */
-    private Flaeche flach;
+    /** Hat der aktuelle Block eine Fläche nach oben, bei einer Pflanze eine liegende? */
     private boolean oben;
+    /**
+     * Die Flächen des aktuellen Blocks, die gekippt werden, über alle Blöcke wiederverwendet: je Fläche 12 Werte Ecken
+     * (x, y, z samt Versatz), 8 UV, je Ecke Lichtkoordinaten und Farbe roh, der Faktor nach oben, Sprite und Schicht. Das Licht
+     * rechnet {@link #kippe} erst für die Flächen, die nach dem Kippen gezeichnet werden.
+     */
+    private float[] kippEcken = new float[12 * 16], kippUv = new float[8 * 16], kippFaktor = new float[16];
+    private int[] kippLichtRoh = new int[4 * 16], kippFarbe = new int[4 * 16];
+    private TextureAtlasSprite[] kippSprite = new TextureAtlasSprite[16];
+    private ChunkSectionLayer[] kippSchicht = new ChunkSectionLayer[16];
+    private boolean[] kippSichtbar = new boolean[16];
+    private int kippAnzahl;
     /** Je Pixel der Spalte vormultipliziert in sRGB: r, g, b, a. */
     private float[] summe = new float[0];
 
     /**
      * Eine Fläche nach oben in x und z, mit UV, Sprite, Schicht und dem Faktor ihrer Ecken
-     * aus Licht, Schatten und Tönung; {@code hoehe} ordnet sie im Block.
+     * aus Licht, Schatten und Tönung; {@code hoehe} ordnet sie im Block. {@code gekippt}: die Fläche einer gekippten
+     * Pflanze, abgetastet über das gemittelte Raster.
      */
     private record Flaeche(float hoehe, float[] xz, float[] uv, TextureAtlasSprite sprite,
-            ChunkSectionLayer schicht, float[][] ecken) {
+            ChunkSectionLayer schicht, float[][] ecken, boolean gekippt) {
     }
 
     /** Zeichnet den Chunk; je Pixel ARGB, Zeile für Zeile, 16 · scale breit. */
@@ -231,7 +243,7 @@ final class ChunkMaler {
                 // Von oben nach unten; was aus dem Wasser ragt, liegt vor der Oberfläche.
                 flaechen.sort((f, g) -> Float.compare(g.hoehe(), f.hoehe()));
                 for (Flaeche f : flaechen) {
-                    schicht(f.xz(), f.uv(), f.sprite(), f.schicht(), f.ecken());
+                    schicht(f.xz(), f.uv(), f.sprite(), f.schicht(), f.ecken(), f.gekippt());
                 }
             }
             schreibe(pixel, seite, lx * scale, lz * scale);
@@ -254,14 +266,16 @@ final class ChunkMaler {
             return;
         }
         boolean pflanze = Pflanzen.bodenpflanze(state);
-        flach = null;
+        boolean bambus = !pflanze && state.is(Blocks.BAMBOO);
         oben = false;
+        kippAnzahl = 0;
         tesselator.tesselateBlock((x, y, z, quad, instanz) -> {
-            // Bei einer Pflanze zählt nur eine liegende Fläche; eine gekippte aus einem Paket legt sie flach. Siehe docs/minimap.md,
-            // „Pflanzen aus Paketen“.
+            // Bei einer Pflanze zählt nur eine liegende Fläche; die übrigen kippen, auch die gekippten eines Pakets. Bei Bambus
+            // kippen nur die Blätter. Siehe docs/minimap.md, „Pflanzen von oben“,
+            // und docs/minimap.md, „Pflanzen aus Paketen“.
             if (pflanze ? !liegt(quad) : !nachOben(quad)) {
-                if (pflanze && flach == null) {
-                    flach = flach(quad, instanz);
+                if (pflanze || bambus && quad.materialInfo().sprite().contents().name().getPath().contains("leaves")) {
+                    merke(quad, instanz, x, y, z);
                 }
                 return;
             }
@@ -279,35 +293,123 @@ final class ChunkMaler {
                 uv[2 * k + 1] = UVPair.unpackV(packed);
             }
             flaechen.add(new Flaeche(hoehe, xz, uv, quad.materialInfo().sprite(), quad.materialInfo().layer(),
-                    ecken(instanz, quad.materialInfo().lightEmission())));
+                    ecken(instanz, quad.materialInfo().lightEmission()), false));
         }, 0, 0, 0, welt, pos, state, model, state.getSeed(pos));
-        // Ein Modell mit einer Fläche nach oben, etwa ein Blütenteppich, bleibt, wie es ist.
-        if (flach != null && !oben) {
-            flaechen.add(flach);
+        // Ein Modell mit einer liegenden Fläche, etwa ein Blütenteppich, bleibt, wie es ist; Bambus kippt nur seine Blätter.
+        if (kippAnzahl > 0 && (bambus || !oben)) {
+            FluidState wasser = state.getFluidState();
+            kippe(wasser.isEmpty() ? Float.POSITIVE_INFINITY : wasser.getHeight(welt, pos) - 1 / 64f);
+        }
+    }
+
+    /** Merkt eine Fläche zum Kippen: Ecken samt Versatz, UV, Licht roh und den Faktor nach oben, Sprite und Schicht. */
+    private void merke(BakedQuad quad, QuadInstance instanz, float x, float y, float z) {
+        if (kippAnzahl == kippSprite.length) {
+            int n = 2 * kippAnzahl;
+            kippEcken = Arrays.copyOf(kippEcken, 12 * n);
+            kippUv = Arrays.copyOf(kippUv, 8 * n);
+            kippFaktor = Arrays.copyOf(kippFaktor, n);
+            kippLichtRoh = Arrays.copyOf(kippLichtRoh, 4 * n);
+            kippFarbe = Arrays.copyOf(kippFarbe, 4 * n);
+            kippSprite = Arrays.copyOf(kippSprite, n);
+            kippSchicht = Arrays.copyOf(kippSchicht, n);
+            kippSichtbar = Arrays.copyOf(kippSichtbar, n);
+        }
+        int i = kippAnzahl++;
+        kippFaktor[i] = schattenNachOben(welt.cardinalLighting(), quad.materialInfo().shadeDirectionOverride(), quad.direction());
+        int leuchten = quad.materialInfo().lightEmission();
+        for (int k = 0; k < 4; k++) {
+            Vector3fc p = quad.position(k);
+            kippEcken[12 * i + 3 * k] = p.x() + x;
+            kippEcken[12 * i + 3 * k + 1] = p.y() + y;
+            kippEcken[12 * i + 3 * k + 2] = p.z() + z;
+            long packed = quad.packedUV(k);
+            kippUv[8 * i + 2 * k] = UVPair.unpackU(packed);
+            kippUv[8 * i + 2 * k + 1] = UVPair.unpackV(packed);
+            kippLichtRoh[4 * i + k] = instanz.getLightCoordsWithEmission(k, leuchten);
+            kippFarbe[4 * i + k] = instanz.getColor(k);
+        }
+        kippSprite[i] = quad.materialInfo().sprite();
+        kippSchicht[i] = quad.materialInfo().layer();
+    }
+
+    /**
+     * Kippt die gemerkten Flächen 45° nach Norden und setzt sie auf ihre alte Tiefe; die danach nach oben zeigen, kommen in
+     * die Spalte, entlang z in den Block eingepasst und im Wasser höchstens {@code hoechstens} hoch eingereiht.
+     * Siehe docs/minimap.md, „Pflanzen von oben“.
+     */
+    private void kippe(float hoechstens) {
+        float alt = Float.MAX_VALUE, neu = Float.MAX_VALUE, zMin = Float.MAX_VALUE, zMax = -Float.MAX_VALUE;
+        for (int i = 0; i < kippAnzahl; i++) {
+            int b = 12 * i;
+            for (int k = 0; k < 4; k++) {
+                alt = Math.min(alt, kippEcken[b + 3 * k + 1]);
+            }
+            kippen(kippEcken, b);
+            for (int k = 0; k < 4; k++) {
+                neu = Math.min(neu, kippEcken[b + 3 * k + 1]);
+            }
+            float[] e = kippEcken;
+            kippSichtbar[i] = obenAnteil(e[b + 3] - e[b], e[b + 4] - e[b + 1], e[b + 5] - e[b + 2], e[b + 6] - e[b], e[b + 7] - e[b + 1],
+                    e[b + 8] - e[b + 2]) > 1e-4f;
+            for (int k = 0; k < 4 && kippSichtbar[i]; k++) {
+                zMin = Math.min(zMin, e[b + 3 * k + 2]);
+                zMax = Math.max(zMax, e[b + 3 * k + 2]);
+            }
+        }
+        float faktor = einpassFaktor(zMin, zMax), schieben = einpassVerschiebung(zMin, zMax);
+        for (int i = 0; i < kippAnzahl; i++) {
+            if (!kippSichtbar[i]) {
+                continue;
+            }
+            float[] xz = new float[8];
+            float[][] ecken = new float[4][3];
+            float hoehe = Float.NEGATIVE_INFINITY;
+            for (int k = 0; k < 4; k++) {
+                int j = 12 * i + 3 * k;
+                xz[2 * k] = kippEcken[j];
+                xz[2 * k + 1] = kippEcken[j + 2] * faktor + schieben;
+                hoehe = Math.max(hoehe, kippEcken[j + 1] + alt - neu);
+                auftrag.licht().hell(kippLichtRoh[4 * i + k], hell);
+                int farbe = kippFarbe[4 * i + k];
+                for (int c = 0; c < 3; c++) {
+                    ecken[k][c] = hell[c] * ((farbe >> (16 - 8 * c)) & 0xFF) / 255f * kippFaktor[i];
+                }
+            }
+            flaechen.add(new Flaeche(Math.min(hoehe, hoechstens), xz, Arrays.copyOfRange(kippUv, 8 * i, 8 * i + 8), kippSprite[i],
+                    kippSchicht[i], ecken, true));
         }
     }
 
     /**
-     * Die flache Fläche einer Bodenpflanze aus ihrer ersten Fläche: über den ganzen Block, ohne seinen Versatz, 1/16 über
-     * seinem Boden, das Rechteck ihrer UV, im Mittel ihrer Ecken und nach oben schattiert statt nach ihrer Richtung.
-     * Siehe docs/minimap.md, „Pflanzen von oben“.
+     * Kippt die vier Ecken ab {@code b} (je x, y, z) starr 45° um die Achse in x durch (·, 0, 0,5): oben wandert nach Norden,
+     * nach −z; x bleibt.
      */
-    private Flaeche flach(BakedQuad quad, QuadInstance instanz) {
-        float[] uv = new float[8];
+    static void kippen(float[] e, int b) {
         for (int k = 0; k < 4; k++) {
-            long packed = quad.packedUV(k);
-            uv[2 * k] = UVPair.unpackU(packed);
-            uv[2 * k + 1] = UVPair.unpackV(packed);
+            int j = b + 3 * k;
+            float t = 0.5f - e[j + 2], y = e[j + 1];
+            e[j + 1] = (y - t) * WURZEL_HALB;
+            e[j + 2] = 0.5f - (t + y) * WURZEL_HALB;
         }
-        float faktor = schattenNachOben(welt.cardinalLighting(), quad.materialInfo().shadeDirectionOverride(), quad.direction()) / 4;
-        float[] mittel = new float[3];
-        for (float[] ecke : ecken(instanz, quad.materialInfo().lightEmission())) {
-            for (int c = 0; c < 3; c++) {
-                mittel[c] += ecke[c] * faktor;
-            }
+    }
+
+    private static final float WURZEL_HALB = (float) Math.sqrt(0.5);
+
+    /** Der Faktor, mit dem die Ausdehnung [zMin, zMax] in den Block passt: 1 bis 1 Block Spanne, darüber 1 / Spanne. */
+    static float einpassFaktor(float zMin, float zMax) {
+        return zMax - zMin > 1 ? 1 / (zMax - zMin) : 1;
+    }
+
+    /**
+     * Die Verschiebung nach dem Faktor: über 1 Block Spanne an 0 gelegt, sonst so wenig wie nötig nach [0, 1]; was passt,
+     * bleibt, etwa der Versatz einer kleinen Pflanze.
+     */
+    static float einpassVerschiebung(float zMin, float zMax) {
+        if (zMax - zMin > 1) {
+            return -zMin / (zMax - zMin);
         }
-        return new Flaeche(1 / 16f, VOLL, rechteck(uv), quad.materialInfo().sprite(), quad.materialInfo().layer(),
-                new float[][] {mittel, mittel, mittel, mittel});
+        return zMin < 0 ? -zMin : zMax > 1 ? 1 - zMax : 0;
     }
 
     /**
@@ -316,18 +418,6 @@ final class ChunkMaler {
      */
     static float schattenNachOben(CardinalLighting licht, Direction ueberschrieben, Direction richtung) {
         return licht.up() / licht.byFace(ueberschrieben != null ? ueberschrieben : richtung);
-    }
-
-    /** Das Rechteck aus min und max der UV über alle vier Ecken, auf {@link #VOLL}: u0, v0 im Nordwesten. */
-    static float[] rechteck(float[] uv) {
-        float u0 = Float.MAX_VALUE, u1 = -Float.MAX_VALUE, v0 = Float.MAX_VALUE, v1 = -Float.MAX_VALUE;
-        for (int k = 0; k < 4; k++) {
-            u0 = Math.min(u0, uv[2 * k]);
-            u1 = Math.max(u1, uv[2 * k]);
-            v0 = Math.min(v0, uv[2 * k + 1]);
-            v1 = Math.max(v1, uv[2 * k + 1]);
-        }
-        return new float[] {u0, v0, u0, v1, u1, v1, u1, v0};
     }
 
     /**
@@ -377,7 +467,7 @@ final class ChunkMaler {
         }
         auftrag.licht().hell(LightCoordsUtil.getLightCoords(welt, pos.above()), hell);
         flaechen.add(new Flaeche((float) box.maxY, xz, uv, s, ChunkSectionLayer.SOLID,
-                new float[][] {hell.clone(), hell.clone(), hell.clone(), hell.clone()}));
+                new float[][] {hell.clone(), hell.clone(), hell.clone(), hell.clone()}, false));
     }
 
     /**
@@ -431,7 +521,7 @@ final class ChunkMaler {
             faktor[c] = hell[c] * schatten * ((tint >> (16 - 8 * c)) & 0xFF) / 255f;
         }
         flaechen.add(new Flaeche(fluid.getHeight(welt, pos), VOLL, voll(sprite), sprite, model.layer(),
-                new float[][] {faktor, faktor, faktor, faktor}));
+                new float[][] {faktor, faktor, faktor, faktor}, false));
     }
 
     private boolean ohneFlaechen(BlockStateModel model) {
@@ -504,7 +594,7 @@ final class ChunkMaler {
      * ihre Mitte liegt, so ist jede Fläche mindestens ein Pixel breit. Die Textur wird über den Pixel
      * in linearem Licht gemittelt, mit dem Test der Schicht. Siehe docs/minimap.md, „Flächen und Pixel“.
      */
-    private void schicht(float[] xz, float[] uv, TextureAtlasSprite sprite, ChunkSectionLayer schicht, float[][] ecken) {
+    private void schicht(float[] xz, float[] uv, TextureAtlasSprite sprite, ChunkSectionLayer schicht, float[][] ecken, boolean gekippt) {
         Texel textur = auftrag.texel().get(sprite);
         if (textur == null) {
             return;
@@ -515,8 +605,10 @@ final class ChunkMaler {
         float uMax = Math.max(Math.max(uv[0], uv[2]), Math.max(uv[4], uv[6]));
         float vMin = Math.min(Math.min(uv[1], uv[3]), Math.min(uv[5], uv[7]));
         float vMax = Math.max(Math.max(uv[1], uv[3]), Math.max(uv[5], uv[7]));
-        // Eine volle Oberseite mit dem ganzen Sprite: das gemittelte Raster, ohne abzutasten.
-        float[] voll = ganzeOberseite(xz, uv, sprite) ? raster(sprite, textur, schicht) : null;
+        // Eine volle Oberseite mit dem ganzen Sprite: das gemittelte Raster, ohne abzutasten. Ebenso die Fläche einer gekippten
+        // Pflanze, je Pixel die Zelle unter seiner Mitte; sonst kostete sie n × n Proben je Pixel. Siehe docs/minimap.md,
+        // „Pflanzen von oben“.
+        float[] voll = gekippt || ganzeOberseite(xz, uv, sprite) ? raster(sprite, textur, schicht) : null;
         int n = Math.max(1, 16 / scale);
         float[] reiheX = duenn(xz, 0, scale), reiheZ = duenn(xz, 1, scale);
         for (int pz = 0; pz < scale; pz++) {

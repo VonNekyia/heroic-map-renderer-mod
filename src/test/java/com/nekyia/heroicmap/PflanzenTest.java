@@ -23,11 +23,12 @@ class PflanzenTest {
     @Test
     void vorlagenWieImRenderer() {
         for (String v : new String[] {"block/cross", "block/tinted_cross", "block/cross_emissive", "block/crop",
-                "block/template_seagrass", "block/flowerbed_1", "block/template_leaf_litter_4"}) {
+                "block/template_seagrass", "block/flowerbed_1", "block/template_leaf_litter_4", "block/stem_growth0", "block/stem_growth7",
+                "block/stem_fruit"}) {
             assertTrue(Pflanzen.vorlage(id(v)), v);
         }
         for (String v : new String[] {"block/block", "block/ladder", "block/vine", "block/grass", "beispiel:block/cross",
-                "block/crossed"}) {
+                "block/crossed", "block/stem", "block/stem_fruits"}) {
             assertFalse(Pflanzen.vorlage(id(v)), v);
         }
     }

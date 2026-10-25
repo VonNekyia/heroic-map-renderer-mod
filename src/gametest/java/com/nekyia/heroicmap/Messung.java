@@ -44,6 +44,8 @@ public final class Messung implements FabricClientGameTest {
     private static final String RAHMEN = System.getProperty("heroicmap.messung.rahmen", Skin.OHNE);
     /** Mit {@code -PmessungEffekte=true} nur die Läufe zu den Effekten in der Welt, siehe docs/wegpunkte.md, „Strahl“. */
     private static final boolean NUR_EFFEKTE = Boolean.getBoolean("heroicmap.messung.effekte");
+    /** Mit {@code -PmessungChunks=true} nur das Zeichnen je Chunk, wie in der ganzen Messung; so passen Läufe im Wechsel in ein Fenster. */
+    private static final boolean NUR_CHUNKS = Boolean.getBoolean("heroicmap.messung.chunks");
     /**
      * Mit {@code -PmessungZoom=true} nur die Läufe zum Zoom 0,5 gegen 2, mit einer Stufe wie {@code -PmessungZoom=0.03125} zu
      * ihr gegen 2; ab 1/4 mit einem Satz aus Rauschen. Siehe docs/minimap.md, „Kosten“.
@@ -168,6 +170,10 @@ public final class Messung implements FabricClientGameTest {
                 for (int runde = 1; runde <= RUNDEN; runde++) {
                     chunks(context, scale, runde);
                 }
+            }
+            if (NUR_CHUNKS) {
+                schreibe();
+                return;
             }
 
             region(context, 512);

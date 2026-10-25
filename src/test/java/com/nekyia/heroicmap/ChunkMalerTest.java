@@ -12,7 +12,7 @@ import net.minecraft.world.level.block.state.properties.ChestType;
 import org.junit.jupiter.api.Test;
 
 /**
- * Dünne Flächen mindestens ein Pixel, der Deckel einer Truhe in ihrer Textur und die UV einer flachen Pflanze. Siehe
+ * Dünne Flächen mindestens ein Pixel, der Deckel einer Truhe in ihrer Textur und Pflanzen gekippt und eingepasst. Siehe
  * docs/minimap.md, „Flächen und Pixel“, „Blockentities“ und „Pflanzen von oben“.
  */
 class ChunkMalerTest {
@@ -74,21 +74,61 @@ class ChunkMalerTest {
                 ChunkMaler.deckel(Direction.SOUTH, ChestType.RIGHT, rechteck(1 / 16f, 1 / 16f, 1, 15 / 16f)), 1e-4f);
     }
 
-    @Test
-    void flachePflanzeNimmtDasRechteckDerUv() {
-        // Die Ostseite einer Feldfrucht, gespiegelt (uv 16 0 0 16), Ecken oben rechts beginnend: Das Rechteck liegt mit u0, v0 im Nordwesten.
-        float[] gespiegelt = {0.2f, 0.1f, 0.2f, 0.3f, 0.1f, 0.3f, 0.1f, 0.1f};
-        assertArrayEquals(new float[] {0.1f, 0.1f, 0.1f, 0.3f, 0.2f, 0.3f, 0.2f, 0.1f}, ChunkMaler.rechteck(gespiegelt));
-        // Um 90° gedreht: dasselbe Rechteck, die Drehung zählt nicht.
-        float[] gedreht = {0.1f, 0.3f, 0.2f, 0.3f, 0.2f, 0.1f, 0.1f, 0.1f};
-        assertArrayEquals(new float[] {0.1f, 0.1f, 0.1f, 0.3f, 0.2f, 0.3f, 0.2f, 0.1f}, ChunkMaler.rechteck(gedreht));
-        // Nicht die erste und dritte Ecke: Ein Teil des Sprites, dessen Ecken 0 und 2 nicht gegenüber liegen.
-        float[] schief = {0.1f, 0.1f, 0.1f, 0.2f, 0.4f, 0.1f, 0.4f, 0.2f};
-        assertArrayEquals(new float[] {0.1f, 0.1f, 0.1f, 0.2f, 0.4f, 0.2f, 0.4f, 0.1f}, ChunkMaler.rechteck(schief));
+    /** Die Ausdehnung in z über die vier Ecken ab {@code b}: min, max. */
+    private static float[] zSpanne(float[] e, int... ab) {
+        float min = Float.MAX_VALUE, max = -Float.MAX_VALUE;
+        for (int b : ab) {
+            for (int k = 0; k < 4; k++) {
+                min = Math.min(min, e[b + 3 * k + 2]);
+                max = Math.max(max, e[b + 3 * k + 2]);
+            }
+        }
+        return new float[] {min, max};
     }
 
     @Test
-    void flachePflanzeNachObenSchattiert() {
+    void kippenNachNorden() {
+        // Die Mitte oben wandert nach Norden, nach −z, und sinkt auf cos 45°; der Fuss bleibt; x bleibt.
+        float[] e = {0.3f, 1, 0.5f, 0.3f, 0, 0.5f, 0.3f, 0, 0.5f, 0.3f, 0, 0.5f};
+        ChunkMaler.kippen(e, 0);
+        assertArrayEquals(new float[] {0.3f, 0.7071f, -0.2071f, 0.3f, 0, 0.5f}, java.util.Arrays.copyOf(e, 6), 1e-4f);
+    }
+
+    @Test
+    void cropEingepasst() {
+        // Die Ebenen eines crop bei z 4/16 und 12/16, je 1 Block hoch: gekippt −0,384 bis 0,677, Spanne 1,06, Faktor 0,94.
+        float[] crop = {0, 0, 0.25f, 1, 0, 0.25f, 1, 1, 0.25f, 0, 1, 0.25f, 0, 0, 0.75f, 1, 0, 0.75f, 1, 1, 0.75f, 0, 1, 0.75f};
+        ChunkMaler.kippen(crop, 0);
+        ChunkMaler.kippen(crop, 12);
+        float[] z = zSpanne(crop, 0, 12);
+        assertEquals(-0.384f, z[0], 1e-3f);
+        assertEquals(0.677f, z[1], 1e-3f);
+        float faktor = ChunkMaler.einpassFaktor(z[0], z[1]), schieben = ChunkMaler.einpassVerschiebung(z[0], z[1]);
+        assertEquals(0.943f, faktor, 1e-3f);
+        // Gestaucht genau in den Block.
+        assertEquals(0, z[0] * faktor + schieben, 1e-6f);
+        assertEquals(1, z[1] * faktor + schieben, 1e-6f);
+    }
+
+    @Test
+    void kleinePflanzeBleibtVersetzt() {
+        // Eine Fläche halb so hoch, 0,1 nach Süden versetzt (z 0,85): gekippt 0,394 bis 0,747, passt also und bleibt, wo sie ist.
+        float[] klein = {0, 0, 0.85f, 1, 0, 0.85f, 1, 0.5f, 0.85f, 0, 0.5f, 0.85f};
+        ChunkMaler.kippen(klein, 0);
+        float[] z = zSpanne(klein, 0);
+        assertEquals(0.394f, z[0], 1e-3f);
+        assertEquals(0.747f, z[1], 1e-3f);
+        assertEquals(1, ChunkMaler.einpassFaktor(z[0], z[1]));
+        assertEquals(0, ChunkMaler.einpassVerschiebung(z[0], z[1]));
+        // Ragt sie über eine Kante, so wenig wie nötig zurück; ein volles Kreuz (Spanne 1,34) wird gestaucht und an 0 gelegt.
+        assertEquals(0.1f, ChunkMaler.einpassVerschiebung(-0.1f, 0.8f), 1e-6f);
+        assertEquals(-0.2f, ChunkMaler.einpassVerschiebung(0.3f, 1.2f), 1e-6f);
+        assertEquals(0.744f, ChunkMaler.einpassFaktor(-0.525f, 0.818f), 1e-3f);
+        assertEquals(0, -0.525f * ChunkMaler.einpassFaktor(-0.525f, 0.818f) + ChunkMaler.einpassVerschiebung(-0.525f, 0.818f), 1e-6f);
+    }
+
+    @Test
+    void gekippteFlaecheNachObenSchattiert() {
         CardinalLighting licht = CardinalLighting.DEFAULT;
         // Die Vorlagen des Spiels schattieren schon nach oben: nichts zu ändern.
         assertEquals(1f, ChunkMaler.schattenNachOben(licht, Direction.UP, Direction.NORTH), 1e-6f);
