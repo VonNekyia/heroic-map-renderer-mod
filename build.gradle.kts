@@ -42,11 +42,16 @@ java {
     toolchain.languageVersion = JavaLanguageVersion.of(25)
 }
 
-// Die Messung von Kachelwerk.schreibe läuft nur mit -Pkachelwerk=<datei>, siehe docs/selbst.md, „Kosten“.
+// Die Messung von Kachelwerk.schreibe läuft nur mit -Pkachelwerk=<datei>, siehe docs/selbst.md, „Kosten“; die des
+// Reliefs je Kachel nur mit -PreliefMessung=<datei> -PreliefBaum=<ordner> [-PreliefArt=ohne], siehe docs/vollbildkarte.md, „Relief“.
 val kachelwerk = providers.gradleProperty("kachelwerk").map { file(it).absolutePath }.orElse("")
+val reliefMessung = providers.gradleProperty("reliefMessung").map { file(it).absolutePath }.orElse("")
 tasks.test {
     useJUnitPlatform()
     systemProperty("heroicmap.kachelwerk", kachelwerk.get())
+    systemProperty("heroicmap.relief.messung", reliefMessung.get())
+    systemProperty("heroicmap.relief.baum", providers.gradleProperty("reliefBaum").orElse("").get())
+    systemProperty("heroicmap.relief.art", providers.gradleProperty("reliefArt").orElse("").get())
 }
 
 // Die Lizenzen gehen mit dem Jar, auch der Hinweis, den TwelveMonkeys verlangt.
