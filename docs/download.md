@@ -708,8 +708,9 @@ damit nichts.
   - `welten`: je Weltschlüssel, etwa `minecraft:overworld`, der erste und
     letzte Besuch, die Zahl der Tage mit Besuch in der Zeitzone des
     Rechners, die Spielzeit vom Server in Ticks: die erste gesehene,
-    die grösste und die letzte, ohne Wert -1, und die UID vom Plugin,
-    siehe „Reset“.
+    die grösste und die letzte, ohne Wert -1, die UID vom Plugin, siehe
+    „Reset“, und die Zahl der Rückfälle, siehe „Runden“; ohne Rückfall
+    fehlt das Feld.
 - **Je Weltschlüssel,** denn Oberwelt, Nether und End mit demselben Seed
   liegen im selben `welt-<hash>`.
 - **Wann:** Beim Betreten jeder Dimension, nach Ablage, Name und Karte,
@@ -741,8 +742,8 @@ immer.
   sonst übergeht der Mod sie mit einer Zeile im Log. Sie gilt für die
   Sitzung; der Ausweis merkt sie je Welt.
 - **Wann:** beim Betreten einer Dimension und wenn die Antwort auf `show`
-  kommt, denn sie kommt nach dem Betreten; ohne UID 10 s nach dem ersten
-  Wert der Spielzeit. Je Besuch einmal.
+  kommt, denn sie kommt nach dem Betreten; die Spielzeit 10 s nach ihrem
+  ersten Wert (`Ausweise.pruefeZeit`). Je Besuch einmal.
 - **Nur unter derselben Adresse** (`Reset.pruefe` mit `netz`): UID und
   Spielzeit vergleicht der Mod nur, wenn der Ausweis vor dem Besuch
   dieselbe eingetippte Adresse nennt; sonst trägt er sie nur ein. Derselbe
@@ -766,8 +767,9 @@ immer.
 - **Unsicher, ohne UID:** Fällt die Spielzeit unter ein Viertel der
   zuletzt gesehenen und um mehr als eine Stunde, 72 000 Ticks
   (`Reset.TEIL`, `Reset.STUNDE`), ruhen die Bäume dieser Welt. Viertel und
-  Stunde sind vorläufig. Mit UID prüft der Mod die Spielzeit nicht, denn
-  ein Rückgang ist dann etwa eine eingespielte Sicherung.
+  Stunde sind vorläufig. Mit derselben UID ist ein solcher Rückgang kein
+  Reset, etwa eine eingespielte Sicherung oder eine Runde, siehe
+  „Runden“.
 - **Ruhen:** Der Baum heisst danach `<baum>-bis-<jjjjmmtt>`, höchstens 64
   Zeichen, mit `-2`, `-3` …, wenn ein Ordner oder ein Baum aus dem Angebot
   so heisst (`Reset.ruhename`). Er bekommt die Marke `ruht.txt` und zeigt
@@ -784,6 +786,30 @@ immer.
   andere Adresse (`Zeiger.loeseNachReset`), denn dort liegt die alte Welt;
   sonst nähme `Satz.fuer` deren Karte über der neuen. Ein Zeiger unter
   derselben Adresse bleibt.
+
+## Runden
+
+Kommt eine Welt mit demselben Seed immer wieder neu, etwa als Runde aus
+einer Vorlage, zählt der Mod das im Ausweis, statt ihre Karte jedes Mal
+ruhen zu lassen (`Reset.Art.RUNDE`). So hat es der User entschieden, siehe
+[0050](entscheidungen/0050-runden-und-wegwerfkarten.md).
+
+- **Rückfall** (`Reset.rueckfall`): Die Spielzeit fällt unter ein Viertel
+  der zuletzt gesehenen und um mehr als eine Stunde, wie unter „Reset“.
+  Jede neue Generation zählt einen (`Ausweis.Welt.rueckfaelle`), auch ein
+  sicherer Reset; je Besuch höchstens einer.
+- **Runde:**
+  - mit derselben UID jeder Rückfall, denn die Welt ist eine Kopie, etwa
+    aus einer Vorlage samt ihrer UID;
+  - ohne UID ab dem zweiten, wenn die Spielzeit wieder höchstens eine
+    Stunde vom Anfang der letzten Generation entfernt ist
+    (`Reset.STUNDE`).
+- **Dann** bleibt die Karte, wie sie ist, und füllt sich mit jeder Runde;
+  der Ausweis bekommt nur die neue Generation, mit einer Zeile im Log.
+- **Der erste Rückfall ohne UID** ist ein unsicherer Reset wie bisher, die
+  Karte ruht.
+- **Zum Wegwerfen** gilt eine Welt ab zwei Rückfällen, siehe
+  [Selbst gezeichnete Karte](selbst.md), „Wegwerfkarten“.
 
 ## Kartenliste
 

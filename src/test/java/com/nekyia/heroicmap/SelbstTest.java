@@ -413,4 +413,41 @@ class SelbstTest {
         BufferedImage bild = ImageIO.read(datei.toFile());
         return bild.getRGB(0, 0, 256, 256, null, 0, 256);
     }
+
+    @Test
+    void weiterInNeuenWelten(@TempDir Path wurzel) throws Exception {
+        // „Selbst“ für neue Welten gilt je Netz und Server mit seinem Massstab; 0 vergisst ihn, eine leere Liste fällt weg.
+        String oben = "minecraft:overworld";
+        assertEquals(0, Selbst.weiter(wurzel, "play.example.net", "main"));
+        Selbst.merkeWeiter(wurzel, "play.example.net", "main", 2);
+        Selbst.merkeWeiter(wurzel, "play.example.net", "build", 4);
+        Selbst.merkeWeiter(wurzel, "play.example.net", "main", 1);
+        assertEquals(1, Selbst.weiter(wurzel, "play.example.net", "main"), "die letzte Wahl gilt");
+        assertEquals(4, Selbst.weiter(wurzel, "play.example.net", "build"));
+        assertEquals(0, Selbst.weiter(wurzel, "zweit.example.net", "main"), "ein anderes Netz");
+        Selbst.merkeWeiter(wurzel, "play.example.net", "main", 0);
+        assertEquals(0, Selbst.weiter(wurzel, "play.example.net", "main"));
+        Selbst.merkeWeiter(wurzel, "play.example.net", "build", 0);
+        assertFalse(Files.exists(wurzel.resolve(Selbst.WEITER)), "leer fällt die Datei weg");
+        Files.writeString(wurzel.resolve(Selbst.WEITER), "play.example.net\tmain\t3\nkaputt\nplay.example.net\t\t4\n");
+        assertEquals(0, Selbst.weiter(wurzel, "play.example.net", "main"), "3 px gibt es nicht");
+        assertEquals(0, Selbst.weiter(wurzel, "play.example.net", ""), "ohne Server nichts");
+
+        // Wo es ohne Klick zeichnet: nur ohne eigene Karte, ohne Wahl in zeigt.txt und ohne andere Karte der Dimension.
+        Path welt = Files.createDirectories(wurzel.resolve("play.example.net/karte-main/welt-1111111111111111"));
+        assertTrue(Selbst.weiterHier(welt, oben, "main", 4));
+        assertFalse(Selbst.weiterHier(welt, oben, "main", 0), "nicht gewählt");
+        Path download = welt.resolve("top");
+        Satz.schreibe(download, "Karte", oben, 4);
+        Files.createDirectories(download.resolve("4"));
+        Files.writeString(download.resolve("4/map.json"), "{\"tileSize\":256,\"scale\":4,\"minZoom\":0,\"maxZoom\":2}");
+        assertFalse(Selbst.weiterHier(welt, oben, "main", 4), "ein Download der Dimension ersetzt es nie still");
+        assertTrue(Selbst.weiterHier(welt, "minecraft:the_end", "main", 4), "eine andere Dimension");
+        Laden.loesche(download);
+        Path eigene = Selbst.anlegen(welt, oben, 4, "main");
+        assertFalse(Selbst.weiterHier(welt, oben, "main", 4), "schon eine eigene Karte");
+        Laden.loesche(eigene);
+        Zeigt.setze(welt, "main", oben, "fehlt");
+        assertFalse(Selbst.weiterHier(welt, oben, "main", 4), "eine Wahl in zeigt.txt");
+    }
 }

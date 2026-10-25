@@ -38,8 +38,10 @@ final class Ausweise {
     private boolean geschrieben;
     /** Der Ausweis, wie er vor diesem Besuch war, oder null; daran misst sich ein Reset. */
     private Ausweis vorher;
-    /** Ist der Reset für diesen Besuch entschieden? Ticks seit dem ersten Wert der Spielzeit. */
-    private boolean geprueft;
+    /** Ist der Reset für diesen Besuch entschieden, und die Spielzeit geprüft? Ticks seit dem ersten Wert der Spielzeit. */
+    private boolean geprueft, zeitGeprueft;
+    /** Hat dieser Besuch die Welt schon sicher zurückgesetzt? Dann zählt ihre Spielzeit nicht noch einmal als Rückfall. */
+    private boolean zurueckgesetzt;
     private int ticks;
     /** So lange wartet der Entscheid ohne UID, in Ticks: Die Antwort auf show mit der UID kommt nach dem Betreten. */
     private static final int OHNE_UID_NACH = 200;
@@ -63,6 +65,8 @@ final class Ausweise {
         alter = -1;
         geschrieben = false;
         geprueft = false;
+        zeitGeprueft = false;
+        zurueckgesetzt = false;
         ticks = 0;
         // Ein neuer Hash bei gleichem Server und gleicher Welt: Die alten Ordner sind sicher veraltet.
         int geloescht = 0;
@@ -73,6 +77,8 @@ final class Ausweise {
             melde(mc, "heroicmap.reset.sicher", "Heroic Map: neuer Seed für {}, alte Karten gelöscht: {}", List.of(schluessel, geloescht));
         }
         pruefeUid(mc);
+        // Eine neue Welt oder Runde desselben Servers: „Selbst“ zeichnet weiter, wenn der Spieler es dort gewählt hat.
+        Selbst.INSTANZ.weiter(mc, ausweis.netz());
     }
 
     /** Die Antwort auf show brachte UIDs; sie kommt nach dem Betreten. */
@@ -100,6 +106,7 @@ final class Ausweise {
         // Läuft ein Download, bleibt die alte UID im Ausweis, und der nächste Besuch versucht es wieder.
         if (geloescht >= 0) {
             ausweis = ausweis.neueGeneration(schluessel, alter, uid);
+            zurueckgesetzt = true;
             loeseZeiger(mc);
         }
         if (geloescht > 0) {
@@ -120,6 +127,8 @@ final class Ausweise {
         }
         Path eigene = welt.resolve(Selbst.baum(schluessel, Downloads.INSTANZ.wer()));
         Satz satz = hier ? Satz.lies(eigene) : null;
+        // Die neue eigene Karte behält, ob „Selbst“ sie ohne Klick begonnen hatte.
+        boolean ohneKlick = satz != null && Files.exists(eigene.resolve(Selbst.OHNE_KLICK));
         for (Path b : baeume) {
             Kartenliste.loescheBaum(b, ok -> {
                 Downloads.INSTANZ.gibFrei(b);
@@ -127,7 +136,7 @@ final class Ausweise {
                     LOGGER.warn("Heroic Map: {} nach dem Reset nicht ganz gelöscht", b);
                 }
                 if (satz != null && b.equals(eigene)) {
-                    Selbst.INSTANZ.waehle(mc, satz.massstab());
+                    Selbst.INSTANZ.waehle(mc, satz.massstab(), ohneKlick);
                 }
             });
         }
@@ -135,21 +144,38 @@ final class Ausweise {
     }
 
     /**
-     * Ohne UID: Fällt die Spielzeit unter derselben eingetippten Adresse weit, ruhen die Bäume der Welt unter einem neuen Namen,
-     * und eine neue Karte beginnt.
+     * Die Spielzeit, gut 10 s nach ihrem ersten Wert: Fällt sie unter derselben eingetippten Adresse weit, ist das eine neue
+     * Runde, mit derselben UID oder ohne UID wieder nahe am Anfang der letzten Generation; dann zählt nur ein Rückfall im
+     * Ausweis. Sonst, ohne UID, ruhen die Bäume der Welt unter einem neuen Namen, und eine neue Karte beginnt. Siehe
+     * docs/download.md, „Runden“.
      */
-    private void pruefeOhneUid(Minecraft mc) {
+    private void pruefeZeit(Minecraft mc) {
+        zeitGeprueft = true;
+        // Kam bis jetzt keine UID, gilt der Entscheid ohne sie, auch wenn sie später kommt.
+        String uid = geprueft ? Downloads.uids().get(schluessel) : null;
         geprueft = true;
-        if (Reset.pruefe(vorher, schluessel, ausweis.netz(), null, alter) != Reset.Art.UNSICHER) {
+        Reset.Art art = zurueckgesetzt ? Reset.Art.GLEICH : Reset.pruefe(vorher, schluessel, ausweis.netz(), uid, alter);
+        if (art == Reset.Art.RUNDE) {
+            ausweis = ausweis.neueGeneration(schluessel, alter, ausweis.welten().get(schluessel).uid());
+            LOGGER.info("Heroic Map: {} in {} beginnt eine neue Runde, Spielzeit {}", schluessel, ordner, alter);
+            return;
+        }
+        if (art != Reset.Art.UNSICHER) {
             return;
         }
         loeseZeiger(mc);
         List<Path> baeume = Reset.baeume(ordner, schluessel);
-        if (baeume.isEmpty() || !halte(baeume)) {
+        if (baeume.isEmpty()) {
+            // Nichts ruht, aber der Rückfall zählt; so erkennt der nächste eine Runde.
+            ausweis = ausweis.neueGeneration(schluessel, alter, null);
+            return;
+        }
+        if (!halte(baeume)) {
             return;
         }
         Path welt = ordner, eigene = welt.resolve(Selbst.baum(schluessel, Downloads.INSTANZ.wer()));
         Satz satz = Satz.lies(eigene);
+        boolean ohneKlick = satz != null && Files.exists(eigene.resolve(Selbst.OHNE_KLICK));
         long von = vorher.welten().get(schluessel).alterZuletzt(), bis = alter;
         Set<String> belegt = new HashSet<>();
         Downloads.INSTANZ.baeume().forEach(b -> belegt.add(b.id()));
@@ -175,7 +201,7 @@ final class Ausweise {
             mc.execute(() -> {
                 baeume.forEach(Downloads.INSTANZ::gibFrei);
                 if (satz != null) {
-                    Selbst.INSTANZ.waehle(mc, satz.massstab());
+                    Selbst.INSTANZ.waehle(mc, satz.massstab(), ohneKlick);
                 }
                 Selbst.INSTANZ.neuGewaehlt(mc);
                 HeroicMap.weltOrdnerGewechselt();
@@ -229,6 +255,8 @@ final class Ausweise {
         if (ausweis != null && o != null) {
             ordner = o;
             ausweis = ausweis.mit(netz(), server());
+            // Erst jetzt kennt der Mod oft den Namen vom Server, und mit ihm die Wahl „Selbst“ für neue Welten.
+            Selbst.INSTANZ.weiter(Minecraft.getInstance(), ausweis.netz());
         }
     }
 
@@ -238,8 +266,8 @@ final class Ausweise {
             return;
         }
         alter = mc.level.getGameTime();
-        if (!geprueft && ++ticks >= OHNE_UID_NACH) {
-            pruefeOhneUid(mc);
+        if (!zeitGeprueft && ++ticks >= OHNE_UID_NACH) {
+            pruefeZeit(mc);
         }
         if (!geschrieben && schreibe()) {
             // Ob die Spielzeit bei jedem Wechsel kommt und weiterläuft, ist zu prüfen; die Zeile zeigt es im Log.
@@ -277,7 +305,8 @@ final class Ausweise {
         return ausweis;
     }
 
-    private static String netz() {
+    /** Die eingetippte Adresse des Servers wie {@link Servername#schluessel}, leer im Einzelspieler. */
+    static String netz() {
         ServerData s = Downloads.server();
         return s == null ? "" : Servername.schluessel(s.ip);
     }

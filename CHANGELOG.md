@@ -4,6 +4,10 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.72
+
+- **Draw it yourself in new worlds and rounds.** Once you switch on "Draw it yourself" on a server, the mod also draws new worlds and rounds of that server, but never over a map the server offers. Maps it started that way for rounds and one-day worlds go away 7 days after your last visit, and all of them together stay under 500 MB; maps you started yourself always stay.
+
 ## 0.2.71
 
 - **"Automatic" for the biome frame.** The frame chooser now shows "Automatic" first for the biome frame, and it's the default: the frame follows the biome you stand in. Pick a biome there instead to keep that frame everywhere.

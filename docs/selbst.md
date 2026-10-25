@@ -18,6 +18,8 @@ code:
   - src/main/java/com/nekyia/heroicmap/mixin/LevelExtractorMixin.java
   - src/main/java/com/nekyia/heroicmap/mixin/ClientLevelMixin.java
   - src/test/java/com/nekyia/heroicmap/SelbstTest.java
+  - src/main/java/com/nekyia/heroicmap/Wegwerf.java
+  - src/test/java/com/nekyia/heroicmap/WegwerfTest.java
   - src/main/java/com/nekyia/heroicmap/Kopie.java
   - src/test/java/com/nekyia/heroicmap/KopieTest.java
   - src/test/java/com/nekyia/heroicmap/PyramideTest.java
@@ -124,6 +126,58 @@ Server, [0029](entscheidungen/0029-was-ein-server-zeigt-gilt-je-server.md).
   der eigenen Karte, nach allem, was er noch schreibt (`Selbst.loesche`);
   gezeichnet wird dann nicht mehr. Scheitert es, nennt die Liste den
   Fehler. Danach zeigt die Vollbildkarte wieder die Karte des Servers.
+
+## Neue Welten
+
+Hat der Spieler „Selbst“ auf einem Server gewählt, zeichnet der Mod auch
+neue Welten und Runden desselben Netzes und Servers selbst, ohne Klick. So
+hat es der User am 24.10. entschieden, siehe
+[0050](entscheidungen/0050-runden-und-wegwerfkarten.md).
+
+- **Gemerkt** beim Klick auf „Selbst“ (`Auswahl`) in
+  `heroicmap/selbst-weiter.txt`: je Zeile eingetippte Adresse, Server und
+  Massstab, mit Tab getrennt (`Selbst.merkeWeiter`). Nur auf einem Server,
+  nie im Einzelspieler.
+- **Beim Betreten** einer Welt und wenn der Name vom Server kommt
+  (`Selbst.weiter`): Der Mod zeichnet mit diesem Massstab, wenn es für die
+  Dimension weder eine eigene Karte noch eine andere Karte zu zeigen gibt
+  und `zeigt.txt` nichts wählt (`Selbst.weiterHier`). So ersetzt er nie
+  still einen Download.
+- **Die Marke `ohne-klick.txt`** (`Selbst.OHNE_KLICK`) im Baum sagt, dass
+  der Mod ihn so ohne Klick begonnen hat; nur dann kann er eine
+  Wegwerfkarte werden. Ein Klick des Spielers in dieser Welt auf „Selbst“,
+  „Behalten“ oder „an“ nimmt sie weg (`Selbst.ohneKlick`). Legt ein Reset
+  die Karte neu an, behält sie die Marke oder nicht.
+- **Endet,** wenn der Spieler die eigene Karte dieses Servers in der Welt,
+  in der er ist, in der Kartenliste löscht (`Kartenliste.loesche`).
+- **Ohne Klick des Spielers** entsteht nichts.
+
+## Wegwerfkarten
+
+Eigene Karten von Welten, die nur kurz leben, räumt der Mod selbst weg
+(`Wegwerf`), Entscheidung 3b des Users, siehe
+[0050](entscheidungen/0050-runden-und-wegwerfkarten.md).
+
+- **Welche** (`Wegwerf.wegwerf`, `Wegwerf.sammle`): eigene Karten mit
+  der Marke `ohne-klick.txt`, siehe „Neue Welten“, von Welten eines
+  Servers, deren Ausweis sie nur an einem Tag besucht nennt oder die
+  mindestens zwei Rückfälle hat, also eine Runde, siehe
+  [Download](download.md), „Runden“.
+  - Nie Downloads, nie von Hand begonnene Karten, nie im Einzelspieler,
+    nie ohne Ausweis. Nach dem Update auf den Ausweis hat jede alte Welt
+    einen Besuchstag; ohne die Marke bliebe sonst keine Karte eines selten
+    besuchten Servers.
+  - Eine Welt mit nur einem Rückfall, etwa nach einer eingespielten
+    Sicherung, bleibt.
+- **Wann weg** (`Wegwerf.weg`): 7 Tage nach dem letzten Besuch der Welt
+  (`Wegwerf.FRIST`). Liegen alle übrigen zusammen über 500 MB
+  (500 000 000 Bytes, `Wegwerf.GRENZE`), gehen die am längsten nicht
+  besuchten zuerst.
+- **Wie** (`Wegwerf.raeume`): einmal je Start im Hintergrund mit niedriger
+  Priorität. Gesucht wird flach in den Ordnern `welt-…` bis zur Tiefe der
+  Bäume, gezählt werden nur die Dateien der Bäume mit Marke, nie die
+  Kacheln der Downloads. Gelöscht im Worker von „Selbst zeichnen“, nie die
+  Karte, in die er gerade zeichnet; eine Zeile im Log.
 
 ## Massstab
 

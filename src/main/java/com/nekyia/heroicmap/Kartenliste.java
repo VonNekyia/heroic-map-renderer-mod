@@ -416,6 +416,10 @@ final class Kartenliste extends Screen {
 
     /** Löscht den Baum, den {@link Downloads#halte} hält, und gibt ihn danach frei. */
     private void loesche(Laden.AufPlatte e) {
+        // Die eigene Karte dieses Servers in dieser Welt löschen beendet „Selbst“ hier, auch für neue Welten.
+        if (Selbst.selbst(e.ordner()) && e.ordner().getParent().equals(Downloads.weltOrdner()) && Selbst.gehoert(e.ordner(), Downloads.INSTANZ.wer())) {
+            Selbst.INSTANZ.weiterAn(Ausweise.netz(), 0);
+        }
         bestand = null;
         // Gezählt wird erst nach dem Löschen.
         zaehlt = new AtomicBoolean();
