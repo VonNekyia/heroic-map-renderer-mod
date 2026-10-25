@@ -169,11 +169,11 @@ public final class KarteJeServer implements FabricClientGameTest {
         }
     }
 
-    /** Die PNG-Kacheln unter {@code stufe}; die selbst gezeichneten. */
+    /** Die PNG-Kacheln unter {@code stufe}; die selbst gezeichneten. Verschwindet beim Durchgehen eine Datei, leer. */
     private static java.util.List<Path> pngs(Path stufe) {
         try (var alle = Files.walk(stufe)) {
             return alle.filter(p -> p.toString().endsWith(".png")).toList();
-        } catch (IOException e) {
+        } catch (IOException | UncheckedIOException e) {
             return java.util.List.of();
         }
     }
