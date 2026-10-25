@@ -150,6 +150,7 @@ public final class Bilder implements FabricClientGameTest {
             pflanzen(context, server);
             pflanzenDesSpielsBleiben(context);
             pflanzenAusPaketen(context, server);
+            reliefNah(context, server);
             weitHeraus(context, server);
             koordinatenAmRand(context, server);
         }
@@ -2115,6 +2116,66 @@ public final class Bilder implements FabricClientGameTest {
         if (zahl[0] < 1000 || zahl[1] != 0) {
             throw new AssertionError("Pflanzen des Spiels: " + zahl[1] + " von " + zahl[0] + " Flächen zugeschnitten statt 0 (mindestens 1000 geprüft)");
         }
+    }
+
+    /**
+     * Relief auf der Minimap nah: eine Säule, 13 Blöcke hoch, bei 4 px mit Flach, Relief und Relief + Schatten. Relief ist an
+     * ihren Kanten anders als Flach, Relief + Schatten im Schatten südöstlich anders als Relief. Dann mit Relief + Schatten ein
+     * Turm im Chunk nordwestlich: Sein Schatten fällt in den Chunk der Säule, den nur der Ring neu malt. Siehe docs/minimap.md,
+     * „Relief“.
+     */
+    private static void reliefNah(ClientGameTestContext context, TestServerContext server) {
+        server.runCommand("fill 60 -60 60 62 -48 62 stone");
+        Relief.Art vorher = context.computeOnClient(mc -> Minimap.INSTANZ.relief());
+        context.runOnClient(mc -> {
+            Minimap.INSTANZ.setzeScale(4);
+            Minimap.INSTANZ.setzeZoom(4);
+        });
+        Relief.Art[] arten = {Relief.Art.OHNE, Relief.Art.SLOPE, Relief.Art.SHADOWS};
+        BufferedImage[] bilder = new BufferedImage[arten.length];
+        BufferedImage turm;
+        try {
+            for (int i = 0; i < arten.length; i++) {
+                Relief.Art art = arten[i];
+                context.runOnClient(mc -> Minimap.INSTANZ.setzeRelief(art));
+                bilder[i] = minimapBei(context, server, 61.5, 58.5, "relief-nah-" + art.name);
+            }
+            // Der Turm in Chunk (2, 2), nicht an dessen Rand: Ohne Ring malte nur dieser Chunk neu, nicht (3, 3) mit dem Schatten.
+            server.runCommand("fill 44 -60 44 45 -41 45 stone");
+            context.waitTicks(5);
+            turm = minimapBei(context, server, 61.5, 58.5, "relief-nah-turm");
+        } finally {
+            context.runOnClient(mc -> Minimap.INSTANZ.setzeRelief(vorher));
+            server.runCommand("fill 60 -60 60 62 -48 62 air");
+            server.runCommand("fill 44 -60 44 45 -41 45 air");
+        }
+        // Im Chunk (3, 3), x und z 48 bis 59, westlich der Säule; die Mitte des Bilds ist der Spieler bei (61,5, 58,5).
+        int block = 4 * context.computeOnClient(mc -> mc.getWindow().getGuiScale());
+        int x0 = bilder[2].getWidth() / 2 + Math.round((48 - 61.5f) * block), z0 = bilder[2].getHeight() / 2 + Math.round((48 - 58.5f) * block);
+        int ring = pixelAnders(bilder[2].getSubimage(x0, z0, 12 * block, 10 * block), turm.getSubimage(x0, z0, 12 * block, 10 * block));
+        int kanten = pixelAnders(bilder[0], bilder[1]), schatten = pixelAnders(bilder[1], bilder[2]);
+        LOGGER.info("Relief auf der Minimap nah, Pixel anders: Relief gegen Flach {}, Relief + Schatten gegen Relief {}, Schatten des Turms {}",
+                kanten, schatten, ring);
+        if (kanten < 100 || schatten < 100 || ring < 20) {
+            throw new AssertionError("Relief auf der Minimap nah: Relief gegen Flach " + kanten + " Pixel anders, Relief + Schatten gegen Relief "
+                    + schatten + ", je mindestens 100; Schatten des Turms im Chunk der Säule " + ring + ", mindestens 20");
+        }
+    }
+
+    /** Wie viele Pixel zweier gleich grosser Bilder in einem Kanal um mehr als 2 abweichen. */
+    private static int pixelAnders(BufferedImage a, BufferedImage b) {
+        int n = 0;
+        for (int y = 0; y < a.getHeight(); y++) {
+            for (int x = 0; x < a.getWidth(); x++) {
+                int p = a.getRGB(x, y), q = b.getRGB(x, y);
+                boolean gleich = true;
+                for (int k = 0; k <= 16; k += 8) {
+                    gleich &= Math.abs((p >> k & 0xFF) - (q >> k & 0xFF)) <= 2;
+                }
+                n += gleich ? 0 : 1;
+            }
+        }
+        return n;
     }
 
     /** Was an ihrer Stelle steht, wenn die Pflanzen weg sind. */

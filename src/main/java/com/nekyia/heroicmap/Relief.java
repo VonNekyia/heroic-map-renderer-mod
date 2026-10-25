@@ -120,4 +120,114 @@ final class Relief {
         }
         return false;
     }
+
+    /** Eine fehlende Spalte in {@link Hoehen}. */
+    static final int FEHLT = Integer.MIN_VALUE;
+    /** So weit sucht der Schatten diagonal nach Nordwesten, in Blöcken. */
+    static final int REICHWEITE = 32;
+    /** Die Seite der Höhen um einen Chunk: 32 Blöcke nach Nordwesten, der Chunk, 1 Block nach Osten und Süden. */
+    static final int SEITE = REICHWEITE + 17;
+
+    /** Die Höhe der Oberfläche je Spalte der Welt, das y aus WORLD_SURFACE, oder {@link #FEHLT}. */
+    interface Hoehen {
+        int an(int x, int z);
+    }
+
+    /**
+     * Der Code der Spalte (x, z) wie in der Schicht des Renderers: n + 4 + 9 · s mit n = hO − hW + hS − hN, begrenzt auf −4
+     * bis 4, und s = 1, wenn k Blöcke diagonal nach Nordwesten eine Spalte um mehr als k · √2 höher ist, für ein k bis 32.
+     * Fehlt ein Nachbar, gilt er als gleich hoch; fehlt die Spalte selbst, 4. Siehe renderer docs/renderer/relief.md, „Die
+     * Schicht“, und docs/minimap.md, „Relief“.
+     */
+    static int code(Hoehen h, int x, int z) {
+        int h0 = h.an(x, z);
+        if (h0 == FEHLT) {
+            return 4;
+        }
+        int w = h.an(x - 1, z), o = h.an(x + 1, z), n = h.an(x, z - 1), s = h.an(x, z + 1);
+        int d = (o == FEHLT ? h0 : o) - (w == FEHLT ? h0 : w) + (s == FEHLT ? h0 : s) - (n == FEHLT ? h0 : n);
+        return Math.clamp(d, -4, 4) + 4 + (imSchatten(h, x, z, h0) ? 9 : 0);
+    }
+
+    private static boolean imSchatten(Hoehen h, int x, int z, int h0) {
+        for (int k = 1; k <= REICHWEITE; k++) {
+            int hk = h.an(x - k, z - k);
+            // In double wie im Renderer.
+            if (hk != FEHLT && (double) (hk - h0) > k * Math.sqrt(2)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Die Codes der 256 Spalten eines Chunks, Zeile für Zeile nach z, aus den Höhen um ihn, {@link #SEITE} im Quadrat ab 32
+     * Blöcken nordwestlich seiner Ecke.
+     */
+    static byte[] codes(int[] hoehen) {
+        Hoehen h = (x, z) -> x < 0 || z < 0 || x >= SEITE || z >= SEITE ? FEHLT : hoehen[z * SEITE + x];
+        byte[] codes = new byte[256];
+        for (int i = 0; i < 256; i++) {
+            codes[i] = (byte) code(h, REICHWEITE + (i & 15), REICHWEITE + (i >> 4));
+        }
+        return codes;
+    }
+
+    /** Aus den Höhen um einen Chunk ({@link #SEITE} im Quadrat) seine eigenen 16 × 16, Zeile für Zeile nach z. */
+    static int[] eigene(int[] hoehen) {
+        int[] eigene = new int[256];
+        for (int z = 0; z < 16; z++) {
+            System.arraycopy(hoehen, (REICHWEITE + z) * SEITE + REICHWEITE, eigene, z * 16, 16);
+        }
+        return eigene;
+    }
+
+    /**
+     * Welche der 4 × 4 Chunks im Fenster um einen Chunk fehlten, aus seinen Höhen ({@link #SEITE} im Quadrat): je Chunk mit dem
+     * Abstand dx und dz von −2 bis 1 das Bit (dz + 2) · 4 + dx + 2. Ein geladener Chunk hat an jeder Spalte eine Höhe.
+     */
+    static int fehlende(int[] hoehen) {
+        int maske = 0;
+        for (int dz = -2; dz <= 1; dz++) {
+            for (int dx = -2; dx <= 1; dx++) {
+                if (hoehen[(dz + 2) * 16 * SEITE + (dx + 2) * 16] == FEHLT) {
+                    maske |= 1 << (dz + 2) * 4 + dx + 2;
+                }
+            }
+        }
+        return maske;
+    }
+
+    /** Fehlte in {@code maske} ({@link #fehlende}) der Chunk mit dem Abstand dx, dz? */
+    static boolean fehlte(int maske, int dx, int dz) {
+        return (maske >> (dz + 2) * 4 + dx + 2 & 1) != 0;
+    }
+
+    /**
+     * Legt die Art {@code art} auf das Bild eines Chunks ohne Relief, je Block {@code scale} × {@code scale} Pixel mit dem Code
+     * seiner Spalte: je Kanal gerundet und bei 255 gekappt, Alpha bleibt, wie der Renderer auf eine Kachel.
+     */
+    static void auf(int[] pixel, int scale, byte[] codes, Art art) {
+        int seite = 16 * scale;
+        for (int i = 0; i < 256; i++) {
+            float f = faktor(codes[i], art);
+            if (f == 1) {
+                continue;
+            }
+            int bx = (i & 15) * scale, bz = (i >> 4) * scale;
+            for (int y = bz; y < bz + scale; y++) {
+                for (int x = bx; x < bx + scale; x++) {
+                    int p = y * seite + x, argb = pixel[p];
+                    if (argb >>> 24 == 0) {
+                        continue;
+                    }
+                    int neu = argb & 0xFF000000;
+                    for (int s = 16; s >= 0; s -= 8) {
+                        neu |= Math.min(255, Math.round((argb >> s & 0xFF) * f)) << s;
+                    }
+                    pixel[p] = neu;
+                }
+            }
+        }
+    }
 }

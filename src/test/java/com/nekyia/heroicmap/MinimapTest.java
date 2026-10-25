@@ -188,6 +188,37 @@ class MinimapTest {
     }
 
     @Test
+    void ringNurWennSichDieHoehenAendern() {
+        Minimap minimap = new Minimap();
+        minimap.setzeRelief(Relief.Art.SHADOWS);
+        minimap.mitte = new ChunkPos(0, 0);
+        int[] hoehen = new int[256];
+        java.util.Arrays.fill(hoehen, 64);
+        // Gemalt sind schon (1, 0) ohne (0, 0), ihm fehlte der Chunk 1 westlich, und (0, 1) mit (0, 0). Das erste Abziehen
+        // von (0, 0) malt nur (1, 0) neu; die Codes von (0, 1) stimmen schon.
+        minimap.abgezogen(1, 0, hoehen.clone(), 1 << 2 * 4 + 1);
+        minimap.abgezogen(0, 1, hoehen.clone(), 0);
+        minimap.offen.clear();
+        minimap.abgezogen(0, 0, hoehen.clone(), 0);
+        assertEquals(java.util.Set.of(ChunkPos.pack(1, 0)), new java.util.HashSet<>(minimap.offen));
+        // Eine Änderung unter der Oberfläche: markiert 1 Chunk, und nach dem Neumalen mit gleichen Höhen kein Ring.
+        minimap.offen.clear();
+        minimap.markiere(0, 0);
+        assertEquals(1, minimap.offen.size());
+        minimap.offen.clear();
+        minimap.abgezogen(0, 0, hoehen.clone(), 0);
+        assertEquals(0, minimap.offen.size());
+        // An der Oberfläche: eine Höhe anders, der Ring, Rand im Westen und Norden, Schatten bis 2 nach Südosten, 8 Chunks.
+        hoehen[17] = 65;
+        minimap.abgezogen(0, 0, hoehen.clone(), 0);
+        java.util.Set<Long> ring = new java.util.HashSet<>();
+        for (int[] k : new int[][] {{-1, 0}, {0, -1}, {1, 0}, {0, 1}, {1, 1}, {2, 1}, {1, 2}, {2, 2}}) {
+            ring.add(ChunkPos.pack(k[0], k[1]));
+        }
+        assertEquals(ring, new java.util.HashSet<>(minimap.offen));
+    }
+
+    @Test
     void ohneMitteNimmtSieAllesAuf() {
         Minimap minimap = new Minimap();
         minimap.markiere(1000, 1000);

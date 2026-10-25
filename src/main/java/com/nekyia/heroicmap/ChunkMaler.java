@@ -46,6 +46,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.AABB;
@@ -107,18 +108,22 @@ final class ChunkMaler {
 
     /**
      * Was der Worker für einen Chunk braucht: je Spalte die erste Höhe, die Abschnitte von
-     * {@code minSektion} an als Kopien und die Texel aller Sprites des Block-Atlas.
+     * {@code minSektion} an als Kopien und die Texel aller Sprites des Block-Atlas. Mit {@code relief} dazu die Höhen um den
+     * Chunk ({@link Relief#codes}); ohne beides null.
      */
     record Auftrag(int cx, int cz, int scale, Licht licht, Map<TextureAtlasSprite, Texel> texel,
-            int[] start, int minSektion, RenderSectionRegion[] abschnitte, long stand) {
+            int[] start, int minSektion, RenderSectionRegion[] abschnitte, long stand, int[] hoehen, Relief.Art relief) {
     }
 
     /**
      * Zieht den Chunk auf dem Render-Thread ab. Je Spalte reicht er von der Höhenkarte, oder
-     * von {@code decke}, bis zum ersten vollen Block darunter.
+     * von {@code decke}, bis zum ersten vollen Block darunter. Legt {@code male} das Relief {@code relief} auf, und gibt es
+     * keine Decke, kommen die Höhen um den Chunk dazu; „ohne“ und null legen keins auf. Siehe docs/minimap.md, „Relief“.
      */
     static Auftrag abziehen(ClientLevel level, LevelChunk chunk, int scale, int decke, Licht licht,
-            Map<TextureAtlasSprite, Texel> texel, long stand) {
+            Map<TextureAtlasSprite, Texel> texel, long stand, Relief.Art relief) {
+        Relief.Art auf = relief == null || relief == Relief.Art.OHNE || decke != Integer.MAX_VALUE ? null : relief;
+        int[] hoehen = auf == null ? null : hoehen(level, chunk.getPos().x(), chunk.getPos().z());
         int cx = chunk.getPos().x(), cz = chunk.getPos().z();
         int bx = chunk.getPos().getMinBlockX(), bz = chunk.getPos().getMinBlockZ();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
@@ -139,7 +144,7 @@ final class ChunkMaler {
             unten = Math.min(unten, y);
         }
         if (oben == Integer.MIN_VALUE) {
-            return new Auftrag(cx, cz, scale, licht, texel, start, 0, new RenderSectionRegion[0], stand);
+            return new Auftrag(cx, cz, scale, licht, texel, start, 0, new RenderSectionRegion[0], stand, hoehen, auf);
         }
         int minSektion = SectionPos.blockToSectionCoord(unten), maxSektion = SectionPos.blockToSectionCoord(oben);
         RenderRegionCache kopien = new RenderRegionCache();
@@ -147,7 +152,31 @@ final class ChunkMaler {
         for (int sy = minSektion; sy <= maxSektion; sy++) {
             abschnitte[sy - minSektion] = kopien.createRegion(level, SectionPos.asLong(cx, sy, cz));
         }
-        return new Auftrag(cx, cz, scale, licht, texel, start, minSektion, abschnitte, stand);
+        return new Auftrag(cx, cz, scale, licht, texel, start, minSektion, abschnitte, stand, hoehen, auf);
+    }
+
+    /**
+     * Die Höhen um den Chunk für das Relief, aus WORLD_SURFACE: {@link Relief#SEITE} im Quadrat ab 32 Blöcken nordwestlich der
+     * Ecke, bis 1 Block östlich und südlich; wo kein Chunk geladen ist, {@link Relief#FEHLT}.
+     */
+    private static int[] hoehen(ClientLevel level, int cx, int cz) {
+        int[] h = new int[Relief.SEITE * Relief.SEITE];
+        int x0 = SectionPos.sectionToBlockCoord(cx) - Relief.REICHWEITE, z0 = SectionPos.sectionToBlockCoord(cz) - Relief.REICHWEITE;
+        for (int kz = SectionPos.blockToSectionCoord(z0); kz <= cz + 1; kz++) {
+            for (int kx = SectionPos.blockToSectionCoord(x0); kx <= cx + 1; kx++) {
+                LevelChunk c = level.getChunkSource().getChunk(kx, kz, ChunkStatus.FULL, false);
+                for (int lz = 0; lz < 16; lz++) {
+                    int z = SectionPos.sectionToBlockCoord(kz) + lz - z0;
+                    for (int lx = 0; lx < 16; lx++) {
+                        int x = SectionPos.sectionToBlockCoord(kx) + lx - x0;
+                        if (x >= 0 && z >= 0 && x < Relief.SEITE && z < Relief.SEITE) {
+                            h[z * Relief.SEITE + x] = c == null ? Relief.FEHLT : c.getHeight(Heightmap.Types.WORLD_SURFACE, lx, lz);
+                        }
+                    }
+                }
+            }
+        }
+        return h;
     }
 
     private final Minecraft minecraft = Minecraft.getInstance();
@@ -268,7 +297,11 @@ final class ChunkMaler {
             summe = new float[scale * scale * 4];
         }
         try {
-            return zeichne(a);
+            int[] pixel = zeichne(a);
+            if (a.relief() != null) {
+                Relief.auf(pixel, scale, Relief.codes(a.hoehen()), a.relief());
+            }
+            return pixel;
         } finally {
             welt = null;
             auftrag = null;

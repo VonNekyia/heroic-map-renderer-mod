@@ -494,7 +494,7 @@ public final class Selbst {
             licht = Licht.von(level.dimensionType());
         }
         Satz s = satz;
-        ChunkMaler.Auftrag auftrag = ChunkMaler.abziehen(level, chunk, s.massstab(), Integer.MAX_VALUE, licht, Minimap.INSTANZ.texel(mc), 0);
+        ChunkMaler.Auftrag auftrag = ChunkMaler.abziehen(level, chunk, s.massstab(), Integer.MAX_VALUE, licht, Minimap.INSTANZ.texel(mc), 0, null);
         inArbeit.incrementAndGet();
         worker.execute(() -> {
             try {
