@@ -343,8 +343,9 @@ im Plugin unter
 
 - **Gelesen** (`Freigabe.lies`): das Objekt `relief` mit `manifest_sha256`,
   `bytes` und `rest` darin, ebenso aufgebaut, als `Freigabe.relief` und
-  `Freigabe.rest`. Fehlt es, gibt es keine; fehlt `rest` oder sind Bytes
-  negativ, ist die `freigabe` unlesbar. `bytes` der `freigabe` bleibt der Baum.
+  `Freigabe.rest`. Fehlt es, gibt es keine; taugt ein Teil nicht, etwa ohne
+  `rest` oder mit negativen Bytes, gilt kein Relief, und der Baum lädt
+  trotzdem (Reviewer, 25.10.). `bytes` der `freigabe` bleibt der Baum.
 - **Wann** (`Downloads.ladeRelief`): nach dem Baum, wenn er fertig und nicht
   gekappt ist, und nur, wenn die gewählte Art nicht die seiner Kacheln ist und
   er die Schicht hat. Die Wahl gilt, wie sie beim Einreihen war.

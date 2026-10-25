@@ -52,12 +52,13 @@ record Freigabe(String baum, String art, int massstab, long bytes, URI url, Stri
         if (!baum(baum)) {
             throw new IllegalArgumentException("freigabe");
         }
-        // Schicht und Rest nur bei einem Baum mit Relief, je mit Prüfsumme und Bytes. Siehe docs/download.md, „Relief“.
-        JsonObject relief = json.has("relief") ? json.getAsJsonObject("relief") : null;
+        // Schicht und Rest nur bei einem Baum mit Relief, je mit Prüfsumme und Bytes; taugt einer nicht, gilt kein Relief, der
+        // Baum lädt trotzdem. Siehe docs/download.md, „Relief“.
+        Teil[] relief = relief(json);
         Freigabe f = new Freigabe(baum, json.get("art").getAsString(),
                 json.get("massstab").getAsInt(), json.get("bytes").getAsLong(), url(json, baum, verbindung),
                 json.get("token").getAsString(), json.get("manifest_sha256").getAsString(),
-                relief == null ? null : teil(relief), relief == null ? null : teil(relief.getAsJsonObject("rest")));
+                relief == null ? null : relief[0], relief == null ? null : relief[1]);
         if (!(f.art.equals("voll") || f.art.equals("abgleich"))
                 || (f.massstab != 1 && f.massstab != 2 && f.massstab != 4) || f.bytes < 0 || !Adresse.form(f.url)) {
             throw new IllegalArgumentException("freigabe");
@@ -65,12 +66,23 @@ record Freigabe(String baum, String art, int massstab, long bytes, URI url, Stri
         return f;
     }
 
+    /** Schicht und Rest aus {@code relief}, oder null, wenn es fehlt oder ein Teil nicht taugt. */
+    private static Teil[] relief(JsonObject json) {
+        try {
+            JsonObject relief = json.getAsJsonObject("relief");
+            if (relief == null) {
+                return null;
+            }
+            Teil schicht = teil(relief), rest = teil(relief.getAsJsonObject("rest"));
+            return schicht == null || rest == null ? null : new Teil[] {schicht, rest};
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     private static Teil teil(JsonObject json) {
         Teil t = new Teil(json.get("manifest_sha256").getAsString(), json.get("bytes").getAsLong());
-        if (t.bytes < 0) {
-            throw new IllegalArgumentException("relief");
-        }
-        return t;
+        return t.bytes < 0 ? null : t;
     }
 
     /**

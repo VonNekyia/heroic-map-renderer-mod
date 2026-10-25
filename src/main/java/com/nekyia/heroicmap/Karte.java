@@ -1,6 +1,8 @@
 package com.nekyia.heroicmap;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -348,6 +350,8 @@ final class Karte extends Screen {
                     zentriere(minecraft.player.getX(), minecraft.player.getZ());
                 }
             }).bounds(x, unterster.getY() + 24, KNOPF, 20).build());
+            // Darunter die Wahl des Reliefs, reihum. Siehe docs/vollbildkarte.md, „Relief“.
+            unterster = addRenderableWidget(reliefKnopf(x, unterster.getY() + 24));
         }
         unterster = ebenen(x, unterster);
         // Darunter „Verwalten“, links daneben dann das Panel mit allen eigenen Objekten. Siehe docs/verwaltung.md.
@@ -473,6 +477,51 @@ final class Karte extends Screen {
     private void stelleUm(List<Ebenenreihe.Schicht> reihe, Set<Ebenenreihe.Schicht> gezeigt, Ebenenreihe.Schicht s, int schritt) {
         Ebenenreihe.INSTANZ.verschiebe(reihe, gezeigt, s, schritt);
         rebuildWidgets();
+    }
+
+    /**
+     * Der Knopf „Relief“: zeigt die gewählte Art, ein Klick nimmt die nächste, speichert sie und lädt die Kacheln neu. Fehlt
+     * die Schicht noch, trägt er „…“ und sagt, dass sie mit dem nächsten Abgleich kommt; kann der Satz kein anderes Relief,
+     * ist er grau mit dem Grund. Siehe docs/vollbildkarte.md, „Relief“.
+     */
+    private Button reliefKnopf(int x, int y) {
+        Relief.Art art = Minimap.INSTANZ.relief();
+        Relief.Satzrelief relief = Relief.von(satz.ordner());
+        boolean fehlt = fehltSchicht(relief, art);
+        Component name = Component.translatable("heroicmap.relief." + art.name);
+        Button knopf = Button.builder(Component.translatable(fehlt ? "heroicmap.karte.relief_fehlt" : "heroicmap.karte.relief", name), b -> {
+            Relief.Art neu = Relief.Art.values()[(Minimap.INSTANZ.relief().ordinal() + 1) % Relief.Art.values().length];
+            Minimap.INSTANZ.setzeRelief(neu);
+            Minimap.INSTANZ.schreibe(HeroicMap.einstellungen());
+            Kacheln.satzGeladen();
+            if (fehltSchicht(relief, neu)) {
+                long ab = baum == null ? 0 : Downloads.INSTANZ.abgleichAb(baum);
+                Component neuName = Component.translatable("heroicmap.relief." + neu.name);
+                zeige(ab > 0 ? Component.translatable("heroicmap.karte.relief_kommt_ab", neuName, Downloads.uhr(ab))
+                        : Component.translatable("heroicmap.karte.relief_kommt", neuName));
+            }
+            rebuildWidgets();
+        }).bounds(x, y, KNOPF, 20).build();
+        String grund = Selbst.selbst(satz.ordner().getParent()) ? "heroicmap.karte.relief_selbst"
+                : relief.gebacken() == Relief.Art.OHNE ? "heroicmap.karte.relief_ohne"
+                : !relief.schicht() ? "heroicmap.karte.relief_alt" : null;
+        knopf.active = grund == null;
+        knopf.setTooltip(Tooltip.create(Component.translatable(grund != null ? grund
+                : fehlt ? "heroicmap.karte.relief_kommt.beschreibung" : "heroicmap.karte.relief.beschreibung")));
+        return knopf;
+    }
+
+    /**
+     * Braucht {@code art} die Schicht dieses Satzes, und liegen Schicht oder Rest noch nicht ganz da: ohne Index, oder ein
+     * Strom ist offen? Ein leerer Rest hat einen leeren Index.
+     */
+    private boolean fehltSchicht(Relief.Satzrelief relief, Relief.Art art) {
+        Path schicht = satz.ordner().resolve(Downloads.RELIEF);
+        return relief.noetig(art) && !(liegt(schicht) && liegt(schicht.resolve("rest")));
+    }
+
+    private static boolean liegt(Path teil) {
+        return Files.exists(teil.resolve("etags.txt")) && !Laden.imStrom(teil);
     }
 
     /** Ob „Im Browser öffnen“ geht, und sonst warum, als Tooltip; nur bei einem anderen Grund neu. */
