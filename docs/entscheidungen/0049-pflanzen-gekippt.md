@@ -71,7 +71,8 @@ Der Versuch steht auf dem Tag `versuch/pflanzen-kippen`.
   +7 %, bei 16 px +1 %. Siehe
   [Pflanzen gekippt, Zeit je Chunk](../messungen/2026-10-24-pflanzen-gekippt.md).
 - **Darum das Raster:** Gekippte Flächen nehmen das gemittelte Raster des
-  Sprites, eine Probe je Pixel, wie die flache Fläche bisher. Ziel: höchstens
-  +5 % bei 4, 8 und 16 px gegen main. Auftrag des Users: die Pflanzen erst
-  mit dem Raster, nicht schon in 0.2.72.
+  Sprites, eine Probe je Pixel, wie die flache Fläche bisher. Auftrag des
+  Users: die Pflanzen erst mit dem Raster, nicht schon in 0.2.72. Gegen main
+  kostet das noch +7,2 % bei 4 px, +6,0 % bei 8 px und +3,3 % bei 16 px;
+  das Ziel waren höchstens +5 %.
 - Die eigene Karte zeichnet mit demselben Maler und kippt also mit.

@@ -1,8 +1,8 @@
 ---
 title: Pflanzen gekippt, Zeit je Chunk
-description: Was die gekippten Pflanzen (0049) im Worker je Chunk kosten, vorher gegen nachher im Wechsel, bei 1 bis 16 px; Reihe 1 ohne Lastprüfung, mit einem Ausreisser.
+description: Was die gekippten Pflanzen (0049) im Worker je Chunk kosten, vorher gegen nachher im Wechsel, bei 1 bis 16 px; Reihe 1 mit n × n Proben, Reihe 2 mit dem gemittelten Raster.
 date: 2026-10-24
-commits: [a834226, 4995213]
+commits: [a834226, 4995213, d356b25, b6c0ae3]
 code:
   - src/main/java/com/nekyia/heroicmap/ChunkMaler.java
   - src/gametest/java/com/nekyia/heroicmap/Messung.java
@@ -14,8 +14,9 @@ Die gekippten Pflanzen kosten im Worker je Chunk rund 0,5 ms mehr, auf jeder
 Auflösung fast gleich viel: bei 4 px +18 % (2,76 → 3,26 ms), bei 1 px +36 %,
 bei 16 px +1 %. Der Grund: Die flache Fläche nahm das vorgemittelte Raster,
 die gekippten Flächen tasten je Pixel n × n Proben ab, je Fläche und Block
-256. Das liegt über dem Ziel von +5 %. Darum nehmen auch die gekippten
-Flächen das Raster; Reihe 2 misst das gegen main.
+256. Das liegt über dem Ziel von +5 %. Mit dem gemittelten Raster
+(Reihe 2) sind es noch +7,2 % bei 4 px, +6,0 % bei 8 px und +3,3 % bei
+16 px, rund 0,2 bis 0,5 ms je Chunk.
 
 ## Aufbau
 
@@ -53,8 +54,9 @@ messen. Kein Spiel lief. Last vor jedem Lauf, drei Proben im Abstand von 5 s:
   Lastprobe fällt hinein; gemessen wird je Chunk erst nach dem Anlegen der
   Welt, rund eine Minute später, doch Lauf 1 liegt bei 4 px 15 % über den
   beiden anderen Läufen von A.
-- **Reihe 2** unter der Lastprüfung des Skills wurde nach dem Bauen
-  abgebrochen, ehe ein Lauf begann: Der Unterschied war schon klar.
+- **Der erste Anlauf zu Reihe 2** unter der Lastprüfung des Skills wurde
+  nach dem Bauen abgebrochen, ehe ein Lauf begann: Der Unterschied war
+  schon klar.
 - Die Zahlen stammen aus den Dateien der Läufe (`-Pmessung`), ausgewertet je
   Lauf als Median der drei Runden.
 
@@ -74,6 +76,56 @@ Zeichnen je Chunk im Worker, Median der Läufe, in Klammern die Spanne:
   Der Unterschied ist grösser als die Streuung.
 - Absolut kostet B rund 0,7 ms mehr bei 1 px, 0,5 ms bei 2 und 4 px, 0,4 ms
   bei 8 px und 0,1 ms bei 16 px.
+
+## Reihe 2: gemitteltes Raster
+
+Gekippte Flächen nehmen hier das gemittelte Raster des Sprites, eine Probe
+je Pixel.
+
+- **Stände:** A ist main `d356b25` mit dem Schalter `-PmessungChunks`, B
+  mod#217 mit dem Raster (`b6c0ae3`); main enthält dazu #218, das den
+  Maler nicht berührt.
+- **Lauf:** 25.10., 02:15 bis 02:34, unter der Sperrdatei, vor jedem Lauf
+  die Lastprüfung des Skills: 30 s unter 10 %, gemessen 1 bis 6 %. Kein
+  Spiel lief.
+- **Lauf 1 A ist gestört:** Bis 02:20:39 räumte eine andere Sitzung
+  Messbäume mit `rmdir` weg; Lauf 1 lief 02:17:38 bis 02:20:22 ganz darin.
+  Ein Kern mit Plattenlast fiel unter 10 % CPU nicht auf. Lauf 7 A ersetzt
+  ihn; seine Zahlen liegen gleichauf mit Lauf 1.
+
+| Lauf | Stand | Zeit | 1 px | 2 px | 4 px | 8 px | 16 px |
+|---|---|---|---|---|---|---|---|
+| 1 | A, gestört | 02:17:38 bis 02:20:22 | 1,958 | 2,111 | 2,697 | 5,164 | 14,51 |
+| 2 | B | 02:21:28 bis 02:23:01 | 2,053 | 2,197 | 2,819 | 5,192 | 14,51 |
+| 3 | B | 02:23:35 bis 02:25:08 | 2,130 | 2,296 | 2,952 | 5,393 | 14,83 |
+| 4 | A | 02:25:55 bis 02:27:26 | 1,924 | 2,094 | 2,670 | 5,055 | 14,26 |
+| 5 | A | 02:28:00 bis 02:29:29 | 1,959 | 2,134 | 2,703 | 5,046 | 14,03 |
+| 6 | B | 02:30:03 bis 02:31:37 | 2,124 | 2,286 | 2,898 | 5,360 | 14,73 |
+| 7 | A | 02:32:20 bis 02:33:50 | 1,934 | 2,105 | 2,716 | 5,108 | 14,38 |
+
+Zeichnen je Chunk in ms, je Lauf der Median der drei Runden. Ohne Lauf 1,
+Median der drei Läufe je Stand, in Klammern die Spanne:
+
+| Auflösung | A | B | B gegen A |
+|---|---|---|---|
+| 1 px | 1,93 ms (1,92–1,96) | 2,12 ms (2,05–2,13) | +0,19 ms, +9,8 % |
+| 2 px | 2,11 ms (2,09–2,13) | 2,29 ms (2,20–2,30) | +0,18 ms, +8,6 % |
+| 4 px | 2,70 ms (2,67–2,72) | 2,90 ms (2,82–2,95) | +0,20 ms, +7,2 % |
+| 8 px | 5,06 ms (5,05–5,11) | 5,36 ms (5,19–5,39) | +0,31 ms, +6,0 % |
+| 16 px | 14,26 ms (14,03–14,38) | 14,73 ms (14,51–14,83) | +0,47 ms, +3,3 % |
+
+- Der Unterschied ist grösser als die Streuung; das Ziel von höchstens +5 %
+  erreicht B bei 16 px, bei 4 und 8 px nicht.
+- Gegen Reihe 1 sinkt der Aufpreis bei 1 px von 0,72 auf 0,19 ms, bei 4 px
+  von 0,50 auf 0,20 ms; bei 16 px steigt er von 0,12 auf 0,47 ms, wo das
+  Raster texelgenau ist und nichts spart. Ob das an den Ständen liegt (A
+  in Reihe 1 ohne, hier mit #218) oder an der Streuung zwischen den
+  Reihen, sagt diese Messung nicht; verglichen wird nur innerhalb der
+  Reihe.
+- **Was bleibt:** Je Pflanze rechnet der Maler das Licht für jede Fläche,
+  die nicht liegt, beim `crop` acht Flächen mit je vier Ecken, auch für die
+  Hälfte, die nach dem Kippen nach unten zeigt und nicht gezeichnet wird.
+  Dazu zeichnet er statt einer Fläche zwei.
 
 ## Schluss
 

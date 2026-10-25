@@ -1194,8 +1194,9 @@ der Platte nichts Neues.
 **Pflanzen gekippt:** Mit n × n Proben je Pixel kosteten sie im Worker je
 Chunk rund 0,5 ms mehr, bei 4 px +18 %, bei 1 px +36 %, bei 16 px +1 %
 (Reihe 1 in [Pflanzen gekippt, Zeit je Chunk](messungen/2026-10-24-pflanzen-gekippt.md)).
-Darum nehmen sie das gemittelte Raster, eine Probe je Pixel; Reihe 2 der
-Messung vergleicht das mit main.
+Darum nehmen sie das gemittelte Raster, eine Probe je Pixel: Gegen main
+kosten sie damit +7,2 % bei 4 px, +6,0 % bei 8 px, +3,3 % bei 16 px und
++9,8 % bei 1 px (Reihe 2 derselben Messung).
 
 **Der Umriss rund ohne Rahmen** (`Minimap.umrissRing`), geschätzt, nicht
 gemessen:
