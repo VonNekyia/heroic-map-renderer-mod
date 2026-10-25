@@ -78,6 +78,13 @@ class ReliefTest {
     }
 
     @Test
+    void restNurBeiAbgeschnittenen() {
+        // Nur ein sichtbarer Pixel mit einem Kanal 255 kann abgeschnitten sein; durchsichtig zählt nicht.
+        assertTrue(Relief.abgeschnitten(new int[] {grau(10), 0xFF10FF10}));
+        assertFalse(Relief.abgeschnitten(new int[] {grau(254), 0x00FFFFFF}));
+    }
+
+    @Test
     void ausShadowsWirdSlope() {
         // Gebacken mit shadows bei Code 13 (eben, im Schatten, f 0,75): 150 ist ohne 200, mit slope bleibt es 200.
         int[] k = {grau(150)};
