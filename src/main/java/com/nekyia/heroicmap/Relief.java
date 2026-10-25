@@ -219,7 +219,7 @@ final class Relief {
         int seite = 16 * scale;
         int[] pixel = new int[seite * seite];
         for (int p = 0; p < pixel.length; p++) {
-            pixel[p] = 0xFF000000 | 0x010101 * codes[p / seite / scale * 16 + p % seite / scale];
+            pixel[p] = 0xFF000000 | 0x010101 * codes[p % seite / scale * 16 + p / seite / scale];
         }
         return pixel;
     }
