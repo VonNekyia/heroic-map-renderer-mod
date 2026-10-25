@@ -501,7 +501,7 @@ public final class Selbst {
             licht = Licht.von(level.dimensionType());
         }
         Satz s = satz;
-        ChunkMaler.Auftrag auftrag = ChunkMaler.abziehen(level, chunk, s.massstab(), Integer.MAX_VALUE, licht, Minimap.INSTANZ.texel(mc), 0, null);
+        ChunkMaler.Auftrag auftrag = ChunkMaler.abziehen(level, chunk, s.massstab(), Integer.MAX_VALUE, licht, Minimap.INSTANZ.texel(mc), 0, Minimap.INSTANZ.relief());
         // Die Kacheln bleiben ohne Relief; mit Relief kommt die Schicht dazu. Siehe docs/selbst.md, „Relief“.
         int[] hoehen = Minimap.INSTANZ.relief() == Relief.Art.OHNE ? null : ChunkMaler.hoehen(level, auftrag.cx(), auftrag.cz());
         if (hoehen != null) {
