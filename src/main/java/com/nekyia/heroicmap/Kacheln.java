@@ -148,7 +148,7 @@ final class Kacheln implements AutoCloseable {
                         // Die selbst gezeichnete Karte schreibt PNG. Siehe docs/selbst.md, „Kacheln“.
                         argb = png(Files.readAllBytes(png), seite).argb();
                     }
-                    if (argb != null && relief.noetig(art)) {
+                    if (argb != null && relief.noetig(art) && Files.exists(datei)) {
                         mitRelief(argb, z, x, y, art);
                     }
                 } catch (IOException e) {
