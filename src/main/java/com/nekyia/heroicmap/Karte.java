@@ -494,7 +494,7 @@ final class Karte extends Screen {
             Minimap.INSTANZ.setzeRelief(neu);
             if (alt == Relief.Art.OHNE && relief.selbst()) {
                 // Mit Flach schrieb die eigene Karte keine Schicht; die geladenen Chunks bekommen sie jetzt.
-                Selbst.INSTANZ.neuGewaehlt(minecraft);
+                ;
             }
             Minimap.INSTANZ.schreibe(HeroicMap.einstellungen());
             Kacheln.satzGeladen();
