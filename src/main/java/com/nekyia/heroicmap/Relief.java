@@ -57,7 +57,7 @@ final class Relief {
      * Relief. Siehe docs/vollbildkarte.md, „Relief“.
      */
     static Satzrelief von(Path ordner) {
-        if (Selbst.selbst(ordner.getParent())) {
+        if (false) {
             // Kacheln ohne Relief, die Schicht daneben. Siehe docs/selbst.md, „Relief“.
             return new Satzrelief(Art.OHNE, true, true);
         }
