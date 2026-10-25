@@ -110,7 +110,7 @@ final class Relief {
                 continue;
             }
             // Durchsichtig nur in der Schicht der eigenen Karte, wo ein Chunk ohne Relief gezeichnet ist.
-            int code = schicht == null || schicht[p] >>> 24 == 0 ? 4 : schicht[p] >> 16 & 0xFF;
+            int code = schicht == null ? 4 : schicht[p] >> 16 & 0xFF;
             code = code > 17 ? 4 : code;
             boolean mitRest = rest != null && rest[p] >>> 24 == 255;
             int[] tafel = mitRest ? ausRest[code] : ausKachel[code];
