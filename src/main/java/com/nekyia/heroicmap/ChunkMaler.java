@@ -167,9 +167,11 @@ final class ChunkMaler {
     private boolean oben;
     /**
      * Die Flächen des aktuellen Blocks, die gekippt werden, über alle Blöcke wiederverwendet: je Fläche 12 Werte Ecken
-     * (x, y, z samt Versatz), 8 UV, 12 Licht (r, g, b je Ecke, nach oben schattiert), Sprite und Schicht.
+     * (x, y, z samt Versatz), 8 UV, je Ecke Lichtkoordinaten und Farbe roh, der Faktor nach oben, Sprite und Schicht. Das Licht
+     * rechnet {@link #kippe} erst für die Flächen, die nach dem Kippen gezeichnet werden.
      */
-    private float[] kippEcken = new float[12 * 16], kippUv = new float[8 * 16], kippLicht = new float[12 * 16];
+    private float[] kippEcken = new float[12 * 16], kippUv = new float[8 * 16], kippFaktor = new float[16];
+    private int[] kippLichtRoh = new int[4 * 16], kippFarbe = new int[4 * 16];
     private TextureAtlasSprite[] kippSprite = new TextureAtlasSprite[16];
     private ChunkSectionLayer[] kippSchicht = new ChunkSectionLayer[16];
     private boolean[] kippSichtbar = new boolean[16];
@@ -300,19 +302,21 @@ final class ChunkMaler {
         }
     }
 
-    /** Merkt eine Fläche zum Kippen: Ecken samt Versatz, UV, Licht nach oben schattiert, Sprite und Schicht. */
+    /** Merkt eine Fläche zum Kippen: Ecken samt Versatz, UV, Licht roh und den Faktor nach oben, Sprite und Schicht. */
     private void merke(BakedQuad quad, QuadInstance instanz, float x, float y, float z) {
         if (kippAnzahl == kippSprite.length) {
             int n = 2 * kippAnzahl;
             kippEcken = Arrays.copyOf(kippEcken, 12 * n);
             kippUv = Arrays.copyOf(kippUv, 8 * n);
-            kippLicht = Arrays.copyOf(kippLicht, 12 * n);
+            kippFaktor = Arrays.copyOf(kippFaktor, n);
+            kippLichtRoh = Arrays.copyOf(kippLichtRoh, 4 * n);
+            kippFarbe = Arrays.copyOf(kippFarbe, 4 * n);
             kippSprite = Arrays.copyOf(kippSprite, n);
             kippSchicht = Arrays.copyOf(kippSchicht, n);
             kippSichtbar = Arrays.copyOf(kippSichtbar, n);
         }
         int i = kippAnzahl++;
-        float faktor = schattenNachOben(welt.cardinalLighting(), quad.materialInfo().shadeDirectionOverride(), quad.direction());
+        kippFaktor[i] = schattenNachOben(welt.cardinalLighting(), quad.materialInfo().shadeDirectionOverride(), quad.direction());
         int leuchten = quad.materialInfo().lightEmission();
         for (int k = 0; k < 4; k++) {
             Vector3fc p = quad.position(k);
@@ -322,11 +326,8 @@ final class ChunkMaler {
             long packed = quad.packedUV(k);
             kippUv[8 * i + 2 * k] = UVPair.unpackU(packed);
             kippUv[8 * i + 2 * k + 1] = UVPair.unpackV(packed);
-            auftrag.licht().hell(instanz.getLightCoordsWithEmission(k, leuchten), hell);
-            int farbe = instanz.getColor(k);
-            for (int c = 0; c < 3; c++) {
-                kippLicht[12 * i + 3 * k + c] = hell[c] * ((farbe >> (16 - 8 * c)) & 0xFF) / 255f * faktor;
-            }
+            kippLichtRoh[4 * i + k] = instanz.getLightCoordsWithEmission(k, leuchten);
+            kippFarbe[4 * i + k] = instanz.getColor(k);
         }
         kippSprite[i] = quad.materialInfo().sprite();
         kippSchicht[i] = quad.materialInfo().layer();
@@ -369,7 +370,11 @@ final class ChunkMaler {
                 xz[2 * k] = kippEcken[j];
                 xz[2 * k + 1] = kippEcken[j + 2] * faktor + schieben;
                 hoehe = Math.max(hoehe, kippEcken[j + 1] + alt - neu);
-                System.arraycopy(kippLicht, j, ecken[k], 0, 3);
+                auftrag.licht().hell(kippLichtRoh[4 * i + k], hell);
+                int farbe = kippFarbe[4 * i + k];
+                for (int c = 0; c < 3; c++) {
+                    ecken[k][c] = hell[c] * ((farbe >> (16 - 8 * c)) & 0xFF) / 255f * kippFaktor[i];
+                }
             }
             flaechen.add(new Flaeche(Math.min(hoehe, hoechstens), xz, Arrays.copyOfRange(kippUv, 8 * i, 8 * i + 8), kippSprite[i],
                     kippSchicht[i], ecken, true));
