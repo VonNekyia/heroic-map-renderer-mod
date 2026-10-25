@@ -36,17 +36,30 @@ class ReliefMessung {
         zeilen.add(String.format(Locale.ROOT, "baum %s gebacken=%s art=%s rechnet=%b kacheln=%d seite=%d", baum.getFileName(),
                 relief.gebacken().name, art.name, relief.noetig(art), kacheln.size(), seite));
         List<Long> alle = new ArrayList<>();
+        // Je Schritt, über alle Runden ausser der ersten: Kachel, Schicht, Rest, Rechnen.
+        long[] teile = new long[4];
         for (int runde = 0; runde < RUNDEN; runde++) {
             List<Long> ns = new ArrayList<>();
             for (Path k : kacheln) {
                 long start = System.nanoTime();
                 int[] argb = Kacheln.dekodiere(Files.readAllBytes(k), seite).argb();
+                long t1 = System.nanoTime(), t2 = t1, t3 = t1, t4 = t1;
                 if (relief.noetig(art)) {
                     Path rel = baum.relativize(k);
-                    Relief.rechne(argb, lies(baum.resolve("relief").resolve(rel), seite), lies(baum.resolve("relief/rest").resolve(rel), seite),
-                            relief.gebacken(), art);
+                    int[] schicht = lies(baum.resolve("relief").resolve(rel), seite);
+                    t2 = System.nanoTime();
+                    int[] rest = Relief.abgeschnitten(argb) ? lies(baum.resolve("relief/rest").resolve(rel), seite) : null;
+                    t3 = System.nanoTime();
+                    Relief.rechne(argb, schicht, rest, relief.gebacken(), art);
+                    t4 = System.nanoTime();
                 }
-                ns.add(System.nanoTime() - start);
+                ns.add(t4 - start);
+                if (runde > 0) {
+                    teile[0] += t1 - start;
+                    teile[1] += t2 - t1;
+                    teile[2] += t3 - t2;
+                    teile[3] += t4 - t3;
+                }
             }
             if (runde > 0) {
                 alle.addAll(ns);
@@ -54,7 +67,11 @@ class ReliefMessung {
             }
         }
         zeilen.add(String.format(Locale.ROOT, "gesamt n=%d median=%.3f ms p90=%.3f ms", alle.size(), ms(alle, 0.5), ms(alle, 0.9)));
-        Files.write(Path.of(System.getProperty("heroicmap.relief.messung")), zeilen);
+        zeilen.add(String.format(Locale.ROOT, "mittel je Kachel: kachel=%.3f schicht=%.3f rest=%.3f rechnen=%.3f ms", teile[0] / 1e6 / alle.size(),
+                teile[1] / 1e6 / alle.size(), teile[2] / 1e6 / alle.size(), teile[3] / 1e6 / alle.size()));
+        Path aus = Path.of(System.getProperty("heroicmap.relief.messung"));
+        Files.createDirectories(aus.toAbsolutePath().getParent());
+        Files.write(aus, zeilen);
     }
 
     private static int[] lies(Path webp, int seite) throws IOException {
