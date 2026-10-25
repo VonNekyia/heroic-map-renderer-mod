@@ -64,5 +64,8 @@ je Zustand und Versatz vorzurechnen, mit einem Aufpreis nahe null.
   Licht je Fläche gemittelt statt je Ecke verteilt.
 - Ein Modell, das je Block neue Flächen baut, rechnet jedes Mal neu und
   kostet so viel wie ohne Vorrat, dazu das Einfügen.
-- **Kosten:** Messung folgt, unter denselben Bedingungen wie Reihe 2 und 3
-  von [Pflanzen gekippt, Zeit je Chunk](../messungen/2026-10-24-pflanzen-gekippt.md).
+- **Kosten:** Gegen die flachen Pflanzen zeichnet der Worker einen Chunk
+  schneller: −1,9 % bei 1 px, −3,1 % bei 2 px, −2,8 % bei 4 px, −6,9 % bei
+  8 px, −7,1 % bei 16 px. Siehe
+  [Pflanzen gekippt, Zeit je Chunk](../messungen/2026-10-24-pflanzen-gekippt.md),
+  „Reihe 4: vorgerechnete Draufsicht“.

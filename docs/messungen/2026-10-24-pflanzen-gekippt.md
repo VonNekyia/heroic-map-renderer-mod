@@ -1,8 +1,8 @@
 ---
 title: Pflanzen gekippt, Zeit je Chunk
-description: Was die gekippten Pflanzen (0049) im Worker je Chunk kosten, vorher gegen nachher im Wechsel, bei 1 bis 16 px; Reihe 1 mit n × n Proben, Reihe 2 mit dem gemittelten Raster, Reihe 3 dazu mit Licht nur für gezeichnete Flächen.
+description: Was die gekippten Pflanzen (0049) im Worker je Chunk kosten, vorher gegen nachher im Wechsel, bei 1 bis 16 px; Reihe 1 mit n × n Proben, Reihe 2 mit dem gemittelten Raster, Reihe 3 dazu mit Licht nur für gezeichnete Flächen, Reihe 4 mit der vorgerechneten Draufsicht (0051).
 date: 2026-10-24
-commits: [a834226, 4995213, d356b25, b6c0ae3, f4eb620]
+commits: [a834226, 4995213, d356b25, b6c0ae3, f4eb620, 0c35060]
 code:
   - src/main/java/com/nekyia/heroicmap/ChunkMaler.java
   - src/gametest/java/com/nekyia/heroicmap/Messung.java
@@ -173,6 +173,46 @@ Median der drei Läufe je Stand, in Klammern die Spanne:
   und jede prüft je Pixel, ob er in ihr liegt; die flache Fläche deckte den
   Block ganz und brauchte diese Prüfung nicht.
 
+## Reihe 4: vorgerechnete Draufsicht
+
+Die gekippte Draufsicht je Modell und Versatz vorgerechnet, je Block nur
+noch ins Licht gelegt, nach
+[0051](../entscheidungen/0051-pflanzen-vorgerechnet.md).
+
+- **Stände:** A wie in Reihe 3, main `d356b25` mit dem Schalter, die
+  flachen Pflanzen; B mod#219 `0c35060`, auf main mit #217.
+- **Lauf:** 25.10., 05:10 bis 05:23, im Fenster des Reviewers, unter der
+  Sperrdatei, vor jedem Lauf die Lastprüfung des Skills: 30 s unter 10 %,
+  gemessen 0 bis 5 %. Kein Spiel lief, keine andere Sitzung arbeitete am
+  Rechner.
+
+| Lauf | Stand | Zeit | 1 px | 2 px | 4 px | 8 px | 16 px |
+|---|---|---|---|---|---|---|---|
+| 1 | A | 05:11:21 bis 05:12:54 | 2,002 | 2,180 | 2,774 | 5,224 | 14,58 |
+| 2 | B | 05:13:27 bis 05:14:55 | 1,933 | 2,077 | 2,656 | 4,802 | 13,26 |
+| 3 | B | 05:15:29 bis 05:16:58 | 1,967 | 2,133 | 2,687 | 4,859 | 13,42 |
+| 4 | A | 05:17:32 bis 05:19:01 | 1,905 | 2,082 | 2,634 | 5,016 | 13,96 |
+| 5 | A | 05:19:35 bis 05:21:07 | 1,986 | 2,187 | 2,749 | 5,217 | 14,45 |
+| 6 | B | 05:21:40 bis 05:23:09 | 1,949 | 2,112 | 2,671 | 4,870 | 13,51 |
+
+Median der drei Läufe je Stand, in Klammern die Spanne:
+
+| Auflösung | A | B | B gegen A |
+|---|---|---|---|
+| 1 px | 1,99 ms (1,91–2,00) | 1,95 ms (1,93–1,97) | −0,04 ms, −1,9 % |
+| 2 px | 2,18 ms (2,08–2,19) | 2,11 ms (2,08–2,13) | −0,07 ms, −3,1 % |
+| 4 px | 2,75 ms (2,63–2,77) | 2,67 ms (2,66–2,69) | −0,08 ms, −2,8 % |
+| 8 px | 5,22 ms (5,02–5,22) | 4,86 ms (4,80–4,87) | −0,36 ms, −6,9 % |
+| 16 px | 14,45 ms (13,96–14,58) | 13,42 ms (13,26–13,51) | −1,03 ms, −7,1 % |
+
+- **Ergebnis:** B ist auf jeder Auflösung schneller als die flachen
+  Pflanzen, am meisten bei 8 und 16 px. Je Block bleibt eine Schleife über
+  die Pixel ohne Dreieckstest und ohne die Umrechnung nach sRGB, die auch
+  die flache Fläche je Pixel hatte.
+- **A streut** hier um 5 % und liegt rund 5 % über A in Reihe 3; B bleibt
+  auf 2 % genau. Bei 1 bis 4 px ist der Abstand kaum grösser als die
+  Spanne von A, bei 8 und 16 px liegt jeder Lauf von B unter jedem von A.
+
 ## Schluss
 
 - **Woher es kommt:** Je gekippte Fläche und Block tastet der Maler
@@ -186,3 +226,7 @@ Median der drei Läufe je Stand, in Klammern die Spanne:
   dem Raster.
 - Diese Reihe ist keine Vergleichsbasis für spätere: ohne Lastprüfung, mit
   einem Ausreisser.
+- **Danach** (25.10.): Raster und Licht nur für gezeichnete Flächen
+  erreichten das Ziel nicht (Reihen 2 und 3). Die vorgerechnete
+  Draufsicht (Reihe 4) ist schneller als die flache Fläche, −2,8 % bei
+  4 px und −6,9 % bei 8 px.

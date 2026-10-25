@@ -973,6 +973,7 @@ Licht (`ChunkMaler.kippe`, `ChunkMaler.lege`). Entschieden in
   höchstens 2¹⁸ / scale², bei 16 px also 1024, bei 2 Flächen rund 9 KB je
   Stück; darüber fällt die am längsten nicht gebrauchte weg. Wie das Raster
   verfällt der Vorrat, wenn sich scale oder die Texturen ändern.
+- **Kosten** siehe „Kosten“.
 - **Ohne Allokation beim Treffer:** Die Flächen zum Kippen liegen in
   Puffern, die der Maler über alle Blöcke wiederverwendet
   (`ChunkMaler.merke`), ebenso der Schlüssel zum Suchen; neu angelegt wird
@@ -1230,10 +1231,11 @@ der Platte nichts Neues.
 **Pflanzen gekippt:** Mit n × n Proben je Pixel kosteten sie im Worker je
 Chunk rund 0,5 ms mehr, bei 4 px +18 %, bei 1 px +36 %, bei 16 px +1 %
 (Reihe 1 in [Pflanzen gekippt, Zeit je Chunk](messungen/2026-10-24-pflanzen-gekippt.md)).
-Darum nehmen sie das gemittelte Raster, eine Probe je Pixel, und das Licht
-rechnet der Maler nur für Flächen, die gezeichnet werden. Gegen main kosten
-sie damit je Chunk noch rund 0,2 bis 0,5 ms, bei 4 und 8 px +6 bis +9 %
-(Reihen 2 und 3 derselben Messung).
+Mit dem gemittelten Raster und Licht nur für gezeichnete Flächen waren es
+noch +6 bis +9 % bei 4 und 8 px (Reihen 2 und 3). Vorgerechnet je Modell
+und Versatz zeichnet der Worker einen Chunk schneller als mit den flachen
+Pflanzen bis 0.2.70: −1,9 % bei 1 px, −3,1 % bei 2 px, −2,8 % bei 4 px,
+−6,9 % bei 8 px, −7,1 % bei 16 px (Reihe 4).
 
 **Der Umriss rund ohne Rahmen** (`Minimap.umrissRing`), geschätzt, nicht
 gemessen:
