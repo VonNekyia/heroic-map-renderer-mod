@@ -148,6 +148,7 @@ public final class Bilder implements FabricClientGameTest {
             selbst(context);
             tueren(context, server);
             pflanzen(context, server);
+            pflanzenDesSpielsBleiben(context);
             pflanzenAusPaketen(context, server);
             weitHeraus(context, server);
             koordinatenAmRand(context, server);
@@ -1725,18 +1726,21 @@ public final class Bilder implements FabricClientGameTest {
      * {@code block/crop} mit gekippten Flächen, reifer Weizen als zwei Blöcke hohes Modell ohne {@code parent}, die Datei
      * {@code potatoes_stage3} des Spiels mit diesem Modell als {@code parent}, Gras, das neben dem Modell des Spiels ein
      * schräges Kreuz ohne {@code parent} wählt, ein kleiner roter Löwenzahn, eine Fläche halb so breit und hoch wie der
-     * Block, und ein Lauch aus zwei solchen Flächen hintereinander, im Modell zuerst die blaue hinten im Norden, dann die rote
-     * vorn. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
+     * Block, ein Lauch aus zwei solchen Flächen hintereinander, im Modell zuerst die blaue hinten im Norden, dann die rote
+     * vorn, und als Rübe ein hoher Weizen: Flächen 32 hoch, in der Textur 32 × 32 nur das Viertel links unten deckend, die
+     * obere Hälfte des Modells also durchsichtig. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
      */
     private static final String[] PAKET_PFLANZEN = {
         "pack.mcmeta",
         "assets/minecraft/blockstates/short_grass.json",
         "assets/minecraft/blockstates/wheat.json",
         "assets/minecraft/blockstates/allium.json",
+        "assets/minecraft/blockstates/beetroots.json",
         "assets/minecraft/blockstates/cobweb.json",
         "assets/minecraft/blockstates/dandelion.json",
         "assets/minecraft/models/block/crop.json",
         "assets/minecraft/models/block/heroicmap_test_gras.json",
+        "assets/minecraft/models/block/heroicmap_test_hoher_weizen.json",
         "assets/minecraft/models/block/heroicmap_test_hohes_getreide.json",
         "assets/minecraft/models/block/heroicmap_test_klein.json",
         "assets/minecraft/models/block/heroicmap_test_liegend.json",
@@ -1744,6 +1748,7 @@ public final class Bilder implements FabricClientGameTest {
         "assets/minecraft/models/block/heroicmap_test_vorn_hinten.json",
         "assets/minecraft/models/block/heroicmap_test_weizen_reif.json",
         "assets/minecraft/models/block/potatoes_stage3.json",
+        "assets/minecraft/textures/block/heroicmap_test_hoher_weizen.png",
     };
 
     /**
@@ -1757,7 +1762,7 @@ public final class Bilder implements FabricClientGameTest {
         "setblock -57 -60 40 wheat[age=6]", "fill -56 -60 40 -53 -60 40 wheat[age=7]",
         "fill -60 -60 42 -57 -60 42 carrots[age=7]", "fill -56 -60 42 -53 -60 42 potatoes[age=7]",
         "fill -60 -60 44 -53 -60 44 short_grass", "fill -60 -60 46 -57 -60 46 fern", "setblock -54 -60 46 cobweb",
-        "setblock -60 -60 45 allium",
+        "setblock -60 -60 45 allium", "setblock -58 -60 41 beetroots[age=3]",
     };
 
     /**
@@ -1889,6 +1894,14 @@ public final class Bilder implements FabricClientGameTest {
         if (!(blau <= 0.5)) {
             fehler.add("Lauch zu " + Math.round(100 * blau) + " % blau statt höchstens 50 %, rot " + farben[0] + ", blau " + farben[1]);
         }
+        double weizenNord = anteilGelb(bilder.get(4), -58, 41, 2 * block, false), weizenSued = anteilGelb(bilder.get(4), -58, 41, 2 * block, true);
+        LOGGER.info("Pflanzen aus Paketen, hoher Weizen bei 16 px gelb: Nordhälfte {}, Südhälfte {}", weizenNord, weizenSued);
+        // Der ganze Block ist Weizen, nicht nur der Süden: Zählte die leere obere Hälfte beim Einpassen mit, lag er gestaucht
+        // im Süden, Nordhälfte 0,125. Siehe docs/minimap.md, „Zuschneiden“.
+        if (!(weizenNord >= 0.3 && weizenSued >= 0.3)) {
+            fehler.add("hoher Weizen bei 16 px in der Nordhälfte zu " + Math.round(100 * weizenNord) + " %, in der Südhälfte zu "
+                    + Math.round(100 * weizenSued) + " % gelb statt je mindestens 30 %");
+        }
         if (!fehler.isEmpty()) {
             throw new AssertionError("Pflanzen aus Paketen: " + String.join("; ", fehler));
         }
@@ -1906,6 +1919,20 @@ public final class Bilder implements FabricClientGameTest {
             }
         }
         return n;
+    }
+
+    /** Welcher Anteil der Pixel in der Nord- oder Südhälfte des Blocks (x, z) gelb ist; Mitte wie bei {@link #rotMitte}. */
+    private static double anteilGelb(BufferedImage bild, int x, int z, int block, boolean sued) {
+        int ax = bild.getWidth() / 2 + Math.round((x + 56.5f) * block), az = bild.getHeight() / 2 + Math.round((z - 43.5f) * block);
+        int gelb = 0, alle = 0;
+        for (int dy = sued ? block / 2 : 0; dy < (sued ? block : block / 2); dy++) {
+            for (int dx = 0; dx < block; dx++) {
+                int c = bild.getRGB(ax + dx, az + dy), r = c >> 16 & 0xFF, g = c >> 8 & 0xFF, b = c & 0xFF;
+                gelb += r > 150 && g > 120 && b < 90 && r - b > 100 ? 1 : 0;
+                alle++;
+            }
+        }
+        return gelb / (double) alle;
     }
 
     /** Der Versatz des Löwenzahns im Block (x, -60, z). */
@@ -2034,6 +2061,60 @@ public final class Bilder implements FabricClientGameTest {
         // Fertig erst, wenn auch das Bild des Ladens ausgeblendet ist.
         context.waitFor(mc -> fertig.isDone() && mc.gui.overlay() == null, 1200);
         context.waitTicks(5);
+    }
+
+    /**
+     * Mit den Assets des Spiels schneidet das Zuschneiden vor dem Kippen nichts: Jede Fläche jeder Bodenpflanze, die kippt,
+     * bleibt, wie sie ist, je Zustand über vier Varianten. So bleiben Feld, Wiese und Seegras bitgleich. Siehe docs/minimap.md,
+     * „Zuschneiden“.
+     */
+    private static void pflanzenDesSpielsBleiben(ClientGameTestContext context) {
+        int[] zahl = context.computeOnClient(mc -> {
+            int flaechen = 0, geschnitten = 0;
+            Map<net.minecraft.client.renderer.texture.TextureAtlasSprite, ChunkMaler.Texel> texel = new java.util.IdentityHashMap<>();
+            var modelle = mc.getModelManager().getBlockStateModelSet();
+            for (net.minecraft.world.level.block.Block block : net.minecraft.core.registries.BuiltInRegistries.BLOCK) {
+                for (var state : block.getStateDefinition().getPossibleStates()) {
+                    if (!Pflanzen.bodenpflanze(state)) {
+                        continue;
+                    }
+                    for (int variante = 0; variante < 4; variante++) {
+                        List<net.minecraft.client.renderer.block.dispatch.BlockStateModelPart> teile = new ArrayList<>();
+                        modelle.get(state).collectParts(net.minecraft.util.RandomSource.create(variante), teile);
+                        for (var teil : teile) {
+                            List<net.minecraft.client.resources.model.geometry.BakedQuad> quads = new ArrayList<>(teil.getQuads(null));
+                            for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+                                quads.addAll(teil.getQuads(d));
+                            }
+                            for (var q : quads) {
+                                if (ChunkMaler.liegt(q)) {
+                                    continue;
+                                }
+                                float[] e = new float[12], uv = new float[8];
+                                for (int k = 0; k < 4; k++) {
+                                    e[3 * k] = q.position(k).x();
+                                    e[3 * k + 1] = q.position(k).y();
+                                    e[3 * k + 2] = q.position(k).z();
+                                    uv[2 * k] = net.minecraft.client.model.geom.builders.UVPair.unpackU(q.packedUV(k));
+                                    uv[2 * k + 1] = net.minecraft.client.model.geom.builders.UVPair.unpackV(q.packedUV(k));
+                                }
+                                float[] e0 = e.clone(), uv0 = uv.clone();
+                                var s = q.materialInfo().sprite();
+                                ChunkMaler.zuschneiden(e, 0, uv, 0, texel.computeIfAbsent(s, ChunkMaler.Texel::von), s.getU0(),
+                                        s.getU1() - s.getU0(), s.getV0(), s.getV1() - s.getV0());
+                                flaechen++;
+                                geschnitten += Arrays.equals(e, e0) && Arrays.equals(uv, uv0) ? 0 : 1;
+                            }
+                        }
+                    }
+                }
+            }
+            return new int[] {flaechen, geschnitten};
+        });
+        LOGGER.info("Pflanzen des Spiels: {} Flächen, die kippen, davon zugeschnitten {}", zahl[0], zahl[1]);
+        if (zahl[0] < 1000 || zahl[1] != 0) {
+            throw new AssertionError("Pflanzen des Spiels: " + zahl[1] + " von " + zahl[0] + " Flächen zugeschnitten statt 0 (mindestens 1000 geprüft)");
+        }
     }
 
     /** Was an ihrer Stelle steht, wenn die Pflanzen weg sind. */

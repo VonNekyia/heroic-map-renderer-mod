@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.NativeImage;
 import com.nekyia.heroicmap.webp.VP8LDecoder;
 import com.twelvemonkeys.imageio.plugins.webp.WebPImageReaderSpi;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -173,7 +174,8 @@ final class Kacheln implements AutoCloseable {
     private void mitRelief(int[] argb, int z, int x, int y, Relief.Art art) {
         Path schicht = ordner.resolve("relief").resolve(String.valueOf(z)).resolve(String.valueOf(x)).resolve(y + ".webp");
         Path rest = ordner.resolve("relief").resolve("rest").resolve(String.valueOf(z)).resolve(String.valueOf(x)).resolve(y + ".webp");
-        Relief.rechne(argb, liesOderNull(schicht), liesOderNull(rest), relief.gebacken(), art);
+        // Den Rest gibt es nur an abgeschnittenen Pixeln, und dort steht in der Kachel 255; ohne solche bleibt er ungelesen.
+        Relief.rechne(argb, liesOderNull(schicht), Relief.abgeschnitten(argb) ? liesOderNull(rest) : null, relief.gebacken(), art);
     }
 
     private int[] liesOderNull(Path webp) {
@@ -270,8 +272,26 @@ final class Kacheln implements AutoCloseable {
         return bild == null ? null : bild(bild);
     }
 
-    private static Bild bild(BufferedImage bild) {
+    static Bild bild(BufferedImage bild) {
         int b = bild.getWidth(), h = bild.getHeight();
+        // Die beiden Formate der Dekoder direkt aus den Bytes: getRGB rechnet je Pixel über das ColorModel und kostete
+        // bei einer Kachel 256² mit Alpha mehrere ms. Siehe docs/vollbildkarte.md, „Relief“.
+        int typ = bild.getType();
+        if ((typ == BufferedImage.TYPE_4BYTE_ABGR || typ == BufferedImage.TYPE_3BYTE_BGR)
+                && bild.getRaster().getDataBuffer() instanceof DataBufferByte puffer && puffer.getData().length == b * h * (typ == BufferedImage.TYPE_4BYTE_ABGR ? 4 : 3)) {
+            byte[] d = puffer.getData();
+            int[] argb = new int[b * h];
+            if (typ == BufferedImage.TYPE_4BYTE_ABGR) {
+                for (int i = 0, j = 0; i < argb.length; i++, j += 4) {
+                    argb[i] = (d[j] & 0xFF) << 24 | (d[j + 3] & 0xFF) << 16 | (d[j + 2] & 0xFF) << 8 | d[j + 1] & 0xFF;
+                }
+            } else {
+                for (int i = 0, j = 0; i < argb.length; i++, j += 3) {
+                    argb[i] = 0xFF000000 | (d[j + 2] & 0xFF) << 16 | (d[j + 1] & 0xFF) << 8 | d[j] & 0xFF;
+                }
+            }
+            return new Bild(b, h, argb);
+        }
         return new Bild(b, h, bild.getRGB(0, 0, b, h, null, 0, b));
     }
 

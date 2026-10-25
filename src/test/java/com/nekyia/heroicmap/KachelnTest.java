@@ -113,4 +113,19 @@ class KachelnTest {
             assertEquals(p.startsWith(stufe0) ? 49152 : 0, anders, p.toString());
         }
     }
+
+    @Test
+    void bytesWieGetRgb() {
+        // Die schnelle Umwandlung aus den Bytes gibt dasselbe wie getRGB, mit Alpha und ohne.
+        java.util.Random zufall = new java.util.Random(7);
+        for (int typ : new int[] {BufferedImage.TYPE_4BYTE_ABGR, BufferedImage.TYPE_3BYTE_BGR}) {
+            BufferedImage bild = new BufferedImage(17, 9, typ);
+            for (int y = 0; y < 9; y++) {
+                for (int x = 0; x < 17; x++) {
+                    bild.setRGB(x, y, zufall.nextInt());
+                }
+            }
+            assertArrayEquals(bild.getRGB(0, 0, 17, 9, null, 0, 17), Kacheln.bild(bild).argb(), "Typ " + typ);
+        }
+    }
 }

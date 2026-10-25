@@ -87,20 +87,37 @@ final class Relief {
      * in Rot der Schicht; ohne Schicht gilt 4, ohne Rest keiner.
      */
     static void rechne(int[] kachel, int[] schicht, int[] rest, Art gebacken, Art gewaehlt) {
+        // Je Code einmal jeder Wert eines Kanals der Kachel, und jeder Wert ohne Relief für den Rest: dieselbe Rechnung, nur
+        // nicht je Pixel.
+        int[][] ausKachel = new int[18][256], ausRest = new int[18][256];
+        for (int c = 0; c < 18; c++) {
+            float fk = faktor(c, gebacken), fg = faktor(c, gewaehlt);
+            for (int v = 0; v < 256; v++) {
+                ausKachel[c][v] = Math.min(255, Math.round(Math.round(v / fk) * fg));
+                ausRest[c][v] = Math.min(255, Math.round(v * fg));
+            }
+        }
         for (int p = 0; p < kachel.length; p++) {
             int argb = kachel[p];
             if (argb >>> 24 == 0) {
                 continue;
             }
             int code = schicht == null ? 4 : schicht[p] >> 16 & 0xFF;
-            boolean ausRest = rest != null && rest[p] >>> 24 == 255;
-            float fk = faktor(code, gebacken), fg = faktor(code, gewaehlt);
-            int neu = argb & 0xFF000000;
-            for (int s = 16; s >= 0; s -= 8) {
-                int ohne = ausRest ? rest[p] >> s & 0xFF : Math.round((argb >> s & 0xFF) / fk);
-                neu |= Math.min(255, Math.round(ohne * fg)) << s;
-            }
-            kachel[p] = neu;
+            code = code > 17 ? 4 : code;
+            boolean mitRest = rest != null && rest[p] >>> 24 == 255;
+            int[] tafel = mitRest ? ausRest[code] : ausKachel[code];
+            int quelle = mitRest ? rest[p] : argb;
+            kachel[p] = argb & 0xFF000000 | tafel[quelle >> 16 & 0xFF] << 16 | tafel[quelle >> 8 & 0xFF] << 8 | tafel[quelle & 0xFF];
         }
+    }
+
+    /** Hat die Kachel einen sichtbaren Pixel mit einem Kanal 255? Nur dort kann das Relief abgeschnitten haben. */
+    static boolean abgeschnitten(int[] kachel) {
+        for (int argb : kachel) {
+            if (argb >>> 24 != 0 && ((argb >> 16 & 0xFF) == 255 || (argb >> 8 & 0xFF) == 255 || (argb & 0xFF) == 255)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
