@@ -183,6 +183,27 @@ final class Relief {
     }
 
     /**
+     * Welche der 4 × 4 Chunks im Fenster um einen Chunk fehlten, aus seinen Höhen ({@link #SEITE} im Quadrat): je Chunk mit dem
+     * Abstand dx und dz von −2 bis 1 das Bit (dz + 2) · 4 + dx + 2. Ein geladener Chunk hat an jeder Spalte eine Höhe.
+     */
+    static int fehlende(int[] hoehen) {
+        int maske = 0;
+        for (int dz = -2; dz <= 1; dz++) {
+            for (int dx = -2; dx <= 1; dx++) {
+                if (hoehen[(dz + 2) * 16 * SEITE + (dx + 2) * 16] == FEHLT) {
+                    maske |= 1 << (dz + 2) * 4 + dx + 2;
+                }
+            }
+        }
+        return maske;
+    }
+
+    /** Fehlte in {@code maske} ({@link #fehlende}) der Chunk mit dem Abstand dx, dz? */
+    static boolean fehlte(int maske, int dx, int dz) {
+        return (maske >> (dz + 2) * 4 + dx + 2 & 1) != 0;
+    }
+
+    /**
      * Legt die Art {@code art} auf das Bild eines Chunks ohne Relief, je Block {@code scale} × {@code scale} Pixel mit dem Code
      * seiner Spalte: je Kanal gerundet und bei 255 gekappt, Alpha bleibt, wie der Renderer auf eine Kachel.
      */

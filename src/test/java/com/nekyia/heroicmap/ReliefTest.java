@@ -156,6 +156,26 @@ class ReliefTest {
     }
 
     @Test
+    void fehlendeChunks() {
+        // Im Fenster fehlen der Chunk 2 nordwestlich, Spalten 0 bis 15, und östlich die letzte Spalte, die Chunks dx = 1.
+        int[] hoehen = new int[Relief.SEITE * Relief.SEITE];
+        java.util.Arrays.fill(hoehen, 64);
+        for (int z = 0; z < Relief.SEITE; z++) {
+            for (int x = 0; x < Relief.SEITE; x++) {
+                if (x < 16 && z < 16 || x == Relief.SEITE - 1) {
+                    hoehen[z * Relief.SEITE + x] = Relief.FEHLT;
+                }
+            }
+        }
+        int maske = Relief.fehlende(hoehen);
+        assertEquals(1 | 1 << 3 | 1 << 7 | 1 << 11 | 1 << 15, maske);
+        assertTrue(Relief.fehlte(maske, -2, -2));
+        assertTrue(Relief.fehlte(maske, 1, 0));
+        assertFalse(Relief.fehlte(maske, -1, -1));
+        assertFalse(Relief.fehlte(maske, 0, 0));
+    }
+
+    @Test
     void codesUndFaktorJeChunk() {
         // Die Höhen um einen Chunk ab 32 Blöcken nordwestlich: eben 64, seine Spalte (1, 0) 66. Westlich davon steigt es nach
         // Osten, Code 6; sie selbst ist eben umgeben, 4; östlich davon fällt es, 2.

@@ -260,8 +260,14 @@ public final class Minimap {
     final LongLinkedOpenHashSet offen = new LongLinkedOpenHashSet();
     /** Wie viele Chunks die Minimap seit dem Start gemalt hat; für die Messung. */
     private int gemalt;
-    /** Mit Relief je gezeichnetem Chunk seine 16 × 16 Höhen beim letzten Abziehen; ändern sie sich, zieht der Ring nach. */
-    private final Long2ObjectOpenHashMap<int[]> hoehenGemalt = new Long2ObjectOpenHashMap<>();
+    /** Mit Relief je gezeichnetem Chunk seine Höhen und die fehlenden Chunks um ihn beim letzten Abziehen. */
+    private final Long2ObjectOpenHashMap<Gemalt> hoehenGemalt = new Long2ObjectOpenHashMap<>();
+    /** Die Chunks, deren Codes an den Höhen eines Chunks hängen: im Westen und Norden der Rand, im Osten und Süden bis 2 der Schatten. */
+    private static final int[][] RING = {{-1, 0}, {0, -1}, {1, 0}, {0, 1}, {1, 1}, {2, 1}, {1, 2}, {2, 2}};
+
+    /** Ein mit Relief gezeichneter Chunk: seine 16 × 16 Höhen und welche Chunks um ihn fehlten ({@link Relief#fehlende}). */
+    private record Gemalt(int[] hoehen, int fehlten) {
+    }
     /** Chunks im Bereich, deren Bild in der Textur steht. */
     private final LongOpenHashSet gezeichnet = new LongOpenHashSet();
     /** Zahl der übernommenen Bilder, für die Messung. */
@@ -322,23 +328,20 @@ public final class Minimap {
     }
 
     /**
-     * Mit Relief, wenn der Chunk (x, z) mit den 16 × 16 Höhen {@code hoehen} (WORLD_SURFACE) abgezogen ist: Haben sie sich seit
-     * dem letzten Mal geändert, oder ist es das erste Mal, sind die Chunks neu zu zeichnen, deren Codes an ihnen hängen: im
-     * Westen und Norden der Rand, im Osten und Süden bis 2 Chunks der Schatten. Eine Änderung unter der Oberfläche malt so
-     * nur ihren Chunk. Siehe docs/minimap.md, „Relief“.
+     * Mit Relief, wenn der Chunk (x, z) mit den 16 × 16 Höhen {@code hoehen} (WORLD_SURFACE) abgezogen ist und um ihn die
+     * Chunks {@code fehlten} ({@link Relief#fehlende}) nicht geladen waren: Haben sich die Höhen seit dem letzten Mal geändert,
+     * sind die Chunks des {@link #RING}s neu zu zeichnen, deren Codes an ihnen hängen. Beim ersten Mal nur die, die ohne ihn
+     * gemalt sind. Eine Änderung unter der Oberfläche malt so nur ihren Chunk. Siehe docs/minimap.md, „Relief“.
      */
-    void abgezogen(int x, int z, int[] hoehen) {
-        int[] vorher = hoehenGemalt.put(ChunkPos.pack(x, z), hoehen);
-        if (vorher != null && Arrays.equals(vorher, hoehen)) {
+    void abgezogen(int x, int z, int[] hoehen, int fehlten) {
+        Gemalt vorher = hoehenGemalt.put(ChunkPos.pack(x, z), new Gemalt(hoehen, fehlten));
+        if (vorher != null && Arrays.equals(vorher.hoehen(), hoehen)) {
             return;
         }
-        markiere(x - 1, z);
-        markiere(x, z - 1);
-        for (int dz = 0; dz <= 2; dz++) {
-            for (int dx = Math.max(0, dz - 1); dx <= Math.min(2, dz + 1); dx++) {
-                if (dx != 0 || dz != 0) {
-                    markiere(x + dx, z + dz);
-                }
+        for (int[] r : RING) {
+            Gemalt nachbar = vorher == null ? hoehenGemalt.get(ChunkPos.pack(x + r[0], z + r[1])) : null;
+            if (vorher != null || nachbar != null && Relief.fehlte(nachbar.fehlten(), -r[0], -r[1])) {
+                markiere(x + r[0], z + r[1]);
             }
         }
     }
@@ -1951,7 +1954,7 @@ public final class Minimap {
             }
             ChunkMaler.Auftrag auftrag = ChunkMaler.abziehen(level, chunk, scale, decke, licht, texel, stand, relief);
             if (auftrag.hoehen() != null) {
-                abgezogen(auftrag.cx(), auftrag.cz(), Relief.eigene(auftrag.hoehen()));
+                abgezogen(auftrag.cx(), auftrag.cz(), Relief.eigene(auftrag.hoehen()), Relief.fehlende(auftrag.hoehen()));
             }
             laufend.add(CompletableFuture.supplyAsync(() -> {
                 if (maler == null) {

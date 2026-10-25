@@ -1176,14 +1176,16 @@ Server zeigt. Bis 0.2.74 hatte sie nah kein Relief. Wahl des Users, siehe
 - **Nicht mit Decke:** In einer Dimension mit Decke, etwa im Nether, malt sie
   kein Relief; Flach malt keins und liest auch keine Höhen.
 - **Neu gemalt** (`Minimap.abgezogen`): Je gezeichnetem Chunk merkt sich die
-  Minimap seine 16 × 16 Höhen beim Abziehen. Sind sie beim nächsten Mal
-  anders, oder ist es das erste Mal, malt sie dazu die Chunks, deren Codes an
-  ihnen hängen: im Westen und Norden der Rand, im Osten und Süden bis 2 Chunks
-  der Schatten, 8 Chunks. Eine Änderung unter der Oberfläche, etwa auf einer
-  Farm, malt so nur ihren Chunk, wie mit Flach; das Zeichnen im Spiel wiegt am
-  schwersten (Reviewer, 25.10.). Lädt ein Chunk im Nordwesten später, malt
-  sein erstes Abziehen die Chunks in seinem Schatten neu. Eine andere Wahl
-  malt alles neu.
+  Minimap seine 16 × 16 Höhen beim Abziehen und welche Chunks um ihn nicht
+  geladen waren (`Relief.fehlende`). Sind die Höhen beim nächsten Mal anders,
+  malt sie dazu die Chunks, deren Codes an ihnen hängen: im Westen und Norden
+  der Rand, im Osten und Süden bis 2 Chunks der Schatten, 8 Chunks. Eine
+  Änderung unter der Oberfläche, etwa auf einer Farm, malt so nur ihren Chunk,
+  wie mit Flach. Beim ersten Abziehen eines Chunks malt sie davon nur die neu,
+  die ohne ihn gemalt sind, etwa wenn er im Nordwesten später lädt; so malt
+  das erste Füllen jeden Chunk einmal. Ändert sich ein Chunk, bevor er selbst
+  gemalt ist, behalten die schon gemalten im Ring seine alten Höhen bis zu
+  ihrem nächsten Neumalen. Eine andere Wahl malt alles neu.
 - **Die eigene Karte** malt noch ohne Relief.
 - **Geprüft** in `ReliefTest`: Codes mit Zahlen, die Codes für zwei
   Basiskacheln der Testwelt aus ihren Höhen (`src/test/resources/relief/hoehen.bin`,
