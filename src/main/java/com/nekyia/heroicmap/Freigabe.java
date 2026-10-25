@@ -15,7 +15,17 @@ import java.util.regex.Pattern;
  * Eine {@code freigabe} des Plugins, geprüft, und ob der Mod vor dem Laden fragt. Ohne
  * Minecraft, damit es sich testen lässt. Siehe docs/download.md, „Zustimmung und Grösse“.
  */
-record Freigabe(String baum, String art, int massstab, long bytes, URI url, String token, String manifestSha256) {
+record Freigabe(String baum, String art, int massstab, long bytes, URI url, String token, String manifestSha256, Teil relief,
+        Teil rest) {
+
+    /** Ein Teil neben dem Baum, Schicht oder Rest des Reliefs: Prüfsumme seines Manifests und seine Bytes bis zur Stufe. */
+    record Teil(String manifestSha256, long bytes) {
+    }
+
+    /** Ohne Relief, wie jede {@code freigabe} vor Plugin 0.21.0. */
+    Freigabe(String baum, String art, int massstab, long bytes, URI url, String token, String manifestSha256) {
+        this(baum, art, massstab, bytes, url, token, manifestSha256, null, null);
+    }
 
     /** Ein Baum wird ein Ordnername; nur so viel ist erlaubt. */
     private static final Pattern BAUM = Pattern.compile("[a-z0-9_-]{1,64}");
@@ -42,14 +52,25 @@ record Freigabe(String baum, String art, int massstab, long bytes, URI url, Stri
         if (!baum(baum)) {
             throw new IllegalArgumentException("freigabe");
         }
+        // Schicht und Rest nur bei einem Baum mit Relief, je mit Prüfsumme und Bytes. Siehe docs/download.md, „Relief“.
+        JsonObject relief = json.has("relief") ? json.getAsJsonObject("relief") : null;
         Freigabe f = new Freigabe(baum, json.get("art").getAsString(),
                 json.get("massstab").getAsInt(), json.get("bytes").getAsLong(), url(json, baum, verbindung),
-                json.get("token").getAsString(), json.get("manifest_sha256").getAsString());
+                json.get("token").getAsString(), json.get("manifest_sha256").getAsString(),
+                relief == null ? null : teil(relief), relief == null ? null : teil(relief.getAsJsonObject("rest")));
         if (!(f.art.equals("voll") || f.art.equals("abgleich"))
                 || (f.massstab != 1 && f.massstab != 2 && f.massstab != 4) || f.bytes < 0 || !Adresse.form(f.url)) {
             throw new IllegalArgumentException("freigabe");
         }
         return f;
+    }
+
+    private static Teil teil(JsonObject json) {
+        Teil t = new Teil(json.get("manifest_sha256").getAsString(), json.get("bytes").getAsLong());
+        if (t.bytes < 0) {
+            throw new IllegalArgumentException("relief");
+        }
+        return t;
     }
 
     /**

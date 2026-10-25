@@ -168,4 +168,22 @@ class FreigabeTest {
             assertNull(Freigabe.Stand.lies(datei), kaputt);
         }
     }
+
+    @Test
+    void reliefMitRest() {
+        JsonObject mit = json("welt", "voll", 4, 1000, "https://karte.example/welt");
+        mit.add("relief", JsonParser.parseString("{\"manifest_sha256\":\"aa\",\"bytes\":670,\"rest\":{\"manifest_sha256\":\"bb\",\"bytes\":460}}"));
+        Freigabe f = Freigabe.lies(mit, null);
+        assertEquals(new Freigabe.Teil("aa", 670), f.relief());
+        assertEquals(new Freigabe.Teil("bb", 460), f.rest());
+        assertEquals(1000, f.bytes());
+        // Ohne relief keines; mit relief ohne rest oder mit negativen Bytes unlesbar.
+        assertNull(Freigabe.lies(json("welt", "voll", 4, 1000, "https://karte.example/welt"), null).relief());
+        JsonObject ohneRest = json("welt", "voll", 4, 1000, "https://karte.example/welt");
+        ohneRest.add("relief", JsonParser.parseString("{\"manifest_sha256\":\"aa\",\"bytes\":670}"));
+        assertThrows(RuntimeException.class, () -> Freigabe.lies(ohneRest, null));
+        JsonObject negativ = json("welt", "voll", 4, 1000, "https://karte.example/welt");
+        negativ.add("relief", JsonParser.parseString("{\"manifest_sha256\":\"aa\",\"bytes\":-1,\"rest\":{\"manifest_sha256\":\"bb\",\"bytes\":1}}"));
+        assertThrows(RuntimeException.class, () -> Freigabe.lies(negativ, null));
+    }
 }
