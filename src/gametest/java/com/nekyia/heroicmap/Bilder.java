@@ -1723,17 +1723,20 @@ public final class Bilder implements FabricClientGameTest {
     /**
      * Das Testpaket unter /pakete/pflanzen, eigene Modelle nach dem Muster mancher Pakete: eine ersetzte Vorlage
      * {@code block/crop} mit gekippten Flächen, reifer Weizen als zwei Blöcke hohes Modell ohne {@code parent}, die Datei
-     * {@code potatoes_stage3} des Spiels mit diesem Modell als {@code parent}, und Gras, das neben dem Modell des Spiels ein
-     * schräges Kreuz ohne {@code parent} wählt. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
+     * {@code potatoes_stage3} des Spiels mit diesem Modell als {@code parent}, Gras, das neben dem Modell des Spiels ein
+     * schräges Kreuz ohne {@code parent} wählt, und ein kleiner roter Löwenzahn, eine Fläche halb so breit und hoch wie der
+     * Block. Siehe docs/minimap.md, „Pflanzen aus Paketen“.
      */
     private static final String[] PAKET_PFLANZEN = {
         "pack.mcmeta",
         "assets/minecraft/blockstates/short_grass.json",
         "assets/minecraft/blockstates/wheat.json",
         "assets/minecraft/blockstates/cobweb.json",
+        "assets/minecraft/blockstates/dandelion.json",
         "assets/minecraft/models/block/crop.json",
         "assets/minecraft/models/block/heroicmap_test_gras.json",
         "assets/minecraft/models/block/heroicmap_test_hohes_getreide.json",
+        "assets/minecraft/models/block/heroicmap_test_klein.json",
         "assets/minecraft/models/block/heroicmap_test_liegend.json",
         "assets/minecraft/models/block/heroicmap_test_schraeges_kreuz.json",
         "assets/minecraft/models/block/heroicmap_test_weizen_reif.json",
@@ -1754,7 +1757,9 @@ public final class Bilder implements FabricClientGameTest {
     };
 
     /**
-     * Pflanzen aus Paketen: das Feld bei 4 px und 1 px, Zoom 4, ohne und mit dem Testpaket. Mit dem Paket kippen Karotten und
+     * Pflanzen aus Paketen: das Feld bei 4 px und 1 px, Zoom 4, ohne und mit dem Testpaket, mit ihm dazu bei 16 px, Zoom 8.
+     * Der kleine Löwenzahn des Pakets steht so verschoben wie sein Block, auch wo sich zwei Blöcke nur in x oder nur in z
+     * unterscheiden; siehe docs/minimap.md, „Vorgerechnet je Modell und Versatz“. Mit dem Paket kippen Karotten und
      * Gras ähnlich wie ohne, im Mittel höchstens 45 % anders, und reifer Weizen und Kartoffeln decken das Ackerland,
      * statt wegzufallen; das Spinnennetz des Pakets mit liegender Fläche bleibt, wie es ist; verglichen mit einem Bild derselben Stelle ohne sie, denn Ackerland in verschiedenen Reihen ist
      * verschieden hell. Die Kartoffeln tragen im Testpaket die Textur des reifen Weizens, denn die linke Hälfte ihrer eigenen
@@ -1763,6 +1768,11 @@ public final class Bilder implements FabricClientGameTest {
     private static void pflanzenAusPaketen(ClientGameTestContext context, TestServerContext server) {
         for (String befehl : FELD) {
             server.runCommand(befehl);
+        }
+        int[][] paare = versatzPaare();
+        for (int[] p : paare) {
+            server.runCommand("setblock " + p[0] + " -60 " + p[1] + " dandelion");
+            server.runCommand("setblock " + p[2] + " -60 " + p[3] + " dandelion");
         }
         Path ordner = FabricLoader.getInstance().getGameDir().resolve("resourcepacks").resolve("heroicmap-pflanzen-test");
         try {
@@ -1794,10 +1804,10 @@ public final class Bilder implements FabricClientGameTest {
         try {
             for (boolean mitPaket : new boolean[] {false, true}) {
                 paket(context, "file/heroicmap-pflanzen-test", mitPaket);
-                for (int scale : new int[] {4, 1}) {
+                for (int scale : mitPaket ? new int[] {4, 1, 16} : new int[] {4, 1}) {
                     context.runOnClient(mc -> {
                         Minimap.INSTANZ.setzeScale(scale);
-                        Minimap.INSTANZ.setzeZoom(4);
+                        Minimap.INSTANZ.setzeZoom(scale == 16 ? 8 : 4);
                     });
                     context.waitTicks(10);
                     bilder.add(minimapBei(context, server, -56.5, 43.5, "pakete-" + scale + "px-" + (mitPaket ? "mit" : "ohne")));
@@ -1844,9 +1854,78 @@ public final class Bilder implements FabricClientGameTest {
             fehler.add("Spinnennetz mit liegender Fläche im Westen zu " + Math.round(100 * west) + " % anders als der Boden (mindestens 50 %), im Osten zu "
                     + Math.round(100 * ost) + " % (höchstens 10 %)");
         }
-        if (!fehler.isEmpty()) {
-            throw new AssertionError("Pflanzen aus Paketen bei 4 px: " + String.join("; ", fehler));
+        // Der kleine Löwenzahn bei 16 px, je Paar: um den Versatz seiner Blöcke verschoben, in x wie sie, in z um √½ davon, denn
+        // er kippt mit. Teilten zwei Blöcke mit anderem Versatz eine Draufsicht, stünde er in beiden gleich.
+        for (int[] p : paare) {
+            double[] a = rotMitte(bilder.get(4), p[0], p[1], 2 * block), b = rotMitte(bilder.get(4), p[2], p[3], 2 * block);
+            net.minecraft.world.phys.Vec3 va = versatz(p[0], p[1]), vb = versatz(p[2], p[3]);
+            double erwartetX = vb.x - va.x, erwartetZ = (vb.z - va.z) * Math.sqrt(0.5), dx = b[0] - a[0], dz = b[1] - a[1];
+            LOGGER.info("Pflanzen aus Paketen, Löwenzahn ({}, {}) gegen ({}, {}): verschoben x {}, z {}, erwartet x {}, z {}", p[0], p[1],
+                    p[2], p[3], dx, dz, erwartetX, erwartetZ);
+            if (!(Math.abs(dx - erwartetX) <= 0.1 && Math.abs(dz - erwartetZ) <= 0.1)) {
+                fehler.add("Löwenzahn (" + p[2] + ", " + p[3] + ") gegen (" + p[0] + ", " + p[1] + ") um x " + dx + ", z " + dz
+                        + " Block verschoben statt x " + erwartetX + ", z " + erwartetZ + " (± 0,1)");
+            }
         }
+        if (!fehler.isEmpty()) {
+            throw new AssertionError("Pflanzen aus Paketen: " + String.join("; ", fehler));
+        }
+    }
+
+    /** Der Versatz des Löwenzahns im Block (x, -60, z). */
+    private static net.minecraft.world.phys.Vec3 versatz(int x, int z) {
+        return net.minecraft.world.level.block.Blocks.DANDELION.defaultBlockState().getOffset(new net.minecraft.core.BlockPos(x, -60, z));
+    }
+
+    /**
+     * Zwei Paare Blöcke am Rand des Felds, je {x1, z1, x2, z2}: das erste mit gleichem Versatz in x und in z um mindestens 8/30
+     * Block verschieden, das zweite umgekehrt.
+     */
+    private static int[][] versatzPaare() {
+        List<int[]> plaetze = new ArrayList<>();
+        for (int z : new int[] {38, 39, 47, 48}) {
+            for (int x = -62; x <= -51; x++) {
+                plaetze.add(new int[] {x, z});
+            }
+        }
+        int[] nurZ = null, nurX = null;
+        for (int i = 0; i < plaetze.size(); i++) {
+            for (int j = i + 1; j < plaetze.size(); j++) {
+                int[] a = plaetze.get(i), b = plaetze.get(j);
+                net.minecraft.world.phys.Vec3 va = versatz(a[0], a[1]), vb = versatz(b[0], b[1]);
+                if (nurZ == null && va.x == vb.x && Math.abs(va.z - vb.z) >= 0.26) {
+                    nurZ = new int[] {a[0], a[1], b[0], b[1]};
+                }
+                if (nurX == null && va.z == vb.z && Math.abs(va.x - vb.x) >= 0.26) {
+                    nurX = new int[] {a[0], a[1], b[0], b[1]};
+                }
+            }
+        }
+        if (nurZ == null || nurX == null) {
+            throw new AssertionError("Kein Paar Blöcke, deren Versatz sich nur in z oder nur in x unterscheidet");
+        }
+        return new int[][] {nurZ, nurX};
+    }
+
+    /**
+     * Die Mitte der roten Pixel im Block (x, z), in Blöcken ab seiner Nordwestecke; NaN ohne rote. Die Minimap steht mit dem
+     * Spieler bei (-56,5, 43,5) in der Mitte, {@code block} Pixel je Block.
+     */
+    private static double[] rotMitte(BufferedImage bild, int x, int z, int block) {
+        int ax = bild.getWidth() / 2 + Math.round((x + 56.5f) * block), az = bild.getHeight() / 2 + Math.round((z - 43.5f) * block);
+        double sx = 0, sz = 0;
+        int n = 0;
+        for (int dy = 0; dy < block; dy++) {
+            for (int dx = 0; dx < block; dx++) {
+                int c = bild.getRGB(ax + dx, az + dy);
+                if ((c >> 16 & 0xFF) > (c >> 8 & 0xFF) + 60) {
+                    sx += dx + 0.5;
+                    sz += dy + 0.5;
+                    n++;
+                }
+            }
+        }
+        return new double[] {sx / n / block, sz / n / block};
     }
 
     /** Wie {@link #anteilAnders}, nur in der West- oder Osthälfte des Blocks (x, z), gegen dieselbe Stelle in {@code b}. */

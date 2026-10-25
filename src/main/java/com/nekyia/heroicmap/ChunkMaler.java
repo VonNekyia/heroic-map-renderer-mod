@@ -6,6 +6,7 @@ import it.unimi.dsi.fastutil.objects.Reference2BooleanOpenHashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.client.Minecraft;
@@ -166,26 +167,90 @@ final class ChunkMaler {
     /** Hat der aktuelle Block eine Fläche nach oben, bei einer Pflanze eine liegende? */
     private boolean oben;
     /**
-     * Die Flächen des aktuellen Blocks, die gekippt werden, über alle Blöcke wiederverwendet: je Fläche 12 Werte Ecken
-     * (x, y, z samt Versatz), 8 UV, je Ecke Lichtkoordinaten und Farbe roh, der Faktor nach oben, Sprite und Schicht. Das Licht
-     * rechnet {@link #kippe} erst für die Flächen, die nach dem Kippen gezeichnet werden.
+     * Die Flächen des aktuellen Blocks, die gekippt werden, über alle Blöcke wiederverwendet: je Fläche das Objekt, 12 Werte
+     * Ecken (x, y, z samt Versatz), 8 UV, je Ecke Lichtkoordinaten und Farbe roh, der Faktor nach oben, Sprite und Schicht.
+     * Das Licht rechnet {@link #kippe} nur für die Flächen, die nach dem Kippen gezeichnet werden.
      */
+    private BakedQuad[] kippQuad = new BakedQuad[16];
     private float[] kippEcken = new float[12 * 16], kippUv = new float[8 * 16], kippFaktor = new float[16];
     private int[] kippLichtRoh = new int[4 * 16], kippFarbe = new int[4 * 16];
     private TextureAtlasSprite[] kippSprite = new TextureAtlasSprite[16];
     private ChunkSectionLayer[] kippSchicht = new ChunkSectionLayer[16];
-    private boolean[] kippSichtbar = new boolean[16];
     private int kippAnzahl;
+    /** Der Versatz des Blocks, dessen Flächen gemerkt sind. */
+    private float kippX, kippY, kippZ;
+    private final Schluessel suche = new Schluessel();
+    /** Die Draufsichten der gekippten Pflanzen beim aktuellen scale, die zuletzt gebrauchte zuletzt. */
+    // ponytail: feste Obergrenze, rund 10 MB je Maler; misst ein Paket mit vielen Pflanzen zu viele Fehlgriffe, nach Bytes
+    // statt nach Zahl begrenzen.
+    private final LinkedHashMap<Schluessel, Draufsicht> draufsichten = new LinkedHashMap<>(256, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<Schluessel, Draufsicht> aelteste) {
+            return size() > Math.min(4096, (1 << 18) / (scale * scale));
+        }
+    };
     /** Je Pixel der Spalte vormultipliziert in sRGB: r, g, b, a. */
     private float[] summe = new float[0];
 
     /**
      * Eine Fläche nach oben in x und z, mit UV, Sprite, Schicht und dem Faktor ihrer Ecken
-     * aus Licht, Schatten und Tönung; {@code hoehe} ordnet sie im Block. {@code gekippt}: die Fläche einer gekippten
-     * Pflanze, abgetastet über das gemittelte Raster.
+     * aus Licht, Schatten und Tönung; {@code hoehe} ordnet sie im Block. Mit {@code draufsicht} die gekippten Flächen einer
+     * Pflanze: {@code ecken} trägt dann den Faktor je Fläche der Draufsicht, xz, UV, Sprite und Schicht bleiben leer.
      */
     private record Flaeche(float hoehe, float[] xz, float[] uv, TextureAtlasSprite sprite,
-            ChunkSectionLayer schicht, float[][] ecken, boolean gekippt) {
+            ChunkSectionLayer schicht, float[][] ecken, Draufsicht draufsicht) {
+    }
+
+    /**
+     * Die gekippten Flächen einer Pflanze von oben, je Pixel vorgerechnet: für jede gezeichnete Fläche, die höchste zuerst, ihr
+     * Anteil am Pixel und ihre Farbe in sRGB, je 4 Werte, dazu wie weit alle zusammen decken. {@code flaechen} nennt die
+     * gemerkten Flächen in dieser Folge, {@code hoehe} ordnet sie im Block; {@code zEgal}: der Versatz in z ändert nichts.
+     */
+    private record Draufsicht(int[] flaechen, float[] zellen, float[] deckung, float hoehe, boolean zEgal) {
+    }
+
+    /** Die gemerkten Flächen eines Blocks und sein Versatz; gleich sind dieselben Objekte, nicht gleiche. */
+    private static final class Schluessel {
+        private BakedQuad[] quads;
+        private int anzahl, hash;
+        private float x, y, z;
+        private boolean zEgal;
+
+        Schluessel setze(BakedQuad[] quads, int anzahl, float x, float y, float z, boolean zEgal) {
+            this.quads = quads;
+            this.anzahl = anzahl;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.zEgal = zEgal;
+            int h = 31 * Boolean.hashCode(zEgal) + Float.floatToIntBits(x);
+            h = 31 * (31 * h + Float.floatToIntBits(y)) + Float.floatToIntBits(z);
+            for (int i = 0; i < anzahl; i++) {
+                h = 31 * h + System.identityHashCode(quads[i]);
+            }
+            hash = h;
+            return this;
+        }
+
+        @Override
+        public int hashCode() {
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof Schluessel s) || s.hash != hash || s.anzahl != anzahl || s.zEgal != zEgal
+                    || Float.floatToIntBits(s.x) != Float.floatToIntBits(x) || Float.floatToIntBits(s.y) != Float.floatToIntBits(y)
+                    || Float.floatToIntBits(s.z) != Float.floatToIntBits(z)) {
+                return false;
+            }
+            for (int i = 0; i < anzahl; i++) {
+                if (s.quads[i] != quads[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 
     /** Zeichnet den Chunk; je Pixel ARGB, Zeile für Zeile, 16 · scale breit. */
@@ -193,6 +258,7 @@ final class ChunkMaler {
         if (a.scale() != scale || a.texel() != texelStand) {
             // Neu geladen: Raster und Modelle können anders sein.
             raster.clear();
+            draufsichten.clear();
             ohneGeometrie.clear();
             texelStand = a.texel();
         }
@@ -243,7 +309,11 @@ final class ChunkMaler {
                 // Von oben nach unten; was aus dem Wasser ragt, liegt vor der Oberfläche.
                 flaechen.sort((f, g) -> Float.compare(g.hoehe(), f.hoehe()));
                 for (Flaeche f : flaechen) {
-                    schicht(f.xz(), f.uv(), f.sprite(), f.schicht(), f.ecken(), f.gekippt());
+                    if (f.draufsicht() != null) {
+                        lege(summe, f.draufsicht().zellen(), f.draufsicht().deckung(), f.ecken());
+                    } else {
+                        schicht(f.xz(), f.uv(), f.sprite(), f.schicht(), f.ecken());
+                    }
                 }
             }
             schreibe(pixel, seite, lx * scale, lz * scale);
@@ -293,7 +363,7 @@ final class ChunkMaler {
                 uv[2 * k + 1] = UVPair.unpackV(packed);
             }
             flaechen.add(new Flaeche(hoehe, xz, uv, quad.materialInfo().sprite(), quad.materialInfo().layer(),
-                    ecken(instanz, quad.materialInfo().lightEmission()), false));
+                    ecken(instanz, quad.materialInfo().lightEmission()), null));
         }, 0, 0, 0, welt, pos, state, model, state.getSeed(pos));
         // Ein Modell mit einer liegenden Fläche, etwa ein Blütenteppich, bleibt, wie es ist; Bambus kippt nur seine Blätter.
         if (kippAnzahl > 0 && (bambus || !oben)) {
@@ -302,7 +372,7 @@ final class ChunkMaler {
         }
     }
 
-    /** Merkt eine Fläche zum Kippen: Ecken samt Versatz, UV, Licht roh und den Faktor nach oben, Sprite und Schicht. */
+    /** Merkt eine Fläche zum Kippen: sie selbst, Ecken samt Versatz, UV, Licht roh, den Faktor nach oben, Sprite und Schicht. */
     private void merke(BakedQuad quad, QuadInstance instanz, float x, float y, float z) {
         if (kippAnzahl == kippSprite.length) {
             int n = 2 * kippAnzahl;
@@ -313,9 +383,13 @@ final class ChunkMaler {
             kippFarbe = Arrays.copyOf(kippFarbe, 4 * n);
             kippSprite = Arrays.copyOf(kippSprite, n);
             kippSchicht = Arrays.copyOf(kippSchicht, n);
-            kippSichtbar = Arrays.copyOf(kippSichtbar, n);
+            kippQuad = Arrays.copyOf(kippQuad, n);
         }
         int i = kippAnzahl++;
+        kippQuad[i] = quad;
+        kippX = x;
+        kippY = y;
+        kippZ = z;
         kippFaktor[i] = schattenNachOben(welt.cardinalLighting(), quad.materialInfo().shadeDirectionOverride(), quad.direction());
         int leuchten = quad.materialInfo().lightEmission();
         for (int k = 0; k < 4; k++) {
@@ -334,12 +408,42 @@ final class ChunkMaler {
     }
 
     /**
-     * Kippt die gemerkten Flächen 45° nach Norden und setzt sie auf ihre alte Tiefe; die danach nach oben zeigen, kommen in
-     * die Spalte, entlang z in den Block eingepasst und im Wasser höchstens {@code hoechstens} hoch eingereiht.
+     * Legt die gemerkten Flächen gekippt in die Spalte, im Wasser höchstens {@code hoechstens} hoch eingereiht: ihre
+     * Draufsicht aus dem Vorrat, sonst vorgerechnet, je Fläche im Mittel des Lichts ihrer Ecken und nach oben schattiert.
      * Siehe docs/minimap.md, „Pflanzen von oben“.
      */
     private void kippe(float hoechstens) {
+        Draufsicht d = draufsichten.get(suche.setze(kippQuad, kippAnzahl, kippX, kippY, 0, true));
+        if (d == null) {
+            d = draufsichten.get(suche.setze(kippQuad, kippAnzahl, kippX, kippY, kippZ, false));
+        }
+        if (d == null) {
+            d = baue();
+            draufsichten.put(new Schluessel().setze(Arrays.copyOf(kippQuad, kippAnzahl), kippAnzahl, kippX, kippY,
+                    d.zEgal() ? 0 : kippZ, d.zEgal()), d);
+        }
+        float[][] faktoren = new float[d.flaechen().length][3];
+        for (int j = 0; j < faktoren.length; j++) {
+            int i = d.flaechen()[j];
+            for (int k = 0; k < 4; k++) {
+                auftrag.licht().hell(kippLichtRoh[4 * i + k], hell);
+                int farbe = kippFarbe[4 * i + k];
+                for (int c = 0; c < 3; c++) {
+                    faktoren[j][c] += hell[c] * ((farbe >> (16 - 8 * c)) & 0xFF) / 255f * kippFaktor[i] / 4;
+                }
+            }
+        }
+        flaechen.add(new Flaeche(Math.min(d.hoehe(), hoechstens), null, null, null, null, faktoren, d));
+    }
+
+    /**
+     * Kippt die gemerkten Flächen 45° nach Norden, setzt sie auf ihre alte Tiefe und passt die, die danach nach oben zeigen,
+     * entlang z in den Block ein; dann je Pixel, von der höchsten Fläche an, Anteil und Farbe aus ihrem gemittelten Raster.
+     * Siehe docs/minimap.md, „Pflanzen von oben“.
+     */
+    private Draufsicht baue() {
         float alt = Float.MAX_VALUE, neu = Float.MAX_VALUE, zMin = Float.MAX_VALUE, zMax = -Float.MAX_VALUE;
+        boolean[] sichtbar = new boolean[kippAnzahl];
         for (int i = 0; i < kippAnzahl; i++) {
             int b = 12 * i;
             for (int k = 0; k < 4; k++) {
@@ -350,34 +454,105 @@ final class ChunkMaler {
                 neu = Math.min(neu, kippEcken[b + 3 * k + 1]);
             }
             float[] e = kippEcken;
-            kippSichtbar[i] = obenAnteil(e[b + 3] - e[b], e[b + 4] - e[b + 1], e[b + 5] - e[b + 2], e[b + 6] - e[b], e[b + 7] - e[b + 1],
+            sichtbar[i] = obenAnteil(e[b + 3] - e[b], e[b + 4] - e[b + 1], e[b + 5] - e[b + 2], e[b + 6] - e[b], e[b + 7] - e[b + 1],
                     e[b + 8] - e[b + 2]) > 1e-4f;
-            for (int k = 0; k < 4 && kippSichtbar[i]; k++) {
+            for (int k = 0; k < 4 && sichtbar[i]; k++) {
                 zMin = Math.min(zMin, e[b + 3 * k + 2]);
                 zMax = Math.max(zMax, e[b + 3 * k + 2]);
             }
         }
         float faktor = einpassFaktor(zMin, zMax), schieben = einpassVerschiebung(zMin, zMax);
+        // Die sichtbaren Flächen nach Höhe, die höchste zuerst, gleich hohe in ihrer Reihenfolge.
+        int n = 0;
+        int[] folge = new int[kippAnzahl];
+        float[] hoehen = new float[kippAnzahl];
+        float[][] xz = new float[kippAnzahl][8];
         for (int i = 0; i < kippAnzahl; i++) {
-            if (!kippSichtbar[i]) {
+            if (!sichtbar[i]) {
                 continue;
             }
-            float[] xz = new float[8];
-            float[][] ecken = new float[4][3];
-            float hoehe = Float.NEGATIVE_INFINITY;
+            float h = Float.NEGATIVE_INFINITY;
             for (int k = 0; k < 4; k++) {
                 int j = 12 * i + 3 * k;
-                xz[2 * k] = kippEcken[j];
-                xz[2 * k + 1] = kippEcken[j + 2] * faktor + schieben;
-                hoehe = Math.max(hoehe, kippEcken[j + 1] + alt - neu);
-                auftrag.licht().hell(kippLichtRoh[4 * i + k], hell);
-                int farbe = kippFarbe[4 * i + k];
-                for (int c = 0; c < 3; c++) {
-                    ecken[k][c] = hell[c] * ((farbe >> (16 - 8 * c)) & 0xFF) / 255f * kippFaktor[i];
+                xz[i][2 * k] = kippEcken[j];
+                xz[i][2 * k + 1] = kippEcken[j + 2] * faktor + schieben;
+                h = Math.max(h, kippEcken[j + 1] + alt - neu);
+            }
+            hoehen[i] = h;
+            int m = n++;
+            for (; m > 0 && hoehen[folge[m - 1]] < h; m--) {
+                folge[m] = folge[m - 1];
+            }
+            folge[m] = i;
+        }
+        folge = Arrays.copyOf(folge, n);
+        float[] zellen = new float[scale * scale * n * 4], deckung = new float[scale * scale];
+        for (int j = 0; j < n; j++) {
+            int i = folge[j];
+            Texel textur = auftrag.texel().get(kippSprite[i]);
+            if (textur == null) {
+                continue;
+            }
+            float[] voll = raster(kippSprite[i], textur, kippSchicht[i]), e = xz[i];
+            float[] reiheX = duenn(e, 0, scale), reiheZ = duenn(e, 1, scale);
+            for (int pz = 0; pz < scale; pz++) {
+                for (int px = 0; px < scale; px++) {
+                    int p = pz * scale + px;
+                    if (deckung[p] >= DECKT || reiheX != null && px != (int) reiheX[0] || reiheZ != null && pz != (int) reiheZ[0]) {
+                        continue;
+                    }
+                    float cx = reiheX != null ? reiheX[1] : (px + 0.5f) / scale, cz = reiheZ != null ? reiheZ[1] : (pz + 0.5f) / scale;
+                    int[] d = dreieck(e, cx, cz);
+                    if (d == null) {
+                        continue;
+                    }
+                    int a = 8 * i + 2 * d[0], b = 8 * i + 2 * d[1], c = 8 * i + 2 * d[2];
+                    int z = zelle(w[0] * kippUv[a] + w[1] * kippUv[b] + w[2] * kippUv[c],
+                            w[0] * kippUv[a + 1] + w[1] * kippUv[b + 1] + w[2] * kippUv[c + 1], kippSprite[i]);
+                    deckung[p] = stapel(zellen, 4 * (p * n + j), deckung[p], voll[z + 3], voll[z], voll[z + 1], voll[z + 2]);
                 }
             }
-            flaechen.add(new Flaeche(Math.min(hoehe, hoechstens), xz, Arrays.copyOfRange(kippUv, 8 * i, 8 * i + 8), kippSprite[i],
-                    kippSchicht[i], ecken, true));
+        }
+        return new Draufsicht(folge, zellen, deckung, n == 0 ? Float.NEGATIVE_INFINITY : hoehen[folge[0]], faktor != 1);
+    }
+
+    /**
+     * Stapelt eine Fläche unter die darüber, die den Pixel schon {@code deckung} weit decken: legt ab {@code o} ihren Anteil
+     * und ihre Farbe aus linearem r, g, b in sRGB ab und gibt die neue Deckung zurück.
+     */
+    static float stapel(float[] zellen, int o, float deckung, float alpha, float r, float g, float b) {
+        if (!(alpha > 0)) {
+            return deckung;
+        }
+        float anteil = (1 - deckung) * alpha;
+        zellen[o] = anteil;
+        zellen[o + 1] = srgb(r);
+        zellen[o + 2] = srgb(g);
+        zellen[o + 3] = srgb(b);
+        return deckung + anteil;
+    }
+
+    /**
+     * Legt eine Draufsicht unter das, was die Spalte schon deckt, jede Fläche in ihrem Faktor aus {@code faktoren}; so, als
+     * kämen ihre Flächen einzeln, wie in {@link #schicht}.
+     */
+    static void lege(float[] summe, float[] zellen, float[] deckung, float[][] faktoren) {
+        int n = faktoren.length;
+        for (int p = 0; p < deckung.length; p++) {
+            int i = 4 * p;
+            if (summe[i + 3] >= DECKT || !(deckung[p] > 0)) {
+                continue;
+            }
+            float rest = 1 - summe[i + 3];
+            for (int j = 0, o = 4 * p * n; j < n; j++, o += 4) {
+                float anteil = rest * zellen[o];
+                if (anteil > 0) {
+                    for (int c = 0; c < 3; c++) {
+                        summe[i + c] += anteil * Math.min(1, zellen[o + 1 + c] * faktoren[j][c]);
+                    }
+                }
+            }
+            summe[i + 3] += rest * deckung[p];
         }
     }
 
@@ -467,7 +642,7 @@ final class ChunkMaler {
         }
         auftrag.licht().hell(LightCoordsUtil.getLightCoords(welt, pos.above()), hell);
         flaechen.add(new Flaeche((float) box.maxY, xz, uv, s, ChunkSectionLayer.SOLID,
-                new float[][] {hell.clone(), hell.clone(), hell.clone(), hell.clone()}, false));
+                new float[][] {hell.clone(), hell.clone(), hell.clone(), hell.clone()}, null));
     }
 
     /**
@@ -521,7 +696,7 @@ final class ChunkMaler {
             faktor[c] = hell[c] * schatten * ((tint >> (16 - 8 * c)) & 0xFF) / 255f;
         }
         flaechen.add(new Flaeche(fluid.getHeight(welt, pos), VOLL, voll(sprite), sprite, model.layer(),
-                new float[][] {faktor, faktor, faktor, faktor}, false));
+                new float[][] {faktor, faktor, faktor, faktor}, null));
     }
 
     private boolean ohneFlaechen(BlockStateModel model) {
@@ -594,7 +769,7 @@ final class ChunkMaler {
      * ihre Mitte liegt, so ist jede Fläche mindestens ein Pixel breit. Die Textur wird über den Pixel
      * in linearem Licht gemittelt, mit dem Test der Schicht. Siehe docs/minimap.md, „Flächen und Pixel“.
      */
-    private void schicht(float[] xz, float[] uv, TextureAtlasSprite sprite, ChunkSectionLayer schicht, float[][] ecken, boolean gekippt) {
+    private void schicht(float[] xz, float[] uv, TextureAtlasSprite sprite, ChunkSectionLayer schicht, float[][] ecken) {
         Texel textur = auftrag.texel().get(sprite);
         if (textur == null) {
             return;
@@ -605,10 +780,8 @@ final class ChunkMaler {
         float uMax = Math.max(Math.max(uv[0], uv[2]), Math.max(uv[4], uv[6]));
         float vMin = Math.min(Math.min(uv[1], uv[3]), Math.min(uv[5], uv[7]));
         float vMax = Math.max(Math.max(uv[1], uv[3]), Math.max(uv[5], uv[7]));
-        // Eine volle Oberseite mit dem ganzen Sprite: das gemittelte Raster, ohne abzutasten. Ebenso die Fläche einer gekippten
-        // Pflanze, je Pixel die Zelle unter seiner Mitte; sonst kostete sie n × n Proben je Pixel. Siehe docs/minimap.md,
-        // „Pflanzen von oben“.
-        float[] voll = gekippt || ganzeOberseite(xz, uv, sprite) ? raster(sprite, textur, schicht) : null;
+        // Eine volle Oberseite mit dem ganzen Sprite: das gemittelte Raster, ohne abzutasten.
+        float[] voll = ganzeOberseite(xz, uv, sprite) ? raster(sprite, textur, schicht) : null;
         int n = Math.max(1, 16 / scale);
         float[] reiheX = duenn(xz, 0, scale), reiheZ = duenn(xz, 1, scale);
         for (int pz = 0; pz < scale; pz++) {
@@ -628,9 +801,7 @@ final class ChunkMaler {
                 float uMitte = w[0] * ua + w[1] * ub + w[2] * uc, vMitte = w[0] * va + w[1] * vb + w[2] * vc;
                 float lr, lg, lb, alpha;
                 if (voll != null) {
-                    int zx = Math.clamp((int) ((uMitte - u0) / du * scale), 0, scale - 1);
-                    int zy = Math.clamp((int) ((vMitte - v0) / dv * scale), 0, scale - 1);
-                    int z = (zy * scale + zx) * 4;
+                    int z = zelle(uMitte, vMitte, sprite);
                     lr = voll[z];
                     lg = voll[z + 1];
                     lb = voll[z + 2];
@@ -750,6 +921,13 @@ final class ChunkMaler {
         // Vier verschiedene Ecken in x und z, keine entartete Fläche.
         float flaeche = (xz[4] - xz[0]) * (xz[7] - xz[1]) - (xz[6] - xz[0]) * (xz[5] - xz[1]);
         return Math.abs(flaeche) > 0.5f;
+    }
+
+    /** Die Zelle des Rasters von {@code s} unter u, v, als Index in {@link #raster}. */
+    private int zelle(float u, float v, TextureAtlasSprite s) {
+        int zx = Math.clamp((int) ((u - s.getU0()) / (s.getU1() - s.getU0()) * scale), 0, scale - 1);
+        int zy = Math.clamp((int) ((v - s.getV0()) / (s.getV1() - s.getV0()) * scale), 0, scale - 1);
+        return (zy * scale + zx) * 4;
     }
 
     /** Das Sprite je Zelle von scale × scale gemittelt: linear r, g, b und Alpha. */
