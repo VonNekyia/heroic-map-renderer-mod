@@ -177,13 +177,18 @@ class FreigabeTest {
         assertEquals(new Freigabe.Teil("aa", 670), f.relief());
         assertEquals(new Freigabe.Teil("bb", 460), f.rest());
         assertEquals(1000, f.bytes());
-        // Ohne relief keines; mit relief ohne rest oder mit negativen Bytes unlesbar.
+        // Ohne relief keines. Taugt ein Teil nicht, etwa ohne rest, mit negativen Bytes oder kein Objekt: kein Relief, aber der
+        // Baum bleibt lesbar.
         assertNull(Freigabe.lies(json("welt", "voll", 4, 1000, "https://karte.example/welt"), null).relief());
-        JsonObject ohneRest = json("welt", "voll", 4, 1000, "https://karte.example/welt");
-        ohneRest.add("relief", JsonParser.parseString("{\"manifest_sha256\":\"aa\",\"bytes\":670}"));
-        assertThrows(RuntimeException.class, () -> Freigabe.lies(ohneRest, null));
-        JsonObject negativ = json("welt", "voll", 4, 1000, "https://karte.example/welt");
-        negativ.add("relief", JsonParser.parseString("{\"manifest_sha256\":\"aa\",\"bytes\":-1,\"rest\":{\"manifest_sha256\":\"bb\",\"bytes\":1}}"));
-        assertThrows(RuntimeException.class, () -> Freigabe.lies(negativ, null));
+        for (String kaputt : new String[] {"{\"manifest_sha256\":\"aa\",\"bytes\":670}",
+            "{\"manifest_sha256\":\"aa\",\"bytes\":-1,\"rest\":{\"manifest_sha256\":\"bb\",\"bytes\":1}}",
+            "{\"manifest_sha256\":\"aa\",\"bytes\":670,\"rest\":{\"bytes\":1}}", "7"}) {
+            JsonObject j = json("welt", "voll", 4, 1000, "https://karte.example/welt");
+            j.add("relief", JsonParser.parseString(kaputt));
+            Freigabe g = Freigabe.lies(j, null);
+            assertNull(g.relief(), kaputt);
+            assertNull(g.rest(), kaputt);
+            assertEquals(1000, g.bytes(), kaputt);
+        }
     }
 }
