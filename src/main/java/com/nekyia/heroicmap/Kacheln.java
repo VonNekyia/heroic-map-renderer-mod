@@ -70,6 +70,8 @@ final class Kacheln implements AutoCloseable {
     /** Kacheln mit einer älteren Textur: Sie bleibt sichtbar, bis die neue da ist. */
     private final Set<String> veraltet = new HashSet<>();
     private final int max;
+    /** Die Art des Reliefs in den Kacheln und ob ihre Schicht daliegt; aus {@code map.json}. */
+    private final Relief.Satzrelief relief;
     private boolean geschlossen;
 
     /** Die Kacheln des Satzes; jede muss genau {@code tileSize} gross sein. Höchstens {@code max} Texturen bleiben. Auf dem Render-Thread. */
@@ -77,6 +79,7 @@ final class Kacheln implements AutoCloseable {
         this.ordner = satz.ordner();
         this.seite = satz.kachel();
         this.max = max;
+        this.relief = Relief.von(ordner);
         OFFEN.add(this);
     }
 
@@ -130,6 +133,7 @@ final class Kacheln implements AutoCloseable {
         laeuft.add(pfad);
         veraltet.remove(pfad);
         int gen = generation.getOrDefault(pfad, 0);
+        Relief.Art art = Minimap.INSTANZ.relief();
         Path spalte = ordner.resolve(String.valueOf(z)).resolve(String.valueOf(x));
         Path datei = spalte.resolve(y + ".webp"), png = spalte.resolve(y + ".png");
         dekoder.execute(() -> {
@@ -139,6 +143,9 @@ final class Kacheln implements AutoCloseable {
                 try {
                     if (Files.exists(datei)) {
                         argb = dekodiere(Files.readAllBytes(datei), seite).argb();
+                        if (relief.noetig(art)) {
+                            mitRelief(argb, z, x, y, art);
+                        }
                     } else if (Files.exists(png)) {
                         // Die selbst gezeichnete Karte schreibt PNG. Siehe docs/selbst.md, „Kacheln“.
                         argb = png(Files.readAllBytes(png), seite).argb();
@@ -157,6 +164,24 @@ final class Kacheln implements AutoCloseable {
             }
         });
         return id;
+    }
+
+    /**
+     * Legt die gewählte Art des Reliefs auf eine Kachel vom Server, aus ihrer Schicht und ihrem Rest unter {@code relief/}.
+     * Fehlt oder bricht die Schicht, gilt Code 4 und die Kachel bleibt; ohne Rest keiner. Siehe docs/vollbildkarte.md, „Relief“.
+     */
+    private void mitRelief(int[] argb, int z, int x, int y, Relief.Art art) {
+        Path schicht = ordner.resolve("relief").resolve(String.valueOf(z)).resolve(String.valueOf(x)).resolve(y + ".webp");
+        Path rest = ordner.resolve("relief").resolve("rest").resolve(String.valueOf(z)).resolve(String.valueOf(x)).resolve(y + ".webp");
+        Relief.rechne(argb, liesOderNull(schicht), liesOderNull(rest), relief.gebacken(), art);
+    }
+
+    private int[] liesOderNull(Path webp) {
+        try {
+            return Files.exists(webp) ? dekodiere(Files.readAllBytes(webp), seite).argb() : null;
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
     }
 
     private void zurueck(String pfad, int gen, NativeImage pixel) {

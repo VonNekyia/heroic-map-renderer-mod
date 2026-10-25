@@ -624,6 +624,38 @@ Warum eine Kopie: [0003](entscheidungen/0003-kopie-des-vp8l-dekoders.md).
   das Paket `webp`, der Weg über die Kopie in `Kacheln.dekodiere`, der
   Absatz in `NOTICE` und dieser Abschnitt.
 
+### Relief
+
+Die Kacheln vom Server tragen das Relief, mit dem der Renderer sie zeichnet,
+auf main `slope`. Ab Renderer 0.19.0 liegt neben jeder Kachel eine Schicht
+mit einem Code je Pixel, dazu ein Rest; daraus rechnet der Mod die anderen
+Arten. Entschieden in [0053](entscheidungen/0053-wahl-des-reliefs.md).
+
+- **Gewählt** als `relief=ohne`, `slope` oder `shadows` in
+  `config/heroicmap.properties` (`Minimap.relief`), Vorgabe `slope`;
+  unlesbar gilt `slope`.
+- **Gerechnet** wird nur, wenn die gewählte Art nicht die der Kacheln ist und
+  der Satz die Schicht hat (`Relief.von`, `Relief.Satzrelief.noetig`):
+  `map.json` nennt die Art unter `relief` und die Schicht unter
+  `reliefTiles`, genau `relief/{z}/{x}/{y}.webp`. Ein anderes Muster gilt als
+  keine Schicht; ein neues Format bekäme laut Renderer ein neues Feld.
+- **Wo:** beim Dekodieren jeder Kachel im Hintergrund (`Kacheln.mitRelief`),
+  also auf der Vollbildkarte und auf der Minimap weit heraus, auf jeder
+  Stufe. Die Schicht liegt im Ordner des Massstabs unter `relief/`, der Rest
+  unter `relief/rest/`, mit den Pfaden der Kacheln.
+- **Die Regel** steht im Renderer,
+  [`map.json`, „Die Schicht lesen“](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/map-json.md#die-schicht-lesen);
+  der Mod rechnet sie nach (`Relief.rechne`, `Relief.faktor`):
+  - In derselben Folge in f32 wie der Renderer, 1 + 0,12 · (n / 2), dann
+    begrenzt, dann mal 0,75; so trifft das letzte Bit. `Math.round` rundet
+    positive Werte wie `f32::round` im Renderer.
+  - Fehlt die Schicht einer Kachel oder lässt sie sich nicht lesen, gilt
+    Code 4 und die Kachel bleibt; fehlt der Rest, gilt keiner.
+  - Pixel mit Alpha 0 bleiben ganz, Alpha bleibt.
+- **Geprüft** in `ReliefTest` mit Zahlen: die Faktoren je Code, Schnee 250
+  bei 1,24 zurück auf 202, abgeschnittene Pixel nur mit dem Rest richtig
+  (230 statt 206), Alpha, Kacheln mit `shadows` gebacken.
+
 ## Spieler und Koordinaten
 
 Der eigene Kopf und die Koordinaten rechnen mit derselben Projektion wie der

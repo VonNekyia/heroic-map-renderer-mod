@@ -217,6 +217,8 @@ public final class Minimap {
     static final int ALLE_MARKEN = 0b1111;
     /** Die Gruppe „Technik“ im Untermenü ist aufgeklappt. Siehe docs/minimap.md, „Bedienung“. */
     private boolean technikOffen;
+    /** Die Art des Reliefs auf den Kacheln vom Server; Vorgabe die der Karte von main. Siehe docs/vollbildkarte.md, „Relief“. */
+    private Relief.Art relief = Relief.Art.SLOPE;
     private Biom biom = new Biom();
     /** Die feste Kategorie von „biom“, null für automatisch, die Vorgabe. Siehe docs/rahmen.md, „Biom“. */
     private String biomFest;
@@ -631,6 +633,14 @@ public final class Minimap {
         }
     }
 
+    Relief.Art relief() {
+        return relief;
+    }
+
+    void setzeRelief(Relief.Art relief) {
+        this.relief = relief;
+    }
+
     boolean technikOffen() {
         return technikOffen;
     }
@@ -819,6 +829,7 @@ public final class Minimap {
         // Bis 0.2.57 ein Schalter todespunkt: aus heisst keiner, an einer.
         todespunkte = Math.clamp(zahl(p.getProperty("todespunkte"), "false".equals(p.getProperty("todespunkt")) ? 0 : 1), 0, MAX_TODESPUNKTE);
         neueVersion = !"false".equals(p.getProperty("neue_version"));
+        relief = Relief.Art.von(p.getProperty("relief"), Relief.Art.SLOPE);
         todZeit = switch (String.valueOf(p.getProperty("tod_zeit")).trim()) {
             case "datum" -> TodZeit.DATUM;
             case "uhrzeit" -> TodZeit.UHRZEIT;
@@ -895,6 +906,7 @@ public final class Minimap {
         p.setProperty("todespunkte", Integer.toString(todespunkte));
         p.setProperty("tod_zeit", todZeit.name().toLowerCase(Locale.ROOT));
         p.setProperty("neue_version", Boolean.toString(neueVersion));
+        p.setProperty("relief", relief.name);
         p.setProperty("widgets", Widgets.schreibe(widgets));
         p.setProperty("bei_f3", beiF3.name().toLowerCase(Locale.ROOT));
         p.setProperty("spieler", darstellung.name().toLowerCase(Locale.ROOT));
