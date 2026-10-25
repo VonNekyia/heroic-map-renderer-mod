@@ -18,7 +18,7 @@ import net.minecraft.network.chat.Component;
 
 /**
  * Der Knopf „Relief“ auf der Vollbildkarte, mit echten Klicks, auf zwei Basiskacheln der Testwelt von Renderer 0.19.0 mit
- * Schicht und Rest: reihum Flach, Relief + Schatten, Relief; Flach und Relief + Schatten sehen anders aus als die Kacheln,
+ * Schicht und Rest: von Relief reihum Relief + Schatten, Flach, Relief; Flach und Relief + Schatten sehen anders aus als die Kacheln,
  * zurück auf Relief wie vorher. Fehlt der Index der Schicht, trägt der Knopf „…“; ohne Schicht in {@code map.json} ist er grau.
  * Siehe docs/vollbildkarte.md, „Relief“.
  */
@@ -52,13 +52,14 @@ public final class ReliefWahl implements FabricClientGameTest {
             BufferedImage relief = bild(context, "relief-slope");
             pruefeText(context, "heroicmap.karte.relief", "slope");
 
-            // Reihum mit Klicks: Flach, Relief + Schatten, wieder Relief.
-            klicke(context);
-            BufferedImage flach = bild(context, "relief-ohne");
-            pruefeText(context, "heroicmap.karte.relief", "ohne");
+            // Reihum mit Klicks, wie gewählt Flach → Relief → Relief + Schatten → Flach: von Relief also Relief + Schatten, Flach,
+            // wieder Relief.
             klicke(context);
             BufferedImage schatten = bild(context, "relief-shadows");
             pruefeText(context, "heroicmap.karte.relief", "shadows");
+            klicke(context);
+            BufferedImage flach = bild(context, "relief-ohne");
+            pruefeText(context, "heroicmap.karte.relief", "ohne");
             klicke(context);
             BufferedImage zurueck = bild(context, "relief-slope-2");
             pruefeText(context, "heroicmap.karte.relief", "slope");
@@ -70,10 +71,10 @@ public final class ReliefWahl implements FabricClientGameTest {
                         + mitSchatten + " (mindestens 5000), zurück " + gleich + " (0)");
             }
 
-            // Ohne Index fehlt die Schicht: Flach trägt „…“.
+            // Ohne Index fehlt die Schicht: Relief + Schatten trägt „…“.
             Files.delete(ordner.resolve("relief/etags.txt"));
             klicke(context);
-            pruefeText(context, "heroicmap.karte.relief_fehlt", "ohne");
+            pruefeText(context, "heroicmap.karte.relief_fehlt", "shadows");
 
             // Ohne Schicht in map.json: grau.
             String karte = Files.readString(ordner.resolve("map.json")).replace("\"reliefTiles\"", "\"reliefTilesAlt\"");
