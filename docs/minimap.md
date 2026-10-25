@@ -907,6 +907,8 @@ dieselbe Regel, siehe
   alte Tiefe: Ihr tiefster Punkt über alle Flächen liegt, wo er vorher lag.
   Gezeichnet wird, was danach nach oben zeigt, n_y > 10⁻⁴ · |n|. Eine
   Fläche, die beim Kippen in sich dreht, steht hochkant und fällt weg.
+- **Zugeschnitten** vor dem Kippen, was ausserhalb des Blocks ganz
+  durchsichtig ist, siehe „Zuschneiden“.
 - **Einpassen** (`ChunkMaler.einpassFaktor`, `ChunkMaler.einpassVerschiebung`):
   Die Spalte malt nur den eigenen Block. Darum misst der Mod die
   gezeichneten Flächen entlang der Kipprichtung und schiebt sie so wenig wie
@@ -943,6 +945,40 @@ dieselbe Regel, siehe
 - **Vorgerechnet** je Modell und Versatz, siehe unten.
 - **Die eigene Karte** zeichnet mit demselben Maler, siehe
   [Selbst gezeichnete Karte](selbst.md).
+
+### Zuschneiden
+
+Manche Pakete bauen eine Pflanze höher als den Block und lassen den oberen
+Teil der Textur leer; im Spiel sieht sie normal hoch aus. Gekippt und
+eingepasst zählte die leere Hälfte mit, und die Pflanze lag gestaucht nur
+in der Südhälfte des Blocks. Gemeldet vom User mit einem Paket für Felder,
+dessen reifer Weizen 32 hoch ist, die Textur 32 × 32 nur unten links
+deckend. Die Regel gab der Reviewer am 25.10. vor, entschieden in
+[0052](entscheidungen/0052-zuschneiden-vor-dem-kippen.md).
+
+- **Was wegfällt** (`ChunkMaler.zuschneiden`): je Fläche, die kippt, nur was
+  ausserhalb des Blocks liegt, unter y 0 oder über 1, und dort im Rechteck
+  ihrer UV ganz durchsichtig ist.
+  - Oben: neue Kante max(Oberkante des Deckenden, min(Oberkante, 1)).
+  - Unten spiegelbildlich: min(Unterkante des Deckenden, max(Unterkante, 0)).
+  - Ohne deckendes Texel auf 0 bis 1. Liegt sie dann ganz ausserhalb,
+    bleibt keine Höhe, und sie zeigt nicht mehr nach oben.
+- **Deckend** heisst Alpha über 0 im ersten Bild des Sprites
+  (`ChunkMaler.deckendesY`): das grösste und kleinste y über die Ecken jeder
+  deckenden Texelzelle, beschnitten auf das Rechteck der UV. y ist über die
+  Fläche affin in u und v, so geht es in jeder Lage.
+- **Geschnitten** (`ChunkMaler.schneide`) wird waagrecht, wenn ein Paar Kanten
+  der Fläche waagrecht liegt; die Ecken rücken entlang des anderen Paars, die
+  UV gehen linear mit. Sonst bleibt die Fläche.
+- **Danach** wie bisher: die alte Tiefe, das Einpassen und das Klemmen unter
+  Wasser rechnen mit den geschnittenen Ecken.
+- **Mit den Assets des Spiels** ändert sich nichts: Kreuze liegen ganz im
+  Block, `crop` und die Stiele beginnen bei −1/16 mit einer deckenden
+  untersten Reihe. Geprüft über jede Fläche jeder Bodenpflanze im Gametest,
+  siehe [Entwicklung](entwicklung.md), „Tests“. Etwas Spiel von 10⁻⁵ hält die
+  Rundung von float von dieser Kante fern.
+- **Der Renderer** schneidet nach derselben Regel, abgestimmt mit Backend am
+  25.10.
 
 ### Vorgerechnet je Modell und Versatz
 

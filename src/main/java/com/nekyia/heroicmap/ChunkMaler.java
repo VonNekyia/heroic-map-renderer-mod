@@ -446,6 +446,11 @@ final class ChunkMaler {
         boolean[] sichtbar = new boolean[kippAnzahl];
         for (int i = 0; i < kippAnzahl; i++) {
             int b = 12 * i;
+            Texel textur = auftrag.texel().get(kippSprite[i]);
+            if (textur != null) {
+                TextureAtlasSprite s = kippSprite[i];
+                zuschneiden(kippEcken, b, kippUv, 8 * i, textur, s.getU0(), s.getU1() - s.getU0(), s.getV0(), s.getV1() - s.getV0());
+            }
             for (int k = 0; k < 4; k++) {
                 alt = Math.min(alt, kippEcken[b + 3 * k + 1]);
             }
@@ -514,6 +519,127 @@ final class ChunkMaler {
             }
         }
         return new Draufsicht(folge, zellen, deckung, n == 0 ? Float.NEGATIVE_INFINITY : hoehen[folge[0]], faktor != 1);
+    }
+
+    /**
+     * Schneidet eine Fläche vor dem Kippen waagrecht zu: Was ausserhalb des Blocks liegt, unter y 0 oder über 1, und dort im
+     * Bereich ihrer UV ganz durchsichtig ist, fällt weg; ganz durchsichtig fällt sie auf 0 bis 1. Ecken ab {@code b}, UV ab
+     * {@code bu}; das Sprite liegt im Atlas bei u0, v0 mit der Breite du, dv. Siehe docs/minimap.md, „Zuschneiden“.
+     */
+    static void zuschneiden(float[] e, int b, float[] uv, int bu, Texel textur, float u0, float du, float v0, float dv) {
+        float unten = Float.MAX_VALUE, oben = -Float.MAX_VALUE;
+        for (int k = 0; k < 4; k++) {
+            unten = Math.min(unten, e[b + 3 * k + 1]);
+            oben = Math.max(oben, e[b + 3 * k + 1]);
+        }
+        if (unten >= 0 && oben <= 1) {
+            return;
+        }
+        float[] deckend = deckendesY(e, b, uv, bu, textur, u0, du, v0, dv);
+        float neuOben = Math.max(deckend == null ? -Float.MAX_VALUE : deckend[1], Math.min(oben, 1));
+        float neuUnten = Math.min(deckend == null ? Float.MAX_VALUE : deckend[0], Math.max(unten, 0));
+        // Liegt sie ganz ausserhalb und ganz durchsichtig, bleibt keine Höhe; dann zeigt sie nicht mehr nach oben.
+        neuOben = Math.max(neuOben, neuUnten);
+        // Etwas Spiel für die Rundung von float, damit eine deckende Kante wie die unterste Reihe von crop bleibt.
+        if (neuOben < oben - 1e-5f || neuUnten > unten + 1e-5f) {
+            schneide(e, b, uv, bu, neuUnten, neuOben);
+        }
+    }
+
+    /**
+     * Das kleinste und grösste y der deckenden Texel einer Fläche, über die Ecken ihrer Zellen im Rechteck der UV; null ohne
+     * deckendes Texel. Lässt sich y nicht aus u und v rechnen, die Fläche selbst, so schneidet nichts.
+     */
+    static float[] deckendesY(float[] e, int b, float[] uv, int bu, Texel textur, float u0, float du, float v0, float dv) {
+        int breite = textur.breite(), hoehe = textur.hoehe();
+        float[] tu = new float[4], tv = new float[4];
+        float uMin = Float.MAX_VALUE, uMax = -Float.MAX_VALUE, vMin = Float.MAX_VALUE, vMax = -Float.MAX_VALUE;
+        for (int k = 0; k < 4; k++) {
+            tu[k] = (uv[bu + 2 * k] - u0) / du * breite;
+            tv[k] = (uv[bu + 2 * k + 1] - v0) / dv * hoehe;
+            uMin = Math.min(uMin, tu[k]);
+            uMax = Math.max(uMax, tu[k]);
+            vMin = Math.min(vMin, tv[k]);
+            vMax = Math.max(vMax, tv[k]);
+        }
+        // y = a · u + c · v + d aus den Ecken 0, 1 und 2, in Texeln.
+        float y0 = e[b + 1], y1 = e[b + 4], y2 = e[b + 7];
+        float det = (tu[1] - tu[0]) * (tv[2] - tv[0]) - (tu[2] - tu[0]) * (tv[1] - tv[0]);
+        if (Math.abs(det) < 1e-6f) {
+            float unten = Math.min(Math.min(y0, y1), Math.min(y2, e[b + 10])), oben = Math.max(Math.max(y0, y1), Math.max(y2, e[b + 10]));
+            return new float[] {unten, oben};
+        }
+        float a = ((y1 - y0) * (tv[2] - tv[0]) - (y2 - y0) * (tv[1] - tv[0])) / det;
+        float c = ((tu[1] - tu[0]) * (y2 - y0) - (tu[2] - tu[0]) * (y1 - y0)) / det;
+        float d = y0 - a * tu[0] - c * tv[0];
+        float unten = Float.MAX_VALUE, oben = -Float.MAX_VALUE;
+        int x0 = Math.max(0, (int) Math.floor(uMin)), x1 = Math.min(breite, (int) Math.ceil(uMax));
+        int z0 = Math.max(0, (int) Math.floor(vMin)), z1 = Math.min(hoehe, (int) Math.ceil(vMax));
+        for (int ty = z0; ty < z1; ty++) {
+            for (int tx = x0; tx < x1; tx++) {
+                if (textur.at(tx, ty) >>> 24 == 0) {
+                    continue;
+                }
+                // Die Zelle des Texels, auf das Rechteck der UV beschnitten; y ist affin, also zählen ihre Ecken.
+                float ua = Math.max(tx, uMin), ub = Math.min(tx + 1, uMax), va = Math.max(ty, vMin), vb = Math.min(ty + 1, vMax);
+                for (float u : new float[] {ua, ub}) {
+                    for (float v : new float[] {va, vb}) {
+                        float y = a * u + c * v + d;
+                        unten = Math.min(unten, y);
+                        oben = Math.max(oben, y);
+                    }
+                }
+            }
+        }
+        return unten > oben ? null : new float[] {unten, oben};
+    }
+
+    /**
+     * Schneidet die Fläche auf y von {@code unten} bis {@code oben}, wenn ein Paar ihrer Kanten waagrecht liegt: die Ecken
+     * rücken entlang des anderen Paars, die UV linear mit. Sonst bleibt sie.
+     */
+    static void schneide(float[] e, int b, float[] uv, int bu, float unten, float oben) {
+        int[][] seiten;
+        if (waagrecht(e, b, 0, 1) && waagrecht(e, b, 3, 2)) {
+            seiten = new int[][] {{0, 3}, {1, 2}};
+        } else if (waagrecht(e, b, 1, 2) && waagrecht(e, b, 0, 3)) {
+            seiten = new int[][] {{0, 1}, {3, 2}};
+        } else {
+            return;
+        }
+        for (int[] seite : seiten) {
+            int tief = seite[0], hoch = seite[1];
+            if (e[b + 3 * tief + 1] > e[b + 3 * hoch + 1]) {
+                tief = seite[1];
+                hoch = seite[0];
+            }
+            float ya = e[b + 3 * tief + 1], yb = e[b + 3 * hoch + 1];
+            if (yb - ya < 1e-6f) {
+                return;
+            }
+            float[] p = new float[5], q = new float[5];
+            for (int j = 0; j < 3; j++) {
+                p[j] = e[b + 3 * tief + j];
+                q[j] = e[b + 3 * hoch + j];
+            }
+            for (int j = 0; j < 2; j++) {
+                p[3 + j] = uv[bu + 2 * tief + j];
+                q[3 + j] = uv[bu + 2 * hoch + j];
+            }
+            float ta = (unten - ya) / (yb - ya), tb = (oben - ya) / (yb - ya);
+            for (int j = 0; j < 3; j++) {
+                e[b + 3 * tief + j] = p[j] + ta * (q[j] - p[j]);
+                e[b + 3 * hoch + j] = p[j] + tb * (q[j] - p[j]);
+            }
+            for (int j = 0; j < 2; j++) {
+                uv[bu + 2 * tief + j] = p[3 + j] + ta * (q[3 + j] - p[3 + j]);
+                uv[bu + 2 * hoch + j] = p[3 + j] + tb * (q[3 + j] - p[3 + j]);
+            }
+        }
+    }
+
+    private static boolean waagrecht(float[] e, int b, int i, int j) {
+        return Math.abs(e[b + 3 * i + 1] - e[b + 3 * j + 1]) < 1e-6f;
     }
 
     /**

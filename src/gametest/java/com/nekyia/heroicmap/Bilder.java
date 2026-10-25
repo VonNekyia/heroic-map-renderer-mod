@@ -148,6 +148,7 @@ public final class Bilder implements FabricClientGameTest {
             selbst(context);
             tueren(context, server);
             pflanzen(context, server);
+            pflanzenDesSpielsBleiben(context);
             pflanzenAusPaketen(context, server);
             weitHeraus(context, server);
             koordinatenAmRand(context, server);
@@ -2054,6 +2055,60 @@ public final class Bilder implements FabricClientGameTest {
         // Fertig erst, wenn auch das Bild des Ladens ausgeblendet ist.
         context.waitFor(mc -> fertig.isDone() && mc.gui.overlay() == null, 1200);
         context.waitTicks(5);
+    }
+
+    /**
+     * Mit den Assets des Spiels schneidet das Zuschneiden vor dem Kippen nichts: Jede Fläche jeder Bodenpflanze, die kippt,
+     * bleibt, wie sie ist, je Zustand über vier Varianten. So bleiben Feld, Wiese und Seegras bitgleich. Siehe docs/minimap.md,
+     * „Zuschneiden“.
+     */
+    private static void pflanzenDesSpielsBleiben(ClientGameTestContext context) {
+        int[] zahl = context.computeOnClient(mc -> {
+            int flaechen = 0, geschnitten = 0;
+            Map<net.minecraft.client.renderer.texture.TextureAtlasSprite, ChunkMaler.Texel> texel = new java.util.IdentityHashMap<>();
+            var modelle = mc.getModelManager().getBlockStateModelSet();
+            for (net.minecraft.world.level.block.Block block : net.minecraft.core.registries.BuiltInRegistries.BLOCK) {
+                for (var state : block.getStateDefinition().getPossibleStates()) {
+                    if (!Pflanzen.bodenpflanze(state)) {
+                        continue;
+                    }
+                    for (int variante = 0; variante < 4; variante++) {
+                        List<net.minecraft.client.renderer.block.dispatch.BlockStateModelPart> teile = new ArrayList<>();
+                        modelle.get(state).collectParts(net.minecraft.util.RandomSource.create(variante), teile);
+                        for (var teil : teile) {
+                            List<net.minecraft.client.resources.model.geometry.BakedQuad> quads = new ArrayList<>(teil.getQuads(null));
+                            for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+                                quads.addAll(teil.getQuads(d));
+                            }
+                            for (var q : quads) {
+                                if (ChunkMaler.liegt(q)) {
+                                    continue;
+                                }
+                                float[] e = new float[12], uv = new float[8];
+                                for (int k = 0; k < 4; k++) {
+                                    e[3 * k] = q.position(k).x();
+                                    e[3 * k + 1] = q.position(k).y();
+                                    e[3 * k + 2] = q.position(k).z();
+                                    uv[2 * k] = net.minecraft.client.model.geom.builders.UVPair.unpackU(q.packedUV(k));
+                                    uv[2 * k + 1] = net.minecraft.client.model.geom.builders.UVPair.unpackV(q.packedUV(k));
+                                }
+                                float[] e0 = e.clone(), uv0 = uv.clone();
+                                var s = q.materialInfo().sprite();
+                                ChunkMaler.zuschneiden(e, 0, uv, 0, texel.computeIfAbsent(s, ChunkMaler.Texel::von), s.getU0(),
+                                        s.getU1() - s.getU0(), s.getV0(), s.getV1() - s.getV0());
+                                flaechen++;
+                                geschnitten += Arrays.equals(e, e0) && Arrays.equals(uv, uv0) ? 0 : 1;
+                            }
+                        }
+                    }
+                }
+            }
+            return new int[] {flaechen, geschnitten};
+        });
+        LOGGER.info("Pflanzen des Spiels: {} Flächen, die kippen, davon zugeschnitten {}", zahl[0], zahl[1]);
+        if (zahl[0] < 1000 || zahl[1] != 0) {
+            throw new AssertionError("Pflanzen des Spiels: " + zahl[1] + " von " + zahl[0] + " Flächen zugeschnitten statt 0 (mindestens 1000 geprüft)");
+        }
     }
 
     /** Was an ihrer Stelle steht, wenn die Pflanzen weg sind. */

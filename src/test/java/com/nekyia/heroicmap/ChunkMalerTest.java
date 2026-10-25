@@ -164,4 +164,65 @@ class ChunkMalerTest {
         ChunkMaler.lege(gedeckt, zellen, deckung, faktoren);
         assertArrayEquals(new float[] {0.3f, 0.3f, 0.3f, 1, 0, 0, 0, 0}, gedeckt);
     }
+
+    /** Eine Textur seite × seite, deckend nur, wo {@code deckt} es sagt. */
+    private static ChunkMaler.Texel textur(int seite, java.util.function.BiPredicate<Integer, Integer> deckt) {
+        int[] argb = new int[seite * seite];
+        for (int y = 0; y < seite; y++) {
+            for (int x = 0; x < seite; x++) {
+                argb[y * seite + x] = deckt.test(x, y) ? 0xFFE0C020 : 0;
+            }
+        }
+        return new ChunkMaler.Texel(argb, seite, seite);
+    }
+
+    /** Eine senkrechte Fläche bei z 0,25 von y unten bis oben, x 0 bis 1; Ecken oben links, unten links, unten rechts, oben rechts. */
+    private static float[] stehend(float unten, float oben) {
+        return new float[] {0, oben, 0.25f, 0, unten, 0.25f, 1, unten, 0.25f, 1, oben, 0.25f};
+    }
+
+    /** UV der Fläche: u von 0 bis {@code ub}, v von 0 bis 1 des Sprites, das bei (0,5, 0,25) mit 0,25 × 0,25 im Atlas liegt. */
+    private static float[] uv(float ub) {
+        return new float[] {0.5f, 0.25f, 0.5f, 0.5f, 0.5f + 0.25f * ub, 0.5f, 0.5f + 0.25f * ub, 0.25f};
+    }
+
+    @Test
+    void hoherWeizenOhneDurchsichtigeObereHaelfte() {
+        // 32 hoch von −1/16 bis 31/16, UV [0, 0, 8, 16] auf 32 × 32, deckend nur im Viertel links unten.
+        float[] e = stehend(-1 / 16f, 31 / 16f), uv = uv(0.5f);
+        ChunkMaler.Texel t = textur(32, (x, y) -> x < 16 && y >= 16);
+        assertArrayEquals(new float[] {-1 / 16f, 15 / 16f}, ChunkMaler.deckendesY(e, 0, uv, 0, t, 0.5f, 0.25f, 0.25f, 0.25f), 1e-5f);
+        ChunkMaler.zuschneiden(e, 0, uv, 0, t, 0.5f, 0.25f, 0.25f, 0.25f);
+        // Oben bei 1 abgeschnitten, v dort 15/32 des Sprites; unten bleibt.
+        assertArrayEquals(stehend(-1 / 16f, 1), e, 1e-5f);
+        assertArrayEquals(new float[] {0.5f, 0.25f + 0.25f * 15 / 32f, 0.5f, 0.5f, 0.625f, 0.5f, 0.625f, 0.25f + 0.25f * 15 / 32f}, uv, 1e-5f);
+    }
+
+    @Test
+    void cropUndKreuzBleiben() {
+        // crop von −1/16 bis 15/16, die unterste Reihe deckt: bleibt, wie es ist.
+        float[] e = stehend(-1 / 16f, 15 / 16f), uv = uv(1);
+        ChunkMaler.zuschneiden(e, 0, uv, 0, textur(16, (x, y) -> y == 15 && x == 7), 0.5f, 0.25f, 0.25f, 0.25f);
+        assertArrayEquals(stehend(-1 / 16f, 15 / 16f), e);
+        assertArrayEquals(uv(1), uv);
+        // Ein Kreuz von 0 bis 1 mit durchsichtigem Rand wie Mohn: im Block, also bleibt es.
+        e = stehend(0, 1);
+        uv = uv(1);
+        ChunkMaler.zuschneiden(e, 0, uv, 0, textur(16, (x, y) -> x >= 5 && x <= 10 && y >= 6), 0.5f, 0.25f, 0.25f, 0.25f);
+        assertArrayEquals(stehend(0, 1), e);
+        assertArrayEquals(uv(1), uv);
+    }
+
+    @Test
+    void ohneWaagrechteKantenUndGanzDurchsichtig() {
+        // Gedreht, kein Paar Kanten waagrecht: bleibt, auch über dem Block.
+        float[] schief = {0, 1.5f, 0.25f, 0.3f, -0.2f, 0.25f, 1.3f, 0, 0.25f, 1, 1.7f, 0.25f}, uv = uv(1);
+        float[] vorher = schief.clone();
+        ChunkMaler.zuschneiden(schief, 0, uv, 0, textur(16, (x, y) -> y >= 12), 0.5f, 0.25f, 0.25f, 0.25f);
+        assertArrayEquals(vorher, schief);
+        // Ganz über dem Block und ganz durchsichtig: ohne Höhe bei 1,2.
+        float[] e = stehend(1.2f, 1.9f);
+        ChunkMaler.zuschneiden(e, 0, uv(1), 0, textur(16, (x, y) -> false), 0.5f, 0.25f, 0.25f, 0.25f);
+        assertArrayEquals(stehend(1.2f, 1.2f), e, 1e-5f);
+    }
 }
