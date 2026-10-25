@@ -1838,6 +1838,16 @@ public final class Bilder implements FabricClientGameTest {
         if (summe / 8 > 0.45) {
             fehler.add("Karotten und Gras im Mittel zu " + Math.round(100 * summe / 8) + " % anders als ohne Paket, statt höchstens 45 %");
         }
+        // Getönt: Farn (z 46) ohne Paket in der Farbe des Bioms, kaum ein grauer Pixel; ohne Licht und Tönung stünde er grau wie
+        // seine Textur.
+        double grau = 0;
+        for (int x = -60; x <= -57; x++) {
+            grau += anteilGrau(ohne, x, 46, block) / 4;
+        }
+        LOGGER.info("Pflanzen aus Paketen, Farn ohne Paket grau: {}", grau);
+        if (grau > 0.1) {
+            fehler.add("Farn zu " + Math.round(100 * grau) + " % grau statt höchstens 10 %");
+        }
         // Deckt das Ackerland: reifer Weizen (z 40) und Kartoffeln (z 42), verglichen mit derselben Stelle ohne sie.
         for (int[] b : new int[][] {{-56, 40}, {-55, 40}, {-54, 40}, {-53, 40}, {-56, 42}, {-55, 42}, {-54, 42}, {-53, 42}}) {
             double wieBoden = 1 - anteilAnders(mit, b[0], b[1], boden, b[0], b[1], block);
@@ -1926,6 +1936,20 @@ public final class Bilder implements FabricClientGameTest {
             }
         }
         return new double[] {sx / n / block, sz / n / block};
+    }
+
+    /** Welcher Anteil der Pixel im Inneren des Blocks (x, z) grau ist, die Kanäle höchstens 12 auseinander; Mitte wie dort. */
+    private static double anteilGrau(BufferedImage a, int x, int z, int block) {
+        int ax = a.getWidth() / 2 + Math.round((x + 56.5f) * block), az = a.getHeight() / 2 + Math.round((z - 43.5f) * block);
+        int grau = 0, alle = 0;
+        for (int dy = 1; dy < block - 1; dy++) {
+            for (int dx = 1; dx < block - 1; dx++) {
+                int p = a.getRGB(ax + dx, az + dy), r = p >> 16 & 0xFF, g = p >> 8 & 0xFF, b = p & 0xFF;
+                grau += Math.max(r, Math.max(g, b)) - Math.min(r, Math.min(g, b)) <= 12 ? 1 : 0;
+                alle++;
+            }
+        }
+        return grau / (double) alle;
     }
 
     /** Wie {@link #anteilAnders}, nur in der West- oder Osthälfte des Blocks (x, z), gegen dieselbe Stelle in {@code b}. */
