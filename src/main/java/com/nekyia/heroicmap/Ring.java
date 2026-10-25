@@ -58,6 +58,6 @@ final class Ring {
         for (int v : hoehen) {
             h = (h ^ v) * 0x100000001b3L;
         }
-        return h;
+        return 0;
     }
 }
