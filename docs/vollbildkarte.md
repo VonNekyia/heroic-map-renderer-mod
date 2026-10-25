@@ -645,9 +645,10 @@ Arten. Entschieden in [0053](entscheidungen/0053-wahl-des-reliefs.md).
   sagen, dass das Relief mit dem nächsten Abgleich kommt und „Abgleich“ es
   jetzt holt; ist der Abgleich bis zu einer Zeit aus, nennt der Hinweis sie.
   Bis dahin zeigt die Karte ihre Kacheln, wie sie sind.
-- **Grau mit Grund** im Tooltip: auf der eigenen Karte, auf einem Satz ohne
-  Relief und auf einem Satz ohne Schicht in bekanntem Format, etwa von einem
-  Renderer vor 0.19.0.
+- **Grau mit Grund** im Tooltip: auf einem Satz ohne Relief und auf einem
+  Satz ohne Schicht in bekanntem Format, etwa von einem Renderer vor 0.19.0.
+  Auf der eigenen Karte nie grau und nie „…“; sie schreibt ihre Schicht
+  selbst, siehe [Selbst](selbst.md), „Relief“.
 - **Gerechnet** wird nur, wenn die gewählte Art nicht die der Kacheln ist und
   der Satz die Schicht hat (`Relief.von`, `Relief.Satzrelief.noetig`):
   `map.json` nennt die Art unter `relief` und die Schicht unter
@@ -664,7 +665,8 @@ Arten. Entschieden in [0053](entscheidungen/0053-wahl-des-reliefs.md).
     begrenzt, dann mal 0,75; so trifft das letzte Bit. `Math.round` rundet
     positive Werte wie `f32::round` im Renderer.
   - Fehlt die Schicht einer Kachel oder lässt sie sich nicht lesen, gilt
-    Code 4 und die Kachel bleibt; fehlt der Rest, gilt keiner.
+    Code 4 und die Kachel bleibt; ebenso, wo sie durchsichtig ist, was nur
+    die Schicht der eigenen Karte sein kann. Fehlt der Rest, gilt keiner.
   - Pixel mit Alpha 0 bleiben ganz, Alpha bleibt.
 - **Geprüft** in `ReliefTest` mit Zahlen: die Faktoren je Code, Schnee 250
   bei 1,24 zurück auf 202, abgeschnittene Pixel nur mit dem Rest richtig

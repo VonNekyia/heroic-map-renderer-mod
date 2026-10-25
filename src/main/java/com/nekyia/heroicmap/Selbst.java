@@ -72,6 +72,8 @@ public final class Selbst {
     /** Gehören dem Worker. */
     private ChunkMaler maler;
     private Kachelwerk werk;
+    /** Die Schicht des Reliefs neben den Kacheln, im Ordner {@code relief} des Massstabs. Siehe docs/selbst.md, „Relief“. */
+    private Kachelwerk schicht;
     private boolean gemeldet;
     /** Hat das Werk aufgegeben, etwa bei voller Platte? Dann zeichnet der Worker bis zum nächsten Wechsel der Welt nicht. */
     private boolean aufgegeben;
@@ -83,6 +85,8 @@ public final class Selbst {
     /** Wann jeder Chunk zuletzt gezeichnet wurde, in ms. */
     private final Long2LongOpenHashMap zuletzt = new Long2LongOpenHashMap();
     private final AtomicInteger inArbeit = new AtomicInteger();
+    /** Mit Relief: welche Chunks neu zu zeichnen sind, wenn sich Höhen ändern. */
+    private final Ring ring = new Ring();
     /** Der selbst gezeichnete Satz dieser Welt und Dimension, oder null; gesucht beim ersten Bedarf. */
     private Satz satz;
     private boolean gesucht;
@@ -375,12 +379,14 @@ public final class Selbst {
     void leeren() {
         offen.clear();
         zuletzt.clear();
+        ring.leeren();
         satz = null;
         gesucht = false;
         licht = null;
         worker.execute(() -> {
             schreibe(true);
             werk = null;
+            schicht = null;
             aufgegeben = false;
         });
     }
@@ -411,6 +417,7 @@ public final class Selbst {
             try {
                 if (werk != null && werk.ordner().getParent().equals(baum)) {
                     werk = null;
+                    schicht = null;
                 }
                 Laden.loesche(baum);
                 ganz = true;
@@ -495,6 +502,11 @@ public final class Selbst {
         }
         Satz s = satz;
         ChunkMaler.Auftrag auftrag = ChunkMaler.abziehen(level, chunk, s.massstab(), Integer.MAX_VALUE, licht, Minimap.INSTANZ.texel(mc), 0, null);
+        // Die Kacheln bleiben ohne Relief; mit Relief kommt die Schicht dazu. Siehe docs/selbst.md, „Relief“.
+        int[] hoehen = Minimap.INSTANZ.relief() == Relief.Art.OHNE ? null : ChunkMaler.hoehen(level, auftrag.cx(), auftrag.cz());
+        if (hoehen != null) {
+            ring.abgezogen(auftrag.cx(), auftrag.cz(), Relief.eigene(hoehen), Relief.fehlende(hoehen), offen::add);
+        }
         inArbeit.incrementAndGet();
         worker.execute(() -> {
             try {
@@ -505,6 +517,9 @@ public final class Selbst {
                     maler = new ChunkMaler();
                 }
                 werk(s).lege(auftrag.cx(), auftrag.cz(), maler.male(auftrag));
+                if (hoehen != null) {
+                    schicht.lege(auftrag.cx(), auftrag.cz(), Relief.schicht(Relief.codes(hoehen), s.massstab()));
+                }
             } catch (RuntimeException e) {
                 melde(e);
             } finally {
@@ -514,13 +529,14 @@ public final class Selbst {
     }
 
     /**
-     * Im Worker: das Werk für den Satz, die feinste Stufe die seines Massstabs; ein anderes schreibt
-     * vorher, was es noch hat.
+     * Im Worker: das Werk für den Satz, die feinste Stufe die seines Massstabs, und das der Schicht daneben; ein anderes
+     * schreibt vorher, was es noch hat.
      */
     private Kachelwerk werk(Satz s) {
         if (werk == null || !werk.ordner().equals(s.ordner())) {
             schreibe(true);
             werk = new Kachelwerk(s.ordner(), s.kachel(), 16 * s.massstab(), s.minZoom(), s.stufe());
+            schicht = new Kachelwerk(s.ordner().resolve(Downloads.RELIEF), s.kachel(), 16 * s.massstab(), s.minZoom(), s.stufe());
         }
         return werk;
     }
@@ -539,12 +555,13 @@ public final class Selbst {
         boolean grob = alles || jetzt - grobGeschrieben >= GROB_MS;
         try {
             werk.schreibe(grob, fertig);
+            schicht.schreibe(grob, fertig);
             if (grob) {
                 grobGeschrieben = jetzt;
             }
         } catch (IOException | RuntimeException e) {
             melde(e);
-            if (werk.aufgegeben()) {
+            if (werk.aufgegeben() || schicht.aufgegeben()) {
                 gibAuf();
             }
         } finally {
@@ -573,11 +590,12 @@ public final class Selbst {
         }
     }
 
-    /** Der offenen Karte melden, was geschrieben ist; sie lädt es neu. */
+    /** Der offenen Karte melden, was geschrieben ist, Kachel oder Schicht; sie lädt die Kachel neu. */
     private void gemeldet(List<Kachelwerk.Kachel> fertig) {
         if (!fertig.isEmpty()) {
             Path ordner = werk.ordner();
-            Minecraft.getInstance().execute(() -> fertig.forEach(k -> Kacheln.geaendert(ordner, k.z(), k.x(), k.y())));
+            List<Kachelwerk.Kachel> einmal = fertig.stream().distinct().toList();
+            Minecraft.getInstance().execute(() -> einmal.forEach(k -> Kacheln.geaendert(ordner, k.z(), k.x(), k.y())));
         }
     }
 
@@ -588,6 +606,7 @@ public final class Selbst {
     private void gibAuf() {
         aufgegeben = true;
         werk = null;
+        schicht = null;
         Minecraft mc = Minecraft.getInstance();
         mc.execute(() -> {
             satz = null;

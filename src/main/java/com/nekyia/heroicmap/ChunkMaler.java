@@ -159,7 +159,7 @@ final class ChunkMaler {
      * Die Höhen um den Chunk für das Relief, aus WORLD_SURFACE: {@link Relief#SEITE} im Quadrat ab 32 Blöcken nordwestlich der
      * Ecke, bis 1 Block östlich und südlich; wo kein Chunk geladen ist, {@link Relief#FEHLT}.
      */
-    private static int[] hoehen(ClientLevel level, int cx, int cz) {
+    static int[] hoehen(ClientLevel level, int cx, int cz) {
         int[] h = new int[Relief.SEITE * Relief.SEITE];
         int x0 = SectionPos.sectionToBlockCoord(cx) - Relief.REICHWEITE, z0 = SectionPos.sectionToBlockCoord(cz) - Relief.REICHWEITE;
         for (int kz = SectionPos.blockToSectionCoord(z0); kz <= cz + 1; kz++) {

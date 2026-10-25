@@ -1,10 +1,11 @@
 ---
 title: Selbst gezeichnete Karte
-description: Die Wahl „Selbst“ - wie der Mod die Chunks, die der Spieler lädt, in eine eigene Karte zeichnet, auch im Einzelspieler, mit Wahl und Beenden, je Server, mit der Frage nach der alten Karte, Massstab 1, 2 oder 4 px, wann gezeichnet wird, Kacheln als PNG, Pyramide, Kosten, Bild und was fehlt.
+description: Die Wahl „Selbst“ - wie der Mod die Chunks, die der Spieler lädt, in eine eigene Karte zeichnet, auch im Einzelspieler, mit Wahl und Beenden, je Server, mit der Frage nach der alten Karte, Massstab 1, 2 oder 4 px, wann gezeichnet wird, Kacheln als PNG, Pyramide, Relief, Kosten, Bild und was fehlt.
 code:
   - src/main/java/com/nekyia/heroicmap/Selbst.java
   - src/main/java/com/nekyia/heroicmap/Kachelwerk.java
   - src/main/java/com/nekyia/heroicmap/Pyramide.java
+  - src/main/java/com/nekyia/heroicmap/Ring.java
   - src/main/java/com/nekyia/heroicmap/Kacheln.java
   - src/main/java/com/nekyia/heroicmap/Satz.java
   - src/main/java/com/nekyia/heroicmap/Auswahl.java
@@ -343,6 +344,45 @@ Bauserver, der eine Kopie der Hauptwelt ist.
     `map.json`. Bricht der Neubau ab, etwa beim Verlassen der Welt oder
     beim Beenden des Spiels, fehlt das Feld noch, und der nächste Start
     baut wieder alles.
+
+## Relief
+
+Die eigene Karte zeigt das Relief, das auf der Vollbildkarte gewählt ist,
+wie eine Karte des Servers. Ihre Kacheln bleiben ohne Relief; daneben
+schreibt sie eine Schicht mit dem Code je Spalte, und die Vollbildkarte
+rechnet daraus die gewählte Art. Entschieden in
+[0053](entscheidungen/0053-wahl-des-reliefs.md).
+
+- **Die Schicht** (`Selbst.schicht`, ein zweites `Kachelwerk`): im Ordner
+  `relief` des Massstabs, mit den Pfaden der Kacheln, als PNG. Wie die des
+  Renderers grau, der Code in Rot, Grün und Blau, Alpha 255
+  (`Relief.schicht`); ihre Pyramide nimmt je 2 × 2 denselben Pixel wie die
+  der Kacheln. Wo noch kein Chunk mit Relief gezeichnet ist, ist sie
+  durchsichtig, und dort gilt Code 4: die Kachel bleibt.
+- **Die Codes** je Spalte aus WORLD_SURFACE wie auf der Minimap nah
+  (`ChunkMaler.hoehen`, `Relief.codes`), siehe [Minimap](minimap.md),
+  „Relief“.
+- **Gerechnet** beim Dekodieren (`Kacheln.mitRelief`), siehe
+  [Vollbildkarte](vollbildkarte.md), „Relief“. Ohne Relief in den Kacheln
+  trifft es genau; einen Rest braucht die eigene Karte nicht. Erkannt an
+  ihrer Marke (`Relief.von`, `Selbst.selbst`), nicht an `map.json`; so
+  bekommt auch eine ältere eigene Karte das Relief.
+- **Mit Flach** liest sie keine Höhen und schreibt keine Schicht. Wechselt
+  der Spieler von Flach auf Relief, zeichnet sie die geladenen Chunks neu
+  (`Selbst.neuGewaehlt`); andere bekommen die Schicht, wenn sie wieder
+  laden.
+- **Neu gezeichnet** wie auf der Minimap (`Ring`): Ändern sich die Höhen
+  eines Chunks, kommen die Chunks dazu, deren Codes an ihnen hängen; beim
+  ersten Zeichnen nur die, die ohne ihn gezeichnet sind. Die eigene Karte
+  merkt sich das für jeden Chunk der Sitzung, je Chunk ein Hash der Höhen
+  mit 64 Bit und welche Chunks um ihn fehlten.
+- **Geprüft** im Gametest `ReliefWahl`: mit Flach keine Schicht; nach dem
+  Klick auf Relief die Codes um eine Säule wie der Renderer (8 am
+  Westrand, 0 am Ostrand, 13 im Schatten, 4 weit weg), die Kachel Pixel für
+  Pixel wie mit Flach, das Bild anders; ein Turm im Nordwesten wirft danach
+  seinen Schatten in die Schicht des Chunks südöstlich (4 → 13).
+- **Kosten:** je Chunk die Höhen und Codes, je geänderter Kachel eine
+  zweite PNG. Nicht gemessen.
 
 ## Kosten
 

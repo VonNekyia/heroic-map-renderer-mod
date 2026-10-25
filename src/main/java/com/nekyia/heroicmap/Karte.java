@@ -490,8 +490,12 @@ final class Karte extends Screen {
         boolean fehlt = fehltSchicht(relief, art);
         Component name = Component.translatable("heroicmap.relief." + art.name);
         Button knopf = Button.builder(Component.translatable(fehlt ? "heroicmap.karte.relief_fehlt" : "heroicmap.karte.relief", name), b -> {
-            Relief.Art neu = Relief.Art.values()[(Minimap.INSTANZ.relief().ordinal() + 1) % Relief.Art.values().length];
+            Relief.Art alt = Minimap.INSTANZ.relief(), neu = Relief.Art.values()[(alt.ordinal() + 1) % Relief.Art.values().length];
             Minimap.INSTANZ.setzeRelief(neu);
+            if (alt == Relief.Art.OHNE && relief.selbst()) {
+                // Mit Flach schrieb die eigene Karte keine Schicht; die geladenen Chunks bekommen sie jetzt.
+                Selbst.INSTANZ.neuGewaehlt(minecraft);
+            }
             Minimap.INSTANZ.schreibe(HeroicMap.einstellungen());
             Kacheln.satzGeladen();
             if (fehltSchicht(relief, neu)) {
@@ -502,7 +506,7 @@ final class Karte extends Screen {
             }
             rebuildWidgets();
         }).bounds(x, y, KNOPF, 20).build();
-        String grund = Selbst.selbst(satz.ordner().getParent()) ? "heroicmap.karte.relief_selbst"
+        String grund = relief.selbst() ? null
                 : relief.gebacken() == Relief.Art.OHNE ? "heroicmap.karte.relief_ohne"
                 : !relief.schicht() ? "heroicmap.karte.relief_alt" : null;
         knopf.active = grund == null;
@@ -517,7 +521,7 @@ final class Karte extends Screen {
      */
     private boolean fehltSchicht(Relief.Satzrelief relief, Relief.Art art) {
         Path schicht = satz.ordner().resolve(Downloads.RELIEF);
-        return relief.noetig(art) && !(liegt(schicht) && liegt(schicht.resolve("rest")));
+        return relief.noetig(art) && !relief.selbst() && !(liegt(schicht) && liegt(schicht.resolve("rest")));
     }
 
     private static boolean liegt(Path teil) {
