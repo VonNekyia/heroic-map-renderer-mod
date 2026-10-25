@@ -49,7 +49,8 @@ sagt sie das und zeigt nichts.
 | Knopf „Karte laden …“ | zeigt die Karten des Servers, je Baum der Name und darunter ein Knopf je Massstab mit seiner Grösse (`Auswahl`), darüber die Wahl „Selbst“, siehe [Selbst gezeichnete Karte](selbst.md); die Knöpfe teilen sich die Breite des Schirms, höchstens 90 Einheiten je Knopf, so passen sie auch bei grossem GUI-Massstab; den Massstab, den der Spieler schon ganz hat (`Downloads.vollstaendig`: ein vollständiger Satz, und das Plugin misst den Abgleich an demselben Massstab), zeigt der Knopf als „Abgleich“ und gleicht ab wie der Knopf „Abgleich“, nach einer Ablehnung mit `wieder` bis dahin aus; ein Klick fragt wie `/hmap laden` erst im Dialog nach |
 | Knopf „Abgleich“ | fragt einen Abgleich des gezeigten Satzes an, wie `/hmap abgleich`; nur mit einem Satz vom Server, nicht auf der selbst gezeichneten Karte. Lehnt der Server mit `wieder` ab, ist der Knopf bis dahin aus und nennt die Uhrzeit |
 | Knopf „Zum Spieler“ | legt den eigenen Spieler in die Mitte, für den Fall, dass man sich verirrt hat, wie auf der Webkarte; Stufe und Lupe bleiben (mod#75) |
-| Knopf „Ebenen +“ unter „Zum Spieler“ | klappt die Liste der Ebenen auf, „Ebenen -“ wieder zu; nur, wenn der Server Ebenen schickt, siehe „Ebenen“ (mod#76) |
+| Knopf „Relief: …“ unter „Zum Spieler“ | wechselt reihum das Relief der Karte, Flach, Relief, Relief + Schatten; gilt auch für die Minimap weit heraus, siehe „Relief“ |
+| Knopf „Ebenen +“ unter „Relief“ | klappt die Liste der Ebenen auf, „Ebenen -“ wieder zu; nur, wenn der Server Ebenen schickt, siehe „Ebenen“ (mod#76) |
 | Knopf „Verwalten +“ unter den Ebenen | öffnet links daneben die Schnellverwaltung aller eigenen Objekte, „Verwalten −“ schliesst sie; ebenso die Taste „Schnellverwaltung“, ohne Belegung, siehe [Schnellverwaltung](verwaltung.md) |
 | Klick auf „An“/„Aus“ in der Liste | schaltet die Ebene an oder aus, sonst nichts, siehe „Ebenen“ |
 | Doppelklick auf den Namen einer Ebene in der Liste | heftet alles von ihr an die Minimap oder löst es, siehe „Ebenen“ |
@@ -631,9 +632,22 @@ auf main `slope`. Ab Renderer 0.19.0 liegt neben jeder Kachel eine Schicht
 mit einem Code je Pixel, dazu ein Rest; daraus rechnet der Mod die anderen
 Arten. Entschieden in [0053](entscheidungen/0053-wahl-des-reliefs.md).
 
-- **Gewählt** als `relief=ohne`, `slope` oder `shadows` in
+- **Gewählt** mit dem Knopf „Relief: …“ unter „Zum Spieler“
+  (`Karte.reliefKnopf`), so hat es der User gewählt; ein Klick nimmt die
+  nächste Art, Flach, Relief, Relief + Schatten, im Code `ohne`, `slope`,
+  `shadows`. Global, gespeichert sofort als `relief=` in
   `config/heroicmap.properties` (`Minimap.relief`), Vorgabe `slope`;
-  unlesbar gilt `slope`.
+  unlesbar gilt `slope`. Danach laden alle offenen Kacheln neu, die alten
+  Texturen bleiben, bis die neuen da sind.
+- **Fehlt die Schicht noch** (`Karte.fehltSchicht`), weil der Satz noch
+  keine Schicht und keinen Rest hat, deren Index ohne offenen Strom daliegt:
+  Der Knopf trägt „…“, sein Tooltip und ein Hinweis über den Koordinaten
+  sagen, dass das Relief mit dem nächsten Abgleich kommt und „Abgleich“ es
+  jetzt holt; ist der Abgleich bis zu einer Zeit aus, nennt der Hinweis sie.
+  Bis dahin zeigt die Karte ihre Kacheln, wie sie sind.
+- **Grau mit Grund** im Tooltip: auf der eigenen Karte, auf einem Satz ohne
+  Relief und auf einem Satz ohne Schicht in bekanntem Format, etwa von einem
+  Renderer vor 0.19.0.
 - **Gerechnet** wird nur, wenn die gewählte Art nicht die der Kacheln ist und
   der Satz die Schicht hat (`Relief.von`, `Relief.Satzrelief.noetig`):
   `map.json` nennt die Art unter `relief` und die Schicht unter
