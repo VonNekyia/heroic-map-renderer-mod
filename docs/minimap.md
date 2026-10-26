@@ -1193,8 +1193,11 @@ Server zeigt. Bis 0.2.74 hatte sie nah kein Relief. Wahl des Users, siehe
   Basiskacheln der Testwelt aus ihren Höhen (`src/test/resources/relief/hoehen.bin`,
   geschrieben von `hoehen.py` aus den Regionen der Testwelt) genau wie die
   Schicht von Renderer 0.19.0, 8192 von 8192, und der Faktor je Block.
-- **Kosten:** Messung (b) folgt im Fenster des Reviewers, Ziel höchstens +5 %
-  Zeit je Chunk bei 4 und 8 px.
+- **Kosten:** Das Zeichnen je Chunk bleibt mit Relief im Rauschen, −2,1
+  bis +1,0 % bei 1 bis 16 px. Der Abzug auf dem Render-Thread braucht je
+  Chunk 0,02 ms mehr, für die Höhen. Änderungen unter der Oberfläche malen
+  so viele Chunks wie Flach. Gemessen am 26.10., siehe
+  [Relief-Wahl](messungen/2026-10-26-relief-wahl.md).
 
 ## Neu zeichnen
 
