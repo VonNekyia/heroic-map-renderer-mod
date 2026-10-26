@@ -677,6 +677,11 @@ Arten. Entschieden in [0053](entscheidungen/0053-wahl-des-reliefs.md).
   ohne und `shadows` die Kacheln des Renderers je Kanal auf ±1, Alpha genau.
   Über alle Stufen der Szene, nachgerechnet mit einem Skript: kein Pixel
   über ±1, um 1 daneben bei 8 px rund 11 % (ohne) und 4 % (`shadows`).
+- **Kosten:** Rechnet der Mod eine andere Art als die gebackene, braucht
+  eine Kachel im Faden des Dekoders rund doppelt so lange, 5,9 → 11,8 ms
+  (+99 %); den grössten Teil kostet das Lesen des Rests. Mit der gebackenen
+  Art kostet es nichts. Gemessen am 26.10., siehe
+  [Relief-Wahl](messungen/2026-10-26-relief-wahl.md).
 
 ## Spieler und Koordinaten
 
