@@ -7,6 +7,7 @@ The release notes on GitHub and Modrinth come from here
 ## 0.2.76
 
 - **No more cross around plants in the relief, on the minimap up close and on your own map.** Grass, flowers, dead bushes and the like no longer count as a step in the ground, so they stop putting light and dark marks on their neighbours. They are still drawn.
+- **No more hard edge next to empty columns,** for example at the edges of End islands, on the minimap up close and on your own map.
 - **The full-screen map and the zoomed-out minimap keep the cross for now:** their tiles come from the server and change once the server has redrawn its map with the fixed renderer. Your own map loses the cross chunk by chunk, whenever a chunk is loaded again; places you don't return to keep it.
 
 ## 0.2.75

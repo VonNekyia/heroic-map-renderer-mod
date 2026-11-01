@@ -1,5 +1,5 @@
-"""Schreibt hoehen.bin: je Spalte das y aus der Heightmap WORLD_SURFACE der Testwelt, wie der Renderer es liest
-(Chunk::surface), für die Szene der Kacheln in diesem Ordner, mit 32 Blöcken Rand nach Norden und Westen für den
+"""Schreibt hoehen.bin: je Spalte das y aus der Heightmap MOTION_BLOCKING der Testwelt, wie der Renderer es liest
+(Chunk::relief_hoehen), für die Szene der Kacheln in diesem Ordner, mit 32 Blöcken Rand nach Norden und Westen für den
 Schatten und 1 nach Osten und Süden. Fehlt ein Chunk, steht dort -32768.
 
 Aufruf aus der Wurzel des Mods: python -I src/test/resources/relief/hoehen.py <ordner der Regionen der Testwelt>
@@ -60,7 +60,7 @@ def nbt(daten, i, typ):
 
 
 def heightmap(werte):
-    """WORLD_SURFACE: je Wert so viele Bits, wie die Höhe der Welt braucht, ohne über ein long zu laufen; Wert 0 heisst leer."""
+    """Eine Heightmap: je Wert so viele Bits, wie die Höhe der Welt braucht, ohne über ein long zu laufen; Wert 0 heisst leer."""
     bits = (HOEHE).bit_length()
     je = 64 // bits
     aus = []
@@ -85,7 +85,11 @@ def chunk(regionen, cx, cz):
             raise ValueError("Kompression %d" % art)
         daten = zlib.decompress(f.read(laenge - 1))
     wurzel, _ = nbt(daten, 3 + struct.unpack_from(">H", daten, 1)[0], 10)
-    karte = (wurzel.get("Heightmaps") or {}).get("WORLD_SURFACE")
+    karten = wurzel.get("Heightmaps") or {}
+    karte = karten.get("MOTION_BLOCKING")
+    # Wie im Renderer: Fehlt das Feld oder passt die Länge nicht, gilt für den ganzen Chunk WORLD_SURFACE.
+    if karte is None or len(karte) != 37:
+        karte = karten.get("WORLD_SURFACE")
     if karte is None:
         return None
     # Wert 0 heisst keine Spalte; sonst y des obersten Blocks + 1 − minY.

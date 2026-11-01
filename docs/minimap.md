@@ -1211,7 +1211,7 @@ Server zeigt. Bis 0.2.74 hatte sie nah kein Relief. Wahl des Users, siehe
 - **Geprüft** in `ReliefTest`: Codes mit Zahlen, die Codes für zwei
   Basiskacheln der Testwelt aus ihren Höhen (`src/test/resources/relief/hoehen.bin`,
   geschrieben von `hoehen.py` aus den Regionen der Testwelt) genau wie die
-  Schicht von Renderer 0.19.0, 8192 von 8192, und der Faktor je Block. Im
+  Schicht des Renderers auf `6cf4e7c4`, 8192 von 8192, und der Faktor je Block. Im
   Gametest `ReliefWahl.pflanzenHeben` mit Blöcken in der Welt: Pflanzen auf
   ebenem Sand ändern keinen Code, eine Stufe aus Laub ihre vier Nachbarn.
 - **Kosten:** Das Zeichnen je Chunk bleibt mit Relief im Rauschen, −2,1
