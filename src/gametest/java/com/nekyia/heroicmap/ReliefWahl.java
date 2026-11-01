@@ -116,6 +116,8 @@ public final class ReliefWahl implements FabricClientGameTest {
         server.runCommand("setblock -24 -60 -24 dead_bush");
         server.runCommand("setblock -20 -60 -24 short_dry_grass");
         server.runCommand("setblock -12 -60 -24 short_grass");
+        // Hohes Gras hält sich nicht auf Sand, darum Erde darunter, eben mit dem Sand.
+        server.runCommand("setblock -8 -61 -24 dirt");
         server.runCommand("setblock -8 -60 -24 tall_grass[half=lower]");
         server.runCommand("setblock -8 -59 -24 tall_grass[half=upper]");
         server.runCommand("setblock -28 -60 -20 dead_bush");
