@@ -1165,10 +1165,29 @@ Server zeigt. Bis 0.2.74 hatte sie nah kein Relief. Wahl des Users, siehe
   Gefälle aus den vier Nachbarn, Schatten bis 32 Blöcke diagonal nach
   Nordwesten. Fehlt ein Nachbar, gilt er als gleich hoch; fehlt die Spalte,
   bleibt sie.
-- **Die Höhen** aus WORLD_SURFACE der Chunks, die der Client hat
+- **Die Höhen** aus `MOTION_BLOCKING` der Chunks, die der Client hat
   (`ChunkMaler.hoehen`), beim Abziehen auf dem Render-Thread: 49 × 49 Spalten
   um den Chunk, 32 nach Norden und Westen, 1 nach Osten und Süden
-  (`Relief.SEITE`). Wo kein Chunk geladen ist, fehlen sie.
+  (`Relief.SEITE`). Wo kein Chunk geladen ist oder eine Spalte keinen
+  zählenden Block hat, etwa im Leeren, fehlen sie, wie im Renderer.
+- **Was zählt,** wie im Spiel: der Block-Tag `blocks_motion` oder eine
+  Flüssigkeit (`Heightmap.Types`, belegt am Client 26.3).
+  - Es zählen Laub, Stämme, Stufen, Treppen, Zäune, Kakteen, Bambus, Glas,
+    Türen, ein Schneeblock, Wasser; auch Druckplatten und `sculk_vein`.
+  - Es zählen nicht Gras, Blumen, Gestrüpp, Getreide, Zuckerrohr, Setzlinge,
+    Fackeln, Schilder, Ranken, Teppiche, Schienen, eine Lage Schnee.
+  - So wirft eine Bodenpflanze kein Kreuz aus hell und dunkel auf ihre vier
+    Nachbarn. Gezeichnet wird sie weiter: Der Anfang jeder Spalte bleibt bei
+    `WORLD_SURFACE`.
+- **Woher der Client sie hat,** belegt am Client und an Paper 26.3:
+  - Der Server schickt `MOTION_BLOCKING` im Chunk-Paket
+    (`Heightmap.Types.sendToClient`, `ClientboundLevelChunkPacketData`).
+  - Der Client hält sie bei jeder Blockänderung aktuell
+    (`LevelChunk.setBlockState`). Fehlt sie, rechnet er sie aus den Blöcken
+    (`ChunkAccess.getHeight`).
+- **Kacheln vom Server:** Die Vollbildkarte und die Minimap weit heraus zeigen
+  das Kreuz, bis der Server mit dem behobenen Renderer neu gezeichnet hat;
+  Kacheln und Schicht kommen von dort. Die Minimap nah darf vorher kommen.
 - **Aufgelegt** nach dem Zeichnen im Worker (`ChunkMaler.male`,
   `Relief.auf`): je Block der Faktor seines Codes auf Rot, Grün und Blau seiner
   Pixel, gerundet und bei 255 gekappt, Alpha bleibt, wie der Renderer auf eine
@@ -1192,7 +1211,9 @@ Server zeigt. Bis 0.2.74 hatte sie nah kein Relief. Wahl des Users, siehe
 - **Geprüft** in `ReliefTest`: Codes mit Zahlen, die Codes für zwei
   Basiskacheln der Testwelt aus ihren Höhen (`src/test/resources/relief/hoehen.bin`,
   geschrieben von `hoehen.py` aus den Regionen der Testwelt) genau wie die
-  Schicht von Renderer 0.19.0, 8192 von 8192, und der Faktor je Block.
+  Schicht von Renderer 0.19.0, 8192 von 8192, und der Faktor je Block. Im
+  Gametest `ReliefWahl.pflanzenHeben` mit Blöcken in der Welt: Pflanzen auf
+  ebenem Sand ändern keinen Code, eine Stufe aus Laub ihre vier Nachbarn.
 - **Kosten:** Das Zeichnen je Chunk bleibt mit Relief im Rauschen, −2,1
   bis +1,0 % bei 1 bis 16 px. Der Abzug auf dem Render-Thread braucht je
   Chunk 0,02 ms mehr, für die Höhen. Änderungen unter der Oberfläche malen

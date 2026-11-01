@@ -359,7 +359,7 @@ rechnet daraus die gewählte Art. Entschieden in
   (`Relief.schicht`); ihre Pyramide nimmt je 2 × 2 denselben Pixel wie die
   der Kacheln. Wo noch kein Chunk mit Relief gezeichnet ist, ist sie
   durchsichtig, und dort gilt Code 4: die Kachel bleibt.
-- **Die Codes** je Spalte aus WORLD_SURFACE wie auf der Minimap nah
+- **Die Codes** je Spalte aus `MOTION_BLOCKING` wie auf der Minimap nah
   (`ChunkMaler.hoehen`, `Relief.codes`), siehe [Minimap](minimap.md),
   „Relief“.
 - **Gerechnet** beim Dekodieren (`Kacheln.mitRelief`), siehe
@@ -371,6 +371,11 @@ rechnet daraus die gewählte Art. Entschieden in
   der Spieler von Flach auf Relief, zeichnet sie die geladenen Chunks neu
   (`Selbst.neuGewaehlt`); andere bekommen die Schicht, wenn sie wieder
   laden.
+- **Eine ältere Schicht** behält ihre Codes: Eine eigene Karte aus 0.2.75
+  zeigt um Bodenpflanzen das Kreuz, bis ihr Chunk neu gezeichnet ist. Das
+  geschieht mit Relief, sobald der Client den Chunk wieder lädt oder sich
+  ein Block darin ändert, siehe „Wann gezeichnet wird“. Wohin der Spieler
+  nicht mehr kommt, bleibt es.
 - **Neu gezeichnet** wie auf der Minimap (`Ring`): Ändern sich die Höhen
   eines Chunks, kommen die Chunks dazu, deren Codes an ihnen hängen; beim
   ersten Zeichnen nur die, die ohne ihn gezeichnet sind. Die eigene Karte

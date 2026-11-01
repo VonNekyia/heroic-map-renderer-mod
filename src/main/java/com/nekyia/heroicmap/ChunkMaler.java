@@ -156,8 +156,9 @@ final class ChunkMaler {
     }
 
     /**
-     * Die Höhen um den Chunk für das Relief, aus WORLD_SURFACE: {@link Relief#SEITE} im Quadrat ab 32 Blöcken nordwestlich der
-     * Ecke, bis 1 Block östlich und südlich; wo kein Chunk geladen ist, {@link Relief#FEHLT}.
+     * Die Höhen um den Chunk für das Relief, aus MOTION_BLOCKING, damit Bodenpflanzen sie nicht heben: {@link Relief#SEITE} im
+     * Quadrat ab 32 Blöcken nordwestlich der Ecke, bis 1 Block östlich und südlich; wo kein Chunk geladen ist oder die Spalte
+     * keinen zählenden Block hat, {@link Relief#FEHLT}. Siehe docs/minimap.md, „Relief“.
      */
     static int[] hoehen(ClientLevel level, int cx, int cz) {
         int[] h = new int[Relief.SEITE * Relief.SEITE];
@@ -170,7 +171,9 @@ final class ChunkMaler {
                     for (int lx = 0; lx < 16; lx++) {
                         int x = SectionPos.sectionToBlockCoord(kx) + lx - x0;
                         if (x >= 0 && z >= 0 && x < Relief.SEITE && z < Relief.SEITE) {
-                            h[z * Relief.SEITE + x] = c == null ? Relief.FEHLT : c.getHeight(Heightmap.Types.WORLD_SURFACE, lx, lz);
+                            int y = c == null ? Relief.FEHLT : c.getHeight(Heightmap.Types.MOTION_BLOCKING, lx, lz);
+                            // Ohne Block nennt die Höhenkarte den Boden der Welt minus 1.
+                            h[z * Relief.SEITE + x] = y < level.getMinY() ? Relief.FEHLT : y;
                         }
                     }
                 }

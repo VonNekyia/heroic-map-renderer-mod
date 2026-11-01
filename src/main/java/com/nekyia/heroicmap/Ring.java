@@ -22,7 +22,7 @@ final class Ring {
     private final Long2ObjectOpenHashMap<Gemalt> gemalt = new Long2ObjectOpenHashMap<>();
 
     /**
-     * Der Chunk (x, z) ist mit den 16 × 16 Höhen {@code hoehen} (WORLD_SURFACE) abgezogen, und um ihn fehlten die Chunks
+     * Der Chunk (x, z) ist mit den 16 × 16 Höhen {@code hoehen} (MOTION_BLOCKING) abgezogen, und um ihn fehlten die Chunks
      * {@code fehlten}: Haben sich die Höhen seit dem letzten Mal geändert, gehen die Chunks, deren Codes an ihnen hängen, an
      * {@code markiere}. Beim ersten Mal nur die, die ohne ihn abgezogen sind. Eine Änderung unter der Oberfläche markiert so
      * keinen.
