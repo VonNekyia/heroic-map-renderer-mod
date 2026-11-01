@@ -100,7 +100,7 @@ class ReliefTest {
 
     @Test
     void wieDerRenderer() throws IOException {
-        // Zwei Basiskacheln der Testwelt von Renderer 0.19.0, siehe src/test/resources/relief/LIESMICH.txt: aus slope mit
+        // Zwei Basiskacheln der Testwelt vom Renderer, siehe src/test/resources/relief/LIESMICH.txt: aus slope mit
         // Schicht und Rest gerechnet treffen ohne und shadows die Kacheln des Renderers je Kanal auf ±1, wie map.json verspricht.
         int pixel = 0, eins = 0, rest = 0, schatten = 0;
         for (String k : new String[] {"8/-44/-52.webp", "8/-45/-53.webp"}) {
@@ -202,7 +202,7 @@ class ReliefTest {
 
     @Test
     void codesWieDerRenderer() throws IOException {
-        // Die Höhen der Testwelt (hoehen.bin, siehe hoehen.py) ergeben genau die Schicht von Renderer 0.19.0 für dieselben zwei
+        // Die Höhen der Testwelt (hoehen.bin, siehe hoehen.py) ergeben genau die Schicht des Renderers für dieselben zwei
         // Basiskacheln, je Block ein Code, bei scale 4 je 4 × 4 Pixel.
         java.nio.ByteBuffer roh;
         try (java.io.InputStream rein = ReliefTest.class.getResourceAsStream("/relief/hoehen.bin")) {

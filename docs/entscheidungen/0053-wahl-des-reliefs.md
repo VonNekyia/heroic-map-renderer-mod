@@ -65,6 +65,9 @@ des Mods gab der Reviewer am 25.10. frei, mit den Antworten des Users.
   bisher, nämlich wie weit; das steht deutlich im CHANGELOG.
 - Ein Baum aus einem Renderer vor 0.19.0 hat keine Schicht; dort ist der
   Knopf grau und nennt den Grund.
+- Seit 0.2.76 kommen die Höhen aus `MOTION_BLOCKING` statt aus
+  `WORLD_SURFACE`, damit Bodenpflanzen kein Kreuz werfen, siehe
+  [Minimap](../minimap.md), „Relief“; im Renderer ebenso.
 - Gemessen am 26.10., alle Ziele erreicht: je Kachel +99 %, die Minimap
   nah zeichnet so schnell wie Flach, die eigene Karte im Worker höchstens
   +4,1 % und +7 % Platz bei 4 px; siehe

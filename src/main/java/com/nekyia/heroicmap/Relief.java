@@ -136,7 +136,7 @@ final class Relief {
     /** Die Seite der Höhen um einen Chunk: 32 Blöcke nach Nordwesten, der Chunk, 1 Block nach Osten und Süden. */
     static final int SEITE = REICHWEITE + 17;
 
-    /** Die Höhe der Oberfläche je Spalte der Welt, das y aus WORLD_SURFACE, oder {@link #FEHLT}. */
+    /** Die Höhe je Spalte der Welt, das y aus MOTION_BLOCKING, oder {@link #FEHLT}. */
     interface Hoehen {
         int an(int x, int z);
     }
@@ -192,7 +192,8 @@ final class Relief {
 
     /**
      * Welche der 4 × 4 Chunks im Fenster um einen Chunk fehlten, aus seinen Höhen ({@link #SEITE} im Quadrat): je Chunk mit dem
-     * Abstand dx und dz von −2 bis 1 das Bit (dz + 2) · 4 + dx + 2. Ein geladener Chunk hat an jeder Spalte eine Höhe.
+     * Abstand dx und dz von −2 bis 1 das Bit (dz + 2) · 4 + dx + 2, an je einer Spalte. Ist sie leer, gilt ein geladener Chunk
+     * als fehlend; das malt höchstens beim ersten Abziehen einmal mehr.
      */
     static int fehlende(int[] hoehen) {
         int maske = 0;

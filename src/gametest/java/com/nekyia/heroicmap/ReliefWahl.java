@@ -14,6 +14,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.ChunkPos;
 
@@ -21,7 +22,8 @@ import net.minecraft.world.level.ChunkPos;
  * Der Knopf „Relief“ auf der Vollbildkarte, mit echten Klicks, auf zwei Basiskacheln der Testwelt von Renderer 0.19.0 mit
  * Schicht und Rest: von Relief reihum Relief + Schatten, Flach, Relief; Flach und Relief + Schatten sehen anders aus als die Kacheln,
  * zurück auf Relief wie vorher. Fehlt der Index der Schicht, trägt der Knopf „…“; ohne Schicht in {@code map.json} ist er grau.
- * Dazu die eigene Karte ({@link #eigeneKarte}). Siehe docs/vollbildkarte.md, „Relief“.
+ * Dazu die eigene Karte ({@link #eigeneKarte}) und die Höhen des Reliefs ({@link #pflanzenHeben}). Siehe docs/vollbildkarte.md,
+ * „Relief“.
  */
 public final class ReliefWahl implements FabricClientGameTest {
 
@@ -86,11 +88,64 @@ public final class ReliefWahl implements FabricClientGameTest {
             }
             context.runOnClient(mc -> mc.gui.setScreen(null));
             Laden.loesche(baum);
+            pflanzenHeben(context, spiel);
             eigeneKarte(context, spiel);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         } finally {
             context.runOnClient(mc -> Minimap.INSTANZ.setzeRelief(vorher));
+        }
+    }
+
+    /**
+     * Bodenpflanzen heben das Relief nicht: Auf ebenem Sand ändern totes Gestrüpp, trockenes, kurzes und hohes Gras keinen Code,
+     * aus den Höhen wie beim Abziehen. Eine Stufe aus Laub ändert genau ihre vier Nachbarn, im Westen und Norden 5, im Osten und
+     * Süden 3. Eine Spalte ohne Block und eine Pflanze über nichts zählen als fehlend, wie im Renderer: überall 4. Siehe
+     * docs/minimap.md, „Relief“.
+     */
+    private static void pflanzenHeben(ClientGameTestContext context, TestSingleplayerContext spiel) {
+        var server = spiel.getServer();
+        server.runCommand("gamemode spectator @a");
+        server.runCommand("tp @a -16.5 -30 -24.5");
+        context.waitTicks(10);
+        spiel.getConnection().waitForChunksRender();
+        server.runCommand("fill -32 -61 -32 -1 -61 -1 sand");
+        server.runCommand("fill -28 -64 -28 -28 -61 -28 air");
+        server.runCommand("fill -28 -64 -20 -28 -61 -20 air");
+        int[][] stehen = {{-24, -60, -24}, {-20, -60, -24}, {-12, -60, -24}, {-8, -60, -24}, {-8, -59, -24}, {-28, -60, -20}};
+        server.runCommand("setblock -24 -60 -24 dead_bush");
+        server.runCommand("setblock -20 -60 -24 short_dry_grass");
+        server.runCommand("setblock -12 -60 -24 short_grass");
+        // Hohes Gras hält sich nicht auf Sand, darum Erde darunter, eben mit dem Sand.
+        server.runCommand("setblock -8 -61 -24 dirt");
+        server.runCommand("setblock -8 -60 -24 tall_grass[half=lower]");
+        server.runCommand("setblock -8 -59 -24 tall_grass[half=upper]");
+        server.runCommand("setblock -28 -60 -20 dead_bush");
+        server.runCommand("setblock -4 -60 -28 oak_leaves[persistent=true]");
+        BlockPos laub = new BlockPos(-4, -60, -28);
+        context.waitFor(mc -> !mc.level.getBlockState(laub).isAir(), 200);
+        // In den Chunks (−2, −2) und (−1, −2).
+        String falsch = context.computeOnClient(mc -> {
+            StringBuilder aus = new StringBuilder();
+            for (int[] p : stehen) {
+                if (mc.level.getBlockState(new BlockPos(p[0], p[1], p[2])).isAir()) {
+                    aus.append(" keine Pflanze bei ").append(java.util.Arrays.toString(p));
+                }
+            }
+            for (int cx = -2; cx <= -1; cx++) {
+                byte[] codes = Relief.codes(ChunkMaler.hoehen(mc.level, cx, -2));
+                for (int i = 0; i < 256; i++) {
+                    int x = cx * 16 + (i & 15), z = -32 + (i >> 4);
+                    int soll = z == -28 && x == -5 || x == -4 && z == -29 ? 5 : z == -28 && x == -3 || x == -4 && z == -27 ? 3 : 4;
+                    if (codes[i] != soll) {
+                        aus.append(" (").append(x).append(", ").append(z).append(") ").append(codes[i]).append(" statt ").append(soll);
+                    }
+                }
+            }
+            return aus.toString();
+        });
+        if (!falsch.isEmpty()) {
+            throw new AssertionError("Höhen des Reliefs:" + falsch);
         }
     }
 
