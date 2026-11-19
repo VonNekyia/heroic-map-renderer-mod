@@ -1161,10 +1161,17 @@ Server zeigt. Bis 0.2.74 hatte sie nah kein Relief. Wahl des Users, siehe
 [Vollbildkarte](vollbildkarte.md), „Relief“.
 
 - **Die Codes je Spalte** wie die Schicht des Renderers (`Relief.code`), nach
-  [Relief von oben, „Die Schicht“](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/renderer/relief.md#die-schicht):
-  Gefälle aus den vier Nachbarn, Schatten bis 32 Blöcke diagonal nach
-  Nordwesten. Fehlt ein Nachbar, gilt er als gleich hoch; fehlt die Spalte,
-  bleibt sie.
+  [Relief von oben](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/renderer/relief.md),
+  „Gefälle“ und „Die Schicht“: die Stufe des Gefälles aus den vier Nachbarn,
+  Schatten bis 32 Blöcke diagonal nach Nordwesten. Fehlt ein Nachbar, gilt
+  er als gleich hoch; fehlt die Spalte, bleibt sie.
+- **Nur die höhere Spalte** einer Stufe wird hell oder dunkel, seit 0.2.77,
+  wie im Renderer ab 0.22.0; die Regel und ihr Grund stehen dort. Ein Ding
+  von einem Block Breite, etwa ein Stamm, eine Kiste oder ein Kaktus, bleibt
+  mit dem Boden um es, wie es ist; ein breiteres wird an seiner Kante im
+  Nordwesten heller und im Südosten dunkler. Bis 0.2.76 nahm der Mod die
+  mittlere Differenz der Nachbarn; um jedes schmale Ding lag so ein Schein
+  auf dem Boden.
 - **Die Höhen** aus `MOTION_BLOCKING` der Chunks, die der Client hat
   (`ChunkMaler.hoehen`), beim Abziehen auf dem Render-Thread: 49 × 49 Spalten
   um den Chunk, 32 nach Norden und Westen, 1 nach Osten und Süden
@@ -1176,9 +1183,9 @@ Server zeigt. Bis 0.2.74 hatte sie nah kein Relief. Wahl des Users, siehe
     Türen, ein Schneeblock, Wasser; auch Druckplatten und `sculk_vein`.
   - Es zählen nicht Gras, Blumen, Gestrüpp, Getreide, Zuckerrohr, Setzlinge,
     Fackeln, Schilder, Ranken, Teppiche, Schienen, eine Lage Schnee.
-  - So wirft eine Bodenpflanze kein Kreuz aus hell und dunkel auf ihre vier
-    Nachbarn. Gezeichnet wird sie weiter: Der Anfang jeder Spalte bleibt bei
-    `WORLD_SURFACE`.
+  - So hebt eine Bodenpflanze das Relief nicht, und ein Feld oder eine Wiese
+    bekommt keine helle und dunkle Kante. Gezeichnet wird sie weiter: Der
+    Anfang jeder Spalte bleibt bei `WORLD_SURFACE`.
 - **Woher der Client sie hat,** belegt am Client und an Paper 26.3:
   - Der Server schickt `MOTION_BLOCKING` im Chunk-Paket
     (`Heightmap.Types.sendToClient`, `ClientboundLevelChunkPacketData`).
@@ -1186,8 +1193,9 @@ Server zeigt. Bis 0.2.74 hatte sie nah kein Relief. Wahl des Users, siehe
     (`LevelChunk.setBlockState`). Fehlt sie, rechnet er sie aus den Blöcken
     (`ChunkAccess.getHeight`).
 - **Kacheln vom Server:** Die Vollbildkarte und die Minimap weit heraus zeigen
-  das Kreuz, bis der Server mit dem behobenen Renderer neu gezeichnet hat;
-  Kacheln und Schicht kommen von dort. Die Minimap nah darf vorher kommen.
+  das Gefälle, mit dem der Server gezeichnet hat; Kacheln und Schicht kommen
+  von dort. Bis er mit Renderer 0.22.0 neu gezeichnet hat, liegt dort noch
+  der Schein um schmale Dinge, nah schon nicht mehr.
 - **Aufgelegt** nach dem Zeichnen im Worker (`ChunkMaler.male`,
   `Relief.auf`): je Block der Faktor seines Codes auf Rot, Grün und Blau seiner
   Pixel, gerundet und bei 255 gekappt, Alpha bleibt, wie der Renderer auf eine
@@ -1208,12 +1216,16 @@ Server zeigt. Bis 0.2.74 hatte sie nah kein Relief. Wahl des Users, siehe
 - **Die eigene Karte** schreibt mit Relief eine Schicht neben ihre Kacheln,
   mit denselben Codes und demselben `Ring`, siehe [Selbst](selbst.md),
   „Relief“.
-- **Geprüft** in `ReliefTest`: Codes mit Zahlen, die Codes für zwei
-  Basiskacheln der Testwelt aus ihren Höhen (`src/test/resources/relief/hoehen.bin`,
-  geschrieben von `hoehen.py` aus den Regionen der Testwelt) genau wie die
-  Schicht des Renderers auf `6cf4e7c4`, 8192 von 8192, und der Faktor je Block. Im
-  Gametest `ReliefWahl.pflanzenHeben` mit Blöcken in der Welt: Pflanzen auf
-  ebenem Sand ändern keinen Code, eine Stufe aus Laub ihre vier Nachbarn.
+- **Geprüft** in `ReliefTest`: Codes mit Zahlen, darunter ein Ding von einem
+  Block Breite, das an sich und um sich kein Gefälle ändert und nur seinen
+  Schatten wirft, und zwei Blöcke breit mit 6 und 2;
+  die Codes für zwei Basiskacheln der Testwelt aus ihren Höhen
+  (`src/test/resources/relief/hoehen.bin`, geschrieben von `hoehen.py` aus
+  den Regionen der Testwelt) genau wie die Schicht des Renderers auf
+  `2621d6cf`, 8192 von 8192, und der Faktor je Block. Im Gametest
+  `ReliefWahl.pflanzenHeben` mit Blöcken in der Welt: Pflanzen auf ebenem
+  Sand ändern keinen Code, zwei Blöcke Laub nebeneinander bekommen 6 und 2,
+  ein einzelner Block Laub ändert keinen.
 - **Kosten:** Das Zeichnen je Chunk bleibt mit Relief im Rauschen, −2,1
   bis +1,0 % bei 1 bis 16 px. Der Abzug auf dem Render-Thread braucht je
   Chunk 0,02 ms mehr, für die Höhen. Änderungen unter der Oberfläche malen

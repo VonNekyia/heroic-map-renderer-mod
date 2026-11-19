@@ -99,9 +99,9 @@ public final class ReliefWahl implements FabricClientGameTest {
 
     /**
      * Bodenpflanzen heben das Relief nicht: Auf ebenem Sand ändern totes Gestrüpp, trockenes, kurzes und hohes Gras keinen Code,
-     * aus den Höhen wie beim Abziehen. Eine Stufe aus Laub ändert genau ihre vier Nachbarn, im Westen und Norden 5, im Osten und
-     * Süden 3. Eine Spalte ohne Block und eine Pflanze über nichts zählen als fehlend, wie im Renderer: überall 4. Siehe
-     * docs/minimap.md, „Relief“.
+     * aus den Höhen wie beim Abziehen. Laub zählt: Zwei Blöcke nebeneinander bekommen 6 im Westen und 2 im Osten, der Sand um
+     * sie bleibt; ein einzelner Block Laub ändert keinen Code. Eine Spalte ohne Block und eine Pflanze über nichts zählen als
+     * fehlend, wie im Renderer: überall 4. Siehe docs/minimap.md, „Relief“.
      */
     private static void pflanzenHeben(ClientGameTestContext context, TestSingleplayerContext spiel) {
         var server = spiel.getServer();
@@ -122,7 +122,9 @@ public final class ReliefWahl implements FabricClientGameTest {
         server.runCommand("setblock -8 -59 -24 tall_grass[half=upper]");
         server.runCommand("setblock -28 -60 -20 dead_bush");
         server.runCommand("setblock -4 -60 -28 oak_leaves[persistent=true]");
-        BlockPos laub = new BlockPos(-4, -60, -28);
+        server.runCommand("setblock -3 -60 -28 oak_leaves[persistent=true]");
+        server.runCommand("setblock -16 -60 -28 oak_leaves[persistent=true]");
+        BlockPos laub = new BlockPos(-16, -60, -28);
         context.waitFor(mc -> !mc.level.getBlockState(laub).isAir(), 200);
         // In den Chunks (−2, −2) und (−1, −2).
         String falsch = context.computeOnClient(mc -> {
@@ -136,7 +138,8 @@ public final class ReliefWahl implements FabricClientGameTest {
                 byte[] codes = Relief.codes(ChunkMaler.hoehen(mc.level, cx, -2));
                 for (int i = 0; i < 256; i++) {
                     int x = cx * 16 + (i & 15), z = -32 + (i >> 4);
-                    int soll = z == -28 && x == -5 || x == -4 && z == -29 ? 5 : z == -28 && x == -3 || x == -4 && z == -27 ? 3 : 4;
+                    // Die zwei Blöcke Laub bei x −4 und −3; der einzelne bei x −16 und alles andere 4.
+                    int soll = z == -28 && x == -4 ? 6 : z == -28 && x == -3 ? 2 : 4;
                     if (codes[i] != soll) {
                         aus.append(" (").append(x).append(", ").append(z).append(") ").append(codes[i]).append(" statt ").append(soll);
                     }
@@ -190,8 +193,10 @@ public final class ReliefWahl implements FabricClientGameTest {
         BufferedImage relief = bild(context, "relief-selbst-slope");
         context.runOnClient(mc -> mc.gui.setScreen(null));
         int[] schicht = png(ordner.resolve("relief/8/0/0.png")), kachel = png(ordner.resolve("8/0/0.png"));
-        // Westrand der Säule steigt (8), Ostrand fällt (0), südöstlich daneben Schatten (13), weit weg eben (4).
-        int[] codes = {code(schicht, 60, 61), code(schicht, 62, 61), code(schicht, 63, 63), code(schicht, 40, 40)};
+        // Die Säule ist 3 Blöcke breit: ihre Westkante hell (8), ihre Ostkante dunkel (0), südöstlich daneben Schatten (13), weit
+        // weg eben (4); der Boden westlich und nördlich an ihr bleibt (4, 4).
+        int[] codes = {code(schicht, 60, 61), code(schicht, 62, 61), code(schicht, 63, 63), code(schicht, 40, 40),
+            code(schicht, 59, 61), code(schicht, 61, 59)};
         int kachelAnders = 0;
         for (int i = 0; i < kachel.length; i++) {
             kachelAnders += kachel[i] != kachelFlach[i] ? 1 : 0;
@@ -204,10 +209,10 @@ public final class ReliefWahl implements FabricClientGameTest {
         zeichne(context);
         int mitTurm = code(png(ordner.resolve("relief/8/0/0.png")), 48, 48);
         context.runOnClient(mc -> Selbst.INSTANZ.leeren());
-        LOGGER.info("Relief der eigenen Karte: Codes {} {} {} {}, Kachel {} Pixel anders, Bild {} Pixel anders, Turm {} → {}",
-                codes[0], codes[1], codes[2], codes[3], kachelAnders, bildAnders, vorTurm, mitTurm);
-        if (codes[0] != 8 || codes[1] != 0 || codes[2] != 13 || codes[3] != 4) {
-            throw new AssertionError("Schicht der eigenen Karte: Codes " + java.util.Arrays.toString(codes) + " statt [8, 0, 13, 4]");
+        LOGGER.info("Relief der eigenen Karte: Codes {}, Kachel {} Pixel anders, Bild {} Pixel anders, Turm {} → {}",
+                java.util.Arrays.toString(codes), kachelAnders, bildAnders, vorTurm, mitTurm);
+        if (!java.util.Arrays.equals(codes, new int[] {8, 0, 13, 4, 4, 4})) {
+            throw new AssertionError("Schicht der eigenen Karte: Codes " + java.util.Arrays.toString(codes) + " statt [8, 0, 13, 4, 4, 4]");
         }
         if (kachelAnders != 0) {
             throw new AssertionError("Mit Relief ist die Kachel der eigenen Karte " + kachelAnders + " Pixel anders; sie bleibt ohne Relief");

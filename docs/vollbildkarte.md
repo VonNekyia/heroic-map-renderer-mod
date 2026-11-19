@@ -668,15 +668,28 @@ Arten. Entschieden in [0053](entscheidungen/0053-wahl-des-reliefs.md).
     Code 4 und die Kachel bleibt; ebenso, wo sie durchsichtig ist, was nur
     die Schicht der eigenen Karte sein kann. Fehlt der Rest, gilt keiner.
   - Pixel mit Alpha 0 bleiben ganz, Alpha bleibt.
+- **±1 nur für verlustfreie Bäume:** Auf ±1 trifft der Mod den Renderer bei
+  den Stufen `maximal` und `maximal_compact`. Bei `good`, `small` und
+  `minimal` legt der Renderer vor dem Packen ähnliche Farben zusammen, je
+  Kanal höchstens 2, 4 oder 8 daneben, siehe dessen
+  [`map.json`, „Die Stufe“](https://github.com/VonNekyia/heroic-map-renderer/blob/master/docs/benutzung/map-json.md#die-stufe).
+  - Die Abweichung N der Kachel geht mit 1 / f_k in die Rechnung. Gegen
+    dasselbe aus einer verlustfreien Kachel liegt Flach aus `slope` je Kanal
+    höchstens N / 0,76 daneben, mit dem Runden 3, 6 oder 11; `shadows`
+    höchstens N + 1. Ein Fehler ist es nicht.
+  - Schicht, Rest und Alpha bleiben in jeder Stufe genau. Ein Kanal, der
+    durch das Zusammenlegen 255 wird, ist harmlos: Der Rest ist dort
+    durchsichtig, und der Pixel rechnet aus der Kachel wie jeder andere.
 - **Geprüft** in `ReliefTest` mit Zahlen: die Faktoren je Code, Schnee 250
   bei 1,24 zurück auf 202, abgeschnittene Pixel nur mit dem Rest richtig
   (230 statt 206), Alpha, Kacheln mit `shadows` gebacken. Dazu gegen den
   Renderer (`ReliefTest.wieDerRenderer`): zwei Basiskacheln der Testwelt vom
-  Renderer auf `6cf4e7c4`, je ohne Relief, mit `slope` samt Schicht und Rest und mit
-  `shadows` (`src/test/resources/relief/`); aus `slope` gerechnet treffen
-  ohne und `shadows` die Kacheln des Renderers je Kanal auf ±1, Alpha genau.
-  Über alle Stufen der Szene, nachgerechnet mit einem Skript: kein Pixel
-  über ±1, um 1 daneben bei 8 px rund 11 % (ohne) und 4 % (`shadows`).
+  Renderer auf `2621d6cf` mit `maximal`, je ohne Relief, mit `slope` samt
+  Schicht und Rest und mit `shadows` (`src/test/resources/relief/`); aus
+  `slope` gerechnet treffen ohne und `shadows` die Kacheln des Renderers je
+  Kanal auf ±1, Alpha genau. Am Stand `6cf4e7c4` über alle Stufen der Szene
+  nachgerechnet mit einem Skript: kein Pixel über ±1, um 1 daneben bei 8 px
+  rund 11 % (ohne) und 4 % (`shadows`).
 - **Kosten:** Rechnet der Mod eine andere Art als die gebackene, braucht
   eine Kachel im Faden des Dekoders rund doppelt so lange, 5,9 → 11,8 ms
   (+99 %); den grössten Teil kostet das Lesen des Rests. Mit der gebackenen
