@@ -142,19 +142,24 @@ final class Relief {
     }
 
     /**
-     * Der Code der Spalte (x, z) wie in der Schicht des Renderers: n + 4 + 9 · s mit n = hO − hW + hS − hN, begrenzt auf −4
-     * bis 4, und s = 1, wenn k Blöcke diagonal nach Nordwesten eine Spalte um mehr als k · √2 höher ist, für ein k bis 32.
-     * Fehlt ein Nachbar, gilt er als gleich hoch; fehlt die Spalte selbst, 4. Siehe renderer docs/renderer/relief.md, „Die
-     * Schicht“, und docs/minimap.md, „Relief“.
+     * Der Code der Spalte (x, z) wie in der Schicht des Renderers: n + 4 + 9 · s. n ist die Stufe des Gefälles, begrenzt auf
+     * −4 bis 4; nur die höhere Spalte einer Stufe bekommt sie. s = 1, wenn k Blöcke diagonal nach Nordwesten eine Spalte um
+     * mehr als k · √2 höher ist, für ein k bis 32. Fehlt ein Nachbar, gilt er als gleich hoch; fehlt die Spalte selbst, 4.
+     * Siehe renderer docs/renderer/relief.md, „Gefälle“ und „Die Schicht“, und docs/minimap.md, „Relief“.
      */
     static int code(Hoehen h, int x, int z) {
         int h0 = h.an(x, z);
         if (h0 == FEHLT) {
             return 4;
         }
-        int w = h.an(x - 1, z), o = h.an(x + 1, z), n = h.an(x, z - 1), s = h.an(x, z + 1);
-        int d = (o == FEHLT ? h0 : o) - (w == FEHLT ? h0 : w) + (s == FEHLT ? h0 : s) - (n == FEHLT ? h0 : n);
-        return Math.clamp(d, -4, 4) + 4 + (imSchatten(h, x, z, h0) ? 9 : 0);
+        // Nach Westen und Norden zum Licht hin hell, nach Osten und Süden dunkel, doppelt.
+        int n = 2 * (hoeher(h0, h.an(x - 1, z)) + hoeher(h0, h.an(x, z - 1)) - hoeher(h0, h.an(x + 1, z)) - hoeher(h0, h.an(x, z + 1)));
+        return Math.clamp(n, -4, 4) + 4 + (imSchatten(h, x, z, h0) ? 9 : 0);
+    }
+
+    /** Um wie viel eine Spalte der Höhe {@code h0} höher ist als ihr Nachbar, mindestens 0; ein fehlender gilt als gleich hoch. */
+    private static int hoeher(int h0, int nachbar) {
+        return nachbar == FEHLT ? 0 : Math.max(0, h0 - nachbar);
     }
 
     private static boolean imSchatten(Hoehen h, int x, int z, int h0) {

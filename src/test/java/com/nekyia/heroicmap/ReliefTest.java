@@ -129,28 +129,61 @@ class ReliefTest {
         assertTrue(eins < pixel / 4, eins + " von " + pixel + " um 1 daneben");
     }
 
+    private static long ort(int x, int z) {
+        return (long) x << 32 | (z & 0xFFFFFFFFL);
+    }
+
     @Test
     void codeJeSpalte() {
-        // Eben: 4. Steigt nach Osten um 3 und nach Süden um 2: n = 5, begrenzt 4, Code 8. Fehlt ein Nachbar, gilt er gleich hoch.
+        // Nur die höhere Spalte einer Stufe bekommt sie: n = 2 · (über West + über Nord − über Ost − über Süd), begrenzt auf
+        // −4 bis 4, Code n + 4. Eben: 4.
         java.util.Map<Long, Integer> h = new java.util.HashMap<>();
-        Relief.Hoehen hoehen = (x, z) -> h.getOrDefault((long) x << 32 | (z & 0xFFFFFFFFL), Relief.FEHLT);
-        java.util.function.BiConsumer<int[], Integer> setze = (p, v) -> h.put((long) p[0] << 32 | (p[1] & 0xFFFFFFFFL), v);
+        Relief.Hoehen hoehen = (x, z) -> h.getOrDefault(ort(x, z), Relief.FEHLT);
         for (int x = -40; x <= 2; x++) {
             for (int z = -40; z <= 2; z++) {
-                setze.accept(new int[] {x, z}, 64);
+                h.put(ort(x, z), 64);
             }
         }
         assertEquals(4, Relief.code(hoehen, 0, 0));
-        setze.accept(new int[] {1, 0}, 67);
-        setze.accept(new int[] {0, 1}, 66);
-        assertEquals(8, Relief.code(hoehen, 0, 0));
-        h.remove((long) 1 << 32);
+        // Ein Ding von einem Block Breite, 6 hoch: Es selbst und der Boden auf jeder Seite bleiben.
+        h.put(ort(0, 0), 70);
+        for (int[] p : new int[][] {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}}) {
+            assertEquals(4, Relief.code(hoehen, p[0], p[1]), p[0] + ", " + p[1]);
+        }
+        // Zwei Blöcke breit nach Osten, 1 hoch: Die westliche Spalte ist über West, Nord und Süd 1 höher, n = 2, Code 6; die
+        // östliche über Nord, Ost und Süd, n = −2, Code 2. Der Boden daneben bleibt.
+        h.put(ort(0, 0), 65);
+        h.put(ort(1, 0), 65);
         assertEquals(6, Relief.code(hoehen, 0, 0));
+        assertEquals(2, Relief.code(hoehen, 1, 0));
+        assertEquals(4, Relief.code(hoehen, -1, 0));
+        assertEquals(4, Relief.code(hoehen, 2, 0));
+        assertEquals(4, Relief.code(hoehen, 0, -1));
+        assertEquals(4, Relief.code(hoehen, 0, 1));
         // Schatten: 20 Blöcke nach Nordwesten eine Spalte 29 höher, mehr als 20 · √2 = 28,3: im Schatten, Code 6 + 9.
-        setze.accept(new int[] {-20, -20}, 64 + 29);
+        h.put(ort(-20, -20), 65 + 29);
         assertEquals(15, Relief.code(hoehen, 0, 0));
-        setze.accept(new int[] {-20, -20}, 64 + 28);
+        h.put(ort(-20, -20), 65 + 28);
         assertEquals(6, Relief.code(hoehen, 0, 0));
+        // Dasselbe 3 hoch: n = 6 und −6, begrenzt auf 4 und −4, Code 8 und 0.
+        h.put(ort(0, 0), 67);
+        h.put(ort(1, 0), 67);
+        assertEquals(8, Relief.code(hoehen, 0, 0));
+        assertEquals(0, Relief.code(hoehen, 1, 0));
+        // Fehlt der Nachbar im Norden, gilt er gleich hoch: über West 3, über Süd 3, n = 0, Code 4.
+        h.remove(ort(0, -1));
+        assertEquals(4, Relief.code(hoehen, 0, 0));
+        // Ein Hang mit einem Block je Spalte, nach Südosten hinauf: über West 1 und über Nord 1, n = 4, Code 8; hinab 0.
+        h.put(ort(-11, -30), 63);
+        h.put(ort(-10, -31), 63);
+        h.put(ort(-9, -30), 65);
+        h.put(ort(-10, -29), 65);
+        assertEquals(8, Relief.code(hoehen, -10, -30));
+        h.put(ort(-11, -30), 65);
+        h.put(ort(-10, -31), 65);
+        h.put(ort(-9, -30), 63);
+        h.put(ort(-10, -29), 63);
+        assertEquals(0, Relief.code(hoehen, -10, -30));
         // Ohne die Spalte selbst: 4.
         assertEquals(4, Relief.code(hoehen, 100, 100));
     }
@@ -177,15 +210,25 @@ class ReliefTest {
 
     @Test
     void codesUndFaktorJeChunk() {
-        // Die Höhen um einen Chunk ab 32 Blöcken nordwestlich: eben 64, seine Spalte (1, 0) 66. Westlich davon steigt es nach
-        // Osten, Code 6; sie selbst ist eben umgeben, 4; östlich davon fällt es, 2.
+        // Die Höhen um einen Chunk ab 32 Blöcken nordwestlich: eben 64, seine Spalten (1, 0) und (2, 0) 65. Die westliche der
+        // beiden ist über West, Nord und Süd höher, Code 6, die östliche über Nord, Ost und Süd, Code 2; der Boden daneben bleibt.
         int[] hoehen = new int[Relief.SEITE * Relief.SEITE];
         java.util.Arrays.fill(hoehen, 64);
-        hoehen[32 * Relief.SEITE + 33] = 66;
+        hoehen[32 * Relief.SEITE + 33] = 65;
+        hoehen[32 * Relief.SEITE + 34] = 65;
         byte[] codes = Relief.codes(hoehen);
-        assertEquals(6, codes[0]);
-        assertEquals(4, codes[1]);
+        assertEquals(4, codes[0]);
+        assertEquals(6, codes[1]);
         assertEquals(2, codes[2]);
+        assertEquals(4, codes[3]);
+        // Nur die Spalte (1, 0), 2 höher, ein Block breit: Kein Gefälle im Chunk ändert sich. Ihr Schatten fällt wie zuvor auf
+        // die Spalte (2, 1) südöstlich, 2 ist mehr als √2: Code 4 + 9.
+        hoehen[32 * Relief.SEITE + 33] = 66;
+        hoehen[32 * Relief.SEITE + 34] = 64;
+        codes = Relief.codes(hoehen);
+        for (int i = 0; i < 256; i++) {
+            assertEquals(i == 18 ? 13 : 4, codes[i], "Spalte " + i);
+        }
         // Bei 2 px je Block: Code 8 mit slope, 1,24: 100 wird 124, 255 bleibt 255; Alpha 0 bleibt; Code 4 bleibt.
         codes[0] = 8;
         int[] pixel = new int[32 * 32];

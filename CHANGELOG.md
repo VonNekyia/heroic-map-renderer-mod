@@ -4,6 +4,11 @@ What changed in the Heroic Map mod, one section per version, newest first.
 The release notes on GitHub and Modrinth come from here
 (`.github/notizen.sh`); write them in English.
 
+## 0.2.77
+
+- **No more glow on the ground around narrow things, on the minimap up close and on your own map.** A palm trunk, a chest, a cactus or a lantern used to put a light mark on the ground to its north-west and a dark one to its south-east. Now only the higher side of a step gets light or dark: narrow things and the ground around them stay as they are, wider things like roofs and treetops get a light edge to the north-west and a dark one to the south-east, and terraces get sharper edges.
+- **The full-screen map and the zoomed-out minimap follow with the server:** their tiles change once the server has redrawn its map with renderer 0.22.0. Your own map changes chunk by chunk, whenever a chunk is loaded again.
+
 ## 0.2.76
 
 - **No more cross around plants in the relief, on the minimap up close and on your own map.** Grass, flowers, dead bushes and the like no longer count as a step in the ground, so they stop putting light and dark marks on their neighbours. They are still drawn.

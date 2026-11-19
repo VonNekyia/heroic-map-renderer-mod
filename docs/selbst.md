@@ -372,18 +372,20 @@ rechnet daraus die gewählte Art. Entschieden in
   (`Selbst.neuGewaehlt`); andere bekommen die Schicht, wenn sie wieder
   laden.
 - **Eine ältere Schicht** behält ihre Codes: Eine eigene Karte aus 0.2.75
-  zeigt um Bodenpflanzen das Kreuz, bis ihr Chunk neu gezeichnet ist. Das
-  geschieht mit Relief, sobald der Client den Chunk wieder lädt oder sich
-  ein Block darin ändert, siehe „Wann gezeichnet wird“. Wohin der Spieler
-  nicht mehr kommt, bleibt es.
+  zeigt um Bodenpflanzen das Kreuz, eine bis 0.2.76 den Schein auf dem
+  Boden um schmale Dinge (siehe [Minimap](minimap.md), „Relief“), bis ihr
+  Chunk neu gezeichnet ist. Das geschieht mit Relief, sobald der Client den
+  Chunk wieder lädt oder sich ein Block darin ändert, siehe „Wann
+  gezeichnet wird“. Wohin der Spieler nicht mehr kommt, bleibt es.
 - **Neu gezeichnet** wie auf der Minimap (`Ring`): Ändern sich die Höhen
   eines Chunks, kommen die Chunks dazu, deren Codes an ihnen hängen; beim
   ersten Zeichnen nur die, die ohne ihn gezeichnet sind. Die eigene Karte
   merkt sich das für jeden Chunk der Sitzung, je Chunk ein Hash der Höhen
   mit 64 Bit und welche Chunks um ihn fehlten.
 - **Geprüft** im Gametest `ReliefWahl`: mit Flach keine Schicht; nach dem
-  Klick auf Relief die Codes um eine Säule wie der Renderer (8 am
-  Westrand, 0 am Ostrand, 13 im Schatten, 4 weit weg), die Kachel Pixel für
+  Klick auf Relief die Codes um eine Säule von 3 Blöcken Breite wie der
+  Renderer (8 an ihrer Westkante, 0 an ihrer Ostkante, 4 auf dem Boden
+  westlich und nördlich an ihr, 13 im Schatten, 4 weit weg), die Kachel Pixel für
   Pixel wie mit Flach, das Bild anders; ein Turm im Nordwesten wirft danach
   seinen Schatten in die Schicht des Chunks südöstlich (4 → 13).
 - **Kosten:** je Chunk die Höhen und Codes, je geänderter Kachel eine
